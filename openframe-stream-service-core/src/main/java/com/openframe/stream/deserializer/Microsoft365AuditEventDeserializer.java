@@ -26,6 +26,7 @@ import java.util.Set;
  * hence {@link com.openframe.data.model.enums.DataEnrichmentServiceType#PRE_ENRICHED}.
  * {@code toolEventId} is the Graph audit record id, so replays from the poller's cursor
  * overlap window upsert idempotently.
+ * {@code connectionId}/{@code connectionName} (multi-connection orgs) are passed through into details.
  */
 @Slf4j
 @Component
@@ -111,6 +112,8 @@ public class Microsoft365AuditEventDeserializer implements KafkaMessageDeseriali
         if (additionalDetails != null && !additionalDetails.isNull()) {
             details.set("additionalDetails", additionalDetails);
         }
+        textField(after, "connectionId").ifPresent(value -> details.put("connectionId", value));
+        textField(after, "connectionName").ifPresent(value -> details.put("connectionName", value));
         return details.toString();
     }
 

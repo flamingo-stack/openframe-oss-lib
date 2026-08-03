@@ -31,7 +31,8 @@ class Microsoft365AuditEventDeserializerTest {
               "initiatedBy": {"user": {"userPrincipalName": "admin@x.com", "id": "user-id-1"}},
               "targetResources": [{"displayName": "Test User", "type": "User", "id": "target-id-1"}],
               "additionalDetails": [{"key": "UserType", "value": "Member"}],
-              "tenantId": "tenant-1", "organizationId": "org-uuid-1", "organizationName": "Acme Org"
+              "tenantId": "tenant-1", "organizationId": "org-uuid-1", "organizationName": "Acme Org",
+              "connectionId": "conn-1", "connectionName": "Main"
             }
             """;
 
@@ -104,6 +105,8 @@ class Microsoft365AuditEventDeserializerTest {
         assertEquals("admin@x.com", details.path("initiatedBy").path("user").path("userPrincipalName").asText());
         assertEquals("User", details.path("targetResources").path(0).path("type").asText());
         assertEquals("UserType", details.path("additionalDetails").path(0).path("key").asText());
+        assertEquals("conn-1", details.get("connectionId").asText());
+        assertEquals("Main", details.get("connectionName").asText());
     }
 
     @Test
