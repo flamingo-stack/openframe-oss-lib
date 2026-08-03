@@ -7,7 +7,7 @@ import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptStatus;
 import org.springframework.stereotype.Component;
 
@@ -98,10 +98,10 @@ public class ScriptMapper {
                 .toList();
     }
 
-    private List<String> mapPlatformsToResponse(List<ScriptPlatform> platforms) {
+    private List<String> mapPlatformsToResponse(List<OsType> platforms) {
         if (platforms == null) {
             return null;
         }
-        return platforms.stream().map(ScriptPlatform::name).toList();
+        return platforms.stream().map(OsType::name).toList();
     }
 }

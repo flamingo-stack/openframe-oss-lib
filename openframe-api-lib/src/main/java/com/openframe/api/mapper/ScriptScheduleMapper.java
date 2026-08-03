@@ -4,7 +4,7 @@ import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -74,10 +74,10 @@ public class ScriptScheduleMapper {
                 .build();
     }
 
-    private List<String> mapPlatformsToResponse(List<ScriptPlatform> platforms) {
+    private List<String> mapPlatformsToResponse(List<OsType> platforms) {
         if (platforms == null) {
             return null;
         }
-        return platforms.stream().map(ScriptPlatform::name).toList();
+        return platforms.stream().map(OsType::name).toList();
     }
 }

@@ -1,7 +1,7 @@
 package com.openframe.api.dto.rmm.script;
 
 import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptShell;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -34,7 +34,7 @@ public class CreateScriptInput {
     @NotBlank
     private String scriptBody;
 
-    private List<ScriptPlatform> supportedPlatforms;
+    private List<OsType> supportedPlatforms;
 
     @Positive
     @Max(value = 600, message = "defaultTimeoutSeconds must not exceed 600 (10 minutes)")

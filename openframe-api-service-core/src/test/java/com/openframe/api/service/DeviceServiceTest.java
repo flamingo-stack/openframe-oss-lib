@@ -86,12 +86,12 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("queryDevicesForPlatforms: passes platform names on the filter — repo expands to osType $or via classifier")
+    @DisplayName("queryDevicesForPlatforms: passes platform names on the filter — repo expands to osType $in")
     void scopesToPlatforms() {
-        service().queryDevicesForPlatforms(List.of("MACOS"), null,
+        service().queryDevicesForPlatforms(List.of("MAC_OS"), null,
                 CursorPaginationCriteria.builder().limit(10).build(), null, null);
 
-        assertThat(capturedFilter().getPlatformNames()).containsExactly("MACOS");
+        assertThat(capturedFilter().getPlatformNames()).containsExactly("MAC_OS");
     }
 
     @Test
@@ -110,12 +110,12 @@ class DeviceServiceTest {
         when(machineRepository.findMachineIds(any(MachineQueryFilter.class), any()))
                 .thenReturn(List.of("m1", "m2"));
 
-        List<String> ids = s.findDeviceIdsForPlatforms(List.of("MACOS"), null, null);
+        List<String> ids = s.findDeviceIdsForPlatforms(List.of("MAC_OS"), null, null);
 
         assertThat(ids).containsExactly("m1", "m2");
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         verify(machineRepository).findMachineIds(captor.capture(), any());
-        assertThat(captor.getValue().getPlatformNames()).containsExactly("MACOS");
+        assertThat(captor.getValue().getPlatformNames()).containsExactly("MAC_OS");
     }
 
     @Test
@@ -124,7 +124,7 @@ class DeviceServiceTest {
         DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
                 .statuses(List.of(DeviceStatus.DELETED)).build();
 
-        service().findDeviceIdsForPlatforms(List.of("MACOS"), filter, null);
+        service().findDeviceIdsForPlatforms(List.of("MAC_OS"), filter, null);
 
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         verify(machineRepository).findMachineIds(captor.capture(), any());
