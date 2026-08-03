@@ -218,6 +218,8 @@ input UpdateScriptScheduleInput {
     supportedPlatforms: [ScriptPlatform!]
     scriptIds: [ID!]
     trigger: ScriptScheduleTrigger!
+    "How this schedule targets devices — SPECIFIC (an explicit machine set) or CRITERIA (a live rule). Null defaults to SPECIFIC, matching legacy documents. Flipping between modes leaves the join rows/rule untouched; whichever mode is active is what the resolver reads."
+    selectionMode: ScheduleDeviceSelectionMode
     "First scheduled run (absolute UTC instant). Required when trigger is DATE_TIME (must fall on a 30-minute boundary, xx:00 or xx:30); must be null when trigger is DEVICE_ONLINE. Changing it reschedules the next run."
     startAt: Instant
     "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …). Null clears recurrence (one-shot)."
