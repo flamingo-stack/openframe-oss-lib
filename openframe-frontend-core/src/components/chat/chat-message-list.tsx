@@ -6,6 +6,7 @@ import { cn } from "../../utils/cn"
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
 import { ChatMessageListSkeleton } from "./chat-message-skeleton"
 import { DotsLoaderIcon, Arrow02DownIcon } from "../icons-v2-generated"
+import { OverlayOpenRegistryProvider } from "../ui/overlay-open-registry"
 import { CyclingPhrase } from "./cycling-phrase"
 import type { ChatMessageListProps } from "./types"
 import { SCROLL_ANCHOR } from "./types/message.types"
@@ -141,10 +142,44 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // effect below owns first-paint positioning so re-opening a chat
     // with prior history lands at the bottom without a smooth-scroll
     // animation playing over the cold-paint.
-    const { scrollRef, contentRef, scrollToBottom, stopScroll } = useStickToBottom({
-      resize: 'smooth',
-      initial: false,
-    })
+    const { scrollRef, contentRef, scrollToBottom, stopScroll, isAtBottom } =
+      useStickToBottom({
+        resize: 'smooth',
+        initial: false,
+      })
+
+    // ---- Overlay guard: don't move the ground under an open menu -------
+    // A ⋯ menu inside a bubble stays anchored to its trigger. While a reply
+    // streams in, the follow-the-bottom scroll carries that trigger upward and
+    // drags the menu with it, until the menu sits at the panel edge detached
+    // from its card. So: while any overlay in this thread is open, stop
+    // chasing the bottom (the same thing ChatGPT/Claude do once you interact
+    // with the transcript), then catch up on close if we were at the bottom
+    // when it opened. New content still renders — we simply stop scrolling to
+    // it, and the existing "scroll to bottom" affordance stays available.
+    const overlayOpenRef = useRef(false)
+    const wasAtBottomOnOpenRef = useRef(false)
+    const isAtBottomRef = useRef(isAtBottom)
+    isAtBottomRef.current = isAtBottom
+    const handleOverlayOpenChange = useCallback(
+      (hasOpenOverlay: boolean) => {
+        overlayOpenRef.current = hasOpenOverlay
+        if (hasOpenOverlay) {
+          wasAtBottomOnOpenRef.current = isAtBottomRef.current
+          // Cancel any in-flight spring so the thread settles immediately
+          // instead of drifting for another few hundred ms under the menu.
+          stopScroll()
+          return
+        }
+        // Closed again: resume only if the reader was pinned to the bottom
+        // before opening it. Someone who had scrolled up to read history keeps
+        // their position.
+        if (wasAtBottomOnOpenRef.current) {
+          void scrollToBottom({ animation: 'smooth' })
+        }
+      },
+      [scrollToBottom, stopScroll],
+    )
 
     // ---- Prepend / load-more state (NOT owned by the library) --------
     const sentinelRef = useRef<HTMLDivElement>(null)
@@ -263,7 +298,12 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         const prevLastIdx = prevLastId ? messages.findIndex((m) => m.id === prevLastId) : -1
         const newSlice = prevLastIdx >= 0 ? messages.slice(prevLastIdx + 1) : messages.slice(prevCount)
         const hasNewUser = newSlice.some((m) => m.role === 'user')
-        if (hasNewUser) {
+        // An open overlay suppresses even this one: `ignoreEscapes` would yank
+        // the thread out from under it — and with it the follow intent, which
+        // would re-assert the jump on every later resize. A user who just sent
+        // a message with a menu open is rare; a menu jumping away mid-click is
+        // not worth it.
+        if (hasNewUser && !overlayOpenRef.current) {
           // Arms the follow intent for the WHOLE turn: the answer's
           // async growth (attachment images, streamed tokens, entity
           // cards resolving out of their skeletons long after the
@@ -657,6 +697,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
 
     useLayoutEffect(() => {
       if (!autoScroll) return
+      // Top-anchored display turns also move the ground — same guard.
+      if (overlayOpenRef.current) return
       const last = messages[messages.length - 1]
       if (!last || last.role !== 'assistant' || last.scrollAnchor !== SCROLL_ANCHOR.TOP) return
       // Metadata frame arrives BEFORE body. Wait for content so we don't
@@ -847,6 +889,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       !(pendingApprovals && pendingApprovals.length > 0)
 
     return (
+      <OverlayOpenRegistryProvider onOpenChange={handleOverlayOpenChange}>
       <div className="flex-1 min-h-0 flex flex-col">
         {/* Positioning box for the jump-to-bottom button: it wraps ONLY the
             scroller, so `absolute bottom-…` really is the scroller's lower
@@ -1029,6 +1072,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           </div>
         )}
       </div>
+      </OverlayOpenRegistryProvider>
     )
   },
 )

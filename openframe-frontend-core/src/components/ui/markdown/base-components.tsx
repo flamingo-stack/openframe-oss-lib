@@ -21,6 +21,11 @@ import {
   useHeadingId,
 } from './heading-ids';
 import { slugifyHeadingText } from '../../../utils/markdown-heading-id';
+import {
+  getHashTargetElement,
+  navigateSamePageHash,
+  HUB_HEADER_OFFSET_PX,
+} from '../../../utils/same-page-hash-nav';
 
 /**
  * True when an image `src` is worth rendering. Shared by the base `img` and
@@ -284,12 +289,33 @@ export function buildBaseComponents({
         );
       }
 
+      // In-page anchor. Doc TOCs are authored against GitHub's slugger
+      // (`## 📚 Table of Contents` → `#-table-of-contents`) while our heading
+      // ids trim the emoji's leftover hyphen, so the raw href resolves to
+      // nothing and the browser silently ignores the click. Resolve through
+      // `getHashTargetElement` — the same resolver deep links use — then hand
+      // the real id to the canonical hash-nav helper, which also lands the
+      // heading BELOW the sticky header instead of under it, matching how the
+      // "On this page" rail scrolls.
+      const isInPageAnchor = typeof href === 'string' && href.startsWith('#') && href.length > 1;
+      const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+        // Let modifier / non-primary clicks keep their native behavior.
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        const target = getHashTargetElement(href.slice(1));
+        // Nothing matched anywhere in the document → leave the browser's
+        // default alone rather than swallowing a click that isn't ours.
+        if (!target?.id) return;
+        e.preventDefault();
+        navigateSamePageHash(`#${target.id}`, { headerOffset: HUB_HEADER_OFFSET_PX });
+      };
+
       return (
         <a
           href={href}
           className={`text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 ${linkClassName || ''}`}
           target={href?.startsWith('http') ? '_blank' : undefined}
           rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
+          onClick={isInPageAnchor ? handleAnchorClick : undefined}
         >
           {children}
         </a>

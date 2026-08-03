@@ -196,4 +196,20 @@ export {
   resolveSourceIcon,
 } from './source-row-cta'
 
+// Post-fetch enrichment for the synthetic ChatRef a `[card://type:id]` marker
+// produces when the transport ships no refs metadata (Mingo/NATS).
+export {
+  resolveFetchedCardHref,
+  readFetchedCardTitle,
+  type FetchedCardHrefInput,
+} from './resolve-fetched-card-href'
+
+// The ONE "Ask Mingo" prompt builder — shared by the SSE adapter, the NATS
+// adapter, and hosts that inject their own Mingo state (openframe-frontend).
+export {
+  buildDiscussPrompt,
+  type DiscussPromptRef,
+  type BuildDiscussPromptOptions,
+} from './discuss-ref-prompt'
+
 export * from './scripted-stream'

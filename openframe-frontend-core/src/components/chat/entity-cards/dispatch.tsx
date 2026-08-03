@@ -36,6 +36,7 @@ import type { ChatRef } from '../chat-ref.types'
 import { useChatCardItem } from '../hooks/use-chat-card-item'
 import { handleChatNavClick } from '../utils/nav-click-handler'
 import { resolveSourceRowCTA, resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta'
+import { resolveFetchedCardHref, readFetchedCardTitle } from '../utils/resolve-fetched-card-href'
 import { resolveHrefForRuntime } from '../utils/chat-nav-resolution'
 import {
   computeIsNewTab,
@@ -1000,8 +1001,15 @@ type ChatCardRegistryEntry =
        *  resolved ref — so the wrapper sees a non-null `href`, the
        *  pre-computed `isNewTab` reflects the actual destination, and
        *  the click goes through `handleChatNavClick` (no silent
-       *  bypass of embed-mode / close-on-nav). */
+       *  bypass of embed-mode / close-on-nav). Takes precedence over the
+       *  `composeContentUrl` fallback below. */
       fallbackHref?: (item: any) => string | null
+      /** Opt OUT of the post-fetch `composeContentUrl` fallback (see
+       *  `resolveFetchedCardHref`). Set for types with NO public destination
+       *  — the seam would otherwise synthesize `<contentOrigin>/<type>/<id>`
+       *  from its default branch and hand the user a 404. Types with a real
+       *  route (hosted, or covered by a host `override`) leave it unset. */
+      noComposedHref?: boolean
     }
 
 interface FinancialCardConfig {
@@ -1106,6 +1114,8 @@ interface RoadmapEntryConfig {
   label: string
   cardType: RoadmapCardType
   contentRefType: string
+  /** See `ChatCardRegistryEntry.noComposedHref`. */
+  noComposedHref?: boolean
 }
 const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
   roadmap_item: { label: 'Roadmap item', cardType: 'roadmap_item', contentRefType: 'roadmap_item' },
@@ -1118,6 +1128,9 @@ const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
     label: 'Internal task',
     cardType: 'internal_task',
     contentRefType: 'internal_task',
+    // Internal ClickUp work has no public destination on any platform — the
+    // seam's default branch would synthesize `<hub>/internal_task/<id>`.
+    noComposedHref: true,
   },
 }
 function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
@@ -1128,6 +1141,7 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
       label: cfg.label,
       contentRefType: cfg.contentRefType,
       bareInline: true,
+      ...(cfg.noComposedHref ? { noComposedHref: true } : {}),
       skeleton: () => <RoadmapCardSkeleton size="sm" />,
       render: (item, chatRef, opts) => (
         <RoadmapChatCard
@@ -1420,6 +1434,17 @@ function ChatCardNavWrap({
   const onClickCapture = (e: React.MouseEvent<HTMLElement>) => {
     if (!href) return
     const targetEl = e.target as HTMLElement
+    // Only claim clicks that physically happened INSIDE this card.
+    //
+    // The card's "⋯" menu renders through a React PORTAL: its DOM lives in the
+    // panel's portal host, but React still bubbles its events through this
+    // subtree — so this capture handler sees them first and, being a capture
+    // phase, runs BEFORE the menu row's own `stopPropagation`. That swallowed
+    // the menu's trailing "↗ Open in new tab" button: `executeNavigation`
+    // called `preventDefault()` and routed the card's href in the SAME tab,
+    // so the anchor's `target="_blank"` never applied.
+    const host = e.currentTarget as HTMLElement | null
+    if (!host?.contains(targetEl)) return
     // Buttons rendered INSIDE the card's outer `<a>` (e.g. RoadmapCard
     // vote buttons, ImageGallery thumbnails) bubble up with
     // `closest('a')` truthy — without this guard, clicking them would
@@ -1522,18 +1547,54 @@ export function ChatCardLoader({
   )
   if (!entry) return null
 
-  // Apply per-type fallback URL AFTER fetch (e.g. campaign → /admin/...).
+  // Apply the post-fetch URL fallback (the ref carried no `externalUrl`).
   // We mutate `resolvedChatRef.url` BEFORE computing isNewTab so the
   // wrapper's interceptor sees the destination the user will actually
   // visit. `safeHref` blocks `javascript:` / `data:` payloads even
   // though the registry callers compose hub-internal strings today.
-  const finalChatRef: ChatRef =
+  //
+  // Two sources, in order:
+  //   1. the registry's per-type `fallbackHref` — an explicit non-content
+  //      destination (marketing campaign → `/admin/...`);
+  //   2. the host's `composeContentUrl` seam via `resolveFetchedCardHref` —
+  //      the SAME resolver page cards and SSE chat cards go through. This is
+  //      what makes Mingo/NATS cards clickable: that transport ships bare
+  //      `[card://type:id]` markers with no refs metadata, so the ref reaches
+  //      us with `url: null` and `resolveSourceRowCTA` has nothing to route.
+  const composedHref =
+    fetchEntry && !resolvedChatRef.url && item && !fetchEntry.fallbackHref && !fetchEntry.noComposedHref
+      ? resolveFetchedCardHref({
+          contentRefType: fetchEntry.contentRefType,
+          id: resolvedChatRef.id,
+          item,
+          composeContentUrl: runtime.composeContentUrl,
+        })
+      : null
+  const hrefResolvedChatRef: ChatRef =
     fetchEntry && !resolvedChatRef.url && item && fetchEntry.fallbackHref
       ? {
           ...resolvedChatRef,
           url: safeHref(fetchEntry.fallbackHref(item)),
         }
-      : resolvedChatRef
+      : composedHref
+        ? {
+            ...resolvedChatRef,
+            url: safeHref(composedHref.href),
+            targetPlatform: composedHref.targetPlatform ?? resolvedChatRef.targetPlatform ?? null,
+          }
+        : resolvedChatRef
+
+  // Title enrichment, same synthetic-ref gap as the href above: a Mingo
+  // `[card://type:id]` marker produces `title: <id>` because the transport
+  // ships no ref metadata. Downstream consumers that read `ref.title` — most
+  // visibly the "Ask Mingo" prompt, which would otherwise send
+  // "Tell me more about 86ad3qvv5" — get the row's real title once it loads.
+  // A ref that already carries a distinct title (the SSE path) is untouched.
+  const fetchedTitle = fetchEntry && item ? readFetchedCardTitle(item) : null
+  const finalChatRef: ChatRef =
+    fetchedTitle && (!hrefResolvedChatRef.title || hrefResolvedChatRef.title === hrefResolvedChatRef.id)
+      ? { ...hrefResolvedChatRef, title: fetchedTitle }
+      : hrefResolvedChatRef
 
   // Pre-compute new-tab decision ONCE here (the same rule chips use).
   // Render branches that pass `target` / `rel` to their card pull this

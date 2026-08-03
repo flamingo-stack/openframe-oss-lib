@@ -29,6 +29,7 @@ import { getBaseUrl } from '../../../utils/cn'
 import { safeHref } from './compact-card-classes'
 import type { ChatRef } from '../chat-ref.types'
 import type { ComposeContentUrl } from '../../../utils/content-href'
+import { canonicalContentRefType } from '../../../utils/list-url'
 
 /** Path sanitization — keep alphanumerics, slash, dash, dot, underscore;
  *  strip everything else. Defends against a hostile mapper returning a
@@ -233,7 +234,10 @@ export function resolveSourceRowCTA(
     // from the externalUrl) and everything else to the externalUrl verbatim —
     // the SAME resolver the page-view cards use, so chat + page links match.
     const composed = ctx.composeContentUrl({
-      type: row.documentType,
+      // Canonical vocabulary only — a rail-vocab alias would miss the host's
+      // `hostedTypes` / `overrides` and fall through to the seam's default
+      // `<origin>/<type>/<id>` branch. Same canonicalizer `buildListUrl` uses.
+      type: canonicalContentRefType(row.documentType),
       identifier: idValue,
       externalUrl: row.externalUrl,
       targetPlatform: row.targetPlatform ?? null,
