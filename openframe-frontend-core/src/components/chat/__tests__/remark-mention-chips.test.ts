@@ -7,9 +7,16 @@ function treeOf(text: string): Root {
   return { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'text', value: text }] }] }
 }
 
+/**
+ * unified's `Plugin` type declares a `this: Processor` parameter, so calling the
+ * attacher bare (outside a pipeline) is a TS2684 — cast the attacher itself, not
+ * just its return value, to drop that `this`.
+ */
+const attach = remarkMentionChips as unknown as () => (t: Root) => void
+
 function run(text: string): Array<Text | Link> {
   const tree = treeOf(text)
-  ;(remarkMentionChips() as (t: Root) => void)(tree)
+  attach()(tree)
   return (tree.children[0] as Paragraph).children as Array<Text | Link>
 }
 
