@@ -7,9 +7,9 @@ import com.openframe.api.service.user.UserService;
 import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.validation.Valid;
 
@@ -32,11 +32,7 @@ public class UserController {
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
     public UserResponse getUserById(@PathVariable String id) {
-        try {
-            return userService.getUserById(id);
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        return userService.getUserById(id);
     }
 
     @PutMapping("/{id}")
@@ -45,11 +41,7 @@ public class UserController {
             @PathVariable String id,
             @Valid @RequestBody UpdateUserRequest request
     ) {
-        try {
-            return userService.updateUser(id, request);
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        return userService.updateUser(id, request);
     }
 
     @DeleteMapping("/{id}")
@@ -57,6 +49,20 @@ public class UserController {
     public void deleteUser(@PathVariable String id,
                            @AuthenticationPrincipal AuthPrincipal principal) {
         userService.softDeleteUser(id, principal.getId());
+    }
+
+    @DeleteMapping("/{id}/purge")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void purgeUser(@PathVariable String id) {
+        userService.purgeUser(id);
+    }
+
+    @PostMapping("/{id}/transfer-ownership")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('OWNER')")
+    public void transferOwnership(@PathVariable String id,
+                                  @AuthenticationPrincipal AuthPrincipal principal) {
+        userService.transferOwnership(id, principal.getId());
     }
 }
 
