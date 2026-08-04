@@ -26,7 +26,6 @@ import static com.openframe.data.document.user.UserRole.ADMIN;
 import static com.openframe.data.document.user.UserRole.OWNER;
 import static com.openframe.data.document.user.UserStatus.ACTIVE;
 import static com.openframe.data.document.user.UserStatus.DELETED;
-import static com.openframe.data.document.user.UserStatus.REMOVED;
 import static com.openframe.data.document.user.UserStatus.SELF_DELETED;
 
 @Service
@@ -47,7 +46,7 @@ public class UserService {
 
     public UserPageResponse listUsers(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<User> p = userRepository.findByStatusNot(REMOVED, pageable);
+        Page<User> p = userRepository.findAll(pageable);
         UserPageResponse response = UserPageResponse.builder()
                 .items(p.getContent().stream().map(userMapper::toResponse).toList())
                 .page(p.getNumber())
@@ -74,10 +73,7 @@ public class UserService {
         }
         List<User> users = userRepository.findAllById(ids);
         UserPageResponse pageResponse = UserPageResponse.builder()
-                .items(users.stream()
-                        .filter(user -> user.getStatus() != REMOVED)
-                        .map(userMapper::toResponse)
-                        .toList())
+                .items(users.stream().map(userMapper::toResponse).toList())
                 .build();
         userProcessor.postProcessUserGet(pageResponse);
         return pageResponse.getItems();
@@ -123,29 +119,6 @@ public class UserService {
     }
 
     /**
-     * Permanently remove an already soft-deleted user: anonymize personal data and move to the
-     * terminal REMOVED status, after which the user is excluded from all user lists. The document
-     * itself is kept so historical references by id stay resolvable. Idempotent.
-     */
-    public void purgeUser(String id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException(id));
-
-        if (user.getStatus() == REMOVED) {
-            return;
-        }
-        if (user.getStatus() == ACTIVE) {
-            throw new OperationNotAllowedException("User must be deleted before permanent removal");
-        }
-
-        user.setStatus(REMOVED);
-        anonymize(user);
-        User savedUser = userRepository.save(user);
-
-        userProcessor.postProcessUserDeleted(savedUser);
-    }
-
-    /**
      * Transfer the OWNER role from the requester to another active user in the tenant.
      * Only the current owner can transfer ownership. The new owner is granted first and the
      * requester demoted after, so a failure in between leaves two owners (recoverable by a
@@ -178,7 +151,7 @@ public class UserService {
     }
 
     /**
-     * Erase personal data on self-deletion or permanent removal. The email tombstone must stay unique per user
+     * Erase personal data on self-deletion. The email tombstone must stay unique per user
      * because of the unique {tenantId, email} index on the users collection, and freeing the
      * real email lets the person register a fresh account later instead of reactivating this
      * one. The document is an AuthUser at runtime (polymorphic {@code _class} mapping), so

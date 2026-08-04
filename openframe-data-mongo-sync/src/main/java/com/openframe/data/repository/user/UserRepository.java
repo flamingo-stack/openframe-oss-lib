@@ -3,8 +3,6 @@ package com.openframe.data.repository.user;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.data.document.user.UserStatus;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -24,10 +22,6 @@ public interface UserRepository extends MongoRepository<User, String>, BaseUserR
     Boolean existsByEmailAndStatus(String email, UserStatus status);
 
     List<User> findByRolesInAndStatus(Collection<UserRole> roles, UserStatus status);
-
-    Page<User> findByStatusNot(UserStatus status, Pageable pageable);
-
-    List<User> findByStatusNot(UserStatus status);
 
     /**
      * Whether a user with the given id is a member of the given tenant. Tenant-first form so the
