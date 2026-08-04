@@ -41,9 +41,6 @@ const OVERFLOW_CIRCLE_SIZE: Record<NonNullable<AvatarStackProps['size']>, string
   lg: 'h-12 w-12',
 }
 
-/** xs has no SquareAvatar bucket — rendered via exact sizePx. */
-const XS_PX = 24
-
 export function AvatarStack({
   people,
   max = 3,
@@ -64,8 +61,7 @@ export function AvatarStack({
         <SquareAvatar
           key={person.key ?? `${person.name}-${i}`}
           variant="round"
-          size={size === 'xs' ? 'sm' : size}
-          sizePx={size === 'xs' ? XS_PX : undefined}
+          size={size}
           src={person.avatarUrl ?? undefined}
           alt={person.name}
           fallback={person.name}

@@ -54,6 +54,9 @@ export function RoadmapCardSkeleton({ size = 'default' }: { size?: CardSize }) {
           <span className={`${COMPACT_CARD_META_ROW_BOX} flex-nowrap gap-2`}>
             <span className="h-3 w-2/5 rounded bg-ods-bg/60 flex-1" />
             <span className="h-3 w-10 rounded bg-ods-bg/40 shrink-0" />
+            {/* assignee-stack placeholder — mirrors the xs AvatarStack
+                slot so row width doesn't shift when assignees load */}
+            <span className="h-6 w-14 rounded-full bg-ods-bg/40 shrink-0" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
             <span className="h-3 w-5/6 rounded bg-ods-bg/40" />
@@ -80,7 +83,12 @@ export function RoadmapCardSkeleton({ size = 'default' }: { size?: CardSize }) {
       <div className="flex-1" />
       <div className="flex items-center justify-between">
         <div className="h-12 w-32 bg-ods-bg rounded" />
-        <div className="h-8 w-20 bg-ods-bg rounded" />
+        <div className="flex items-center gap-2">
+          {/* assignee-stack placeholder — matches the xs AvatarStack in
+              the loaded card's action row */}
+          <div className="h-6 w-14 rounded-full bg-ods-bg/60" />
+          <div className="h-8 w-20 bg-ods-bg rounded" />
+        </div>
       </div>
     </div>
   )
