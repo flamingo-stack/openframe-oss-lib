@@ -26,6 +26,11 @@ export interface AvatarStackProps {
   /** Size bucket (also sizes the "+N" circle). `xs` (24px) is for
    *  dense card meta rows (chat compact cards, delivery rows). */
   size?: 'xs' | 'sm' | 'md' | 'lg'
+  /** Ring color class separating overlapped avatars from each other —
+   *  MUST match the surface the stack sits on (default: card surface).
+   *  Without the surface-colored ring, overlapping photos read as one
+   *  smeared blob — the ring is what makes a stack look deliberate. */
+  ringClassName?: string
   className?: string
 }
 
@@ -39,11 +44,23 @@ const OVERFLOW_CIRCLE_SIZE: Record<NonNullable<AvatarStackProps['size']>, string
 /** xs has no SquareAvatar bucket — rendered via exact sizePx. */
 const XS_PX = 24
 
-export function AvatarStack({ people, max = 3, size = 'md', className }: AvatarStackProps) {
+export function AvatarStack({
+  people,
+  max = 3,
+  size = 'md',
+  ringClassName = 'ring-ods-card',
+  className,
+}: AvatarStackProps) {
   if (people.length === 0) return null
+  const visible = people.slice(0, max)
+  const overflow = people.slice(max)
   return (
-    <div className={cn('flex items-center', className)}>
-      {people.slice(0, max).map((person, i) => (
+    <div
+      className={cn('flex items-center', className)}
+      role="group"
+      aria-label={`Assignees: ${people.map((p) => p.name).join(', ')}`}
+    >
+      {visible.map((person, i) => (
         <SquareAvatar
           key={person.key ?? `${person.name}-${i}`}
           variant="round"
@@ -52,18 +69,24 @@ export function AvatarStack({ people, max = 3, size = 'md', className }: AvatarS
           src={person.avatarUrl ?? undefined}
           alt={person.name}
           fallback={person.name}
-          className={cn(i > 0 && (size === 'xs' ? '-ml-2' : '-ml-3'))}
+          title={person.name}
+          className={cn('relative ring-2', ringClassName, i > 0 && (size === 'xs' ? '-ml-2' : '-ml-3'))}
+          // Leftmost (primary assignee) on TOP — later avatars tuck
+          // BEHIND, so the first face is always fully visible.
+          style={{ zIndex: visible.length - i }}
         />
       ))}
-      {people.length > max && (
+      {overflow.length > 0 && (
         <span
+          title={overflow.map((p) => p.name).join(', ')}
           className={cn(
-            'flex shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-ods-text-secondary',
+            'relative z-0 flex shrink-0 items-center justify-center rounded-full ring-2 bg-ods-bg text-ods-text-secondary',
+            ringClassName,
             size === 'xs' ? '-ml-2 text-badge' : '-ml-3 text-h6',
             OVERFLOW_CIRCLE_SIZE[size],
           )}
         >
-          +{people.length - max}
+          +{overflow.length}
         </span>
       )}
     </div>

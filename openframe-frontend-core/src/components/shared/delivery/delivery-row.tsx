@@ -111,8 +111,13 @@ export function DeliveryRow({
         </div>
       </div>
 
-      {/* Right: status + task-type badges + assignee stack */}
-      <div className="flex-shrink-0 self-start flex flex-col items-end gap-2">
+      {/* Right (desktop): badges + assignee stack in a right-aligned
+          column. Mobile: ONE horizontal footer row — badges lead,
+          avatars anchor the right edge (kanban-card convention: the
+          assignee owns the trailing slot of the meta row; a column of
+          right-aligned orphans under the description reads as clutter
+          on small screens). */}
+      <div className="flex-shrink-0 self-stretch md:self-start w-full md:w-auto flex flex-row md:flex-col items-center md:items-end gap-2">
         <StatusBadge
           text={item.status.toUpperCase()}
           colorScheme={statusBadgeScheme}
@@ -127,6 +132,7 @@ export function DeliveryRow({
         {item.assignees && item.assignees.length > 0 ? (
           <AvatarStack
             size="xs"
+            className="ml-auto md:ml-0"
             people={item.assignees.map((a) => ({
               key: a.id,
               name: a.name ?? 'Unknown',
