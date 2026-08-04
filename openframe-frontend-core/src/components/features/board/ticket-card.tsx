@@ -69,7 +69,7 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
         <div className="flex -space-x-2">
           {ticket.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map(a =>
             a.deleted ? (
-              <DeletedUserAvatar key={a.id} size="sm" />
+              <DeletedUserAvatar key={a.id} size="sm" accessibleLabel={`Deleted user: ${a.name ?? a.initials ?? a.id}`} />
             ) : (
               <SquareAvatar
                 key={a.id}

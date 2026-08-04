@@ -83,7 +83,7 @@ function CompactAssigneeDropdown({
       )}
     >
       {currentAssignee.deleted ? (
-        <DeletedUserAvatar size="sm" />
+        <DeletedUserAvatar size="sm" accessibleLabel={`Deleted user: ${currentAssignee.name || currentAssignee.id}`} />
       ) : (
         <SquareAvatar
           src={currentAssignee.avatarSrc}
@@ -167,7 +167,11 @@ function DefaultAssigneeDropdown({
           startAdornment={
             hasAssignee ? (
               currentAssignee!.deleted ? (
-                <DeletedUserAvatar size="sm" className="h-6 w-6" />
+                <DeletedUserAvatar
+                  size="sm"
+                  className="h-6 w-6"
+                  accessibleLabel={`Deleted user: ${currentAssignee!.name || currentAssignee!.id}`}
+                />
               ) : (
                 <SquareAvatar
                   src={currentAssignee!.avatarSrc}
@@ -193,7 +197,7 @@ function DefaultAssigneeDropdown({
     return (
       <div className={cn('flex items-center gap-[var(--spacing-system-xs)] min-w-0', className)}>
         {currentAssignee!.deleted ? (
-          <DeletedUserAvatar size="md" />
+          <DeletedUserAvatar size="md" accessibleLabel={`Deleted user: ${currentAssignee!.name || currentAssignee!.id}`} />
         ) : (
           <SquareAvatar
             src={currentAssignee!.avatarSrc}

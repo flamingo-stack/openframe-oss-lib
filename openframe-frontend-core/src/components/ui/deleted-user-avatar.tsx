@@ -20,6 +20,12 @@ const ICON_CLASSES = {
 export interface DeletedUserAvatarProps {
   size?: keyof typeof SIZE_CLASSES
   className?: string
+  /**
+   * Accessible name for the placeholder. Pass the user's identity when known
+   * (e.g. "Deleted user: Jane Doe") so assistive technology doesn't lose who
+   * the row refers to. Falls back to the generic "Deleted user".
+   */
+  accessibleLabel?: string
 }
 
 /**
@@ -29,11 +35,11 @@ export interface DeletedUserAvatarProps {
  * initials, and initials for a deleted account is exactly what the design
  * replaces.
  */
-export function DeletedUserAvatar({ size = 'md', className }: DeletedUserAvatarProps) {
+export function DeletedUserAvatar({ size = 'md', className, accessibleLabel }: DeletedUserAvatarProps) {
   return (
     <span
       role="img"
-      aria-label="Deleted user"
+      aria-label={accessibleLabel || 'Deleted user'}
       className={cn(
         'flex items-center justify-center rounded-full bg-ods-error/20 shrink-0',
         SIZE_CLASSES[size],
