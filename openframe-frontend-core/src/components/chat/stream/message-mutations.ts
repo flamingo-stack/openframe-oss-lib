@@ -135,6 +135,36 @@ export function appendToTrailingAssistant(
 }
 
 /**
+ * Flip ONLY an approval_batch segment's status — no execution writes.
+ * The click-time optimistic flip uses this instead of
+ * `projectApprovalResolutionToMessages` as defense-in-depth: even if a
+ * (misbehaving) server emitted a batchId colliding with a row's
+ * proposal id, the flip could not pre-tick that row's execution to a
+ * false success before its confirm actually ran.
+ */
+export function projectBatchStatusToMessages(
+  prev: UnifiedChatMessage[],
+  anchorId: string,
+  status: ChatApprovalStatus,
+): UnifiedChatMessage[] {
+  let changed = false
+  const next = prev.map((m) => {
+    if (m.role !== 'assistant' || !m.segments) return m
+    let msgChanged = false
+    const segs = m.segments.map((s) => {
+      if (s.type !== 'approval_batch') return s
+      if (s.data.approvalRequestId !== anchorId || s.status === status) return s
+      msgChanged = true
+      return { ...s, status }
+    })
+    if (!msgChanged) return m
+    changed = true
+    return { ...m, segments: segs }
+  })
+  return changed ? next : prev
+}
+
+/**
  * Mark ONE batch row's confirm as FAILED (expired proposal, network
  * error): tick its execution icon to the failure cross so the row's
  * loader doesn't spin forever. Batch status is untouched — other rows
@@ -373,8 +403,11 @@ export function projectApprovalResolutionToMessages(
         // own per-proposal confirm — a resolution for a row ticks that
         // row's execution icon (check on approved, cross on rejected/
         // failed) without touching the batch status (flipped
-        // optimistically at click time). The anchor row ALSO flips the
-        // batch status (anchor id = first proposal id).
+        // optimistically at click time via
+        // `projectBatchStatusToMessages`). The anchor id is the
+        // server-minted `batch:<first proposalId>` — NEVER a row id
+        // (see ApprovalBatchFrame.batchId) — so `isAnchor` flips the
+        // batch status only.
         const hasRow = s.data.toolCalls?.some((c) => c.toolExecutionRequestId === requestId)
         if (!isAnchor && !hasRow) return s
         const nextResolvedBy = resolvedByName ?? s.resolvedByName

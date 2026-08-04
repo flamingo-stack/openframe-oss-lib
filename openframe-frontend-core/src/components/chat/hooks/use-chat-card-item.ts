@@ -28,6 +28,9 @@ export interface UseChatCardItemResult<T = unknown> {
   item: T | undefined
   isLoading: boolean
   isError: boolean
+  /** True only after a fetch actually completed — false for disabled
+   *  queries (no list URL for the type / empty id). */
+  isFetched: boolean
 }
 
 // `extractItems` / `extractItemId` hoisted to `src/utils/extract-items.ts`
@@ -84,5 +87,11 @@ export function useChatCardItem<T = unknown>(
     item: (query.data ?? undefined) as T | undefined,
     isLoading: query.isLoading,
     isError: query.isError,
+    // True only after the query actually completed a fetch. DISABLED
+    // queries (no list URL registered for the type, empty id) never
+    // fetch — `item` is undefined there as well, and callers must not
+    // read that as "fetched fine, entity absent" (tombstone gate in
+    // entity-cards/dispatch.tsx).
+    isFetched: query.isFetched,
   }
 }

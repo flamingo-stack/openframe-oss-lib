@@ -95,6 +95,7 @@ import {
   nextId,
   projectApprovalResolutionToMessages,
   projectBatchRowFailureToMessages,
+  projectBatchStatusToMessages,
   updateTrailingAssistant,
   upsertTrailingCompaction,
 } from './message-mutations'
@@ -1562,9 +1563,11 @@ export function createChatStreamReducer(
               const resolveBatch =
                 (status: 'approved' | 'rejected', confirm: typeof callbacks.onApprove) =>
                 async () => {
-                  setMessagesInternal(
-                    projectApprovalResolutionToMessages(messages, anchorId, status),
-                  )
+                  // STATUS-ONLY projection (defense-in-depth): even a
+                  // batchId colliding with a row id cannot pre-tick an
+                  // execution here — rows resolve exclusively via their
+                  // own confirm results / approval-resolved events.
+                  setMessagesInternal(projectBatchStatusToMessages(messages, anchorId, status))
                   for (const id of ids) {
                     const ok = await confirm?.(id)
                     if (ok === false) {

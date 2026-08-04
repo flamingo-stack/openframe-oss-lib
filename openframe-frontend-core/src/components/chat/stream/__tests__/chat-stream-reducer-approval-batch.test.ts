@@ -175,4 +175,22 @@ describe('decoder — approval_batch frame mapping', () => {
     expect(approval!.toolCalls?.[0].toolTitle).toContain('Fix Website Header')
     expect(approval!.toolCalls?.[1].toolExecutionRequestId).toBe('prop-2')
   })
+
+  it('a colliding anchor id (misbehaving server) still cannot pre-tick a row execution', async () => {
+    // Defense-in-depth pin: the click-time flip uses the STATUS-ONLY
+    // projection, so even a server that (incorrectly) reuses a row's
+    // proposal id as the batchId cannot mark that row done before its
+    // confirm actually resolves.
+    const onApprove = vi.fn().mockResolvedValue(undefined)
+    const r = createChatStreamReducer({ transport: 'sse', callbacks: { onApprove } })
+    r.beginSseSend({ text: 'delete both', assistantName: 'Mingo AI' })
+    r.apply({ ...batchEvent, requestId: 'prop-1' })
+    const batch = findBatch(r)
+    await batch.onApprove?.(batch.data.approvalRequestId)
+    const after = findBatch(r)
+    expect(after.status).toBe('approved')
+    // The flip itself wrote NO execution for prop-1 — its icon state
+    // comes only from the confirm result / approval-resolved event.
+    expect(after.data.executions ?? {}).toEqual({})
+  })
 })

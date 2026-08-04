@@ -27,11 +27,13 @@ export const remarkStripCitations: Plugin<[], Root> = () => {
   return (tree: Root) => {
     visit(tree, "text", (node: Text) => {
       if (!node.value || !node.value.includes("[")) return
-      const stripped = node.value
-        .replace(CITATION_REGEX, "$1")
-        // Collapse doubled spaces the removal can leave mid-sentence.
-        .replace(/ {2,}/g, " ")
-      if (stripped !== node.value) node.value = stripped
+      const withoutCitations = node.value.replace(CITATION_REGEX, "$1")
+      // No citation matched → leave the node untouched, INCLUDING its
+      // whitespace (collapsing unconditionally would rewrite deliberate
+      // spacing in prose like `array[1]  value`).
+      if (withoutCitations === node.value) return
+      // Collapse doubled spaces the removal can leave mid-sentence.
+      node.value = withoutCitations.replace(/ {2,}/g, " ")
     })
   }
 }
