@@ -11,7 +11,9 @@ import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.repository.user.UserRepository;
+import com.openframe.notification.mail.service.EmailService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,12 +31,14 @@ import static com.openframe.data.document.user.UserStatus.DELETED;
 import static com.openframe.data.document.user.UserStatus.SELF_DELETED;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final UserProcessor userProcessor;
+    private final EmailService emailService;
 
     public Optional<User> getUserByEmail(String email) {
         return userRepository.findByEmail(email);
@@ -107,6 +111,9 @@ public class UserService {
             return;
         }
 
+        // Self-deletion anonymizes the email, so capture the real address for the notification
+        String originalEmail = user.getEmail();
+
         if (requesterUserId.equals(user.getId())) {
             user.setStatus(SELF_DELETED);
             anonymize(user);
@@ -116,6 +123,13 @@ public class UserService {
         User savedUser = userRepository.save(user);
 
         userProcessor.postProcessUserDeleted(savedUser);
+
+        // Notification failure must not fail the already-completed deletion
+        try {
+            emailService.sendAccountDeletedEmail(originalEmail);
+        } catch (Exception e) {
+            log.error("Failed to send account deletion email to {}", originalEmail, e);
+        }
     }
 
     /**
@@ -148,6 +162,13 @@ public class UserService {
         requester.setRoles(new ArrayList<>(List.of(ADMIN)));
         User savedRequester = userRepository.save(requester);
         userProcessor.postProcessUserUpdated(savedRequester);
+
+        // Notification failure must not fail the already-completed transfer
+        try {
+            emailService.sendOwnershipTransferEmail(savedNewOwner.getEmail());
+        } catch (Exception e) {
+            log.error("Failed to send ownership transfer email to {}", savedNewOwner.getEmail(), e);
+        }
     }
 
     /**
