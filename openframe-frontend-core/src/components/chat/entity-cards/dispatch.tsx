@@ -49,6 +49,7 @@ import { SourceActionButton } from '../source-action-button'
 import { NavLinkAnchorViaRuntime } from '../nav-link-anchor-via-runtime'
 import { defaultBuildProductReleaseCardProps } from './product-release-card-defaults'
 import { ChatVideoEntityCard } from './chat-video-entity-card'
+import { DeletedDataCard } from './deleted-data-card'
 import { BlockCard } from './block-card'
 import { BlogCardSkeleton } from './blog-card'
 import { CaseStudyCardSkeleton } from './case-study-card'
@@ -1160,6 +1161,22 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
 const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   // ───────── no-fetch: ChatRef carries everything ─────────
   ...githubRegistryEntries(),
+  // Generic TOMBSTONE for entities a chat action deleted (ClickUp task
+  // today; any deletable entity tomorrow). No fetch, no navigation —
+  // the entity no longer resolves anywhere; the placeholder keeps the
+  // thread's integrity (Teams/Slack "This message was deleted" pattern).
+  deleted_data: {
+    mode: 'no-fetch',
+    label: 'Deleted',
+    bareInline: true,
+    render: (chatRef) => (
+      <DeletedDataCard
+        title={chatRef.title ?? null}
+        entityLabel={(chatRef.metadata?.entity_label as string | undefined) ?? null}
+        recoveryNote={(chatRef.metadata?.recovery_note as string | undefined) ?? null}
+      />
+    ),
+  },
   slack_message: {
     mode: 'no-fetch',
     label: 'Slack message',
