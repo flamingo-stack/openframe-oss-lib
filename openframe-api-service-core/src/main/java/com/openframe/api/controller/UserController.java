@@ -51,12 +51,6 @@ public class UserController {
         userService.softDeleteUser(id, principal.getId());
     }
 
-    @DeleteMapping("/{id}/purge")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void purgeUser(@PathVariable String id) {
-        userService.purgeUser(id);
-    }
-
     @PostMapping("/{id}/transfer-ownership")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('OWNER')")
