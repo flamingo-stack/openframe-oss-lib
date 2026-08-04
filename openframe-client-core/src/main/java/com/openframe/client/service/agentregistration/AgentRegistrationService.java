@@ -167,12 +167,6 @@ public class AgentRegistrationService {
         machine.setLastSeen(Instant.now());
     }
 
-    /**
-     * Rust agent's contract is to send an exact {@link OsType} enum name (e.g. {@code "MAC_OS"},
-     * {@code "WINDOWS"}) — parse it directly. Fail fast on anything unknown or null; the field
-     * is typed and NotNull on {@link Machine}, so silently saving a mystery string is not an
-     * option.
-     */
     private static OsType normalizeOsType(String rawOsType) {
         try {
             return OsType.valueOf(rawOsType);

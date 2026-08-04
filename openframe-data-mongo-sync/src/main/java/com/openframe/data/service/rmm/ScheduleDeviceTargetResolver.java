@@ -133,9 +133,6 @@ public class ScheduleDeviceTargetResolver {
         if (!hasOs) {
             return supported.stream().map(Enum::name).toList();     // schedule platforms only
         }
-        // criteria.osTypes are strings that must be exact OsType enum names — parse directly.
-        // Unknown values are silently dropped rather than kept as literals: a raw string sneaked
-        // into the scope would only match itself and silently exclude every real device.
         List<OsType> criteriaPlatforms = osTypes.stream()
                 .map(ScheduleDeviceTargetResolver::parseOsTypeSafely)
                 .filter(Objects::nonNull)
