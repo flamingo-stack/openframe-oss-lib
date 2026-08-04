@@ -1705,7 +1705,34 @@ export function ChatCardLoader({
     )
   }
   if (isLoading) return <>{entry.skeleton()}</>
-  if (!item) return null
+  if (!item) {
+    // FETCH MISS. Two distinct cases, split by ref provenance:
+    //
+    //   - SERVER-BUILT ref (`sourceRepo` present — the entity provably
+    //     existed when the answer was written, its ref was persisted
+    //     with the message): the entity is GONE now (deleted /
+    //     tombstoned). Render the generic deleted-data TOMBSTONE so the
+    //     thread keeps its integrity instead of a silent gap — works
+    //     for ANY fetch-mode entity type, no per-type wiring.
+    //
+    //   - SYNTHETIC client-built ref (bare marker with no refs entry —
+    //     possibly a hallucinated id): keep the existing hide-it
+    //     behavior; a "deleted" placeholder would assert an existence
+    //     we can't vouch for.
+    if (finalChatRef.sourceRepo) {
+      return (
+        <DeletedDataCard
+          title={finalChatRef.title ?? null}
+          entityLabel={entry.label}
+          recoveryNote={
+            (finalChatRef.metadata as Record<string, unknown> | null | undefined)
+              ?.recovery_note as string | undefined ?? null
+          }
+        />
+      )
+    }
+    return null
+  }
   if (entry.bareInline) {
     return <>{navWrap(entry.render(item, finalChatRef, renderOpts))}</>
   }
