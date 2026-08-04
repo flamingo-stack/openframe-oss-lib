@@ -51,6 +51,16 @@ class ScriptDispatchServiceTest {
     private DeviceService deviceService;
     @Mock
     private ScriptExecutionService scriptExecutionService;
+    @Mock
+    private com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    @Mock
+    private ScriptScheduleService scriptScheduleService;
+    @Mock
+    private ScriptScheduleDeviceService scriptScheduleDeviceService;
+    @Mock
+    private com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
+    @Mock
+    private com.openframe.data.service.TenantIdProvider tenantIdProvider;
 
     @InjectMocks
     private ScriptDispatchService scriptDispatchService;
@@ -311,5 +321,44 @@ class ScriptDispatchServiceTest {
         ArgumentCaptor<ScriptMessage> captor = ArgumentCaptor.forClass(ScriptMessage.class);
         verify(scriptNatsPublisher).publishScript(eq(MACHINE_ID), captor.capture());
         return captor.getValue();
+    }
+
+    @Test
+    @DisplayName("runSchedule: a script's stored custom params override its args + env for the manual run (full replace, not merge)")
+    void runSchedule_customParamsOverrideArgsAndEnv() {
+        String scheduleId = "sched-1";
+        com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse schedule =
+                com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse.builder()
+                        .id(scheduleId)
+                        .scriptIds(List.of(SCRIPT_ID))
+                        .scriptCustomParams(List.of(
+                                com.openframe.data.document.rmm.ScheduledScriptCustomParams.builder()
+                                        .scriptId(SCRIPT_ID)
+                                        .args(List.of("--custom", "42"))
+                                        .envVars(List.of(new ScriptEnvVar("OVERRIDE", "v", false)))
+                                        .build()))
+                        .build();
+        when(scriptScheduleService.get(scheduleId)).thenReturn(schedule);
+        when(scriptScheduleDeviceService.getMachineIds(scheduleId)).thenReturn(List.of(MACHINE_ID));
+        when(scriptService.getScriptsByIds(List.of(SCRIPT_ID))).thenReturn(List.of(
+                ScriptResponse.builder()
+                        .id(SCRIPT_ID).name("disk").shell("BASH").scriptBody("df -h")
+                        .status("ACTIVE")
+                        .defaultArgs(List.of("-a")).defaultTimeoutSeconds(60)
+                        .envVars(List.of(ScriptEnvVarInput.builder().name("BASE").value("b").secret(false).build()))
+                        .privilegeLevel(PrivilegeLevel.USER)
+                        .build()));
+        when(tenantIdProvider.getTenantId()).thenReturn("tenant-1");
+
+        scriptDispatchService.runSchedule(scheduleId, USER_ID);
+
+        ArgumentCaptor<com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage> msgCaptor =
+                ArgumentCaptor.forClass(com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage.class);
+        verify(scriptScheduleNatsPublisher).publish(eq(MACHINE_ID), msgCaptor.capture());
+        com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem item =
+                msgCaptor.getValue().getScripts().get(0);
+        assertThat(item.getArgs()).containsExactly("--custom", "42");
+        assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("OVERRIDE");
+        assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).doesNotContain("BASE");
     }
 }

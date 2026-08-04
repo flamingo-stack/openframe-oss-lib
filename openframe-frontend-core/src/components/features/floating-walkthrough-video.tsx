@@ -57,6 +57,7 @@ import {
   isWalkthroughDismissed,
   dismissWalkthrough,
 } from '../../utils/dismissal-storage';
+import { WALKTHROUGH_OPEN_QUERY_PARAM } from '../../utils/walkthrough-deep-link';
 
 /** Wire-shape data for the widget. Kept as the shared contract the hub DAL
  *  re-exports as `PublicWalkthroughVideo & { id }`. `mainVideoUrl`/`youtubeUrl`
@@ -82,6 +83,23 @@ export interface FloatingWalkthroughVideoProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   defaultOpen?: boolean;
+  /** With `defaultOpen`: the initial theater starts PAUSED instead of
+   *  autoplaying — for deep links (`?walkthrough=1`), where the open has no
+   *  user gesture and unrequested audio/motion would be hostile. Applies to
+   *  the initial `defaultOpen` session only: it ends when the NEXT open —
+   *  gesture-driven (card click) or host-driven (`open` flipping true) —
+   *  mounts a fresh theater, which autoplays as usual. */
+  defaultOpenPaused?: boolean;
+  /** Query-param NAME that deep-links into the theater: when present in
+   *  `window.location.search` at first client render, the theater opens
+   *  immediately and PAUSED — `defaultOpen + defaultOpenPaused` decided
+   *  inside the component, so hosts don't defer their first render to read
+   *  the URL. Defaults to `WALKTHROUGH_OPEN_QUERY_PARAM` ('walkthrough');
+   *  pass '' to disable. Presence-based (any value counts), read ONCE at
+   *  mount (deep links arrive by full page load, not client navigation).
+   *  SSR-safe: the server renders closed, and the theater lives in a portal,
+   *  so the hydrated (non-portal) markup is identical either way. */
+  deepLinkParam?: string;
   label?: string;
   appearDelayMs?: number;
   /** Cookie-based dismissal (id-match, mirrors the announcement bar). `false`
@@ -111,6 +129,8 @@ export function FloatingWalkthroughVideo({
   open: openProp,
   onOpenChange,
   defaultOpen,
+  defaultOpenPaused,
+  deepLinkParam = WALKTHROUGH_OPEN_QUERY_PARAM,
   label = 'Play Demo Video',
   appearDelayMs = 3000,
   dismissal = {},
@@ -171,8 +191,29 @@ export function FloatingWalkthroughVideo({
   }, []);
 
   // --- controlled/uncontrolled open ---
-  const [openState, setOpenState] = useState(Boolean(defaultOpen));
+  // Deep link: read ONCE, synchronously, on the first client render — the
+  // theater's autoplay props are load-time, so the decision must exist before
+  // the render that mounts it (an effect would be one commit too late). The
+  // lazy initializer never re-runs, so client navigation can't re-trigger it.
+  const [deepLinkHit] = useState(() => {
+    if (!deepLinkParam || typeof window === 'undefined') return false;
+    try {
+      return new URLSearchParams(window.location.search).has(deepLinkParam);
+    } catch {
+      return false;
+    }
+  });
+  const [openState, setOpenState] = useState(Boolean(defaultOpen) || deepLinkHit);
   const open = openProp !== undefined ? openProp : openState;
+  // The paused deep-link session — see `defaultOpenPaused`. Load-time-safe:
+  // the theater player's autoplay props are read once at construction, and
+  // this is set before the first render that mounts it. Cleared on the next
+  // OPEN transition only (the prevOpen sync below), right before a fresh
+  // theater constructs — never on close, where the closing player is still
+  // mounted and a prop flip would restart it (see the sync's comment).
+  const [pausedOpenSession, setPausedOpenSession] = useState(
+    Boolean(defaultOpen && defaultOpenPaused) || deepLinkHit,
+  );
 
   // --- refs & continuation state ---
   const previewHandleRef = useRef<VideoPlayerHandle | null>(null);
@@ -400,6 +441,16 @@ export function FloatingWalkthroughVideo({
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
+    // RISING edge only: the paused deep-link session ends when the NEXT
+    // (gesture- or host-driven) open mounts a fresh theater — this re-render
+    // commits the cleared flag before that content constructs, so it
+    // autoplays as usual. NEVER clear on close: Radix keeps the closing
+    // theater mounted through its exit animation, and flipping the flag then
+    // flips `autoPlayUnmuted` false→true on the STILL-MOUNTED player, whose
+    // autoplay kick effect resurrects playback — audible after close and
+    // doubled against the card's resume player. Idempotent, so a
+    // discarded-and-retried render attempt decides the same way.
+    if (open && pausedOpenSession) setPausedOpenSession(false);
     // Compared, not cleared: React can discard and re-run a render attempt
     // (concurrent interruption, error retry, a host wrapping setOpen in
     // startTransition). A read-and-clear would decide differently on the
@@ -874,11 +925,15 @@ export function FloatingWalkthroughVideo({
               playerHandleRef={theaterHandleRef}
               // Muted still means PLAYING: without this a deliberately muted
               // card opened a paused theater, breaking parity with the
-              // unmuted path.
-              autoPlay={theaterStart.muted}
-              autoPlayUnmuted={!theaterStart.muted}
+              // unmuted path. EXCEPT the paused deep-link session, which
+              // starts fully stopped: no autoplay flag at all, and for
+              // YouTube no autoActivate either — the activated iframe
+              // hardcodes `autoplay=1`, so staying on the facade IS the
+              // paused presentation (clicking it activates and plays).
+              autoPlay={theaterStart.muted && !pausedOpenSession}
+              autoPlayUnmuted={!theaterStart.muted && !pausedOpenSession}
               startMuted={theaterStart.muted}
-              autoActivate
+              autoActivate={!pausedOpenSession}
               suspended={suspended}
               onMutedFallbackChange={st => { theaterForcedMuteRef.current = st.muted; }}
               onEnded={() => { endedLatchRef.current = true; }}

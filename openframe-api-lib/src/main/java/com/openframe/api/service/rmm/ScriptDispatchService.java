@@ -12,6 +12,7 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -192,17 +193,26 @@ public class ScriptDispatchService {
                     initiatedBy);
         }
 
-        // 3. Build the batched agent payload once — shared across every target machine.
+        // 3. Build the batched agent payload once — shared across every target machine. Per-script
+        //    custom params (args/env) override the script's stored defaults for THIS schedule only.
+        Map<String, ScheduledScriptCustomParams> customParamsByScriptId = customParamsByScriptId(schedule);
         List<ScriptScheduleExecutionItem> scheduledScripts = runnableScripts.stream()
-                .map(script -> ScriptScheduleExecutionItem.builder()
-                        .scriptId(script.getId())
-                        .code(script.getScriptBody())
-                        .shell(ScriptShell.valueOf(script.getShell()))
-                        .privilegeLevel(script.getPrivilegeLevel())
-                        .args(ScriptArgsTokenizer.tokenize(script.getDefaultArgs()))
-                        .timeoutSeconds(script.getDefaultTimeoutSeconds())
-                        .envVars(mergeEnvVars(script.getEnvVars(), null))
-                        .build())
+                .map(script -> {
+                    ScheduledScriptCustomParams cp = customParamsByScriptId.get(script.getId());
+                    List<String> effectiveArgs = cp != null && cp.getArgs() != null
+                            ? cp.getArgs() : script.getDefaultArgs();
+                    List<ScriptEnvVar> effectiveEnv = cp != null && cp.getEnvVars() != null
+                            ? cp.getEnvVars() : mergeEnvVars(script.getEnvVars(), null);
+                    return ScriptScheduleExecutionItem.builder()
+                            .scriptId(script.getId())
+                            .code(script.getScriptBody())
+                            .shell(ScriptShell.valueOf(script.getShell()))
+                            .privilegeLevel(script.getPrivilegeLevel())
+                            .args(ScriptArgsTokenizer.tokenize(effectiveArgs))
+                            .timeoutSeconds(script.getDefaultTimeoutSeconds())
+                            .envVars(effectiveEnv)
+                            .build();
+                })
                 .toList();
 
         // 4. Fan out: ONE message per machine (vs. the old N-per-machine). subject:
@@ -263,6 +273,16 @@ public class ScriptDispatchService {
 
     private static Integer effectiveTimeout(Integer override, Integer scriptDefault) {
         return override != null ? override : scriptDefault;
+    }
+
+    private static Map<String, ScheduledScriptCustomParams> customParamsByScriptId(ScriptScheduleResponse schedule) {
+        List<ScheduledScriptCustomParams> customParams = schedule.getScriptCustomParams();
+        if (customParams == null || customParams.isEmpty()) {
+            return Map.of();
+        }
+        return customParams.stream()
+                .filter(cp -> cp.getScriptId() != null)
+                .collect(Collectors.toMap(ScheduledScriptCustomParams::getScriptId, Function.identity(), (a, b) -> b));
     }
 
     private List<ScriptEnvVar> mergeEnvVars(List<ScriptEnvVarInput> base, List<ScriptEnvVarInput> overrides) {

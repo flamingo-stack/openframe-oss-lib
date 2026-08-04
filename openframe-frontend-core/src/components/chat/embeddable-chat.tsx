@@ -52,7 +52,7 @@ import { MingoHistoryRail } from './mingo-history-rail'
 import { GuideWelcome, type GuideWelcomeProps } from './guide-welcome'
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip'
 import { GuideModeBanner } from './guide-mode-banner'
-import { PortalContainerContext } from '../ui/portal-container'
+import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-container'
 import { ChatPanelHeader, type ChatPanelHeaderProps } from './chat-panel-header'
 import { SquareAvatar } from '../ui/square-avatar'
 import { ChatHeaderIconButton } from './chat-header-icon-button'
@@ -1531,6 +1531,12 @@ function EmbeddableChatInner({
         content: m.segments && m.segments.length > 0 ? m.segments : m.content,
         timestamp,
         assistantType: m.role === 'assistant' ? ('mingo' as const) : undefined,
+        // `hidden` is load-bearing, NOT cosmetic: it carries synthetic rows
+        // (e.g. an auto-continuation directive) that the LLM must see but the
+        // reader must not. Dropping it here made the raw directive text render
+        // as an ordinary bubble. This field-by-field rebuild has to forward it
+        // explicitly — see `Message.hidden` and `chat-message-list`'s skip.
+        ...(m.hidden ? { hidden: true } : {}),
         ...(m.chatRefs ? { chatRefs: m.chatRefs } : {}),
         ...(m.scrollAnchor ? { scrollAnchor: m.scrollAnchor } : {}),
         // Forward attached context items so the user bubble renders its chips.
@@ -1789,6 +1795,13 @@ function EmbeddableChatInner({
 
   // Host node for in-panel Radix portals (see the body wrapper below).
   const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null)
+  // The panel element itself, published as the COLLISION boundary for overlays
+  // opened inside it. Radix otherwise collides against the viewport, so a ⋯ menu
+  // near the top of the thread flips upward past the panel and renders over the
+  // app header (reported: an entity card's menu landing in the top-right corner,
+  // detached from its card). `portalHost` can't serve here — it is
+  // `display: contents` and has no box to measure.
+  const [panelBoundary, setPanelBoundary] = useState<HTMLDivElement | null>(null)
 
   // ── Split (wide) Mingo layout ─────────────────────────────────────────────
   // The panel measures its own width and, in Mingo mode, promotes the inline
@@ -1809,6 +1822,14 @@ function EmbeddableChatInner({
     ro.observe(el)
     setPanelWidth(el.clientWidth)
     return () => ro.disconnect()
+  }, [])
+
+  // One ref for two consumers: the width measurement above (a plain ref, read
+  // once on mount) and the collision-boundary context (state, so provider
+  // consumers re-render once the node exists).
+  const setPanelNode = useCallback((node: HTMLDivElement | null) => {
+    panelMeasureRef.current = node
+    setPanelBoundary(node)
   }, [])
 
   // Rail collapse toggle (Figma ⟶| control), persisted so it survives the
@@ -1997,6 +2018,7 @@ function EmbeddableChatInner({
   // document root. See `PortalContainerContext`.
   const body = (
         <PortalContainerContext.Provider value={portalHost}>
+         <CollisionBoundaryContext.Provider value={panelBoundary}>
             {/* Panel surface depends on state (Figma):
                   • Narrow "Current Chats" LIST + FULL-PANEL archive page → grey
                     `ods-card` (#212121) — matching the grey rail those lists live
@@ -2011,7 +2033,7 @@ function EmbeddableChatInner({
                 grey), so the chat block on the right must keep the conversation's
                 dark surface instead of following the archive. */}
             <div
-              ref={panelMeasureRef}
+              ref={setPanelNode}
               className={`flex h-full flex-col overflow-hidden transition-colors duration-200 ${
                 (archiveOpen && !splitActive) || stackedListView
                   ? 'bg-ods-card'
@@ -2581,6 +2603,7 @@ function EmbeddableChatInner({
             {/* Portal target for in-panel Radix overlays — `display: contents`
                 so it adds no box; content is positioned `fixed` by Radix. */}
             <div ref={setPortalHost} style={{ display: 'contents' }} />
+         </CollisionBoundaryContext.Provider>
           </PortalContainerContext.Provider>
   )
 

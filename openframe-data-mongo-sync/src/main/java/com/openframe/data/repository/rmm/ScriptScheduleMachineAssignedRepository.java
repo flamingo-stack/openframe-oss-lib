@@ -24,4 +24,6 @@ public interface ScriptScheduleMachineAssignedRepository
     long deleteByTenantIdAndScriptScheduleId(String tenantId, String scriptScheduleId);
 
     long deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(String tenantId, String scriptScheduleId, Collection<String> machineIds);
+
+    long deleteByTenantIdAndMachineId(String tenantId, String machineId);
 }

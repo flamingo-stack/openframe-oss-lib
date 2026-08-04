@@ -14,6 +14,7 @@ import type {
   ApprovalRequestSegment,
   ApprovalBatchSegment,
   ApprovalBatchExecutionState,
+  ApprovalResolutionHandler,
   ContextCompactionSegment,
   ErrorSegment,
   PendingApproval,
@@ -22,10 +23,17 @@ import type {
   ChatApprovalStatus,
   ExecutingToolState,
 } from '../types'
+import {
+  applyApprovalStatusToSegment,
+  nextBatchExecution,
+  withBatchExecution,
+} from '../stream/message-mutations'
 
 export interface AccumulatorCallbacks {
-  onApprove?: (requestId?: string) => Promise<void> | void
-  onReject?: (requestId?: string) => Promise<void> | void
+  /** See `ApprovalResolutionHandler` (message.types) — the SSOT for the
+   *  approve/reject signature incl. the boolean failure flag. */
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
 }
 
 /**
@@ -244,25 +252,13 @@ export class MessageSegmentAccumulator {
       if (!hasCall) return seg
 
       const prev: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId]
-      // Never downgrade a done slot back to executing (redelivered EXECUTING
-      // after its EXECUTED already landed) — matched, but unchanged.
-      if (toolData.type === 'EXECUTING_TOOL' && prev?.status === 'done') {
-        matched = true
-        return seg
-      }
-      const next: ApprovalBatchExecutionState =
-        toolData.type === 'EXECUTED_TOOL'
-          ? { status: 'done', result: toolData.result, success: toolData.success }
-          : { status: 'executing', result: prev?.result, success: prev?.success }
-
+      // Shared rule (`nextBatchExecution` from message-mutations): the
+      // never-downgrade guard + EXECUTED/EXECUTING ternary — one
+      // implementation with the message-array projection.
+      const next = nextBatchExecution(prev, toolData)
       matched = true
-      return {
-        ...seg,
-        data: {
-          ...seg.data,
-          executions: { ...(seg.data.executions ?? {}), [execId]: next },
-        },
-      }
+      if (next === null) return seg
+      return withBatchExecution(seg, execId, next)
     })
     return matched
   }
@@ -429,15 +425,14 @@ export class MessageSegmentAccumulator {
    * resolved card shows "by {name}"; omit it to leave any existing value untouched.
    */
   updateApprovalStatus(requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null): MessageSegment[] {
-    this.segments = this.segments.map(segment => {
-      if (segment.type === 'approval_request' && segment.data.requestId === requestId) {
-        return { ...segment, status }
-      }
-      if (segment.type === 'approval_batch' && segment.data.approvalRequestId === requestId) {
-        return { ...segment, status, resolvedByName: resolvedByName ?? segment.resolvedByName }
-      }
-      return segment
-    })
+    // ONE rule, two containers: `applyApprovalStatusToSegment` is the
+    // same predicate the message-array projection uses
+    // (`projectApprovalResolutionToMessages`) — anchor status flip AND
+    // batch-row execution tick, so this flat-list path can never drift
+    // from the projection again (it previously missed the row case).
+    this.segments = this.segments.map((segment) =>
+      applyApprovalStatusToSegment(segment, requestId, status, resolvedByName),
+    )
     return this.getSegments()
   }
 

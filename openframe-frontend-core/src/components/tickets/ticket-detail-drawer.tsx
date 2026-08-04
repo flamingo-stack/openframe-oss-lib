@@ -21,6 +21,7 @@
  * callbacks; we don't reach into the QueryClient.
  */
 
+import { useEffect, useRef } from 'react'
 import { useStickToBottom } from 'use-stick-to-bottom'
 import { Button } from './../ui/button'
 import { useChatIdentity } from './../chat/hooks/use-chat-identity'
@@ -40,13 +41,14 @@ import type {
   TicketEngagementFile,
 } from './hooks/use-ticket-engagements'
 import { TicketLinkedDeliveryCard } from './ticket-linked-delivery-card'
+import { useOptionalTicketLive } from './ticket-live-provider'
 import { TicketReplyComposer } from './ticket-reply-composer'
 import type {
   AnyTicket,
   TicketAssignedOwner,
   MappedTicketActionError,
 } from './types'
-import { isOptimistic, TICKET_LIVE_POLL_MS } from './types'
+import { isOptimistic, TICKET_MARK_READ_DEBOUNCE_MS } from './types'
 
 /** Identity bundle threaded through the action callbacks: local mirror
  *  UUID + HubSpot external_id. Actions send `external_id` to HubSpot
@@ -204,18 +206,48 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
   // Optimistic placeholders don't have a real external_id yet — skip
   // the engagement fetch until the real ticket lands.
   const externalId = isOptimistic(ticket) ? null : ticket.external_id
-  // Live conversation refresh: this panel only mounts while the drawer is
-  // open, so the constant interval is already gated to "open" (closing the
-  // drawer unmounts the panel → polling stops). New agent replies +
-  // attachments surface within one cadence without a manual refresh — the
-  // same 8s the list-level status/assignee poll uses (single source:
-  // TICKET_LIVE_POLL_MS). A background poll never flashes the skeleton
-  // (the `isLoading` guard below keys off "no data yet", not `isFetching`).
-  const { engagements, isLoading } = useTicketEngagements(
-    externalId,
-    !!externalId,
-    TICKET_LIVE_POLL_MS,
-  )
+  // Live conversation refresh is PUSH-driven: `TicketLiveProvider`
+  // invalidates `['ticket-engagements', id]` on stream events, so new
+  // agent replies surface without any interval (polling was deleted
+  // 2026-08; `refetchOnWindowFocus` remains the no-stream fallback).
+  const { engagements, isLoading } = useTicketEngagements(externalId, !!externalId)
+
+  // Read-state lifecycle — this panel mounts exactly while the drawer is
+  // open, so it owns: register the open ticket (provider suppresses
+  // unread bumps + masks the row), markRead on open, debounced markRead
+  // as new messages stream in, flush on close. The provider's callbacks
+  // are stable (useCallback) so these effects don't re-fire on unrelated
+  // context-value changes.
+  const live = useOptionalTicketLive()
+  const setOpenTicketId = live?.setOpenTicketId
+  const markRead = live?.markRead
+  const markReadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!externalId || !setOpenTicketId || !markRead) return
+    setOpenTicketId(externalId)
+    void markRead(externalId)
+    return () => {
+      // Flush a pending debounced markRead on close so a reply that
+      // arrived moments before closing is still receipted.
+      if (markReadDebounceRef.current) {
+        clearTimeout(markReadDebounceRef.current)
+        markReadDebounceRef.current = null
+        void markRead(externalId)
+      }
+      setOpenTicketId(null)
+    }
+  }, [externalId, setOpenTicketId, markRead])
+
+  const engagementsCount = engagements.length
+  useEffect(() => {
+    if (!externalId || !markRead || engagementsCount === 0) return
+    if (markReadDebounceRef.current) clearTimeout(markReadDebounceRef.current)
+    markReadDebounceRef.current = setTimeout(() => {
+      markReadDebounceRef.current = null
+      void markRead(externalId)
+    }, TICKET_MARK_READ_DEBOUNCE_MS)
+  }, [engagementsCount, externalId, markRead])
 
   // Slack-style auto-tail (same lib mechanism `ChatMessageList` uses): jump to
   // the newest message on open (`initial:'instant'`), smooth-scroll on a new

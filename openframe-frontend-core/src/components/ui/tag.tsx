@@ -4,6 +4,8 @@ import React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { XmarkCircleIcon } from "../icons-v2-generated/signs-and-symbols/xmark-circle-icon"
 import { cn } from "../../utils/cn"
+import { useIsTruncated } from "../../hooks/ui/use-is-truncated"
+import { FloatingTooltip } from "./floating-tooltip"
 
 const tagVariants = cva(
   [
@@ -107,6 +109,37 @@ export interface TagProps
   as?: 'div' | 'span'
 }
 
+/**
+ * The tag's label slot. String labels get a `FloatingTooltip` with the full
+ * value when (and only when) the text is actually clipped — replacing the old
+ * native `title`, which showed with the OS delay, unstyled, and even when
+ * nothing was truncated. Node labels render exactly as before: the caller owns
+ * their content (and any tooltip), so none is added here.
+ * The trigger is a `span` so the tag stays valid phrasing content (`as="span"`
+ * exists precisely for tags inside a `<p>`).
+ */
+function TagLabel({ label, labelClassName }: { label: React.ReactNode; labelClassName?: string }) {
+  const isString = typeof label === 'string'
+  const { ref, isTruncated } = useIsTruncated<HTMLSpanElement>(isString ? label : null)
+
+  if (!isString) {
+    return <span className={cn("truncate", labelClassName)}>{label}</span>
+  }
+
+  return (
+    <FloatingTooltip
+      content={label}
+      side="top"
+      disabled={!isTruncated}
+      as="span"
+      triggerClassName="min-w-0 max-w-full"
+      className="max-w-xs whitespace-pre-line [overflow-wrap:anywhere]"
+    >
+      <span ref={ref} className={cn("truncate block", labelClassName)}>{label}</span>
+    </FloatingTooltip>
+  )
+}
+
 function Tag({
   label,
   variant,
@@ -134,7 +167,7 @@ function Tag({
           {icon}
         </span>
       )}
-      <span className={cn("truncate", labelClassName)} title={typeof label === 'string' ? label : undefined}>{label}</span>
+      <TagLabel label={label} labelClassName={labelClassName} />
       {onClose && (
         <button
           type="button"

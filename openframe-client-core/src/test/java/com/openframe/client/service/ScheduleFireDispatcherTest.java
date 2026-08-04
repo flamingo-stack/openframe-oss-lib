@@ -4,7 +4,9 @@ import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptShell;
@@ -177,6 +179,72 @@ class ScheduleFireDispatcherTest {
                 ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
         verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
         assertThat(msgCaptor.getValue().getMachineId()).isEqualTo("m9");
+    }
+
+    @Test
+    @DisplayName("dispatch: per-script custom params override args + env for that script only; others keep their defaults")
+    void dispatch_customParamsOverrideArgsAndEnv() {
+        when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
+        Script scriptA = Script.builder()
+                .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.BASH)
+                .privilegeLevel(PrivilegeLevel.USER).scriptBody("echo a")
+                .defaultArgs(List.of("--default"))
+                .envVars(List.of(new ScriptEnvVar("BASE", "base-val", false)))
+                .defaultTimeoutSeconds(120).status(ScriptStatus.ACTIVE).build();
+        Script scriptB = script("script-b", ScriptShell.POWERSHELL);   // no custom params → defaults
+        scriptB.setDefaultArgs(List.of("--b-default"));
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(scriptA, scriptB));
+
+        ScriptSchedule schedule = schedule(List.of("script-a", "script-b"));
+        schedule.setScriptCustomParams(List.of(ScheduledScriptCustomParams.builder()
+                .scriptId("script-a")
+                .args(List.of("--custom", "42"))
+                .envVars(List.of(new ScriptEnvVar("OVERRIDE", "custom-val", false)))
+                .build()));
+
+        dispatcher.dispatch(schedule, Instant.now());
+
+        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
+                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
+        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
+        List<ScriptScheduleExecutionItem> items = msgCaptor.getValue().getScripts();
+
+        ScriptScheduleExecutionItem a = items.stream().filter(i -> i.getScriptId().equals("script-a")).findFirst().orElseThrow();
+        assertThat(a.getArgs()).containsExactly("--custom", "42");                 // override args win
+        assertThat(a.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("OVERRIDE");  // full replace, not merge
+        assertThat(a.getEnvVars()).extracting(ScriptEnvVar::getName).doesNotContain("BASE");
+
+        ScriptScheduleExecutionItem b = items.stream().filter(i -> i.getScriptId().equals("script-b")).findFirst().orElseThrow();
+        assertThat(b.getArgs()).containsExactly("--b-default");                    // no custom params → stored default
+    }
+
+    @Test
+    @DisplayName("dispatch: a custom-params entry with null args/env inherits the script's defaults for that dimension")
+    void dispatch_customParamsNullFieldsInheritDefaults() {
+        when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
+        Script scriptA = Script.builder()
+                .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.BASH)
+                .privilegeLevel(PrivilegeLevel.USER).scriptBody("echo a")
+                .defaultArgs(List.of("--default"))
+                .envVars(List.of(new ScriptEnvVar("BASE", "base-val", false)))
+                .defaultTimeoutSeconds(120).status(ScriptStatus.ACTIVE).build();
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(scriptA));
+
+        ScriptSchedule schedule = schedule(List.of("script-a"));
+        schedule.setScriptCustomParams(List.of(ScheduledScriptCustomParams.builder()
+                .scriptId("script-a")
+                .args(List.of("--custom"))   // args overridden; envVars null → inherit
+                .envVars(null)
+                .build()));
+
+        dispatcher.dispatch(schedule, Instant.now());
+
+        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
+                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
+        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
+        ScriptScheduleExecutionItem a = msgCaptor.getValue().getScripts().get(0);
+        assertThat(a.getArgs()).containsExactly("--custom");
+        assertThat(a.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("BASE");   // inherited default env
     }
 
     private static ScriptSchedule schedule(List<String> scriptIds) {

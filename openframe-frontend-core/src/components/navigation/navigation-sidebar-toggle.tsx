@@ -30,12 +30,16 @@ export function NavigationSidebarToggle({
         aria-label={"Hide Menu"}
       >
         <div className="flex items-center justify-center flex-shrink-0">
-          <Chevrons03LeftIcon
-            className={cn(
-              "text-ods-text-secondary w-6 h-6 transition-transform duration-300",
-              minimized && "rotate-180",
-            )}
-          />
+          {/* Direction follows the rail's measured width (the `of-nav-sidebar`
+              container declared in `navigation-sidebar.tsx`), not `minimized`:
+              before hydration that prop can only carry the server's answer, and
+              a chevron pointing the wrong way in a 56px rail is the one piece of
+              sidebar state a user actually notices arriving late.
+
+              Collapsed is the default because container queries are min-width —
+              the rail is narrower than every threshold, so it needs no query of
+              its own. */}
+          <Chevrons03LeftIcon className="rotate-180 @[140px]/of-nav-sidebar:rotate-0 text-ods-text-secondary w-6 h-6 transition-transform duration-300" />
         </div>
 
         <span
