@@ -60,6 +60,7 @@ import { parseScrollAnchor, type ScrollAnchor } from '../utils/scroll-anchor'
 import { escapeThinkingTags } from '../../../chat-protocol/decode'
 import { buildChatRefKey } from '../types/chat.types'
 import type {
+  ApprovalBatchSegment,
   ApprovalRequestSegment,
   ChatApprovalStatus,
   MessageSegment,
@@ -1526,12 +1527,54 @@ export function createChatStreamReducer(
           onReject: callbacks.onReject,
         }
         const last = messages[messages.length - 1]
-        if (last && last.role === 'assistant') {
+        if (!last || last.role !== 'assistant') break
+        // ── WIRE-NATIVE BATCH ─────────────────────────────────────────
+        // The SERVER groups a multi-proposal turn into ONE
+        // `approval_batch` frame (decoded to `event.toolCalls`) — the
+        // client performs NO adjacency heuristics. Render the bulk-
+        // approval component: one Approve/Reject resolving every row
+        // sequentially through its own per-proposal confirm; per-row
+        // execution icons ticked by each `approval-resolved` event
+        // (see `projectApprovalResolutionToMessages`). Single-proposal
+        // turns keep the classic editable per-card flow below.
+        if (event.toolCalls && event.toolCalls.length > 0) {
+          const rows = event.toolCalls
+          const anchorId = event.requestId
+          const ids = rows.map((c) => c.toolExecutionRequestId)
+          const batchSegment: ApprovalBatchSegment = {
+            type: 'approval_batch',
+            status: 'pending',
+            data: {
+              approvalRequestId: anchorId,
+              approvalType: event.approvalType ?? 'chat',
+              toolCalls: rows,
+              executions: {},
+            },
+            // Optimistic status flip so the per-row loaders show while
+            // the sequential per-proposal confirms run.
+            onApprove: async () => {
+              setMessagesInternal(
+                projectApprovalResolutionToMessages(messages, anchorId, 'approved'),
+              )
+              for (const id of ids) await callbacks.onApprove?.(id)
+            },
+            onReject: async () => {
+              setMessagesInternal(
+                projectApprovalResolutionToMessages(messages, anchorId, 'rejected'),
+              )
+              for (const id of ids) await callbacks.onReject?.(id)
+            },
+          }
           setMessagesInternal([
             ...messages.slice(0, -1),
-            { ...last, segments: [...(last.segments ?? []), segment] },
+            { ...last, segments: [...(last.segments ?? []), batchSegment] },
           ])
+          break
         }
+        setMessagesInternal([
+          ...messages.slice(0, -1),
+          { ...last, segments: [...(last.segments ?? []), segment] },
+        ])
         break
       }
       case 'approval-resolved':

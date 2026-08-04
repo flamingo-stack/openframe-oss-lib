@@ -165,6 +165,30 @@ export interface ApprovalRequestFrame {
   ttlSeconds?: number
 }
 
+/** A single write-tool turn produced MULTIPLE proposals (batch
+ *  operations — "delete both", "close all three"). The SERVER is the
+ *  authority on the grouping: it collects the turn's proposals and
+ *  ships ONE batch frame instead of N `approval_request` frames, so
+ *  clients render the bulk-approval component without any adjacency
+ *  heuristics. Single-proposal turns keep the classic
+ *  `approval_request` frame. */
+export interface ApprovalBatchFrame {
+  kind: 'approval_batch'
+  /** Stable batch anchor — the FIRST proposal's id. Client-side only
+   *  (locates the batch segment for status flips); each row still
+   *  resolves through its own per-proposal confirm. */
+  batchId: string
+  proposals: Array<{
+    proposalId: string
+    toolName: string
+    title?: string
+    fields?: ApprovalRequestField[]
+    expiresAt?: string
+    ttlSeconds?: number
+  }>
+  preamble?: string | null
+}
+
 /** Server-driven post-approve / post-reject frame (confirm-tool route).
  *  Mirror of the hub's `DecisionResolvedFrame` in
  *  `lib/data/chat-agent-utils.ts` (tool_name widened to string — the
@@ -205,6 +229,7 @@ export type SseLeadingFrame =
   | TextLeadingFrame
   | ToolErrorFrame
   | ApprovalRequestFrame
+  | ApprovalBatchFrame
   | DecisionResolvedFrame
 
 // =============================================================================

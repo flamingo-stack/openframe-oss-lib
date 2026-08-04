@@ -100,6 +100,49 @@ function mapLeadingFrame(meta: any, out: ChatStreamEvent[]): void {
       ...(typeof meta.receiptText === 'string' ? { receiptText: meta.receiptText } : {}),
       requestId: typeof meta.proposalId === 'string' ? meta.proposalId : undefined,
     })
+  } else if (meta.kind === 'approval_batch' && meta.batchId && Array.isArray(meta.proposals)) {
+    // Server-grouped multi-proposal turn → ONE batch event carrying a
+    // tool-call row per proposal. `toolExecutionRequestId` is the row's
+    // PROPOSAL id (each row resolves through its own per-proposal
+    // confirm); the batch's `requestId` is the stable anchor the shell
+    // uses for status flips. Field rows ride as the row's expandable
+    // args so per-proposal detail stays reachable inside the batch.
+    const toolCalls = (meta.proposals as Array<Record<string, any>>)
+      .filter((p) => p && typeof p.proposalId === 'string')
+      .map((p) => {
+        const rawFields = Array.isArray(p.fields)
+          ? (p.fields as Array<{ label?: string; value?: string }>).filter(
+              (f) => f && f.label && f.value,
+            )
+          : []
+        // Prefer human-readable identity labels for the row's
+        // disambiguator; opaque-id labels ("Task", "Ticket") only as
+        // the last-resort first field.
+        const detail =
+          rawFields.find((f) => /^(title|subject|name)$/i.test(String(f.label))) ??
+          rawFields[0]
+        const base =
+          typeof p.title === 'string' && p.title.length > 0 ? p.title : String(p.toolName ?? 'Tool call')
+        return {
+          toolExecutionRequestId: String(p.proposalId),
+          toolName: String(p.toolName ?? 'tool'),
+          toolTitle: detail ? `${base} — ${detail.value}` : base,
+          requiresApproval: true,
+          toolCallArguments:
+            rawFields.length > 0
+              ? Object.fromEntries(rawFields.map((f) => [String(f.label), String(f.value)]))
+              : null,
+        }
+      })
+    if (toolCalls.length > 0) {
+      out.push({
+        type: 'approval-request',
+        requestId: String(meta.batchId),
+        approvalType: 'chat',
+        toolCalls,
+        status: 'pending',
+      })
+    }
   } else if (meta.kind === 'approval_request' && meta.proposalId) {
     const proposalId = String(meta.proposalId)
     const toolName = String(meta.toolName ?? 'tool')

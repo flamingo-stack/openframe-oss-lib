@@ -324,11 +324,42 @@ export function projectApprovalResolutionToMessages(
         msgChanged = true
         return { ...s, status }
       }
-      if (s.type === 'approval_batch' && s.data.approvalRequestId === requestId) {
+      if (s.type === 'approval_batch') {
+        const isAnchor = s.data.approvalRequestId === requestId
+        // Wire-native chat batches: each ROW is its own proposal
+        // (`toolExecutionRequestId` = proposalId) resolving through its
+        // own per-proposal confirm — a resolution for a row ticks that
+        // row's execution icon (check on approved, cross on rejected/
+        // failed) without touching the batch status (flipped
+        // optimistically at click time). The anchor row ALSO flips the
+        // batch status (anchor id = first proposal id).
+        const hasRow = s.data.toolCalls?.some((c) => c.toolExecutionRequestId === requestId)
+        if (!isAnchor && !hasRow) return s
         const nextResolvedBy = resolvedByName ?? s.resolvedByName
-        if (s.status === status && nextResolvedBy === s.resolvedByName) return s
+        const nextExecutions = hasRow
+          ? {
+              ...(s.data.executions ?? {}),
+              [requestId]: { status: 'done' as const, success: status === 'approved' },
+            }
+          : s.data.executions
+        const nextStatus = isAnchor ? status : s.status
+        if (
+          s.status === nextStatus &&
+          nextResolvedBy === s.resolvedByName &&
+          nextExecutions === s.data.executions
+        ) {
+          return s
+        }
         msgChanged = true
-        return { ...s, status, resolvedByName: nextResolvedBy }
+        return {
+          ...s,
+          status: nextStatus,
+          resolvedByName: nextResolvedBy,
+          data: {
+            ...s.data,
+            ...(nextExecutions ? { executions: nextExecutions } : {}),
+          },
+        }
       }
       return s
     })
