@@ -123,6 +123,14 @@ type ScriptSchedule implements Node {
         search: String,
         sort: SortInput
     ): AvailableDeviceConnection!
+    """Faceted filter options (status / deviceType / osType / organization, each with counts) for the
+    "Assigned Devices" picker — the values actually present among this schedule's assigned devices,
+    narrowed by `filter`/`search`. Same shape as the top-level `deviceFilters` query so the same
+    filter panel can drive the picker. `tagKeys` is currently always empty for the pickers."""
+    assignedDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
+    """Faceted filter options for the "Available Devices" picker — like `assignedDeviceFilters` but
+    over this schedule's platform-scoped selectable set (matching the `availableDevices` picker)."""
+    availableDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
     """Number of machines assigned to this schedule (the DEVICES column)."""
     deviceCount: Int!
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
