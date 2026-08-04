@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -39,10 +40,11 @@ class DeviceServiceTest {
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private DeviceStatusProcessor deviceStatusProcessor;
     @Mock private ScriptScheduleDeviceService scriptScheduleDeviceService;
+    @Mock private DeviceFilterOptionMapper deviceFilterOptionMapper;
 
     private DeviceService service() {
         DeviceService s = new DeviceService(machineRepository, tagRepository, tagAssignmentRepository,
-                deviceStatusProcessor, scriptScheduleDeviceService);
+                deviceStatusProcessor, scriptScheduleDeviceService, deviceFilterOptionMapper);
         lenient().when(machineRepository.countMachines(any(MachineQueryFilter.class), any())).thenReturn(0L);
         lenient().when(machineRepository.findMachinesWithCursor(any(MachineQueryFilter.class), any(),
                 any(), anyInt(), any(), any())).thenReturn(List.of());
@@ -83,6 +85,30 @@ class DeviceServiceTest {
                 CursorPaginationCriteria.builder().limit(10).build(), null, null);
 
         assertThat(capturedFilter().getRestrictToMachineIds()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getAssignedDeviceFilters: scopes the facets to the assigned machineIds and queries all four dimensions")
+    void assignedDeviceFiltersScopeAndDimensions() {
+        service().getAssignedDeviceFilters(List.of("m1", "m2"), null, "srch");
+
+        assertThat(capturedFilter().getRestrictToMachineIds()).containsExactlyInAnyOrder("m1", "m2");
+
+        ArgumentCaptor<String> fields = ArgumentCaptor.forClass(String.class);
+        verify(machineRepository, times(4)).facet(any(MachineQueryFilter.class), any(), fields.capture());
+        assertThat(fields.getAllValues())
+                .containsExactlyInAnyOrder("status", "type", "osType", "organizationId");
+    }
+
+    @Test
+    @DisplayName("getAvailableDeviceFilters: scopes the facets to the schedule's platforms, with no assigned restriction")
+    void availableDeviceFiltersScopeToPlatforms() {
+        service().getAvailableDeviceFilters(List.of("MACOS"), null, null);
+
+        MachineQueryFilter filter = capturedFilter();
+        assertThat(filter.getPlatformNames()).containsExactly("MACOS");
+        assertThat(filter.getRestrictToMachineIds()).isNull();
+        verify(machineRepository, times(4)).facet(any(MachineQueryFilter.class), any(), any());
     }
 
     @Test

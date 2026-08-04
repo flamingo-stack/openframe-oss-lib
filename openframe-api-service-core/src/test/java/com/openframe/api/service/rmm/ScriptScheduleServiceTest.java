@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
+import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
@@ -169,6 +170,55 @@ class ScriptScheduleServiceTest {
 
         assertThat(scheduleService.create(createInput, "user-1")).isNotNull();
         verify(scheduleRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("create: custom params referencing a scriptId not in the schedule are rejected (400)")
+    void create_customParamsOrphanScriptId_rejected() {
+        createInput.setScriptIds(List.of("sc-1"));
+        createInput.setScriptCustomParams(List.of(customParams("sc-999")));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("sc-999");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: two custom-params entries for the same scriptId are rejected (400)")
+    void create_customParamsDuplicateScriptId_rejected() {
+        createInput.setScriptIds(List.of("sc-1"));
+        createInput.setScriptCustomParams(List.of(customParams("sc-1"), customParams("sc-1")));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Duplicate");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: valid custom params (scriptId in the schedule) are persisted on the entity")
+    void create_customParamsValid_persisted() {
+        createInput.setScriptIds(List.of("sc-1", "sc-2"));
+        ScheduledScriptCustomParamsInput cp = customParams("sc-1");
+        cp.setArgs(List.of("--custom"));
+        createInput.setScriptCustomParams(List.of(cp));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ScriptScheduleResponse result = scheduleService.create(createInput, "user-1");
+
+        assertThat(result.getScriptCustomParams()).hasSize(1);
+        assertThat(result.getScriptCustomParams().get(0).getScriptId()).isEqualTo("sc-1");
+        assertThat(result.getScriptCustomParams().get(0).getArgs()).containsExactly("--custom");
+    }
+
+    private static ScheduledScriptCustomParamsInput customParams(String scriptId) {
+        ScheduledScriptCustomParamsInput cp = new ScheduledScriptCustomParamsInput();
+        cp.setScriptId(scriptId);
+        return cp;
     }
 
     @Test

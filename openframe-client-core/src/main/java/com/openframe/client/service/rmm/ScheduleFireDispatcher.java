@@ -2,7 +2,9 @@ package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -91,6 +93,16 @@ public class ScheduleFireDispatcher {
                 fire.scheduleId(), fire.executionId(), scripts.size(), machineIds.size());
     }
 
+    private static Map<String, ScheduledScriptCustomParams> customParamsByScriptId(ScriptSchedule schedule) {
+        List<ScheduledScriptCustomParams> customParams = schedule.getScriptCustomParams();
+        if (customParams == null || customParams.isEmpty()) {
+            return Map.of();
+        }
+        return customParams.stream()
+                .filter(cp -> cp.getScriptId() != null)
+                .collect(Collectors.toMap(ScheduledScriptCustomParams::getScriptId, Function.identity(), (a, b) -> b));
+    }
+
     /**
      * The schedule's runnable scripts, in its stored order: resolved once, ACTIVE only,
      * deduped, with missing/inactive ids dropped.
@@ -136,16 +148,23 @@ public class ScheduleFireDispatcher {
 
     /** Build the shared payload once, fan out ONE message per machine. */
     private void publish(Fire fire) {
+        Map<String, ScheduledScriptCustomParams> customParamsByScriptId = customParamsByScriptId(fire.schedule());
         List<ScriptScheduleExecutionItem> items = fire.scripts().stream()
-                .map(script -> ScriptScheduleExecutionItem.builder()
-                        .scriptId(script.getId())
-                        .code(script.getScriptBody())
-                        .shell(script.getShell())
-                        .privilegeLevel(script.getPrivilegeLevel())
-                        .args(ScriptArgsTokenizer.tokenize(script.getDefaultArgs()))
-                        .timeoutSeconds(script.getDefaultTimeoutSeconds())
-                        .envVars(script.getEnvVars())
-                        .build())
+                .map(script -> {
+                    ScheduledScriptCustomParams cp = customParamsByScriptId.get(script.getId());
+                    List<String> effectiveArgs = cp != null && cp.getArgs() != null ? cp.getArgs() : script.getDefaultArgs();
+                    List<ScriptEnvVar> effectiveEnv = cp != null && cp.getEnvVars() != null ? cp.getEnvVars() : script.getEnvVars();
+
+                    return ScriptScheduleExecutionItem.builder()
+                            .scriptId(script.getId())
+                            .code(script.getScriptBody())
+                            .shell(script.getShell())
+                            .privilegeLevel(script.getPrivilegeLevel())
+                            .args(ScriptArgsTokenizer.tokenize(effectiveArgs))
+                            .timeoutSeconds(script.getDefaultTimeoutSeconds())
+                            .envVars(effectiveEnv)
+                            .build();
+                })
                 .toList();
 
         fire.machineIds().forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
