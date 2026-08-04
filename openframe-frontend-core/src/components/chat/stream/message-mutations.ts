@@ -135,6 +135,48 @@ export function appendToTrailingAssistant(
 }
 
 /**
+ * Mark ONE batch row's confirm as FAILED (expired proposal, network
+ * error): tick its execution icon to the failure cross so the row's
+ * loader doesn't spin forever. Batch status is untouched — other rows
+ * may still be resolving.
+ */
+export function projectBatchRowFailureToMessages(
+  prev: UnifiedChatMessage[],
+  rowRequestId: string,
+): UnifiedChatMessage[] {
+  let changed = false
+  const next = prev.map((m) => {
+    if (m.role !== 'assistant' || !m.segments) return m
+    let msgChanged = false
+    const segs = m.segments.map((s) => {
+      if (
+        s.type !== 'approval_batch' ||
+        !s.data.toolCalls?.some((c) => c.toolExecutionRequestId === rowRequestId)
+      ) {
+        return s
+      }
+      const existing = s.data.executions?.[rowRequestId]
+      if (existing?.status === 'done') return s
+      msgChanged = true
+      return {
+        ...s,
+        data: {
+          ...s.data,
+          executions: {
+            ...(s.data.executions ?? {}),
+            [rowRequestId]: { status: 'done' as const, success: false },
+          },
+        },
+      }
+    })
+    if (!msgChanged) return m
+    changed = true
+    return { ...m, segments: segs }
+  })
+  return changed ? next : prev
+}
+
+/**
  * Upsert a standalone context-compaction segment into the trailing assistant
  * bubble. Compaction emissions arrive as the accumulator's CUMULATIVE array —
  * only the compaction segment itself may be applied, or interleaved

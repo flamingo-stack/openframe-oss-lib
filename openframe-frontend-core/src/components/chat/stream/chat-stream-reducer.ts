@@ -94,6 +94,7 @@ import {
   mergeToolExecutionIfPresent,
   nextId,
   projectApprovalResolutionToMessages,
+  projectBatchRowFailureToMessages,
   updateTrailingAssistant,
   upsertTrailingCompaction,
 } from './message-mutations'
@@ -1551,18 +1552,31 @@ export function createChatStreamReducer(
               executions: {},
             },
             // Optimistic status flip so the per-row loaders show while
-            // the sequential per-proposal confirms run.
+            // the sequential per-proposal confirms run. A confirm that
+            // reports failure (`false` — expired proposal, network
+            // error) ticks THAT row's cross so no loader spins forever;
+            // remaining rows still get their attempt.
             onApprove: async () => {
               setMessagesInternal(
                 projectApprovalResolutionToMessages(messages, anchorId, 'approved'),
               )
-              for (const id of ids) await callbacks.onApprove?.(id)
+              for (const id of ids) {
+                const ok = await callbacks.onApprove?.(id)
+                if (ok === false) {
+                  setMessagesInternal(projectBatchRowFailureToMessages(messages, id))
+                }
+              }
             },
             onReject: async () => {
               setMessagesInternal(
                 projectApprovalResolutionToMessages(messages, anchorId, 'rejected'),
               )
-              for (const id of ids) await callbacks.onReject?.(id)
+              for (const id of ids) {
+                const ok = await callbacks.onReject?.(id)
+                if (ok === false) {
+                  setMessagesInternal(projectBatchRowFailureToMessages(messages, id))
+                }
+              }
             },
           }
           setMessagesInternal([

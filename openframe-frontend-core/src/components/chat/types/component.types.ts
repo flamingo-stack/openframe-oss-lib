@@ -129,8 +129,8 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   timestamp?: Date
   showAvatar?: boolean
   isTyping?: boolean
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
+  onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>
+  onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>
   /**
    * Per-row metadata for inline entity-card rendering (v6.1 §B.2.6+§B.2.7).
    * Keyed by `<documentType>:<primaryKey>`. When present AND
@@ -259,8 +259,8 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   approvalVariant?: ApprovalBlockVariant
   assistantIcon?: React.ReactNode
   pendingApprovals?: MessageSegment[]
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
+  onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>
+  onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>
   // Infinite scroll for loading older messages
   hasNextPage?: boolean
   isFetchingNextPage?: boolean
@@ -518,8 +518,8 @@ export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement
 
 export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivElement> {
   data: ApprovalRequestData
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
+  onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>
+  onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>
   status?: ChatApprovalStatus
   disabled?: boolean
   /** Chat identity. Accepted for parity with the batch card; does NOT drive

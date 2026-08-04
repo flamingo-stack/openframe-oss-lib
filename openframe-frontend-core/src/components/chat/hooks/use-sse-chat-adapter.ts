@@ -249,17 +249,20 @@ export function useSseChatAdapter(
   // creation-time callbacks stay stable.
 
   const sendMessageRef = useRef<
-    (text: string, options?: InternalSendMessageOptions) => Promise<void>
-  >(async () => {})
+    (text: string, options?: InternalSendMessageOptions) => Promise<boolean>
+  >(async () => true)
 
-  const cardApprove = useCallback((reqId?: string): void | Promise<void> => {
+  // Approve/reject pass the transport's boolean outcome through so batch
+  // approve-all loops can mark a FAILED row (expired proposal, network
+  // error) instead of leaving its execution loader spinning.
+  const cardApprove = useCallback((reqId?: string): void | Promise<boolean> => {
     if (!reqId) return
     return sendMessageRef.current('', {
       hidden: true,
       approvalAction: { proposalId: reqId, action: 'approve' },
     })
   }, [])
-  const cardReject = useCallback((reqId?: string): void | Promise<void> => {
+  const cardReject = useCallback((reqId?: string): void | Promise<boolean> => {
     if (!reqId) return
     return sendMessageRef.current('', {
       hidden: true,
@@ -416,7 +419,9 @@ export function useSseChatAdapter(
   )
 
   const sendMessage = useCallback(
-    async (text: string, sendOptions?: InternalSendMessageOptions): Promise<void> => {
+    // Resolves `true` on a clean turn, `false` when the request failed
+    // (surfaced to batch approve-all loops via the card callbacks).
+    async (text: string, sendOptions?: InternalSendMessageOptions): Promise<boolean> => {
       const { hidden, attachments, commandOverride, approvalAction } = sendOptions ?? {}
 
       // URL + body branch — approvalAction routes to the approval-tool
@@ -467,7 +472,20 @@ export function useSseChatAdapter(
           signal: ctrl.signal,
         })
         if (!response.ok) {
-          throw new Error(`Chat request failed: ${response.status}`)
+          // Surface the SERVER's error copy (route-base envelope
+          // `{error, code}`) — a bare "Chat request failed: 409" told
+          // the user nothing when e.g. a batch approval expired; the
+          // server ships real copy ("This approval expired — ...").
+          let serverMessage: string | null = null
+          try {
+            const errBody = (await response.json()) as { error?: unknown }
+            if (typeof errBody?.error === 'string' && errBody.error.length > 0) {
+              serverMessage = errBody.error
+            }
+          } catch {
+            /* non-JSON error body — fall through to the generic copy */
+          }
+          throw new Error(serverMessage ?? `Chat request failed: ${response.status}`)
         }
         const reader = response.body?.getReader()
         if (!reader) throw new Error('No response body')
@@ -497,6 +515,7 @@ export function useSseChatAdapter(
             for (const event of endEvents) applyEvent(event)
           }
         }
+        return true
       } catch (err) {
         // AbortError on user-initiated stop is expected — keep the partial
         // message, no error row.
@@ -510,6 +529,7 @@ export function useSseChatAdapter(
             ),
           )
         }
+        return false
       } finally {
         if (abortControllerRef.current === ctrl) {
           abortControllerRef.current = null
