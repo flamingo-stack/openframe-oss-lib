@@ -177,6 +177,8 @@ type User implements Node {
     firstName: String
     lastName: String
     email: String
+    "ACTIVE, DELETED or SELF_DELETED"
+    status: String
     image: UserImage
 }
 
