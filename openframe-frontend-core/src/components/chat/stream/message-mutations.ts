@@ -134,6 +134,119 @@ export function appendToTrailingAssistant(
   return [...prev.slice(0, -1), { ...last, segments: merged }]
 }
 
+// =============================================================================
+// Segment-projection kernel — shared scaffolding + single-rule predicates
+// =============================================================================
+
+/**
+ * Map every assistant message's segments through `fn`, preserving the
+ * REFERENTIAL-STABILITY CONTRACT in ONE place: `fn` returns the SAME
+ * segment reference to signal "unchanged"; untouched messages (and the
+ * whole array on a global no-op) keep their prior references. Every
+ * segment projection below rides this scaffold instead of re-implementing
+ * the changed-flag dance.
+ */
+function mapSegments(
+  prev: UnifiedChatMessage[],
+  fn: (s: MessageSegment) => MessageSegment,
+): UnifiedChatMessage[] {
+  let changed = false
+  const next = prev.map((m) => {
+    if (m.role !== 'assistant' || !m.segments) return m
+    let msgChanged = false
+    const segs = m.segments.map((s) => {
+      const out = fn(s)
+      if (out !== s) msgChanged = true
+      return out
+    })
+    if (!msgChanged) return m
+    changed = true
+    return { ...m, segments: segs }
+  })
+  return changed ? next : prev
+}
+
+/**
+ * THE approval-resolution rule for a single segment — one predicate for
+ * both containers (the message-array projections here AND the flat
+ * segment list in `MessageSegmentAccumulator.updateApprovalStatus`), so
+ * the two paths can never drift:
+ *   - `approval_request` matched on `data.requestId` → status flip;
+ *   - `approval_batch` anchor (`data.approvalRequestId`, the server's
+ *     `batch:<first proposalId>` — never a row id) → status flip;
+ *   - `approval_batch` ROW (`toolCalls[].toolExecutionRequestId`) →
+ *     tick that row's execution (check on approved, cross otherwise)
+ *     without touching the batch status.
+ * Returns the SAME reference when nothing matched or changed.
+ */
+export function applyApprovalStatusToSegment(
+  s: MessageSegment,
+  requestId: string,
+  status: ChatApprovalStatus,
+  resolvedByName?: string | null,
+): MessageSegment {
+  if (s.type === 'approval_request' && s.data.requestId === requestId && s.status !== status) {
+    return { ...s, status }
+  }
+  if (s.type !== 'approval_batch') return s
+  const isAnchor = s.data.approvalRequestId === requestId
+  const hasRow = s.data.toolCalls?.some((c) => c.toolExecutionRequestId === requestId)
+  if (!isAnchor && !hasRow) return s
+  const nextResolvedBy = resolvedByName ?? s.resolvedByName
+  const nextExecutions = hasRow
+    ? {
+        ...(s.data.executions ?? {}),
+        [requestId]: { status: 'done' as const, success: status === 'approved' },
+      }
+    : s.data.executions
+  const nextStatus = isAnchor ? status : s.status
+  if (
+    s.status === nextStatus &&
+    nextResolvedBy === s.resolvedByName &&
+    nextExecutions === s.data.executions
+  ) {
+    return s
+  }
+  return {
+    ...s,
+    status: nextStatus,
+    resolvedByName: nextResolvedBy,
+    data: {
+      ...s.data,
+      ...(nextExecutions ? { executions: nextExecutions } : {}),
+    },
+  }
+}
+
+/**
+ * Next state for a batch row's execution slot from a tool-execution
+ * chunk — folds the never-downgrade guard (redelivered EXECUTING after
+ * EXECUTED landed) and the EXECUTED/EXECUTING ternary into ONE rule
+ * shared by the message projection and the accumulator. Returns null
+ * for the no-op case (caller keeps prior references).
+ */
+export function nextBatchExecution(
+  prevExec: ApprovalBatchExecutionState | undefined,
+  toolData: ToolExecutionData,
+): ApprovalBatchExecutionState | null {
+  if (toolData.type === 'EXECUTING_TOOL' && prevExec?.status === 'done') return null
+  return toolData.type === 'EXECUTED_TOOL'
+    ? { status: 'done', result: toolData.result, success: toolData.success }
+    : { status: 'executing', result: prevExec?.result, success: prevExec?.success }
+}
+
+/** The executions-map triple-spread — one home for the write shape. */
+export function withBatchExecution<S extends { data: { executions?: Record<string, ApprovalBatchExecutionState> } }>(
+  seg: S,
+  execId: string,
+  state: ApprovalBatchExecutionState,
+): S {
+  return {
+    ...seg,
+    data: { ...seg.data, executions: { ...(seg.data.executions ?? {}), [execId]: state } },
+  }
+}
+
 /**
  * Flip ONLY an approval_batch segment's status — no execution writes.
  * The click-time optimistic flip uses this instead of
@@ -147,21 +260,11 @@ export function projectBatchStatusToMessages(
   anchorId: string,
   status: ChatApprovalStatus,
 ): UnifiedChatMessage[] {
-  let changed = false
-  const next = prev.map((m) => {
-    if (m.role !== 'assistant' || !m.segments) return m
-    let msgChanged = false
-    const segs = m.segments.map((s) => {
-      if (s.type !== 'approval_batch') return s
-      if (s.data.approvalRequestId !== anchorId || s.status === status) return s
-      msgChanged = true
-      return { ...s, status }
-    })
-    if (!msgChanged) return m
-    changed = true
-    return { ...m, segments: segs }
+  return mapSegments(prev, (s) => {
+    if (s.type !== 'approval_batch') return s
+    if (s.data.approvalRequestId !== anchorId || s.status === status) return s
+    return { ...s, status }
   })
-  return changed ? next : prev
 }
 
 /**
@@ -174,36 +277,17 @@ export function projectBatchRowFailureToMessages(
   prev: UnifiedChatMessage[],
   rowRequestId: string,
 ): UnifiedChatMessage[] {
-  let changed = false
-  const next = prev.map((m) => {
-    if (m.role !== 'assistant' || !m.segments) return m
-    let msgChanged = false
-    const segs = m.segments.map((s) => {
-      if (
-        s.type !== 'approval_batch' ||
-        !s.data.toolCalls?.some((c) => c.toolExecutionRequestId === rowRequestId)
-      ) {
-        return s
-      }
-      const existing = s.data.executions?.[rowRequestId]
-      if (existing?.status === 'done') return s
-      msgChanged = true
-      return {
-        ...s,
-        data: {
-          ...s.data,
-          executions: {
-            ...(s.data.executions ?? {}),
-            [rowRequestId]: { status: 'done' as const, success: false },
-          },
-        },
-      }
-    })
-    if (!msgChanged) return m
-    changed = true
-    return { ...m, segments: segs }
+  return mapSegments(prev, (s) => {
+    if (
+      s.type !== 'approval_batch' ||
+      !s.data.toolCalls?.some((c) => c.toolExecutionRequestId === rowRequestId)
+    ) {
+      return s
+    }
+    const existing = s.data.executions?.[rowRequestId]
+    if (existing?.status === 'done') return s
+    return withBatchExecution(s, rowRequestId, { status: 'done', success: false })
   })
-  return changed ? next : prev
 }
 
 /**
@@ -314,23 +398,16 @@ export function mergeToolExecutionIfPresent(
         seg.data.toolCalls.some((c) => c.toolExecutionRequestId === execId)
       ) {
         const prevExec: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId]
-        // Never downgrade a done batch slot back to executing (JetStream
-        // redelivery of the EXECUTING chunk after EXECUTED landed). Returning
-        // prev = matched-with-no-change, so the caller doesn't append either.
-        if (toolData.type === 'EXECUTING_TOOL' && prevExec?.status === 'done') {
-          return prev
-        }
-        const nextExec: ApprovalBatchExecutionState =
-          toolData.type === 'EXECUTED_TOOL'
-            ? { status: 'done', result: toolData.result, success: toolData.success }
-            : { status: 'executing', result: prevExec?.result, success: prevExec?.success }
+        // Shared rule (`nextBatchExecution`): folds the never-downgrade
+        // guard (JetStream redelivery of EXECUTING after EXECUTED
+        // landed — null = matched-with-no-change, caller doesn't append
+        // either) and the EXECUTED/EXECUTING ternary.
+        const nextExec = nextBatchExecution(prevExec, toolData)
+        if (nextExec === null) return prev
         // Value-level no-op (replayed duplicate) → prior references.
         if (sameExecutionState(prevExec, nextExec)) return prev
         const nextSegments = [...message.segments]
-        nextSegments[j] = {
-          ...seg,
-          data: { ...seg.data, executions: { ...(seg.data.executions ?? {}), [execId]: nextExec } },
-        }
+        nextSegments[j] = withBatchExecution(seg, execId, nextExec)
         const next = [...prev]
         next[i] = { ...message, segments: nextSegments }
         return next
@@ -376,10 +453,10 @@ export function mergeToolExecutionIfPresent(
 }
 
 /**
- * Cross-message approval status flip (absorbed from the NATS adapter's
- * `onApprovalResolved` handler). Idempotent + reference-preserving: only the
- * messages/segments whose status (or resolvedByName) actually changes are
- * cloned; a no-op returns `prev`.
+ * Project an approval resolution onto the thread — the ONE rule lives in
+ * `applyApprovalStatusToSegment` (shared with the accumulator's flat
+ * segment list); this is just its message-array projection via
+ * `mapSegments`.
  */
 export function projectApprovalResolutionToMessages(
   prev: UnifiedChatMessage[],
@@ -387,60 +464,7 @@ export function projectApprovalResolutionToMessages(
   status: ChatApprovalStatus,
   resolvedByName?: string | null,
 ): UnifiedChatMessage[] {
-  let changed = false
-  const next = prev.map((m) => {
-    if (m.role !== 'assistant' || !m.segments) return m
-    let msgChanged = false
-    const segs = m.segments.map((s) => {
-      if (s.type === 'approval_request' && s.data.requestId === requestId && s.status !== status) {
-        msgChanged = true
-        return { ...s, status }
-      }
-      if (s.type === 'approval_batch') {
-        const isAnchor = s.data.approvalRequestId === requestId
-        // Wire-native chat batches: each ROW is its own proposal
-        // (`toolExecutionRequestId` = proposalId) resolving through its
-        // own per-proposal confirm — a resolution for a row ticks that
-        // row's execution icon (check on approved, cross on rejected/
-        // failed) without touching the batch status (flipped
-        // optimistically at click time via
-        // `projectBatchStatusToMessages`). The anchor id is the
-        // server-minted `batch:<first proposalId>` — NEVER a row id
-        // (see ApprovalBatchFrame.batchId) — so `isAnchor` flips the
-        // batch status only.
-        const hasRow = s.data.toolCalls?.some((c) => c.toolExecutionRequestId === requestId)
-        if (!isAnchor && !hasRow) return s
-        const nextResolvedBy = resolvedByName ?? s.resolvedByName
-        const nextExecutions = hasRow
-          ? {
-              ...(s.data.executions ?? {}),
-              [requestId]: { status: 'done' as const, success: status === 'approved' },
-            }
-          : s.data.executions
-        const nextStatus = isAnchor ? status : s.status
-        if (
-          s.status === nextStatus &&
-          nextResolvedBy === s.resolvedByName &&
-          nextExecutions === s.data.executions
-        ) {
-          return s
-        }
-        msgChanged = true
-        return {
-          ...s,
-          status: nextStatus,
-          resolvedByName: nextResolvedBy,
-          data: {
-            ...s.data,
-            ...(nextExecutions ? { executions: nextExecutions } : {}),
-          },
-        }
-      }
-      return s
-    })
-    if (!msgChanged) return m
-    changed = true
-    return { ...m, segments: segs }
-  })
-  return changed ? next : prev
+  return mapSegments(prev, (s) =>
+    applyApprovalStatusToSegment(s, requestId, status, resolvedByName),
+  )
 }

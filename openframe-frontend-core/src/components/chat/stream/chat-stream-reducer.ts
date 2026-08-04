@@ -1978,6 +1978,12 @@ export function createChatStreamReducer(
       setMessagesInternal(
         projectApprovalResolutionToMessages(messages, requestId, status, resolvedByName),
       )
+      // Status-map mirror — kept in lockstep with the other two flip
+      // paths (SSE approval-resolved at ~1240, NATS at ~1950): the map
+      // restores status when a replayed approval-request event
+      // re-renders the card, and a flip applied through THIS path must
+      // survive that replay the same way.
+      mirrorApprovalStatus(requestId, status)
       return segments
     },
     getPendingEscalated() {

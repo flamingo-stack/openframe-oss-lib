@@ -254,21 +254,21 @@ export function useSseChatAdapter(
 
   // Approve/reject pass the transport's boolean outcome through so batch
   // approve-all loops can mark a FAILED row (expired proposal, network
-  // error) instead of leaving its execution loader spinning.
-  const cardApprove = useCallback((reqId?: string): void | Promise<boolean> => {
-    if (!reqId) return
-    return sendMessageRef.current('', {
-      hidden: true,
-      approvalAction: { proposalId: reqId, action: 'approve' },
-    })
-  }, [])
-  const cardReject = useCallback((reqId?: string): void | Promise<boolean> => {
-    if (!reqId) return
-    return sendMessageRef.current('', {
-      hidden: true,
-      approvalAction: { proposalId: reqId, action: 'reject' },
-    })
-  }, [])
+  // error) instead of leaving its execution loader spinning. ONE factory
+  // — the two handlers differ only in the action literal.
+  const cardResolve = useCallback(
+    (action: 'approve' | 'reject') =>
+      (reqId?: string): void | Promise<boolean> => {
+        if (!reqId) return
+        return sendMessageRef.current('', {
+          hidden: true,
+          approvalAction: { proposalId: reqId, action },
+        })
+      },
+    [],
+  )
+  const cardApprove = useMemo(() => cardResolve('approve'), [cardResolve])
+  const cardReject = useMemo(() => cardResolve('reject'), [cardResolve])
 
   const createReducerOptions = useCallback(
     (): ChatStreamReducerOptions => ({

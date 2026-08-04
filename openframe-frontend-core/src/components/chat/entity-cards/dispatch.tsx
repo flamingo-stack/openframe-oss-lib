@@ -1026,24 +1026,32 @@ const FINANCIAL_CARD_CONFIGS: Record<string, FinancialCardConfig> = {
   balance_sheet: { label: 'Balance sheet', icon: () => <BankIcon size={24} /> },
   cash_flow: { label: 'Cash flow', icon: () => <CoinsExchangeCurrencyIcon size={24} /> },
 }
-function financialRegistryEntries(): Record<string, ChatCardRegistryEntry> {
+/** Expand a per-family config map into registry entries — ONE loop shell
+ *  for every card family (financial, github, program, roadmap); adding a
+ *  family is a config map + one `registryEntries(...)` call. */
+function registryEntries<C>(
+  configs: Record<string, C>,
+  build: (cfg: C) => ChatCardRegistryEntry,
+): Record<string, ChatCardRegistryEntry> {
   const out: Record<string, ChatCardRegistryEntry> = {}
-  for (const [docType, cfg] of Object.entries(FINANCIAL_CARD_CONFIGS)) {
-    out[docType] = {
-      mode: 'no-fetch',
-      label: cfg.label,
-      bareInline: true,
-      render: (chatRef, opts) => (
-        <GenericFinancialChatCard
-          chatRef={chatRef}
-          icon={cfg.icon()}
-          isNewTab={opts.isNewTab}
-          discuss={opts.discuss}
-        />
-      ),
-    }
-  }
+  for (const [docType, cfg] of Object.entries(configs)) out[docType] = build(cfg)
   return out
+}
+
+function financialRegistryEntries(): Record<string, ChatCardRegistryEntry> {
+  return registryEntries(FINANCIAL_CARD_CONFIGS, (cfg) => ({
+    mode: 'no-fetch',
+    label: cfg.label,
+    bareInline: true,
+    render: (chatRef, opts) => (
+      <GenericFinancialChatCard
+        chatRef={chatRef}
+        icon={cfg.icon()}
+        isNewTab={opts.isNewTab}
+        discuss={opts.discuss}
+      />
+    ),
+  }))
 }
 
 interface GitHubCardConfig {
@@ -1059,19 +1067,15 @@ const GITHUB_CARD_CONFIGS: Record<string, GitHubCardConfig> = {
   github_pr_review_public: { label: 'GitHub review (public)', kind: 'pr_review' },
 }
 function githubRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  const out: Record<string, ChatCardRegistryEntry> = {}
-  for (const [docType, cfg] of Object.entries(GITHUB_CARD_CONFIGS)) {
-    out[docType] = {
-      mode: 'no-fetch',
-      label: cfg.label,
-      bareInline: true,
-      render: (chatRef, opts) => (
-        <GitHubChatCard chatRef={chatRef} kind={cfg.kind} isNewTab={opts.isNewTab}
-          discuss={opts.discuss} />
-      ),
-    }
-  }
-  return out
+  return registryEntries(GITHUB_CARD_CONFIGS, (cfg) => ({
+    mode: 'no-fetch',
+    label: cfg.label,
+    bareInline: true,
+    render: (chatRef, opts) => (
+      <GitHubChatCard chatRef={chatRef} kind={cfg.kind} isNewTab={opts.isNewTab}
+        discuss={opts.discuss} />
+    ),
+  }))
 }
 
 type ProgramConfigKey = 'podcast' | 'webinar' | 'event'
@@ -1086,28 +1090,24 @@ const PROGRAM_CARD_CONFIGS: Record<string, ProgramCardConfig> = {
   event: { label: 'Event', configKey: 'event', contentRefType: 'event' },
 }
 function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  const out: Record<string, ChatCardRegistryEntry> = {}
-  for (const [docType, cfg] of Object.entries(PROGRAM_CARD_CONFIGS)) {
-    out[docType] = {
-      mode: 'fetch',
-      label: cfg.label,
-      contentRefType: cfg.contentRefType,
-      bareInline: true,
-      skeleton: () => <ProgramCardSkeleton size="sm" />,
-      render: (item, chatRef, opts) => (
-        <ProgramChatCard
-          item={item}
-          chatRef={chatRef}
-          isNewTab={opts.isNewTab}
-          discuss={opts.discuss}
-          configKey={cfg.configKey}
-          label={cfg.configKey.charAt(0).toUpperCase() + cfg.configKey.slice(1)}
-          ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
-        />
-      ),
-    }
-  }
-  return out
+  return registryEntries(PROGRAM_CARD_CONFIGS, (cfg) => ({
+    mode: 'fetch',
+    label: cfg.label,
+    contentRefType: cfg.contentRefType,
+    bareInline: true,
+    skeleton: () => <ProgramCardSkeleton size="sm" />,
+    render: (item, chatRef, opts) => (
+      <ProgramChatCard
+        item={item}
+        chatRef={chatRef}
+        isNewTab={opts.isNewTab}
+        discuss={opts.discuss}
+        configKey={cfg.configKey}
+        label={cfg.configKey.charAt(0).toUpperCase() + cfg.configKey.slice(1)}
+        ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
+      />
+    ),
+  }))
 }
 
 type RoadmapCardType = 'roadmap_item' | 'delivery_item' | 'internal_task'
@@ -1135,27 +1135,23 @@ const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
   },
 }
 function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  const out: Record<string, ChatCardRegistryEntry> = {}
-  for (const [docType, cfg] of Object.entries(ROADMAP_CARD_CONFIGS)) {
-    out[docType] = {
-      mode: 'fetch',
-      label: cfg.label,
-      contentRefType: cfg.contentRefType,
-      bareInline: true,
-      ...(cfg.noComposedHref ? { noComposedHref: true } : {}),
-      skeleton: () => <RoadmapCardSkeleton size="sm" />,
-      render: (item, chatRef, opts) => (
-        <RoadmapChatCard
-          item={item}
-          chatRef={chatRef}
-          isNewTab={opts.isNewTab}
-          discuss={opts.discuss}
-          cardType={cfg.cardType}
-        />
-      ),
-    }
-  }
-  return out
+  return registryEntries(ROADMAP_CARD_CONFIGS, (cfg) => ({
+    mode: 'fetch',
+    label: cfg.label,
+    contentRefType: cfg.contentRefType,
+    bareInline: true,
+    ...(cfg.noComposedHref ? { noComposedHref: true } : {}),
+    skeleton: () => <RoadmapCardSkeleton size="sm" />,
+    render: (item, chatRef, opts) => (
+      <RoadmapChatCard
+        item={item}
+        chatRef={chatRef}
+        isNewTab={opts.isNewTab}
+        discuss={opts.discuss}
+        cardType={cfg.cardType}
+      />
+    ),
+  }))
 }
 
 const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
@@ -1668,6 +1664,23 @@ export function ChatCardLoader({
       {children}
     </ChatCardNavWrap>
   )
+  // ONE render tail for both modes — bare-inline cards skip the discuss
+  // wrapper; everything else gets the ChatCardWithDiscuss chrome. Kept
+  // here (not per-branch) so the two paths can never drift on the
+  // discuss-menu wiring.
+  const finish = (node: React.ReactNode) =>
+    entry.bareInline ? (
+      <>{navWrap(node)}</>
+    ) : (
+      <ChatCardWithDiscuss
+        chatRef={finalChatRef}
+        onDiscuss={onDiscuss}
+        onDisplay={onDisplay}
+        displayAction={entry.displayAction}
+      >
+        {navWrap(node)}
+      </ChatCardWithDiscuss>
+    )
   if (entry.mode === 'no-fetch') {
     // Synthetic-ref gate. `chat-message-enhanced.tsx` builds a minimal
     // `{ type, id, title: cardId, url: null }` ChatRef when the LLM
@@ -1690,19 +1703,7 @@ export function ChatCardLoader({
     // Fetch-mode types already handle this gracefully: a synthetic
     // id leads to a fetch miss → `!item` → null at line ~1034.
     if (!finalChatRef.sourceRepo) return null
-    if (entry.bareInline) {
-      return navWrap(entry.render(finalChatRef, renderOpts))
-    }
-    return (
-      <ChatCardWithDiscuss
-        chatRef={finalChatRef}
-        onDiscuss={onDiscuss}
-        onDisplay={onDisplay}
-        displayAction={entry.displayAction}
-      >
-        {navWrap(entry.render(finalChatRef, renderOpts))}
-      </ChatCardWithDiscuss>
-    )
+    return finish(entry.render(finalChatRef, renderOpts))
   }
   if (isLoading) return <>{entry.skeleton()}</>
   if (!item) {
@@ -1742,19 +1743,7 @@ export function ChatCardLoader({
     }
     return null
   }
-  if (entry.bareInline) {
-    return <>{navWrap(entry.render(item, finalChatRef, renderOpts))}</>
-  }
-  return (
-    <ChatCardWithDiscuss
-      chatRef={finalChatRef}
-      onDiscuss={onDiscuss}
-      onDisplay={onDisplay}
-      displayAction={entry.displayAction}
-    >
-      {navWrap(entry.render(item, finalChatRef, renderOpts))}
-    </ChatCardWithDiscuss>
-  )
+  return finish(entry.render(item, finalChatRef, renderOpts))
 }
 
 // =============================================================================
