@@ -2,6 +2,7 @@ package com.openframe.api.dto.rmm.schedule;
 
 import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import lombok.Builder;
@@ -25,6 +26,8 @@ public class ScriptScheduleResponse {
     private List<String> supportedPlatforms;
 
     private List<String> scriptIds;
+
+    private List<ScheduledScriptCustomParams> scriptCustomParams;
 
     private ScheduleDeviceSelectionMode selectionMode;
 

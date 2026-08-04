@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -39,10 +40,11 @@ class DeviceServiceTest {
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private DeviceStatusProcessor deviceStatusProcessor;
     @Mock private ScriptScheduleDeviceService scriptScheduleDeviceService;
+    @Mock private DeviceFilterOptionMapper deviceFilterOptionMapper;
 
     private DeviceService service() {
         DeviceService s = new DeviceService(machineRepository, tagRepository, tagAssignmentRepository,
-                deviceStatusProcessor, scriptScheduleDeviceService);
+                deviceStatusProcessor, scriptScheduleDeviceService, deviceFilterOptionMapper);
         lenient().when(machineRepository.countMachines(any(MachineQueryFilter.class), any())).thenReturn(0L);
         lenient().when(machineRepository.findMachinesWithCursor(any(MachineQueryFilter.class), any(),
                 any(), anyInt(), any(), any())).thenReturn(List.of());

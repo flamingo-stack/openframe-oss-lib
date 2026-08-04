@@ -250,7 +250,7 @@ describe('SSE wire decode — golden fixtures (full hook path)', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { result } = renderAdapter()
-    let sendPromise!: Promise<void>
+    let sendPromise!: Promise<void | boolean>
     act(() => {
       sendPromise = result.current.sendMessage('will be aborted')
     })

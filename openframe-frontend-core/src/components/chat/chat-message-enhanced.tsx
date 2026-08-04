@@ -15,6 +15,7 @@ import { GuideDisplay } from "./guide-display"
 import { SimpleMarkdownRenderer } from "../ui/markdown/simple-markdown-renderer"
 import type { ChatRef } from "./chat-ref.types"
 import { remarkCardLinks } from "./remark-card-links"
+import { remarkStripCitations } from "./remark-strip-citations"
 import { remarkMentionChips } from "./remark-mention-chips"
 import { BlockCard, type BlockCardProps } from "./entity-cards/block-card"
 import { ChatContextChipStrip } from "./chat-context-picker"
@@ -110,7 +111,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // (user). Each is gated independently so neither fires without its data.
     const cardRemarkPlugins = useMemo(
       () => [
-        ...(hasMarkerSupport ? [remarkCardLinks] : []),
+        ...(hasMarkerSupport ? [remarkCardLinks, remarkStripCitations] : []),
         ...(hasMentionSupport ? [remarkMentionChips] : []),
       ],
       [hasMarkerSupport, hasMentionSupport],

@@ -12,9 +12,11 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
+import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScheduleDeviceCriteriaInput;
+import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilters;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
@@ -35,6 +37,7 @@ import com.openframe.api.service.rmm.ScriptScheduleService;
 import com.openframe.api.service.rmm.ScriptService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
+import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -123,6 +126,7 @@ public class ScriptScheduleDataFetcher {
     public ScriptScheduleResponse createScriptSchedule(@InputArgument @Valid CreateScriptScheduleInput input,
                                                        @AuthenticationPrincipal AuthPrincipal principal) {
         input.setScriptIds(decodeIds(input.getScriptIds()));
+        decodeCustomParamsScriptIds(input.getScriptCustomParams());
         return scheduleService.create(input, principal.getId());
     }
 
@@ -130,6 +134,7 @@ public class ScriptScheduleDataFetcher {
     public ScriptScheduleResponse updateScriptSchedule(@InputArgument @Valid UpdateScriptScheduleInput input) {
         input.setId(decodeId(input.getId()));
         input.setScriptIds(decodeIds(input.getScriptIds()));
+        decodeCustomParamsScriptIds(input.getScriptCustomParams());
         return scheduleService.update(input);
     }
 
@@ -261,6 +266,22 @@ public class ScriptScheduleDataFetcher {
         return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
     }
 
+    @DgsData(parentType = "ScriptSchedule", field = "scriptCustomParams")
+    public List<ScheduledScriptCustomParams> scriptCustomParams(DgsDataFetchingEnvironment dfe) {
+        ScriptScheduleResponse schedule = dfe.getSource();
+        List<ScheduledScriptCustomParams> params = schedule.getScriptCustomParams();
+        if (params == null || params.isEmpty()) {
+            return List.of();
+        }
+        return params.stream()
+                .map(p -> ScheduledScriptCustomParams.builder()
+                        .scriptId(RELAY.toGlobalId("Script", p.getScriptId()))
+                        .args(p.getArgs())
+                        .envVars(p.getEnvVars())
+                        .build())
+                .toList();
+    }
+
     /**
      * Resolves {@code ScriptSchedule.assignedDevices} as a Relay connection — same
      * filter/search/sort/pagination machinery as the top-level {@code devices} query, scoped to
@@ -309,6 +330,27 @@ public class ScriptScheduleDataFetcher {
         return deviceMapper.toAvailableDeviceConnection(result, assignedMachineIds);
     }
 
+    @DgsData(parentType = "ScriptSchedule", field = "assignedDeviceFilters")
+    public DeviceFilters assignedDeviceFilters(
+            DgsDataFetchingEnvironment dfe,
+            @InputArgument @Valid DeviceFilterInput filter,
+            @InputArgument String search) {
+        ScriptScheduleResponse schedule = dfe.getSource();
+        List<String> machineIds = scheduleDeviceService.getMachineIds(schedule.getId());
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        return deviceService.getAssignedDeviceFilters(machineIds, filterOptions, search);
+    }
+
+    @DgsData(parentType = "ScriptSchedule", field = "availableDeviceFilters")
+    public DeviceFilters availableDeviceFilters(
+            DgsDataFetchingEnvironment dfe,
+            @InputArgument @Valid DeviceFilterInput filter,
+            @InputArgument String search) {
+        ScriptScheduleResponse schedule = dfe.getSource();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        return deviceService.getAvailableDeviceFilters(schedule.getSupportedPlatforms(), filterOptions, search);
+    }
+
     /** Resolves {@code ScriptSchedule.deviceCount} (the DEVICES column), batched per request. */
     @DgsData(parentType = "ScriptSchedule", field = "deviceCount")
     public CompletableFuture<Integer> deviceCount(DgsDataFetchingEnvironment dfe) {
@@ -336,6 +378,14 @@ public class ScriptScheduleDataFetcher {
 
     private static List<String> decodeIds(List<String> globalIds) {
         return globalIds == null ? null : globalIds.stream().map(ScriptScheduleDataFetcher::decodeId).toList();
+    }
+
+    /** Decode each custom-params {@code scriptId} (Script global id → raw) in place before the service. */
+    private static void decodeCustomParamsScriptIds(List<ScheduledScriptCustomParamsInput> customParams) {
+        if (customParams == null) {
+            return;
+        }
+        customParams.forEach(p -> p.setScriptId(decodeId(p.getScriptId())));
     }
 
     private static void encodeNodeOptions(List<ScriptFilterOption> options, String nodeType) {
