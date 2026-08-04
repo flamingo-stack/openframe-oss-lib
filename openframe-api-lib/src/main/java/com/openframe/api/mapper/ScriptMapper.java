@@ -35,7 +35,7 @@ public class ScriptMapper {
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .defaultTimeoutSeconds(input.getDefaultTimeoutSeconds())
                 .defaultArgs(input.getDefaultArgs())
-                .envVars(mapEnvVarsToEntity(input.getEnvVars()))
+                .envVars(ScriptEnvVarMapper.toEntity(input.getEnvVars()))
                 .build();
     }
 
@@ -48,7 +48,7 @@ public class ScriptMapper {
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setDefaultTimeoutSeconds(input.getDefaultTimeoutSeconds());
         existing.setDefaultArgs(input.getDefaultArgs());
-        existing.setEnvVars(mapEnvVarsToEntity(input.getEnvVars()));
+        existing.setEnvVars(ScriptEnvVarMapper.toEntity(input.getEnvVars()));
     }
 
     public ScriptResponse toResponse(Script entity) {
@@ -69,19 +69,6 @@ public class ScriptMapper {
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
-    }
-
-    private List<ScriptEnvVar> mapEnvVarsToEntity(List<ScriptEnvVarInput> envVars) {
-        if (envVars == null) {
-            return null;
-        }
-        return envVars.stream()
-                .map(v -> ScriptEnvVar.builder()
-                        .name(v.getName())
-                        .value(v.getValue())
-                        .secret(v.isSecret())
-                        .build())
-                .toList();
     }
 
     private List<ScriptEnvVarInput> mapEnvVarsToResponse(List<ScriptEnvVar> envVars) {
