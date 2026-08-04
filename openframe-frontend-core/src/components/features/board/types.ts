@@ -18,6 +18,8 @@ export interface BoardTicketAssignee {
   initials?: string
   avatarUrl?: string
   name?: string
+  /** Deleted account (DELETED / SELF_DELETED) — renders the red user-x placeholder instead of the avatar. */
+  deleted?: boolean
 }
 
 export interface BoardTicket {

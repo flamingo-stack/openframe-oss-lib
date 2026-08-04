@@ -5,6 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import Link from '../../../embed-shims/next-link'
 import * as React from 'react'
 import { LaptopIcon, Flag02Icon, MessagesIcon } from '../../icons-v2-generated'
+import { DeletedUserAvatar } from '../../ui/deleted-user-avatar'
 import { SquareAvatar } from '../../ui/square-avatar'
 import { Tag } from '../../ui/tag'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip'
@@ -66,16 +67,20 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
         renderAssignSlot(ticket)
       ) : ticket.assignees?.length ? (
         <div className="flex -space-x-2">
-          {ticket.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map(a => (
-            <SquareAvatar
-              key={a.id}
-              src={a.avatarUrl}
-              alt={a.name ?? a.initials ?? a.id}
-              fallback={a.name ?? a.initials}
-              size="sm"
-              variant="round"
-            />
-          ))}
+          {ticket.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map(a =>
+            a.deleted ? (
+              <DeletedUserAvatar key={a.id} size="sm" />
+            ) : (
+              <SquareAvatar
+                key={a.id}
+                src={a.avatarUrl}
+                alt={a.name ?? a.initials ?? a.id}
+                fallback={a.name ?? a.initials}
+                size="sm"
+                variant="round"
+              />
+            ),
+          )}
           {ticket.assignees.length > MAX_VISIBLE_ASSIGNEES && (
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-h6 text-ods-text-secondary">
               +{ticket.assignees.length - MAX_VISIBLE_ASSIGNEES}
