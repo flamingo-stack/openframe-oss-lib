@@ -33,7 +33,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
@@ -134,12 +133,6 @@ public class AuthorizationServerConfig {
         return context -> {
             Authentication authentication = context.getPrincipal();
             String tenantId = getTenantId();
-
-            // Machine clients (e.g. client_credentials) have no user behind them — issue the token
-            // without user claims instead of failing the lookup with "User not found: <client-id>".
-            if (authentication instanceof OAuth2ClientAuthenticationToken) {
-                return;
-            }
 
             String username = authentication != null ? authentication.getName().toLowerCase(Locale.ROOT) : null;
 

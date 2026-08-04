@@ -1,6 +1,7 @@
 package com.openframe.authz.service.sso;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.util.AppleUserParam;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.user.UserService;
@@ -116,7 +117,9 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
     }
 
     private AuthUser registerUser(String tenantId, String email, OidcUser user, String provider) {
-        String[] names = resolveNames(user);
+        // Apple's ID token never carries names; the helper falls back to the one-time "user" form
+        // parameter of the current (form_post callback) request when the provider is Apple.
+        String[] names = AppleUserParam.namesOrAppleFallback(resolveNames(user), provider, null);
         return userService.registerOrReactivateFromSso(tenantId, email, names[0], names[1], List.of(ADMIN), provider);
     }
 

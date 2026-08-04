@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Slf4j
 @Service
@@ -48,16 +47,14 @@ public class SSOConfigService {
     }
 
     private Optional<SSOConfig> buildFromDefaults(String provider, DefaultProviderConfig defaults) {
-        String clientId = defaults.getDefaultClientId();
-        String clientSecret = defaults.getDefaultClientSecret();
-        if (clientId == null || clientId.isBlank() || clientSecret == null || clientSecret.isBlank()) {
+        if (!defaults.isConfigured()) {
             return Optional.empty();
         }
         SSOConfig cfg = new SSOConfig();
         cfg.setProvider(provider);
-        cfg.setClientId(clientId);
+        cfg.setClientId(defaults.getDefaultClientId());
         // Encrypt so downstream decryption works transparently
-        cfg.setClientSecret(encryptionService.encryptClientSecret(clientSecret));
+        cfg.setClientSecret(encryptionService.encryptClientSecret(defaults.getDefaultClientSecret()));
         cfg.setTeamId(defaults.getDefaultTeamId());
         cfg.setKeyId(defaults.getDefaultKeyId());
         cfg.setEnabled(true);
@@ -91,7 +88,7 @@ public class SSOConfigService {
         List<String> result = new ArrayList<>();
 
         for (DefaultProviderConfig cfg : defaultProviderConfigs) {
-            if (isNotBlank(cfg.getDefaultClientId()) && isNotBlank(cfg.getDefaultClientSecret())) {
+            if (cfg.isConfigured()) {
                 result.add(cfg.providerId().toLowerCase());
             }
         }

@@ -4,6 +4,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 import com.openframe.authz.util.AppleUserParam;
@@ -75,19 +76,15 @@ public interface SsoFlowHandler {
 
     /**
      * Token names first; when the token has none (Apple's never does), falls back to the
-     * {@code user} form parameter Apple posts on the first-ever callback only.
+     * {@code user} form parameter Apple posts on the first-ever callback only. The fallback is
+     * gated on the authenticated provider actually being Apple — the parameter is untrusted
+     * request input and must not feed names into other providers' callbacks.
      */
-    default String[] resolveNames(HttpServletRequest request, OidcUser oidcUser) {
-        String[] names = OidcUserUtils.resolveNames(oidcUser);
-        if (isBlank(names[0]) && isBlank(names[1])) {
-            String[] appleNames = AppleUserParam.parseNames(request);
-            if (appleNames != null) return appleNames;
-        }
-        return names;
-    }
-
-    private static boolean isBlank(String s) {
-        return s == null || s.isBlank();
+    default String[] resolveNames(HttpServletRequest request, Authentication authentication, OidcUser oidcUser) {
+        String registrationId = authentication instanceof OAuth2AuthenticationToken token
+                ? token.getAuthorizedClientRegistrationId()
+                : null;
+        return AppleUserParam.namesOrAppleFallback(OidcUserUtils.resolveNames(oidcUser), registrationId, request);
     }
 
     default void clearFlowCookieAndRedirect(HttpServletResponse response,

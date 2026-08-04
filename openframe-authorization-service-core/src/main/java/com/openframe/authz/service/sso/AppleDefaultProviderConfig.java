@@ -40,4 +40,12 @@ public class AppleDefaultProviderConfig implements DefaultProviderConfig {
     public String getDefaultKeyId() {
         return props.getDefaultKeyId();
     }
+
+    /** Apple additionally needs teamId and keyId to mint the client-secret JWT. */
+    @Override
+    public boolean isConfigured() {
+        return DefaultProviderConfig.super.isConfigured()
+                && props.getDefaultTeamId() != null && !props.getDefaultTeamId().isBlank()
+                && props.getDefaultKeyId() != null && !props.getDefaultKeyId().isBlank();
+    }
 }

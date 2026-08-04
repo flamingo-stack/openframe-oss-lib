@@ -17,6 +17,19 @@ public interface DefaultProviderConfig {
     default String getDefaultKeyId() {
         return null;
     }
+
+    /**
+     * Whether enough defaults are present to actually complete a login. Gates the provider out of
+     * signup/login lists when misconfigured, instead of showing a button that fails at the
+     * client-registration step.
+     */
+    default boolean isConfigured() {
+        return notBlank(getDefaultClientId()) && notBlank(getDefaultClientSecret());
+    }
+
+    private static boolean notBlank(String s) {
+        return s != null && !s.isBlank();
+    }
 }
 
 

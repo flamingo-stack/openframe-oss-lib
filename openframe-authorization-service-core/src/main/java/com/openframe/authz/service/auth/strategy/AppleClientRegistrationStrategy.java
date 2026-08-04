@@ -5,16 +5,16 @@ import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.ECDSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import com.openframe.authz.config.oidc.AbstractOidcProviderProperties;
 import com.openframe.authz.config.oidc.AppleSSOProperties;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.data.document.sso.SSOConfig;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
-import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
@@ -29,18 +29,17 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.openframe.authz.config.oidc.AppleSSOProperties.APPLE;
-import static org.springframework.security.oauth2.core.AuthorizationGrantType.AUTHORIZATION_CODE;
 import static org.springframework.security.oauth2.core.ClientAuthenticationMethod.CLIENT_SECRET_POST;
 
 /**
- * Sign in with Apple. Deliberately not built on {@link BaseOidcClientRegistrationStrategy}, because
- * Apple differs from a plain OIDC provider in two ways that the base hardcodes the other way:
+ * Sign in with Apple. Differs from a plain OIDC provider in exactly the ways the base class
+ * exposes as hooks:
  * <ul>
  *   <li>The {@code client_secret} is an ES256 JWT minted per request from the tenant's .p8 key
  *       (stored in the config's {@code clientSecret} field), not a static string. Building the
  *       registration per request via {@code DynamicClientRegistrationRepository} makes Apple's
  *       6-month secret-expiry a non-issue.</li>
- *   <li>Apple's token endpoint only accepts {@code client_secret_post}; the base uses Basic.</li>
+ *   <li>Apple's token endpoint only accepts {@code client_secret_post}.</li>
  * </ul>
  * Apple also requires {@code response_mode=form_post} whenever the email or name scope is
  * requested — see {@link #additionalAuthorizationParams()}; the resulting cross-site POST callback
@@ -48,19 +47,27 @@ import static org.springframework.security.oauth2.core.ClientAuthenticationMetho
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
-public class AppleClientRegistrationStrategy implements ClientRegistrationStrategy {
+public class AppleClientRegistrationStrategy extends BaseOidcClientRegistrationStrategy {
 
     private static final String APPLE_ISSUER = "https://appleid.apple.com";
     /** Apple caps the client-secret JWT at 6 months; a fresh one is minted per request, so keep it short. */
     private static final Duration CLIENT_SECRET_TTL = Duration.ofMinutes(5);
 
-    private final SSOConfigService ssoConfigService;
     private final AppleSSOProperties appleProps;
+
+    public AppleClientRegistrationStrategy(SSOConfigService ssoConfigService, AppleSSOProperties appleProps) {
+        super(ssoConfigService);
+        this.appleProps = appleProps;
+    }
 
     @Override
     public String providerId() {
         return APPLE;
+    }
+
+    @Override
+    protected AbstractOidcProviderProperties props() {
+        return appleProps;
     }
 
     @Override
@@ -69,28 +76,18 @@ public class AppleClientRegistrationStrategy implements ClientRegistrationStrate
     }
 
     @Override
-    public ClientRegistration buildClient(String tenantId) {
-        SSOConfig cfg = ssoConfigService.getEffectiveSSOConfig(tenantId, APPLE)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "No active SSO config for provider 'apple' (tenant-specific or default) and tenant " + tenantId));
+    protected String clientSecret(SSOConfig cfg) {
+        return mintClientSecret(cfg, super.clientSecret(cfg));
+    }
 
-        String privateKeyPem = ssoConfigService.getDecryptedClientSecret(cfg);
-        String clientSecret = mintClientSecret(cfg, privateKeyPem);
+    @Override
+    protected ClientAuthenticationMethod clientAuthenticationMethod() {
+        return CLIENT_SECRET_POST;
+    }
 
-        return ClientRegistration.withRegistrationId(APPLE)
-                .clientId(cfg.getClientId())
-                .clientSecret(clientSecret)
-                .clientAuthenticationMethod(CLIENT_SECRET_POST)
-                .authorizationGrantType(AUTHORIZATION_CODE)
-                .redirectUri(appleProps.getLoginRedirectUri())
-                .scope(appleProps.getScopes())
-                .authorizationUri(appleProps.getAuthorizationUrl())
-                .tokenUri(appleProps.getTokenUrl())
-                .jwkSetUri(appleProps.getJwkSetUri())
-                .issuerUri(APPLE_ISSUER)
-                .userNameAttributeName(IdTokenClaimNames.SUB)
-                .clientName("Apple (" + tenantId + ")")
-                .build();
+    @Override
+    protected void customize(ClientRegistration.Builder builder, SSOConfig cfg) {
+        builder.issuerUri(APPLE_ISSUER);
     }
 
     @Override
