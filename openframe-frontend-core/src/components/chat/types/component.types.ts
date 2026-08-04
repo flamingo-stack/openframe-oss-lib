@@ -4,7 +4,9 @@
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 import type { ApprovalBlockVariant, AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
-import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
+import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData,
+  ApprovalResolutionHandler,
+} from './message.types'
 import type { ChatRef } from '../chat-ref.types'
 import type { ChatContextItem } from './context-item.types'
 import type { MspOrganizationCardProps } from '../msp-organization-card'
@@ -129,8 +131,8 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   timestamp?: Date
   showAvatar?: boolean
   isTyping?: boolean
-  onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>
-  onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
   /**
    * Per-row metadata for inline entity-card rendering (v6.1 §B.2.6+§B.2.7).
    * Keyed by `<documentType>:<primaryKey>`. When present AND
@@ -259,8 +261,8 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   approvalVariant?: ApprovalBlockVariant
   assistantIcon?: React.ReactNode
   pendingApprovals?: MessageSegment[]
-  onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>
-  onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
   // Infinite scroll for loading older messages
   hasNextPage?: boolean
   isFetchingNextPage?: boolean
@@ -518,8 +520,8 @@ export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement
 
 export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivElement> {
   data: ApprovalRequestData
-  onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>
-  onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
   status?: ChatApprovalStatus
   disabled?: boolean
   /** Chat identity. Accepted for parity with the batch card; does NOT drive

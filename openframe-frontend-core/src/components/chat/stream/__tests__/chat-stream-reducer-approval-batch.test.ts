@@ -23,7 +23,10 @@ import type { ApprovalBatchSegment } from '../../types'
 
 const batchEvent = {
   type: 'approval-request' as const,
-  requestId: 'prop-1',
+  // Anchor is DISTINCT from every row's proposal id (server emits
+  // `batch:<first proposalId>`) — the optimistic click flip keys on it
+  // and must never pre-tick a row's execution.
+  requestId: 'batch:prop-1',
   approvalType: 'chat',
   toolCalls: [
     {
@@ -63,7 +66,7 @@ describe('SSE kernel — wire-native approval batch', () => {
     ).toBe(0)
     const batch = findBatch(r)
     expect(batch.status).toBe('pending')
-    expect(batch.data.approvalRequestId).toBe('prop-1')
+    expect(batch.data.approvalRequestId).toBe('batch:prop-1')
     expect(batch.data.toolCalls.map((c) => c.toolExecutionRequestId)).toEqual([
       'prop-1',
       'prop-2',
@@ -78,7 +81,28 @@ describe('SSE kernel — wire-native approval batch', () => {
     const batch = findBatch(r)
     await batch.onApprove?.(batch.data.approvalRequestId)
     expect(onApprove.mock.calls.map((c) => c[0])).toEqual(['prop-1', 'prop-2'])
-    expect(findBatch(r).status).toBe('approved')
+    const after = findBatch(r)
+    expect(after.status).toBe('approved')
+    // REGRESSION PIN: the optimistic flip must NOT pre-tick any row's
+    // execution — a pre-ticked green check would mask a failed confirm
+    // (observed when the anchor doubled as row 1's proposal id).
+    expect(after.data.executions ?? {}).toEqual({})
+  })
+
+  it('a failed row confirm (false) ticks that row cross, others still attempted', async () => {
+    const onApprove = vi
+      .fn()
+      .mockResolvedValueOnce(false) // row 1 confirm fails (e.g. expired)
+      .mockResolvedValueOnce(true)
+    const r = createChatStreamReducer({ transport: 'sse', callbacks: { onApprove } })
+    r.beginSseSend({ text: 'delete both', assistantName: 'Mingo AI' })
+    r.apply(batchEvent)
+    const batch = findBatch(r)
+    await batch.onApprove?.(batch.data.approvalRequestId)
+    expect(onApprove).toHaveBeenCalledTimes(2)
+    const after = findBatch(r)
+    expect(after.data.executions?.['prop-1']).toEqual({ status: 'done', success: false })
+    expect(after.data.executions?.['prop-2']).toBeUndefined()
   })
 
   it('per-proposal approval-resolved events tick the matching row execution', () => {
@@ -92,8 +116,10 @@ describe('SSE kernel — wire-native approval batch', () => {
     r.apply({ type: 'approval-resolved', requestId: 'prop-1', status: 'approved', ok: true })
     batch = findBatch(r)
     expect(batch.data.executions?.['prop-1']).toEqual({ status: 'done', success: true })
-    // Anchor row also carries the status flip.
-    expect(batch.status).toBe('approved')
+    // Status flips at CLICK time (anchor never matches a row id, and no
+    // decision frame carries the anchor) — row resolutions alone leave
+    // the pending status untouched.
+    expect(batch.status).toBe('pending')
   })
 
   it('a single proposal keeps the classic approval_request card', () => {
@@ -116,7 +142,7 @@ describe('decoder — approval_batch frame mapping', () => {
   it('maps the wire frame to ONE batched approval-request event', () => {
     const frame = {
       kind: 'approval_batch',
-      batchId: 'prop-1',
+      batchId: 'batch:prop-1',
       proposals: [
         {
           proposalId: 'prop-1',
@@ -142,7 +168,7 @@ describe('decoder — approval_batch frame mapping', () => {
       | { requestId: string; toolCalls?: Array<Record<string, unknown>> }
       | undefined
     expect(approval).toBeTruthy()
-    expect(approval!.requestId).toBe('prop-1')
+    expect(approval!.requestId).toBe('batch:prop-1')
     expect(approval!.toolCalls?.length).toBe(2)
     expect(approval!.toolCalls?.[0].toolExecutionRequestId).toBe('prop-1')
     // Title field drives the row's disambiguating toolTitle.

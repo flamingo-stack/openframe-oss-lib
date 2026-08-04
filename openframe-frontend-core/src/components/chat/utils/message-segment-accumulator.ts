@@ -14,6 +14,7 @@ import type {
   ApprovalRequestSegment,
   ApprovalBatchSegment,
   ApprovalBatchExecutionState,
+  ApprovalResolutionHandler,
   ContextCompactionSegment,
   ErrorSegment,
   PendingApproval,
@@ -24,13 +25,10 @@ import type {
 } from '../types'
 
 export interface AccumulatorCallbacks {
-  /** Approve/reject transports MAY resolve to a boolean success flag —
-   *  `false` means the request FAILED (network / expired proposal) and
-   *  lets batch approve-all loops mark the row failed instead of
-   *  leaving its execution loader spinning. `void` (legacy transports)
-   *  is treated as success. */
-  onApprove?: (requestId?: string) => Promise<void | boolean> | void | boolean
-  onReject?: (requestId?: string) => Promise<void | boolean> | void | boolean
+  /** See `ApprovalResolutionHandler` (message.types) — the SSOT for the
+   *  approve/reject signature incl. the boolean failure flag. */
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
 }
 
 /**

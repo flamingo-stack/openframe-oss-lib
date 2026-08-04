@@ -174,9 +174,12 @@ export interface ApprovalRequestFrame {
  *  `approval_request` frame. */
 export interface ApprovalBatchFrame {
   kind: 'approval_batch'
-  /** Stable batch anchor — the FIRST proposal's id. Client-side only
-   *  (locates the batch segment for status flips); each row still
-   *  resolves through its own per-proposal confirm. */
+  /** Stable batch anchor — client-side only (locates the batch segment
+   *  for status flips). MUST NOT equal any row's `proposalId`: the
+   *  click-time optimistic status flip keys on this id, and an anchor
+   *  that doubles as a row id would falsely tick that row's execution
+   *  as succeeded before its confirm ran (masking a failed write). The
+   *  server emits `batch:<first proposalId>`. */
   batchId: string
   proposals: Array<{
     proposalId: string
@@ -186,7 +189,6 @@ export interface ApprovalBatchFrame {
     expiresAt?: string
     ttlSeconds?: number
   }>
-  preamble?: string | null
 }
 
 /** Server-driven post-approve / post-reject frame (confirm-tool route).

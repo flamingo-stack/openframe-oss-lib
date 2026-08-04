@@ -1558,7 +1558,7 @@ export function ChatCardLoader({
   // `contentRefType` is empty so the hook returns `isLoading=false` and
   // `item=undefined`, which we ignore.
   const fetchEntry = entry && entry.mode === 'fetch' ? entry : null
-  const { item, isLoading } = useChatCardItem<any>(
+  const { item, isLoading, isError } = useChatCardItem<any>(
     fetchEntry?.contentRefType ?? '',
     fetchEntry ? resolvedChatRef.id : '',
   )
@@ -1706,6 +1706,11 @@ export function ChatCardLoader({
   }
   if (isLoading) return <>{entry.skeleton()}</>
   if (!item) {
+    // FETCH FAILURE (non-OK response — auth blip, 5xx, rate limit) is
+    // NOT evidence of deletion: render nothing rather than a false
+    // "deleted" claim. Only a SUCCESSFUL fetch that lacks the id
+    // reaches the tombstone below.
+    if (isError) return null
     // FETCH MISS. Two distinct cases, split by ref provenance:
     //
     //   - SERVER-BUILT ref (`sourceRepo` present — the entity provably

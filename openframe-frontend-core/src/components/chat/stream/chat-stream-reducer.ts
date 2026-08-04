@@ -1552,32 +1552,31 @@ export function createChatStreamReducer(
               executions: {},
             },
             // Optimistic status flip so the per-row loaders show while
-            // the sequential per-proposal confirms run. A confirm that
+            // the sequential per-proposal confirms run (the anchor id is
+            // NEVER a row id — see ApprovalBatchFrame.batchId — so the
+            // flip cannot pre-tick a row's execution). A confirm that
             // reports failure (`false` — expired proposal, network
             // error) ticks THAT row's cross so no loader spins forever;
             // remaining rows still get their attempt.
-            onApprove: async () => {
-              setMessagesInternal(
-                projectApprovalResolutionToMessages(messages, anchorId, 'approved'),
-              )
-              for (const id of ids) {
-                const ok = await callbacks.onApprove?.(id)
-                if (ok === false) {
-                  setMessagesInternal(projectBatchRowFailureToMessages(messages, id))
+            ...(() => {
+              const resolveBatch =
+                (status: 'approved' | 'rejected', confirm: typeof callbacks.onApprove) =>
+                async () => {
+                  setMessagesInternal(
+                    projectApprovalResolutionToMessages(messages, anchorId, status),
+                  )
+                  for (const id of ids) {
+                    const ok = await confirm?.(id)
+                    if (ok === false) {
+                      setMessagesInternal(projectBatchRowFailureToMessages(messages, id))
+                    }
+                  }
                 }
+              return {
+                onApprove: resolveBatch('approved', callbacks.onApprove),
+                onReject: resolveBatch('rejected', callbacks.onReject),
               }
-            },
-            onReject: async () => {
-              setMessagesInternal(
-                projectApprovalResolutionToMessages(messages, anchorId, 'rejected'),
-              )
-              for (const id of ids) {
-                const ok = await callbacks.onReject?.(id)
-                if (ok === false) {
-                  setMessagesInternal(projectBatchRowFailureToMessages(messages, id))
-                }
-              }
-            },
+            })(),
           }
           setMessagesInternal([
             ...messages.slice(0, -1),

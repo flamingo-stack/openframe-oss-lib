@@ -518,17 +518,20 @@ export function useSseChatAdapter(
         return true
       } catch (err) {
         // AbortError on user-initiated stop is expected — keep the partial
-        // message, no error row.
-        if ((err as { name?: string })?.name !== 'AbortError' && !ctrl.signal.aborted) {
-          flushDeltas()
-          mutate((r) =>
-            r.failSseTurn(
-              err instanceof Error
-                ? err.message
-                : 'An error occurred while processing your request.',
-            ),
-          )
+        // message, no error row, and DON'T report failure (`true`): the
+        // request may have committed server-side, and a `false` here
+        // would falsely tick a batch row's failure cross.
+        if ((err as { name?: string })?.name === 'AbortError' || ctrl.signal.aborted) {
+          return true
         }
+        flushDeltas()
+        mutate((r) =>
+          r.failSseTurn(
+            err instanceof Error
+              ? err.message
+              : 'An error occurred while processing your request.',
+          ),
+        )
         return false
       } finally {
         if (abortControllerRef.current === ctrl) {

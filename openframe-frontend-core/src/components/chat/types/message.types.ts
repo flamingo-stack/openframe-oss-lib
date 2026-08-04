@@ -159,6 +159,16 @@ export interface ApprovalBatchData {
   executions?: Record<string, ApprovalBatchExecutionState>
 }
 
+/** Approve/reject handler stamped onto approval segments. MAY resolve a
+ *  boolean success flag — `false` means the confirm FAILED (expired
+ *  proposal, network error); batch approve-all loops use it to tick the
+ *  row's failure cross. `void` (legacy transports) is treated as
+ *  success. Single source of truth for this signature — component
+ *  props, accumulator callbacks, and adapters all reference it. */
+export type ApprovalResolutionHandler = (
+  requestId?: string,
+) => void | boolean | Promise<void | boolean>
+
 // ========== Message Segment Types ==========
 
 export type TextSegment = {
@@ -192,11 +202,8 @@ export type ApprovalRequestSegment = {
   /** Display name of the user who resolved the request; baked into the client
    *  variant's full-text status pill ("Approved by {name}"). */
   resolvedByName?: string | null
-  /** May resolve a boolean success flag — `false` = the confirm FAILED
-   *  (expired proposal, network error); batch approve-all loops use it
-   *  to tick the row's failure cross. `void` is treated as success. */
-  onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>
-  onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
 }
 
 export type ApprovalBatchSegment = {
@@ -205,11 +212,8 @@ export type ApprovalBatchSegment = {
   status?: ChatApprovalStatus
   /** Display name of the user who resolved the request; set when the batch is resolved (null/absent for system actions). */
   resolvedByName?: string | null
-  /** May resolve a boolean success flag — `false` = the confirm FAILED
-   *  (expired proposal, network error); batch approve-all loops use it
-   *  to tick the row's failure cross. `void` is treated as success. */
-  onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>
-  onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
 }
 
 export type ErrorSegment = {
