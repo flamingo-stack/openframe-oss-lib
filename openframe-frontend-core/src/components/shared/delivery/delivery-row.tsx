@@ -27,6 +27,7 @@
 import * as React from 'react'
 import Link from '../../../embed-shims/next-link'
 import { StatusBadge } from '../../ui/status-badge'
+import { AvatarStack } from '../../ui/avatar-stack'
 import { getStatusColorScheme } from '../../../utils'
 import {
   type DeliveryItem,
@@ -110,8 +111,8 @@ export function DeliveryRow({
         </div>
       </div>
 
-      {/* Right: status + task-type badges */}
-      <div className="flex-shrink-0 self-start flex flex-col gap-2">
+      {/* Right: status + task-type badges + assignee stack */}
+      <div className="flex-shrink-0 self-start flex flex-col items-end gap-2">
         <StatusBadge
           text={item.status.toUpperCase()}
           colorScheme={statusBadgeScheme}
@@ -123,6 +124,16 @@ export function DeliveryRow({
           variant="card"
           className={`border border-ods-border ${typeBadgeTextColor}`}
         />
+        {item.assignees && item.assignees.length > 0 ? (
+          <AvatarStack
+            size="xs"
+            people={item.assignees.map((a) => ({
+              key: a.id,
+              name: a.name ?? 'Unknown',
+              avatarUrl: a.avatarUrl,
+            }))}
+          />
+        ) : null}
       </div>
     </div>
   )

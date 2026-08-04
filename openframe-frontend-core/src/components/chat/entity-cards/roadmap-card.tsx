@@ -14,6 +14,7 @@ import React, { useState } from 'react'
 import Image from '../../../embed-shims/next-image'
 import { ThumbsUp, ThumbsDown } from 'lucide-react'
 import { RoadmapVoteButton } from './roadmap-vote-button'
+import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack'
 import { FigmaIcon } from '../../icons/figma-icon'
 import { ImageIcon } from '../../icons/image-icon'
 import { Button } from '../../ui/button/button'
@@ -110,6 +111,17 @@ export interface RoadmapCardProps {
   userVote?: VoteType | null
   onVote?: (voteType: 'up' | 'down') => void
   isVoting?: boolean
+}
+
+/** Wire assignees → AvatarStack people (name+avatar only on the wire). */
+function assigneePeople(
+  assignees: Array<{ id: number; name: string | null; avatarUrl: string | null }> | undefined,
+): AvatarStackPerson[] {
+  return (assignees ?? []).map((a) => ({
+    key: a.id,
+    name: a.name ?? 'Unknown',
+    avatarUrl: a.avatarUrl,
+  }))
 }
 
 export function RoadmapCard({
@@ -220,6 +232,9 @@ export function RoadmapCard({
                 <span>{item.screenshots.length}</span>
               </span>
             ) : null}
+            {item.assignees && item.assignees.length > 0 ? (
+              <AvatarStack size="xs" people={assigneePeople(item.assignees)} className="shrink-0" />
+            ) : null}
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
             <span className={COMPACT_CARD_SUMMARY}>
@@ -321,7 +336,10 @@ export function RoadmapCard({
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {item.assignees && item.assignees.length > 0 ? (
+            <AvatarStack size="xs" people={assigneePeople(item.assignees)} className="shrink-0" />
+          ) : null}
           {item.screenshots && item.screenshots.length > 0 && (
             <Button
               variant="outline"
