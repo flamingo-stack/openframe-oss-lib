@@ -1,4 +1,5 @@
 import { scrollElementIntoView } from './scroll-into-view'
+import { findAnchorElementByNormalizedId } from './anchor-id'
 
 /** Pages with a section-nav STRIP on top of the global hub header
  *  (dev-center roadmap/delivery/tickets, FAQ category-pill nav).
@@ -24,24 +25,42 @@ export function normalizeHashFragment(hash: string): string {
 }
 
 /**
- * Resolve the DOM element a hash fragment id points at. Tries the raw
- * id first (ordinary anchors), then the percent-decoded form — href
- * composers like `buildTicketOpenHref` encode the id into the fragment
- * while rows render the raw id, so `#ticket-a%2Fb` must still find
- * `id="ticket-a/b"`. A malformed escape sequence falls back to the
- * raw lookup result.
+ * Resolve the DOM element a hash fragment id points at — THE hash resolver;
+ * `navigateSamePageHash`, `useScrollToHash` and the markdown link renderer
+ * all go through this one, so a fragment that resolves for a deep link
+ * resolves for an in-body click too.
+ *
+ * Three passes, cheapest first:
+ *   1. the raw id (ordinary anchors — the overwhelming common case);
+ *   2. the percent-decoded form — href composers like `buildTicketOpenHref`
+ *      encode the id into the fragment while rows render the raw id, so
+ *      `#ticket-a%2Fb` must still find `id="ticket-a/b"`. A malformed escape
+ *      sequence just falls through;
+ *   3. a NORMALIZED match against the document's headings — doc bodies are
+ *      authored on GitHub, whose slugger keeps the hyphen left behind by a
+ *      stripped emoji (`## 📚 Table of Contents` → `#-table-of-contents`)
+ *      while our ids trim it. Without this every in-body TOC link in every
+ *      GitHub-authored doc resolves to nothing and clicking one does nothing.
+ *      See `utils/anchor-id`.
  */
 export function getHashTargetElement(id: string): HTMLElement | null {
   if (!id) return null
   const direct = document.getElementById(id)
   if (direct) return direct
+
+  let decoded = id
   try {
-    const decoded = decodeURIComponent(id)
-    if (decoded !== id) return document.getElementById(decoded)
+    decoded = decodeURIComponent(id)
+    if (decoded !== id) {
+      const decodedEl = document.getElementById(decoded)
+      if (decodedEl) return decodedEl
+    }
   } catch {
     // malformed escape — the raw lookup above already covered it
+    decoded = id
   }
-  return null
+
+  return findAnchorElementByNormalizedId(decoded, document)
 }
 
 export interface NavigateSamePageHashOptions {

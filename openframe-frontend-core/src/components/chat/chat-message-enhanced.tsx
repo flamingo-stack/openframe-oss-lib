@@ -27,8 +27,9 @@ import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from ".
  *  (e.g. it matches `x@device:1` mid-word, which the plugin skips), so a context
  *  item would be stripped from the chip strip yet never rendered inline — lost
  *  from display entirely. The id is capture group 2 (group 1 is the boundary).
- *  Marker lowercase; id is the mention-token charset. */
-const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g
+ *  Marker `[a-zA-Z]+` (markers are mostly lowercase but not all — e.g.
+ *  `scheduledScript`); id is the mention-token charset. */
+const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-zA-Z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g
 
 /**
  * Same regex shape as `remarkCardLinks` — kept in lockstep so the
