@@ -7,7 +7,8 @@
         </encoder>
     </appender>
 
-    <!-- Console only: stdout is scraped by Alloy/Loki; file logging is intentionally disabled -->
+    <!-- Console (stdout) only, no file appenders: the deployment's log collector (e.g. Alloy -> Loki)
+         must scrape container stdout and own retention. See README.md in this directory. -->
     <root level="info">
         <appender-ref ref="ConsoleAppender" />
     </root>
