@@ -4,6 +4,7 @@ import com.openframe.authz.config.oidc.AbstractOidcProviderProperties;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.data.document.sso.SSOConfig;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 
 import static org.springframework.security.oauth2.core.AuthorizationGrantType.AUTHORIZATION_CODE;
@@ -28,21 +29,35 @@ public abstract class BaseOidcClientRegistrationStrategy implements ClientRegist
         AbstractOidcProviderProperties props = props();
         String msTenantId = cfg.getMsTenantId();
 
-        String authorizationUrl = props.effectiveAuthorizationUrl(msTenantId);
-        return ClientRegistration.withRegistrationId(provider)
+        ClientRegistration.Builder builder = ClientRegistration.withRegistrationId(provider)
                 .clientId(cfg.getClientId())
-                .clientSecret(ssoConfigService.getDecryptedClientSecret(cfg))
-                .clientAuthenticationMethod(CLIENT_SECRET_BASIC)
+                .clientSecret(clientSecret(cfg))
+                .clientAuthenticationMethod(clientAuthenticationMethod())
                 .authorizationGrantType(AUTHORIZATION_CODE)
                 .redirectUri(props.getLoginRedirectUri())
                 .scope(props.getScopes())
-                .authorizationUri(authorizationUrl)
+                .authorizationUri(props.effectiveAuthorizationUrl(msTenantId))
                 .tokenUri(props.effectiveTokenUrl(msTenantId))
                 .userInfoUri(props.getUserInfoUrl())
                 .userNameAttributeName(IdTokenClaimNames.SUB)
                 .jwkSetUri(props.effectiveJwkSetUri(msTenantId))
-                .clientName(capitalize(provider) + " (" + tenantId + ")")
-                .build();
+                .clientName(capitalize(provider) + " (" + tenantId + ")");
+        customize(builder, cfg);
+        return builder.build();
+    }
+
+    /** The value sent as {@code client_secret}. Default: the stored secret, decrypted. */
+    protected String clientSecret(SSOConfig cfg) {
+        return ssoConfigService.getDecryptedClientSecret(cfg);
+    }
+
+    /** How the client authenticates at the token endpoint. Apple only accepts {@code client_secret_post}. */
+    protected ClientAuthenticationMethod clientAuthenticationMethod() {
+        return CLIENT_SECRET_BASIC;
+    }
+
+    /** Last-word hook for provider-specific registration details (e.g. a fixed issuer). */
+    protected void customize(ClientRegistration.Builder builder, SSOConfig cfg) {
     }
 
     private static String capitalize(String s) {
@@ -52,5 +67,3 @@ public abstract class BaseOidcClientRegistrationStrategy implements ClientRegist
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 }
-
-
