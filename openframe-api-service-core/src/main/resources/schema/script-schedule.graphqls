@@ -265,4 +265,8 @@ input ScriptScheduleFilterInput {
     statuses: [ScriptStatus!]
     supportedPlatforms: [OsType!]
     authorIds: [ID!]
+    createdAtFrom: Instant
+    createdAtTo: Instant
+    updatedAtFrom: Instant
+    updatedAtTo: Instant
 }
