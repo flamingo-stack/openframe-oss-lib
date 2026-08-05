@@ -1,7 +1,7 @@
 package com.openframe.api.dto.rmm.script;
 
 import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptShell;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -32,7 +32,7 @@ public class CreateScriptInput {
     @NotBlank
     private String scriptBody;
 
-    private List<ScriptPlatform> supportedPlatforms;
+    private List<OsType> supportedPlatforms;
 
     private Integer defaultTimeoutSeconds;
 

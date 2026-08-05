@@ -12,9 +12,9 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
-import com.openframe.data.util.MachineOsClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -167,10 +167,12 @@ public class AgentRegistrationService {
         machine.setLastSeen(Instant.now());
     }
 
-    private static String normalizeOsType(String rawOsType) {
-        return MachineOsClassifier.classify(rawOsType)
-                .map(Enum::name)
-                .orElse(rawOsType);
+    private static OsType normalizeOsType(String rawOsType) {
+        try {
+            return OsType.valueOf(rawOsType);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new IllegalArgumentException("Unsupported osType reported by agent: " + rawOsType);
+        }
     }
 
 }
