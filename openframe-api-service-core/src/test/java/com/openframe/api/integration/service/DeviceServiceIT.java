@@ -176,10 +176,11 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
                 .doesNotContain("gone");
         assertThat(result.getFilteredCount()).isEqualTo(2);
     }
+
     @Test
     @DisplayName("updateNickname: atomic $set — a concurrent writer's fields survive the rename (regression: save() rewrote the whole document)")
     void updateNickname_preservesConcurrentWrites() {
-        machine("m1", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.ONLINE);
+        machine("m1", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.ONLINE);
         mongoTemplate.updateFirst(byMachineId("m1"),
                 new Update().set("agentReportedField", "keep-me"), Machine.class);
 
@@ -193,14 +194,14 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
         assertThat(stored.get("nickname")).isEqualTo("Reception iMac");
         assertThat(stored.get("agentReportedField")).as("concurrent writer's field").isEqualTo("keep-me");
         assertThat(stored.get("status")).isEqualTo(DeviceStatus.ONLINE.name());
-        assertThat(stored.get("osType")).isEqualTo("windows");
+        assertThat(stored.get("osType")).isEqualTo(OsType.WINDOWS.name());
         assertThat(stored.get("updatedAt")).isNotNull();
     }
 
     @Test
     @DisplayName("updateNickname: a blank value clears the stored nickname; an unknown device throws")
     void updateNickname_clearsAndRejectsUnknown() {
-        machine("m1", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.ONLINE);
+        machine("m1", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.ONLINE);
         deviceService.updateNickname("m1", "Reception iMac");
 
         assertThat(deviceService.updateNickname("m1", "   ").getNickname()).isNull();
