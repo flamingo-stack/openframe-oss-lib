@@ -3,14 +3,9 @@
  * Export all utilities for processing chat messages
  */
 
-// Chunk parsing utilities
-export {
-  parseChunkToAction,
-  isControlChunk,
-  isErrorChunk,
-  isMetadataChunk,
-  extractTextFromChunk,
-} from './chunk-parser'
+// NOTE: NATS chunk parsing lives in `chat-protocol/nats-decoder`
+// (`decodeNatsChunk`) — the legacy `chunk-parser` module was deleted once the
+// reducer became the single reading path.
 
 // Segment accumulator
 export {
@@ -24,11 +19,13 @@ export {
   processHistoricalMessages,
   extractErrorMessages,
   processHistoricalMessagesWithErrors,
+  decodeHistoricalMessageData,
 } from './process-historical-messages'
 
 // Incomplete message state extraction
 export {
   extractIncompleteMessageState,
+  extractIncompleteTailState,
 } from './extract-incomplete-message-state'
 
 // History <-> realtime reconciliation
@@ -198,5 +195,21 @@ export {
   resolveSourceRowCTA,
   resolveSourceIcon,
 } from './source-row-cta'
+
+// Post-fetch enrichment for the synthetic ChatRef a `[card://type:id]` marker
+// produces when the transport ships no refs metadata (Mingo/NATS).
+export {
+  resolveFetchedCardHref,
+  readFetchedCardTitle,
+  type FetchedCardHrefInput,
+} from './resolve-fetched-card-href'
+
+// The ONE "Ask Mingo" prompt builder — shared by the SSE adapter, the NATS
+// adapter, and hosts that inject their own Mingo state (openframe-frontend).
+export {
+  buildDiscussPrompt,
+  type DiscussPromptRef,
+  type BuildDiscussPromptOptions,
+} from './discuss-ref-prompt'
 
 export * from './scripted-stream'

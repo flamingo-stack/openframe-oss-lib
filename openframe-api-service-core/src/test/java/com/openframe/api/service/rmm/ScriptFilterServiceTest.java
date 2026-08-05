@@ -3,7 +3,7 @@ package com.openframe.api.service.rmm;
 import com.openframe.api.dto.rmm.script.ScriptFilterInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterOption;
 import com.openframe.api.dto.rmm.script.ScriptFilters;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
@@ -60,7 +60,7 @@ class ScriptFilterServiceTest {
     void getScriptFilters_buildsAllFacets() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(scriptRepository.shellFacet(eq(TENANT_ID), any())).thenReturn(Map.of("BASH", 3, "POWERSHELL", 1));
-        when(scriptRepository.platformFacet(eq(TENANT_ID), any())).thenReturn(Map.of("MACOS", 2));
+        when(scriptRepository.platformFacet(eq(TENANT_ID), any())).thenReturn(Map.of("MAC_OS", 2));
         when(scriptRepository.authorFacet(eq(TENANT_ID), any())).thenReturn(Map.of("u-1", 4, "u-2", 1));
         when(scriptRepository.countForTenant(eq(TENANT_ID), any(), isNull())).thenReturn(5L);
         when(userRepository.findAllById(any())).thenReturn(List.of(
@@ -74,7 +74,7 @@ class ScriptFilterServiceTest {
                 .extracting(ScriptFilterOption::getValue).containsExactlyInAnyOrder("BASH", "POWERSHELL");
         assertThat(result.getShells()).allSatisfy(o -> assertThat(o.getLabel()).isEqualTo(o.getValue()));  // self-labeled
         assertThat(result.getPlatforms()).singleElement().satisfies(o -> {
-            assertThat(o.getValue()).isEqualTo("MACOS");
+            assertThat(o.getValue()).isEqualTo("MAC_OS");
             assertThat(o.getCount()).isEqualTo(2);
         });
         assertThat(result.getAuthors())
@@ -116,7 +116,7 @@ class ScriptFilterServiceTest {
         ScriptFilterInput input = ScriptFilterInput.builder()
                 .shells(List.of(ScriptShell.BASH))
                 .statuses(List.of(ScriptStatus.ACTIVE))
-                .supportedPlatforms(List.of(ScriptPlatform.MACOS))
+                .supportedPlatforms(List.of(OsType.MAC_OS))
                 .tagIds(List.of("tag-1"))
                 .authorIds(List.of("user-7"))
                 .build();
@@ -129,7 +129,7 @@ class ScriptFilterServiceTest {
         assertThat(qf.getCreatedByIds()).containsExactly("user-7");          // authorIds → createdByIds
         assertThat(qf.getShells()).containsExactly(ScriptShell.BASH);
         assertThat(qf.getStatuses()).containsExactly(ScriptStatus.ACTIVE);
-        assertThat(qf.getSupportedPlatforms()).containsExactly(ScriptPlatform.MACOS);
+        assertThat(qf.getSupportedPlatforms()).containsExactly(OsType.MAC_OS);
         assertThat(qf.getTagIds()).containsExactly("tag-1");
 
         // the same mapped filter reaches the count (with search == null)

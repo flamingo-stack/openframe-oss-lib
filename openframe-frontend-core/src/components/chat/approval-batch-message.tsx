@@ -25,8 +25,8 @@ import {
 export interface ApprovalBatchMessageProps extends React.HTMLAttributes<HTMLDivElement> {
   data: ApprovalBatchSegment["data"]
   status?: ApprovalBatchSegment["status"]
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
+  onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>
+  onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>
   /**
    * Cap the tool-call list height so it scrolls internally while the footer
    * (explanations + Approve/Reject) stays pinned below. Omit for the default

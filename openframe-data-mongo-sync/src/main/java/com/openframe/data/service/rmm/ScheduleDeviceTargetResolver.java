@@ -5,12 +5,11 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
-import com.openframe.data.util.MachineOsClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,7 +33,7 @@ import java.util.stream.Collectors;
  *
  * <p>Criteria OS is always intersected with the schedule's {@code supportedPlatforms}, so a criteria
  * target is guaranteed platform-compatible. Matching on {@code osType} is case-insensitive (osType is
- * stored lowercase; {@link ScriptPlatform} names are upper).
+ * stored lowercase; {@link OsType} names are upper).
  */
 @Component
 @RequiredArgsConstructor
@@ -78,21 +77,13 @@ public class ScheduleDeviceTargetResolver {
         }
         List<String> platformScope = platformScope(schedule);
         if (platformScope != null) {                       // an OS constraint applies
-            String osType = machine.getOsType();
-            if (osType == null || !matchesPlatformScope(osType, platformScope)) {
+            OsType osType = machine.getOsType();
+            // Direct enum match — no more raw-string classification, osType is typed now.
+            if (osType == null || platformScope.stream().noneMatch(osType.name()::equalsIgnoreCase)) {
                 return false;
             }
         }
         return true;
-    }
-
-    private static boolean matchesPlatformScope(String osType, List<String> platformScope) {
-        if (platformScope.stream().anyMatch(osType::equalsIgnoreCase)) {
-            return true;
-        }
-        return MachineOsClassifier.classify(osType)
-                .map(platform -> platformScope.stream().anyMatch(platform.name()::equalsIgnoreCase))
-                .orElse(false);
     }
 
     /**
@@ -131,7 +122,7 @@ public class ScheduleDeviceTargetResolver {
     private List<String> platformScope(ScriptSchedule schedule) {
         ScheduleDeviceCriteria criteria = schedule.getDeviceCriteria();
         List<String> osTypes = criteria == null ? null : criteria.getOsTypes();
-        Set<ScriptPlatform> supported = schedule.getSupportedPlatforms() == null
+        Set<OsType> supported = schedule.getSupportedPlatforms() == null
                 ? Set.of()
                 : schedule.getSupportedPlatforms().stream().collect(Collectors.toUnmodifiableSet());
 
@@ -142,9 +133,9 @@ public class ScheduleDeviceTargetResolver {
         if (!hasOs) {
             return supported.stream().map(Enum::name).toList();     // schedule platforms only
         }
-        List<ScriptPlatform> criteriaPlatforms = osTypes.stream()
-                .map(MachineOsClassifier::classify)
-                .flatMap(Optional::stream)
+        List<OsType> criteriaPlatforms = osTypes.stream()
+                .map(ScheduleDeviceTargetResolver::parseOsTypeSafely)
+                .filter(Objects::nonNull)
                 .distinct()
                 .toList();
         if (supported.isEmpty()) {
@@ -166,5 +157,13 @@ public class ScheduleDeviceTargetResolver {
 
     private static boolean isNotEmpty(List<?> list) {
         return list != null && !list.isEmpty();
+    }
+
+    private static OsType parseOsTypeSafely(String value) {
+        try {
+            return OsType.valueOf(value);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return null;
+        }
     }
 }

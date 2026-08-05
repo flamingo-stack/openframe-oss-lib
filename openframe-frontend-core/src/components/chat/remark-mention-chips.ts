@@ -15,9 +15,12 @@
  * intact, and the marker disappears before any rehype-raw HTML pass.
  *
  * Grammar:
- *   - marker: `[a-z]+` — the backend `ContextItemType.marker()` short form
+ *   - marker: `[a-zA-Z]+` — the backend `ContextItemType.marker()` short form
  *     (`device`, `script`, `ticket`, `organization`, `user`, `kb`, `policy`,
- *     `query`, …). Always lowercase.
+ *     `query`, `scheduledScript`, …). Mostly lowercase, but NOT guaranteed to be:
+ *     the marker is matched verbatim by the backend's `MentionParser`, and
+ *     `SCHEDULED_SCRIPT` ships as camelCase `scheduledScript` — a lowercase-only
+ *     grammar silently dropped that whole token (no chip, raw text in the bubble).
  *   - id: charset `[A-Za-z0-9_.+/=-]` (UUIDs with hyphens, fleet numeric ids,
  *     base64 global ids, etc.; matches the composer's `MENTION_TOKEN`) — but the
  *     id may NOT END in `.` or `-`, so a trailing SENTENCE period/dash isn't
@@ -35,7 +38,7 @@ import type { Plugin } from 'unified'
 import type { Root, Text, Link } from 'mdast'
 import { visit, SKIP } from 'unist-util-visit'
 
-const MENTION_REGEX = /(^|[^\w@])@([a-z]+):([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g
+const MENTION_REGEX = /(^|[^\w@])@([a-zA-Z]+):([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g
 
 export const remarkMentionChips: Plugin<[], Root> = () => {
   return (tree: Root) => {

@@ -30,7 +30,7 @@ public class DeviceMapper extends BaseRestMapper {
                 .manufacturer(machine.getManufacturer())
                 .model(machine.getModel())
                 .type(machine.getType())
-                .osType(machine.getOsType())
+                .osType(machine.getOsType() != null ? machine.getOsType().name() : null)
                 .osVersion(machine.getOsVersion())
                 .osBuild(machine.getOsBuild())
                 .timezone(machine.getTimezone())

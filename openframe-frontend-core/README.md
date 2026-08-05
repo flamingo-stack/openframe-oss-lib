@@ -163,6 +163,7 @@ End-to-end guides under [`docs/`](./docs):
 - [`EMBEDDING.md`](./docs/EMBEDDING.md) — runtime providers (`EndpointsRuntimeContext`, `ChatRuntimeContext`) for non-hub React apps.
 - [`EMBEDDING_DOCS_HUB.md`](./docs/EMBEDDING_DOCS_HUB.md) — embed `<DocsHubPage>` (sidebar tree + content + RAG search bar) in a third-party app. The hub uses this same component at `/knowledge-base` and `/data-room`.
 - [`CHAT_EMBEDDING_TUTORIAL.md`](./docs/CHAT_EMBEDDING_TUTORIAL.md) — embed the full `<EmbeddableChat>` panel (Guide + Mingo modes).
+- [`EMBEDDING_HUBSPOT_MEETINGS.md`](./docs/EMBEDDING_HUBSPOT_MEETINGS.md) — embed `<HubSpotMeetingScheduler>` (natively-branded HubSpot booking flow) behind a host proxy; includes the link naming convention and the proxy endpoint contract.
 
 ## Key Dependencies
 

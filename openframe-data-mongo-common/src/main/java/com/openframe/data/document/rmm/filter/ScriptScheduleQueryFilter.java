@@ -1,12 +1,13 @@
 package com.openframe.data.document.rmm.filter;
 
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -25,11 +26,17 @@ import java.util.List;
 public class ScriptScheduleQueryFilter {
 
     private List<ScriptStatus> statuses;
-    private List<ScriptPlatform> supportedPlatforms;
+    private List<OsType> supportedPlatforms;
 
     /**
      * Match schedules whose {@code createdBy} (author user id) is ANY of these.
      * {@code null} = no author constraint.
      */
     private List<String> createdByIds;
+
+    private Instant createdAtFrom;
+    private Instant createdAtTo;
+
+    private Instant updatedAtFrom;
+    private Instant updatedAtTo;
 }

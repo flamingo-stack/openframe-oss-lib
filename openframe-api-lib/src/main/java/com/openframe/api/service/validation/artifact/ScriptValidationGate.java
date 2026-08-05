@@ -1,7 +1,7 @@
 package com.openframe.api.service.validation.artifact;
 
 import com.openframe.core.exception.ArtifactValidationException;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptValidation;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +33,7 @@ public class ScriptValidationGate {
     private final StaticSafetyAnalyzer safetyAnalyzer;
 
     public ScriptValidation validateOrThrow(ScriptShell shell, String body,
-                                            List<ScriptPlatform> platforms, String actor) {
+                                            List<OsType> platforms, String actor) {
         ArtifactValidationResult result = ArtifactValidationResult.merge(
                 syntaxValidator.validate(shell, body),
                 safetyAnalyzer.analyzeScript(shell, body));

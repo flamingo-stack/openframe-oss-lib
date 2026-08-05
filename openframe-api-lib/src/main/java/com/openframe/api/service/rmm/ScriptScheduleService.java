@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
+import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
@@ -15,7 +16,7 @@ import com.openframe.api.mapper.ScriptScheduleMapper;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -77,7 +78,8 @@ public class ScriptScheduleService {
 
         ScriptScheduleTrigger trigger = defaultTrigger(input.getTrigger());
         validateTiming(trigger, input.getStartAt(), input.getRepeat());
-        validateScriptPlatforms(input.getSupportedPlatforms(), input.getScriptIds());
+        validateOsTypes(input.getSupportedPlatforms(), input.getScriptIds());
+        validateCustomParams(input.getScriptIds(), input.getScriptCustomParams());
 
         ScriptSchedule entity = scheduleMapper.toEntity(tenantId, input);
         entity.setCreatedBy(createdBy);
@@ -179,6 +181,10 @@ public class ScriptScheduleService {
                 .statuses(input.getStatuses())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .createdByIds(input.getAuthorIds())
+                .createdAtFrom(input.getCreatedAtFrom())
+                .createdAtTo(input.getCreatedAtTo())
+                .updatedAtFrom(input.getUpdatedAtFrom())
+                .updatedAtTo(input.getUpdatedAtTo())
                 .build();
     }
 
@@ -201,7 +207,8 @@ public class ScriptScheduleService {
 
         ScriptScheduleTrigger trigger = defaultTrigger(input.getTrigger());
         validateTiming(trigger, input.getStartAt(), input.getRepeat());
-        validateScriptPlatforms(input.getSupportedPlatforms(), input.getScriptIds());
+        validateOsTypes(input.getSupportedPlatforms(), input.getScriptIds());
+        validateCustomParams(input.getScriptIds(), input.getScriptCustomParams());
 
         Instant priorStartAt = existing.getStartAt();
         scheduleMapper.updateEntity(existing, input);
@@ -303,7 +310,7 @@ public class ScriptScheduleService {
         return instant.getNano() == 0 && Math.floorMod(instant.getEpochSecond(), SLOT_SECONDS) == 0;
     }
 
-    private void validateScriptPlatforms(List<ScriptPlatform> schedulePlatforms, List<String> scriptIds) {
+    private void validateOsTypes(List<OsType> schedulePlatforms, List<String> scriptIds) {
         if (schedulePlatforms == null || schedulePlatforms.isEmpty()
                 || scriptIds == null || scriptIds.isEmpty()) {
             return;
@@ -322,6 +329,23 @@ public class ScriptScheduleService {
         if (!incompatible.isEmpty()) {
             throw new BadRequestException(
                     "Scripts do not support the schedule's platform(s) " + required + ": " + incompatible);
+        }
+    }
+
+    private void validateCustomParams(List<String> scriptIds, List<ScheduledScriptCustomParamsInput> customParams) {
+        if (customParams == null || customParams.isEmpty()) {
+            return;
+        }
+        Set<String> scheduleScriptIds = scriptIds == null ? Set.of() : new HashSet<>(scriptIds);
+        Set<String> seen = new HashSet<>();
+        for (ScheduledScriptCustomParamsInput cp : customParams) {
+            String scriptId = cp.getScriptId();
+            if (!scheduleScriptIds.contains(scriptId)) {
+                throw new BadRequestException("Custom params reference scriptId not in this schedule: " + scriptId);
+            }
+            if (!seen.add(scriptId)) {
+                throw new BadRequestException("Duplicate custom params for scriptId: " + scriptId);
+            }
         }
     }
 

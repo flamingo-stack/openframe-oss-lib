@@ -1,10 +1,12 @@
 package com.openframe.security.oauth.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jwt.JWTParser;
 import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import com.openframe.security.jwt.JwtService;
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
 import com.openframe.security.oauth.dto.TokenResponse;
+import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
 import com.openframe.security.oauth.headers.ForwardedHeadersContributor;
 import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +50,10 @@ public class OAuthBffService {
     private final MongoOAuth2AuthorizationRepository authorizationRepository;
 
     private static final String USER_ID_CLAIM = "userId";
+
+    private static final String INVALID_GRANT = "invalid_grant";
+    private static final Pattern OAUTH_ERROR_CODE = Pattern.compile("[a-z0-9_]{1,40}");
+    private static final ObjectMapper ERROR_BODY_MAPPER = new ObjectMapper();
 
     @Value("${openframe.auth.server.url}")
     private String authServerUrl;
@@ -213,11 +219,38 @@ public class OAuthBffService {
                 .header(ACCEPT, "application/json")
                 .body(BodyInserters.fromFormData(form))
                 .retrieve()
-                .onStatus(s -> s.is4xxClientError() || s.is5xxServerError(), resp ->
+                .onStatus(s -> s.is4xxClientError(), resp ->
                         resp.bodyToMono(String.class).defaultIfEmpty("")
-                                .flatMap(body -> Mono.error(new IllegalStateException("token_refresh_failed:" + body)))
+                                .flatMap(body -> {
+                                    String oauthError = extractOAuthErrorCode(body);
+                                    if (INVALID_GRANT.equals(oauthError)) {
+                                        log.warn("Auth server rejected refresh for tenant {} ({}): error={}",
+                                                tenantId, resp.statusCode(), oauthError);
+                                        return Mono.error(new InvalidRefreshTokenException());
+                                    }
+                                    log.error("Auth server refused refresh for tenant {} ({}): error={}",
+                                            tenantId, resp.statusCode(), oauthError);
+                                    return Mono.error(new IllegalStateException("token_refresh_failed"));
+                                })
+                )
+                .onStatus(s -> s.is5xxServerError(), resp ->
+                        resp.bodyToMono(String.class).defaultIfEmpty("")
+                                .flatMap(body -> {
+                                    log.error("Auth server error during refresh for tenant {} ({})",
+                                            tenantId, resp.statusCode());
+                                    return Mono.error(new IllegalStateException("token_refresh_failed"));
+                                })
                 )
                 .bodyToMono(TokenResponse.class);
+    }
+
+    private String extractOAuthErrorCode(String body) {
+        try {
+            String error = ERROR_BODY_MAPPER.readTree(body).path("error").asText(null);
+            return error != null && OAUTH_ERROR_CODE.matcher(error).matches() ? error : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private String basicAuth(String clientId, String clientSecret) {

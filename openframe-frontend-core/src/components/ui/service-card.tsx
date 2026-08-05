@@ -8,6 +8,9 @@ import { CheckIcon } from '../icons-v2-generated/signs-and-symbols'
 import { ExternalLink } from 'lucide-react'
 import { OpenFrameLogo } from '../..'
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard'
+import { useIsTruncated } from '../../hooks/ui/use-is-truncated'
+import { FloatingTooltip } from './floating-tooltip'
+import { TruncateText } from './truncate-text'
 
 export type ServiceCardRowAction = {
   copy?: boolean
@@ -61,9 +64,11 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, className }: Ser
             {resolvedIcon}
           </div>
           <div className="min-w-0">
-            <div className="text-h3 text-ods-text-primary truncate" title={title}>{title}</div>
+            <TruncateText variant="h3">{title}</TruncateText>
             {subtitle && (
-              <div className="text-h6 text-ods-text-secondary truncate" title={subtitle}>{subtitle}</div>
+              <TruncateText variant="h6" tone="secondary">
+                {subtitle}
+              </TruncateText>
             )}
           </div>
         </div>
@@ -87,6 +92,7 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, className }: Ser
 function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
   const [revealed, setRevealed] = useState(false)
   const { copy, copied } = useCopyToClipboard()
+  const { ref: valueRef, isTruncated: valueTruncated } = useIsTruncated<HTMLDivElement>(row.value)
   const actions = useMemo<ServiceCardRowAction>(() => ({ copy: true, open: !!row.href, reveal: !!row.isSecret, ...row.actions }), [row])
 
   const displayValue = row.isSecret ? <MaskedValue value={row.value} isRevealed={revealed} /> : <span>{row.value}</span>
@@ -104,7 +110,16 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
         <div className="w-20 md:w-24 shrink-0 text-h6 text-ods-text-primary">{row.label}</div>
       )}
       <div className={cn('flex-1 h-12 rounded-md border border-ods-border bg-ods-bg px-3 md:px-4 flex items-center justify-between min-w-0', row.monospace ? 'font-mono' : '')}>
-        <div className="truncate text-ods-text-primary min-w-0" title={typeof row.value === 'string' ? row.value : undefined}>{displayValue}</div>
+        {/* No tooltip while a secret is masked — the old native `title` leaked the raw value on hover. */}
+        <FloatingTooltip
+          content={row.value}
+          side="top"
+          disabled={!valueTruncated || (row.isSecret && !revealed)}
+          triggerClassName="min-w-0"
+          className="max-w-xs [overflow-wrap:anywhere]"
+        >
+          <div ref={valueRef} className="truncate text-ods-text-primary">{displayValue}</div>
+        </FloatingTooltip>
         <div className="flex items-center gap-2 pl-3 flex-shrink-0">
           {actions.reveal && (
             <button

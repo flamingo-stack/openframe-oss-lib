@@ -85,7 +85,7 @@ enum ScriptShell {
     SHELL
 }
 
-enum ScriptPlatform {
+enum OsType {
     WINDOWS
     LINUX
     MACOS
@@ -98,7 +98,7 @@ type Script implements Node {
     shell: ScriptShell!
     privilegeLevel: PrivilegeLevel!
     scriptBody: String!
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     defaultTimeoutSeconds: Int
     defaultArgs: [String!]
     envVars: [ScriptEnvVar!]
@@ -168,7 +168,7 @@ input CreateScriptInput {
     shell: ScriptShell!
     privilegeLevel: PrivilegeLevel!
     scriptBody: String!
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     defaultTimeoutSeconds: Int
     defaultArgs: [String!]
     envVars: [ScriptEnvVarInput!]
@@ -188,7 +188,7 @@ input UpdateScriptInput {
     shell: ScriptShell!
     privilegeLevel: PrivilegeLevel!
     scriptBody: String!
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     defaultTimeoutSeconds: Int
     defaultArgs: [String!]
     envVars: [ScriptEnvVarInput!]
@@ -211,7 +211,7 @@ the list is used verbatim with no implicit exclusion.
 input ScriptFilterInput {
     shells: [ScriptShell!]
     statuses: [ScriptStatus!]
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     tagIds: [ID!]
     authorIds: [ID!]
 }

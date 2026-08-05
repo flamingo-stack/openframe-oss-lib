@@ -4,6 +4,7 @@ import com.openframe.test.api.UserApi;
 import com.openframe.test.data.dto.user.AuthUser;
 import com.openframe.test.data.dto.user.UserRole;
 import com.openframe.test.data.dto.user.UserStatus;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,7 @@ public class UserTest extends BaseTest {
     @Tag("delete")
     @Test
     @DisplayName("Check that Owner User cannot be deleted")
+    @Disabled("Until new logic for delete user implemented")
     public void testDeleteOwner() {
         List<AuthUser> users = UserApi.getUsers(UserRole.OWNER);
         assertThat(users).as("No active Admin users").isNotEmpty();

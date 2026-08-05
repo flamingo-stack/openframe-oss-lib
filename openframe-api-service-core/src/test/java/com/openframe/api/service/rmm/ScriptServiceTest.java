@@ -16,7 +16,9 @@ import com.openframe.api.service.validation.artifact.ScriptSyntaxValidator;
 import com.openframe.api.service.validation.artifact.ScriptValidationGate;
 import com.openframe.api.service.validation.artifact.StaticSafetyAnalyzer;
 import com.openframe.core.exception.ArtifactValidationException;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
+import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptShell;
@@ -42,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -71,6 +74,8 @@ class ScriptServiceTest {
 
     @Mock
     private ScriptTagService scriptTagService;
+    @Mock
+    private ScriptTimeoutValidator timeoutValidator;
 
     /**
      * Real gate (not a mock): create/update tests must actually pass through
@@ -132,6 +137,36 @@ class ScriptServiceTest {
         assertThat(mapped.getCreatedBy()).isEqualTo("user-1");
         // Tag assignments are (re)written from the input after the script is saved.
         verify(scriptTagService).replaceTags(SCRIPT_ID, List.of("tag-1", "tag-2"));
+    }
+
+    @Test
+    @DisplayName("create: validates the timeout first — a rejected timeout throws (400) and nothing is persisted")
+    void create_validatesTimeoutBeforeSave() {
+        createInput.setDefaultTimeoutSeconds(700);
+        doThrow(new BadRequestException(ErrorCode.VALIDATION_ERROR, "timeoutSeconds must not exceed 600 seconds"))
+                .when(timeoutValidator).validate(700);
+
+        assertThatThrownBy(() -> scriptService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("600");
+
+        verify(timeoutValidator).validate(700);
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: validates the timeout first — a rejected timeout throws before the script is even loaded")
+    void update_validatesTimeoutBeforeSave() {
+        updateInput.setName("Restart Spooler");
+        updateInput.setDefaultTimeoutSeconds(700);
+        doThrow(new BadRequestException(ErrorCode.VALIDATION_ERROR, "timeoutSeconds must not exceed 600 seconds"))
+                .when(timeoutValidator).validate(700);
+
+        assertThatThrownBy(() -> scriptService.update(updateInput, "user-1"))
+                .isInstanceOf(BadRequestException.class);
+
+        verify(timeoutValidator).validate(700);
+        verify(scriptRepository, never()).save(any());
     }
 
     @Test

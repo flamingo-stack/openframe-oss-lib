@@ -63,6 +63,7 @@ public class ScriptService {
     private final TenantIdProvider tenantIdProvider;
     private final ScriptTagService scriptTagService;
     private final ScriptValidationGate scriptValidationGate;
+    private final ScriptTimeoutValidator timeoutValidator;
 
     /**
      * Create a new script in the current pod's tenant.
@@ -76,6 +77,8 @@ public class ScriptService {
      */
     public ScriptResponse create(CreateScriptInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
+
+        timeoutValidator.validate(input.getDefaultTimeoutSeconds());
 
         ScriptValidation validation = scriptValidationGate.validateOrThrow(
                 input.getShell(), input.getScriptBody(), input.getSupportedPlatforms(), createdBy);
@@ -232,6 +235,9 @@ public class ScriptService {
     public ScriptResponse update(UpdateScriptInput input, String updatedBy) {
         String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();
+
+        timeoutValidator.validate(input.getDefaultTimeoutSeconds());
+
         Script existing = loadVisibleOrThrow(tenantId, id);
 
         ScriptValidation validation = scriptValidationGate.validateOrThrow(

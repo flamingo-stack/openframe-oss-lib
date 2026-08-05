@@ -217,8 +217,33 @@ export function useChunkCatchup({
       })
       
       const allChunkResults = await Promise.all(chunkPromises)
+
+      // STALENESS GATE — the FIRST thing after the await, because everything
+      // below this line is bound to the CURRENTLY active dialog, not to the one
+      // this fetch was issued for:
+      //   - `onChunkReceivedRef.current` is reassigned every render, so it
+      //     routes into whichever dialog's reducer is mounted now;
+      //   - `processedSequenceKeys` / `lastSequenceId` / `lastSequenceIdByType`
+      //     were re-armed by `resetChunkTracking` for the new dialog;
+      //   - `chunkBuffer` holds the NEW dialog's buffered live deliveries;
+      //   - `hasCompletedInitialCatchup` / `bufferUntilInitialCatchupComplete`
+      //     govern the NEW dialog's buffering window.
+      // So a fetch that resolved after a dialog switch used to write dialog A's
+      // transcript into dialog B AND advance B's seq cursor to A's JetStream
+      // sequence — and because the reducer drops any event at or below
+      // `lastAppliedSeq`, an unrelated (higher) position permanently discards
+      // B's own live chunks. Switching dialogs mid-fetch is the ordinary
+      // interaction, not an edge case.
+      //
+      // The `finally` below already handles stale bookkeeping correctly (it
+      // keeps the new dialog's cycle intact and only discards a pending entry
+      // belonging to THIS dialog); it still runs on this early return. The
+      // guard could not live there — by then the chunks had already been
+      // applied.
+      if (dialogId !== dialogIdRef.current) return
+
       const allCatchupChunks: BufferedChunk[] = allChunkResults.flat()
-      
+
       if (allCatchupChunks.length === 0) {
         flushBufferedRealtimeChunks()
         bufferUntilInitialCatchupComplete.current = false
