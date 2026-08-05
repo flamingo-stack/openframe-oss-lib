@@ -2,7 +2,8 @@
 
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import * as React from 'react'
-import { SearchIcon } from '../icons-v2-generated'
+import { Copy02Icon, SearchIcon } from '../icons-v2-generated'
+import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard'
 import { cn } from '../../utils/cn'
 import { formatTime } from '../../utils/format-date'
 import { DataTable } from './data-table'
@@ -10,6 +11,7 @@ import { useDataTable } from './data-table/use-data-table'
 import { NoData } from './no-data'
 import type { QueryResultRow } from './query-report-table'
 import { ScrollShadow } from './scroll-fade'
+import { Tag } from './tag'
 
 /*
  * Live test-run building blocks: the UI (timing stats, one-row skeleton,
@@ -129,15 +131,37 @@ export interface TestRunResultsProps {
   className?: string
 }
 
+/** Red error banner with a copy-to-clipboard action, per the test-run design. */
+export function TestRunErrorBanner({ error, className }: { error: string; className?: string }) {
+  const { copy } = useCopyToClipboard({ successDescription: 'Error message copied to clipboard' })
+  return (
+    <div
+      role="alert"
+      className={cn(
+        'flex items-center justify-between gap-[var(--spacing-system-s)]',
+        'rounded-[6px] border border-ods-error bg-ods-error-secondary',
+        'px-[var(--spacing-system-mf)] py-[var(--spacing-system-s)]',
+        className,
+      )}
+    >
+      <p className="text-h4 text-ods-error min-w-0 break-words">{error}</p>
+      <button
+        type="button"
+        aria-label="Copy error message"
+        onClick={() => copy(error)}
+        className="shrink-0 text-ods-error hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus rounded-sm"
+      >
+        <Copy02Icon className="size-5" />
+      </button>
+    </div>
+  )
+}
+
 /** Error line + empty state + result table for a finished/running test run. */
 export function TestRunResults({ isActive, displayRows, firstError, className }: TestRunResultsProps) {
   return (
     <div className={cn('flex flex-col gap-[var(--spacing-system-xsf)]', className)}>
-      {firstError && (
-        <p role="alert" className="text-h6 text-ods-error">
-          {firstError}
-        </p>
-      )}
+      {firstError && <TestRunErrorBanner error={firstError} />}
       {!isActive && displayRows.length === 0 ? (
         // With zero rows the error line alone explains the outcome; a
         // "No results returned" empty state next to it would mislead.
@@ -160,6 +184,30 @@ export function TimingStat({ value, label, className }: { value: string; label: 
     <div className={cn('flex flex-col justify-center min-w-0', className)}>
       <span className="text-h4 text-ods-text-secondary truncate">{value}</span>
       <span className="text-h6 text-ods-text-secondary truncate">{label}</span>
+    </div>
+  )
+}
+
+/** Overall run outcome shown in a test-run controls row. */
+export type TestRunStatus = 'idle' | 'running' | 'success' | 'error'
+
+const TEST_RUN_STATUS_TAGS: Record<Exclude<TestRunStatus, 'idle'>, { label: string; variant: 'warning' | 'success' | 'error' }> = {
+  running: { label: 'IN PROCESS', variant: 'warning' },
+  success: { label: 'SUCCESS', variant: 'success' },
+  error: { label: 'ERROR', variant: 'error' },
+}
+
+/** Status stat cell: "-" before the first run, then a colored state tag. */
+export function TestRunStatusStat({ status, className }: { status: TestRunStatus; className?: string }) {
+  const tag = status === 'idle' ? null : TEST_RUN_STATUS_TAGS[status]
+  return (
+    <div className={cn('flex flex-col justify-center items-start min-w-0 gap-[var(--spacing-system-xxs)]', className)}>
+      {tag ? (
+        <Tag label={tag.label} variant={tag.variant} className="pointer-events-none" />
+      ) : (
+        <span className="text-h4 text-ods-text-secondary truncate">-</span>
+      )}
+      <span className="text-h6 text-ods-text-secondary truncate">Status</span>
     </div>
   )
 }
@@ -248,6 +296,10 @@ export function useTestRunState(campaign: TestRunCampaignState) {
 
   const firstError = isFinished && campaign.errors.length > 0 ? campaign.errors[0].error : null
 
+  // Overall run outcome for the Status stat: '-' until a run starts, then
+  // IN PROCESS while active, and SUCCESS/ERROR once the campaign finishes.
+  const status: TestRunStatus = isActive ? 'running' : hasRun && isFinished ? (firstError ? 'error' : 'success') : 'idle'
+
   // Started/Duration show zeros until the current run's timing is real:
   // hasRun=false after a reset, and campaignStatus resets while the next
   // run is being created, so stale values never linger on screen.
@@ -271,6 +323,7 @@ export function useTestRunState(campaign: TestRunCampaignState) {
     isActive,
     isFinished,
     showResults,
+    status,
     firstError,
     startedLabel,
     durationLabel,
