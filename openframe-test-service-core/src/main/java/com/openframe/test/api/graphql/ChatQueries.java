@@ -20,7 +20,12 @@ public class ChatQueries {
                                 type
                                 ... on TextData { text }
                                 ... on ExecutedToolData { toolFunction result success }
-                                ... on ApprovalRequestData { approvalRequestId command }
+                                ... on ApprovalRequestData {
+                                    approvalRequestId
+                                    command
+                                    approvalType
+                                    toolCalls { toolName toolType toolCallArguments approvalType }
+                                }
                                 ... on ErrorData { error details }
                             }
                         }
