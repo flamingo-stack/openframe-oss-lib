@@ -39,6 +39,30 @@ class ScriptSyntaxValidatorTest {
         assertTrue(r.methods().contains("SYNTAX_SH_N"));
     }
 
+    /**
+     * Python is checked only where python3 exists (it ships in the ai-agent
+     * runtime image). Asserted conditionally so the suite is honest on hosts
+     * without it: either the parser ran and rejected the body, or the check
+     * was recorded as skipped — never "silently passed as validated".
+     */
+    @Test
+    void brokenPythonIsRejectedWhenInterpreterAvailable() {
+        ArtifactValidationResult r = validator.validate(ScriptShell.PYTHON,
+                "def broken(:\n    pass\n");
+        if (r.methods().contains("SYNTAX_PYTHON_AST")) {
+            assertTrue(r.blocked());
+        } else {
+            assertTrue(r.methods().contains("SYNTAX_SKIPPED_NO_INTERPRETER"));
+        }
+    }
+
+    @Test
+    void validPythonPasses() {
+        ArtifactValidationResult r = validator.validate(ScriptShell.PYTHON,
+                "import os\n\ndef main():\n    print(os.getcwd())\n");
+        assertFalse(r.blocked());
+    }
+
     @Test
     void powershellIsSkippedNotBlocked() {
         ArtifactValidationResult r = validator.validate(ScriptShell.POWERSHELL,
