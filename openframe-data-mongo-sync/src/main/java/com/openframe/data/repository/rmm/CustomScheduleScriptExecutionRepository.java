@@ -2,6 +2,7 @@ package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.filter.ScheduleRunQueryFilter;
+import org.springframework.data.domain.Sort;
 
 import java.util.Collection;
 import java.util.List;
@@ -26,9 +27,20 @@ public interface CustomScheduleScriptExecutionRepository {
                                                      String scriptScheduleId,
                                                      ScheduleRunQueryFilter filter,
                                                      String search,
+                                                     String sortField,
+                                                     Sort.Direction sortDirection,
                                                      String cursor,
                                                      boolean backward,
                                                      int limit);
+
+    /** Whether {@code field} may back a {@code sort} on the Schedule Runs tab ({@code _id} / {@code dispatchedAt}). */
+    boolean isSortableField(String field);
+
+    /** Default sort field when the caller supplies none or an unknown one. */
+    String getDefaultSortField();
+
+    /** Cursor for a boundary row under the active sort: raw id for {@code _id}, else {@code epochMillis|id}. */
+    String encodeCursor(ScheduleScriptExecution run, String sortField);
 
     /**
      * Full matching count for the {@code (tenantId, scheduleId, filter, search)} tuple,
