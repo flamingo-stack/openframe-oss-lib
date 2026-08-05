@@ -4,6 +4,7 @@ import * as React from 'react'
 import { PenEditIcon, UserIcon, UserPlusIcon } from '../icons-v2-generated'
 import { cn } from '../../utils/cn'
 import { Autocomplete, type AutocompleteOption } from './autocomplete'
+import { DeletedUserAvatar } from './deleted-user-avatar'
 import { SearchableSelect, type SearchableSelectOption } from './searchable-select'
 import { SquareAvatar } from './square-avatar'
 
@@ -18,6 +19,8 @@ export interface AssigneeDropdownProps {
     id: string
     name: string
     avatarSrc?: string
+    /** Deleted account (DELETED / SELF_DELETED) — renders the red user-x placeholder + red name. */
+    deleted?: boolean
   }
   options: TicketAssigneeOption[]
   isLoading?: boolean
@@ -79,13 +82,17 @@ function CompactAssigneeDropdown({
         className,
       )}
     >
-      <SquareAvatar
-        src={currentAssignee.avatarSrc}
-        alt={currentAssignee.name}
-        fallback={currentAssignee.name || 'User'}
-        size="sm"
-        variant="round"
-      />
+      {currentAssignee.deleted ? (
+        <DeletedUserAvatar size="sm" accessibleLabel={`Deleted user: ${currentAssignee.name || currentAssignee.id}`} />
+      ) : (
+        <SquareAvatar
+          src={currentAssignee.avatarSrc}
+          alt={currentAssignee.name}
+          fallback={currentAssignee.name || 'User'}
+          size="sm"
+          variant="round"
+        />
+      )}
     </button>
   ) : (
     <button
@@ -159,14 +166,22 @@ function DefaultAssigneeDropdown({
           showChevron={false}
           startAdornment={
             hasAssignee ? (
-              <SquareAvatar
-                src={currentAssignee!.avatarSrc}
-                alt={currentAssignee!.name}
-                fallback={currentAssignee!.name || 'User'}
-                size="sm"
-                variant="round"
-                className="h-6 w-6"
-              />
+              currentAssignee!.deleted ? (
+                <DeletedUserAvatar
+                  size="sm"
+                  className="h-6 w-6"
+                  accessibleLabel={`Deleted user: ${currentAssignee!.name || currentAssignee!.id}`}
+                />
+              ) : (
+                <SquareAvatar
+                  src={currentAssignee!.avatarSrc}
+                  alt={currentAssignee!.name}
+                  fallback={currentAssignee!.name || 'User'}
+                  size="sm"
+                  variant="round"
+                  className="h-6 w-6"
+                />
+              )
             ) : (
               <UserIcon className="size-5 text-ods-text-secondary" />
             )
@@ -181,14 +196,18 @@ function DefaultAssigneeDropdown({
   if (hasAssignee) {
     return (
       <div className={cn('flex items-center gap-[var(--spacing-system-xs)] min-w-0', className)}>
-        <SquareAvatar
-          src={currentAssignee!.avatarSrc}
-          alt={currentAssignee!.name}
-          fallback={currentAssignee!.name || 'User'}
-          size="md"
-          variant="round"
-          className="shrink-0"
-        />
+        {currentAssignee!.deleted ? (
+          <DeletedUserAvatar size="md" accessibleLabel={`Deleted user: ${currentAssignee!.name || currentAssignee!.id}`} />
+        ) : (
+          <SquareAvatar
+            src={currentAssignee!.avatarSrc}
+            alt={currentAssignee!.name}
+            fallback={currentAssignee!.name || 'User'}
+            size="md"
+            variant="round"
+            className="shrink-0"
+          />
+        )}
         <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex flex-col justify-center">
             <div className="flex items-center gap-[var(--spacing-system-xxs)] w-full min-w-0">
@@ -198,7 +217,10 @@ function DefaultAssigneeDropdown({
                 className="flex items-center gap-[var(--spacing-system-xxs)] cursor-pointer group text-left"
               >
                 <PenEditIcon className="size-4 shrink-0 text-ods-text-secondary group-hover:text-ods-accent transition-colors" />
-                <span className="text-h4 text-ods-text-primary truncate" title={currentAssignee!.name}>{currentAssignee!.name}</span>
+                <span
+                  className={cn('text-h4 truncate', currentAssignee!.deleted ? 'text-ods-error' : 'text-ods-text-primary')}
+                  title={currentAssignee!.name}
+                >{currentAssignee!.name}</span>
               </button>
             </div>
             <span className="text-h6 text-ods-text-secondary truncate">Assigned</span>

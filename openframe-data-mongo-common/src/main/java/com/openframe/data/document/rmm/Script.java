@@ -68,7 +68,7 @@ public class Script implements TenantScoped {
      * Operating systems the script supports. Used by the UI/service layer to
      * prevent dispatching a Windows-only script to a Linux agent.
      */
-    private List<ScriptPlatform> supportedPlatforms;
+    private List<OsType> supportedPlatforms;
     /**
      * Default execution timeout in seconds. The agent will forcibly kill the
      * process if this is exceeded. May be overridden per execution request.

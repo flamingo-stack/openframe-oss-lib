@@ -1,5 +1,6 @@
 package com.openframe.data.document.device;
 import com.openframe.data.document.TenantScoped;
+import com.openframe.data.document.rmm.OsType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import org.springframework.data.annotation.CreatedDate;
@@ -37,7 +38,7 @@ public class Machine implements TenantScoped {
     @Indexed
     private DeviceType type;
     @Indexed
-    private String osType;
+    private OsType osType;
     private String osVersion;
     private String osBuild;
     private String timezone;
