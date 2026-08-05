@@ -9,7 +9,7 @@ import { getFirstLastInitials } from "../../utils/format";
 interface SquareAvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   src?: string;
   alt?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   /** Exact pixel size (width & height). Overrides the `size` bucket dimensions —
    *  for callers with a numeric-px API (e.g. UserDisplay/MSPDisplay). */
   sizePx?: number;
@@ -25,6 +25,10 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
   ({ className, src, alt, size = 'md', sizePx, fallback, variant = 'square', initialsClassName, style, ...props }, ref) => {
     const resolvedSrc = useAuthedImageSrc(src)
     const sizeClasses = {
+      // xs (24px): dense card meta rows — avatar stacks on delivery/
+      // roadmap cards. Part of the shared scale so no caller ever
+      // bypasses the buckets with raw sizePx for a standard size.
+      xs: 'h-6 w-6',
       sm: 'h-8 w-8',
       md: 'h-10 w-10',
       lg: 'h-12 w-12',
@@ -32,6 +36,7 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
     };
 
     const sizePxBySize = {
+      xs: 24,
       sm: 32,
       md: 40,
       lg: 48,

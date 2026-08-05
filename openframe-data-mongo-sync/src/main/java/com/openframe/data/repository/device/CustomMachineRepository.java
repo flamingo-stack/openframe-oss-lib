@@ -5,10 +5,13 @@ import com.openframe.data.document.device.filter.MachineQueryFilter;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 public interface CustomMachineRepository {
 
     long countMachines(MachineQueryFilter filter, String search);
+
+    Map<String, Integer> facet(MachineQueryFilter filter, String search, String field);
 
     List<String> findMachineIds(MachineQueryFilter filter, String search);
 

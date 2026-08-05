@@ -44,6 +44,22 @@ public class SmtpEmailService implements EmailService {
         throw new UnsupportedOperationException("Email verification via SMTP is not supported; use HubSpot provider");
     }
 
+    @Override
+    public void sendOwnershipTransferEmail(String toEmail) {
+        String subject = "You're now the owner of your OpenFrame organization";
+        String body = "Hello,\n\nOwnership of your OpenFrame organization has been transferred to you. " +
+                "You now have full owner access.";
+        sendPlainText(toEmail, subject, body);
+    }
+
+    @Override
+    public void sendAccountDeletedEmail(String toEmail) {
+        String subject = "Your OpenFrame account has been deleted";
+        String body = "Hello,\n\nYour OpenFrame account has been deleted. " +
+                "If this wasn't expected, please contact your organization's administrator.";
+        sendPlainText(toEmail, subject, body);
+    }
+
     private void sendPlainText(String toEmail, String subject, String body) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { TestResultsSkeleton, TestRunResults, TimingStat } from '../components/ui/test-run';
+import { TestResultsSkeleton, TestRunResults, TestRunStatusStat, TimingStat } from '../components/ui/test-run';
 
 const meta = {
   title: 'UI/TestRun',
@@ -85,7 +85,7 @@ export const EmptyResult: Story = {
   ),
 };
 
-/** Finished with an error: the alert line replaces the empty state. */
+/** Finished with an error: red banner with a copy action replaces the empty state. */
 export const WithError: Story = {
   args: {
     isActive: false,
@@ -111,8 +111,26 @@ export const TimingAndSkeleton: Story = {
       <div className="flex items-center gap-[var(--spacing-system-m)]">
         <TimingStat value="02:15 PM" label="Started" className="flex-1" />
         <TimingStat value="00:00:05" label="Duration" className="flex-1" />
+        <TestRunStatusStat status="running" className="flex-1" />
       </div>
       <TestResultsSkeleton />
+    </div>
+  ),
+};
+
+/** The four Status stat states: "-" before a run, then a colored tag. */
+export const StatusStates: Story = {
+  args: {
+    isActive: false,
+    displayRows: [],
+    firstError: null,
+  },
+  render: () => (
+    <div className="flex max-w-[720px] items-center gap-[var(--spacing-system-l)] bg-ods-bg p-[var(--spacing-system-mf)]">
+      <TestRunStatusStat status="idle" />
+      <TestRunStatusStat status="running" />
+      <TestRunStatusStat status="success" />
+      <TestRunStatusStat status="error" />
     </div>
   ),
 };

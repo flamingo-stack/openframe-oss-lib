@@ -352,7 +352,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                 .organizationId(machine.getOrganizationId())
                 .deviceType(machine.getType() != null ? machine.getType().toString() : null)
                 .status(machine.getStatus() != null ? machine.getStatus().toString() : null)
-                .osType(machine.getOsType())
+                .osType(machine.getOsType() != null ? machine.getOsType().name() : null)
                 .tags(tagKeyNames)
                 .tagKeyValues(tagKeyValues)
                 .ingestionTime(System.currentTimeMillis())

@@ -67,7 +67,11 @@ function Calendar({
           "[&>button]:bg-ods-accent [&>button]:text-ods-text-on-accent [&>button]:hover:bg-ods-accent",
         today: "[&>button]:text-ods-accent [&[aria-selected]>button]:text-ods-text-on-accent",
         outside: "[&>button]:text-ods-text-muted [&>button]:opacity-50",
-        disabled: "[&>button]:text-ods-text-muted [&>button]:opacity-40 [&>button]:hover:bg-transparent",
+        // `cursor-not-allowed` on the CELL, not the button: the day button is a
+        // core `Button`, whose disabled state carries `pointer-events-none`, so
+        // a cursor set on it never applies — the pointer is over the cell.
+        disabled:
+          "cursor-not-allowed [&>button]:text-ods-text-muted [&>button]:opacity-40 [&>button]:hover:bg-transparent",
         hidden: "invisible",
         ...classNames,
       }}

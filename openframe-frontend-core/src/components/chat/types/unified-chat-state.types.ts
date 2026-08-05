@@ -274,10 +274,13 @@ export interface UnifiedChatState {
   isHydratingHistory?: boolean
 
   // ─── Actions ──────────────────────────────────────────────────────────────
+  /** Resolution MAY carry a boolean success flag (`false` = the request
+   *  failed) — consumed by batch approve-all loops to mark failed rows.
+   *  Callers that only await it are unaffected (`void` = success). */
   sendMessage: (
     text: string,
     options?: UnifiedSendMessageOptions,
-  ) => Promise<void>
+  ) => Promise<void | boolean>
 
   /** Abort the in-flight stream. No-op when idle. */
   stopMessage: () => void

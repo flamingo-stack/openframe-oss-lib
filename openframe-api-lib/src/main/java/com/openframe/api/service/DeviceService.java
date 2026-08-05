@@ -2,6 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
@@ -42,11 +43,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DeviceService {
 
+    private static final String FACET_STATUS = "status";
+    private static final String FACET_TYPE = "type";
+    private static final String FACET_OS_TYPE = "osType";
+    private static final String FACET_ORGANIZATION_ID = "organizationId";
+
     private final MachineRepository machineRepository;
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final DeviceStatusProcessor deviceStatusProcessor;
     private final ScriptScheduleDeviceService scriptScheduleDeviceService;
+    private final DeviceFilterOptionMapper deviceFilterOptionMapper;
 
     public Optional<Machine> findByMachineId(@NotBlank String machineId) {
         log.debug("Finding machine by ID: {}", machineId);
@@ -110,6 +117,28 @@ public class DeviceService {
                 .items(page)
                 .pageInfo(pageInfo)
                 .filteredCount((int) totalFilteredCount)
+                .build();
+    }
+
+    public DeviceFilters getAssignedDeviceFilters(Collection<String> machineIds,
+                                                  DeviceFilterCriteria filterOptions, String search) {
+        Collection<String> scope = machineIds == null ? List.of() : machineIds;
+        return deviceFilters(machineFilter(filterOptions, null, scope), search);
+    }
+
+    public DeviceFilters getAvailableDeviceFilters(Collection<String> platformNames,
+                                                   DeviceFilterCriteria filterOptions, String search) {
+        return deviceFilters(machineFilter(filterOptions, platformNames, null), search);
+    }
+
+    private DeviceFilters deviceFilters(MachineQueryFilter filter, String search) {
+        return DeviceFilters.builder()
+                .statuses(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, FACET_STATUS)))
+                .deviceTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, FACET_TYPE)))
+                .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, FACET_OS_TYPE)))
+                .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(filter, search, FACET_ORGANIZATION_ID)))
+                .tagKeys(List.of())
+                .filteredCount((int) machineRepository.countMachines(filter, search))
                 .build();
     }
 

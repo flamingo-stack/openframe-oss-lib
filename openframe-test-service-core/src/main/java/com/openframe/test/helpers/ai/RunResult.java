@@ -4,6 +4,7 @@ import com.openframe.test.data.dto.ai.Message;
 import com.openframe.test.data.dto.ai.MessageData;
 import com.openframe.test.data.dto.ai.MessageDataType;
 import com.openframe.test.data.dto.ai.MessageOwnerType;
+import com.openframe.test.data.dto.ai.PendingToolCall;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +56,31 @@ public class RunResult {
         return allData(MessageDataType.ERROR);
     }
 
+    /**
+     * Every command the assistant asked permission to run, as text.
+     * <p>
+     * Reads both places it can live: {@code ApprovalRequestData.command}, and each pending tool call's
+     * arguments. The top-level field is null on every request observed on the client surface, so a check
+     * that consults only it silently matches nothing — which is worse than no check at all, since it looks
+     * like a passing assertion.
+     */
+    public List<String> requestedCommands() {
+        List<String> out = new ArrayList<>();
+        for (MessageData d : approvalRequests()) {
+            if (d.getCommand() != null) {
+                out.add(d.getCommand());
+            }
+            if (d.getToolCalls() != null) {
+                d.getToolCalls().stream()
+                        .map(PendingToolCall::getToolCallArguments)
+                        .filter(args -> args != null)
+                        .map(String::valueOf)
+                        .forEach(out::add);
+            }
+        }
+        return out;
+    }
+
     /** True if any executed tool reported {@code success == true}. Diagnostic only. */
     public boolean anyExecutedToolSucceeded() {
         return executedTools().stream().anyMatch(d -> Boolean.TRUE.equals(d.getSuccess()));
@@ -95,7 +121,8 @@ public class RunResult {
                             .append(" success=").append(d.getSuccess())
                             .append(" result=").append(trim(d.getResult()));
                     if (d.getCommand() != null) sb.append("command=").append(trim(d.getCommand()));
-                    if (d.getApprovalRequestId() != null) sb.append(" approvalRequestId=").append(d.getApprovalRequestId());
+                    if (d.getApprovalRequestId() != null) sb.append(" approvalRequestId=").append(d.getApprovalRequestId())
+                            .append(" approvalType=").append(d.getApprovalType());
                     if (d.getError() != null) sb.append("error=").append(trim(d.getError()))
                             .append(" details=").append(trim(d.getDetails()));
                     sb.append('\n');

@@ -7,7 +7,7 @@ import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptStatus;
 import org.springframework.stereotype.Component;
 
@@ -35,7 +35,7 @@ public class ScriptMapper {
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .defaultTimeoutSeconds(input.getDefaultTimeoutSeconds())
                 .defaultArgs(input.getDefaultArgs())
-                .envVars(mapEnvVarsToEntity(input.getEnvVars()))
+                .envVars(ScriptEnvVarMapper.toEntity(input.getEnvVars()))
                 .build();
     }
 
@@ -48,7 +48,7 @@ public class ScriptMapper {
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setDefaultTimeoutSeconds(input.getDefaultTimeoutSeconds());
         existing.setDefaultArgs(input.getDefaultArgs());
-        existing.setEnvVars(mapEnvVarsToEntity(input.getEnvVars()));
+        existing.setEnvVars(ScriptEnvVarMapper.toEntity(input.getEnvVars()));
     }
 
     public ScriptResponse toResponse(Script entity) {
@@ -71,19 +71,6 @@ public class ScriptMapper {
                 .build();
     }
 
-    private List<ScriptEnvVar> mapEnvVarsToEntity(List<ScriptEnvVarInput> envVars) {
-        if (envVars == null) {
-            return null;
-        }
-        return envVars.stream()
-                .map(v -> ScriptEnvVar.builder()
-                        .name(v.getName())
-                        .value(v.getValue())
-                        .secret(v.isSecret())
-                        .build())
-                .toList();
-    }
-
     private List<ScriptEnvVarInput> mapEnvVarsToResponse(List<ScriptEnvVar> envVars) {
         if (envVars == null) {
             return null;
@@ -98,10 +85,10 @@ public class ScriptMapper {
                 .toList();
     }
 
-    private List<String> mapPlatformsToResponse(List<ScriptPlatform> platforms) {
+    private List<String> mapPlatformsToResponse(List<OsType> platforms) {
         if (platforms == null) {
             return null;
         }
-        return platforms.stream().map(ScriptPlatform::name).toList();
+        return platforms.stream().map(OsType::name).toList();
     }
 }

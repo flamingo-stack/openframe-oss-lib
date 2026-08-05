@@ -60,6 +60,7 @@ import { parseScrollAnchor, type ScrollAnchor } from '../utils/scroll-anchor'
 import { escapeThinkingTags } from '../../../chat-protocol/decode'
 import { buildChatRefKey } from '../types/chat.types'
 import type {
+  ApprovalBatchSegment,
   ApprovalRequestSegment,
   ChatApprovalStatus,
   MessageSegment,
@@ -93,6 +94,8 @@ import {
   mergeToolExecutionIfPresent,
   nextId,
   projectApprovalResolutionToMessages,
+  projectBatchRowFailureToMessages,
+  projectBatchStatusToMessages,
   updateTrailingAssistant,
   upsertTrailingCompaction,
 } from './message-mutations'
@@ -1526,12 +1529,68 @@ export function createChatStreamReducer(
           onReject: callbacks.onReject,
         }
         const last = messages[messages.length - 1]
-        if (last && last.role === 'assistant') {
+        if (!last || last.role !== 'assistant') break
+        // ── WIRE-NATIVE BATCH ─────────────────────────────────────────
+        // The SERVER groups a multi-proposal turn into ONE
+        // `approval_batch` frame (decoded to `event.toolCalls`) — the
+        // client performs NO adjacency heuristics. Render the bulk-
+        // approval component: one Approve/Reject resolving every row
+        // sequentially through its own per-proposal confirm; per-row
+        // execution icons ticked by each `approval-resolved` event
+        // (see `projectApprovalResolutionToMessages`). Single-proposal
+        // turns keep the classic editable per-card flow below.
+        if (event.toolCalls && event.toolCalls.length > 0) {
+          const rows = event.toolCalls
+          const anchorId = event.requestId
+          const ids = rows.map((c) => c.toolExecutionRequestId)
+          const batchSegment: ApprovalBatchSegment = {
+            type: 'approval_batch',
+            status: 'pending',
+            data: {
+              approvalRequestId: anchorId,
+              approvalType: event.approvalType ?? 'chat',
+              toolCalls: rows,
+              executions: {},
+            },
+            // Optimistic status flip so the per-row loaders show while
+            // the sequential per-proposal confirms run (the anchor id is
+            // NEVER a row id — see ApprovalBatchFrame.batchId — so the
+            // flip cannot pre-tick a row's execution). A confirm that
+            // reports failure (`false` — expired proposal, network
+            // error) ticks THAT row's cross so no loader spins forever;
+            // remaining rows still get their attempt.
+            ...(() => {
+              const resolveBatch =
+                (status: 'approved' | 'rejected', confirm: typeof callbacks.onApprove) =>
+                async () => {
+                  // STATUS-ONLY projection (defense-in-depth): even a
+                  // batchId colliding with a row id cannot pre-tick an
+                  // execution here — rows resolve exclusively via their
+                  // own confirm results / approval-resolved events.
+                  setMessagesInternal(projectBatchStatusToMessages(messages, anchorId, status))
+                  for (const id of ids) {
+                    const ok = await confirm?.(id)
+                    if (ok === false) {
+                      setMessagesInternal(projectBatchRowFailureToMessages(messages, id))
+                    }
+                  }
+                }
+              return {
+                onApprove: resolveBatch('approved', callbacks.onApprove),
+                onReject: resolveBatch('rejected', callbacks.onReject),
+              }
+            })(),
+          }
           setMessagesInternal([
             ...messages.slice(0, -1),
-            { ...last, segments: [...(last.segments ?? []), segment] },
+            { ...last, segments: [...(last.segments ?? []), batchSegment] },
           ])
+          break
         }
+        setMessagesInternal([
+          ...messages.slice(0, -1),
+          { ...last, segments: [...(last.segments ?? []), segment] },
+        ])
         break
       }
       case 'approval-resolved':
@@ -1919,6 +1978,12 @@ export function createChatStreamReducer(
       setMessagesInternal(
         projectApprovalResolutionToMessages(messages, requestId, status, resolvedByName),
       )
+      // Status-map mirror — kept in lockstep with the other two flip
+      // paths (SSE approval-resolved at ~1240, NATS at ~1950): the map
+      // restores status when a replayed approval-request event
+      // re-renders the card, and a flip applied through THIS path must
+      // survive that replay the same way.
+      mirrorApprovalStatus(requestId, status)
       return segments
     },
     getPendingEscalated() {
