@@ -2,7 +2,7 @@
 #
 # Tenant scoping is implicit — the resolver extracts the tenant from the
 # authenticated principal, so clients never specify or see tenantId. Reuses the
-# ScriptPlatform / ScriptStatus / ScriptFilterOption / Script / User / Node /
+# OsType / ScriptStatus / ScriptFilterOption / Script / User / Node /
 # PageInfo / SortInput types defined elsewhere in the merged schema.
 
 extend type Query {
@@ -81,7 +81,7 @@ type ScriptSchedule implements Node {
     id: ID!
     name: String!
     description: String
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     """How this schedule targets devices: SPECIFIC (an explicit machine set, managed on the "Select Specific Devices" tab) or CRITERIA (a live rule; devices registered later that match are included automatically). Never null — legacy schedules read as SPECIFIC."""
     selectionMode: ScheduleDeviceSelectionMode!
     """The device-selection rule when selectionMode is CRITERIA (customer / type / OS). Null for SPECIFIC schedules."""
@@ -223,7 +223,7 @@ input ScheduledScriptCustomParamsInput {
 input CreateScriptScheduleInput {
     name: String!
     description: String
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     "Ids of existing Scripts to run, in run order."
     scriptIds: [ID!]
     "Optional per-script custom args / env overrides. Sparse; each scriptId must be in scriptIds."
@@ -243,7 +243,7 @@ input UpdateScriptScheduleInput {
     id: ID!
     name: String!
     description: String
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     scriptIds: [ID!]
     "Optional per-script custom args / env overrides. PUT semantics: fully replaces the stored custom params (null/empty clears them). Each scriptId must be in scriptIds."
     scriptCustomParams: [ScheduledScriptCustomParamsInput!]
@@ -263,6 +263,6 @@ is used verbatim.
 """
 input ScriptScheduleFilterInput {
     statuses: [ScriptStatus!]
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     authorIds: [ID!]
 }
