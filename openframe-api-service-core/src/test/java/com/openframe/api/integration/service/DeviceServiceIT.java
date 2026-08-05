@@ -3,6 +3,7 @@ package com.openframe.api.integration.service;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.integration.BaseMongoIntegrationTest;
 import com.openframe.api.integration.support.DeviceServiceIntegrationTestApplication;
 import com.openframe.api.service.DeviceService;
@@ -10,6 +11,7 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
+import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -18,12 +20,15 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 
 import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Integration tests for {@link DeviceService}'s platform-scoped picker queries against a real MongoDB.
@@ -169,6 +174,47 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
                 .containsExactlyInAnyOrder("live-on", "live-off")
                 .doesNotContain("gone");
         assertThat(result.getFilteredCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("updateNickname: atomic $set — a concurrent writer's fields survive the rename (regression: save() rewrote the whole document)")
+    void updateNickname_preservesConcurrentWrites() {
+        machine("m1", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.ONLINE);
+        mongoTemplate.updateFirst(byMachineId("m1"),
+                new Update().set("agentReportedField", "keep-me"), Machine.class);
+
+        Machine updated = deviceService.updateNickname("m1", "  Reception iMac  ");
+
+        assertThat(updated.getNickname()).isEqualTo("Reception iMac");
+        assertThat(updated.getUpdatedAt()).isNotNull();
+
+        Document stored = mongoTemplate.findOne(byMachineId("m1"), Document.class, "machines");
+        assertThat(stored).isNotNull();
+        assertThat(stored.get("nickname")).isEqualTo("Reception iMac");
+        assertThat(stored.get("agentReportedField")).as("concurrent writer's field").isEqualTo("keep-me");
+        assertThat(stored.get("status")).isEqualTo(DeviceStatus.ONLINE.name());
+        assertThat(stored.get("osType")).isEqualTo("windows");
+        assertThat(stored.get("updatedAt")).isNotNull();
+    }
+
+    @Test
+    @DisplayName("updateNickname: a blank value clears the stored nickname; an unknown device throws")
+    void updateNickname_clearsAndRejectsUnknown() {
+        machine("m1", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.ONLINE);
+        deviceService.updateNickname("m1", "Reception iMac");
+
+        assertThat(deviceService.updateNickname("m1", "   ").getNickname()).isNull();
+
+        Document stored = mongoTemplate.findOne(byMachineId("m1"), Document.class, "machines");
+        assertThat(stored).isNotNull();
+        assertThat(stored.get("nickname")).isNull();
+
+        assertThatThrownBy(() -> deviceService.updateNickname("nope", "x"))
+                .isInstanceOf(DeviceNotFoundException.class);
+    }
+
+    private static Query byMachineId(String machineId) {
+        return new Query(Criteria.where("machineId").is(machineId));
     }
 
     private void machine(String machineId, String orgId, DeviceType type, String osType) {

@@ -8,15 +8,20 @@ import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -251,5 +256,50 @@ class CustomMachineRepositoryImplTest {
         assertThat(nickHasOp(q, "$gt")).isTrue();
         assertThat(nickIsNull(q)).isFalse();
         assertThat(nickHasOp(q, "$ne")).isFalse();
+    }
+
+    @Test
+    @DisplayName("updateNickname: $set on nickname+updatedAt only — no whole-document rewrite")
+    void updateNickname_atomicSet() {
+        MongoTemplate template = mock(MongoTemplate.class);
+        CustomMachineRepositoryImpl repository = new CustomMachineRepositoryImpl(template);
+        Machine stored = new Machine();
+        Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        when(template.findAndModify(any(Query.class), any(Update.class),
+                any(FindAndModifyOptions.class), eq(Machine.class))).thenReturn(stored);
+
+        Optional<Machine> result = repository.updateNickname("m1", "Reception iMac", now);
+
+        assertThat(result).containsSame(stored);
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        ArgumentCaptor<FindAndModifyOptions> options = ArgumentCaptor.forClass(FindAndModifyOptions.class);
+        verify(template).findAndModify(query.capture(), update.capture(), options.capture(), eq(Machine.class));
+
+        assertThat(query.getValue().getQueryObject().get("machineId")).isEqualTo("m1");
+        Document set = (Document) update.getValue().getUpdateObject().get("$set");
+        assertThat(set).containsOnlyKeys("nickname", "updatedAt");
+        assertThat(set.get("nickname")).isEqualTo("Reception iMac");
+        assertThat(set.get("updatedAt")).isEqualTo(now);
+        assertThat(options.getValue().isReturnNew()).isTrue();
+        verify(template, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateNickname: null clears the field via $set, and a missing device yields empty")
+    void updateNickname_clearsAndReportsMissing() {
+        MongoTemplate template = mock(MongoTemplate.class);
+        CustomMachineRepositoryImpl repository = new CustomMachineRepositoryImpl(template);
+        when(template.findAndModify(any(Query.class), any(Update.class),
+                any(FindAndModifyOptions.class), eq(Machine.class))).thenReturn(null);
+
+        Optional<Machine> result = repository.updateNickname("gone", null, Instant.parse("2026-01-01T00:00:00Z"));
+
+        assertThat(result).isEmpty();
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        verify(template).findAndModify(any(Query.class), update.capture(),
+                any(FindAndModifyOptions.class), eq(Machine.class));
+        Document set = (Document) update.getValue().getUpdateObject().get("$set");
+        assertThat(set).containsEntry("nickname", null);
     }
 }

@@ -18,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -245,54 +248,69 @@ class DeviceServiceTest {
         verify(scriptScheduleDeviceService, never()).removeDeviceFromAllSchedules(any(), any());
     }
 
+    /** Echoes the atomic update back as the stored device, the way findAndModify(returnNew) does. */
+    private void stubAtomicNicknameUpdate(String machineId) {
+        when(machineRepository.updateNickname(eq(machineId), any(), any(Instant.class)))
+                .thenAnswer(inv -> {
+                    Machine stored = new Machine();
+                    stored.setMachineId(inv.getArgument(0));
+                    stored.setNickname(inv.getArgument(1));
+                    stored.setUpdatedAt(inv.getArgument(2));
+                    return Optional.of(stored);
+                });
+    }
+
     @Test
-    @DisplayName("updateNickname: trims the value, bumps updatedAt, saves and returns the device")
+    @DisplayName("updateNickname: trims the value, bumps updatedAt, returns the updated device")
     void updateNickname_setsAndSaves() {
         DeviceService s = service();
-        Machine m = new Machine();
-        m.setMachineId("m1");
-        when(machineRepository.findByMachineId("m1")).thenReturn(Optional.of(m));
-        when(machineRepository.save(any(Machine.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubAtomicNicknameUpdate("m1");
 
         Machine result = s.updateNickname("m1", "  Reception iMac  ");
 
         assertThat(result.getNickname()).isEqualTo("Reception iMac");
-        assertThat(m.getNickname()).isEqualTo("Reception iMac");
-        assertThat(m.getUpdatedAt()).isNotNull();
-        verify(machineRepository).save(m);
+        assertThat(result.getUpdatedAt()).isNotNull();
+        verify(machineRepository).updateNickname(eq("m1"), eq("Reception iMac"), any(Instant.class));
+    }
+
+    @Test
+    @DisplayName("updateNickname: updates atomically — never a read-modify-write via save()")
+    void updateNickname_doesNotSaveWholeDocument() {
+        DeviceService s = service();
+        stubAtomicNicknameUpdate("m1");
+
+        s.updateNickname("m1", "Reception iMac");
+
+        verify(machineRepository, never()).save(any(Machine.class));
+        verify(machineRepository, never()).findByMachineId(any());
     }
 
     @Test
     @DisplayName("updateNickname: a blank value clears the nickname (stored as null)")
     void updateNickname_blankClears() {
         DeviceService s = service();
-        Machine m = new Machine();
-        m.setMachineId("m1");
-        m.setNickname("old");
-        when(machineRepository.findByMachineId("m1")).thenReturn(Optional.of(m));
-        when(machineRepository.save(any(Machine.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubAtomicNicknameUpdate("m1");
 
         assertThat(s.updateNickname("m1", "   ").getNickname()).isNull();
+        verify(machineRepository).updateNickname(eq("m1"), isNull(), any(Instant.class));
     }
 
     @Test
     @DisplayName("updateNickname: a null value clears the nickname")
     void updateNickname_nullClears() {
         DeviceService s = service();
-        Machine m = new Machine();
-        m.setMachineId("m1");
-        m.setNickname("old");
-        when(machineRepository.findByMachineId("m1")).thenReturn(Optional.of(m));
-        when(machineRepository.save(any(Machine.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubAtomicNicknameUpdate("m1");
 
         assertThat(s.updateNickname("m1", null).getNickname()).isNull();
+        verify(machineRepository).updateNickname(eq("m1"), isNull(), any(Instant.class));
     }
 
     @Test
     @DisplayName("updateNickname: unknown machine → DeviceNotFoundException, nothing saved")
     void updateNickname_notFound() {
         DeviceService s = service();
-        when(machineRepository.findByMachineId("nope")).thenReturn(Optional.empty());
+        when(machineRepository.updateNickname(eq("nope"), any(), any(Instant.class)))
+                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> s.updateNickname("nope", "x"))
                 .isInstanceOf(DeviceNotFoundException.class);

@@ -309,18 +309,12 @@ public class DeviceService {
 
     public Machine updateNickname(@NotBlank String machineId, String nickname) {
         log.info("Updating device nickname. machineId={}", machineId);
-        Machine machine = machineRepository.findByMachineId(machineId)
+        Machine updated = machineRepository.updateNickname(machineId, normalizeNickname(nickname), Instant.now())
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
-        machine.setNickname(normalizeNickname(nickname));
-        machine.setUpdatedAt(Instant.now());
-        Machine saved = machineRepository.save(machine);
         log.info("Device {} nickname updated", machineId);
-        return saved;
+        return updated;
     }
 
-    /**
-     * Trim the nickname; a blank or null value clears it (stored as null).
-     */
     private String normalizeNickname(String nickname) {
         if (nickname == null) {
             return null;
