@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { OpenmspLogo } from '../openmsp-logo';
+import { OpenmspLogo } from '../icons/openmsp-logo';
 
 export function OpenmspHeartbeatLoader({ className = '', progress = 0, label, barWidth = 'w-128' }: { className?: string; progress?: number; label?: string; barWidth?: string }) {
   return (
