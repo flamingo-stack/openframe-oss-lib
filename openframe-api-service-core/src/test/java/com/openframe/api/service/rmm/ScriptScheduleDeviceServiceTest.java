@@ -5,7 +5,7 @@ import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -58,7 +58,7 @@ class ScriptScheduleDeviceServiceTest {
         // platform/existence tests override this stub with their own machines.
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenAnswer(inv -> {
             java.util.Collection<String> ids = inv.getArgument(1);
-            return ids.stream().map(id -> machine(id, id, "windows")).toList();
+            return ids.stream().map(id -> machine(id, id, OsType.WINDOWS)).toList();
         });
     }
 
@@ -67,12 +67,12 @@ class ScriptScheduleDeviceServiceTest {
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
     }
 
-    private void scheduleExistsWithPlatforms(ScriptStatus status, List<ScriptPlatform> platforms) {
+    private void scheduleExistsWithPlatforms(ScriptStatus status, List<OsType> platforms) {
         ScriptSchedule schedule = ScriptSchedule.builder().id(SCHEDULE_ID).status(status).supportedPlatforms(platforms).build();
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
     }
 
-    private static Machine machine(String machineId, String hostname, String osType) {
+    private static Machine machine(String machineId, String hostname, OsType osType) {
         Machine m = new Machine();
         m.setMachineId(machineId);
         m.setHostname(hostname);
@@ -116,9 +116,9 @@ class ScriptScheduleDeviceServiceTest {
     @Test
     @DisplayName("setDevices: a device whose OS is not among the schedule's platforms is rejected (Windows device on a macOS schedule)")
     void setDevices_deviceOsMismatch_rejected() {
-        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-win", "win-box", "windows")));
+                .thenReturn(List.of(machine("m-win", "win-box", OsType.WINDOWS)));
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
                 .isInstanceOf(BadRequestException.class)
@@ -129,9 +129,9 @@ class ScriptScheduleDeviceServiceTest {
     @Test
     @DisplayName("setDevices: a device whose OS matches the schedule's platform is accepted (case-insensitive: macos == MACOS)")
     void setDevices_deviceOsMatch_accepted() {
-        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-mac", "mac-box", "macos")));
+                .thenReturn(List.of(machine("m-mac", "mac-box", OsType.MAC_OS)));
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
 
         service.setDevices(SCHEDULE_ID, List.of("m-mac"), "user-1");
@@ -142,7 +142,7 @@ class ScriptScheduleDeviceServiceTest {
     @Test
     @DisplayName("setDevices: a device with unknown/blank osType is allowed (can't determine platform)")
     void setDevices_unknownOs_allowed() {
-        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
                 .thenReturn(List.of(machine("m-x", "x-box", null)));
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
@@ -150,68 +150,6 @@ class ScriptScheduleDeviceServiceTest {
         service.setDevices(SCHEDULE_ID, List.of("m-x"), "user-1");
 
         verify(assignedRepository).saveAll(any());
-    }
-
-    @Test
-    @DisplayName("setDevices: legacy raw osType ('Windows 11') canonicalizes via the classifier — a WINDOWS schedule accepts it")
-    void setDevices_legacyRawWindowsOsType_accepted() {
-        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.WINDOWS));
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-win", "win-11-box", "Windows 11")));
-        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
-
-        service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1");
-
-        verify(assignedRepository).saveAll(any());
-    }
-
-    @Test
-    @DisplayName("setDevices: legacy raw osType ('darwin') canonicalizes via the classifier — a MACOS schedule accepts it")
-    void setDevices_legacyRawDarwinOsType_accepted() {
-        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-mac", "mac-box", "darwin")));
-        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
-
-        service.setDevices(SCHEDULE_ID, List.of("m-mac"), "user-1");
-
-        verify(assignedRepository).saveAll(any());
-    }
-
-    @Test
-    @DisplayName("setDevices: batch mixing canonical + legacy shapes for the schedule's platforms is fully persisted — regression for \"can't assign more than one device\"")
-    void setDevices_mixedCanonicalAndLegacyForSamePlatforms_allAccepted() {
-        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE,
-                List.of(ScriptPlatform.WINDOWS, ScriptPlatform.MACOS));
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(
-                        machine("m-win-new", "win-new", "WINDOWS"),          // canonical
-                        machine("m-win-legacy", "win-legacy", "Windows 11"), // legacy raw
-                        machine("m-mac-new", "mac-new", "MACOS"),            // canonical
-                        machine("m-mac-legacy", "mac-legacy", "darwin")));   // legacy raw
-        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
-
-        service.setDevices(SCHEDULE_ID,
-                List.of("m-win-new", "m-win-legacy", "m-mac-new", "m-mac-legacy"),
-                "user-1");
-
-        ArgumentCaptor<List<ScriptScheduleMachineAssigned>> captor = ArgumentCaptor.forClass(List.class);
-        verify(assignedRepository).saveAll(captor.capture());
-        assertThat(captor.getValue()).extracting(ScriptScheduleMachineAssigned::getMachineId)
-                .containsExactly("m-win-new", "m-win-legacy", "m-mac-new", "m-mac-legacy");
-    }
-
-    @Test
-    @DisplayName("setDevices: legacy raw osType still incompatible with the schedule's platforms is rejected (Windows 11 device on a MACOS-only schedule)")
-    void setDevices_legacyRawIncompatible_rejected() {
-        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-win", "win-11-box", "Windows 11")));
-
-        assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("win-11-box");
-        verify(assignedRepository, never()).saveAll(any());
     }
 
     @Test
@@ -340,9 +278,9 @@ class ScriptScheduleDeviceServiceTest {
     @Test
     @DisplayName("addDevices: a platform-mismatched device is rejected (Windows device on a macOS schedule)")
     void addDevices_platformMismatch_rejected() {
-        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-win", "win-box", "windows")));
+                .thenReturn(List.of(machine("m-win", "win-box", OsType.WINDOWS)));
 
         assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
                 .isInstanceOf(BadRequestException.class);
@@ -355,7 +293,7 @@ class ScriptScheduleDeviceServiceTest {
         scheduleExists(ScriptStatus.ACTIVE);
         // only m-known resolves in this tenant; m-ghost is absent (unknown or belongs to another tenant)
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-known", "known-box", "windows")));
+                .thenReturn(List.of(machine("m-known", "known-box", OsType.WINDOWS)));
 
         assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-known", "m-ghost"), "user-1"))
                 .isInstanceOf(BadRequestException.class)
@@ -368,7 +306,7 @@ class ScriptScheduleDeviceServiceTest {
     void setDevices_unknownMachineId_rejected() {
         scheduleExists(ScriptStatus.ACTIVE);
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-known", "known-box", "windows")));
+                .thenReturn(List.of(machine("m-known", "known-box", OsType.WINDOWS)));
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-known", "m-ghost"), "user-1"))
                 .isInstanceOf(BadRequestException.class)

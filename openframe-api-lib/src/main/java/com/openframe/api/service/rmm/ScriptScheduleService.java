@@ -16,7 +16,7 @@ import com.openframe.api.mapper.ScriptScheduleMapper;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -78,7 +78,7 @@ public class ScriptScheduleService {
 
         ScriptScheduleTrigger trigger = defaultTrigger(input.getTrigger());
         validateTiming(trigger, input.getStartAt(), input.getRepeat());
-        validateScriptPlatforms(input.getSupportedPlatforms(), input.getScriptIds());
+        validateOsTypes(input.getSupportedPlatforms(), input.getScriptIds());
         validateCustomParams(input.getScriptIds(), input.getScriptCustomParams());
 
         ScriptSchedule entity = scheduleMapper.toEntity(tenantId, input);
@@ -181,6 +181,10 @@ public class ScriptScheduleService {
                 .statuses(input.getStatuses())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .createdByIds(input.getAuthorIds())
+                .createdAtFrom(input.getCreatedAtFrom())
+                .createdAtTo(input.getCreatedAtTo())
+                .updatedAtFrom(input.getUpdatedAtFrom())
+                .updatedAtTo(input.getUpdatedAtTo())
                 .build();
     }
 
@@ -203,7 +207,7 @@ public class ScriptScheduleService {
 
         ScriptScheduleTrigger trigger = defaultTrigger(input.getTrigger());
         validateTiming(trigger, input.getStartAt(), input.getRepeat());
-        validateScriptPlatforms(input.getSupportedPlatforms(), input.getScriptIds());
+        validateOsTypes(input.getSupportedPlatforms(), input.getScriptIds());
         validateCustomParams(input.getScriptIds(), input.getScriptCustomParams());
 
         Instant priorStartAt = existing.getStartAt();
@@ -306,7 +310,7 @@ public class ScriptScheduleService {
         return instant.getNano() == 0 && Math.floorMod(instant.getEpochSecond(), SLOT_SECONDS) == 0;
     }
 
-    private void validateScriptPlatforms(List<ScriptPlatform> schedulePlatforms, List<String> scriptIds) {
+    private void validateOsTypes(List<OsType> schedulePlatforms, List<String> scriptIds) {
         if (schedulePlatforms == null || schedulePlatforms.isEmpty()
                 || scriptIds == null || scriptIds.isEmpty()) {
             return;

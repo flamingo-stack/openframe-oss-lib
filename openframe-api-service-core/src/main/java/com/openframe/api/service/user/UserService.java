@@ -4,6 +4,7 @@ import com.openframe.api.dto.user.UpdateUserRequest;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.dto.user.UserPageResponse;
 import com.openframe.api.exception.OperationNotAllowedException;
+import com.openframe.api.exception.OwnerDeleteNotAllowedException;
 import com.openframe.api.exception.UserNotFoundException;
 import com.openframe.api.mapper.UserMapper;
 import com.openframe.api.service.processor.UserProcessor;
@@ -104,7 +105,7 @@ public class UserService {
                 .orElseThrow(() -> new UserNotFoundException(id));
 
         if (user.getRoles().contains(OWNER)) {
-            throw new OperationNotAllowedException("Owner accounts can’t be deleted");
+            throw new OwnerDeleteNotAllowedException("Owner accounts can’t be deleted; transfer ownership first");
         }
 
         if (user.getStatus() != ACTIVE) {
