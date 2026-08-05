@@ -1,6 +1,6 @@
 package com.openframe.data.document.rmm.filter;
 
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;
 import lombok.AllArgsConstructor;
@@ -25,7 +25,7 @@ public class ScriptQueryFilter {
 
     private List<ScriptShell> shells;
     private List<ScriptStatus> statuses;
-    private List<ScriptPlatform> supportedPlatforms;
+    private List<OsType> supportedPlatforms;
 
     /**
      * Match scripts assigned ANY of these tag ids. The repository resolves them

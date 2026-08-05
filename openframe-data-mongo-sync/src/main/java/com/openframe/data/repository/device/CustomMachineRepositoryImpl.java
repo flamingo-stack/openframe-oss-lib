@@ -3,7 +3,7 @@ package com.openframe.data.repository.device;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
-import com.openframe.data.util.MachineOsClassifier;
+import com.openframe.data.document.rmm.OsType;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -331,25 +331,17 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     private static Optional<Criteria> osTypeOrCriteria(Collection<String> osTypeScope) {
-        if (osTypeScope == null || osTypeScope.isEmpty()) {
-            return Optional.empty();
-        }
-        List<Document> perPlatform = osTypeScope.stream()
-                .filter(Objects::nonNull)
-                .map(name -> osTypeCriteria(name).getCriteriaObject())
-                .toList();
-        return perPlatform.isEmpty() ? Optional.empty()
-                : Optional.of(Criteria.where("$or").is(perPlatform));
+        List<String> valid = filterNonNull(osTypeScope);
+        return valid.isEmpty() ? Optional.empty()
+                : Optional.of(Criteria.where(OS_TYPE_FIELD).in(valid));
     }
 
     private static List<Criteria> osTypeCriteriaList(Collection<String> osTypeScope) {
-        return osTypeScope.stream()
-                .filter(Objects::nonNull)
-                .map(CustomMachineRepositoryImpl::osTypeCriteria)
-                .toList();
+        List<String> valid = filterNonNull(osTypeScope);
+        return valid.isEmpty() ? List.of() : List.of(Criteria.where(OS_TYPE_FIELD).in(valid));
     }
 
-    private static Criteria osTypeCriteria(String rawOsType) {
-        return Criteria.where(OS_TYPE_FIELD).regex(MachineOsClassifier.matchRegex(rawOsType), "i");
+    private static List<String> filterNonNull(Collection<String> values) {
+        return values == null ? List.of() : values.stream().filter(Objects::nonNull).toList();
     }
 }
