@@ -60,6 +60,7 @@ public class ScriptService {
     private final ScriptMapper scriptMapper;
     private final TenantIdProvider tenantIdProvider;
     private final ScriptTagService scriptTagService;
+    private final ScriptTimeoutValidator timeoutValidator;
 
     /**
      * Create a new script in the current pod's tenant.
@@ -69,6 +70,8 @@ public class ScriptService {
      */
     public ScriptResponse create(CreateScriptInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
+
+        timeoutValidator.validate(input.getDefaultTimeoutSeconds());
 
         if (scriptRepository.existsByTenantIdAndNameAndStatusIn(tenantId, input.getName(), NAME_UNIQUE_STATUSES)) {
             throw new ConflictException(
@@ -217,6 +220,9 @@ public class ScriptService {
     public ScriptResponse update(UpdateScriptInput input) {
         String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();
+
+        timeoutValidator.validate(input.getDefaultTimeoutSeconds());
+
         Script existing = loadVisibleOrThrow(tenantId, id);
 
         if (!input.getName().equals(existing.getName())
