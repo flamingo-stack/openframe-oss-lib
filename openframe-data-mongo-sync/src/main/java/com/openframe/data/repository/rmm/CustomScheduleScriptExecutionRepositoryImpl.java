@@ -17,11 +17,13 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -51,6 +53,9 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
     private static final String FIELD_SCRIPT_SCHEDULE_ID = "scheduleId";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_COUNT = "count";
+    private static final String CURSOR_SEPARATOR = "|";
+
+    private static final Set<String> SORTABLE_FIELDS = Set.of(FIELD_ID, FIELD_DISPATCHED_AT);
 
     private final MongoTemplate mongoTemplate;
 
@@ -59,19 +64,52 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
                                                              String scriptScheduleId,
                                                              ScheduleRunQueryFilter filter,
                                                              String search,
+                                                             String sortField,
+                                                             Sort.Direction sortDirection,
                                                              String cursor,
                                                              boolean backward,
                                                              int limit) {
-        Criteria criteria = baseCriteria(tenantId, scriptScheduleId, filter);
-        applyCursor(criteria, cursor, backward);
+        Criteria criteria = applyCursor(baseCriteria(tenantId, scriptScheduleId, filter),
+                cursor, backward, sortDirection, sortField);
         criteria = withSearch(criteria, search);
 
-        // Default sort is _id DESC (newest first); backward paginates in the opposite direction.
-        Sort.Direction effectiveDir = backward ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Sort.Direction effectiveDir = backward ? flip(sortDirection) : sortDirection;
         Query query = new Query(criteria)
-                .with(Sort.by(effectiveDir, FIELD_ID))
+                .with(sortSpec(effectiveDir, sortField))
                 .limit(limit);
         return mongoTemplate.find(query, ScheduleScriptExecution.class);
+    }
+
+    private static Sort sortSpec(Sort.Direction dir, String sortField) {
+        Sort primary = Sort.by(dir, sortField);
+        return FIELD_ID.equals(sortField) ? primary : primary.and(Sort.by(dir, FIELD_ID));
+    }
+
+    @Override
+    public boolean isSortableField(String field) {
+        return field != null && SORTABLE_FIELDS.contains(field);
+    }
+
+    @Override
+    public String getDefaultSortField() {
+        return FIELD_ID;
+    }
+
+    @Override
+    public String encodeCursor(ScheduleScriptExecution run, String sortField) {
+        if (run == null) {
+            return null;
+        }
+        if (FIELD_ID.equals(sortField)) {
+            return run.getId();
+        }
+        // dispatchedAt is non-null (stamped at fire) → epochMillis|id.
+        long millis = run.getDispatchedAt() == null ? 0L : run.getDispatchedAt().toEpochMilli();
+        return millis + CURSOR_SEPARATOR + run.getId();
+    }
+
+    private static Sort.Direction flip(Sort.Direction dir) {
+        return dir == Sort.Direction.ASC ? Sort.Direction.DESC : Sort.Direction.ASC;
     }
 
     @Override
@@ -200,22 +238,50 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
         return new Criteria().andOperator(base, match);
     }
 
-    private static void applyCursor(Criteria criteria, String cursor, boolean backward) {
+    private static Criteria applyCursor(Criteria base, String cursor, boolean backward,
+                                        Sort.Direction sortDirection, String sortField) {
         if (isBlank(cursor)) {
-            return;
+            return base;
         }
-        ObjectId cursorId;
+        boolean desc = (sortDirection == Sort.Direction.DESC) ^ backward;
+
+        if (FIELD_ID.equals(sortField)) {
+            return new Criteria().andOperator(base, strictlyAfter(FIELD_ID, parseCursorId(cursor), desc));
+        }
+
+        int sep = cursor.lastIndexOf(CURSOR_SEPARATOR);
+        if (sep < 0) {
+            throw new BadRequestException("Invalid compound schedule-runs cursor (no separator): " + cursor);
+        }
+        Instant value = parseInstant(cursor.substring(0, sep));
+        ObjectId id = parseCursorId(cursor.substring(sep + 1));
+
+        // (dispatchedAt strictly-after value) OR (dispatchedAt == value AND _id strictly-after id).
+        // dispatchedAt is non-null, so no null-bracket handling is needed.
+        Criteria keyset = new Criteria().orOperator(
+                strictlyAfter(FIELD_DISPATCHED_AT, value, desc),
+                new Criteria().andOperator(Criteria.where(FIELD_DISPATCHED_AT).is(value), strictlyAfter(FIELD_ID, id, desc)));
+        return new Criteria().andOperator(base, keyset);
+    }
+
+    /** One field's "strictly after the cursor" bound for the effective direction: {@code <} for DESC, {@code >} for ASC. */
+    private static Criteria strictlyAfter(String field, Object value, boolean desc) {
+        return desc ? Criteria.where(field).lt(value) : Criteria.where(field).gt(value);
+    }
+
+    private static ObjectId parseCursorId(String hex) {
         try {
-            cursorId = new ObjectId(cursor);
+            return new ObjectId(hex);
         } catch (IllegalArgumentException ex) {
-            throw new BadRequestException("Invalid schedule-runs cursor: " + cursor);
+            throw new BadRequestException("Invalid ObjectId in schedule-runs cursor: " + hex);
         }
-        // Default sort is DESC; forward+DESC and backward+ASC both want _id < cursor.
-        boolean useLessThan = !backward;
-        if (useLessThan) {
-            criteria.and(FIELD_ID).lt(cursorId);
-        } else {
-            criteria.and(FIELD_ID).gt(cursorId);
+    }
+
+    private static Instant parseInstant(String millis) {
+        try {
+            return Instant.ofEpochMilli(Long.parseLong(millis));
+        } catch (NumberFormatException ex) {
+            throw new BadRequestException("Unparseable epoch millis in schedule-runs cursor: " + millis);
         }
     }
 }
