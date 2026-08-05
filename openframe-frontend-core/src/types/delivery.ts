@@ -8,6 +8,20 @@
  * related delivery items) share one canonical shape.
  */
 
+/**
+ * Display identity for a task assignee — WIRE-SAFE shape: name + avatar
+ * only, resolved server-side (ClickUp assignee × profiles). Emails are
+ * deliberately NOT on the wire; the roadmap/delivery boards are public
+ * surfaces (same policy as the RAG mappers). Feeds `AvatarStack`
+ * directly.
+ */
+export interface TaskAssigneeDisplay {
+  /** ClickUp member id — stable render key. */
+  id: number;
+  name: string | null;
+  avatarUrl: string | null;
+}
+
 export interface DeliveryItem {
   id: string;
   title: string;
@@ -23,6 +37,10 @@ export interface DeliveryItem {
    * `lib/utils/clickup-task-type-utils.ts` (hub-side).
    */
   customItemId: number | null;
+  /** Assignee display identities (name + avatar, never email) — powers
+   *  the AvatarStack on cards. Optional: producers that don't enrich
+   *  (e.g. activity-cache recent_tasks) simply omit it. */
+  assignees?: TaskAssigneeDisplay[];
   /**
    * Every ClickUp list the task is associated with (home list + ClickUp's
    * "Tasks in Multiple Lists" locations). UI joins these for display.

@@ -14,6 +14,7 @@ import React, { useState } from 'react'
 import Image from '../../../embed-shims/next-image'
 import { ThumbsUp, ThumbsDown } from 'lucide-react'
 import { RoadmapVoteButton } from './roadmap-vote-button'
+import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack'
 import { FigmaIcon } from '../../icons/figma-icon'
 import { ImageIcon } from '../../icons/image-icon'
 import { Button } from '../../ui/button/button'
@@ -53,6 +54,9 @@ export function RoadmapCardSkeleton({ size = 'default' }: { size?: CardSize }) {
           <span className={`${COMPACT_CARD_META_ROW_BOX} flex-nowrap gap-2`}>
             <span className="h-3 w-2/5 rounded bg-ods-bg/60 flex-1" />
             <span className="h-3 w-10 rounded bg-ods-bg/40 shrink-0" />
+            {/* assignee-stack placeholder — mirrors the xs AvatarStack
+                slot so row width doesn't shift when assignees load */}
+            <span className="h-6 w-14 rounded-full bg-ods-bg/40 shrink-0" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
             <span className="h-3 w-5/6 rounded bg-ods-bg/40" />
@@ -79,7 +83,12 @@ export function RoadmapCardSkeleton({ size = 'default' }: { size?: CardSize }) {
       <div className="flex-1" />
       <div className="flex items-center justify-between">
         <div className="h-12 w-32 bg-ods-bg rounded" />
-        <div className="h-8 w-20 bg-ods-bg rounded" />
+        <div className="flex items-center gap-2">
+          {/* assignee-stack placeholder — matches the xs AvatarStack in
+              the loaded card's action row */}
+          <div className="h-6 w-14 rounded-full bg-ods-bg/60" />
+          <div className="h-8 w-20 bg-ods-bg rounded" />
+        </div>
       </div>
     </div>
   )
@@ -110,6 +119,17 @@ export interface RoadmapCardProps {
   userVote?: VoteType | null
   onVote?: (voteType: 'up' | 'down') => void
   isVoting?: boolean
+}
+
+/** Wire assignees → AvatarStack people (name+avatar only on the wire). */
+function assigneePeople(
+  assignees: Array<{ id: number; name: string | null; avatarUrl: string | null }> | undefined,
+): AvatarStackPerson[] {
+  return (assignees ?? []).map((a) => ({
+    key: a.id,
+    name: a.name ?? 'Unknown',
+    avatarUrl: a.avatarUrl,
+  }))
 }
 
 export function RoadmapCard({
@@ -220,6 +240,9 @@ export function RoadmapCard({
                 <span>{item.screenshots.length}</span>
               </span>
             ) : null}
+            {item.assignees && item.assignees.length > 0 ? (
+              <AvatarStack size="xs" people={assigneePeople(item.assignees)} className="shrink-0" />
+            ) : null}
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
             <span className={COMPACT_CARD_SUMMARY}>
@@ -321,7 +344,10 @@ export function RoadmapCard({
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {item.assignees && item.assignees.length > 0 ? (
+            <AvatarStack size="xs" people={assigneePeople(item.assignees)} className="shrink-0" />
+          ) : null}
           {item.screenshots && item.screenshots.length > 0 && (
             <Button
               variant="outline"

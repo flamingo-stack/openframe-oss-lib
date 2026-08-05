@@ -7,6 +7,8 @@ import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceService;
+import com.openframe.core.exception.BadRequestException;
+import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScriptEnvVar;
@@ -29,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
@@ -61,6 +64,8 @@ class ScriptDispatchServiceTest {
     private com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
     @Mock
     private com.openframe.data.service.TenantIdProvider tenantIdProvider;
+    @Mock
+    private ScriptTimeoutValidator timeoutValidator;
 
     @InjectMocks
     private ScriptDispatchService scriptDispatchService;
@@ -89,6 +94,38 @@ class ScriptDispatchServiceTest {
         input.setMachineId(MACHINE_ID);
         input.setScriptId(SCRIPT_ID);
         input.setPrivilegeLevel(PrivilegeLevel.ADMIN);
+    }
+
+    @Test
+    @DisplayName("runScript: validates the timeout override first — a rejected timeout throws (400) and nothing is dispatched")
+    void runScript_validatesTimeoutBeforeDispatch() {
+        input.setTimeoutSeconds(700);
+        doThrow(new BadRequestException(ErrorCode.VALIDATION_ERROR, "timeoutSeconds must not exceed 600 seconds"))
+                .when(timeoutValidator).validate(700);
+
+        assertThatThrownBy(() -> scriptDispatchService.runScript(input, "user-1"))
+                .isInstanceOf(BadRequestException.class);
+
+        verify(timeoutValidator).validate(700);
+        verifyNoInteractions(scriptNatsPublisher);
+    }
+
+    @Test
+    @DisplayName("batchRunScript: validates the timeout override first — a rejected timeout throws (400) and nothing is dispatched")
+    void batchRunScript_validatesTimeoutBeforeDispatch() {
+        BatchRunScriptInput batch = new BatchRunScriptInput();
+        batch.setMachineIds(List.of(MACHINE_ID));
+        batch.setScriptId(SCRIPT_ID);
+        batch.setPrivilegeLevel(PrivilegeLevel.ADMIN);
+        batch.setTimeoutSeconds(700);
+        doThrow(new BadRequestException(ErrorCode.VALIDATION_ERROR, "timeoutSeconds must not exceed 600 seconds"))
+                .when(timeoutValidator).validate(700);
+
+        assertThatThrownBy(() -> scriptDispatchService.batchRunScript(batch, "user-1"))
+                .isInstanceOf(BadRequestException.class);
+
+        verify(timeoutValidator).validate(700);
+        verifyNoInteractions(scriptNatsPublisher);
     }
 
     @Test

@@ -1,6 +1,6 @@
 package com.openframe.api.dto.rmm.script;
 
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;
 import lombok.AllArgsConstructor;
@@ -23,7 +23,7 @@ public class ScriptFilterInput {
     private List<ScriptStatus> statuses;
 
     /** Match scripts whose {@code supportedPlatforms} contains ANY of these platforms. */
-    private List<ScriptPlatform> supportedPlatforms;
+    private List<OsType> supportedPlatforms;
 
     /** Match scripts assigned ANY of these tag ids (real {@code Tag} entities). */
     private List<String> tagIds;
