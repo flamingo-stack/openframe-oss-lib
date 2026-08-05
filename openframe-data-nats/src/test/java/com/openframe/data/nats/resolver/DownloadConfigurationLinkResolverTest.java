@@ -41,6 +41,15 @@ class DownloadConfigurationLinkResolverTest {
     }
 
     @Test
+    void shouldStripAllConsecutiveTrailingSlashesFromConfiguredBaseUrl() {
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("https://openframe.build///");
+
+        String resolved = resolver.resolve(config(GATEWAY_TEMPLATE), "1.0.19");
+
+        assertThat(resolved).isEqualTo("https://openframe.build/v0/api/assets/download?agent=chat&platform=macos");
+    }
+
+    @Test
     void shouldLeavePlaceholderUntouchedWhenBaseUrlNotConfigured() {
         DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("");
 

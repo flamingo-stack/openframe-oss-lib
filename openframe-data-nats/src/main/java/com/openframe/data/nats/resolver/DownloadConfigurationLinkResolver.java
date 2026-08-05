@@ -16,14 +16,8 @@ public class DownloadConfigurationLinkResolver {
 
     private final String assetsBaseUrl;
 
-    /**
-     * Base URL of the shared gateway assets endpoint (e.g. {@code https://openframe.ai}),
-     * substituted for {@code {assetsBaseUrl}} in link templates. Empty by default, so templates
-     * that do not use the placeholder — and deployments that do not set the property — resolve
-     * exactly as before.
-     */
     public DownloadConfigurationLinkResolver(@Value("${openframe.assets.base-url:}") String assetsBaseUrl) {
-        this.assetsBaseUrl = stripTrailingSlash(assetsBaseUrl);
+        this.assetsBaseUrl = stripTrailingSlashes(assetsBaseUrl);
     }
 
     public String resolve(DownloadConfiguration config, String version) {
@@ -41,8 +35,8 @@ public class DownloadConfigurationLinkResolver {
         return link;
     }
 
-    private static String stripTrailingSlash(String value) {
-        return value != null && value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    private static String stripTrailingSlashes(String value) {
+        return value == null ? null : value.replaceAll("/+$", "");
     }
 
 }
