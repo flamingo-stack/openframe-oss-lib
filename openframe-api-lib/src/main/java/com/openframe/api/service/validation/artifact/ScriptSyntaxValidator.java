@@ -16,10 +16,16 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>Delegates to the shell's own parser where one exists in the container
  * ({@code bash -n} / {@code sh -n} / python {@code ast.parse}); nothing is
- * ever executed. Shells with no interpreter available in the JVM container
- * (PowerShell, CMD, NuShell — and python when python3 is absent) are recorded
- * as {@code SYNTAX_SKIPPED_NO_INTERPRETER} rather than blocked: the static
- * safety rules still run, and the honest skip shows up in artifact metadata.
+ * ever executed. Where the interpreter is absent the check is recorded as
+ * {@code SYNTAX_SKIPPED_NO_INTERPRETER} rather than blocking the save, and the
+ * honest skip shows up in artifact metadata.
+ *
+ * <p>Deployment note: the OpenFrame service images deliberately ship WITHOUT
+ * these interpreters, so in production every shell takes the skip path. A
+ * script is proven by running it on a machine the technician approved — see the
+ * library-save rules in the agent's system prompt — not by parsing it here.
+ * Adding bash/python to a service image is what turns this validator on again;
+ * do that only as a deliberate decision, not as a "missing dependency" fix.
  */
 @Slf4j
 @Component
