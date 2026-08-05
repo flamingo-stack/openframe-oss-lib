@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Slf4j
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
@@ -171,10 +172,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                 query.addCriteria(Criteria.where(sortField).is(null).and(ID_FIELD).lt(cursorId));
             } else {
                 // Leading null group: remaining null rows (by _id), then EVERY non-null row.
-                query.addCriteria(new Criteria().orOperator(
+                addOrCriteria(query,
                         Criteria.where(sortField).is(null).and(ID_FIELD).gt(cursorId),
                         Criteria.where(sortField).ne(null)
-                ));
+                );
             }
             return;
         }
@@ -190,17 +191,30 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         if (isDesc) {
             // Descending: null-valued rows sort AFTER every non-null value, so they belong on the
             // pages that follow a non-null cursor — include them or the trailing nulls are dropped.
-            query.addCriteria(new Criteria().orOperator(
+            addOrCriteria(query,
                     pastSortValue,
                     sameSortValuePastId,
                     Criteria.where(sortField).is(null)
-            ));
+            );
         } else {
-            query.addCriteria(new Criteria().orOperator(
+            addOrCriteria(query,
                     pastSortValue,
                     sameSortValuePastId
-            ));
+            );
         }
+    }
+
+    /**
+     * Adds a top-level {@code $or} to the query. The base device query already occupies the
+     * single null-key slot with its {@code $and}, and {@link Query#addCriteria} rejects a
+     * second key-less criteria — so the alternatives are pre-serialised under an explicit
+     * {@code $or} key instead of {@code new Criteria().orOperator(...)}.
+     */
+    private static void addOrCriteria(Query query, Criteria... alternatives) {
+        List<Document> branches = Stream.of(alternatives)
+                .map(Criteria::getCriteriaObject)
+                .toList();
+        query.addCriteria(Criteria.where("$or").is(branches));
     }
 
     private Object getSortFieldValue(Machine machine, String sortField) {
