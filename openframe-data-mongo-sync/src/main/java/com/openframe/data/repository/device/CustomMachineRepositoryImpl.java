@@ -2,6 +2,7 @@ package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.rmm.OsType;
 import lombok.extern.slf4j.Slf4j;
@@ -219,7 +220,8 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     @Override
-    public Map<String, Integer> facet(MachineQueryFilter filter, String search, String field) {
+    public Map<String, Integer> facet(MachineQueryFilter filter, String search, DeviceFacetDimension dimension) {
+        String field = dimension.fieldName();
         Query query = buildDeviceQuery(filter, search, field);
         Aggregation agg = Aggregation.newAggregation(
                 ctx -> new Document("$match", query.getQueryObject()),
