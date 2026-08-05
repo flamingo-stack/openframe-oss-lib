@@ -154,4 +154,28 @@ class CustomMachineRepositoryImplTest {
 
         assertThat(mentionsField(q, "machineId")).isTrue();
     }
+
+    @Test
+    @DisplayName("buildDeviceQuery: a search term matches nickname (alongside hostname and displayName)")
+    void searchMatchesNickname() {
+        Document q = repo.buildDeviceQuery(null, "reception").getQueryObject();
+
+        assertThat(mentionsField(q, "nickname")).isTrue();
+        assertThat(mentionsField(q, "hostname")).isTrue();
+        assertThat(mentionsField(q, "displayName")).isTrue();
+    }
+
+    @Test
+    @DisplayName("no search term → the name $or (and nickname) is absent")
+    void noSearchNoNicknameClause() {
+        Document q = repo.buildDeviceQuery(null, null).getQueryObject();
+
+        assertThat(mentionsField(q, "nickname")).isFalse();
+    }
+
+    @Test
+    @DisplayName("nickname is a sortable field")
+    void nicknameIsSortable() {
+        assertThat(repo.isSortableField("nickname")).isTrue();
+    }
 }

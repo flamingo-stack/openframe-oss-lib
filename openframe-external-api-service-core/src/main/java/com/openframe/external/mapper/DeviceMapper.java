@@ -19,6 +19,7 @@ public class DeviceMapper extends BaseRestMapper {
                 .machineId(machine.getMachineId())
                 .hostname(machine.getHostname())
                 .displayName(machine.getDisplayName())
+                .nickname(machine.getNickname())
                 .ip(machine.getIp())
                 .macAddress(machine.getMacAddress())
                 .osUuid(machine.getOsUuid())

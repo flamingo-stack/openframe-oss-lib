@@ -42,6 +42,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             "_id",
             "hostname",
             "displayName",
+            "nickname",
             "status",
             "lastSeen"
     );
@@ -185,6 +186,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return switch (sortField) {
             case "hostname" -> machine.getHostname();
             case "displayName" -> machine.getDisplayName();
+            case "nickname" -> machine.getNickname();
             case "status" -> machine.getStatus() != null ? machine.getStatus().name() : null;
             case "lastSeen" -> machine.getLastSeen();
             default -> null;
@@ -306,6 +308,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             criteriaList.add(new Criteria().orOperator(
                     Criteria.where("hostname").regex(search, "i"),
                     Criteria.where("displayName").regex(search, "i"),
+                    Criteria.where("nickname").regex(search, "i"),
                     Criteria.where("ip").regex(search, "i"),
                     Criteria.where("serialNumber").regex(search, "i"),
                     Criteria.where("manufacturer").regex(search, "i"),

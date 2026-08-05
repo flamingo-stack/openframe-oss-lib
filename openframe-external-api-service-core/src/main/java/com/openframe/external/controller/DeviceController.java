@@ -13,6 +13,7 @@ import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.external.dto.device.DeviceFilterResponse;
 import com.openframe.external.dto.device.DeviceResponse;
 import com.openframe.external.dto.device.DevicesResponse;
+import com.openframe.external.dto.device.UpdateDeviceNicknameRequest;
 import com.openframe.external.dto.device.UpdateDeviceStatusRequest;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -232,6 +233,22 @@ public class DeviceController {
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
         log.info("Updating device {} status to {} - userId: {}, apiKeyId: {}", machineId, request.status(), userId, apiKeyId);
         deviceService.updateStatusByMachineId(machineId, request.status());
+    }
+
+    @Operation(
+            summary = "Update device nickname by machine ID",
+            description = "Set or clear the user-defined nickname for a device"
+    )
+    @PatchMapping("/{machineId}/nickname")
+    @ResponseStatus(NO_CONTENT)
+    public void updateDeviceNickname(
+            @Parameter(description = "Machine ID of the device")
+            @PathVariable String machineId,
+            @RequestBody UpdateDeviceNicknameRequest request,
+            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+        log.info("Updating device {} nickname - userId: {}, apiKeyId: {}", machineId, userId, apiKeyId);
+        deviceService.updateNickname(machineId, request.nickname());
     }
 
 }

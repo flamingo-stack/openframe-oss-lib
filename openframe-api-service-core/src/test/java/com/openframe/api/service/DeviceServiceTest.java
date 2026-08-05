@@ -3,6 +3,7 @@ package com.openframe.api.service;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -242,5 +243,59 @@ class DeviceServiceTest {
         service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
         verify(scriptScheduleDeviceService, never()).removeDeviceFromAllSchedules(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateNickname: trims the value, bumps updatedAt, saves and returns the device")
+    void updateNickname_setsAndSaves() {
+        DeviceService s = service();
+        Machine m = new Machine();
+        m.setMachineId("m1");
+        when(machineRepository.findByMachineId("m1")).thenReturn(Optional.of(m));
+        when(machineRepository.save(any(Machine.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Machine result = s.updateNickname("m1", "  Reception iMac  ");
+
+        assertThat(result.getNickname()).isEqualTo("Reception iMac");
+        assertThat(m.getNickname()).isEqualTo("Reception iMac");
+        assertThat(m.getUpdatedAt()).isNotNull();
+        verify(machineRepository).save(m);
+    }
+
+    @Test
+    @DisplayName("updateNickname: a blank value clears the nickname (stored as null)")
+    void updateNickname_blankClears() {
+        DeviceService s = service();
+        Machine m = new Machine();
+        m.setMachineId("m1");
+        m.setNickname("old");
+        when(machineRepository.findByMachineId("m1")).thenReturn(Optional.of(m));
+        when(machineRepository.save(any(Machine.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(s.updateNickname("m1", "   ").getNickname()).isNull();
+    }
+
+    @Test
+    @DisplayName("updateNickname: a null value clears the nickname")
+    void updateNickname_nullClears() {
+        DeviceService s = service();
+        Machine m = new Machine();
+        m.setMachineId("m1");
+        m.setNickname("old");
+        when(machineRepository.findByMachineId("m1")).thenReturn(Optional.of(m));
+        when(machineRepository.save(any(Machine.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(s.updateNickname("m1", null).getNickname()).isNull();
+    }
+
+    @Test
+    @DisplayName("updateNickname: unknown machine → DeviceNotFoundException, nothing saved")
+    void updateNickname_notFound() {
+        DeviceService s = service();
+        when(machineRepository.findByMachineId("nope")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> s.updateNickname("nope", "x"))
+                .isInstanceOf(DeviceNotFoundException.class);
+        verify(machineRepository, never()).save(any());
     }
 }
