@@ -1,6 +1,6 @@
 package com.openframe.data.integration.repository.rmm;
 
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
@@ -53,7 +53,7 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     private ScriptSchedule save(String tenantId, String name, ScriptStatus status,
-                                String createdBy, List<ScriptPlatform> platforms) {
+                                String createdBy, List<OsType> platforms) {
         ScriptSchedule schedule = ScriptSchedule.builder()
                 .tenantId(tenantId)
                 .name(name)
@@ -65,7 +65,7 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     private ScriptSchedule saveActive(String tenantId, String name) {
-        return save(tenantId, name, ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.WINDOWS));
+        return save(tenantId, name, ScriptStatus.ACTIVE, "user-1", List.of(OsType.WINDOWS));
     }
 
     @Test
@@ -243,7 +243,7 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
                 .name(name)
                 .status(ScriptStatus.ACTIVE)
                 .createdBy("user-1")
-                .supportedPlatforms(List.of(ScriptPlatform.WINDOWS))
+                .supportedPlatforms(List.of(OsType.WINDOWS))
                 .repeat(repeat)
                 .build();
         return scheduleRepository.save(schedule);
@@ -327,7 +327,7 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
     @DisplayName("sort by deviceCount is tenant-isolated — a schedule in tenant B does not leak into tenant A's page even if their assignment docs coexist in the collection")
     void findPageForTenant_deviceCountAggregation_isTenantIsolated() {
         ScriptSchedule aOnly = saveActive(TENANT_A, "a-only");
-        ScriptSchedule bOnly = save(TENANT_B, "b-only", ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.MACOS));
+        ScriptSchedule bOnly = save(TENANT_B, "b-only", ScriptStatus.ACTIVE, "user-1", List.of(OsType.MAC_OS));
         assignMachines(TENANT_A, aOnly.getId(), List.of("m1"));
         assignMachines(TENANT_B, bOnly.getId(), List.of("m1", "m2", "m3", "m4"));
 
@@ -349,7 +349,7 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
     @DisplayName("findPageForTenant excludes soft-deleted schedules by default")
     void findPageForTenant_excludesDeleted() {
         saveActive(TENANT_A, "active");
-        save(TENANT_A, "deleted", ScriptStatus.DELETED, "user-1", List.of(ScriptPlatform.MACOS));
+        save(TENANT_A, "deleted", ScriptStatus.DELETED, "user-1", List.of(OsType.MAC_OS));
 
         List<ScriptSchedule> page = scheduleRepository.findPageForTenant(
                 TENANT_A, null, null, "_id", Sort.Direction.DESC, null, false, 10);
@@ -374,7 +374,7 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
     void countForTenant_excludesDeletedByDefault() {
         saveActive(TENANT_A, "a1");
         saveActive(TENANT_A, "a2");
-        save(TENANT_A, "gone", ScriptStatus.DELETED, "user-1", List.of(ScriptPlatform.WINDOWS));
+        save(TENANT_A, "gone", ScriptStatus.DELETED, "user-1", List.of(OsType.WINDOWS));
 
         assertThat(scheduleRepository.countForTenant(TENANT_A, null, null)).isEqualTo(2L);
     }
@@ -382,21 +382,21 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("platformFacet counts schedules per supported platform (array unwound)")
     void platformFacet_countsByPlatform() {
-        save(TENANT_A, "win", ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.WINDOWS));
-        save(TENANT_A, "both", ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.WINDOWS, ScriptPlatform.MACOS));
+        save(TENANT_A, "win", ScriptStatus.ACTIVE, "user-1", List.of(OsType.WINDOWS));
+        save(TENANT_A, "both", ScriptStatus.ACTIVE, "user-1", List.of(OsType.WINDOWS, OsType.MAC_OS));
 
         Map<String, Integer> facet = scheduleRepository.platformFacet(TENANT_A, null);
 
-        assertThat(facet).containsEntry(ScriptPlatform.WINDOWS.name(), 2)
-                .containsEntry(ScriptPlatform.MACOS.name(), 1);
+        assertThat(facet).containsEntry(OsType.WINDOWS.name(), 2)
+                .containsEntry(OsType.MAC_OS.name(), 1);
     }
 
     @Test
     @DisplayName("authorFacet counts schedules per createdBy user")
     void authorFacet_countsByCreatedBy() {
-        save(TENANT_A, "s1", ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.WINDOWS));
-        save(TENANT_A, "s2", ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.WINDOWS));
-        save(TENANT_A, "s3", ScriptStatus.ACTIVE, "user-2", List.of(ScriptPlatform.WINDOWS));
+        save(TENANT_A, "s1", ScriptStatus.ACTIVE, "user-1", List.of(OsType.WINDOWS));
+        save(TENANT_A, "s2", ScriptStatus.ACTIVE, "user-1", List.of(OsType.WINDOWS));
+        save(TENANT_A, "s3", ScriptStatus.ACTIVE, "user-2", List.of(OsType.WINDOWS));
 
         Map<String, Integer> facet = scheduleRepository.authorFacet(TENANT_A, new ScriptScheduleQueryFilter());
 

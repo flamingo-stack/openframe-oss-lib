@@ -2,7 +2,7 @@
 #
 # Tenant scoping is implicit — the resolver extracts the tenant from the
 # authenticated principal, so clients never specify or see tenantId. Reuses the
-# ScriptPlatform / ScriptStatus / ScriptFilterOption / Script / User / Node /
+# OsType / ScriptStatus / ScriptFilterOption / Script / User / Node /
 # PageInfo / SortInput types defined elsewhere in the merged schema.
 
 extend type Query {
@@ -81,7 +81,7 @@ type ScriptSchedule implements Node {
     id: ID!
     name: String!
     description: String
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     """How this schedule targets devices: SPECIFIC (an explicit machine set, managed on the "Select Specific Devices" tab) or CRITERIA (a live rule; devices registered later that match are included automatically). Never null — legacy schedules read as SPECIFIC."""
     selectionMode: ScheduleDeviceSelectionMode!
     """The device-selection rule when selectionMode is CRITERIA (customer / type / OS). Null for SPECIFIC schedules."""
@@ -98,6 +98,10 @@ type ScriptSchedule implements Node {
     lastRunAt: Instant
     """The scripts this schedule runs, in run order (resolved from the stored script ids)."""
     scripts: [Script!]!
+    """Per-script custom args / env overrides for this schedule ("custom scripts"). Sparse — only the
+    scripts the user customised; every other script in `scripts` runs on its stored defaults. `scriptId`
+    is a Script global id (matches `scripts[].id`)."""
+    scriptCustomParams: [ScheduledScriptCustomParams!]!
     """Machines assigned to this schedule — a Relay connection with the same filter/search/sort/pagination
     as the top-level `devices` query, scoped to this schedule's assignments."""
     assignedDevices(
@@ -123,6 +127,14 @@ type ScriptSchedule implements Node {
         search: String,
         sort: SortInput
     ): AvailableDeviceConnection!
+    """Faceted filter options (status / deviceType / osType / organization, each with counts) for the
+    "Assigned Devices" picker — the values actually present among this schedule's assigned devices,
+    narrowed by `filter`/`search`. Same shape as the top-level `deviceFilters` query so the same
+    filter panel can drive the picker. `tagKeys` is currently always empty for the pickers."""
+    assignedDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
+    """Faceted filter options for the "Available Devices" picker — like `assignedDeviceFilters` but
+    over this schedule's platform-scoped selectable set (matching the `availableDevices` picker)."""
+    availableDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
     """Number of machines assigned to this schedule (the DEVICES column)."""
     deviceCount: Int!
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
@@ -194,12 +206,28 @@ type ScriptScheduleFilters {
     filteredCount: Int!
 }
 
+type ScheduledScriptCustomParams {
+    scriptId: ID!
+    args: [String!]
+    envVars: [ScriptEnvVar!]
+}
+
+input ScheduledScriptCustomParamsInput {
+    scriptId: ID!
+    "Full replacement for the script's defaultArgs; null/omitted inherits the default."
+    args: [String!]
+    "Full replacement for the script's envVars; null/omitted inherits the default. NOT merged."
+    envVars: [ScriptEnvVarInput!]
+}
+
 input CreateScriptScheduleInput {
     name: String!
     description: String
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     "Ids of existing Scripts to run, in run order."
     scriptIds: [ID!]
+    "Optional per-script custom args / env overrides. Sparse; each scriptId must be in scriptIds."
+    scriptCustomParams: [ScheduledScriptCustomParamsInput!]
     trigger: ScriptScheduleTrigger!
     "First scheduled run as an absolute UTC instant. Required when trigger is DATE_TIME (must fall on a 30-minute boundary, xx:00 or xx:30); must be null when trigger is DEVICE_ONLINE."
     startAt: Instant
@@ -215,8 +243,10 @@ input UpdateScriptScheduleInput {
     id: ID!
     name: String!
     description: String
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     scriptIds: [ID!]
+    "Optional per-script custom args / env overrides. PUT semantics: fully replaces the stored custom params (null/empty clears them). Each scriptId must be in scriptIds."
+    scriptCustomParams: [ScheduledScriptCustomParamsInput!]
     trigger: ScriptScheduleTrigger!
     "How this schedule targets devices — SPECIFIC (an explicit machine set) or CRITERIA (a live rule). Null defaults to SPECIFIC, matching legacy documents. Flipping between modes leaves the join rows/rule untouched; whichever mode is active is what the resolver reads."
     selectionMode: ScheduleDeviceSelectionMode
@@ -233,6 +263,6 @@ is used verbatim.
 """
 input ScriptScheduleFilterInput {
     statuses: [ScriptStatus!]
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     authorIds: [ID!]
 }

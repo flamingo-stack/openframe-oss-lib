@@ -1,7 +1,6 @@
 package com.openframe.data.repository.user;
 
 import com.openframe.data.document.user.User;
-import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.document.user.filter.UserQueryFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,10 +28,6 @@ public class CustomUserRepositoryImpl implements CustomUserRepository {
 
     @Override
     public List<User> findUsersBySearch(UserQueryFilter filter, int limit) {
-        // REMOVED users are permanently erased and never surface in any user list
-        if (filter != null && filter.getStatus() == UserStatus.REMOVED) {
-            return List.of();
-        }
         Query query = buildQuery(filter);
         query.limit(limit);
         query.with(Sort.by(Sort.Direction.DESC, FIELD_CREATED_AT));
@@ -43,13 +38,10 @@ public class CustomUserRepositoryImpl implements CustomUserRepository {
     private Query buildQuery(UserQueryFilter filter) {
         Query query = new Query();
         if (filter == null) {
-            query.addCriteria(Criteria.where(FIELD_STATUS).ne(UserStatus.REMOVED));
             return query;
         }
         if (filter.getStatus() != null) {
             query.addCriteria(Criteria.where(FIELD_STATUS).is(filter.getStatus()));
-        } else {
-            query.addCriteria(Criteria.where(FIELD_STATUS).ne(UserStatus.REMOVED));
         }
         if (hasText(filter.getEmailRegex())) {
             query.addCriteria(Criteria.where(FIELD_EMAIL)

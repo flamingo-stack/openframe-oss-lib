@@ -57,6 +57,8 @@ export interface TicketInfoSectionProps {
       id: string
       name: string
       avatarSrc?: string
+      /** Deleted account (DELETED / SELF_DELETED) — renders the red user-x placeholder + red name. */
+      deleted?: boolean
     }
     options: TicketAssigneeOption[]
     isLoading?: boolean

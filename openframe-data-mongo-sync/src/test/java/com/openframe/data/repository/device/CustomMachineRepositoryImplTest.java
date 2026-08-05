@@ -30,6 +30,16 @@ class CustomMachineRepositoryImplTest {
                 .orElse(null);
     }
 
+    private static boolean mentionsField(Object node, String field) {
+        if (node instanceof Document doc) {
+            return doc.containsKey(field) || doc.values().stream().anyMatch(v -> mentionsField(v, field));
+        }
+        if (node instanceof List<?> list) {
+            return list.stream().anyMatch(v -> mentionsField(v, field));
+        }
+        return false;
+    }
+
     @Test
     @DisplayName("buildDeviceQuery: no filter → default guard status $ne DELETED — every caller inherits this without opting in")
     void defaultGuardExcludesDeleted() {
@@ -76,5 +86,72 @@ class CustomMachineRepositoryImplTest {
         assertThat(status).isNotNull();
         assertThat(status).containsKey("$in");
         assertThat(status).doesNotContainKey("$ne");
+    }
+
+    private static MachineQueryFilter allDimensionsFilter() {
+        MachineQueryFilter filter = new MachineQueryFilter();
+        filter.setStatuses(List.of("ONLINE"));
+        filter.setDeviceTypes(List.of("WORKSTATION"));
+        filter.setOsTypes(List.of("macos"));
+        filter.setOrganizationIds(List.of("org-1"));
+        return filter;
+    }
+
+    @Test
+    @DisplayName("facet(status): the status arm self-excludes — the $in is gone and the DELETED guard returns, so the status dropdown still offers every non-deleted status; other arms stay")
+    void statusFacetSelfExcludesAndKeepsOtherArms() {
+        Document q = repo.buildDeviceQuery(allDimensionsFilter(), null, "status").getQueryObject();
+
+        Document status = statusClause(q);
+        assertThat(status).isNotNull();
+        assertThat(status).containsKey("$ne");          // guard re-applied (no caller status constraint)
+        assertThat(status).doesNotContainKey("$in");    // caller's status arm dropped
+        assertThat(mentionsField(q, "type")).isTrue();
+        assertThat(mentionsField(q, "osType")).isTrue();
+        assertThat(mentionsField(q, "organizationId")).isTrue();
+    }
+
+    @Test
+    @DisplayName("facet(type): the deviceType arm self-excludes; status $in and the other arms remain")
+    void typeFacetSelfExcludes() {
+        Document q = repo.buildDeviceQuery(allDimensionsFilter(), null, "type").getQueryObject();
+
+        assertThat(mentionsField(q, "type")).isFalse();
+        assertThat(statusClause(q)).containsKey("$in");
+        assertThat(mentionsField(q, "osType")).isTrue();
+        assertThat(mentionsField(q, "organizationId")).isTrue();
+    }
+
+    @Test
+    @DisplayName("facet(osType): the osType arm self-excludes; the other arms remain")
+    void osTypeFacetSelfExcludes() {
+        Document q = repo.buildDeviceQuery(allDimensionsFilter(), null, "osType").getQueryObject();
+
+        assertThat(mentionsField(q, "osType")).isFalse();
+        assertThat(statusClause(q)).containsKey("$in");
+        assertThat(mentionsField(q, "type")).isTrue();
+        assertThat(mentionsField(q, "organizationId")).isTrue();
+    }
+
+    @Test
+    @DisplayName("facet(organizationId): the organization arm self-excludes; the other arms remain")
+    void organizationFacetSelfExcludes() {
+        Document q = repo.buildDeviceQuery(allDimensionsFilter(), null, "organizationId").getQueryObject();
+
+        assertThat(mentionsField(q, "organizationId")).isFalse();
+        assertThat(statusClause(q)).containsKey("$in");
+        assertThat(mentionsField(q, "type")).isTrue();
+        assertThat(mentionsField(q, "osType")).isTrue();
+    }
+
+    @Test
+    @DisplayName("facet: the picker's scope (restrictToMachineIds) is NEVER dropped — it defines the set, not a facet dimension")
+    void facetNeverDropsScopeRestriction() {
+        MachineQueryFilter filter = allDimensionsFilter();
+        filter.setRestrictToMachineIds(List.of("m1", "m2"));
+
+        Document q = repo.buildDeviceQuery(filter, null, "status").getQueryObject();
+
+        assertThat(mentionsField(q, "machineId")).isTrue();
     }
 }

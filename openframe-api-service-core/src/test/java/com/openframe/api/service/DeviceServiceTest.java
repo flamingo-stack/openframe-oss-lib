@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -39,10 +40,11 @@ class DeviceServiceTest {
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private DeviceStatusProcessor deviceStatusProcessor;
     @Mock private ScriptScheduleDeviceService scriptScheduleDeviceService;
+    @Mock private DeviceFilterOptionMapper deviceFilterOptionMapper;
 
     private DeviceService service() {
         DeviceService s = new DeviceService(machineRepository, tagRepository, tagAssignmentRepository,
-                deviceStatusProcessor, scriptScheduleDeviceService);
+                deviceStatusProcessor, scriptScheduleDeviceService, deviceFilterOptionMapper);
         lenient().when(machineRepository.countMachines(any(MachineQueryFilter.class), any())).thenReturn(0L);
         lenient().when(machineRepository.findMachinesWithCursor(any(MachineQueryFilter.class), any(),
                 any(), anyInt(), any(), any())).thenReturn(List.of());
@@ -86,12 +88,12 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("queryDevicesForPlatforms: passes platform names on the filter — repo expands to osType $or via classifier")
+    @DisplayName("queryDevicesForPlatforms: passes platform names on the filter — repo expands to osType $in")
     void scopesToPlatforms() {
-        service().queryDevicesForPlatforms(List.of("MACOS"), null,
+        service().queryDevicesForPlatforms(List.of("MAC_OS"), null,
                 CursorPaginationCriteria.builder().limit(10).build(), null, null);
 
-        assertThat(capturedFilter().getPlatformNames()).containsExactly("MACOS");
+        assertThat(capturedFilter().getPlatformNames()).containsExactly("MAC_OS");
     }
 
     @Test
@@ -110,12 +112,12 @@ class DeviceServiceTest {
         when(machineRepository.findMachineIds(any(MachineQueryFilter.class), any()))
                 .thenReturn(List.of("m1", "m2"));
 
-        List<String> ids = s.findDeviceIdsForPlatforms(List.of("MACOS"), null, null);
+        List<String> ids = s.findDeviceIdsForPlatforms(List.of("MAC_OS"), null, null);
 
         assertThat(ids).containsExactly("m1", "m2");
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         verify(machineRepository).findMachineIds(captor.capture(), any());
-        assertThat(captor.getValue().getPlatformNames()).containsExactly("MACOS");
+        assertThat(captor.getValue().getPlatformNames()).containsExactly("MAC_OS");
     }
 
     @Test
@@ -124,7 +126,7 @@ class DeviceServiceTest {
         DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
                 .statuses(List.of(DeviceStatus.DELETED)).build();
 
-        service().findDeviceIdsForPlatforms(List.of("MACOS"), filter, null);
+        service().findDeviceIdsForPlatforms(List.of("MAC_OS"), filter, null);
 
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         verify(machineRepository).findMachineIds(captor.capture(), any());
