@@ -29,6 +29,7 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -231,6 +232,9 @@ public class DeviceController {
             @RequestBody UpdateDeviceStatusRequest request,
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+        if (request == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "Request body is required");
+        }
         log.info("Updating device {} status to {} - userId: {}, apiKeyId: {}", machineId, request.status(), userId, apiKeyId);
         deviceService.updateStatusByMachineId(machineId, request.status());
     }
@@ -247,6 +251,9 @@ public class DeviceController {
             @RequestBody UpdateDeviceNicknameRequest request,
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+        if (request == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "Request body is required");
+        }
         log.info("Updating device {} nickname - userId: {}, apiKeyId: {}", machineId, userId, apiKeyId);
         deviceService.updateNickname(machineId, request.nickname());
     }

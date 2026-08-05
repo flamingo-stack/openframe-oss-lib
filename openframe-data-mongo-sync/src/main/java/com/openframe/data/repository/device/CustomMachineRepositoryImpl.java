@@ -161,10 +161,21 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         }
 
         Object cursorSortValue = getSortFieldValue(cursorDoc, sortField);
+
+        // Keyset over (sortField, _id). MongoDB orders null/missing values FIRST ascending and
+        // LAST descending, and $lt/$gt are type-bracketed (they never match null), so null-valued
+        // rows need explicit predicates or the page boundary silently drops or duplicates rows.
         if (cursorSortValue == null) {
-            query.addCriteria(isDesc ?
-                Criteria.where(ID_FIELD).lt(cursorId) :
-                Criteria.where(ID_FIELD).gt(cursorId));
+            if (isDesc) {
+                // Trailing null group: only the remaining null rows, ordered by _id descending.
+                query.addCriteria(Criteria.where(sortField).is(null).and(ID_FIELD).lt(cursorId));
+            } else {
+                // Leading null group: remaining null rows (by _id), then EVERY non-null row.
+                query.addCriteria(new Criteria().orOperator(
+                        Criteria.where(sortField).is(null).and(ID_FIELD).gt(cursorId),
+                        Criteria.where(sortField).ne(null)
+                ));
+            }
             return;
         }
 
@@ -172,14 +183,24 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             Criteria.where(sortField).lt(cursorSortValue) :
             Criteria.where(sortField).gt(cursorSortValue);
 
-        Criteria sameSortValuePastId = new Criteria().andOperator(
-            Criteria.where(sortField).is(cursorSortValue),
-            isDesc ? Criteria.where(ID_FIELD).lt(cursorId) : Criteria.where(ID_FIELD).gt(cursorId)
-        );
+        Criteria sameSortValuePastId = isDesc ?
+            Criteria.where(sortField).is(cursorSortValue).and(ID_FIELD).lt(cursorId) :
+            Criteria.where(sortField).is(cursorSortValue).and(ID_FIELD).gt(cursorId);
 
-        query.addCriteria(Criteria.where("$or").is(
-                List.of(pastSortValue.getCriteriaObject(), sameSortValuePastId.getCriteriaObject())
-        ));
+        if (isDesc) {
+            // Descending: null-valued rows sort AFTER every non-null value, so they belong on the
+            // pages that follow a non-null cursor — include them or the trailing nulls are dropped.
+            query.addCriteria(new Criteria().orOperator(
+                    pastSortValue,
+                    sameSortValuePastId,
+                    Criteria.where(sortField).is(null)
+            ));
+        } else {
+            query.addCriteria(new Criteria().orOperator(
+                    pastSortValue,
+                    sameSortValuePastId
+            ));
+        }
     }
 
     private Object getSortFieldValue(Machine machine, String sortField) {
