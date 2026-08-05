@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -32,4 +33,10 @@ public class ScriptScheduleQueryFilter {
      * {@code null} = no author constraint.
      */
     private List<String> createdByIds;
+
+    private Instant createdAtFrom;
+    private Instant createdAtTo;
+
+    private Instant updatedAtFrom;
+    private Instant updatedAtTo;
 }

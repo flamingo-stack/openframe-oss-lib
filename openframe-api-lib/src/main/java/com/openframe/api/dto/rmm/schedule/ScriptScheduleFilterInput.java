@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.List;
 
 @Data
@@ -20,4 +21,10 @@ public class ScriptScheduleFilterInput {
     private List<OsType> supportedPlatforms;
 
     private List<String> authorIds;
+
+    private Instant createdAtFrom;
+    private Instant createdAtTo;
+
+    private Instant updatedAtFrom;
+    private Instant updatedAtTo;
 }
