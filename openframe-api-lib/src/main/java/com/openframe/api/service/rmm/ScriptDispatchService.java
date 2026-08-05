@@ -62,8 +62,10 @@ public class ScriptDispatchService {
     private final ScriptScheduleDeviceService scriptScheduleDeviceService;
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
+    private final ScriptTimeoutValidator timeoutValidator;
 
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy) {
+        timeoutValidator.validate(input.getTimeoutSeconds());
         deviceService.findByMachineId(input.getMachineId())
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + input.getMachineId()));
 
@@ -99,6 +101,7 @@ public class ScriptDispatchService {
     }
 
     public DispatchResponse batchRunScript(BatchRunScriptInput input, String initiatedBy) {
+        timeoutValidator.validate(input.getTimeoutSeconds());
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
 
         // Verify every target up front — reject the whole batch if any is unknown,
