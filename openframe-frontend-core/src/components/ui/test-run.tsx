@@ -139,7 +139,7 @@ export function TestRunErrorBanner({ error, className }: { error: string; classN
       role="alert"
       className={cn(
         'flex items-center justify-between gap-[var(--spacing-system-s)]',
-        'rounded-[6px] border border-ods-error bg-ods-error-secondary',
+        'rounded-md border border-ods-error bg-ods-error-secondary',
         'px-[var(--spacing-system-mf)] py-[var(--spacing-system-s)]',
         className,
       )}
