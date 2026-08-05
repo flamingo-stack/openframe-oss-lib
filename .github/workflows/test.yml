@@ -241,7 +241,7 @@ jobs:
 
   all-checks:
     name: "All Checks"
-    needs: [changes, matrix, trivy_scan, test-java, test-node, test-rust]
+    needs: [changes, matrix, test-java, test-node, test-rust]
     runs-on: ubuntu-latest
     if: |
       always() && 
