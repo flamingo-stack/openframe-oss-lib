@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { FlamingoLogo } from './flamingo-logo';
+import { FlamingoLogo } from './icons/flamingo-logo';
 import { getBaseUrl } from '../utils';
 
 interface MadeWithLoveProps {
@@ -117,8 +117,9 @@ export function MadeWithLove({
       >
         <div style={logoStyle}>
           <FlamingoLogo
-            size={config.logoSize}
-            color="#f357bb" // Direct hex instead of CSS variable for cross-framework compatibility
+            width={config.logoSize}
+            height={config.logoSize}
+            fill="#f357bb" // Direct hex instead of CSS variable for cross-framework compatibility
           />
         </div>
         <span style={textStyle}>Flamingo</span>

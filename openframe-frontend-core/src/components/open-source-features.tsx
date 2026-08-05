@@ -33,7 +33,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) =
   );
 };
 
-const OpenSourceFeatures: React.FC = () => {
+export const OpenSourceFeatures: React.FC = () => {
   const features = [
     {
       icon: <Terminal className="w-6 h-6" />,

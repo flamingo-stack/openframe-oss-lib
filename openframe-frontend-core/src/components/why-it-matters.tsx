@@ -35,7 +35,7 @@ const WhyItMattersItem: React.FC<WhyItMattersItemProps> = ({ number, title, desc
 };
 
 
-const WhyItMatters = () => {
+export const WhyItMatters = () => {
   const items = [
     {
       number: "1.",

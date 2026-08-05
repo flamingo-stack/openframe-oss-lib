@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { cn } from '../../utils/cn';
-import { FlamingoLogo } from '../flamingo-logo';
-import { OpenmspLogo } from '../openmsp-logo';
+import { FlamingoLogo } from '../icons/flamingo-logo';
+import { OpenmspLogo } from '../icons/openmsp-logo';
 import { OpenFrameLogo } from '../icons/openframe-logo';
 import { MiamiCyberGangLogoFaceOnly } from '../icons/miami-cyber-gang-logo-face-only';
 import { Globe } from 'lucide-react';

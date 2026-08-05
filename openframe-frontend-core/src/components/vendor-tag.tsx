@@ -1,7 +1,7 @@
 "use client"
 
 import { OpenSourceIcon, CoinsIcon } from "./icons-stub"
-import { OpenFrameLogo } from "./openframe-logo"
+import { OpenFrameLogo } from "./icons/openframe-logo"
 import { cn } from "../utils/cn"
 import { Boxes, Database, Hand, Plug, ShieldCheck, Sparkles } from "lucide-react"
 
