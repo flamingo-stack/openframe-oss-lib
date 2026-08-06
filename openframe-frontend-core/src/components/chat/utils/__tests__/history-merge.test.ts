@@ -930,3 +930,102 @@ describe('mid-stream refetch (turn partially persisted)', () => {
     expect(ids(merged)).toEqual([U0.id, A0.id, PERSISTED_PARTIAL.id, unrelatedLive.id])
   })
 })
+
+describe('ordering of surviving realtime messages', () => {
+  // The merge concatenates: all persisted history, then every realtime message
+  // the coverage rules kept, each side in its own order. These pin that
+  // contract, which nothing asserted before — the suite tested only WHICH
+  // messages survive, never where they land — and which an attempt to
+  // chronologically interleave the two sides repeatedly broke.
+  const H_U0: TestMessage = { ...U0, streamSeq: 5 }
+  const H_A0: TestMessage = { ...A0, streamSeq: 10 }
+  /**
+   * Sent from a notification while the window was away, and persisted. NO
+   * `streamSeq`: the backend does not stamp user MESSAGE_REQUEST rows, which is
+   * the missing signal that makes interleaving guesswork.
+   */
+  const AWAY_U: TestMessage = {
+    id: 'bbbb0001',
+    role: 'user',
+    content: 'replied from a notification',
+    timestamp: t(3000),
+  }
+  /** Mingo's answer to it. Assistant rows DO carry a sequence. */
+  const AWAY_A: TestMessage = {
+    id: 'bbbb0002',
+    role: 'assistant',
+    content: txt('answered while the window was away'),
+    timestamp: t(3100),
+    streamSeq: 80,
+  }
+
+  it('appends surviving realtime messages after all persisted history', () => {
+    // A technician direct message the snapshot has not caught up with. Its own
+    // role's persisted max (H_U0, seq 5) is below it, so coverage keeps it.
+    const unpersistedDirect: TestMessage = {
+      id: 'direct-1500-old',
+      role: 'user',
+      content: 'a direct message history has not persisted yet',
+      timestamp: t(1500),
+      streamSeq: 40,
+    }
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [H_U0, H_A0, AWAY_U, AWAY_A],
+      existingMessages: [H_U0, H_A0, unpersistedDirect],
+      streamingMessageId: null,
+      historyFetchedAt: 9000,
+      historyMaxStreamSeq: 80,
+      realtimeSeenStreamSeq: 40,
+    })
+
+    expect(ids(merged)).toEqual([H_U0.id, H_A0.id, AWAY_U.id, AWAY_A.id, unpersistedDirect.id])
+  })
+
+  it('keeps survivors in store order, sequence or no sequence', () => {
+    // The guard against reordering the two kinds against each other: an
+    // optimistic bubble carries no sequence and a replayed direct message does,
+    // and sorting by sequence would render the user's question below the reply
+    // that came after it.
+    const optimistic: TestMessage = {
+      id: 'optimistic-9400-x',
+      role: 'user',
+      content: 'just typed, no seq of its own',
+      timestamp: t(9400),
+    }
+    const laterDirect: TestMessage = {
+      id: 'direct-9500-x',
+      role: 'user',
+      content: 'and a direct message after it',
+      timestamp: t(9500),
+      streamSeq: 40,
+    }
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [H_U0, H_A0, AWAY_U, AWAY_A],
+      existingMessages: [H_U0, H_A0, optimistic, laterDirect],
+      streamingMessageId: null,
+      // Before either was minted, so neither can be in the snapshot.
+      historyFetchedAt: 9000,
+      historyMaxStreamSeq: 80,
+      realtimeSeenStreamSeq: 40,
+    })
+
+    expect(ids(merged)).toEqual([H_U0.id, H_A0.id, AWAY_U.id, AWAY_A.id, optimistic.id, laterDirect.id])
+  })
+
+  it('keeps history in snapshot order even when its sequences do not climb', () => {
+    // The snapshot is the server's account of the conversation; the merge is
+    // not entitled to second-guess it from a `streamSeq` that looks out of
+    // order, which is what any sort of the two sides together would do.
+    const outOfOrder: TestMessage = { ...H_A0, id: 'aaaa0009', streamSeq: 3 }
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [H_U0, outOfOrder, AWAY_U, AWAY_A],
+      existingMessages: [H_U0],
+      streamingMessageId: null,
+      historyFetchedAt: 9000,
+      historyMaxStreamSeq: 80,
+      realtimeSeenStreamSeq: 0,
+    })
+
+    expect(ids(merged)).toEqual([H_U0.id, outOfOrder.id, AWAY_U.id, AWAY_A.id])
+  })
+})

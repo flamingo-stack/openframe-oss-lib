@@ -131,6 +131,22 @@ export interface UseJetStreamDialogSubscriptionOptions {
   /** Consumer inactivity threshold in ms before NATS auto-cleans it. Defaults to the
    *  client's, and applies only to the first consumer — recreations use nats.ws's. */
   inactiveThresholdMs?: number
+  /**
+   * A counter the host bumps when it knows, from outside the page, that the tail
+   * may have missed something.
+   *
+   * The hook's own detector is `visibilitychange`, which a browser tab reports
+   * honestly and an embedding shell may not — and which says nothing at all
+   * about a write made on the page's behalf while it was away. A host holding
+   * either kind of knowledge bumps this instead of hoping the page noticed.
+   *
+   * Treated exactly like a reconnect: the consumer is rebuilt from the highest
+   * sequence already seen, and `reconnectionCount` moves so callers refetch
+   * persisted history. Any increase counts; the value itself means nothing, and
+   * an increase arriving alongside a `visibilitychange` costs one rebuild, not
+   * two.
+   */
+  resyncSignal?: number
 }
 
 export interface UseJetStreamDialogSubscriptionReturn {
@@ -138,10 +154,12 @@ export interface UseJetStreamDialogSubscriptionReturn {
   isSubscribed: boolean
   /**
    * Incremented each time the live tail is re-established: a NATS reconnect, a
-   * JetStream ordered-consumer recreation, or the page returning to view after
-   * being hidden long enough to have missed something. All three mean the same
-   * thing to the caller — the tail may have skipped messages, so persisted
-   * history has to be refetched. Starts at 0.
+   * JetStream ordered-consumer recreation, the page returning to view after
+   * being hidden long enough to have missed something, or a host reporting the
+   * same via `resyncSignal`. All of them mean the same thing to the caller —
+   * the tail may have skipped messages, so persisted history has to be
+   * refetched. One absence counts once even when two sources report it.
+   * Starts at 0.
    */
   reconnectionCount: number
   /** Highest JetStream stream sequence observed so far (null before first delivery). */
