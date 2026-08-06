@@ -31,6 +31,15 @@ public class SSOConfig implements TenantScoped {
      * Microsoft Entra tenant ID for Office 365 OIDC (optional for common endpoints).
      */
     private String msTenantId;
+    /**
+     * Apple Developer Team ID — issuer of the client-secret JWT. For Apple configs the
+     * {@code clientSecret} field holds the .p8 private key (PEM) the JWT is signed with.
+     */
+    private String teamId;
+    /**
+     * Apple Key ID of the "Sign in with Apple" .p8 key — the JWT's {@code kid} header.
+     */
+    private String keyId;
 
     /**
      * Whitelisted email domains for auto-provisioning. If empty/null, any domain is allowed.

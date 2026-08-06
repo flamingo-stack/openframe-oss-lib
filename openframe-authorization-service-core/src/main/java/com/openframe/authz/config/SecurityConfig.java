@@ -1,19 +1,11 @@
 package com.openframe.authz.config;
 
-import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.security.AuthSuccessHandler;
 import com.openframe.authz.security.SsoAuthorizationRequestResolver;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
-import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
 import com.openframe.authz.web.AuthErrorResponder;
-import com.openframe.authz.service.processor.RegistrationProcessor;
-import com.openframe.authz.service.sso.SSOConfigService;
-import com.openframe.authz.service.user.UserService;
-import com.openframe.data.document.auth.AuthUser;
-import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -22,50 +14,41 @@ import org.springframework.security.config.annotation.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
-import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
-import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
-import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
+import org.springframework.security.oauth2.jwt.JwtDecoders;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-
-import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
-import static com.openframe.authz.util.OidcUserUtils.resolveNames;
-import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
-import static com.openframe.data.document.user.UserRole.ADMIN;
-import static java.util.Locale.ROOT;
 
 /**
- * Security Configuration for Default Requests
- * This handles all non-Authorization Server requests
+ * Security configuration for all non-Authorization-Server requests: the login page, form login,
+ * and OAuth2/OIDC login against the external SSO providers.
+ * <p>
+ * User loading and auto-provisioning live in
+ * {@link com.openframe.authz.service.sso.SsoOidcUserService}; this class only wires the chain.
  */
 @Configuration
 @EnableWebSecurity
 @Slf4j
 public class SecurityConfig {
-
-    public static final String EMAIL = "email";
-    public static final String SUB = "sub";
 
     @Bean
     @Order(2)
@@ -75,7 +58,8 @@ public class SecurityConfig {
                                                           ClientRegistrationRepository clientRegistrationRepository,
                                                           SsoCookieCodec ssoCookieCodec,
                                                           AuthenticationFailureHandler oauth2LoginFailureHandler,
-                                                          JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory) throws Exception {
+                                                          JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory,
+                                                          SsoProviderRegistry ssoProviderRegistry) throws Exception {
         return http
                 // Scoped to the one cookie-authenticated form POST on this chain. Everything else is
                 // either OAuth (client-authenticated or GET) or JSON-only, which a cross-site form
@@ -108,7 +92,7 @@ public class SecurityConfig {
                         .loginPage("/login")
                         .failureHandler(oauth2LoginFailureHandler)
                         .authorizationEndpoint(a -> a.authorizationRequestResolver(
-                                new SsoAuthorizationRequestResolver(clientRegistrationRepository, ssoCookieCodec)
+                                new SsoAuthorizationRequestResolver(clientRegistrationRepository, ssoCookieCodec, ssoProviderRegistry)
                         ))
                         .userInfoEndpoint(u -> u.oidcUserService(oidcUserService))
                         .successHandler(authSuccessHandler)
@@ -128,29 +112,6 @@ public class SecurityConfig {
         return (HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) ->
                 authErrorResponder.send(response, request, "oauth2-login", exception,
                         "SSO login failed. Please try again.");
-    }
-
-    @Bean
-    public OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService(SSOConfigService ssoConfigService,
-                                                                        UserService userService,
-                                                                        GlobalDomainPolicyLookup globalDomainPolicyLookup,
-                                                                        RegistrationProcessor registrationProcessor) {
-        OidcUserService delegate = new OidcUserService();
-        return userRequest -> {
-            OidcUser user = delegate.loadUser(userRequest);
-
-            autoProvisionIfNeeded(userRequest, user, ssoConfigService, userService, globalDomainPolicyLookup, registrationProcessor);
-
-            Set<GrantedAuthority> authorities = new HashSet<>(user.getAuthorities());
-
-            String nameKey = resolvePreferredPrincipalClaim(user);
-
-            OidcUserInfo userInfo = user.getUserInfo() != null
-                    ? user.getUserInfo()
-                    : new OidcUserInfo(user.getClaims());
-
-            return new DefaultOidcUser(authorities, userRequest.getIdToken(), userInfo, nameKey);
-        };
     }
 
     /**
@@ -184,103 +145,5 @@ public class SecurityConfig {
                     providerValidator.get()));
             return decoder;
         };
-    }
-
-    private void autoProvisionIfNeeded(OidcUserRequest userRequest,
-                                       OidcUser user,
-                                       SSOConfigService ssoConfigService,
-                                       UserService userService,
-                                       GlobalDomainPolicyLookup globalDomainPolicyLookup,
-                                       RegistrationProcessor registrationProcessor) {
-        try {
-            String tenantId = TenantContext.getTenantId();
-            String provider = userRequest.getClientRegistration().getRegistrationId();
-            if (tenantId == null || provider == null) {
-                return;
-            }
-            String email = resolveEmail(user);
-            if (email == null || email.isBlank()) {
-                return;
-            }
-
-            String normalizedEmail = email.toLowerCase(ROOT);
-            String pictureUrl = resolvePictureUrl(user);
-
-            ssoConfigService
-                    .getSSOConfig(tenantId, provider)
-                    .filter(SSOPerTenantConfig::isEnabled)
-                    .ifPresentOrElse(cfg -> {
-                        if (!cfg.isAutoProvisionUsers()) {
-                            return;
-                        }
-                        if (isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
-                            provisionOrRefresh(userService, registrationProcessor, tenantId, email, normalizedEmail, user, provider, pictureUrl);
-                        }
-                    }, () -> {
-                        String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
-                        globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
-                                .ifPresent(mappedTenantId -> {
-                                    if (tenantId.equals(mappedTenantId)) {
-                                        provisionOrRefresh(userService, registrationProcessor, tenantId, email, normalizedEmail, user, provider, pictureUrl);
-                                    }
-                                });
-                    });
-        } catch (Exception ignored) {
-            // Do not block login flow if provisioning has a non-critical issue
-        }
-    }
-
-    private void provisionOrRefresh(UserService userService,
-                                    RegistrationProcessor registrationProcessor,
-                                    String tenantId,
-                                    String email,
-                                    String normalizedEmail,
-                                    OidcUser user,
-                                    String provider,
-                                    String pictureUrl) {
-        AuthUser authUser = userService.findActiveByEmailAndTenant(normalizedEmail, tenantId)
-                .orElseGet(() -> registerUser(userService, tenantId, email, user, provider));
-        registrationProcessor.postProcessAutoProvision(authUser, pictureUrl);
-    }
-
-    private AuthUser registerUser(UserService userService, String tenantId, String email, OidcUser user, String provider) {
-        String[] names = resolveNames(user);
-        return userService.registerOrReactivateFromSso(tenantId, email, names[0], names[1], List.of(ADMIN), provider);
-    }
-
-    /**
-     * Select the preferred claim to use as principal name:
-     * email -> preferred_username -> upn -> unique_name -> sub
-     */
-    private String resolvePreferredPrincipalClaim(OidcUser user) {
-        var claims = user.getClaims();
-        if (user.getEmail() != null && !user.getEmail().isBlank()) {
-            return EMAIL;
-        }
-        Object preferred = claims.get("preferred_username");
-        if (preferred instanceof String s && !s.isBlank()) {
-            return "preferred_username";
-        }
-        Object upn = claims.get("upn");
-        if (upn instanceof String s2 && !s2.isBlank()) {
-            return "upn";
-        }
-        Object uniq = claims.get("unique_name");
-        if (uniq instanceof String s3 && !s3.isBlank()) {
-            return "unique_name";
-        }
-        return SUB;
-    }
-
-
-    private boolean isEmailAllowedByDomains(List<String> allowedDomains, String email) {
-        if (allowedDomains == null || allowedDomains.isEmpty()) {
-            return false;
-        }
-        String domain = email.substring(email.lastIndexOf('@') + 1)
-                .toLowerCase(ROOT);
-        return allowedDomains.stream()
-                .map(d -> d.toLowerCase(ROOT))
-                .anyMatch(domain::equals);
     }
 }

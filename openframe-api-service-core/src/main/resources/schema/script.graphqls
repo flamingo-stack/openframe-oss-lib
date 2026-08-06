@@ -87,8 +87,7 @@ enum ScriptShell {
 
 enum OsType {
     WINDOWS
-    LINUX
-    MACOS
+    MAC_OS
 }
 
 type Script implements Node {

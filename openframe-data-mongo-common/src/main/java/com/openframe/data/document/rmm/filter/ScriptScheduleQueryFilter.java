@@ -34,9 +34,6 @@ public class ScriptScheduleQueryFilter {
      */
     private List<String> createdByIds;
 
-    private Instant createdAtFrom;
-    private Instant createdAtTo;
-
-    private Instant updatedAtFrom;
-    private Instant updatedAtTo;
+    private Instant startAtFrom;
+    private Instant startAtTo;
 }
