@@ -1,6 +1,5 @@
 package com.openframe.api.service.validation.artifact;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.sql.Connection;
@@ -15,11 +14,11 @@ import java.util.Locale;
  * <p>osquery speaks the SQLite dialect, so the artifact is compiled against an
  * in-memory SQLite database. Bare SQLite has none of osquery's virtual tables,
  * therefore "no such table/column/function" compile errors are treated as a
- * syntax PASS with a warning (table/column existence is covered by the
- * live-query dry-run, not this gate). osquery is read-only: anything that is
- * not a single SELECT/WITH statement is rejected outright.
+ * syntax PASS with a warning (table/column existence is proven by running the
+ * query on a machine the technician approved, not by this gate). osquery is
+ * read-only: anything that is not a single SELECT/WITH statement is rejected
+ * outright.
  */
-@Slf4j
 @Component
 public class OsquerySqlValidator {
 
@@ -58,7 +57,8 @@ public class OsquerySqlValidator {
                 return new ArtifactValidationResult(
                         List.of(new ValidationFinding(ValidationSeverity.WARNING,
                                 "SQL_UNVERIFIED_SCHEMA",
-                                "sqlite cannot verify osquery schema (" + msg + "); dry-run will verify")),
+                                "syntax is valid; sqlite cannot verify the osquery schema ("
+                                        + msg + ") — run the query on a machine to confirm it returns data")),
                         List.of(METHOD));
             }
             return error("SQL_SYNTAX", "SQL syntax error: " + msg);
@@ -89,12 +89,13 @@ public class OsquerySqlValidator {
                 } else if (c == ')') {
                     depth--;
                     if (depth == 0) {
-                        int next = skipSpacesAndCommas(sql, i + 1);
+                        int next = skipWhitespace(sql, i + 1);
                         if (next >= sql.length()) {
                             return false;
                         }
-                        // another CTE follows — keep scanning; otherwise this is the statement
-                        if (sql.charAt(next) != ',' && !isAnotherCte(sql, next)) {
+                        // a comma means another CTE follows — keep scanning;
+                        // anything else is the statement the WITH introduces
+                        if (sql.charAt(next) != ',') {
                             return sql.substring(next).toUpperCase(Locale.ROOT).startsWith("SELECT");
                         }
                         i = next - 1;
@@ -106,17 +107,12 @@ public class OsquerySqlValidator {
         return false;
     }
 
-    private int skipSpacesAndCommas(String sql, int from) {
+    private int skipWhitespace(String sql, int from) {
         int i = from;
         while (i < sql.length() && Character.isWhitespace(sql.charAt(i))) {
             i++;
         }
         return i;
-    }
-
-    /** After a closing paren, a comma means the CTE list continues. */
-    private boolean isAnotherCte(String sql, int index) {
-        return sql.charAt(index) == ',';
     }
 
     /** Detects a ';' outside string literals that is followed by more SQL (a single trailing ';' is fine). */

@@ -11,15 +11,8 @@ import java.util.List;
  */
 public class ArtifactValidationException extends BaseException {
 
-    private final List<String> errors;
-
     public ArtifactValidationException(List<String> errors) {
         super(ErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST,
                 "Artifact validation failed: " + String.join("; ", errors));
-        this.errors = List.copyOf(errors);
-    }
-
-    public List<String> getErrors() {
-        return errors;
     }
 }

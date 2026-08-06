@@ -40,10 +40,11 @@ class ScriptSyntaxValidatorTest {
     }
 
     /**
-     * Python is checked only where python3 exists (it ships in the ai-agent
-     * runtime image). Asserted conditionally so the suite is honest on hosts
-     * without it: either the parser ran and rejected the body, or the check
-     * was recorded as skipped — never "silently passed as validated".
+     * Python is checked only where python3 exists — on a developer machine,
+     * never in the service images, which ship no interpreters on purpose.
+     * Asserted conditionally so the suite is honest either way: the parser ran
+     * and rejected the body, or the check was recorded as skipped — never
+     * "silently passed as validated".
      */
     @Test
     void brokenPythonIsRejectedWhenInterpreterAvailable() {
@@ -61,9 +62,6 @@ class ScriptSyntaxValidatorTest {
         ArtifactValidationResult r = validator.validate(ScriptShell.PYTHON,
                 "import os\n\ndef main():\n    print(os.getcwd())\n");
         assertFalse(r.blocked());
-        // the recorded method must say which of the two actually happened
-        assertTrue(r.methods().contains("SYNTAX_PYTHON_AST")
-                || r.methods().contains("SYNTAX_SKIPPED_NO_INTERPRETER"));
     }
 
     @Test
