@@ -38,6 +38,9 @@ import {
   type MessageOwner,
 } from '../types'
 import type { ChatStreamEvent } from '../../../chat-protocol/events'
+// One normalizer for ask rows, shared with the live decoder — history and the
+// stream must agree on which options are usable.
+import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder'
 import { MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator'
 import { getCommandText } from './tool-call-helpers'
 
@@ -116,6 +119,22 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
         return { type: 'guide-delta', text: data.text }
       }
       return null
+
+    // Same completeness gate as the live decoder (`decodeNatsChunk`): a
+    // persisted row without a question or without options is not a card the
+    // user can answer, so it replays as nothing rather than as empty chrome.
+    case MESSAGE_TYPE.ASK: {
+      if (!('question' in data)) return null
+      const question = typeof data.question === 'string' ? data.question.trim() : ''
+      const options = normalizeAskOptions(data.options)
+      if (!question || options.length === 0) return null
+      return {
+        type: 'ask',
+        ...(data.text ? { text: data.text } : {}),
+        question,
+        options,
+      }
+    }
 
     case MESSAGE_TYPE.EXECUTING_TOOL:
       if ('integratedToolType' in data) {
@@ -250,6 +269,13 @@ function applyHistoryEvent(
 
     case 'guide-delta':
       accumulator.appendGuide(event.text)
+      break
+
+    // Mirror of the live path: the intro sentence replays as answer text in
+    // front of the card, so a reloaded thread reads exactly like the stream did.
+    case 'ask':
+      if (event.text) accumulator.appendText(event.text)
+      accumulator.addAsk(event.question, event.options)
       break
 
     case 'tool-execution':

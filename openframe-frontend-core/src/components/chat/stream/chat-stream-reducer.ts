@@ -1041,6 +1041,33 @@ export function createChatStreamReducer(
         break
       }
 
+      // A clarification card arrives whole, not as deltas. The intro sentence
+      // riding the same chunk goes in FIRST as ordinary answer text so it runs
+      // through the markdown body pipeline (and coalesces with any preamble the
+      // turn already streamed); the card follows as its own segment. Both land
+      // in one emit, so the bubble never shows the card ahead of its lead-in.
+      case 'ask': {
+        if (event.text) accumulator.appendText(event.text)
+        const segments = accumulator.addAsk(event.question, event.options)
+        if (isInStream || !hasEverStreamed) {
+          emitSegments(segments)
+          applySegmentsToState(segments, withSeqMeta(undefined))
+          break
+        }
+        // Post-MESSAGE_END: the delta is spelled out rather than sliced off the
+        // accumulator. `appendText` COALESCES into a trailing text segment, so a
+        // slice would silently drop the intro whenever the continuation already
+        // had text in flight; `appendToTrailingAssistant` re-coalesces it here
+        // instead, exactly like a `text-delta`.
+        const delta: MessageSegment[] = [
+          ...(event.text ? [{ type: 'text' as const, text: event.text }] : []),
+          { type: 'ask' as const, question: event.question, options: event.options },
+        ]
+        emitSegments(delta, { append: true })
+        applySegmentsToState(delta, withSeqMeta({ append: true }))
+        break
+      }
+
       case 'tool-execution': {
         const segment: ToolExecutionSegment = { type: 'tool_execution', data: event.data }
         // A starting tool run means the agent's turn is in progress even
