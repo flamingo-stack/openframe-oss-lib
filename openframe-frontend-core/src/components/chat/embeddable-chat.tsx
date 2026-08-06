@@ -1584,6 +1584,24 @@ function EmbeddableChatInner({
     [sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
   )
 
+  /**
+   * Picking an option on a clarification card — deliberately NOT `handleSend`.
+   *
+   * `handleSend` belongs to the composer: it appends the staged attachments'
+   * markdown to the text, ships the staged context items, and then clears both.
+   * Routing an ask click through it would (a) send `label + attachment markdown`
+   * where the backend's classifier expects the label VERBATIM to resolve which
+   * reading was picked, and (b) consume a draft's attachments/context into a
+   * one-word answer the user never attached them to. So the label goes out on
+   * its own and whatever is staged in the composer stays staged.
+   */
+  const handleAskSelect = useCallback(
+    (label: string) => {
+      sendMessage(label)
+    },
+    [sendMessage],
+  )
+
   // Admin "try-asking chips" → GUIDE-mode quick-action chips only (Mingo mode
   // deliberately doesn't surface them). Clicking one SENDS the query immediately
   // via the GuideWelcome `onQuickAction` → `handleSend` at the render site (no
@@ -2351,14 +2369,10 @@ function EmbeddableChatInner({
                       resolveContextIcon={resolveContextIcon}
                       renderContextItem={renderContextItem}
                       renderMention={renderMention}
-                      // Picking an option on a clarification card sends its
-                      // label as an ordinary message — the SAME path the
-                      // composer uses, so attachments/context ride along and
-                      // the backend sees a normal user reply. Gated on
-                      // `chatLoading` for the same reason the composer is: no
-                      // second send while a turn is in flight. Passive demo
-                      // hosts (previewMode) stay read-only.
-                      onAskSelect={chatLoading || previewMode ? undefined : handleSend}
+                      // Gated on `chatLoading` for the same reason the composer
+                      // is: no second send while a turn is in flight. Passive
+                      // demo hosts (previewMode) stay read-only.
+                      onAskSelect={chatLoading || previewMode ? undefined : handleAskSelect}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
                       // Real Mingo drawer: hide the message-list scrollbar
                       // (scroll stays functional). Scoped here via `className`

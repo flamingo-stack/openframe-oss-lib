@@ -60,6 +60,22 @@ describe('AskDisplay', () => {
     expect(veil?.className).toContain('cursor-not-allowed')
   })
 
+  it('tells assistive tech WHY the options are disabled', () => {
+    const { container, rerender } = render(<AskDisplay cards={[card('Which one?')]} />)
+
+    // The veil is decorative (aria-hidden), so its `title` never reaches a
+    // screen reader — the group's description is what does.
+    const describedBy = screen.getByRole('group').getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    expect(container.querySelector(`#${CSS.escape(describedBy!)}`)?.textContent).toBe(
+      'This question was already answered',
+    )
+
+    // An answerable card describes nothing — there is no lock to explain.
+    rerender(<AskDisplay cards={[card('Which one?')]} onSelect={vi.fn()} />)
+    expect(screen.getByRole('group')).not.toHaveAttribute('aria-describedby')
+  })
+
   it('hides the pager for a single card', () => {
     render(<AskDisplay cards={[card('Which one?')]} onSelect={vi.fn()} />)
 

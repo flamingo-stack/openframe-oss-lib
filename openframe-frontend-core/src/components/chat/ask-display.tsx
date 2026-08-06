@@ -1,13 +1,14 @@
 "use client"
 
-import { forwardRef, useEffect, useState } from "react"
+import { forwardRef, useEffect, useId, useState } from "react"
 
 import { cn } from "../../utils/cn"
 import { Chevron02LeftIcon, Chevron02RightIcon } from "../icons-v2-generated"
 import type { AskDisplayProps } from "./types"
 
-/** Hover explanation on the locked veil — a disabled control should say WHY it
- *  is disabled, and the answer here is always the same: the turn moved on. */
+/** Why the card is locked. Surfaced twice on purpose: as the veil's `title`
+ *  (mouse) and as the group's `aria-describedby` text (keyboard / screen
+ *  reader) — a disabled control that doesn't say why reads as a bug. */
 const LOCKED_HINT = "This question was already answered"
 
 /**
@@ -33,6 +34,7 @@ const LOCKED_HINT = "This question was already answered"
 const AskDisplay = forwardRef<HTMLDivElement, AskDisplayProps>(
   ({ className, cards, onSelect, ...props }, ref) => {
     const [index, setIndex] = useState(0)
+    const lockedHintId = useId()
 
     // A shrinking run (segments replaced mid-stream) must not strand the pager
     // past the end — clamp instead of rendering an undefined card.
@@ -51,6 +53,11 @@ const AskDisplay = forwardRef<HTMLDivElement, AskDisplayProps>(
         ref={ref}
         role="group"
         aria-label={active.question}
+        // A disabled control must say WHY. The veil's `title` is a mouse-only
+        // affordance, so the same sentence is also carried as group description
+        // text — that is what a screen-reader user hears on entering the card,
+        // instead of two silently "dimmed" buttons.
+        aria-describedby={isInteractive ? undefined : lockedHintId}
         className={cn(
           "flex flex-col gap-[var(--spacing-system-s)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-s)]",
           className
@@ -122,11 +129,16 @@ const AskDisplay = forwardRef<HTMLDivElement, AskDisplayProps>(
             ))}
           </div>
           {!isInteractive && (
-            <div
-              aria-hidden="true"
-              title={LOCKED_HINT}
-              className="absolute inset-0 cursor-not-allowed rounded-md bg-ods-bg/40"
-            />
+            <>
+              <span id={lockedHintId} className="sr-only">
+                {LOCKED_HINT}
+              </span>
+              <div
+                aria-hidden="true"
+                title={LOCKED_HINT}
+                className="absolute inset-0 cursor-not-allowed rounded-md bg-ods-bg/40"
+              />
+            </>
           )}
         </div>
       </div>
