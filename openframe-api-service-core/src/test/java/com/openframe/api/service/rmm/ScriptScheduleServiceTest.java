@@ -278,10 +278,16 @@ class ScriptScheduleServiceTest {
     @DisplayName("list: API filter is translated into a data-layer ScriptScheduleQueryFilter and forwarded")
     void list_filterForwardedToRepository() {
         stubSortDefault();
+        Instant createdFrom = Instant.parse("2026-01-01T00:00:00Z");
+        Instant createdTo = Instant.parse("2026-02-01T00:00:00Z");
+        Instant updatedFrom = Instant.parse("2026-03-01T00:00:00Z");
         ScriptScheduleFilterInput filter = ScriptScheduleFilterInput.builder()
                 .statuses(List.of(ScriptStatus.ACTIVE))
                 .supportedPlatforms(List.of(OsType.WINDOWS))
                 .authorIds(List.of("user-7"))
+                .createdAtFrom(createdFrom)
+                .createdAtTo(createdTo)
+                .updatedAtFrom(updatedFrom)
                 .build();
         when(scheduleRepository.countForTenant(eq(TENANT_ID), any(), any())).thenReturn(0L);
         when(scheduleRepository.findPageForTenant(any(), any(), any(), any(), any(), any(), eq(false), eq(21)))
@@ -296,6 +302,10 @@ class ScriptScheduleServiceTest {
         assertThat(forwarded.getStatuses()).containsExactly(ScriptStatus.ACTIVE);
         assertThat(forwarded.getSupportedPlatforms()).containsExactly(OsType.WINDOWS);
         assertThat(forwarded.getCreatedByIds()).containsExactly("user-7");
+        assertThat(forwarded.getCreatedAtFrom()).isEqualTo(createdFrom);
+        assertThat(forwarded.getCreatedAtTo()).isEqualTo(createdTo);
+        assertThat(forwarded.getUpdatedAtFrom()).isEqualTo(updatedFrom);
+        assertThat(forwarded.getUpdatedAtTo()).isNull();
     }
 
     @Test
