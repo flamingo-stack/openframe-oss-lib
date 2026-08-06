@@ -62,7 +62,7 @@ export function AuthProvidersList({
           .map((provider) => (
             <ProviderButton
               key={provider.provider}
-              provider={provider.provider as 'microsoft' | 'google' | 'slack' | 'github'}
+              provider={provider.provider as 'microsoft' | 'google' | 'slack' | 'github' | 'apple'}
               onClick={() => handleProviderClick(provider.provider)}
               disabled={loading}
               loading={loading}

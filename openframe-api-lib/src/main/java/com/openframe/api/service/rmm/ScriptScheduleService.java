@@ -181,6 +181,8 @@ public class ScriptScheduleService {
                 .statuses(input.getStatuses())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .createdByIds(input.getAuthorIds())
+                .startAtFrom(input.getStartAtFrom())
+                .startAtTo(input.getStartAtTo())
                 .build();
     }
 

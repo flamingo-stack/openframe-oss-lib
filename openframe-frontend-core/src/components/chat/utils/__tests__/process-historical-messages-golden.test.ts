@@ -392,3 +392,77 @@ describe('processHistoricalMessages — GUIDE rows', () => {
     expect(processHistoricalMessages(empty).messages).toEqual([])
   })
 })
+
+// ─── ASK rows ──────────────────────────────────────────────────────────────
+//
+// Same contract as GUIDE above: history must replay a persisted `ASK` row into
+// the SAME shape the live `ASK` chunk produces — the intro sentence as answer
+// text, then the card — or a reloaded dialog loses the clarification the user
+// was about to answer.
+
+describe('processHistoricalMessages — ASK rows', () => {
+  const askRow = {
+    type: 'ASK',
+    text: 'Do you want the docs, or your own workspace?',
+    question: 'What do you want to work on?',
+    options: [
+      { label: 'Find documentation', description: 'How scripting works and how to set it up' },
+      { label: 'Your scripts', description: 'List, edit or run the scripts in your workspace' },
+    ],
+  }
+
+  it('replays an ASK row as intro text followed by the card', () => {
+    const dialog: HistoricalMessage[] = [
+      {
+        id: 'a1',
+        chatType: 'CLIENT_CHAT',
+        createdAt: '2026-07-19T09:00:05Z',
+        owner: { type: 'ASSISTANT' },
+        messageData: [askRow as any],
+      },
+    ]
+    expect(processHistoricalMessages(dialog).messages[0].content).toEqual([
+      { type: 'text', text: 'Do you want the docs, or your own workspace?' },
+      {
+        type: 'ask',
+        question: 'What do you want to work on?',
+        options: [
+          { label: 'Find documentation', description: 'How scripting works and how to set it up' },
+          { label: 'Your scripts', description: 'List, edit or run the scripts in your workspace' },
+        ],
+      },
+    ])
+  })
+
+  it('keeps consecutive ASK rows as SEPARATE segments (the card pages them)', () => {
+    const dialog: HistoricalMessage[] = [
+      {
+        id: 'a1',
+        chatType: 'CLIENT_CHAT',
+        createdAt: '2026-07-19T09:00:05Z',
+        owner: { type: 'ASSISTANT' },
+        messageData: [
+          { type: 'ASK', question: 'First?', options: [{ label: 'A' }] } as any,
+          { type: 'ASK', question: 'Second?', options: [{ label: 'B' }] } as any,
+        ],
+      },
+    ]
+    expect(processHistoricalMessages(dialog).messages[0].content).toEqual([
+      { type: 'ask', question: 'First?', options: [{ label: 'A', description: undefined }] },
+      { type: 'ask', question: 'Second?', options: [{ label: 'B', description: undefined }] },
+    ])
+  })
+
+  it('an ASK row with no answerable options decodes to nothing', () => {
+    const dialog: HistoricalMessage[] = [
+      {
+        id: 'a1',
+        chatType: 'CLIENT_CHAT',
+        createdAt: '2026-07-19T09:00:05Z',
+        owner: { type: 'ASSISTANT' },
+        messageData: [{ type: 'ASK', question: 'Which one?', options: [{ description: 'no label' }] } as any],
+      },
+    ]
+    expect(processHistoricalMessages(dialog).messages).toEqual([])
+  })
+})

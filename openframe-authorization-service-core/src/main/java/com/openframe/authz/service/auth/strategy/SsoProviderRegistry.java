@@ -40,6 +40,18 @@ public class SsoProviderRegistry {
     }
 
     /**
+     * Extra authorization-request parameters the provider requires (e.g. Apple's
+     * {@code response_mode=form_post}). Empty for providers that need none, or for unknown ids.
+     */
+    public Map<String, String> additionalAuthorizationParams(String registrationId) {
+        if (registrationId == null) {
+            return Map.of();
+        }
+        ClientRegistrationStrategy strategy = byProviderId.get(registrationId.toLowerCase(ROOT));
+        return strategy == null ? Map.of() : strategy.additionalAuthorizationParams();
+    }
+
+    /**
      * Extra ID-token validation the provider behind this registration requires, if any.
      * Empty for providers the OIDC defaults already cover.
      */

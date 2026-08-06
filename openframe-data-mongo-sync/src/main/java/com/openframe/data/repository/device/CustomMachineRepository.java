@@ -1,6 +1,7 @@
 package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 
 import java.util.Collection;
@@ -11,7 +12,7 @@ public interface CustomMachineRepository {
 
     long countMachines(MachineQueryFilter filter, String search);
 
-    Map<String, Integer> facet(MachineQueryFilter filter, String search, String field);
+    Map<String, Integer> facet(MachineQueryFilter filter, String search, DeviceFacetDimension dimension);
 
     List<String> findMachineIds(MachineQueryFilter filter, String search);
 
