@@ -70,8 +70,9 @@ public class NotificationReadStateService {
     }
 
     public long markAllAsRead(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
-        // Snapshot BEFORE the bulk flip: a row created in between gets flipped but not reported —
-        // acceptable, its banner is cleaned up by the client's on-open reconciliation.
+        // Snapshot BEFORE the flip: under concurrency the ids can drift from what the flip matches,
+        // in both directions. Deliberate — events are best-effort (a throwing listener already loses
+        // one) and listeners must be idempotent; exactness would need a transaction.
         List<String> unreadIds = notificationIds(
                 repository.findByRecipientIdAndRecipientTypeAndStatus(recipientId, recipientType, ReadStatus.UNREAD));
         long flipped = repository.markAllAsRead(recipientId, recipientType);
