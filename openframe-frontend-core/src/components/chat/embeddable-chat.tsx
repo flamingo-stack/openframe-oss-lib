@@ -2351,6 +2351,14 @@ function EmbeddableChatInner({
                       resolveContextIcon={resolveContextIcon}
                       renderContextItem={renderContextItem}
                       renderMention={renderMention}
+                      // Picking an option on a clarification card sends its
+                      // label as an ordinary message — the SAME path the
+                      // composer uses, so attachments/context ride along and
+                      // the backend sees a normal user reply. Gated on
+                      // `chatLoading` for the same reason the composer is: no
+                      // second send while a turn is in flight. Passive demo
+                      // hosts (previewMode) stay read-only.
+                      onAskSelect={chatLoading || previewMode ? undefined : handleSend}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
                       // Real Mingo drawer: hide the message-list scrollbar
                       // (scroll stays functional). Scoped here via `className`

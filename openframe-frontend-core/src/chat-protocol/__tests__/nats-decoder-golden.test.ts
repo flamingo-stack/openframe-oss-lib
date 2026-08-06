@@ -29,6 +29,29 @@ const CORPUS: Record<string, unknown> = {
   guide_empty_string: { type: 'GUIDE', text: '' },
   guide_missing_text: { type: 'GUIDE' },
 
+  // ASK — the guide-routing clarification card. `text` is the intro sentence
+  // riding the same chunk; a card without a question or without usable options
+  // is dropped (nothing the user could answer).
+  ask: {
+    type: 'ASK',
+    text: 'Do you want the OpenFrame docs on scripts, or the scripts in your own workspace?',
+    question: 'What do you want to work on?',
+    options: [
+      { label: 'Find documentation', description: 'How scripting works and how to set it up' },
+      { label: 'Your scripts', description: 'List, edit or run the scripts in your workspace' },
+    ],
+  },
+  ask_without_intro: { type: 'ASK', question: 'Which one?', options: [{ label: 'Docs' }] },
+  ask_missing_question: { type: 'ASK', options: [{ label: 'Docs' }] },
+  ask_blank_question: { type: 'ASK', question: '   ', options: [{ label: 'Docs' }] },
+  ask_no_options: { type: 'ASK', question: 'Which one?', options: [] },
+  ask_options_not_array: { type: 'ASK', question: 'Which one?', options: 'Docs' },
+  ask_unusable_option_rows: {
+    type: 'ASK',
+    question: 'Which one?',
+    options: [{ label: '   ' }, { description: 'no label' }, null, 'Docs'],
+  },
+
   ai_metadata_full: {
     type: 'AI_METADATA',
     modelDisplayName: 'Claude Sonnet',
