@@ -55,6 +55,15 @@ const buttonVariants = cva(
         // metadata rather than CTAs — author-page social rows, share rows.
         // Pair with variant="transparent" for the ghost treatment.
         'icon-sm': 'p-[var(--spacing-system-xxs)] h-8 w-8 [&_svg]:h-4 [&_svg]:w-4',
+        // 20px inline glyph for affordances that sit INSIDE a line of text —
+        // an info hint beside a badge, a copy glyph after an id. `icon-sm`'s
+        // 32px target is correct for a metadata row but visually swamps a
+        // 10px badge or a 14px label, so hosts were reaching for className
+        // overrides to shrink it. Below the WCAG 2.5.8 target floor on purpose:
+        // this is only for glyphs whose information is ALSO available another
+        // way (tooltip content mirrored into an aria-describedby node), never
+        // for a sole means of performing an action.
+        'icon-inline': 'p-0 h-5 w-5 min-h-0 min-w-0 shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5',
         // Bare 56px media glyph (play / unmute over video). A size variant so
         // hosts stop re-implementing a <button> to escape the 20px svg cap.
         'icon-glyph': 'p-0 h-14 w-14 [&_svg]:h-14 [&_svg]:w-14',
