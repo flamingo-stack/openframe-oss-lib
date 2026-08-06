@@ -15,6 +15,11 @@ import type {
   DecisionResolvedFrame,
   UsageTelemetry,
 } from './frames'
+// The ask card's option shape is the SEGMENT's shape — the decoder hands the
+// rows straight to the accumulator, so restating them here would be two
+// declarations of one wire contract. Type-only import from a React-free
+// module; `nats-decoder.ts` already depends on the same file for MESSAGE_TYPE.
+import type { AskOptionData } from '../components/chat/types/message.types'
 
 /** Optional envelope on every event. `seq` carries the transport's
  *  stream sequence (JetStream `streamSeq` on NATS; unused on SSE). */
@@ -63,6 +68,20 @@ export interface ThinkingDeltaEvent extends ChatStreamEventBase {
 export interface GuideDeltaEvent extends ChatStreamEventBase {
   type: 'guide-delta'
   text: string
+}
+
+/** Clarification card (NATS `ASK` chunk) — the assistant asking which reading
+ *  of an ambiguous question to answer. NOT a delta: the chunk carries the
+ *  finished card, so consumers push it whole instead of coalescing. `text` is
+ *  the intro sentence the same chunk rides along with; consumers render it as
+ *  ordinary answer text BEFORE the card. NATS-only — the SSE frame grammar has
+ *  no ask frame — but it lives in the shared union because the reducer is
+ *  transport-agnostic. */
+export interface AskEvent extends ChatStreamEventBase {
+  type: 'ask'
+  text?: string
+  question: string
+  options: AskOptionData[]
 }
 
 export interface StatusEvent extends ChatStreamEventBase {
@@ -241,6 +260,7 @@ export type ChatStreamEvent =
   | TextDeltaEvent
   | ThinkingDeltaEvent
   | GuideDeltaEvent
+  | AskEvent
   | StatusEvent
   | ToolExecutionEvent
   | ApprovalRequestEvent
