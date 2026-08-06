@@ -197,23 +197,16 @@ class ScriptDataFetcherTest {
     }
 
     @Test
-    @DisplayName("updateScript: decodes the input's global id to raw in place, stamps the acting user, then forwards to the service")
+    @DisplayName("updateScript: decodes the input's global id to raw in place, then forwards to the service")
     void updateScript() {
-        Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("user-1").build();
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(jwt, null));
-        try {
-            UpdateScriptInput input = new UpdateScriptInput();
-            input.setId(RELAY.toGlobalId("Script", "id-1"));
-            ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
-            when(scriptService.update(input, "user-1")).thenReturn(resp);
+        UpdateScriptInput input = new UpdateScriptInput();
+        input.setId(RELAY.toGlobalId("Script", "id-1"));
+        ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
+        when(scriptService.update(input)).thenReturn(resp);
 
-            assertThat(dataFetcher.updateScript(input)).isSameAs(resp);
-            assertThat(input.getId()).isEqualTo("id-1"); // decoded in place
-            verify(scriptService).update(input, "user-1");
-        } finally {
-            SecurityContextHolder.clearContext();
-        }
+        assertThat(dataFetcher.updateScript(input)).isSameAs(resp);
+        assertThat(input.getId()).isEqualTo("id-1"); // decoded in place
+        verify(scriptService).update(input);
     }
 
     @Test

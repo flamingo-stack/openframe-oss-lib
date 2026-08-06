@@ -12,10 +12,6 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
 import com.openframe.api.service.ScriptTagService;
-import com.openframe.api.service.validation.artifact.ScriptSyntaxValidator;
-import com.openframe.api.service.validation.artifact.ScriptValidationGate;
-import com.openframe.api.service.validation.artifact.StaticSafetyAnalyzer;
-import com.openframe.core.exception.ArtifactValidationException;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
@@ -32,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
 
@@ -77,14 +72,6 @@ class ScriptServiceTest {
     @Mock
     private ScriptTimeoutValidator timeoutValidator;
 
-    /**
-     * Real gate (not a mock): create/update tests must actually pass through
-     * validation, proving the wiring rejects invalid bodies end-to-end.
-     */
-    @Spy
-    private ScriptValidationGate scriptValidationGate = new ScriptValidationGate(
-            new ScriptSyntaxValidator(), new StaticSafetyAnalyzer(), true);
-
     @InjectMocks
     private ScriptService scriptService;
 
@@ -100,9 +87,6 @@ class ScriptServiceTest {
 
         updateInput = new UpdateScriptInput();
         updateInput.setId(SCRIPT_ID); // id now travels inside the input
-        // PUT semantics: shell + body are required and re-validated by the gate.
-        updateInput.setShell(ScriptShell.POWERSHELL);
-        updateInput.setScriptBody("Get-Process");
 
         // lenient: the empty-input getScriptsByIds path short-circuits before resolving the tenant.
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
@@ -162,7 +146,7 @@ class ScriptServiceTest {
         doThrow(new BadRequestException(ErrorCode.VALIDATION_ERROR, "timeoutSeconds must not exceed 600 seconds"))
                 .when(timeoutValidator).validate(700);
 
-        assertThatThrownBy(() -> scriptService.update(updateInput, "user-1"))
+        assertThatThrownBy(() -> scriptService.update(updateInput))
                 .isInstanceOf(BadRequestException.class);
 
         verify(timeoutValidator).validate(700);
@@ -180,69 +164,6 @@ class ScriptServiceTest {
 
         verify(scriptRepository, never()).save(any());
         verifyNoInteractions(scriptMapper);
-    }
-
-    @Test
-    @DisplayName("create: rejects a script that fails the validation gate — nothing is saved")
-    void create_whenValidationFails_throwsAndNeverSaves() {
-        createInput.setShell(ScriptShell.BASH);
-        createInput.setScriptBody("set -e\nrm -rf /");
-
-        assertThatThrownBy(() -> scriptService.create(createInput, "user-1"))
-                .isInstanceOf(ArtifactValidationException.class)
-                .hasMessageContaining("filesystem root");
-
-        verify(scriptRepository, never()).save(any());
-        verifyNoInteractions(scriptMapper);
-    }
-
-    @Test
-    @DisplayName("create: high-impact script with the AI_AGENT sentinel actor is rejected — human approval cannot be recorded")
-    void create_whenHighImpactAndAiAgentActor_throws() {
-        createInput.setScriptBody("Restart-Computer -Force");
-
-        assertThatThrownBy(() -> scriptService.create(createInput, "AI_AGENT"))
-                .isInstanceOf(ArtifactValidationException.class)
-                .hasMessageContaining("human approval");
-
-        verify(scriptRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("create: stamps validation metadata (methods, validatedAt) on the saved entity")
-    void create_stampsValidationMetadata() {
-        Script mapped = new Script();
-        Script saved = new Script();
-        saved.setId(SCRIPT_ID);
-        when(scriptRepository.existsByTenantIdAndNameAndStatusIn(TENANT_ID, createInput.getName(), UNIQUE_STATUSES)).thenReturn(false);
-        when(scriptMapper.toEntity(TENANT_ID, createInput)).thenReturn(mapped);
-        when(scriptRepository.save(mapped)).thenReturn(saved);
-        when(scriptMapper.toResponse(saved)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
-
-        scriptService.create(createInput, "user-1");
-
-        assertThat(mapped.getValidation()).isNotNull();
-        assertThat(mapped.getValidation().getValidatedAt()).isNotNull();
-        assertThat(mapped.getValidation().getMethods()).contains("STATIC_RULES");
-    }
-
-    @Test
-    @DisplayName("update: rejects a body that fails the validation gate — nothing is saved")
-    void update_whenValidationFails_throwsAndNeverSaves() {
-        Script existing = new Script();
-        existing.setId(SCRIPT_ID);
-        existing.setName("old");
-        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(existing));
-
-        updateInput.setName("old");
-        updateInput.setShell(ScriptShell.BASH);
-        updateInput.setScriptBody("set -e\ndd if=/dev/zero of=/dev/sda\n");
-
-        assertThatThrownBy(() -> scriptService.update(updateInput, "user-1"))
-                .isInstanceOf(ArtifactValidationException.class)
-                .hasMessageContaining("block device");
-
-        verify(scriptRepository, never()).save(any());
     }
 
     @Test
@@ -554,7 +475,7 @@ class ScriptServiceTest {
         when(scriptRepository.save(existing)).thenReturn(saved);
         when(scriptMapper.toResponse(saved)).thenReturn(response);
 
-        ScriptResponse result = scriptService.update(updateInput, "user-1");
+        ScriptResponse result = scriptService.update(updateInput);
 
         assertThat(result).isSameAs(response);
         verify(scriptMapper).updateEntity(existing, updateInput);
@@ -568,7 +489,7 @@ class ScriptServiceTest {
     void update_whenNotFound_throwsNotFound() {
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> scriptService.update(updateInput, "user-1"))
+        assertThatThrownBy(() -> scriptService.update(updateInput))
                 .isInstanceOf(NotFoundException.class);
 
         verify(scriptRepository, never()).save(any());
@@ -585,7 +506,7 @@ class ScriptServiceTest {
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(existing));
         when(scriptRepository.existsByTenantIdAndNameAndIdNotAndStatusIn(TENANT_ID, "taken name", SCRIPT_ID, UNIQUE_STATUSES)).thenReturn(true);
 
-        assertThatThrownBy(() -> scriptService.update(updateInput, "user-1"))
+        assertThatThrownBy(() -> scriptService.update(updateInput))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("taken name");
 
@@ -604,7 +525,7 @@ class ScriptServiceTest {
         when(scriptRepository.save(existing)).thenReturn(existing);
         when(scriptMapper.toResponse(existing)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
 
-        scriptService.update(updateInput, "user-1");
+        scriptService.update(updateInput);
 
         verify(scriptRepository, never()).existsByTenantIdAndNameAndIdNotAndStatusIn(any(), any(), any(), any());
     }
@@ -625,7 +546,7 @@ class ScriptServiceTest {
         when(scriptRepository.save(existing)).thenReturn(existing);
         when(scriptMapper.toResponse(existing)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
 
-        scriptService.update(updateInput, "user-1");
+        scriptService.update(updateInput);
 
         verify(scriptRepository, never()).existsByTenantIdAndNameAndIdNotAndStatusIn(any(), any(), any(), any());
         verify(scriptMapper).updateEntity(existing, updateInput);
@@ -654,7 +575,7 @@ class ScriptServiceTest {
         deleted.setStatus(ScriptStatus.DELETED);
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(deleted));
 
-        assertThatThrownBy(() -> scriptService.update(updateInput, "user-1"))
+        assertThatThrownBy(() -> scriptService.update(updateInput))
                 .isInstanceOf(NotFoundException.class);
 
         verify(scriptRepository, never()).save(any());

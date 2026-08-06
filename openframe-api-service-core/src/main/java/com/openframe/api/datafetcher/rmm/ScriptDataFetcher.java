@@ -115,7 +115,7 @@ public class ScriptDataFetcher {
     public ScriptResponse updateScript(@InputArgument @Valid UpdateScriptInput input) {
         input.setId(decodeId(input.getId()));
         input.setTagIds(decodeIds(input.getTagIds()));
-        return scriptService.update(input, getCurrentUserId());
+        return scriptService.update(input);
     }
 
     @DgsMutation

@@ -35,9 +35,6 @@ public class ScriptResponse {
     private List<String> defaultArgs;
     private List<ScriptEnvVarInput> envVars;
 
-    /** Validation gate outcome; null only on scripts created before the gate shipped. */
-    private ScriptValidationResponse validation;
-
     /** Id of the creating user; resolved to a User via the GraphQL {@code author} field. */
     private String createdBy;
 
