@@ -83,7 +83,7 @@ class ScriptServiceTest {
      */
     @Spy
     private ScriptValidationGate scriptValidationGate = new ScriptValidationGate(
-            new ScriptSyntaxValidator(), new StaticSafetyAnalyzer());
+            new ScriptSyntaxValidator(), new StaticSafetyAnalyzer(), true);
 
     @InjectMocks
     private ScriptService scriptService;
