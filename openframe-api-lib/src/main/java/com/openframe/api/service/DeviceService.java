@@ -13,6 +13,7 @@ import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
@@ -42,11 +43,6 @@ import java.util.stream.Collectors;
 @Validated
 @RequiredArgsConstructor
 public class DeviceService {
-
-    private static final String FACET_STATUS = "status";
-    private static final String FACET_TYPE = "type";
-    private static final String FACET_OS_TYPE = "osType";
-    private static final String FACET_ORGANIZATION_ID = "organizationId";
 
     private final MachineRepository machineRepository;
     private final TagRepository tagRepository;
@@ -133,10 +129,10 @@ public class DeviceService {
 
     private DeviceFilters deviceFilters(MachineQueryFilter filter, String search) {
         return DeviceFilters.builder()
-                .statuses(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, FACET_STATUS)))
-                .deviceTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, FACET_TYPE)))
-                .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, FACET_OS_TYPE)))
-                .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(filter, search, FACET_ORGANIZATION_ID)))
+                .statuses(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, DeviceFacetDimension.STATUS)))
+                .deviceTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, DeviceFacetDimension.DEVICE_TYPE)))
+                .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, DeviceFacetDimension.OS_TYPE)))
+                .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(filter, search, DeviceFacetDimension.ORGANIZATION_ID)))
                 .tagKeys(List.of())
                 .filteredCount((int) machineRepository.countMachines(filter, search))
                 .build();

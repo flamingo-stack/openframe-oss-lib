@@ -278,10 +278,14 @@ class ScriptScheduleServiceTest {
     @DisplayName("list: API filter is translated into a data-layer ScriptScheduleQueryFilter and forwarded")
     void list_filterForwardedToRepository() {
         stubSortDefault();
+        Instant startFrom = Instant.parse("2026-04-01T00:00:00Z");
+        Instant startTo = Instant.parse("2026-05-01T00:00:00Z");
         ScriptScheduleFilterInput filter = ScriptScheduleFilterInput.builder()
                 .statuses(List.of(ScriptStatus.ACTIVE))
                 .supportedPlatforms(List.of(OsType.WINDOWS))
                 .authorIds(List.of("user-7"))
+                .startAtFrom(startFrom)
+                .startAtTo(startTo)
                 .build();
         when(scheduleRepository.countForTenant(eq(TENANT_ID), any(), any())).thenReturn(0L);
         when(scheduleRepository.findPageForTenant(any(), any(), any(), any(), any(), any(), eq(false), eq(21)))
@@ -296,6 +300,8 @@ class ScriptScheduleServiceTest {
         assertThat(forwarded.getStatuses()).containsExactly(ScriptStatus.ACTIVE);
         assertThat(forwarded.getSupportedPlatforms()).containsExactly(OsType.WINDOWS);
         assertThat(forwarded.getCreatedByIds()).containsExactly("user-7");
+        assertThat(forwarded.getStartAtFrom()).isEqualTo(startFrom);
+        assertThat(forwarded.getStartAtTo()).isEqualTo(startTo);
     }
 
     @Test
