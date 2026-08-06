@@ -22,12 +22,6 @@ public class ScriptScheduleFilterInput {
 
     private List<String> authorIds;
 
-    private Instant createdAtFrom;
-    private Instant createdAtTo;
-
-    private Instant updatedAtFrom;
-    private Instant updatedAtTo;
-
     private Instant startAtFrom;
     private Instant startAtTo;
 }

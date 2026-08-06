@@ -1,8 +1,8 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
+import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,6 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -50,8 +49,6 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_NAME = "name";
     private static final String FIELD_SUPPORTED_PLATFORMS = "supportedPlatforms";
-    private static final String FIELD_CREATED_AT = "createdAt";
-    private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String FIELD_START_AT = "startAt";
     private static final String FIELD_CREATED_BY = "createdBy";
     private static final String FIELD_COUNT = "count";
@@ -66,9 +63,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static final String CURSOR_SEPARATOR = "|";
 
     private static final Set<String> SORTABLE_FIELDS =
-            Set.of(FIELD_ID, FIELD_NAME, FIELD_CREATED_AT, FIELD_UPDATED_AT, FIELD_START_AT, FIELD_REPEAT, FIELD_DEVICE_COUNT);
-
-    private static final Set<String> DATE_SORT_FIELDS = Set.of(FIELD_CREATED_AT, FIELD_UPDATED_AT, FIELD_START_AT);
+            Set.of(FIELD_ID, FIELD_NAME, FIELD_START_AT, FIELD_REPEAT, FIELD_DEVICE_COUNT);
 
     private final MongoTemplate mongoTemplate;
 
@@ -86,8 +81,8 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         if (FIELD_DEVICE_COUNT.equals(sortField)) {
             return findPageAggregatedByDeviceCount(tenantId, filter, search, effectiveDir, cursor, limit);
         }
-        if (DATE_SORT_FIELDS.contains(sortField)) {
-            return findPageAggregatedByDateTriggerLast(tenantId, filter, search, sortField, effectiveDir, backward, cursor, limit);
+        if (FIELD_START_AT.equals(sortField)) {
+            return findPageAggregatedByStartAtTriggerLast(tenantId, filter, search, effectiveDir, backward, cursor, limit);
         }
 
         Criteria criteria = buildBaseCriteria(tenantId, filter, search);
@@ -165,23 +160,22 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         ops.add(ctx -> new Document("$match", orExpr));
     }
 
-    private List<ScriptSchedule> findPageAggregatedByDateTriggerLast(String tenantId,
-                                                                     ScriptScheduleQueryFilter filter,
-                                                                     String search,
-                                                                     String dateField,
-                                                                     Sort.Direction effectiveDir,
-                                                                     boolean backward,
-                                                                     String cursor,
-                                                                     int limit) {
+    private List<ScriptSchedule> findPageAggregatedByStartAtTriggerLast(String tenantId,
+                                                                        ScriptScheduleQueryFilter filter,
+                                                                        String search,
+                                                                        Sort.Direction effectiveDir,
+                                                                        boolean backward,
+                                                                        String cursor,
+                                                                        int limit) {
         Sort.Direction bucketDir = backward ? Sort.Direction.DESC : Sort.Direction.ASC;
 
         List<AggregationOperation> ops = new ArrayList<>();
         ops.add(Aggregation.match(buildBaseCriteria(tenantId, filter, search)));
         ops.add(triggerBucketAddFieldsStage());
-        appendDateTriggerCursor(ops, cursor, dateField, effectiveDir, bucketDir);
+        appendStartAtTriggerCursor(ops, cursor, effectiveDir, bucketDir);
         ops.add(Aggregation.sort(Sort.by(
                 new Sort.Order(bucketDir, FIELD_TRIGGER_BUCKET),
-                new Sort.Order(effectiveDir, dateField),
+                new Sort.Order(effectiveDir, FIELD_START_AT),
                 new Sort.Order(effectiveDir, FIELD_ID))));
         ops.add(Aggregation.limit(limit));
 
@@ -197,15 +191,14 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         return ctx -> addFields;
     }
 
-    private static void appendDateTriggerCursor(List<AggregationOperation> ops, String cursor,
-                                                String dateField, Sort.Direction effectiveDir,
-                                                Sort.Direction bucketDir) {
+    private static void appendStartAtTriggerCursor(List<AggregationOperation> ops, String cursor,
+                                                   Sort.Direction effectiveDir, Sort.Direction bucketDir) {
         if (isBlank(cursor)) {
             return;
         }
         String[] parts = cursor.split("\\" + CURSOR_SEPARATOR);
         if (parts.length != 3) {
-            log.warn("Invalid date-trigger cursor (expected bucket|millis|id): '{}' — falling back to first page", cursor);
+            log.warn("Invalid startAt cursor (expected bucket|millis|id): '{}' — falling back to first page", cursor);
             return;
         }
         ObjectId cursorId = parseObjectId(parts[2]);
@@ -213,12 +206,12 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
             return;
         }
         int bucket;
-        Date dateValue;
+        Date startAt;   // null = the row's startAt was null; the whole bucket is null (DEVICE_ONLINE has no startAt)
         try {
             bucket = Integer.parseInt(parts[0]);
-            dateValue = parts[1].isEmpty() ? null : new Date(Long.parseLong(parts[1]));
+            startAt = parts[1].isEmpty() ? null : new Date(Long.parseLong(parts[1]));
         } catch (NumberFormatException ex) {
-            log.warn("Unparseable bucket/date in date-trigger cursor '{}' — falling back to first page", cursor);
+            log.warn("Unparseable bucket/startAt in cursor '{}' — falling back to first page", cursor);
             return;
         }
 
@@ -226,13 +219,17 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         String bucketCmp = bucketDir == Sort.Direction.ASC ? "$gt" : "$lt";
 
         List<Document> arms = new ArrayList<>();
+        // Cross-bucket: everything past this bucket in bucket order (e.g. the whole DEVICE_ONLINE tail).
         arms.add(new Document(FIELD_TRIGGER_BUCKET, new Document(bucketCmp, bucket)));
-        if (dateValue == null) {
-            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(dateField, null)
+        if (startAt == null) {
+            // Null-startAt bucket (DEVICE_ONLINE): startAt is constant (null) across it, so order by
+            // _id alone. A range against a sentinel Date never matches null, which would silently
+            // drop the rest of the bucket.
+            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, null)
                     .append(FIELD_ID, new Document(cmp, cursorId)));
         } else {
-            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(dateField, new Document(cmp, dateValue)));
-            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(dateField, dateValue)
+            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, new Document(cmp, startAt)));
+            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, startAt)
                     .append(FIELD_ID, new Document(cmp, cursorId)));
         }
         ops.add(ctx -> new Document("$match", new Document("$or", arms)));
@@ -263,7 +260,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         applyStatusFilter(criteria, filter);
         applyPlatformsFilter(criteria, filter);
         applyCreatedByFilter(criteria, filter);
-        applyDateRangeFilters(criteria, filter);
+        applyStartAtRangeFilter(criteria, filter);
         applySearch(criteria, search);
         return criteria;
     }
@@ -292,7 +289,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         if (!FIELD_CREATED_BY.equals(excludeField)) {
             applyCreatedByFilter(criteria, filter);
         }
-        applyDateRangeFilters(criteria, filter);
+        applyStartAtRangeFilter(criteria, filter);
         return criteria;
     }
 
@@ -349,14 +346,12 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         }
     }
 
-    private static void applyDateRangeFilters(Criteria criteria, ScriptScheduleQueryFilter filter) {
+    private static void applyStartAtRangeFilter(Criteria criteria, ScriptScheduleQueryFilter filter) {
         if (filter == null) {
             return;
         }
-        applyRange(criteria, FIELD_CREATED_AT, filter.getCreatedAtFrom(), filter.getCreatedAtTo());
-        applyRange(criteria, FIELD_UPDATED_AT, filter.getUpdatedAtFrom(), filter.getUpdatedAtTo());
-        // startAt is null for DEVICE_ONLINE (and timing-less) schedules, so a startAt range
-        // naturally excludes them — a value window can't match a schedule that has no start.
+        // startAt is null for DEVICE_ONLINE schedules, so a startAt range naturally excludes
+        // them — a value window can't match a schedule that has no start.
         applyRange(criteria, FIELD_START_AT, filter.getStartAtFrom(), filter.getStartAtTo());
     }
 
@@ -500,9 +495,10 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         if (FIELD_ID.equals(sortField)) {
             return schedule.getId();
         }
-        if (DATE_SORT_FIELDS.contains(sortField)) {
-            Instant date = dateSortValue(schedule, sortField);
-            String millis = date == null ? "" : String.valueOf(date.toEpochMilli());
+        if (FIELD_START_AT.equals(sortField)) {
+            // bucket|millis|id — millis empty when startAt is null (the whole DEVICE_ONLINE bucket).
+            Instant startAt = schedule.getStartAt();
+            String millis = startAt == null ? "" : String.valueOf(startAt.toEpochMilli());
             return triggerBucket(schedule) + CURSOR_SEPARATOR + millis + CURSOR_SEPARATOR + schedule.getId();
         }
         return encodeSortValue(schedule, sortField) + CURSOR_SEPARATOR + schedule.getId();
@@ -510,14 +506,6 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
 
     private static int triggerBucket(ScriptSchedule schedule) {
         return schedule.getTrigger() == TRIGGER_LAST ? 1 : 0;
-    }
-
-    private static Instant dateSortValue(ScriptSchedule schedule, String dateField) {
-        return switch (dateField) {
-            case FIELD_UPDATED_AT -> schedule.getUpdatedAt();
-            case FIELD_START_AT -> schedule.getStartAt();
-            default -> schedule.getCreatedAt();
-        };
     }
 
     /**
@@ -545,9 +533,8 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
      * the whole list) come back in a stable, repeatable order instead of Mongo's arbitrary
      * one. Redundant when already sorting by {@code _id}.
      *
-     * <p>Note: the cursor predicate is still {@code _id}-only, so deep paging across a tie
-     * boundary on a non-{@code _id} sort can skip/repeat rows. Pre-existing for
-     * name/createdAt/updatedAt; a compound keyset cursor is the proper fix.
+     * <p>Applies to the plain-query sorts (name / repeat); the startAt and deviceCount sorts run
+     * through their own aggregation keyset instead.
      */
     private static Sort sortWithIdTiebreaker(Sort.Direction direction, String sortField) {
         if (FIELD_ID.equals(sortField)) {
