@@ -43,6 +43,60 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
   ({ isOpen, onClose, children, className }, ref) => {
     // Keep the modal mounted while the exit animation plays.
     const [isMounted, setIsMounted] = useState(isOpen)
+    const panelRef = React.useRef<HTMLDivElement | null>(null)
+    const restoreFocusRef = React.useRef<HTMLElement | null>(null)
+
+    // FOCUS MANAGEMENT — the dialog contract every ModalV2 consumer was
+    // missing: focus moves INTO the dialog on open (a modal opened from a
+    // Radix dropdown otherwise loses the focus race to the menu's
+    // close-restore and focus stays on the page), Tab cycles inside it, and
+    // focus returns to the opener on close.
+    useEffect(() => {
+      if (!isOpen) return
+      restoreFocusRef.current = document.activeElement as HTMLElement | null
+      const raf = requestAnimationFrame(() => {
+        const panel = panelRef.current
+        if (!panel) return
+        // If a consumer already moved focus inside (e.g. a form autofocusing
+        // its first field), leave it alone.
+        if (panel.contains(document.activeElement)) return
+        panel.focus()
+      })
+      return () => {
+        cancelAnimationFrame(raf)
+        restoreFocusRef.current?.focus?.()
+      }
+    }, [isOpen])
+
+    // Tab trap: cycle within the panel's focusables.
+    useEffect(() => {
+      if (!isOpen) return
+      const handleTab = (event: KeyboardEvent) => {
+        if (event.key !== 'Tab') return
+        const panel = panelRef.current
+        if (!panel) return
+        const focusables = Array.from(
+          panel.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter(el => el.getAttribute('aria-hidden') !== 'true' && el.offsetParent !== null)
+        if (focusables.length === 0) return
+        const first = focusables[0]
+        const last = focusables[focusables.length - 1]
+        const active = document.activeElement
+        if (event.shiftKey) {
+          if (active === first || !panel.contains(active)) {
+            event.preventDefault()
+            last.focus()
+          }
+        } else if (active === last || !panel.contains(active)) {
+          event.preventDefault()
+          first.focus()
+        }
+      }
+      document.addEventListener('keydown', handleTab)
+      return () => document.removeEventListener('keydown', handleTab)
+    }, [isOpen])
 
     useEffect(() => {
       if (isOpen) {
@@ -93,7 +147,12 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           aria-hidden="true"
         />
         <div
-          ref={ref}
+          ref={(node) => {
+            panelRef.current = node
+            if (typeof ref === 'function') ref(node)
+            else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node
+          }}
+          tabIndex={-1}
           data-state={state}
           className={cn(
             // min() keeps the desktop cap at 28rem while never letting content
