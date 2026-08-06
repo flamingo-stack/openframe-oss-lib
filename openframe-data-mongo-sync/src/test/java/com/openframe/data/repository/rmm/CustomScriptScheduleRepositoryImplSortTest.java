@@ -172,6 +172,24 @@ class CustomScriptScheduleRepositoryImplSortTest {
     }
 
     @Test
+    void ascendingCursor_nullStartAt_alsoSweepsDatedRowsAheadInSameBucket() {
+        List<Document> or = keysetArms(startAtPipeline(Sort.Direction.ASC, "0||507f1f77bcf86cd799439011"));
+        boolean sweepsDated = or.stream().anyMatch(a ->
+                Integer.valueOf(0).equals(a.get("_triggerBucket"))
+                        && a.get("startAt") instanceof Document sd && sd.containsKey("$ne"));
+        assertThat(sweepsDated).isTrue();
+    }
+
+    @Test
+    void descendingCursor_datedStartAt_alsoSweepsNullTailInSameBucket() {
+        List<Document> or = keysetArms(startAtPipeline(Sort.Direction.DESC, "0|1735689600000|507f1f77bcf86cd799439011"));
+        boolean sweepsNullTail = or.stream().anyMatch(a ->
+                Integer.valueOf(0).equals(a.get("_triggerBucket"))
+                        && a.containsKey("startAt") && a.get("startAt") == null && !a.containsKey("_id"));
+        assertThat(sweepsNullTail).isTrue();
+    }
+
+    @Test
     void invalidCursor_wrongPartCount_fallsBackToFirstPage_noKeyset() {
         assertThat(hasKeysetStage(startAtPipeline(Sort.Direction.ASC, "not-a-valid-cursor"))).isFalse();
     }

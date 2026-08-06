@@ -217,20 +217,25 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
 
         String cmp = effectiveDir == Sort.Direction.ASC ? "$gt" : "$lt";
         String bucketCmp = bucketDir == Sort.Direction.ASC ? "$gt" : "$lt";
+        boolean ascending = effectiveDir == Sort.Direction.ASC;
 
         List<Document> arms = new ArrayList<>();
         // Cross-bucket: everything past this bucket in bucket order (e.g. the whole DEVICE_ONLINE tail).
         arms.add(new Document(FIELD_TRIGGER_BUCKET, new Document(bucketCmp, bucket)));
         if (startAt == null) {
-            // Null-startAt bucket (DEVICE_ONLINE): startAt is constant (null) across it, so order by
-            // _id alone. A range against a sentinel Date never matches null, which would silently
-            // drop the rest of the bucket.
+            // Cursor sits in this bucket's null group: continue it by _id...
             arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, null)
                     .append(FIELD_ID, new Document(cmp, cursorId)));
+            if (ascending) {
+                arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, new Document("$ne", null)));
+            }
         } else {
             arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, new Document(cmp, startAt)));
             arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, startAt)
                     .append(FIELD_ID, new Document(cmp, cursorId)));
+            if (!ascending) {
+                arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, null));
+            }
         }
         ops.add(ctx -> new Document("$match", new Document("$or", arms)));
     }
