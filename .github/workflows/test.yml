@@ -33,6 +33,39 @@ jobs:
     uses: ./.github/workflows/matrix.yml
 
 
+  trivy_code:
+    name: "Trivy Code Scan"
+    runs-on: ubuntu-latest
+    needs: [changes]
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Trivy scan (dependencies + Dockerfile base images)
+        uses: ./.github/steps/trivy
+        with:
+          scan: code
+
+  trivy_report:
+    name: "Trivy Report"
+    runs-on: ubuntu-latest
+    needs: [trivy_code]
+    if: always()
+    steps:
+      - name: Merge all scan reports into one artifact
+        continue-on-error: true
+        uses: actions/upload-artifact/merge@v4
+        with:
+          name: trivy-${{ github.event.repository.name }}-report
+          pattern: trivy-*-report*
+          delete-merged: true
+
   test-java:
     name: Test Java
     runs-on: ubuntu-latest

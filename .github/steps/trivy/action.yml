@@ -1,0 +1,90 @@
+name: "Trivy"
+description: "Trivy PR security scans. scan: code = repo dependencies (HIGH/CRITICAL) + Dockerfile base images (CRITICAL), image = image built in the pipeline (HIGH/CRITICAL). Each scan uploads its TSV report as an artifact"
+
+inputs:
+  scan:
+    description: "code | image"
+    required: true
+  maven-token:
+    description: "Token for internal GitHub Packages: Maven resolution (scan: code) and docker build secret (scan: image)"
+    required: false
+    default: ${{ github.token }}
+  image-name:
+    description: "Service name from the build matrix (scan: image)"
+    required: false
+  dockerfile:
+    description: "Path to the service Dockerfile (scan: image)"
+    required: false
+  context:
+    description: "Docker build context (scan: image)"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Install Trivy
+      uses: aquasecurity/setup-trivy@v0.3.1
+      with:
+        version: v0.73.0
+        cache: true
+
+    - name: Scan dependencies and Dockerfile base images
+      if: inputs.scan == 'code'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.maven-token }}
+        GITHUB_ACTOR: ${{ github.actor }}
+      run: |
+        set -euo pipefail
+        if [ -f pom.xml ]; then  # warm ~/.m2 via Google's Central mirror so trivy sees parent-managed versions
+          echo '<settings><mirrors><mirror><id>google-central</id><url>https://maven-central.storage-download.googleapis.com/maven2/</url><mirrorOf>central</mirrorOf></mirror></mirrors></settings>' > /tmp/mirror.xml
+          mvn -B -q -fn -DskipTests -gs /tmp/mirror.xml $([ -f .mvn/settings.xml ] && echo '-s .mvn/settings.xml') dependency:go-offline | tee /tmp/mvn.log || true
+          ! grep -q '\[ERROR\]' /tmp/mvn.log || echo "::warning::Some Maven dependencies could not be resolved; scan depth may be reduced"
+        fi
+        trivy fs --no-progress --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --offline-scan --format json . |
+          jq -r '.Results[]? as $r | $r.Vulnerabilities[]? | [.Severity, .PkgName, .InstalledVersion, (.FixedVersion // "-"), .VulnerabilityID, $r.Target] | @tsv' | sort -u > "trivy-${GITHUB_REPOSITORY##*/}-code-report.tsv"
+
+        out="trivy-${GITHUB_REPOSITORY##*/}-docker-report.tsv"; : > "$out"
+        find . -name 'Dockerfile*' -not -path './.git/*' -not -path '*/node_modules/*' -print0 |
+          xargs -0 -r awk 'toupper($1)=="FROM" {i=$2; if (i ~ /^--/) i=$3; print i; if (toupper($3)=="AS") print "~"$4; if (toupper($4)=="AS") print "~"$5}' | sort -u > /tmp/from.txt
+        for img in $(grep -v '^~' /tmp/from.txt); do
+          [ "$img" = scratch ] && continue
+          case "$img" in *'$'*) echo "::warning::Skipping base image with unresolved variable: ${img}"; continue ;; esac
+          grep -qxF "~$img" /tmp/from.txt && continue
+          trivy image --no-progress --scanners vuln --severity CRITICAL --ignore-unfixed --format json "$img" |
+            jq -r --arg img "$img" '.Results[]? as $r | $r.Vulnerabilities[]? | [.Severity, .PkgName, .InstalledVersion, (.FixedVersion // "-"), .VulnerabilityID, $img] | @tsv' >> "$out" ||
+            echo "::warning::Base image ${img} could not be scanned (pull/scan error); it was NOT checked"
+        done
+        sort -u "$out" -o "$out"
+        find . -maxdepth 1 -name 'trivy-*.tsv' -empty -delete
+
+    - name: Scan built image
+      if: inputs.scan == 'image'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.maven-token }}
+        GITHUB_ACTOR: ${{ github.actor }}
+      run: |
+        set -euo pipefail
+        docker buildx build --platform linux/amd64 --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN --build-arg GITHUB_ACTOR="$GITHUB_ACTOR" \
+          -f "${{ inputs.dockerfile }}" --output type=oci,dest=/tmp/image.tar "${{ inputs.context }}"
+        out="trivy-${GITHUB_REPOSITORY##*/}-image-report-${{ inputs.image-name }}.tsv"
+        trivy image --no-progress --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --input /tmp/image.tar --format json |
+          jq -r '.Results[]? as $r | $r.Vulnerabilities[]? | [.Severity, .PkgName, .InstalledVersion, (.FixedVersion // "-"), .VulnerabilityID, $r.Target] | @tsv' | sort -u > "$out"
+        find . -maxdepth 1 -name 'trivy-*.tsv' -empty -delete
+
+    - name: Upload report
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.scan == 'code' && format('trivy-{0}-code-report', github.event.repository.name) || format('trivy-{0}-image-report-{1}', github.event.repository.name, inputs.image-name) }}
+        path: trivy-*.tsv
+        if-no-files-found: ignore
+
+    - name: Evaluate
+      shell: bash
+      run: |
+        set -euo pipefail
+        files=$(ls trivy-*.tsv 2>/dev/null) || { echo "No vulnerabilities found."; exit 0; }
+        column -t -s "$(printf '\t')" $files
+        echo "::error::Trivy found $(cut -f1,2,5 $files | sort -u | wc -l | tr -d ' ') unique HIGH/CRITICAL vulnerabilities ($(cat $files | wc -l | tr -d ' ') occurrences across modules) in: ${files//$'\n'/, } (full report in the run artifacts)"
+        exit 1
