@@ -282,12 +282,8 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                     && filter.getDeviceTypes() != null && !filter.getDeviceTypes().isEmpty()) {
                 criteriaList.add(Criteria.where("type").in(filter.getDeviceTypes()));
             }
-            if (!OS_TYPE_FIELD.equals(excludeField)
-                    && filter.getOsTypes() != null && !filter.getOsTypes().isEmpty()) {
-                List<Criteria> perOs = osTypeCriteriaList(filter.getOsTypes());
-                if (!perOs.isEmpty()) {
-                    criteriaList.add(new Criteria().orOperator(perOs.toArray(new Criteria[0])));
-                }
+            if (!OS_TYPE_FIELD.equals(excludeField)) {
+                osTypeOrCriteria(filter.getOsTypes()).ifPresent(criteriaList::add);
             }
             if (!ORGANIZATION_ID_FIELD.equals(excludeField)
                     && filter.getOrganizationIds() != null && !filter.getOrganizationIds().isEmpty()) {
@@ -336,11 +332,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         List<String> valid = filterNonNull(osTypeScope);
         return valid.isEmpty() ? Optional.empty()
                 : Optional.of(Criteria.where(OS_TYPE_FIELD).in(valid));
-    }
-
-    private static List<Criteria> osTypeCriteriaList(Collection<String> osTypeScope) {
-        List<String> valid = filterNonNull(osTypeScope);
-        return valid.isEmpty() ? List.of() : List.of(Criteria.where(OS_TYPE_FIELD).in(valid));
     }
 
     private static List<String> filterNonNull(Collection<String> values) {
