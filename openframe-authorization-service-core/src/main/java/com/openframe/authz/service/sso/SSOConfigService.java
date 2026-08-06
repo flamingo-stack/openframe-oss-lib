@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Slf4j
 @Service
@@ -44,18 +43,20 @@ public class SSOConfigService {
         return defaultProviderConfigs.stream()
                 .filter(cfg -> cfg.providerId().equalsIgnoreCase(provider))
                 .findFirst()
-                .flatMap(cfg -> buildFromDefaults(provider, cfg.getDefaultClientId(), cfg.getDefaultClientSecret()));
+                .flatMap(cfg -> buildFromDefaults(provider, cfg));
     }
 
-    private Optional<SSOConfig> buildFromDefaults(String provider, String clientId, String clientSecret) {
-        if (clientId == null || clientId.isBlank() || clientSecret == null || clientSecret.isBlank()) {
+    private Optional<SSOConfig> buildFromDefaults(String provider, DefaultProviderConfig defaults) {
+        if (!defaults.isConfigured()) {
             return Optional.empty();
         }
         SSOConfig cfg = new SSOConfig();
         cfg.setProvider(provider);
-        cfg.setClientId(clientId);
+        cfg.setClientId(defaults.getDefaultClientId());
         // Encrypt so downstream decryption works transparently
-        cfg.setClientSecret(encryptionService.encryptClientSecret(clientSecret));
+        cfg.setClientSecret(encryptionService.encryptClientSecret(defaults.getDefaultClientSecret()));
+        cfg.setTeamId(defaults.getDefaultTeamId());
+        cfg.setKeyId(defaults.getDefaultKeyId());
         cfg.setEnabled(true);
         return Optional.of(cfg);
     }
@@ -87,7 +88,7 @@ public class SSOConfigService {
         List<String> result = new ArrayList<>();
 
         for (DefaultProviderConfig cfg : defaultProviderConfigs) {
-            if (isNotBlank(cfg.getDefaultClientId()) && isNotBlank(cfg.getDefaultClientSecret())) {
+            if (cfg.isConfigured()) {
                 result.add(cfg.providerId().toLowerCase());
             }
         }
