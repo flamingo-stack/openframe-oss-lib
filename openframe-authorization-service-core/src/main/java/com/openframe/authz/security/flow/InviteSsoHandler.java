@@ -43,7 +43,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
         requireEmail(user); // ensure email present even if not directly used
-        String[] names = resolveNames(user);
+        String[] names = resolveNames(request, authentication, user);
         String givenName = names[0];
         String familyName = names[1];
 

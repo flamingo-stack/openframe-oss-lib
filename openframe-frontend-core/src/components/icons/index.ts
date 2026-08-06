@@ -81,6 +81,7 @@ export { GitHubIcon } from './github-icon';
 export { SlackIcon } from './slack-icon';
 export { ClickUpIcon } from './clickup-icon';
 export { MicrosoftIcon } from './ms-icon';
+export { AppleIcon } from './apple-icon';
 export { GoogleLogo } from './google-logo';
 export { RedditIcon } from './reddit-icon';
 export { XLogo } from './x-logo';
