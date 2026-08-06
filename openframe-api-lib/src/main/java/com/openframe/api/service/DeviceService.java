@@ -20,6 +20,8 @@ import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import com.openframe.data.service.machine.MachineWriteResult;
+import com.openframe.data.service.machine.MachineWriter;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.service.machine.MachineFields.NICKNAME;
+import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
+
 @Service
 @Slf4j
 @Validated
@@ -48,6 +53,7 @@ public class DeviceService {
     private static final String FACET_ORGANIZATION_ID = "organizationId";
 
     private final MachineRepository machineRepository;
+    private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final DeviceStatusProcessor deviceStatusProcessor;
@@ -309,10 +315,11 @@ public class DeviceService {
 
     public Machine updateNickname(@NotBlank String machineId, String nickname) {
         log.info("Updating device nickname. machineId={}", machineId);
-        Machine updated = machineRepository.updateNickname(machineId, normalizeNickname(nickname), Instant.now())
+        MachineWriteResult result = machineWriter
+                .update(machineId, machineUpdate().set(NICKNAME, normalizeNickname(nickname)))
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
         log.info("Device {} nickname updated", machineId);
-        return updated;
+        return result.after();
     }
 
     private String normalizeNickname(String nickname) {

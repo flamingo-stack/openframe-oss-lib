@@ -3,15 +3,11 @@ package com.openframe.data.repository.device;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 
-import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 public interface CustomMachineRepository {
-
-    Optional<Machine> updateNickname(String machineId, String nickname, Instant updatedAt);
 
     long countMachines(MachineQueryFilter filter, String search);
 

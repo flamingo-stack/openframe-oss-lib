@@ -11,6 +11,9 @@ import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import com.openframe.data.service.machine.MachineUpdate;
+import com.openframe.data.service.machine.MachineWriteResult;
+import com.openframe.data.service.machine.MachineWriter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,7 +30,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.when;
 class DeviceServiceTest {
 
     @Mock private MachineRepository machineRepository;
+    @Mock private MachineWriter machineWriter;
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private DeviceStatusProcessor deviceStatusProcessor;
@@ -47,7 +50,7 @@ class DeviceServiceTest {
     @Mock private DeviceFilterOptionMapper deviceFilterOptionMapper;
 
     private DeviceService service() {
-        DeviceService s = new DeviceService(machineRepository, tagRepository, tagAssignmentRepository,
+        DeviceService s = new DeviceService(machineRepository, machineWriter, tagRepository, tagAssignmentRepository,
                 deviceStatusProcessor, scriptScheduleDeviceService, deviceFilterOptionMapper);
         lenient().when(machineRepository.countMachines(any(MachineQueryFilter.class), any())).thenReturn(0L);
         lenient().when(machineRepository.findMachinesWithCursor(any(MachineQueryFilter.class), any(),
@@ -224,16 +227,26 @@ class DeviceServiceTest {
         verify(scriptScheduleDeviceService, never()).removeDeviceFromAllSchedules(any(), any());
     }
 
-    /** Echoes the atomic update back as the stored device, the way findAndModify(returnNew) does. */
+
     private void stubAtomicNicknameUpdate(String machineId) {
-        when(machineRepository.updateNickname(eq(machineId), any(), any(Instant.class)))
+        when(machineWriter.update(eq(machineId), any(MachineUpdate.class)))
                 .thenAnswer(inv -> {
-                    Machine stored = new Machine();
-                    stored.setMachineId(inv.getArgument(0));
-                    stored.setNickname(inv.getArgument(1));
-                    stored.setUpdatedAt(inv.getArgument(2));
-                    return Optional.of(stored);
+                    Machine before = new Machine();
+                    before.setMachineId(inv.getArgument(0));
+                    Machine after = new Machine();
+                    after.setMachineId(inv.getArgument(0));
+                    after.setUpdatedAt(Instant.now());
+                    inv.getArgument(1, MachineUpdate.class).applyTo(after);
+                    return Optional.of(new MachineWriteResult(before, after));
                 });
+    }
+
+    private String capturedNickname() {
+        ArgumentCaptor<MachineUpdate> captor = ArgumentCaptor.forClass(MachineUpdate.class);
+        verify(machineWriter).update(any(), captor.capture());
+        Machine probe = new Machine();
+        captor.getValue().applyTo(probe);
+        return probe.getNickname();
     }
 
     @Test
@@ -246,7 +259,7 @@ class DeviceServiceTest {
 
         assertThat(result.getNickname()).isEqualTo("Reception iMac");
         assertThat(result.getUpdatedAt()).isNotNull();
-        verify(machineRepository).updateNickname(eq("m1"), eq("Reception iMac"), any(Instant.class));
+        assertThat(capturedNickname()).isEqualTo("Reception iMac");
     }
 
     @Test
@@ -259,6 +272,7 @@ class DeviceServiceTest {
 
         verify(machineRepository, never()).save(any(Machine.class));
         verify(machineRepository, never()).findByMachineId(any());
+        verify(machineWriter).update(eq("m1"), any(MachineUpdate.class));
     }
 
     @Test
@@ -268,7 +282,7 @@ class DeviceServiceTest {
         stubAtomicNicknameUpdate("m1");
 
         assertThat(s.updateNickname("m1", "   ").getNickname()).isNull();
-        verify(machineRepository).updateNickname(eq("m1"), isNull(), any(Instant.class));
+        assertThat(capturedNickname()).isNull();
     }
 
     @Test
@@ -278,15 +292,14 @@ class DeviceServiceTest {
         stubAtomicNicknameUpdate("m1");
 
         assertThat(s.updateNickname("m1", null).getNickname()).isNull();
-        verify(machineRepository).updateNickname(eq("m1"), isNull(), any(Instant.class));
+        assertThat(capturedNickname()).isNull();
     }
 
     @Test
     @DisplayName("updateNickname: unknown machine → DeviceNotFoundException, nothing saved")
     void updateNickname_notFound() {
         DeviceService s = service();
-        when(machineRepository.updateNickname(eq("nope"), any(), any(Instant.class)))
-                .thenReturn(Optional.empty());
+        when(machineWriter.update(eq("nope"), any(MachineUpdate.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> s.updateNickname("nope", "x"))
                 .isInstanceOf(DeviceNotFoundException.class);

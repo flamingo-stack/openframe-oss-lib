@@ -8,16 +8,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -34,8 +31,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String ID_FIELD = "_id";
     private static final String OS_TYPE_FIELD = "osType";
     private static final String MACHINE_ID_FIELD = "machineId";
-    private static final String NICKNAME_FIELD = "nickname";
-    private static final String UPDATED_AT_FIELD = "updatedAt";
     private static final String STATUS_FIELD = "status";
     private static final String TYPE_FIELD = "type";
     private static final String ORGANIZATION_ID_FIELD = "organizationId";
@@ -258,17 +253,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                                                             String cursor, int limit) {
         return findAvailableForScheduleWithCursor(buildDeviceQuery(filter, search),
                 assignedMachineIds, cursor, limit);
-    }
-
-    @Override
-    public Optional<Machine> updateNickname(String machineId, String nickname, Instant updatedAt) {
-        Query byMachineId = new Query(Criteria.where(MACHINE_ID_FIELD).is(machineId));
-        Update update = new Update()
-                .set(NICKNAME_FIELD, nickname)
-                .set(UPDATED_AT_FIELD, updatedAt);
-        Machine updated = mongoTemplate.findAndModify(byMachineId, update,
-                FindAndModifyOptions.options().returnNew(true), Machine.class);
-        return Optional.ofNullable(updated);
     }
 
     @Override
