@@ -38,7 +38,7 @@ import java.util.concurrent.TimeoutException;
 @Component
 public class ScriptSyntaxValidator {
 
-    static final String METHOD_SKIPPED = "SYNTAX_SKIPPED_NO_INTERPRETER";
+    private static final String METHOD_SKIPPED = "SYNTAX_SKIPPED_NO_INTERPRETER";
     private static final int TIMEOUT_SECONDS = 10;
     private static final int OUTPUT_DRAIN_SECONDS = 2;
     private static final int MAX_OUTPUT_CHARS = 2000;

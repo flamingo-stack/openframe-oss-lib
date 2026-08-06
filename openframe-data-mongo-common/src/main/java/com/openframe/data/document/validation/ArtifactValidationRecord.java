@@ -37,6 +37,4 @@ public class ArtifactValidationRecord implements TenantScoped {
     private List<String> targetOs;
     private boolean highImpact;
     private List<String> warnings;
-    private String approvedBy;
-    private Instant approvedAt;
 }
