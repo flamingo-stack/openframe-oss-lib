@@ -1,0 +1,108 @@
+name: Detect Changes
+
+on:
+  workflow_call:
+    outputs:
+      node_matrix:
+        description: "Node packages matrix"
+        value: ${{ jobs.collect.outputs.node_matrix }}
+      changes:
+        description: "JSON object mapping each component key to true/false"
+        value: ${{ jobs.collect.outputs.changes }}
+
+jobs:
+  collect:
+    name: Changes and Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      node_matrix: ${{ steps.define.outputs.node_matrix }}
+      changes: ${{ steps.changes.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Define components
+        id: define
+        run: |
+          set -euo pipefail
+
+          node_matrix=$(jq -nc '[
+              {
+                "name": "openframe-frontend-core",
+                "path": "openframe-frontend-core"
+              }
+            ]')
+
+          filters=$(jq -nc '{
+              "java": [
+                "pom.xml",
+                "openframe-api-lib/**",
+                "openframe-api-service-core/**",
+                "openframe-authorization-service-core/**",
+                "openframe-client-core/**",
+                "openframe-config-core/**",
+                "openframe-core/**",
+                "openframe-core-crypto/**",
+                "openframe-data-cassandra/**",
+                "openframe-data-device-aspect/**",
+                "openframe-data-kafka/**",
+                "openframe-data-mongo-common/**",
+                "openframe-data-mongo-sync/**",
+                "openframe-data-mongo-reactive/**",
+                "openframe-data-nats/**",
+                "openframe-data-pinot/**",
+                "openframe-data-redis/**",
+                "openframe-data-timeentry-aspect/**",
+                "openframe-debezium-initializer/**",
+                "openframe-exception/**",
+                "openframe-external-api-service-core/**",
+                "openframe-fe-feature-flags/**",
+                "openframe-gateway-service-core/**",
+                "openframe-idp-configuration/**",
+                "openframe-management-service-core/**",
+                "openframe-notification-mail/**",
+                "openframe-notification-push/**",
+                "openframe-pinot-initializer/**",
+                "openframe-security-core/**",
+                "openframe-security-oauth/**",
+                "openframe-stream-service-core/**",
+                "openframe-test-service-core/**",
+                "openframe-tool-agent-nats-installation/**",
+                "sdk/**",
+                ".mvn/**"
+              ],
+              "openframe-frontend-core": [
+                "openframe-frontend-core/**"
+              ],
+              "rust": [
+                "clients/**",
+                ".github/steps/rust-setup/**"
+              ]
+            }')
+
+          keys=$(jq -nc --argjson f "$filters" '$f | keys')
+
+          [ "$(jq 'length' <<< "$node_matrix")" -gt 0 ] || { echo "node_matrix is empty" >&2; exit 1; }
+          [ "$(jq 'length' <<< "$keys")" -gt 0 ] || { echo "no change filters" >&2; exit 1; }
+
+          {
+            echo "node_matrix=$node_matrix"
+            echo "filters=$filters"
+            echo "keys=$keys"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: ${{ steps.define.outputs.filters }}
+
+      - name: Build changes map
+        id: changes
+        env:
+          CHANGED: ${{ steps.filter.outputs.changes || '[]' }}
+          KEYS: ${{ steps.define.outputs.keys }}
+        run: |
+          set -euo pipefail
+          changes=$(jq -nc --argjson changed "$CHANGED" --argjson keys "$KEYS" '
+            reduce $keys[] as $k ({}; .[$k] = ((($changed | index($k)) != null) | tostring))
+          ')
+          echo "changes=$changes" >> "$GITHUB_OUTPUT"
