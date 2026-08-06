@@ -18,6 +18,8 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.Locale;
 
+import com.openframe.authz.util.OidcUserUtils;
+
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 
 /**
@@ -66,14 +68,9 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
 
         // Best practice: only mark verified if the IdP asserts it (when claim is present).
         // Google typically provides email_verified. Microsoft may omit it; we treat omission as verified for trusted providers.
-        if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
-            Object claim = oidcUser.getClaims().get("email_verified");
-            if (claim instanceof Boolean b && !b) {
-                return;
-            }
-            if (claim instanceof String s && "false".equalsIgnoreCase(s)) {
-                return;
-            }
+        if (authentication.getPrincipal() instanceof OidcUser oidcUser
+                && !OidcUserUtils.emailVerifiedClaimAllows(oidcUser)) {
+            return;
         }
 
         userService.findActiveByEmailAndTenant(email.trim().toLowerCase(Locale.ROOT), tenantId)
