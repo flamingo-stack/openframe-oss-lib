@@ -112,6 +112,36 @@ exports[`decodeNatsChunk — golden corpus > maps the full recorded corpus to no
     "status": "rejected",
     "type": "approval-resolved",
   },
+  "ask": {
+    "options": [
+      {
+        "description": "How scripting works and how to set it up",
+        "label": "Find documentation",
+      },
+      {
+        "description": "List, edit or run the scripts in your workspace",
+        "label": "Your scripts",
+      },
+    ],
+    "question": "What do you want to work on?",
+    "text": "Do you want the OpenFrame docs on scripts, or the scripts in your own workspace?",
+    "type": "ask",
+  },
+  "ask_blank_question": null,
+  "ask_missing_question": null,
+  "ask_no_options": null,
+  "ask_options_not_array": null,
+  "ask_unusable_option_rows": null,
+  "ask_without_intro": {
+    "options": [
+      {
+        "description": undefined,
+        "label": "Docs",
+      },
+    ],
+    "question": "Which one?",
+    "type": "ask",
+  },
   "context_compaction_end": {
     "phase": "end",
     "summary": "Compacted 34 messages",
