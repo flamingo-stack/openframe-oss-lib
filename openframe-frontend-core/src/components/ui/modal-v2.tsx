@@ -39,12 +39,17 @@ interface ModalFooterProps {
   className?: string
 }
 
+// Topmost-modal stack: with stacked modals (confirm above a form) only the
+// TOP one may contain focus, or they fight each other.
+const modalStack: symbol[] = []
+
 const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
   ({ isOpen, onClose, children, className }, ref) => {
     // Keep the modal mounted while the exit animation plays.
     const [isMounted, setIsMounted] = useState(isOpen)
     const panelRef = React.useRef<HTMLDivElement | null>(null)
     const restoreFocusRef = React.useRef<HTMLElement | null>(null)
+    const stackIdRef = React.useRef<symbol>(Symbol('modal'))
 
     // FOCUS MANAGEMENT — the dialog contract every ModalV2 consumer was
     // missing: focus moves INTO the dialog on open (a modal opened from a
@@ -53,6 +58,8 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
     // focus returns to the opener on close.
     useEffect(() => {
       if (!isOpen) return
+      const stackId = stackIdRef.current
+      modalStack.push(stackId)
       restoreFocusRef.current = document.activeElement as HTMLElement | null
       const raf = requestAnimationFrame(() => {
         const panel = panelRef.current
@@ -62,8 +69,36 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         if (panel.contains(document.activeElement)) return
         panel.focus()
       })
+      // CONTAINMENT, not a one-shot: whatever tears down after the dialog
+      // opens (a Radix menu restoring/abandoning focus frames later, a
+      // removed node dropping focus to body) — if focus leaves the topmost
+      // dialog, pull it back. This is what actually wins the multi-frame
+      // focus races a single autofocus cannot.
+      const containFocus = (event: FocusEvent) => {
+        if (modalStack[modalStack.length - 1] !== stackId) return
+        const panel = panelRef.current
+        if (!panel) return
+        const target = event.target as Node | null
+        if (target && panel.contains(target)) return
+        panel.focus()
+      }
+      document.addEventListener('focusin', containFocus)
+      // Focus dropped to <body> by NODE REMOVAL (a closing menu unmounting the
+      // focused item) dispatches NO focusin — bounded re-asserts cover it.
+      const reasserts = [80, 240, 500].map(ms =>
+        setTimeout(() => {
+          if (modalStack[modalStack.length - 1] !== stackId) return
+          const panel = panelRef.current
+          if (!panel) return
+          if (!panel.contains(document.activeElement)) panel.focus()
+        }, ms),
+      )
       return () => {
         cancelAnimationFrame(raf)
+        reasserts.forEach(clearTimeout)
+        document.removeEventListener('focusin', containFocus)
+        const idx = modalStack.lastIndexOf(stackId)
+        if (idx !== -1) modalStack.splice(idx, 1)
         restoreFocusRef.current?.focus?.()
       }
     }, [isOpen])
