@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ScriptValidationGateTest {
 
     private final ScriptValidationGate gate = new ScriptValidationGate(
-            new ScriptSyntaxValidator(), new StaticSafetyAnalyzer());
+            new ScriptSyntaxValidator(), new StaticSafetyAnalyzer(), true);
 
     @Test
     @EnabledOnOs({OS.LINUX, OS.MAC})
