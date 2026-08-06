@@ -37,6 +37,11 @@ public class StaticSafetyAnalyzer {
             // catastrophic — block
             Rule.of("rm\\s+(-[a-z]*[rf][a-z]*\\s+)+(/|/\\*)(\\s|$|['\"])", ValidationSeverity.ERROR,
                     "DESTRUCTIVE_ROOT_DELETE", "deletes the filesystem root"),
+            // --no-preserve-root exists for exactly one purpose: wiping '/'. Its presence
+            // alongside a recursive rm is enough on its own — the flag may sit anywhere
+            // among the options, so the path no longer has to follow them directly.
+            Rule.of("rm\\s+[^\\n]*--no-preserve-root", ValidationSeverity.ERROR,
+                    "DESTRUCTIVE_ROOT_DELETE", "disables rm's root protection"),
             Rule.of("Remove-Item\\b[^\\n]*-Recurse[^\\n]*\\s(C:\\\\|/)(\\s|$|['\"])", ValidationSeverity.ERROR,
                     "DESTRUCTIVE_ROOT_DELETE", "recursively deletes a drive/filesystem root"),
             Rule.of("dd\\s+[^\\n]*of=/dev/(sd|nvme|disk|hd)", ValidationSeverity.ERROR,

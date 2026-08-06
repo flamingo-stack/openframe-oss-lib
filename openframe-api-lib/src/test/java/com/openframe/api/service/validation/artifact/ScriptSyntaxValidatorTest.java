@@ -61,6 +61,9 @@ class ScriptSyntaxValidatorTest {
         ArtifactValidationResult r = validator.validate(ScriptShell.PYTHON,
                 "import os\n\ndef main():\n    print(os.getcwd())\n");
         assertFalse(r.blocked());
+        // the recorded method must say which of the two actually happened
+        assertTrue(r.methods().contains("SYNTAX_PYTHON_AST")
+                || r.methods().contains("SYNTAX_SKIPPED_NO_INTERPRETER"));
     }
 
     @Test

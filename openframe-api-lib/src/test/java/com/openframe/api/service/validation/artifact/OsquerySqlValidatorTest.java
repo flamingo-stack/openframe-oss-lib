@@ -49,6 +49,21 @@ class OsquerySqlValidatorTest {
     }
 
     @Test
+    void rejectsWriteStatementHiddenBehindCte() {
+        // SQLite allows WITH before DELETE/INSERT/UPDATE; bare sqlite would only complain
+        // about the missing table, which this validator treats as an unverified schema.
+        assertTrue(validator.validate("WITH c AS (SELECT 1) DELETE FROM processes").blocked());
+        assertTrue(validator.validate("WITH c AS (SELECT 1) INSERT INTO users VALUES (1)").blocked());
+        assertTrue(validator.validate("WITH c AS (SELECT 1) UPDATE users SET uid = 0").blocked());
+    }
+
+    @Test
+    void acceptsMultipleCtesEndingInSelect() {
+        assertFalse(validator.validate(
+                "WITH a AS (SELECT 1 AS x), b AS (SELECT 2 AS y) SELECT * FROM a, b").blocked());
+    }
+
+    @Test
     void acceptsWithCte() {
         ArtifactValidationResult r = validator.validate(
                 "WITH u AS (SELECT uid FROM users) SELECT * FROM u");

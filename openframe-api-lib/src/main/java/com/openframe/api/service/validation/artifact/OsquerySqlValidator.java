@@ -36,6 +36,13 @@ public class OsquerySqlValidator {
             return error("SQL_NOT_SELECT",
                     "osquery artifacts must be a single read-only SELECT (or WITH ... SELECT) statement");
         }
+        if (upper.startsWith("WITH") && !statementAfterCteIsSelect(trimmed)) {
+            // SQLite allows WITH before DELETE/INSERT/UPDATE; without this check such a
+            // statement reaches sqlite, fails with "no such table" (the tables live in
+            // osquery, not here), and would be waved through as an unverified-schema warning.
+            return error("SQL_NOT_SELECT",
+                    "osquery artifacts must be a single read-only SELECT (or WITH ... SELECT) statement");
+        }
         if (containsMultipleStatements(trimmed)) {
             return error("SQL_MULTIPLE_STATEMENTS", "exactly one SQL statement is allowed");
         }
@@ -57,6 +64,59 @@ public class OsquerySqlValidator {
             return error("SQL_SYNTAX", "SQL syntax error: " + msg);
         }
         return new ArtifactValidationResult(List.of(), List.of(METHOD));
+    }
+
+    /**
+     * Walks past the CTE list of a {@code WITH} statement and reports whether the
+     * statement it introduces is a SELECT. Quote- and paren-aware, so commas and
+     * keywords inside a CTE body or a string literal do not confuse it.
+     */
+    private boolean statementAfterCteIsSelect(String sql) {
+        boolean inSingle = false;
+        boolean inDouble = false;
+        int depth = 0;
+        int i = "WITH".length();
+        // The CTE list is `name AS ( ... )` groups separated by commas at depth 0.
+        while (i < sql.length()) {
+            char c = sql.charAt(i);
+            if (c == '\'' && !inDouble) {
+                inSingle = !inSingle;
+            } else if (c == '"' && !inSingle) {
+                inDouble = !inDouble;
+            } else if (!inSingle && !inDouble) {
+                if (c == '(') {
+                    depth++;
+                } else if (c == ')') {
+                    depth--;
+                    if (depth == 0) {
+                        int next = skipSpacesAndCommas(sql, i + 1);
+                        if (next >= sql.length()) {
+                            return false;
+                        }
+                        // another CTE follows — keep scanning; otherwise this is the statement
+                        if (sql.charAt(next) != ',' && !isAnotherCte(sql, next)) {
+                            return sql.substring(next).toUpperCase(Locale.ROOT).startsWith("SELECT");
+                        }
+                        i = next - 1;
+                    }
+                }
+            }
+            i++;
+        }
+        return false;
+    }
+
+    private int skipSpacesAndCommas(String sql, int from) {
+        int i = from;
+        while (i < sql.length() && Character.isWhitespace(sql.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+
+    /** After a closing paren, a comma means the CTE list continues. */
+    private boolean isAnotherCte(String sql, int index) {
+        return sql.charAt(index) == ',';
     }
 
     /** Detects a ';' outside string literals that is followed by more SQL (a single trailing ';' is fine). */

@@ -19,6 +19,12 @@ class StaticSafetyAnalyzerTest {
     }
 
     @Test
+    void blocksRootDeletionWithNoPreserveRootFlag() {
+        assertTrue(analyzer.analyzeScript(ScriptShell.BASH, "rm -rf --no-preserve-root /").blocked());
+        assertTrue(analyzer.analyzeScript(ScriptShell.BASH, "rm --no-preserve-root -rf /").blocked());
+    }
+
+    @Test
     void allowsScopedDeletion() {
         assertFalse(analyzer.analyzeScript(ScriptShell.BASH,
                 "set -e\nrm -rf /tmp/build-cache\n").blocked());
