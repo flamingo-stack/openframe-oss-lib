@@ -52,6 +52,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static final String FIELD_SUPPORTED_PLATFORMS = "supportedPlatforms";
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String FIELD_UPDATED_AT = "updatedAt";
+    private static final String FIELD_START_AT = "startAt";
     private static final String FIELD_CREATED_BY = "createdBy";
     private static final String FIELD_COUNT = "count";
     private static final String FIELD_REPEAT = "repeat";
@@ -65,9 +66,9 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static final String CURSOR_SEPARATOR = "|";
 
     private static final Set<String> SORTABLE_FIELDS =
-            Set.of(FIELD_ID, FIELD_NAME, FIELD_CREATED_AT, FIELD_UPDATED_AT, FIELD_REPEAT, FIELD_DEVICE_COUNT);
+            Set.of(FIELD_ID, FIELD_NAME, FIELD_CREATED_AT, FIELD_UPDATED_AT, FIELD_START_AT, FIELD_REPEAT, FIELD_DEVICE_COUNT);
 
-    private static final Set<String> DATE_SORT_FIELDS = Set.of(FIELD_CREATED_AT, FIELD_UPDATED_AT);
+    private static final Set<String> DATE_SORT_FIELDS = Set.of(FIELD_CREATED_AT, FIELD_UPDATED_AT, FIELD_START_AT);
 
     private final MongoTemplate mongoTemplate;
 
@@ -215,7 +216,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         Date dateValue;
         try {
             bucket = Integer.parseInt(parts[0]);
-            dateValue = new Date(Long.parseLong(parts[1]));
+            dateValue = parts[1].isEmpty() ? null : new Date(Long.parseLong(parts[1]));
         } catch (NumberFormatException ex) {
             log.warn("Unparseable bucket/date in date-trigger cursor '{}' — falling back to first page", cursor);
             return;
@@ -223,12 +224,18 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
 
         String cmp = effectiveDir == Sort.Direction.ASC ? "$gt" : "$lt";
         String bucketCmp = bucketDir == Sort.Direction.ASC ? "$gt" : "$lt";
-        Document orExpr = new Document("$or", List.of(
-                new Document(FIELD_TRIGGER_BUCKET, new Document(bucketCmp, bucket)),
-                new Document(FIELD_TRIGGER_BUCKET, bucket).append(dateField, new Document(cmp, dateValue)),
-                new Document(FIELD_TRIGGER_BUCKET, bucket).append(dateField, dateValue)
-                        .append(FIELD_ID, new Document(cmp, cursorId))));
-        ops.add(ctx -> new Document("$match", orExpr));
+
+        List<Document> arms = new ArrayList<>();
+        arms.add(new Document(FIELD_TRIGGER_BUCKET, new Document(bucketCmp, bucket)));
+        if (dateValue == null) {
+            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(dateField, null)
+                    .append(FIELD_ID, new Document(cmp, cursorId)));
+        } else {
+            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(dateField, new Document(cmp, dateValue)));
+            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(dateField, dateValue)
+                    .append(FIELD_ID, new Document(cmp, cursorId)));
+        }
+        ops.add(ctx -> new Document("$match", new Document("$or", arms)));
     }
 
     private ScriptSchedule toSchedule(Document doc) {
@@ -348,6 +355,9 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         }
         applyRange(criteria, FIELD_CREATED_AT, filter.getCreatedAtFrom(), filter.getCreatedAtTo());
         applyRange(criteria, FIELD_UPDATED_AT, filter.getUpdatedAtFrom(), filter.getUpdatedAtTo());
+        // startAt is null for DEVICE_ONLINE (and timing-less) schedules, so a startAt range
+        // naturally excludes them — a value window can't match a schedule that has no start.
+        applyRange(criteria, FIELD_START_AT, filter.getStartAtFrom(), filter.getStartAtTo());
     }
 
     private static void applyRange(Criteria criteria, String field, Instant from, Instant to) {
@@ -491,9 +501,9 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
             return schedule.getId();
         }
         if (DATE_SORT_FIELDS.contains(sortField)) {
-            return triggerBucket(schedule) + CURSOR_SEPARATOR
-                    + dateEpochMillis(schedule, sortField) + CURSOR_SEPARATOR
-                    + schedule.getId();
+            Instant date = dateSortValue(schedule, sortField);
+            String millis = date == null ? "" : String.valueOf(date.toEpochMilli());
+            return triggerBucket(schedule) + CURSOR_SEPARATOR + millis + CURSOR_SEPARATOR + schedule.getId();
         }
         return encodeSortValue(schedule, sortField) + CURSOR_SEPARATOR + schedule.getId();
     }
@@ -502,9 +512,12 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         return schedule.getTrigger() == TRIGGER_LAST ? 1 : 0;
     }
 
-    private static long dateEpochMillis(ScriptSchedule schedule, String dateField) {
-        Instant value = FIELD_UPDATED_AT.equals(dateField) ? schedule.getUpdatedAt() : schedule.getCreatedAt();
-        return value == null ? 0L : value.toEpochMilli();
+    private static Instant dateSortValue(ScriptSchedule schedule, String dateField) {
+        return switch (dateField) {
+            case FIELD_UPDATED_AT -> schedule.getUpdatedAt();
+            case FIELD_START_AT -> schedule.getStartAt();
+            default -> schedule.getCreatedAt();
+        };
     }
 
     /**

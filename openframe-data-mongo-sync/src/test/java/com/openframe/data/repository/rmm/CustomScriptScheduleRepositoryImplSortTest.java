@@ -87,6 +87,55 @@ class CustomScriptScheduleRepositoryImplSortTest {
     }
 
     @Test
+    void startAtSort_deviceOnlineLast_bucketThenStartAtThenId() {
+        Document sort = (Document) stage(pipelineForDateSort("startAt", Sort.Direction.ASC, null), "$sort").get("$sort");
+        assertThat(new ArrayList<>(sort.keySet())).containsExactly("_triggerBucket", "startAt", "_id");
+        assertThat(sort.get("_triggerBucket")).isEqualTo(1);   // DEVICE_ONLINE always last
+        assertThat(sort.get("startAt")).isEqualTo(1);
+    }
+
+    @Test
+    void encodeCursor_startAtSort_dateTime_usesStartAtMillis_bucketZero() {
+        Instant startAt = Instant.parse("2026-03-15T00:00:00Z");
+        ScriptSchedule s = new ScriptSchedule();
+        s.setId("507f1f77bcf86cd799439011");
+        s.setStartAt(startAt);
+        s.setTrigger(ScriptScheduleTrigger.DATE_TIME);
+
+        assertThat(repo.encodeCursor(s, "startAt"))
+                .isEqualTo("0|" + startAt.toEpochMilli() + "|507f1f77bcf86cd799439011");
+    }
+
+    @Test
+    void encodeCursor_startAtSort_deviceOnline_nullStartAt_isEmptyMillisBucketOne() {
+        // DEVICE_ONLINE always has null startAt (invariant); the millis segment must be empty,
+        // not a 0 sentinel, so the keyset can match on null instead of Date(0).
+        ScriptSchedule s = new ScriptSchedule();
+        s.setId("507f1f77bcf86cd799439011");
+        s.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);   // startAt left null
+
+        assertThat(repo.encodeCursor(s, "startAt")).isEqualTo("1||507f1f77bcf86cd799439011");
+    }
+
+    @Test
+    void startAtCursor_nullDatedBucket_keysetMatchesNullNotSentinel_soDeviceOnlineTailPaginates() {
+        // Regression: a cursor sitting inside the DEVICE_ONLINE tail (null startAt) must continue
+        // by _id within bucket 1. Matching startAt == Date(0) would hit nothing and drop the rest.
+        List<Document> pipeline = pipelineForDateSort("startAt", Sort.Direction.ASC,
+                "1||507f1f77bcf86cd799439011");
+        Document match = pipeline.stream()
+                .filter(d -> d.containsKey("$match") && d.get("$match") instanceof Document m && m.containsKey("$or"))
+                .findFirst().orElseThrow();
+        @SuppressWarnings("unchecked")
+        List<Document> or = (List<Document>) ((Document) match.get("$match")).get("$or");
+        Document tieArm = or.get(1);
+        assertThat(tieArm.get("_triggerBucket")).isEqualTo(1);
+        assertThat(tieArm.containsKey("startAt")).isTrue();
+        assertThat(tieArm.get("startAt")).isNull();                 // matches null, not Date(0)
+        assertThat((Document) tieArm.get("_id")).containsKey("$gt");
+    }
+
+    @Test
     void updatedAtSort_ascending_bucketStillAscending() {
         Document sort = (Document) stage(pipelineForDateSort("updatedAt", Sort.Direction.ASC, null), "$sort").get("$sort");
         assertThat(sort.get("_triggerBucket")).isEqualTo(1);   // bucket never flips — DEVICE_ONLINE always last

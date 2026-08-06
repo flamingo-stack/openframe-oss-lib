@@ -281,6 +281,8 @@ class ScriptScheduleServiceTest {
         Instant createdFrom = Instant.parse("2026-01-01T00:00:00Z");
         Instant createdTo = Instant.parse("2026-02-01T00:00:00Z");
         Instant updatedFrom = Instant.parse("2026-03-01T00:00:00Z");
+        Instant startFrom = Instant.parse("2026-04-01T00:00:00Z");
+        Instant startTo = Instant.parse("2026-05-01T00:00:00Z");
         ScriptScheduleFilterInput filter = ScriptScheduleFilterInput.builder()
                 .statuses(List.of(ScriptStatus.ACTIVE))
                 .supportedPlatforms(List.of(OsType.WINDOWS))
@@ -288,6 +290,8 @@ class ScriptScheduleServiceTest {
                 .createdAtFrom(createdFrom)
                 .createdAtTo(createdTo)
                 .updatedAtFrom(updatedFrom)
+                .startAtFrom(startFrom)
+                .startAtTo(startTo)
                 .build();
         when(scheduleRepository.countForTenant(eq(TENANT_ID), any(), any())).thenReturn(0L);
         when(scheduleRepository.findPageForTenant(any(), any(), any(), any(), any(), any(), eq(false), eq(21)))
@@ -306,6 +310,8 @@ class ScriptScheduleServiceTest {
         assertThat(forwarded.getCreatedAtTo()).isEqualTo(createdTo);
         assertThat(forwarded.getUpdatedAtFrom()).isEqualTo(updatedFrom);
         assertThat(forwarded.getUpdatedAtTo()).isNull();
+        assertThat(forwarded.getStartAtFrom()).isEqualTo(startFrom);
+        assertThat(forwarded.getStartAtTo()).isEqualTo(startTo);
     }
 
     @Test

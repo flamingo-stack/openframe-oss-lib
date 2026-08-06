@@ -185,6 +185,8 @@ public class ScriptScheduleService {
                 .createdAtTo(input.getCreatedAtTo())
                 .updatedAtFrom(input.getUpdatedAtFrom())
                 .updatedAtTo(input.getUpdatedAtTo())
+                .startAtFrom(input.getStartAtFrom())
+                .startAtTo(input.getStartAtTo())
                 .build();
     }
 

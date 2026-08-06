@@ -27,4 +27,7 @@ public class ScriptScheduleFilterInput {
 
     private Instant updatedAtFrom;
     private Instant updatedAtTo;
+
+    private Instant startAtFrom;
+    private Instant startAtTo;
 }

@@ -39,4 +39,7 @@ public class ScriptScheduleQueryFilter {
 
     private Instant updatedAtFrom;
     private Instant updatedAtTo;
+
+    private Instant startAtFrom;
+    private Instant startAtTo;
 }

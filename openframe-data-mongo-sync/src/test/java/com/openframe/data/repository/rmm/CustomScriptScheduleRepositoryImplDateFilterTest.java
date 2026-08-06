@@ -52,10 +52,24 @@ class CustomScriptScheduleRepositoryImplDateFilterTest {
     }
 
     @Test
+    void startAtRange_appliesInclusiveGteLte() {
+        Instant from = Instant.parse("2026-04-01T00:00:00Z");
+        Instant to = Instant.parse("2026-05-01T00:00:00Z");
+
+        Document startAt = (Document) countQueryFor(ScriptScheduleQueryFilter.builder()
+                .startAtFrom(from).startAtTo(to).build()).get("startAt");
+
+        assertThat(startAt).isNotNull();
+        assertThat(startAt.get("$gte")).isEqualTo(from);
+        assertThat(startAt.get("$lte")).isEqualTo(to);
+    }
+
+    @Test
     void noDateFilter_addsNoDateCriteria() {
         Document q = countQueryFor(ScriptScheduleQueryFilter.builder().build());
 
         assertThat(q).doesNotContainKey("createdAt");
         assertThat(q).doesNotContainKey("updatedAt");
+        assertThat(q).doesNotContainKey("startAt");
     }
 }

@@ -11,7 +11,9 @@ extend type Query {
 
     """Cursor-paginated list of schedules within the current tenant (Relay Connection Spec).
     Default order is newest-first by _id. Optional filter / search / sort.
-    Sortable fields: _id (default), name, createdAt, updatedAt, repeat, deviceCount.
+    Sortable fields: _id (default), name, createdAt, updatedAt, startAt, repeat, deviceCount.
+    When sorting by a date field (createdAt / updatedAt / startAt), DEVICE_ONLINE schedules
+    are always ordered last (they are event-driven and have no startAt).
     Ties are broken by _id so the order is stable. Search is a
     case-insensitive substring match on name."""
     scriptSchedules(
@@ -269,4 +271,7 @@ input ScriptScheduleFilterInput {
     createdAtTo: Instant
     updatedAtFrom: Instant
     updatedAtTo: Instant
+    "Filter by first-run instant (startAt). DEVICE_ONLINE schedules have no startAt, so a startAt range excludes them."
+    startAtFrom: Instant
+    startAtTo: Instant
 }
