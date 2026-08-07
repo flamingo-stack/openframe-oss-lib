@@ -19,12 +19,16 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.mapping;
+import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.toSet;
 
 @Service
 @RequiredArgsConstructor
@@ -46,65 +50,97 @@ public class DeviceOnlineDispatchService {
         if (pending.isEmpty()) {
             return;
         }
-        int limit = Math.min(pending.size(), batchSize);
-        log.info("DEVICE_ONLINE dispatch tick: {} pending, processing up to {}", pending.size(), limit);
+        List<MachineFirstOnlineDispatch> batch = pending.stream().limit(batchSize).toList();
+        log.info("DEVICE_ONLINE dispatch tick: {} pending, processing up to {}", pending.size(), batch.size());
 
-        // Cache the tenant's DEVICE_ONLINE+ACTIVE schedule set once per tick — mass onboarding
-        // (many pending machines under the same tenant) collapses N repo hits into 1.
-        Map<String, List<ScriptSchedule>> schedulesByTenant = new HashMap<>();
-        for (MachineFirstOnlineDispatch row : pending.subList(0, limit)) {
+        Map<String, List<MachineFirstOnlineDispatch>> rowsByTenant = batch.stream()
+                .collect(groupingBy(MachineFirstOnlineDispatch::getTenantId));
+
+        List<String> dispatchedRowIds = new ArrayList<>();
+        for (Map.Entry<String, List<MachineFirstOnlineDispatch>> e : rowsByTenant.entrySet()) {
             try {
-                List<ScriptSchedule> tenantSchedules = schedulesByTenant.computeIfAbsent(
-                        row.getTenantId(),
-                        tid -> scheduleRepository.findByTenantIdAndTriggerAndStatus(
-                                tid, ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE));
-                processOne(row, tenantSchedules);
-            } catch (Exception e) {
-                log.error("DEVICE_ONLINE dispatch failed: tenantId={} machineId={} (will retry next tick)",
-                        row.getTenantId(), row.getMachineId(), e);
+                dispatchedRowIds.addAll(processTenant(e.getKey(), e.getValue()));
+            } catch (Exception ex) {
+                log.error("DEVICE_ONLINE dispatch: tenant sweep failed, tenantId={} — retrying next tick",
+                        e.getKey(), ex);
+            }
+        }
+
+        if (!dispatchedRowIds.isEmpty()) {
+            long matched = dispatchRepository.markDispatchedIn(dispatchedRowIds, Instant.now());
+            if (matched != dispatchedRowIds.size()) {
+                log.error("DEVICE_ONLINE dispatch: bulk-mark mismatch — sent {} ids, matched {} (updateMulti degraded?)",
+                        dispatchedRowIds.size(), matched);
             }
         }
     }
 
-    private void processOne(MachineFirstOnlineDispatch row, List<ScriptSchedule> tenantSchedules) {
-        Machine machine = machineRepository.findByTenantIdAndMachineId(row.getTenantId(), row.getMachineId()).orElse(null);
+    private List<String> processTenant(String tenantId, List<MachineFirstOnlineDispatch> tenantRows) {
+        Set<String> machineIds = tenantRows.stream()
+                .map(MachineFirstOnlineDispatch::getMachineId).collect(toSet());
+
+        Map<String, Machine> machinesById = machineRepository
+                .findByTenantIdAndMachineIdIn(tenantId, machineIds).stream()
+                .collect(toMap(Machine::getMachineId, m -> m));
+        Map<String, Set<String>> assignedScheduleIdsByMachine = assignedRepository
+                .findByTenantIdAndMachineIdIn(tenantId, machineIds).stream()
+                .filter(a -> a.getScriptScheduleId() != null)
+                .collect(groupingBy(
+                        ScriptScheduleMachineAssigned::getMachineId,
+                        mapping(ScriptScheduleMachineAssigned::getScriptScheduleId, toSet())));
+        List<ScriptSchedule> tenantSchedules = scheduleRepository
+                .findByTenantIdAndTriggerAndStatus(tenantId, ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
+
+        List<String> dispatched = new ArrayList<>(tenantRows.size());
+        for (MachineFirstOnlineDispatch row : tenantRows) {
+            try {
+                processOne(row, machinesById, assignedScheduleIdsByMachine, tenantSchedules)
+                        .ifPresent(dispatched::add);
+            } catch (Exception ex) {
+                log.error("DEVICE_ONLINE dispatch failed: tenantId={} machineId={} (will retry next tick)",
+                        row.getTenantId(), row.getMachineId(), ex);
+            }
+        }
+        return dispatched;
+    }
+
+    private Optional<String> processOne(MachineFirstOnlineDispatch row,
+                                        Map<String, Machine> machinesById,
+                                        Map<String, Set<String>> assignedScheduleIdsByMachine,
+                                        List<ScriptSchedule> tenantSchedules) {
+        Machine machine = machinesById.get(row.getMachineId());
         if (machine == null) {
             log.warn("DEVICE_ONLINE dispatch: machine gone before first fire, tenantId={} machineId={} — leaving pending",
                     row.getTenantId(), row.getMachineId());
-            return;
+            return Optional.empty();
         }
         if (machine.getStatus() != DeviceStatus.ONLINE) {
-            return;
+            return Optional.empty();
         }
 
+        Set<String> assignedIds = assignedScheduleIdsByMachine.getOrDefault(row.getMachineId(), Set.of());
+        List<ScriptSchedule> due = dueSchedulesFor(machine, tenantSchedules, assignedIds);
+
         Instant now = Instant.now();
-        List<ScriptSchedule> due = dueSchedulesFor(machine, tenantSchedules);
-        List<String> targets = List.of(machine.getMachineId());
+        List<String> targets = List.of(row.getMachineId());
         for (ScriptSchedule schedule : due) {
             fireDispatcher.dispatch(schedule, targets, now);
         }
-        dispatchRepository.markDispatched(row.getId(), now);
         log.info("DEVICE_ONLINE dispatched: machineId={} tenantId={} schedules={}",
-                machine.getMachineId(), machine.getTenantId(), due.size());
+                row.getMachineId(), row.getTenantId(), due.size());
+        return Optional.of(row.getId());
     }
 
-    private List<ScriptSchedule> dueSchedulesFor(Machine machine, List<ScriptSchedule> tenantSchedules) {
+    private List<ScriptSchedule> dueSchedulesFor(Machine machine,
+                                                 List<ScriptSchedule> tenantSchedules,
+                                                 Set<String> assignedIds) {
         if (tenantSchedules.isEmpty()) {
             return List.of();
         }
-        Set<String> assignedIds = assignedScheduleIds(machine);
         return tenantSchedules.stream()
                 .filter(s -> s.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA
                         ? targetResolver.matchesCriteria(s, machine)
                         : assignedIds.contains(s.getId()))
                 .toList();
-    }
-
-    private Set<String> assignedScheduleIds(Machine machine) {
-        return assignedRepository
-                .findByTenantIdAndMachineId(machine.getTenantId(), machine.getMachineId()).stream()
-                .map(ScriptScheduleMachineAssigned::getScriptScheduleId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
     }
 }
