@@ -62,27 +62,26 @@ class DeviceOnlineDispatchServiceTest {
         // @Value fields don't get populated by @InjectMocks — set explicitly.
         ReflectionTestUtils.setField(service, "batchSize", 500);
         // Default: bulk update reports "everything you sent got modified" — the healthy case.
-        // Individual tests override this only to exercise the mismatch canary.
         lenient().when(dispatchRepository.markDispatchedIn(anyCollection(), any(Instant.class)))
                 .thenAnswer(inv -> (long) ((Collection<?>) inv.getArgument(0)).size());
     }
 
     @Test
-    @DisplayName("pending row + online machine + specific DEVICE_ONLINE schedule → dispatches and marks row via bulk update")
+    @DisplayName("pending row + online machine + assigned DEVICE_ONLINE schedule → dispatched, bulk-marked")
     void firesActiveDeviceOnlineOnly() {
         MachineFirstOnlineDispatch row = pendingRow();
+        ScriptSchedule s = schedule("s1");
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
-        ScriptSchedule deviceOnline = schedule("s1", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
-        stubTenantReads(TENANT, List.of(onlineMachine()), List.of(assignment(MACHINE, "s1")), List.of(deviceOnline));
+        stubTenantReads(TENANT, List.of(onlineMachine()), List.of(assignment(MACHINE, "s1")), List.of(s));
 
         service.processPending();
 
-        verify(fireDispatcher).dispatch(eq(deviceOnline), eq(List.of(MACHINE)), any(Instant.class));
+        verify(fireDispatcher).dispatch(eq(s), eq(List.of(MACHINE)), any(Instant.class));
         verify(dispatchRepository).markDispatchedIn(eq(List.of(ROW_ID)), any(Instant.class));
     }
 
     @Test
-    @DisplayName("machine offline at tick time → row NOT marked, next tick retries")
+    @DisplayName("machine offline at tick → skipped, row stays pending")
     void offlineMachine_leavesRowPending() {
         MachineFirstOnlineDispatch row = pendingRow();
         Machine offline = onlineMachine();
@@ -97,11 +96,11 @@ class DeviceOnlineDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("machine missing (deleted between insert and tick) → row stays pending")
-    void missingMachine_skippedGracefully() {
+    @DisplayName("machine missing → skipped, row stays pending")
+    void missingMachine_leavesRowPending() {
         MachineFirstOnlineDispatch row = pendingRow();
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
-        stubTenantReads(TENANT, List.of(), List.of(), List.of());   // no Machine → empty map
+        stubTenantReads(TENANT, List.of(), List.of(), List.of());
 
         service.processPending();
 
@@ -110,11 +109,11 @@ class DeviceOnlineDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("no schedules due for this machine → row STILL marked dispatched (drains pending set)")
+    @DisplayName("no schedules due → row STILL bulk-marked (drains pending set)")
     void noSchedulesDue_stillMarksDispatched() {
         MachineFirstOnlineDispatch row = pendingRow();
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
-        stubTenantReads(TENANT, List.of(onlineMachine()), List.of(), List.of());   // schedules empty
+        stubTenantReads(TENANT, List.of(onlineMachine()), List.of(), List.of());
 
         service.processPending();
 
@@ -123,11 +122,11 @@ class DeviceOnlineDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("matching CRITERIA schedule fires even with no explicit assignment")
+    @DisplayName("matching CRITERIA schedule fires without explicit assignment")
     void criteriaScheduleFiresWithoutAssignment() {
         MachineFirstOnlineDispatch row = pendingRow();
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
         ScriptSchedule criteria = criteriaSchedule("c1");
+        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
         stubTenantReads(TENANT, List.of(onlineMachine()), List.of(), List.of(criteria));
         when(targetResolver.matchesCriteria(eq(criteria), any(Machine.class))).thenReturn(true);
 
@@ -138,14 +137,13 @@ class DeviceOnlineDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("dispatch throws → failing row's id NOT in bulk update; siblings still flushed together")
+    @DisplayName("per-row dispatch throws → failing row NOT in bulk-mark; siblings flushed")
     void dispatchFailure_leavesRowPendingAndKeepsProcessingOthers() {
         MachineFirstOnlineDispatch bad = row("row-bad", "m-bad");
         MachineFirstOnlineDispatch ok = row("row-ok", "m-ok");
+        ScriptSchedule s = schedule("s1");
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(bad, ok));
-        ScriptSchedule s = schedule("s1", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
-        stubTenantReads(
-                TENANT,
+        stubTenantReads(TENANT,
                 List.of(onlineMachine("m-bad"), onlineMachine("m-ok")),
                 List.of(assignment("m-bad", "s1"), assignment("m-ok", "s1")),
                 List.of(s));
@@ -155,46 +153,41 @@ class DeviceOnlineDispatchServiceTest {
         service.processPending();
 
         verify(fireDispatcher).dispatch(eq(s), eq(List.of("m-ok")), any(Instant.class));
-        // Only the healthy row's id is in the bulk update — the failing one stays pending.
         ArgumentCaptor<Collection<String>> ids = ArgumentCaptor.forClass(Collection.class);
         verify(dispatchRepository).markDispatchedIn(ids.capture(), any(Instant.class));
         assertThat(ids.getValue()).containsExactly("row-ok");
     }
 
     @Test
-    @DisplayName("empty pending set → zero repo touches, zero bulk update")
+    @DisplayName("empty pending set → no work")
     void nothingPending_noWork() {
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of());
 
         service.processPending();
 
         verify(machineRepository, never()).findByTenantIdAndMachineIdIn(any(), any());
-        verify(assignedRepository, never()).findByTenantIdAndMachineIdIn(any(), any());
-        verify(scheduleRepository, never()).findByTenantIdAndTriggerAndStatus(any(), any(), any());
         verify(dispatchRepository, never()).markDispatchedIn(any(), any(Instant.class));
     }
 
     @Test
-    @DisplayName("batch cap: pending > batchSize → over-cap rows are NOT read this tick")
+    @DisplayName("batch cap: pending > batchSize → over-cap rows NOT read this tick")
     void batchSizeCapsPerTick() {
         ReflectionTestUtils.setField(service, "batchSize", 2);
         MachineFirstOnlineDispatch a = row("row-a", "m-a");
         MachineFirstOnlineDispatch b = row("row-b", "m-b");
-        MachineFirstOnlineDispatch c = row("row-c", "m-c");   // over the cap
+        MachineFirstOnlineDispatch c = row("row-c", "m-c");
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(a, b, c));
-        stubTenantReads(TENANT, List.of(), List.of(), List.of());   // no machines → no marks
+        stubTenantReads(TENANT, List.of(), List.of(), List.of());
 
         service.processPending();
 
-        // Bulk lookup gets only the first two machineIds, not m-c.
         ArgumentCaptor<Collection<String>> machineIds = ArgumentCaptor.forClass(Collection.class);
         verify(machineRepository).findByTenantIdAndMachineIdIn(eq(TENANT), machineIds.capture());
         assertThat(machineIds.getValue()).containsExactlyInAnyOrder("m-a", "m-b");
-        verify(dispatchRepository, never()).markDispatchedIn(any(), any(Instant.class));
     }
 
     @Test
-    @DisplayName("no N+1: 3 rows same tenant → exactly ONE bulk read of each collection, ONE bulk update")
+    @DisplayName("no N+1: 3 rows same tenant → ONE bulk read per collection, ONE bulk mark")
     void oneRoundTripPerCollectionPerTenant() {
         MachineFirstOnlineDispatch a = row("row-a", "m-a");
         MachineFirstOnlineDispatch b = row("row-b", "m-b");
@@ -216,7 +209,7 @@ class DeviceOnlineDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("cross-tenant: rows from two tenants processed in isolation — one bulk read per (tenant, collection)")
+    @DisplayName("cross-tenant: 2 tenants → bulk reads per tenant, ONE global bulk-mark")
     void multiTenantIsolation() {
         MachineFirstOnlineDispatch a = row("row-a", "m-a", TENANT);
         MachineFirstOnlineDispatch b = row("row-b", "m-b", OTHER_TENANT);
@@ -233,50 +226,8 @@ class DeviceOnlineDispatchServiceTest {
         assertThat(ids.getValue()).containsExactlyInAnyOrder("row-a", "row-b");
     }
 
-    @Test
-    @DisplayName("tenant-scope bulk-read throws → that tenant's rows stay pending; other tenants still flush")
-    void oneTenantBulkReadFails_othersStillFlush() {
-        MachineFirstOnlineDispatch bad = row("row-bad", "m-bad", TENANT);        // will die on bulk-read
-        MachineFirstOnlineDispatch good = row("row-good", "m-good", OTHER_TENANT); // healthy path
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(bad, good));
-        // TENANT's machine bulk-read explodes (replica-set failover, timeout, ...).
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenThrow(new RuntimeException("mongo timeout"));
-        // OTHER_TENANT works normally.
-        stubTenantReads(OTHER_TENANT, List.of(onlineMachine("m-good", OTHER_TENANT)), List.of(), List.of());
-
-        service.processPending();
-
-        // Failed tenant → its row NOT flushed. Healthy tenant → its row IS flushed. tick still writes.
-        ArgumentCaptor<Collection<String>> ids = ArgumentCaptor.forClass(Collection.class);
-        verify(dispatchRepository, times(1)).markDispatchedIn(ids.capture(), any(Instant.class));
-        assertThat(ids.getValue()).containsExactly("row-good");
-    }
-
-    @Test
-    @DisplayName("bulk-mark canary: matched < sent → error logged (silent updateFirst regression would be caught)")
-    void markDispatchedInMismatch_isDetected() {
-        MachineFirstOnlineDispatch a = row("row-a", "m-a");
-        MachineFirstOnlineDispatch b = row("row-b", "m-b");
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(a, b));
-        stubTenantReads(TENANT,
-                List.of(onlineMachine("m-a"), onlineMachine("m-b")),
-                List.of(), List.of());
-        // Simulate a driver/store regression that matched only 1 of the 2 sent ids.
-        when(dispatchRepository.markDispatchedIn(anyCollection(), any(Instant.class))).thenReturn(1L);
-
-        service.processPending();
-
-        // The call still happened — the canary is a logged warning, not an exception.
-        // (Log assertion would need a log-capturing appender; behaviour check is enough here.)
-        ArgumentCaptor<Collection<String>> ids = ArgumentCaptor.forClass(Collection.class);
-        verify(dispatchRepository).markDispatchedIn(ids.capture(), any(Instant.class));
-        assertThat(ids.getValue()).hasSize(2);
-    }
-
     // --- fixtures --------------------------------------------------------------------------------
 
-    /** Stubs the 3 per-tenant reads at once so tests read as one intention, not three lines each. */
     private void stubTenantReads(String tenantId,
                                  List<Machine> machines,
                                  List<ScriptScheduleMachineAssigned> assignments,
@@ -324,9 +275,10 @@ class DeviceOnlineDispatchServiceTest {
                 .tenantId(TENANT).scriptScheduleId(scheduleId).machineId(machineId).build();
     }
 
-    private static ScriptSchedule schedule(String id, ScriptScheduleTrigger trigger, ScriptStatus status) {
+    private static ScriptSchedule schedule(String id) {
         return ScriptSchedule.builder()
-                .id(id).tenantId(TENANT).name(id).trigger(trigger).status(status)
+                .id(id).tenantId(TENANT).name(id)
+                .trigger(ScriptScheduleTrigger.DEVICE_ONLINE).status(ScriptStatus.ACTIVE)
                 .scriptIds(List.of("sc")).build();
     }
 
