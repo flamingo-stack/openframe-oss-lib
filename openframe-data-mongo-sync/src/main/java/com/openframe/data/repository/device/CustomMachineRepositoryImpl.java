@@ -4,12 +4,11 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
-import com.openframe.data.document.rmm.OsType;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
@@ -24,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 @Slf4j
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
@@ -44,6 +44,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             "_id",
             "hostname",
             "displayName",
+            "nickname",
             "status",
             "lastSeen"
     );
@@ -170,9 +171,16 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
         Object cursorSortValue = getSortFieldValue(cursorDoc, sortField);
         if (cursorSortValue == null) {
-            query.addCriteria(isDesc ?
-                Criteria.where(ID_FIELD).lt(cursorId) :
-                Criteria.where(ID_FIELD).gt(cursorId));
+            if (isDesc) {
+                // Trailing null group: only the remaining null rows, ordered by _id descending.
+                query.addCriteria(Criteria.where(sortField).is(null).and(ID_FIELD).lt(cursorId));
+            } else {
+                // Leading null group: remaining null rows (by _id), then EVERY non-null row.
+                addOrCriteria(query,
+                        Criteria.where(sortField).is(null).and(ID_FIELD).gt(cursorId),
+                        Criteria.where(sortField).ne(null)
+                );
+            }
             return;
         }
 
@@ -180,20 +188,44 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             Criteria.where(sortField).lt(cursorSortValue) :
             Criteria.where(sortField).gt(cursorSortValue);
 
-        Criteria sameSortValuePastId = new Criteria().andOperator(
-            Criteria.where(sortField).is(cursorSortValue),
-            isDesc ? Criteria.where(ID_FIELD).lt(cursorId) : Criteria.where(ID_FIELD).gt(cursorId)
-        );
+        Criteria sameSortValuePastId = isDesc ?
+            Criteria.where(sortField).is(cursorSortValue).and(ID_FIELD).lt(cursorId) :
+            Criteria.where(sortField).is(cursorSortValue).and(ID_FIELD).gt(cursorId);
 
-        query.addCriteria(Criteria.where("$or").is(
-                List.of(pastSortValue.getCriteriaObject(), sameSortValuePastId.getCriteriaObject())
-        ));
+        if (isDesc) {
+            // Descending: null-valued rows sort AFTER every non-null value, so they belong on the
+            // pages that follow a non-null cursor — include them or the trailing nulls are dropped.
+            addOrCriteria(query,
+                    pastSortValue,
+                    sameSortValuePastId,
+                    Criteria.where(sortField).is(null)
+            );
+        } else {
+            addOrCriteria(query,
+                    pastSortValue,
+                    sameSortValuePastId
+            );
+        }
+    }
+
+    /**
+     * Adds a top-level {@code $or} to the query. The base device query already occupies the
+     * single null-key slot with its {@code $and}, and {@link Query#addCriteria} rejects a
+     * second key-less criteria — so the alternatives are pre-serialised under an explicit
+     * {@code $or} key instead of {@code new Criteria().orOperator(...)}.
+     */
+    private static void addOrCriteria(Query query, Criteria... alternatives) {
+        List<Document> branches = Stream.of(alternatives)
+                .map(Criteria::getCriteriaObject)
+                .toList();
+        query.addCriteria(Criteria.where("$or").is(branches));
     }
 
     private Object getSortFieldValue(Machine machine, String sortField) {
         return switch (sortField) {
             case "hostname" -> machine.getHostname();
             case "displayName" -> machine.getDisplayName();
+            case "nickname" -> machine.getNickname();
             case "status" -> machine.getStatus() != null ? machine.getStatus().name() : null;
             case "lastSeen" -> machine.getLastSeen();
             default -> null;
@@ -228,7 +260,8 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     @Override
-    public Map<String, Integer> facet(String tenantId, MachineQueryFilter filter, String search, DeviceFacetDimension dimension) {
+    public Map<String, Integer> facet(String tenantId, MachineQueryFilter filter, String search,
+                                      DeviceFacetDimension dimension) {
         String field = dimension.fieldName();
         Query query = withTenant(tenantId, buildDeviceQuery(filter, search, field));
         Aggregation agg = Aggregation.newAggregation(
@@ -313,6 +346,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             criteriaList.add(new Criteria().orOperator(
                     Criteria.where("hostname").regex(quoted, "i"),
                     Criteria.where("displayName").regex(quoted, "i"),
+                    Criteria.where("nickname").regex(quoted, "i"),
                     Criteria.where("ip").regex(quoted, "i"),
                     Criteria.where("serialNumber").regex(quoted, "i"),
                     Criteria.where("manufacturer").regex(quoted, "i"),

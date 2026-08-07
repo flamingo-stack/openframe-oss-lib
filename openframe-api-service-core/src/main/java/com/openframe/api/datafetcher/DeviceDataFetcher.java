@@ -1,15 +1,19 @@
 package com.openframe.api.datafetcher;
 
-import com.netflix.graphql.dgs.*;
-import graphql.relay.Relay;
+import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsData;
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
+import com.netflix.graphql.dgs.DgsMutation;
+import com.netflix.graphql.dgs.DgsQuery;
+import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
-import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.device.DeviceFilters;
-import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.DeviceFilterService;
@@ -21,6 +25,7 @@ import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
+import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -82,6 +87,13 @@ public class DeviceDataFetcher {
     public Machine device(@InputArgument @NotBlank String machineId) {
         log.debug("Fetching device with machineId: {}", machineId);
         return deviceService.findByMachineId(machineId).orElse(null);
+    }
+
+    @DgsMutation
+    public Machine updateDeviceNickname(@InputArgument @NotBlank String machineId,
+                                        @InputArgument String nickname) {
+        log.debug("Updating nickname for machineId: {}", machineId);
+        return deviceService.updateNickname(machineId, nickname);
     }
 
     @DgsData(parentType = "Machine", field = "id")

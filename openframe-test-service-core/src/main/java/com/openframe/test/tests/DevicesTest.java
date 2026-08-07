@@ -200,8 +200,10 @@ public class DevicesTest extends BaseTest {
     @Test
     @DisplayName("Archive device")
     public void testArchiveDevice() {
-        List<Machine> devices = DeviceApi.getDevices(offlineDevicesFilter());
-        assertThat(devices).as("Expected at least one OFFLINE device to archive").isNotEmpty();
+        List<Machine> devices = DeviceApi.getDevices(pipelineScoped(offlineDevicesFilter()));
+        assertThat(devices)
+                .as("Expected at least one OFFLINE device to archive%s", orgSuffix())
+                .isNotEmpty();
         Machine device = devices.getLast();
         DeviceApi.archiveDevice(device);
         List<String> ids = DeviceApi.getDeviceIds(listedStatusesDevicesFilter());
@@ -213,13 +215,16 @@ public class DevicesTest extends BaseTest {
     @Test
     @DisplayName("Delete device")
     public void testDeleteDevice() {
-        // Archive (@Order(1)) moves the single enrolled device to ARCHIVED, so it no longer appears
+        // Archive (@Order(1)) moves this pipeline's enrolled device to ARCHIVED, so it no longer appears
         // in the OFFLINE listing. Delete operates on that archived device.
-        List<Machine> devices = DeviceApi.getDevices(archivedDevicesFilter());
-        assertThat(devices).as("Expected at least one ARCHIVED device to delete").isNotEmpty();
+        List<Machine> devices = DeviceApi.getDevices(pipelineScoped(archivedDevicesFilter()));
+        assertThat(devices)
+                .as("Expected at least one ARCHIVED device to delete%s", orgSuffix())
+                .isNotEmpty();
         Machine device = devices.getLast();
         DeviceApi.deleteDevice(device);
         List<String> ids = DeviceApi.getDeviceIds(listedStatusesDevicesFilter());
         assertThat(ids).as("Deleted device should not be in listed devices").doesNotContain(device.getMachineId());
     }
+
 }
