@@ -65,18 +65,17 @@ class DeviceOnlineDispatchServiceTest {
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
         when(machineRepository.findByTenantIdAndMachineId(TENANT, MACHINE)).thenReturn(Optional.of(onlineMachine()));
         when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE))
-                .thenReturn(List.of(assignment("s1"), assignment("s2"), assignment("s3")));
+                .thenReturn(List.of(assignment("s1")));
         ScriptSchedule deviceOnline = schedule("s1", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
-        ScriptSchedule wrongTrigger = schedule("s2", ScriptScheduleTrigger.DATE_TIME, ScriptStatus.ACTIVE);
-        ScriptSchedule archived = schedule("s3", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ARCHIVED);
-        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(deviceOnline, wrongTrigger, archived));
+        when(scheduleRepository.findByTenantIdAndIdInAndSelectionModeNotAndTriggerAndStatus(
+                eq(TENANT), any(),
+                eq(ScheduleDeviceSelectionMode.CRITERIA),
+                eq(ScriptScheduleTrigger.DEVICE_ONLINE), eq(ScriptStatus.ACTIVE)))
+                .thenReturn(List.of(deviceOnline));
 
         service.processPending();
 
         verify(fireDispatcher).dispatch(eq(deviceOnline), eq(List.of(MACHINE)), any(Instant.class));
-        verify(fireDispatcher, never()).dispatch(eq(wrongTrigger), any(), any(Instant.class));
-        verify(fireDispatcher, never()).dispatch(eq(archived), any(), any(Instant.class));
         verify(dispatchRepository).markDispatched(eq(ROW_ID), any(Instant.class));
     }
 
@@ -156,7 +155,11 @@ class DeviceOnlineDispatchServiceTest {
         lenient().when(assignedRepository.findByTenantIdAndMachineId(eq(TENANT), any()))
                 .thenReturn(List.of(assignment("s1")));
         ScriptSchedule s = schedule("s1", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
-        lenient().when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(s));
+        lenient().when(scheduleRepository.findByTenantIdAndIdInAndSelectionModeNotAndTriggerAndStatus(
+                eq(TENANT), any(),
+                eq(ScheduleDeviceSelectionMode.CRITERIA),
+                eq(ScriptScheduleTrigger.DEVICE_ONLINE), eq(ScriptStatus.ACTIVE)))
+                .thenReturn(List.of(s));
         doThrow(new RuntimeException("nats down"))
                 .when(fireDispatcher).dispatch(eq(s), eq(List.of("m-bad")), any(Instant.class));
 

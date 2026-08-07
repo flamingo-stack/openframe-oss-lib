@@ -68,12 +68,12 @@ public class DeviceOnlineDispatchService {
             return;
         }
 
-        Map<String, ScriptSchedule> due = collectDueSchedules(machine);
         Instant now = Instant.now();
+        Map<String, ScriptSchedule> due = collectDueSchedules(machine);
         for (ScriptSchedule schedule : due.values()) {
             fireDispatcher.dispatch(schedule, List.of(machine.getMachineId()), now);
         }
-        dispatchRepository.markDispatched(row.getId(), Instant.now());
+        dispatchRepository.markDispatched(row.getId(), now);
         log.info("DEVICE_ONLINE dispatched: machineId={} tenantId={} schedules={}",
                 machine.getMachineId(), machine.getTenantId(), due.size());
     }
@@ -99,11 +99,10 @@ public class DeviceOnlineDispatchService {
         if (scheduleIds.isEmpty()) {
             return List.of();
         }
-        return scheduleRepository.findByTenantIdAndIdIn(tenantId, scheduleIds).stream()
-                .filter(s -> s.getSelectionMode() != ScheduleDeviceSelectionMode.CRITERIA)
-                .filter(s -> s.getTrigger() == ScriptScheduleTrigger.DEVICE_ONLINE)
-                .filter(s -> s.getStatus() == ScriptStatus.ACTIVE)
-                .toList();
+        return scheduleRepository.findByTenantIdAndIdInAndSelectionModeNotAndTriggerAndStatus(
+                tenantId, scheduleIds,
+                ScheduleDeviceSelectionMode.CRITERIA,
+                ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
     }
 
     private List<ScriptSchedule> criteriaDueSchedules(String tenantId, Machine machine) {

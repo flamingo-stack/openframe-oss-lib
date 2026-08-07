@@ -27,6 +27,11 @@ public interface ScriptScheduleRepository
 
     List<ScriptSchedule> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
 
+    List<ScriptSchedule> findByTenantIdAndIdInAndSelectionModeNotAndTriggerAndStatus(
+            String tenantId, Collection<String> ids,
+            ScheduleDeviceSelectionMode selectionModeNot,
+            ScriptScheduleTrigger trigger, ScriptStatus status);
+
     Optional<ScriptSchedule> findByTenantIdAndName(String tenantId, String name);
 
     boolean existsByTenantIdAndNameAndStatusIn(String tenantId, String name, Collection<ScriptStatus> statuses);
