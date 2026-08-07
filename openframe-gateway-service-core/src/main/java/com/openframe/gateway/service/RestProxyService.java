@@ -37,16 +37,11 @@ public class RestProxyService {
 
     private static final AttributeKey<URI> TARGET_URI_KEY = AttributeKey.valueOf("target_uri");
 
-    /**
-     * Upstream response headers relayed to the caller, lower-cased. Allowlist, not a hop-by-hop
-     * denylist: this proxy fronts many tenants, so {@code Set-Cookie} (lands on the gateway's own
-     * domain) and {@code Access-Control-*} (silently replaces this gateway's CorsWebFilter, since
-     * the result handler merges with putAll) must not leak through. Length headers are omitted —
-     * the body is re-encoded here.
-     */
     private static final Set<String> FORWARDED_RESPONSE_HEADERS = Set.of(
             "content-type",
             "content-disposition",
+            "location",
+            "retry-after",
             "x-fleet-capabilities");
 
     private final ReactiveIntegratedToolRepository toolRepository;
@@ -208,11 +203,6 @@ public class RestProxyService {
         Mono<ResponseEntity<String>> monoResponseEntity;
         try {
             monoResponseEntity = requestSpec
-                    // exchangeToMono, not retrieve(): a proxy relays the upstream status, headers
-                    // and body verbatim. retrieve() turns 4xx/5xx into exceptions, and bodyToMono
-                    // emits NOTHING for an empty body — which the callers' switchIfEmpty then
-                    // reported as 404 "Tool not found". Fleet's HEAD /api/fleet/orbit/ping is
-                    // header-only by design, so it 404'd on every poll.
                     .exchangeToMono(response -> response.toEntity(String.class))
                     .timeout(Duration.ofSeconds(60))
                     .map(upstream -> ResponseEntity.status(upstream.getStatusCode())
@@ -237,7 +227,6 @@ public class RestProxyService {
         });
     }
 
-    /** Package-private so tests can stub the upstream exchange. */
     WebClient webClient(URI targetUri) {
         return WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(buildHttpClient(targetUri)))
@@ -272,7 +261,6 @@ public class RestProxyService {
                 });
     }
 
-    /** Transport failure only — upstream HTTP statuses are relayed as ordinary responses. */
     private Mono<ResponseEntity<String>> buildErrorResponse(Throwable e) {
         return Mono.just(ResponseEntity.status(500).body(e.getMessage()));
     }

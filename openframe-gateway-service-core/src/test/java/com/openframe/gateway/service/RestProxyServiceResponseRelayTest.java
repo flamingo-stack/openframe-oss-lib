@@ -27,12 +27,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
-/**
- * The agent proxy must relay the upstream response as-is. Regression cover for orbit's
- * {@code HEAD /api/fleet/orbit/ping}, which Fleet answers 200 with a capabilities header and no
- * body: the old {@code bodyToMono(String.class)} emitted nothing there, so every poll surfaced as
- * a 404 "Tool not found".
- */
 class RestProxyServiceResponseRelayTest {
 
     private static final String FLEET = "fleetmdm-server";
@@ -61,7 +55,6 @@ class RestProxyServiceResponseRelayTest {
                 new FleetEndpointAllowlist(props)));
     }
 
-    /** Stubs the upstream exchange, bypassing the real connector. */
     private void upstreamResponds(ClientResponse response) {
         WebClient stub = WebClient.builder()
                 .exchangeFunction(request -> Mono.just(response))
@@ -116,13 +109,39 @@ class RestProxyServiceResponseRelayTest {
         assertThat(response.getBody()).isEqualTo("{\"error\":\"gone\"}");
     }
 
-    /** An empty-bodied upstream error used to collapse into the same bogus 404. */
     @Test
     void relaysEmptyBodiedUpstreamError() {
         toolExists(true);
         upstreamResponds(ClientResponse.create(HttpStatus.UNAUTHORIZED).build());
 
         assertThat(proxyPing().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void relaysRedirectLocation() {
+        toolExists(true);
+        upstreamResponds(ClientResponse.create(HttpStatus.TEMPORARY_REDIRECT)
+                .header(HttpHeaders.LOCATION, "https://storage.example/package.pkg")
+                .build());
+
+        ResponseEntity<String> response = proxyPing();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TEMPORARY_REDIRECT);
+        assertThat(response.getHeaders().getFirst(HttpHeaders.LOCATION))
+                .isEqualTo("https://storage.example/package.pkg");
+    }
+
+    @Test
+    void relaysRetryAfterOnThrottledUpstream() {
+        toolExists(true);
+        upstreamResponds(ClientResponse.create(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, "120")
+                .build());
+
+        ResponseEntity<String> response = proxyPing();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("120");
     }
 
     @Test
@@ -142,7 +161,6 @@ class RestProxyServiceResponseRelayTest {
         assertThat(headers.getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
     }
 
-    /** A genuinely missing tool must still 404 — that path moved off the response chain. */
     @Test
     void stillReportsMissingTool() {
         when(toolRepository.findByKey(FLEET)).thenReturn(Mono.empty());
