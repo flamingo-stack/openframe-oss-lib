@@ -25,6 +25,8 @@ import static org.mockito.Mockito.when;
 
 class CustomMachineRepositoryImplTest {
 
+    private static final String TENANT_ID = "tenant-1";
+
     private final CustomMachineRepositoryImpl repo = new CustomMachineRepositoryImpl(mock(TenantAwareMongoTemplate.class));
 
     private static Document statusClause(Document queryObject) {
@@ -193,7 +195,8 @@ class CustomMachineRepositoryImplTest {
         cursorDoc.setNickname(cursorNickname);
         when(tpl.findById(any(ObjectId.class), eq(Machine.class))).thenReturn(cursorDoc);
         when(tpl.find(any(Query.class), eq(Machine.class))).thenReturn(List.of());
-        r.findMachinesWithCursor(null, null, new ObjectId().toHexString(), 10, "nickname", asc ? "ASC" : "DESC");
+        r.findMachinesWithCursor(TENANT_ID, null, null, new ObjectId().toHexString(), 10,
+                "nickname", asc ? "ASC" : "DESC");
         ArgumentCaptor<Query> qc = ArgumentCaptor.forClass(Query.class);
         verify(tpl).find(qc.capture(), eq(Machine.class));
         return qc.getValue().getQueryObject();

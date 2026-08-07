@@ -225,6 +225,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return switch (sortField) {
             case "hostname" -> machine.getHostname();
             case "displayName" -> machine.getDisplayName();
+            case "nickname" -> machine.getNickname();
             case "status" -> machine.getStatus() != null ? machine.getStatus().name() : null;
             case "lastSeen" -> machine.getLastSeen();
             default -> null;
