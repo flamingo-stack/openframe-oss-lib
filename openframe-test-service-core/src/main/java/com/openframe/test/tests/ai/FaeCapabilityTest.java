@@ -80,6 +80,7 @@ public class FaeCapabilityTest extends FaeBaseTest {
         log.info("Seeded ticket #{} ({}) for the capability cases", seededTicket.getTicketNumber(), seededTicket.getId());
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Fae cannot create a ticket")
     public void testCannotCreateTicket() {
