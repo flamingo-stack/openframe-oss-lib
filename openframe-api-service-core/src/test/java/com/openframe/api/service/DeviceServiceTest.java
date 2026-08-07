@@ -2,8 +2,8 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.api.exception.DeviceNotFoundException;
+import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -11,6 +11,7 @@ import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
@@ -33,13 +34,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DeviceServiceTest {
+
+    private static final String TENANT_ID = "tenant-1";
 
     @Mock private MachineRepository machineRepository;
     @Mock private MachineWriter machineWriter;
@@ -48,22 +50,25 @@ class DeviceServiceTest {
     @Mock private DeviceStatusProcessor deviceStatusProcessor;
     @Mock private ScriptScheduleDeviceService scriptScheduleDeviceService;
     @Mock private DeviceFilterOptionMapper deviceFilterOptionMapper;
+    @Mock
+    private TenantIdProvider tenantIdProvider;
 
     private DeviceService service() {
         DeviceService s = new DeviceService(machineRepository, machineWriter, tagRepository, tagAssignmentRepository,
-                deviceStatusProcessor, scriptScheduleDeviceService, deviceFilterOptionMapper);
-        lenient().when(machineRepository.countMachines(any(MachineQueryFilter.class), any())).thenReturn(0L);
-        lenient().when(machineRepository.findMachinesWithCursor(any(MachineQueryFilter.class), any(),
+                deviceStatusProcessor, scriptScheduleDeviceService, deviceFilterOptionMapper, tenantIdProvider);
+        lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        lenient().when(machineRepository.countMachines(any(), any(MachineQueryFilter.class), any())).thenReturn(0L);
+        lenient().when(machineRepository.findMachinesWithCursor(any(), any(MachineQueryFilter.class), any(),
                 any(), anyInt(), any(), any())).thenReturn(List.of());
-        lenient().when(machineRepository.findAvailableForScheduleWithCursor(any(MachineQueryFilter.class), any(),
+        lenient().when(machineRepository.findAvailableForScheduleWithCursor(any(), any(MachineQueryFilter.class), any(),
                 any(), any(), anyInt())).thenReturn(List.of());
-        lenient().when(machineRepository.findMachineIds(any(MachineQueryFilter.class), any())).thenReturn(List.of());
+        lenient().when(machineRepository.findMachineIds(any(), any(MachineQueryFilter.class), any())).thenReturn(List.of());
         return s;
     }
 
     private MachineQueryFilter capturedFilter() {
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
-        verify(machineRepository).countMachines(captor.capture(), any());
+        verify(machineRepository).countMachines(any(), captor.capture(), any());
         return captor.getValue();
     }
 
@@ -116,14 +121,14 @@ class DeviceServiceTest {
     @DisplayName("findDeviceIdsForPlatforms: delegates to repo.findMachineIds with a filter carrying platformNames")
     void findDeviceIdsForPlatforms_returnsIds() {
         DeviceService s = service();
-        when(machineRepository.findMachineIds(any(MachineQueryFilter.class), any()))
+        when(machineRepository.findMachineIds(any(), any(MachineQueryFilter.class), any()))
                 .thenReturn(List.of("m1", "m2"));
 
         List<String> ids = s.findDeviceIdsForPlatforms(List.of("MAC_OS"), null, null);
 
         assertThat(ids).containsExactly("m1", "m2");
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
-        verify(machineRepository).findMachineIds(captor.capture(), any());
+        verify(machineRepository).findMachineIds(any(), captor.capture(), any());
         assertThat(captor.getValue().getPlatformNames()).containsExactly("MAC_OS");
     }
 
@@ -136,7 +141,7 @@ class DeviceServiceTest {
         service().findDeviceIdsForPlatforms(List.of("MAC_OS"), filter, null);
 
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
-        verify(machineRepository).findMachineIds(captor.capture(), any());
+        verify(machineRepository).findMachineIds(any(), captor.capture(), any());
         assertThat(captor.getValue().getStatuses()).containsExactly(DeviceStatus.DELETED.name());
     }
 
@@ -144,7 +149,7 @@ class DeviceServiceTest {
     @DisplayName("findAssignedDeviceIds: empty input → empty, no query issued")
     void findAssignedDeviceIds_empty() {
         assertThat(service().findAssignedDeviceIds(List.of(), null, null)).isEmpty();
-        verify(machineRepository, never()).findMachineIds(any(MachineQueryFilter.class), any());
+        verify(machineRepository, never()).findMachineIds(any(), any(MachineQueryFilter.class), any());
     }
 
     @Test
@@ -157,14 +162,14 @@ class DeviceServiceTest {
         // blank search is also treated as "no search"
         assertThat(s.findAssignedDeviceIds(List.of("m1"), null, "   ")).containsExactly("m1");
 
-        verify(machineRepository, never()).findMachineIds(any(MachineQueryFilter.class), any());
+        verify(machineRepository, never()).findMachineIds(any(), any(MachineQueryFilter.class), any());
     }
 
     @Test
     @DisplayName("findAssignedDeviceIds: WITH a filter narrows the assigned ids via the Machine query — restrictToMachineIds carries the assigned set")
     void findAssignedDeviceIds_withFilter_queries() {
         DeviceService s = service();
-        when(machineRepository.findMachineIds(any(MachineQueryFilter.class), any()))
+        when(machineRepository.findMachineIds(any(), any(MachineQueryFilter.class), any()))
                 .thenReturn(List.of("m1"));
 
         DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
@@ -173,7 +178,7 @@ class DeviceServiceTest {
         assertThat(s.findAssignedDeviceIds(List.of("m1", "m2"), filter, null))
                 .containsExactly("m1");
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
-        verify(machineRepository).findMachineIds(captor.capture(), any());
+        verify(machineRepository).findMachineIds(any(), captor.capture(), any());
         assertThat(captor.getValue().getRestrictToMachineIds()).containsExactlyInAnyOrder("m1", "m2");
         assertThat(captor.getValue().getStatuses()).containsExactly(DeviceStatus.ONLINE.name());
     }

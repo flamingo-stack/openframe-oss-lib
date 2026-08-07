@@ -28,6 +28,9 @@ import static org.junit.platform.launcher.TagFilter.includeTags;
 @Slf4j
 public class TestRunner {
 
+    /** One test at a time — the historical behaviour, and the default for every existing caller. */
+    public static final int SEQUENTIAL = 1;
+
     private final TestRunnerConfig config;
     private final Launcher launcher;
 
@@ -54,7 +57,29 @@ public class TestRunner {
     }
 
     public TestPlan discover(String[] includeTags, String[] excludeTags) {
-        return discover(buildRequest(includeTags, excludeTags));
+        return discover(includeTags, excludeTags, SEQUENTIAL);
+    }
+
+    /**
+     * Discovers a plan that runs up to {@code parallelism} test <em>classes</em> at once.
+     *
+     * <p>Methods within a class still run one at a time, on the class's own thread, so a class whose
+     * cases build on each other (create then find) is unaffected — and {@code @BeforeAll} runs on the
+     * same thread its tests will use, which the ThreadLocal auth session depends on.
+     *
+     * <p>Worth it where per-test latency dominates and the work is I/O-bound: the AI assistant suite
+     * spends ~30s per case waiting on a model, so it is almost entirely idle. Speedup is capped by the
+     * slowest single class, not by the thread count.
+     *
+     * <p><b>Only for suites whose cases are isolated from each other.</b> The AI cases qualify — every
+     * artifact they create is namespaced by {@link com.openframe.test.helpers.ai.RunId} and each holds
+     * its own {@code AgentSession} — but a suite sharing fixtures or driving one browser does not.
+     * Callers opt in per phase rather than this being switched on globally.
+     *
+     * @param parallelism max concurrent classes; {@link #SEQUENTIAL} (or less) keeps the old behaviour
+     */
+    public TestPlan discover(String[] includeTags, String[] excludeTags, int parallelism) {
+        return discover(buildRequest(includeTags, excludeTags, parallelism));
     }
 
     public TestPlan discover(LauncherDiscoveryRequest request) {
@@ -62,12 +87,13 @@ public class TestRunner {
     }
 
     private LauncherDiscoveryRequest buildRequest(String... tags) {
-        return buildRequest(tags, new String[0]);
+        return buildRequest(tags, new String[0], SEQUENTIAL);
     }
 
-    private LauncherDiscoveryRequest buildRequest(String[] include, String[] exclude) {
+    private LauncherDiscoveryRequest buildRequest(String[] include, String[] exclude, int parallelism) {
         List<ClassSelector> classSelectors = discoverTestClasses();
         LauncherDiscoveryRequestBuilder builder = LauncherDiscoveryRequestBuilder.request();
+        applyParallelism(builder, parallelism);
         if (include != null && include.length > 0) {
             builder.filters(includeTags(include));
         }
@@ -83,6 +109,30 @@ public class TestRunner {
             builder.selectors(selectPackage(this.config.getTestPackage()));
         }
         return builder.build();
+    }
+
+    /**
+     * Sets the parallel-execution parameters on the discovery request. They are read again at
+     * execution time from the plan this request produces, so {@code run(TestPlan)} honours them —
+     * discovery and execution do not have to share a call.
+     *
+     * <p>{@code mode.default=same_thread} with {@code mode.classes.default=concurrent} is the pairing
+     * that gives concurrency between classes and none inside one. Leaving {@code mode.default} at its
+     * {@code same_thread} default is not enough on its own: without setting both explicitly the
+     * intent is invisible to the next reader, and flipping either one alone changes which of the two
+     * levels runs concurrently.
+     */
+    private void applyParallelism(LauncherDiscoveryRequestBuilder builder, int parallelism) {
+        if (parallelism <= SEQUENTIAL) {
+            return;
+        }
+        log.info("Parallel execution enabled: up to {} test classes at once", parallelism);
+        builder.configurationParameter("junit.jupiter.execution.parallel.enabled", "true")
+                .configurationParameter("junit.jupiter.execution.parallel.mode.default", "same_thread")
+                .configurationParameter("junit.jupiter.execution.parallel.mode.classes.default", "concurrent")
+                .configurationParameter("junit.jupiter.execution.parallel.config.strategy", "fixed")
+                .configurationParameter("junit.jupiter.execution.parallel.config.fixed.parallelism",
+                        String.valueOf(parallelism));
     }
 
     private List<ClassSelector> discoverTestClasses() {

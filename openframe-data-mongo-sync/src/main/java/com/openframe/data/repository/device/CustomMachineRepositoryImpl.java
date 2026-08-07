@@ -4,7 +4,6 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
-import com.openframe.data.document.rmm.OsType;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -23,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 @Slf4j
@@ -50,10 +50,16 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     );
     private static final String DEFAULT_SORT_FIELD = "_id";
 
+    private static final String TENANT_ID_FIELD = "tenantId";
+
     private final MongoTemplate mongoTemplate;
 
     public CustomMachineRepositoryImpl(MongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
+    }
+
+    private static Query withTenant(String tenantId, Query query) {
+        return query.addCriteria(Criteria.where(TENANT_ID_FIELD).is(tenantId));
     }
 
     private List<Machine> findMachinesWithCursor(Query query, String cursor, int limit,
@@ -88,9 +94,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         List<String> assigned = assignedMachineIds == null ? List.of() : new ArrayList<>(assignedMachineIds);
 
         List<AggregationOperation> ops = new ArrayList<>();
-        // $match: the platform/filter/search predicate already assembled in the Query.
-        Document match = baseQuery.getQueryObject();
-        ops.add(ctx -> new Document("$match", match));
+        // $match: the tenant + platform/filter/search predicate already assembled in the Query
+        // (tenantId is added by the caller via withTenant(...) — aggregate() bypasses the
+        // wrapping template's auto-scope, so we can't rely on that here).
+        ops.add(ctx -> new Document("$match", baseQuery.getQueryObject()));
         // $addFields: bucket 0..3 = (assigned ? 0 : 2) + (ONLINE ? 0 : 1).
         ops.add(bucketAddFieldsStage(assigned));
         // Keyset cursor over (bucket, _id), then the matching sort.
@@ -163,10 +170,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         }
 
         Object cursorSortValue = getSortFieldValue(cursorDoc, sortField);
-
-        // Keyset over (sortField, _id). MongoDB orders null/missing values FIRST ascending and
-        // LAST descending, and $lt/$gt are type-bracketed (they never match null), so null-valued
-        // rows need explicit predicates or the page boundary silently drops or duplicates rows.
         if (cursorSortValue == null) {
             if (isDesc) {
                 // Trailing null group: only the remaining null rows, ordered by _id descending.
@@ -222,7 +225,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return switch (sortField) {
             case "hostname" -> machine.getHostname();
             case "displayName" -> machine.getDisplayName();
-            case "nickname" -> machine.getNickname();
             case "status" -> machine.getStatus() != null ? machine.getStatus().name() : null;
             case "lastSeen" -> machine.getLastSeen();
             default -> null;
@@ -230,36 +232,37 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     @Override
-    public long countMachines(MachineQueryFilter filter, String search) {
-        return mongoTemplate.count(buildDeviceQuery(filter, search), Machine.class);
+    public long countMachines(String tenantId, MachineQueryFilter filter, String search) {
+        return mongoTemplate.count(withTenant(tenantId, buildDeviceQuery(filter, search)), Machine.class);
     }
 
     @Override
-    public List<String> findMachineIds(MachineQueryFilter filter, String search) {
-        return mongoTemplate.findDistinct(buildDeviceQuery(filter, search),
+    public List<String> findMachineIds(String tenantId, MachineQueryFilter filter, String search) {
+        return mongoTemplate.findDistinct(withTenant(tenantId, buildDeviceQuery(filter, search)),
                 MACHINE_ID_FIELD, Machine.class, String.class);
     }
 
     @Override
-    public List<Machine> findMachinesWithCursor(MachineQueryFilter filter, String search,
+    public List<Machine> findMachinesWithCursor(String tenantId, MachineQueryFilter filter, String search,
                                                 String cursor, int limit,
                                                 String sortField, String sortDirection) {
-        return findMachinesWithCursor(buildDeviceQuery(filter, search),
+        return findMachinesWithCursor(withTenant(tenantId, buildDeviceQuery(filter, search)),
                 cursor, limit, sortField, sortDirection);
     }
 
     @Override
-    public List<Machine> findAvailableForScheduleWithCursor(MachineQueryFilter filter, String search,
+    public List<Machine> findAvailableForScheduleWithCursor(String tenantId, MachineQueryFilter filter, String search,
                                                             Collection<String> assignedMachineIds,
                                                             String cursor, int limit) {
-        return findAvailableForScheduleWithCursor(buildDeviceQuery(filter, search),
+        return findAvailableForScheduleWithCursor(withTenant(tenantId, buildDeviceQuery(filter, search)),
                 assignedMachineIds, cursor, limit);
     }
 
     @Override
-    public Map<String, Integer> facet(MachineQueryFilter filter, String search, DeviceFacetDimension dimension) {
+    public Map<String, Integer> facet(String tenantId, MachineQueryFilter filter, String search,
+                                      DeviceFacetDimension dimension) {
         String field = dimension.fieldName();
-        Query query = buildDeviceQuery(filter, search, field);
+        Query query = withTenant(tenantId, buildDeviceQuery(filter, search, field));
         Aggregation agg = Aggregation.newAggregation(
                 ctx -> new Document("$match", query.getQueryObject()),
                 Aggregation.group(field).count().as(COUNT_FIELD));
@@ -338,14 +341,15 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         }
 
         if (search != null && !search.isEmpty()) {
+            String quoted = Pattern.quote(search);
             criteriaList.add(new Criteria().orOperator(
-                    Criteria.where("hostname").regex(search, "i"),
-                    Criteria.where("displayName").regex(search, "i"),
-                    Criteria.where("nickname").regex(search, "i"),
-                    Criteria.where("ip").regex(search, "i"),
-                    Criteria.where("serialNumber").regex(search, "i"),
-                    Criteria.where("manufacturer").regex(search, "i"),
-                    Criteria.where("model").regex(search, "i")
+                    Criteria.where("hostname").regex(quoted, "i"),
+                    Criteria.where("displayName").regex(quoted, "i"),
+                    Criteria.where("nickname").regex(quoted, "i"),
+                    Criteria.where("ip").regex(quoted, "i"),
+                    Criteria.where("serialNumber").regex(quoted, "i"),
+                    Criteria.where("manufacturer").regex(quoted, "i"),
+                    Criteria.where("model").regex(quoted, "i")
             ));
         }
 

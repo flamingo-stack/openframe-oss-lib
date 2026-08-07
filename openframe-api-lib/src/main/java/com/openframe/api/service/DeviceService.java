@@ -23,6 +23,7 @@ import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
+import com.openframe.data.service.TenantIdProvider;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +56,7 @@ public class DeviceService {
     private final DeviceStatusProcessor deviceStatusProcessor;
     private final ScriptScheduleDeviceService scriptScheduleDeviceService;
     private final DeviceFilterOptionMapper deviceFilterOptionMapper;
+    private final TenantIdProvider tenantIdProvider;
 
     public Optional<Machine> findByMachineId(@NotBlank String machineId) {
         log.debug("Finding machine by ID: {}", machineId);
@@ -99,12 +101,13 @@ public class DeviceService {
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
                                                   String search) {
+        String tenantId = tenantIdProvider.getTenantId();
         MachineQueryFilter filter = machineFilter(filterOptions, platformNames, null);
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
 
-        long totalFilteredCount = machineRepository.countMachines(filter, search);
+        long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
         List<Machine> page = machineRepository.findAvailableForScheduleWithCursor(
-                filter, search, assignedMachineIds, normalized.getCursor(), normalized.getLimit() + 1);
+                tenantId, filter, search, assignedMachineIds, normalized.getCursor(), normalized.getLimit() + 1);
         boolean hasNextPage = page.size() > normalized.getLimit();
         if (hasNextPage) {
             page = page.subList(0, normalized.getLimit());
@@ -133,13 +136,14 @@ public class DeviceService {
     }
 
     private DeviceFilters deviceFilters(MachineQueryFilter filter, String search) {
+        String tenantId = tenantIdProvider.getTenantId();
         return DeviceFilters.builder()
-                .statuses(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, DeviceFacetDimension.STATUS)))
-                .deviceTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, DeviceFacetDimension.DEVICE_TYPE)))
-                .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, DeviceFacetDimension.OS_TYPE)))
-                .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(filter, search, DeviceFacetDimension.ORGANIZATION_ID)))
+                .statuses(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.STATUS)))
+                .deviceTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.DEVICE_TYPE)))
+                .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.OS_TYPE)))
+                .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.ORGANIZATION_ID)))
                 .tagKeys(List.of())
-                .filteredCount((int) machineRepository.countMachines(filter, search))
+                .filteredCount((int) machineRepository.countMachines(tenantId, filter, search))
                 .build();
     }
 
@@ -149,7 +153,8 @@ public class DeviceService {
      */
     public List<String> findDeviceIdsForPlatforms(Collection<String> platformNames,
                                                   DeviceFilterCriteria filterOptions, String search) {
-        return machineRepository.findMachineIds(machineFilter(filterOptions, platformNames, null), search);
+        return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
+                machineFilter(filterOptions, platformNames, null), search);
     }
 
     /**
@@ -164,20 +169,22 @@ public class DeviceService {
         if (filterOptions == null && (search == null || search.isBlank())) {
             return List.copyOf(machineIds);
         }
-        return machineRepository.findMachineIds(machineFilter(filterOptions, null, machineIds), search);
+        return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
+                machineFilter(filterOptions, null, machineIds), search);
     }
 
     private CountedGenericQueryResult<Machine> paginate(MachineQueryFilter filter, String search,
                                                         CursorPaginationCriteria paginationCriteria,
                                                         SortInput sort) {
+        String tenantId = tenantIdProvider.getTenantId();
         CursorPaginationCriteria normalizedPagination = paginationCriteria.normalize();
         String sortField = validateSortField(sort != null ? sort.getField() : null);
         SortDirection sortDirection = (sort != null && sort.getDirection() != null) ?
                 sort.getDirection() : SortDirection.DESC;
 
-        long totalFilteredCount = machineRepository.countMachines(filter, search);
+        long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
 
-        List<Machine> allWithOne = machineRepository.findMachinesWithCursor(filter, search,
+        List<Machine> allWithOne = machineRepository.findMachinesWithCursor(tenantId, filter, search,
                 normalizedPagination.getCursor(), normalizedPagination.getLimit() + 1,
                 sortField, sortDirection.name());
         List<Machine> pageItems = allWithOne.size() > normalizedPagination.getLimit()

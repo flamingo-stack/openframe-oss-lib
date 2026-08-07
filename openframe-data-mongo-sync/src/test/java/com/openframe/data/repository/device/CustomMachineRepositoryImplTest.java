@@ -3,6 +3,7 @@ package com.openframe.data.repository.device;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +13,8 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,8 +25,7 @@ import static org.mockito.Mockito.when;
 
 class CustomMachineRepositoryImplTest {
 
-    private final CustomMachineRepositoryImpl repo =
-            new CustomMachineRepositoryImpl(mock(MongoTemplate.class));
+    private final CustomMachineRepositoryImpl repo = new CustomMachineRepositoryImpl(mock(TenantAwareMongoTemplate.class));
 
     private static Document statusClause(Document queryObject) {
         @SuppressWarnings("unchecked")
@@ -163,31 +165,26 @@ class CustomMachineRepositoryImplTest {
         assertThat(mentionsField(q, "machineId")).isTrue();
     }
 
-    @Test
-    @DisplayName("buildDeviceQuery: a search term matches nickname (alongside hostname and displayName)")
-    void searchMatchesNickname() {
-        Document q = repo.buildDeviceQuery(null, "reception").getQueryObject();
-
-        assertThat(mentionsField(q, "nickname")).isTrue();
-        assertThat(mentionsField(q, "hostname")).isTrue();
-        assertThat(mentionsField(q, "displayName")).isTrue();
+    private static Pattern fieldPattern(Object node, String field) {
+        if (node instanceof Document doc) {
+            if (doc.get(field) instanceof Pattern pattern) {
+                return pattern;
+            }
+            return doc.values().stream()
+                    .map(v -> fieldPattern(v, field))
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (node instanceof List<?> list) {
+            return list.stream()
+                    .map(v -> fieldPattern(v, field))
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+        }
+        return null;
     }
-
-    @Test
-    @DisplayName("no search term → the name $or (and nickname) is absent")
-    void noSearchNoNicknameClause() {
-        Document q = repo.buildDeviceQuery(null, null).getQueryObject();
-
-        assertThat(mentionsField(q, "nickname")).isFalse();
-    }
-
-    @Test
-    @DisplayName("nickname is a sortable field")
-    void nicknameIsSortable() {
-        assertThat(repo.isSortableField("nickname")).isTrue();
-    }
-
-    // ---- cursor null-key boundary regression (nickname is nullable + sortable) ----
 
     private static Document runNicknameCursor(String cursorNickname, boolean asc) {
         MongoTemplate tpl = mock(MongoTemplate.class);
@@ -218,6 +215,46 @@ class CustomMachineRepositoryImplTest {
             return list.stream().anyMatch(v -> anyNode(v, pred));
         }
         return false;
+    }
+
+    // ---- cursor null-key boundary regression (nickname is nullable + sortable) ----
+
+    @Test
+    @DisplayName("buildDeviceQuery: search input is regex-quoted — metacharacters match literally and hostile patterns like (a+)+$ never reach the regex engine unescaped")
+    void searchInputIsRegexQuoted() {
+        String hostile = "(a+)+$";
+
+        Document q = repo.buildDeviceQuery(null, hostile).getQueryObject();
+
+        for (String field : List.of("hostname", "displayName", "ip", "serialNumber", "manufacturer", "model")) {
+            Pattern pattern = fieldPattern(q, field);
+            assertThat(pattern).as(field).isNotNull();
+            assertThat(pattern.pattern()).as(field).isEqualTo(Pattern.quote(hostile));
+        }
+    }
+
+    @Test
+    @DisplayName("buildDeviceQuery: a search term matches nickname (alongside hostname and displayName)")
+    void searchMatchesNickname() {
+        Document q = repo.buildDeviceQuery(null, "reception").getQueryObject();
+
+        assertThat(mentionsField(q, "nickname")).isTrue();
+        assertThat(mentionsField(q, "hostname")).isTrue();
+        assertThat(mentionsField(q, "displayName")).isTrue();
+    }
+
+    @Test
+    @DisplayName("no search term → the name $or (and nickname) is absent")
+    void noSearchNoNicknameClause() {
+        Document q = repo.buildDeviceQuery(null, null).getQueryObject();
+
+        assertThat(mentionsField(q, "nickname")).isFalse();
+    }
+
+    @Test
+    @DisplayName("nickname is a sortable field")
+    void nicknameIsSortable() {
+        assertThat(repo.isSortableField("nickname")).isTrue();
     }
 
     @Test
