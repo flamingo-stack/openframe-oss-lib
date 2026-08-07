@@ -63,7 +63,7 @@ class DeviceOnlineDispatchServiceTest {
     void firesActiveDeviceOnlineOnly() {
         MachineFirstOnlineDispatch row = pendingRow();
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
-        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(onlineMachine()));
+        when(machineRepository.findByTenantIdAndMachineId(TENANT, MACHINE)).thenReturn(Optional.of(onlineMachine()));
         when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE))
                 .thenReturn(List.of(assignment("s1"), assignment("s2"), assignment("s3")));
         ScriptSchedule deviceOnline = schedule("s1", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
@@ -87,7 +87,7 @@ class DeviceOnlineDispatchServiceTest {
         Machine offline = onlineMachine();
         offline.setStatus(DeviceStatus.OFFLINE);
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
-        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(offline));
+        when(machineRepository.findByTenantIdAndMachineId(TENANT, MACHINE)).thenReturn(Optional.of(offline));
 
         service.processPending();
 
@@ -100,7 +100,7 @@ class DeviceOnlineDispatchServiceTest {
     void missingMachine_skippedGracefully() {
         MachineFirstOnlineDispatch row = pendingRow();
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
-        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.empty());
+        when(machineRepository.findByTenantIdAndMachineId(TENANT, MACHINE)).thenReturn(Optional.empty());
 
         service.processPending();
 
@@ -113,7 +113,7 @@ class DeviceOnlineDispatchServiceTest {
     void noSchedulesDue_stillMarksDispatched() {
         MachineFirstOnlineDispatch row = pendingRow();
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
-        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(onlineMachine()));
+        when(machineRepository.findByTenantIdAndMachineId(TENANT, MACHINE)).thenReturn(Optional.of(onlineMachine()));
         when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE)).thenReturn(List.of());
         when(scheduleRepository.findByTenantIdAndSelectionModeAndTriggerAndStatus(
                 TENANT, ScheduleDeviceSelectionMode.CRITERIA,
@@ -130,7 +130,7 @@ class DeviceOnlineDispatchServiceTest {
     void criteriaScheduleFiresWithoutAssignment() {
         MachineFirstOnlineDispatch row = pendingRow();
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
-        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(onlineMachine()));
+        when(machineRepository.findByTenantIdAndMachineId(TENANT, MACHINE)).thenReturn(Optional.of(onlineMachine()));
         when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE)).thenReturn(List.of());
         ScriptSchedule criteria = criteriaSchedule("c1");
         when(scheduleRepository.findByTenantIdAndSelectionModeAndTriggerAndStatus(
@@ -150,8 +150,8 @@ class DeviceOnlineDispatchServiceTest {
         MachineFirstOnlineDispatch bad = row("row-bad", "m-bad");
         MachineFirstOnlineDispatch ok = row("row-ok", "m-ok");
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(bad, ok));
-        when(machineRepository.findByMachineId("m-bad")).thenReturn(Optional.of(onlineMachine("m-bad")));
-        when(machineRepository.findByMachineId("m-ok")).thenReturn(Optional.of(onlineMachine("m-ok")));
+        when(machineRepository.findByTenantIdAndMachineId(TENANT, "m-bad")).thenReturn(Optional.of(onlineMachine("m-bad")));
+        when(machineRepository.findByTenantIdAndMachineId(TENANT, "m-ok")).thenReturn(Optional.of(onlineMachine("m-ok")));
         // Both machines assigned to the same DEVICE_ONLINE schedule; dispatch throws only for m-bad.
         lenient().when(assignedRepository.findByTenantIdAndMachineId(eq(TENANT), any()))
                 .thenReturn(List.of(assignment("s1")));
@@ -176,7 +176,7 @@ class DeviceOnlineDispatchServiceTest {
 
         service.processPending();
 
-        verify(machineRepository, never()).findByMachineId(any());
+        verify(machineRepository, never()).findByTenantIdAndMachineId(any(), any());
         verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
         verify(dispatchRepository, never()).markDispatched(any(), any(Instant.class));
     }
@@ -189,13 +189,13 @@ class DeviceOnlineDispatchServiceTest {
         MachineFirstOnlineDispatch b = row("row-b", "m-b");
         MachineFirstOnlineDispatch c = row("row-c", "m-c");   // over the cap — must NOT be touched this tick
         when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(a, b, c));
-        lenient().when(machineRepository.findByMachineId(any())).thenReturn(Optional.empty());   // skip -> no fire, no mark
+        lenient().when(machineRepository.findByTenantIdAndMachineId(any(), any())).thenReturn(Optional.empty());   // skip -> no fire, no mark
 
         service.processPending();
 
-        verify(machineRepository).findByMachineId("m-a");
-        verify(machineRepository).findByMachineId("m-b");
-        verify(machineRepository, never()).findByMachineId("m-c");
+        verify(machineRepository).findByTenantIdAndMachineId(TENANT, "m-a");
+        verify(machineRepository).findByTenantIdAndMachineId(TENANT, "m-b");
+        verify(machineRepository, never()).findByTenantIdAndMachineId(TENANT, "m-c");
     }
 
     private static MachineFirstOnlineDispatch pendingRow() {

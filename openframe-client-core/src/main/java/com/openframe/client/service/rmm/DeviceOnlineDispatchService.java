@@ -58,7 +58,7 @@ public class DeviceOnlineDispatchService {
     }
 
     private void processOne(MachineFirstOnlineDispatch row) {
-        Machine machine = machineRepository.findByMachineId(row.getMachineId()).orElse(null);
+        Machine machine = machineRepository.findByTenantIdAndMachineId(row.getTenantId(), row.getMachineId()).orElse(null);
         if (machine == null) {
             log.warn("DEVICE_ONLINE dispatch: machine gone before first fire, tenantId={} machineId={} — leaving pending",
                     row.getTenantId(), row.getMachineId());
