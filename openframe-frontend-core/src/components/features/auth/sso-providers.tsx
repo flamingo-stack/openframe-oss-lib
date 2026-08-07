@@ -2,12 +2,13 @@
 
 import * as React from 'react'
 import { OpenFrameLogo } from '../../icons'
+import { AppleLogoIcon } from '../../icons-v2-generated/brand-logos/apple-logo-icon'
 import { GoogleLogoIcon } from '../../icons-v2-generated/brand-logos/google-logo-icon'
 import { MicrosoftLogoIcon } from '../../icons-v2-generated/brand-logos/microsoft-logo-icon'
 import { Button } from '../../ui/button'
 
 /** SSO providers offered on the auth forms. */
-export type AuthSsoProvider = 'openframe' | 'google' | 'microsoft'
+export type AuthSsoProvider = 'openframe' | 'google' | 'microsoft' | 'apple'
 
 export const PROVIDER_META: Record<
   AuthSsoProvider,
@@ -25,6 +26,7 @@ export const PROVIDER_META: Record<
   },
   google: { name: 'Google', Icon: GoogleLogoIcon },
   microsoft: { name: 'Microsoft', Icon: MicrosoftLogoIcon },
+  apple: { name: 'Apple', Icon: AppleLogoIcon },
 }
 
 export interface SsoProviderButtonsProps {
