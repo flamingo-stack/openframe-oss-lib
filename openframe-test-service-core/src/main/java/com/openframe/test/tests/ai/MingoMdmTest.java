@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * only to resolve its Fleet host id).
  */
 @Tag("ai")
+@Tag("mingo")
 @DisplayName("Mingo — Fleet MDM")
 public class MingoMdmTest extends MingoBaseTest {
 
