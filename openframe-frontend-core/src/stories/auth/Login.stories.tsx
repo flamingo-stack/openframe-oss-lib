@@ -72,7 +72,7 @@ export const Filled: Story = {
   render: () => <LoginPage email="roman@mail.com" />,
 }
 
-const SSO_PROVIDERS: AuthSsoProvider[] = ['openframe', 'google', 'microsoft']
+const SSO_PROVIDERS: AuthSsoProvider[] = ['openframe', 'google', 'microsoft', 'apple']
 
 /** SSO configured: email filled, submit replaced by provider buttons. */
 export const SSO: Story = {

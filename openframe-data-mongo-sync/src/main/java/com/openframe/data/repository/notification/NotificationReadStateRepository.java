@@ -24,6 +24,10 @@ public interface NotificationReadStateRepository
 
     List<NotificationReadState> findByNotificationId(String notificationId);
 
+    List<NotificationReadState> findByRecipientIdAndRecipientTypeAndStatus(String recipientId,
+                                                                           RecipientType recipientType,
+                                                                           ReadStatus status);
+
     @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'notificationId': ?2, 'status': 'UNREAD' }")
     @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
     long markAsRead(String recipientId, RecipientType recipientType, String notificationId);
