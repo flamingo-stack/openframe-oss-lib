@@ -15,6 +15,7 @@ import java.time.Instant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -99,6 +100,34 @@ class NotificationNatsPublisherTest {
         assertThatThrownBy(() -> publisher.publishToUser("user-1", unpersisted, NotificationCategory.GENERIC))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(messagePublisher);
+    }
+
+    @Test
+    @DisplayName("Given read-state ids, when publishReadStateToUser is called, then a content-free message with eventType and ids goes to the user subject")
+    void read_state_publish_carries_only_ids_and_event_type() {
+        publisher.publishReadStateToUser("user-42", java.util.List.of("n-1", "n-2"), com.openframe.data.nats.model.NotificationEventType.READ);
+
+        ArgumentCaptor<NotificationMessage> message = ArgumentCaptor.forClass(NotificationMessage.class);
+        verify(messagePublisher).publish(eq("user.user-42.notification"), message.capture());
+        assertThat(message.getValue().getEventType()).isEqualTo(com.openframe.data.nats.model.NotificationEventType.READ);
+        assertThat(message.getValue().getNotificationIds()).containsExactly("n-1", "n-2");
+        assertThat(message.getValue().getId()).isNull();
+        assertThat(message.getValue().getTitle()).isNull();
+    }
+
+    @Test
+    @DisplayName("Given NATS is down, when publishReadStateToUser fails, then the exception is swallowed — read-state sync is best-effort")
+    void read_state_publish_swallows_nats_failures() {
+        doThrow(new NatsException("down")).when(messagePublisher).publish(anyString(), any());
+
+        publisher.publishReadStateToUser("user-42", java.util.List.of("n-1"), com.openframe.data.nats.model.NotificationEventType.DELETED);
+    }
+
+    @Test
+    @DisplayName("Given a blank userId, when publishReadStateToUser is called, then it throws — a broadcast to a malformed subject must not happen")
+    void read_state_publish_rejects_blank_user() {
+        assertThatThrownBy(() -> publisher.publishReadStateToUser(" ", java.util.List.of("n-1"), com.openframe.data.nats.model.NotificationEventType.READ))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static Notification persistedNotification() {
