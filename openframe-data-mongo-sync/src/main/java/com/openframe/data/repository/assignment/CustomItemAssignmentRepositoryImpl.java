@@ -18,6 +18,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Slf4j
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
@@ -131,7 +132,7 @@ public class CustomItemAssignmentRepositoryImpl extends TenantAwareRepositorySup
         query.addCriteria(Criteria.where(FIELD_TARGET_TYPE).is(targetType));
 
         if (StringUtils.hasText(search)) {
-            query.addCriteria(Criteria.where(FIELD_DISPLAY_NAME).regex(search.trim(), "i"));
+            query.addCriteria(Criteria.where(FIELD_DISPLAY_NAME).regex(Pattern.quote(search.trim()), "i"));
         }
 
         return query;

@@ -8,6 +8,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -152,5 +154,40 @@ class CustomMachineRepositoryImplTest {
         Document q = repo.buildDeviceQuery(filter, null, "status").getQueryObject();
 
         assertThat(mentionsField(q, "machineId")).isTrue();
+    }
+
+    private static Pattern fieldPattern(Object node, String field) {
+        if (node instanceof Document doc) {
+            if (doc.get(field) instanceof Pattern pattern) {
+                return pattern;
+            }
+            return doc.values().stream()
+                    .map(v -> fieldPattern(v, field))
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (node instanceof List<?> list) {
+            return list.stream()
+                    .map(v -> fieldPattern(v, field))
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+        }
+        return null;
+    }
+
+    @Test
+    @DisplayName("buildDeviceQuery: search input is regex-quoted — metacharacters match literally and hostile patterns like (a+)+$ never reach the regex engine unescaped")
+    void searchInputIsRegexQuoted() {
+        String hostile = "(a+)+$";
+
+        Document q = repo.buildDeviceQuery(null, hostile).getQueryObject();
+
+        for (String field : List.of("hostname", "displayName", "ip", "serialNumber", "manufacturer", "model")) {
+            Pattern pattern = fieldPattern(q, field);
+            assertThat(pattern).as(field).isNotNull();
+            assertThat(pattern.pattern()).as(field).isEqualTo(Pattern.quote(hostile));
+        }
     }
 }
