@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   acquireClient as acquireSharedClient,
   releaseClient as releaseSharedClient,
@@ -20,7 +20,24 @@ const DEFAULT_STREAM_NAME = 'CHAT_CHUNKS'
  * absence worth resyncing for. Alt-tabbing must not churn the consumer; a
  * window that sat in the tray must not come back showing a stale conversation.
  */
-const RESYNC_AFTER_HIDDEN_MS = 10_000
+export const RESYNC_AFTER_HIDDEN_MS = 10_000
+/**
+ * How long resync requests are gathered before one is acted on.
+ *
+ * A single reveal can be reported twice: the page sees `visibilitychange`, and
+ * a host that knows the window was away reports it too (`resyncSignal`),
+ * neither able to tell whether the other noticed. Both land within a frame or
+ * two of each other, being driven by the same OS event, and acting on both
+ * rebuilds the consumer and refetches history twice for one reveal.
+ *
+ * Gathered on the TRAILING edge, so a request is deferred and never dropped.
+ * Two reports of one reveal collapse into one rebuild; two genuinely different
+ * signals — a notification reply landing just before the user opens the window
+ * — also collapse into one, which is correct, because a single refetch after
+ * the last of them covers both. The cost is a second of latency on a path whose
+ * next step is a network round trip.
+ */
+const RESYNC_COALESCE_MS = 1_000
 /**
  * Floor between two reported recoveries. Every recovery costs the caller a
  * history refetch, and a consumer that cannot hold its sequence — gap, reset,
@@ -60,6 +77,7 @@ export function useJetStreamDialogSubscription({
   clientConfig = {},
   reconnectionBackoff,
   inactiveThresholdMs,
+  resyncSignal = 0,
 }: UseJetStreamDialogSubscriptionOptions): UseJetStreamDialogSubscriptionReturn {
   const [isConnected, setIsConnected] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
@@ -73,6 +91,8 @@ export function useJetStreamDialogSubscription({
   const [currentStreamSeq, setCurrentStreamSeq] = useState<number | null>(null)
 
   const lastRecoveryReportRef = useRef(0)
+  const resyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastResyncSignalRef = useRef(resyncSignal)
   const clientRef = useRef<NatsClient | null>(null)
   const subscriptionRef = useRef<JetStreamSubscriptionHandle | null>(null)
   const highestStreamSeqRef = useRef<number | null>(null)
@@ -245,7 +265,26 @@ export function useJetStreamDialogSubscription({
   // ignoring optStartSeq).
   useEffect(() => {
     highestStreamSeqRef.current = null
+    // A host's signal counts per dialog (it can carry a per-conversation term),
+    // so the baseline has to move with the dialog or a switch to one with a
+    // LOWER count would swallow every later resync for it.
+    lastResyncSignalRef.current = resyncSignal
     setCurrentStreamSeq(null)
+    // A resync gathered for the previous dialog must not land on this one: the
+    // counter says nothing about which conversation it meant, so callers would
+    // refetch the wrong one. The dialog change supersedes it — the new dialog
+    // loads its own history regardless. As cleanup, so it covers unmount too,
+    // which is the same rule.
+    return () => {
+      if (resyncTimerRef.current !== null) {
+        clearTimeout(resyncTimerRef.current)
+        resyncTimerRef.current = null
+      }
+    }
+    // `resyncSignal` is read as the new baseline, not depended on: reacting to
+    // it here would reset the baseline on the very change meant to trigger a
+    // resync, and the effect below owns that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dialogId])
 
   // Coming back into view after a real absence is treated exactly like a
@@ -256,8 +295,20 @@ export function useJetStreamDialogSubscription({
   // report that: the tail simply stays quiet, and the conversation on screen
   // stays frozen at whatever was there when the window went away (the user's
   // manual fix is a page refresh, which is exactly the history refetch this
-  // triggers). Bumping the counter rebuilds the consumer from the last sequence
-  // seen AND tells callers to refetch history.
+  // triggers). Rebuilds the consumer from the last sequence seen AND tells
+  // callers to refetch history.
+  //
+  // Every source funnels through here (see `RESYNC_COALESCE_MS`). Restarting
+  // the timer rather than dropping is what makes that safe: a request is only
+  // ever folded into the one that follows it, never discarded.
+  const requestResync = useCallback(() => {
+    if (resyncTimerRef.current !== null) clearTimeout(resyncTimerRef.current)
+    resyncTimerRef.current = setTimeout(() => {
+      resyncTimerRef.current = null
+      setReconnectionCount((c) => c + 1)
+    }, RESYNC_COALESCE_MS)
+  }, [])
+
   useEffect(() => {
     if (!enabled) return
     let hiddenSince = document.visibilityState === 'hidden' ? Date.now() : 0
@@ -270,13 +321,27 @@ export function useJetStreamDialogSubscription({
       const awayMs = hiddenSince === 0 ? 0 : Date.now() - hiddenSince
       hiddenSince = 0
       if (awayMs >= RESYNC_AFTER_HIDDEN_MS) {
-        setReconnectionCount((c) => c + 1)
+        requestResync()
       }
     }
 
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
-  }, [enabled])
+  }, [enabled, requestResync])
+
+  useEffect(() => {
+    // Held, not consumed, while disabled: it fires once on enable instead.
+    // A host reports a signal against the conversation, not against this hook's
+    // readiness, so one arriving while the caller is still assembling the
+    // subscription describes a gap in the history the caller is fetching right
+    // now. Dropping it would leave that fetch's result stale with nothing left
+    // to say so.
+    if (!enabled) return
+    // The mount value is a baseline, not a signal.
+    if (resyncSignal <= lastResyncSignalRef.current) return
+    lastResyncSignalRef.current = resyncSignal
+    requestResync()
+  }, [enabled, resyncSignal, requestResync])
 
   // Subscription lifecycle: (re)create the ephemeral JetStream consumer whenever
   // we transition into a connected state for a dialog, and whenever the dialog
