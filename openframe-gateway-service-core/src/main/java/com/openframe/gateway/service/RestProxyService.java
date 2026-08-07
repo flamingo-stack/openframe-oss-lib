@@ -14,9 +14,7 @@ import org.springframework.http.*;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
@@ -24,7 +22,9 @@ import javax.net.ssl.SSLException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import static com.openframe.core.constants.HttpHeaders.*;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -36,6 +36,18 @@ import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 public class RestProxyService {
 
     private static final AttributeKey<URI> TARGET_URI_KEY = AttributeKey.valueOf("target_uri");
+
+    /**
+     * Upstream response headers relayed to the caller, lower-cased. Allowlist, not a hop-by-hop
+     * denylist: this proxy fronts many tenants, so {@code Set-Cookie} (lands on the gateway's own
+     * domain) and {@code Access-Control-*} (silently replaces this gateway's CorsWebFilter, since
+     * the result handler merges with putAll) must not leak through. Length headers are omitted —
+     * the body is re-encoded here.
+     */
+    private static final Set<String> FORWARDED_RESPONSE_HEADERS = Set.of(
+            "content-type",
+            "content-disposition",
+            "x-fleet-capabilities");
 
     private final ReactiveIntegratedToolRepository toolRepository;
     private final ToolUpstreamResolverRegistry upstreamRegistry;
@@ -52,6 +64,7 @@ public class RestProxyService {
 
     public Mono<ResponseEntity<String>> proxyApiRequest(String toolId, ServerHttpRequest request, String body) {
         return findTool(toolId, request)
+                .switchIfEmpty(Mono.error(new ToolNotFoundException(toolId)))
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
                         return Mono
@@ -72,8 +85,8 @@ public class RestProxyService {
 
                     return proxy(tool, targetUri, method, headers, body);
                 })
-                .switchIfEmpty(
-                        Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Tool not found: " + toolId)));
+                .onErrorResume(ToolNotFoundException.class, e -> Mono.just(
+                        ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage())));
     }
 
     /**
@@ -144,6 +157,7 @@ public class RestProxyService {
      */
     public Mono<ResponseEntity<String>> proxyAgentRequest(String toolId, ServerHttpRequest request, String body) {
         return findTool(toolId, request)
+                .switchIfEmpty(Mono.error(new ToolNotFoundException(toolId)))
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
                         ResponseEntity<String> response = ResponseEntity.badRequest()
@@ -159,8 +173,8 @@ public class RestProxyService {
 
                     return proxy(tool, targetUri, method, headers, body);
                 })
-                .switchIfEmpty(
-                        Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Tool not found: " + toolId)));
+                .onErrorResume(ToolNotFoundException.class, e -> Mono.just(
+                        ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage())));
     }
 
     private Map<String, String> buildAgentRequestHeaders(ServerHttpRequest request) {
@@ -182,16 +196,7 @@ public class RestProxyService {
             HttpMethod method,
             Map<String, String> proxyHeaders,
             String body) {
-        HttpClient httpClient = buildHttpClient(targetUri);
-
-        WebClient webClient = WebClient.builder()
-                .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .codecs(configurer -> configurer
-                        .defaultCodecs()
-                        .maxInMemorySize(16 * 1024 * 1024)) // Increase to 16MB
-                .build();
-
-        WebClient.RequestBodySpec requestSpec = webClient
+        WebClient.RequestBodySpec requestSpec = webClient(targetUri)
                 .method(method)
                 .uri(targetUri)
                 .headers(headers -> headers.setAll(proxyHeaders));
@@ -203,11 +208,16 @@ public class RestProxyService {
         Mono<ResponseEntity<String>> monoResponseEntity;
         try {
             monoResponseEntity = requestSpec
-                    .retrieve()
-                    .onStatus(this::isErrorStatusCode, this::processErrorResponse)
-                    .bodyToMono(String.class)
+                    // exchangeToMono, not retrieve(): a proxy relays the upstream status, headers
+                    // and body verbatim. retrieve() turns 4xx/5xx into exceptions, and bodyToMono
+                    // emits NOTHING for an empty body — which the callers' switchIfEmpty then
+                    // reported as 404 "Tool not found". Fleet's HEAD /api/fleet/orbit/ping is
+                    // header-only by design, so it 404'd on every poll.
+                    .exchangeToMono(response -> response.toEntity(String.class))
                     .timeout(Duration.ofSeconds(60))
-                    .map(ResponseEntity::ok)
+                    .map(upstream -> ResponseEntity.status(upstream.getStatusCode())
+                            .headers(headers -> forwardHeaders(upstream.getHeaders(), headers))
+                            .body(upstream.getBody()))
                     .onErrorResume(this::buildErrorResponse)
                     .doOnSuccess(response -> log.debug("Successfully proxied request to {}", tool.getName()))
                     .doOnError(error -> log.error("Failed to proxy request to {}: {}", tool.getName(),
@@ -217,6 +227,24 @@ public class RestProxyService {
             return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()));
         }
         return monoResponseEntity;
+    }
+
+    private static void forwardHeaders(HttpHeaders from, HttpHeaders to) {
+        from.forEach((name, values) -> {
+            if (FORWARDED_RESPONSE_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
+                to.addAll(name, values);
+            }
+        });
+    }
+
+    /** Package-private so tests can stub the upstream exchange. */
+    WebClient webClient(URI targetUri) {
+        return WebClient.builder()
+                .clientConnector(new ReactorClientHttpConnector(buildHttpClient(targetUri)))
+                .codecs(configurer -> configurer
+                        .defaultCodecs()
+                        .maxInMemorySize(16 * 1024 * 1024)) // Increase to 16MB
+                .build();
     }
 
     private HttpClient buildHttpClient(URI targetUri) {
@@ -244,28 +272,14 @@ public class RestProxyService {
                 });
     }
 
-    private boolean isErrorStatusCode(HttpStatusCode statusCode) {
-        return statusCode.is4xxClientError() || statusCode.is5xxServerError();
-    }
-
-    private Mono<Throwable> processErrorResponse(ClientResponse response) {
-        return response.bodyToMono(String.class)
-                .flatMap(errorBody -> Mono.error(
-                        WebClientResponseException.create(
-                                response.statusCode().value(),
-                                response.statusCode().toString(),
-                                response.headers().asHttpHeaders(),
-                                errorBody.getBytes(),
-                                null)));
-    }
-
+    /** Transport failure only — upstream HTTP statuses are relayed as ordinary responses. */
     private Mono<ResponseEntity<String>> buildErrorResponse(Throwable e) {
-        if (e instanceof WebClientResponseException responseException) {
-            ResponseEntity<String> response = ResponseEntity.status(responseException.getStatusCode())
-                    .body(responseException.getResponseBodyAsString());
-            return Mono.just(response);
+        return Mono.just(ResponseEntity.status(500).body(e.getMessage()));
+    }
+
+    private static class ToolNotFoundException extends RuntimeException {
+        ToolNotFoundException(String toolId) {
+            super("Tool not found: " + toolId);
         }
-        ResponseEntity<String> response = ResponseEntity.status(500).body(e.getMessage());
-        return Mono.just(response);
     }
 }
