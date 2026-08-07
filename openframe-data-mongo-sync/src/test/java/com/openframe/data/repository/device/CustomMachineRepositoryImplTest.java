@@ -2,10 +2,10 @@ package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.util.List;
 
@@ -14,8 +14,7 @@ import static org.mockito.Mockito.mock;
 
 class CustomMachineRepositoryImplTest {
 
-    private final CustomMachineRepositoryImpl repo =
-            new CustomMachineRepositoryImpl(mock(MongoTemplate.class));
+    private final CustomMachineRepositoryImpl repo = new CustomMachineRepositoryImpl(mock(TenantAwareMongoTemplate.class));
 
     private static Document statusClause(Document queryObject) {
         @SuppressWarnings("unchecked")
