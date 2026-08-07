@@ -16,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class ScriptsTest extends BaseTest {
 
+    @Tag("feature")
     @Test
     @DisplayName("Add script")
     @Order(1)
@@ -29,6 +30,7 @@ public class ScriptsTest extends BaseTest {
         assertThat(created.getSupportedPlatforms()).as("Supported platforms should match").isEqualTo(input.getSupportedPlatforms());
     }
 
+    @Tag("feature")
     @Tag("read")
     @Test
     @DisplayName("List scripts")
@@ -43,6 +45,7 @@ public class ScriptsTest extends BaseTest {
         });
     }
 
+    @Tag("feature")
     @Tag("read")
     @Test
     @DisplayName("Get script")
@@ -59,6 +62,7 @@ public class ScriptsTest extends BaseTest {
         assertThat(script.getScriptBody()).as("Script body should not be empty").isNotEmpty();
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Edit script")
     @Order(4)
@@ -77,6 +81,7 @@ public class ScriptsTest extends BaseTest {
         assertThat(refetched.getDescription()).as("Persisted description should match the update").isEqualTo("Updated description");
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Archive script")
     @Order(5)

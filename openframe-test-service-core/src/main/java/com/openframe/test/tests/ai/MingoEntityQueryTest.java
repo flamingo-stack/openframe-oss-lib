@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class MingoEntityQueryTest extends MingoBaseTest {
 
 
+    @Tag("feature")
     @Test
     @Tag("directory")
     @DisplayName("Mingo finds an organization")
