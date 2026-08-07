@@ -32,6 +32,11 @@ const EscalationOfferMessage = forwardRef<HTMLDivElement, EscalationOfferMessage
     <div ref={ref} className={cn("flex flex-col", className)} {...props}>
       <ApprovalRequestMessage
         variant="client"
+        // Only the client may resolve an offer — the backend rejects every
+        // other actor — so a viewer with no handlers wired (the admin ticket
+        // view) sees the prompt read-only rather than dead buttons. A resolved
+        // offer still shows its "Approved by {name}" pill for everyone.
+        showFooterActions={!!onApprove || !!onReject || status !== 'pending'}
         // The client card renders `explanation` as its body and never shows
         // `command`; the offer's whole payload is that one backend-fixed line.
         data={{ command: '', explanation: data.text, requestId: data.offerId }}
