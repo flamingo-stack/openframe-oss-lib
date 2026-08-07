@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.List;
 
 @Getter
 @Setter
@@ -26,4 +27,7 @@ public class NotificationMessage {
     private NotificationCategory category;
     private NotificationContext context;
     private NotificationEventType eventType;
+
+    /** READ/DELETED batches: every affected notification id in one message ("mark all read" is one event, not fifty). */
+    private List<String> ids;
 }
