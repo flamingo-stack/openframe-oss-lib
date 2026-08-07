@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("Test Access tokens")
 public class AuthTokensTest extends BaseTest {
 
+    @Tag("feature")
     @Tag("token")
     @Test
     @DisplayName("Verify refresh of access tokens")
@@ -36,6 +37,7 @@ public class AuthTokensTest extends BaseTest {
         assertThat(response.isAuthenticated()).as("Access token not refreshed").isTrue();
     }
 
+    @Tag("feature")
     @Tag("token")
     @Test
     @DisplayName("Verify refresh of access tokens without tenantId")
@@ -49,6 +51,7 @@ public class AuthTokensTest extends BaseTest {
         assertThat(response.isAuthenticated()).as("Access token not refreshed").isTrue();
     }
 
+    @Tag("feature")
     @Tag("logout")
     @Test
     @DisplayName("Verify logout")
@@ -62,6 +65,7 @@ public class AuthTokensTest extends BaseTest {
         assertThat(response.getStatusCode()).isEqualTo(401);
     }
 
+    @Tag("feature")
     @Tag("logout")
     @Test
     @DisplayName("Verify logout without tenantId")
