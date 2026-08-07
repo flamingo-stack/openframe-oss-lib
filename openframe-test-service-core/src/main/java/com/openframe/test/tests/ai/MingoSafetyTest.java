@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * than being masked — by design).
  */
 @Tag("ai")
+@Tag("mingo")
 @Tag("negative")
 @DisplayName("Mingo — safety")
 public class MingoSafetyTest extends MingoBaseTest {

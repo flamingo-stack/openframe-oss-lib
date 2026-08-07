@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Immune to the searchMachines online-flap — no machine is involved.
  */
 @Tag("ai")
+@Tag("mingo")
 @DisplayName("Mingo — scripts & KB")
 public class MingoEntityMutationTest extends MingoBaseTest {
 

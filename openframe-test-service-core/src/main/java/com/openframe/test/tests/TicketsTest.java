@@ -69,9 +69,12 @@ public class TicketsTest extends BaseTest {
         String reorderAssigneeId = TicketGenerator.assigneeId(reorderAdmins);
 
         // Pick a device first (prefer ONLINE) and create under that device's own organization —
-        // createTicket rejects a device from a different org.
-        Machine reorderDevice = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
-        assertThat(reorderDevice).as("Expected at least one device").isNotNull();
+        // createTicket rejects a device from a different org. Scoped to the pipeline's org so the
+        // ticket lands on the device this run enrolled, rather than on whichever device a shared
+        // tenant happens to list first — and so the records it leaves behind stay in the fixture org.
+        Machine reorderDevice = DeviceApi.getAnyDevice(
+                pipelineScoped(onlineDevicesFilter()), pipelineScoped(offlineDevicesFilter()));
+        assertThat(reorderDevice).as("Expected at least one device%s", orgSuffix()).isNotNull();
 
         List<TicketLabel> reorderLabels = TicketApi.getTicketLabels();
         assertThat(reorderLabels).as("Expected at least one ticket label").isNotEmpty();
@@ -108,9 +111,10 @@ public class TicketsTest extends BaseTest {
         String assigneeId = TicketGenerator.assigneeId(users);
 
         // Pick a device first (prefer ONLINE) and create the ticket under that device's own organization —
-        // createTicket rejects a device that doesn't belong to the selected org.
-        Machine device = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
-        assertThat(device).as("Expected at least one device").isNotNull();
+        // createTicket rejects a device that doesn't belong to the selected org. Scoped as above.
+        Machine device = DeviceApi.getAnyDevice(
+                pipelineScoped(onlineDevicesFilter()), pipelineScoped(offlineDevicesFilter()));
+        assertThat(device).as("Expected at least one device%s", orgSuffix()).isNotNull();
 
         List<TicketLabel> labels = TicketApi.getTicketLabels();
         assertThat(labels).as("Expected at least one ticket label").isNotEmpty();

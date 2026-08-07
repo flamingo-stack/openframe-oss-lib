@@ -21,13 +21,14 @@ import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import com.openframe.data.service.machine.MachineWriteResult;
+import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.TenantIdProvider;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
@@ -39,6 +40,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.service.machine.MachineFields.NICKNAME;
+import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
+
 @Service
 @Slf4j
 @Validated
@@ -46,6 +50,7 @@ import java.util.stream.Collectors;
 public class DeviceService {
 
     private final MachineRepository machineRepository;
+    private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final DeviceStatusProcessor deviceStatusProcessor;
@@ -309,6 +314,23 @@ public class DeviceService {
         } catch (Exception e) {
             log.error("Post-processor failed for machineId={}: {}", machineId, e.getMessage(), e);
         }
+    }
+
+    public Machine updateNickname(@NotBlank String machineId, String nickname) {
+        log.info("Updating device nickname. machineId={}", machineId);
+        MachineWriteResult result = machineWriter
+                .update(machineId, machineUpdate().set(NICKNAME, normalizeNickname(nickname)))
+                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
+        log.info("Device {} nickname updated", machineId);
+        return result.after();
+    }
+
+    private String normalizeNickname(String nickname) {
+        if (nickname == null) {
+            return null;
+        }
+        String trimmed = nickname.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private String validateSortField(String field) {
