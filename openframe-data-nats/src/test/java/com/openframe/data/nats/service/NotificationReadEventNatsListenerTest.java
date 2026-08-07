@@ -9,7 +9,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -23,7 +22,7 @@ class NotificationReadEventNatsListenerTest {
     @BeforeEach
     void setUp() {
         publisher = mock(NotificationNatsPublisher.class);
-        listener = new NotificationReadEventNatsListener(Optional.of(publisher));
+        listener = new NotificationReadEventNatsListener(publisher);
     }
 
     @Test
@@ -51,14 +50,5 @@ class NotificationReadEventNatsListenerTest {
                 "m1", RecipientType.MACHINE, List.of("n-1"), NotificationReadEvent.Transition.READ));
 
         verifyNoInteractions(publisher);
-    }
-
-    @Test
-    @DisplayName("Given no NATS publisher in this service, when an event arrives, then the listener is a quiet no-op")
-    void missing_publisher_is_a_noop() {
-        listener = new NotificationReadEventNatsListener(Optional.empty());
-
-        listener.onReadStateChanged(new NotificationReadEvent(
-                "u1", RecipientType.USER, List.of("n-1"), NotificationReadEvent.Transition.READ));
     }
 }
