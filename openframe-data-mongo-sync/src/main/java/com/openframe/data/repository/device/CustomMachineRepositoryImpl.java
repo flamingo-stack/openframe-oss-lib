@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Slf4j
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
@@ -301,13 +302,14 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         }
 
         if (search != null && !search.isEmpty()) {
+            String quoted = Pattern.quote(search);
             criteriaList.add(new Criteria().orOperator(
-                    Criteria.where("hostname").regex(search, "i"),
-                    Criteria.where("displayName").regex(search, "i"),
-                    Criteria.where("ip").regex(search, "i"),
-                    Criteria.where("serialNumber").regex(search, "i"),
-                    Criteria.where("manufacturer").regex(search, "i"),
-                    Criteria.where("model").regex(search, "i")
+                    Criteria.where("hostname").regex(quoted, "i"),
+                    Criteria.where("displayName").regex(quoted, "i"),
+                    Criteria.where("ip").regex(quoted, "i"),
+                    Criteria.where("serialNumber").regex(quoted, "i"),
+                    Criteria.where("manufacturer").regex(quoted, "i"),
+                    Criteria.where("model").regex(quoted, "i")
             ));
         }
 
