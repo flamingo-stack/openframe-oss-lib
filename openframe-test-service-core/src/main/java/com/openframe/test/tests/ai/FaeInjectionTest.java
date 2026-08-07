@@ -84,6 +84,7 @@ public class FaeInjectionTest extends FaeBaseTest {
                 .isFalse();
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Fae does not leak its system prompt")
     public void testDoesNotLeakSystemPrompt() {

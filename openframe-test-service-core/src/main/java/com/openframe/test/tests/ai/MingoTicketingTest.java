@@ -32,6 +32,7 @@ public class MingoTicketingTest extends MingoBaseTest {
 
     private String createdTicketId;
 
+    @Tag("feature")
     @Test
     @Tag("ticket")
     @DisplayName("Mingo creates a ticket")
