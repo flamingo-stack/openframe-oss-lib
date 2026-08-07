@@ -21,6 +21,20 @@ public class DeviceGenerator {
         return statusDevicesFilter(DeviceStatus.ARCHIVED);
     }
 
+    /**
+     * Narrows a filter to one organization, in place.
+     *
+     * <p>Load-bearing for any case that <em>mutates</em> what it finds. A status-only filter spans the
+     * whole tenant, which is harmless on a single-device fixture tenant and destructive on a shared one:
+     * the archive cases picked an unrelated OFFLINE device out of a long-lived QA tenant, archived and
+     * deleted it, and left the pipeline's own device assigned to the org it was about to archive — which
+     * then failed with a 409.
+     */
+    public static DeviceFilterInput inOrganization(DeviceFilterInput filter, String organizationId) {
+        filter.setOrganizationIds(List.of(organizationId));
+        return filter;
+    }
+
     public static DeviceFilterInput osDevicesFilter(String os) {
         return DeviceFilterInput.builder()
                 .osTypes(List.of(os))

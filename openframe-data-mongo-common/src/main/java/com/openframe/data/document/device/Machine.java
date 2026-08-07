@@ -31,6 +31,7 @@ public class Machine implements TenantScoped {
     private String organizationId;
     private String hostname;
     private String displayName;
+    private String nickname;
     private String serialNumber;
     private String manufacturer;
     private String model;

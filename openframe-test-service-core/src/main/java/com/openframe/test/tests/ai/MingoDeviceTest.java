@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * resolves it via its own {@code searchMachines} tool — so no ticket binding is needed.
  */
 @Tag("ai")
+@Tag("mingo")
 @DisplayName("Mingo — device")
 public class MingoDeviceTest extends MingoBaseTest {
 
