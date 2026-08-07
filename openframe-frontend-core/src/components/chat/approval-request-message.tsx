@@ -120,7 +120,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
                 size="small-legacy"
                 variant="accent"
                 onClick={handleApprove}
-                disabled={isProcessing}
+                disabled={isProcessing || !onApprove}
                 className={cn(
                   "bg-ods-accent hover:bg-ods-accent/90",
                   "text-h5 text-ods-bg",
@@ -133,7 +133,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
                 size="small-legacy"
                 variant="outline"
                 onClick={handleReject}
-                disabled={isProcessing}
+                disabled={isProcessing || !onReject}
                 className={cn(
                   "bg-ods-card border-ods-border",
                   "text-h5 text-ods-text-primary",
@@ -168,7 +168,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
               size="small-legacy"
               variant="accent"
               onClick={handleApprove}
-              disabled={isProcessing}
+              disabled={isProcessing || !onApprove}
               className={cn(
                 "bg-ods-accent hover:bg-ods-accent/90",
                 "text-h5 text-ods-bg",
@@ -181,7 +181,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
               size="small-legacy"
               variant="outline"
               onClick={handleReject}
-              disabled={isProcessing}
+              disabled={isProcessing || !onReject}
               className={cn(
                 "bg-ods-card border-ods-border",
                 "text-h5 text-ods-text-primary",
