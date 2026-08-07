@@ -8,6 +8,8 @@ import { SquareAvatar } from "../ui/square-avatar"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
 import { ApprovalBatchMessage } from "./approval-batch-message"
+import { EscalationOfferMessage } from "./escalation-offer-message"
+import { TicketEscalatedMessage } from "./ticket-escalated-message"
 import { ErrorMessageDisplay } from "./error-message-display"
 import { ContextCompactionDisplay } from "./context-compaction-display"
 import { ThinkingDisplay } from "./thinking-display"
@@ -725,6 +727,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       variant={approvalVariant}
                     />
                   )
+                } else if (segment.type === 'escalation_offer') {
+                  return (
+                    <EscalationOfferMessage
+                      key={index}
+                      data={segment.data}
+                      status={segment.status}
+                      resolvedByName={segment.resolvedByName}
+                      onApprove={segment.onApprove}
+                      onReject={segment.onReject}
+                    />
+                  )
+                } else if (segment.type === 'ticket_escalated') {
+                  return <TicketEscalatedMessage key={index} data={segment.data} timestamp={timestamp} />
                 } else if (segment.type === 'error') {
                   return (
                     <ErrorMessageDisplay

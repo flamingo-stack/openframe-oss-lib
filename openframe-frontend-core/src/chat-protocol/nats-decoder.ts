@@ -18,6 +18,7 @@
 
 import { MESSAGE_TYPE } from '../components/chat/types/message.types'
 import type { AskOptionData } from '../components/chat/types/message.types'
+import { ESCALATION_STATE, escalationResolvedStatus } from './events'
 import type { ApprovalToolCall, ChatStreamEvent } from './events'
 
 /** Minimal structural view of a NATS chunk (see `ChunkData` in
@@ -211,6 +212,52 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         status: data.approved === true ? 'approved' : 'rejected',
         approvalType: data.approvalType || 'CLIENT',
         resolvedByName,
+        ...seq,
+      }
+    }
+
+    case MESSAGE_TYPE.ESCALATION_OFFER: {
+      const offerId = typeof data.offerId === 'string' ? data.offerId : ''
+      if (!offerId) return null
+      if (data.state === ESCALATION_STATE.PENDING) {
+        return {
+          type: 'escalation-offer',
+          offerId,
+          text: typeof data.text === 'string' ? data.text : '',
+          origin: typeof data.origin === 'string' ? data.origin : undefined,
+          ...seq,
+        }
+      }
+      const status = escalationResolvedStatus(data.state)
+      if (!status) return null
+      // Same realtime/history field split as APPROVAL_RESULT: the chunk names
+      // the resolver `displayName`, the persisted row `resolvedByName`.
+      return {
+        type: 'escalation-offer-resolved',
+        offerId,
+        status,
+        resolvedByName:
+          typeof data.resolvedByName === 'string'
+            ? data.resolvedByName
+            : typeof data.displayName === 'string'
+              ? data.displayName
+              : undefined,
+        ...seq,
+      }
+    }
+
+    case MESSAGE_TYPE.TICKET_ESCALATED: {
+      const ticketId = typeof data.ticketId === 'string' ? data.ticketId : ''
+      const reason = typeof data.reason === 'string' ? data.reason : ''
+      // Both are non-null on the wire; a payload missing either is malformed
+      // rather than a variant to render.
+      if (!ticketId || !reason) return null
+      return {
+        type: 'ticket-escalated',
+        ticketId,
+        reason,
+        ticketNumber: typeof data.ticketNumber === 'number' ? data.ticketNumber : undefined,
+        text: typeof data.text === 'string' ? data.text : undefined,
         ...seq,
       }
     }

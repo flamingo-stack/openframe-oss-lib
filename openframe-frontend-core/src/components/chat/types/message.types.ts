@@ -16,6 +16,8 @@ export const MESSAGE_TYPE = {
   EXECUTED_TOOL: 'EXECUTED_TOOL',
   APPROVAL_REQUEST: 'APPROVAL_REQUEST',
   APPROVAL_RESULT: 'APPROVAL_RESULT',
+  ESCALATION_OFFER: 'ESCALATION_OFFER',
+  TICKET_ESCALATED: 'TICKET_ESCALATED',
   ERROR: 'ERROR',
   MESSAGE_START: 'MESSAGE_START',
   MESSAGE_END: 'MESSAGE_END',
@@ -119,6 +121,35 @@ export interface ApprovalResultData {
   approvalType?: string
   /** Display name of the user who resolved the request; null/absent for system actions. */
   resolvedByName?: string | null
+}
+
+// ========== Escalation Offer Types ==========
+
+export interface EscalationOfferData {
+  offerId: string
+  /** Backend-fixed card copy; the client never composes it. */
+  text: string
+  /** Why the offer was raised (`TOOL`, `MANUAL`, a trigger reason). Carried
+   *  for telemetry — every origin renders the same card. */
+  origin?: string
+}
+
+// ========== Ticket Escalated Types ==========
+
+/** Open union: the wire currently defines only `INACTIVITY`, and the block
+ *  renders from `text` rather than branching on this, so a reason added
+ *  server-side needs no client change. */
+export type TicketEscalationReason = 'INACTIVITY' | (string & {})
+
+/** The handoff receipt — a real block on the wire, not something the client
+ *  infers from an escalation offer's state. */
+export interface TicketEscalatedData {
+  ticketId: string
+  ticketNumber?: number
+  reason: TicketEscalationReason
+  /** Backend-authored explanation; the card falls back to generic copy when
+   *  the wire omits it (the field is nullable). */
+  text?: string
 }
 
 /**
@@ -239,6 +270,35 @@ export type ApprovalBatchSegment = {
   onReject?: ApprovalResolutionHandler
 }
 
+/**
+ * Ticket-escalation offer block. Visually the client approval card (same
+ * Figma component), but a SEPARATE segment type on purpose: it resolves
+ * through the ticket-escalation GraphQL mutations rather than the tool
+ * approval endpoint, and hosts that hide pending tool approvals from the
+ * thread must still render this one inline.
+ *
+ * `cancelled` is the wire's SUPERSEDED — the client typed over the offer.
+ */
+export type EscalationOfferSegment = {
+  type: 'escalation_offer'
+  data: EscalationOfferData
+  status?: ChatApprovalStatus
+  resolvedByName?: string | null
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
+}
+
+/**
+ * The conversation was handed off to a human technician. Decoded from the
+ * `TICKET_ESCALATED` block, so it appears for every escalation path the
+ * backend emits it for — including the inactivity auto-escalation, which
+ * raises no offer and therefore has no offer state to infer from.
+ */
+export type TicketEscalatedSegment = {
+  type: 'ticket_escalated'
+  data: TicketEscalatedData
+}
+
 export type ErrorSegment = {
   type: 'error'
   title: string
@@ -251,7 +311,7 @@ export type ContextCompactionSegment = {
   summary?: string
 }
 
-export type MessageSegment = TextSegment | ThinkingSegment | GuideSegment | AskSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | ErrorSegment | ContextCompactionSegment
+export type MessageSegment = TextSegment | ThinkingSegment | GuideSegment | AskSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | EscalationOfferSegment | TicketEscalatedSegment | ErrorSegment | ContextCompactionSegment
 
 export type MessageContent = string | MessageSegment[]
 
@@ -329,6 +389,29 @@ export interface ApprovalResultMessageData extends MessageDataBase {
   resolvedByName?: string | null
 }
 
+/**
+ * Persisted escalation-offer row. The PENDING row carries `text`/`origin`;
+ * the resolution is a SECOND row with the same `offerId`, state
+ * APPROVED/DECLINED/SUPERSEDED and no text — matched on replay by id.
+ */
+export interface EscalationOfferMessageData extends MessageDataBase {
+  type: 'ESCALATION_OFFER'
+  offerId?: string
+  state?: string
+  text?: string
+  origin?: string
+  resolvedByUserId?: string | null
+  resolvedByName?: string | null
+}
+
+export interface TicketEscalatedMessageData extends MessageDataBase {
+  type: 'TICKET_ESCALATED'
+  ticketId?: string
+  ticketNumber?: number
+  reason?: TicketEscalationReason
+  text?: string
+}
+
 export interface ErrorMessageData extends MessageDataBase {
   type: 'ERROR'
   error?: string
@@ -373,6 +456,8 @@ export type MessageData =
   | ExecutedToolMessageData
   | ApprovalRequestMessageData
   | ApprovalResultMessageData
+  | EscalationOfferMessageData
+  | TicketEscalatedMessageData
   | ErrorMessageData
   | AIMetadataMessageData
   | SystemMessageData
