@@ -37,11 +37,12 @@ import {
   type MessageData,
   type MessageOwner,
 } from '../types'
-import type { ChatStreamEvent } from '../../../chat-protocol/events'
+import { ESCALATION_STATE, escalationResolvedStatus, type ChatStreamEvent } from '../../../chat-protocol/events'
 // One normalizer for ask rows, shared with the live decoder — history and the
 // stream must agree on which options are usable.
 import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder'
 import { MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator'
+import { applyApprovalStatusToSegment } from '../stream/message-mutations'
 import { getCommandText } from './tool-call-helpers'
 
 function getOwnerDisplayName(owner?: MessageOwner): string {
@@ -199,6 +200,38 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
       }
       return null
 
+    case MESSAGE_TYPE.ESCALATION_OFFER: {
+      if (!('offerId' in data) || !data.offerId) return null
+      if (data.state === ESCALATION_STATE.PENDING) {
+        return {
+          type: 'escalation-offer',
+          offerId: data.offerId,
+          text: data.text || '',
+          origin: data.origin,
+        }
+      }
+      const status = escalationResolvedStatus(data.state)
+      if (!status) return null
+      return {
+        type: 'escalation-offer-resolved',
+        offerId: data.offerId,
+        status,
+        resolvedByName: data.resolvedByName,
+      }
+    }
+
+    case MESSAGE_TYPE.TICKET_ESCALATED:
+      if ('ticketId' in data && data.ticketId && data.reason) {
+        return {
+          type: 'ticket-escalated',
+          ticketId: data.ticketId,
+          reason: data.reason,
+          ticketNumber: data.ticketNumber,
+          text: data.text,
+        }
+      }
+      return null
+
     case MESSAGE_TYPE.ERROR:
       if ('error' in data) {
         return {
@@ -241,6 +274,18 @@ type EscalatedApprovals = Map<
 >
 
 /**
+ * Terminal escalation-offer resolutions collected while walking history, so
+ * they can be applied to ALREADY-FLUSHED bubbles after the walk. The offer
+ * row and its resolution row are separated by the user message that caused
+ * SUPERSEDED, which puts them in different assistant envelopes — by the time
+ * the resolution is read, the accumulator holding the card has been reset.
+ */
+type OfferResolutions = Map<
+  string,
+  { status: ChatApprovalStatus; resolvedByName?: string | null }
+>
+
+/**
  * Replay one decoded event into the shared per-turn segment kernel with the
  * HISTORY approval semantics (an omitted `displayApprovalTypes` means
  * "display every approval type" — the original history behavior; the
@@ -252,13 +297,43 @@ function applyHistoryEvent(
   approvalStatuses: Record<string, string>,
   options: MessageProcessingOptions,
   escalatedApprovals?: EscalatedApprovals,
+  offerResolutions?: OfferResolutions,
 ): void {
   // batchApprovalsEnabled is owned by the consumer (oss-tenant chat client /
   // openframe-frontend tickets). Defaults to ON so consumers that haven't
   // wired the flag yet get the batch UI; pass `false` to force legacy.
-  const { displayApprovalTypes, batchApprovalsEnabled = true } = options
+  const { displayApprovalTypes, batchApprovalsEnabled = true, escalationOfferStates } = options
 
   switch (event.type) {
+    case 'escalation-offer':
+      // Always a real segment, never the tracked/flushed treatment single
+      // approvals get: the offer belongs inline where it was posted.
+      accumulator.addEscalationOffer(
+        event.offerId,
+        event.text,
+        event.origin,
+        escalationOfferStates?.[event.offerId] ?? 'pending',
+      )
+      break
+
+    case 'ticket-escalated':
+      accumulator.addTicketEscalated({
+        ticketId: event.ticketId,
+        ticketNumber: event.ticketNumber,
+        reason: event.reason,
+        text: event.text,
+      })
+      break
+
+    case 'escalation-offer-resolved':
+      // Recorded, not applied here: `applyOfferResolutions` runs after every
+      // flush and covers the same-bubble case as well as the cross-bubble one.
+      offerResolutions?.set(event.offerId, {
+        status: event.status,
+        resolvedByName: event.resolvedByName,
+      })
+      break
+
     case 'text-delta':
       accumulator.appendText(event.text)
       break
@@ -464,11 +539,20 @@ export function processHistoricalMessages(
     // opt-in: pass the same explicit list to both.
     displayApprovalTypes,
     batchApprovalsEnabled,
+    escalationOfferStates,
+    onEscalationApprove,
+    onEscalationReject,
   } = options
 
   const processedMessages: ProcessedMessage[] = []
-  const accumulator = createMessageSegmentAccumulator({ onApprove, onReject })
+  const accumulator = createMessageSegmentAccumulator({
+    onApprove,
+    onReject,
+    onEscalationApprove,
+    onEscalationReject,
+  })
   const escalatedApprovals: EscalatedApprovals = new Map()
+  const offerResolutions: OfferResolutions = new Map()
 
   let currentAssistantId: string | null = null
   let currentAssistantTimestamp: Date | null = null
@@ -581,8 +665,9 @@ export function processHistoricalMessages(
           event,
           accumulator,
           approvalStatuses,
-          { displayApprovalTypes, batchApprovalsEnabled },
+          { displayApprovalTypes, batchApprovalsEnabled, escalationOfferStates },
           escalatedApprovals,
+          offerResolutions,
         )
       })
 
@@ -614,10 +699,44 @@ export function processHistoricalMessages(
     })
   }
 
+  applyOfferResolutions(processedMessages, offerResolutions)
+
   return {
     messages: processedMessages,
     escalatedApprovals: escalatedApprovals
   }
+}
+
+/**
+ * Flip escalation-offer cards that were flushed into an EARLIER bubble than
+ * their resolution row. Mutates `processedMessages` in place (it is local to
+ * the caller and not yet handed out). Uses the same `applyApprovalStatusToSegment`
+ * rule as the live projection so the two paths cannot drift.
+ */
+function applyOfferResolutions(
+  processedMessages: ProcessedMessage[],
+  offerResolutions: OfferResolutions,
+): void {
+  if (offerResolutions.size === 0) return
+
+  processedMessages.forEach((msg, index) => {
+    if (!Array.isArray(msg.content)) return
+    let changed = false
+    const content = msg.content.map((segment) => {
+      if (segment.type !== 'escalation_offer') return segment
+      const resolution = offerResolutions.get(segment.data.offerId)
+      if (!resolution) return segment
+      const next = applyApprovalStatusToSegment(
+        segment,
+        segment.data.offerId,
+        resolution.status,
+        resolution.resolvedByName,
+      )
+      if (next !== segment) changed = true
+      return next
+    })
+    if (changed) processedMessages[index] = { ...msg, content }
+  })
 }
 
 /**

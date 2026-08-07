@@ -161,6 +161,38 @@ const CORPUS: Record<string, unknown> = {
     command: 'echo hi',
   },
 
+  escalation_offer_pending: {
+    type: 'ESCALATION_OFFER',
+    offerId: 'offer-1',
+    state: 'PENDING',
+    text: 'This ticket can be handed off to a technician.',
+    origin: 'MANUAL',
+  },
+  escalation_offer_approved: {
+    type: 'ESCALATION_OFFER',
+    offerId: 'offer-1',
+    state: 'APPROVED',
+    displayName: 'John Smith',
+  },
+  escalation_offer_superseded: {
+    type: 'ESCALATION_OFFER',
+    offerId: 'offer-1',
+    state: 'SUPERSEDED',
+    resolvedByName: 'John Smith',
+  },
+  escalation_offer_unknown_state: { type: 'ESCALATION_OFFER', offerId: 'offer-1', state: 'WAT' },
+  escalation_offer_missing_id: { type: 'ESCALATION_OFFER', state: 'PENDING' },
+
+  ticket_escalated: {
+    type: 'TICKET_ESCALATED',
+    ticketId: 'ticket-1',
+    ticketNumber: 1002,
+    reason: 'INACTIVITY',
+    text: 'Automatically escalated to a human technician.',
+  },
+  ticket_escalated_missing_reason: { type: 'TICKET_ESCALATED', ticketId: 'ticket-1' },
+  ticket_escalated_missing_ticket_id: { type: 'TICKET_ESCALATED', reason: 'INACTIVITY' },
+
   approval_result_approved: {
     type: 'APPROVAL_RESULT',
     approvalRequestId: 'req-1',

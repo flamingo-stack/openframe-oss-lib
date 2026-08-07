@@ -197,6 +197,7 @@ export interface ChatReducerEffect {
     | 'onEscalatedApproval'
     | 'onEscalatedApprovalResult'
     | 'onApprovalResolved'
+    | 'onEscalationOfferResolved'
     | 'onToolExecuted'
     | 'onAgentBusy'
     | 'onDialogClosed'
@@ -1272,6 +1273,55 @@ export function createChatStreamReducer(
         )
         mirrorApprovalStatus(requestId, status)
         emit('onApprovalResolved', requestId, status, approvalType, resolvedByName)
+        break
+      }
+
+      case 'escalation-offer': {
+        // MUST route through `applyAccumulated`. The block reaches a client
+        // in three shapes — inline in Fae's live turn (tool origin), or with
+        // NO preceding MESSAGE_START when the backend surfaces a deferred
+        // offer at turn end or honours the header button while idle. In the
+        // latter shapes a cumulative emit would replace the trailing bubble's
+        // segments with the lone card, wiping the reply the user is reading.
+        const status = (approvalStatuses[event.offerId] || 'pending') as ChatApprovalStatus
+        const before = accumulator.getSegments().length
+        const segments = accumulator.addEscalationOffer(
+          event.offerId,
+          event.text,
+          event.origin,
+          status,
+        )
+        applyAccumulated(before, segments)
+        break
+      }
+
+      case 'escalation-offer-resolved': {
+        const { offerId, status, resolvedByName: offerResolvedBy } = event
+        // Approving hands the ticket to a human; Fae goes silent rather than
+        // resuming, so — unlike an approved command — there is no work to
+        // signal and the busy lock stays untouched.
+        accumulator.updateApprovalStatus(offerId, status, offerResolvedBy)
+        setMessagesInternal(
+          projectApprovalResolutionToMessages(messages, offerId, status, offerResolvedBy),
+        )
+        mirrorApprovalStatus(offerId, status)
+        emit('onEscalationOfferResolved', offerId, status, offerResolvedBy)
+        break
+      }
+
+      case 'ticket-escalated': {
+        // Same `applyAccumulated` routing as the offer, and for the same
+        // reason: the inactivity auto-escalation fires from a scheduler with
+        // no turn open at all, so this block routinely arrives with no
+        // preceding MESSAGE_START.
+        const before = accumulator.getSegments().length
+        const segments = accumulator.addTicketEscalated({
+          ticketId: event.ticketId,
+          ticketNumber: event.ticketNumber,
+          reason: event.reason,
+          text: event.text,
+        })
+        applyAccumulated(before, segments)
         break
       }
 
