@@ -10,8 +10,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Repository
-public interface MachineFirstOnlineDispatchRepository
-        extends MongoRepository<MachineFirstOnlineDispatch, String> {
+public interface MachineFirstOnlineDispatchRepository extends MongoRepository<MachineFirstOnlineDispatch, String> {
 
     boolean existsByTenantIdAndMachineId(String tenantId, String machineId);
 
