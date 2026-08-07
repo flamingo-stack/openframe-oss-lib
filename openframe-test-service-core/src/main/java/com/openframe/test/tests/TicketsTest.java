@@ -303,6 +303,9 @@ public class TicketsTest extends BaseTest {
         assertThat(existing.getOwner()).as("Owner should be present").isNotNull();
     }
 
+    // Tagged `feature` as a fixture, not for its own sake: three feature cases below read
+    // getTicketLabels() and would find it empty on a tenant this has never run against.
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(0)   // before Create ticket (@Order 1): seeds a TICKET tag so getTicketLabels() is non-empty
