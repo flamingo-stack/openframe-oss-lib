@@ -73,7 +73,7 @@ public class NotificationNatsPublisher {
         try {
             natsMessagePublisher.publish(topic, NotificationMessage.builder()
                     .eventType(eventType)
-                    .ids(List.copyOf(notificationIds))
+                    .notificationIds(List.copyOf(notificationIds))
                     .build());
         } catch (NatsException ex) {
             log.warn("NATS publish failed for {} read-state ids on {}: {}",

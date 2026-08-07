@@ -110,7 +110,7 @@ class NotificationNatsPublisherTest {
         ArgumentCaptor<NotificationMessage> message = ArgumentCaptor.forClass(NotificationMessage.class);
         verify(messagePublisher).publish(eq("user.user-42.notification"), message.capture());
         assertThat(message.getValue().getEventType()).isEqualTo(com.openframe.data.nats.model.NotificationEventType.READ);
-        assertThat(message.getValue().getIds()).containsExactly("n-1", "n-2");
+        assertThat(message.getValue().getNotificationIds()).containsExactly("n-1", "n-2");
         assertThat(message.getValue().getId()).isNull();
         assertThat(message.getValue().getTitle()).isNull();
     }

@@ -28,6 +28,5 @@ public class NotificationMessage {
     private NotificationContext context;
     private NotificationEventType eventType;
 
-    /** READ/DELETED batches: every affected notification id in one message ("mark all read" is one event, not fifty). */
-    private List<String> ids;
+    private List<String> notificationIds;
 }
