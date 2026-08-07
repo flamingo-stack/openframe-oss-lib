@@ -22,6 +22,11 @@ import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class DevicesTest extends BaseTest {
 
+    /** The tag seeded on {@link #TAGGED_DEVICE}, rendered as the chip "purpose:auto_test" in the UI. */
+    private static final String TAG_KEY = "purpose";
+    private static final String TAG_VALUE = "auto_test";
+    private static final String TAGGED_DEVICE = "vm115982";
+
     @Tag("saas")
     @Tag("read")
     @Test
@@ -166,6 +171,28 @@ public class DevicesTest extends BaseTest {
         assertThat(devices).allSatisfy(device -> {
             assertThat(device.getOsType()).as("Device osType should be WINDOWS").isEqualTo("WINDOWS");
         });
+    }
+
+    @Tag("saas")
+    @Tag("read")
+    @Test
+    @DisplayName("Filter devices by tag")
+    public void testFilterByTag() {
+        List<Machine> devices = DeviceApi.getDevices(tagDevicesFilter(TAG_KEY, TAG_VALUE));
+        assertThat(devices).as("No devices tagged %s:%s", TAG_KEY, TAG_VALUE).isNotEmpty();
+        assertThat(devices)
+                .as("Device %s should be among the %s:%s tagged devices", TAGGED_DEVICE, TAG_KEY, TAG_VALUE)
+                .extracting(Machine::getHostname)
+                .contains(TAGGED_DEVICE);
+        // Every match must actually carry the tag. The UI equivalent could only see that a row appeared,
+        // so a filter returning the right count of the wrong devices would have passed.
+        assertThat(devices).allSatisfy(device -> assertThat(device.getTags())
+                .as("Device %s matched the filter without carrying %s:%s",
+                        device.getHostname(), TAG_KEY, TAG_VALUE)
+                .anySatisfy(tag -> {
+                    assertThat(tag.getKey()).isEqualTo(TAG_KEY);
+                    assertThat(tag.getValues()).contains(TAG_VALUE);
+                }));
     }
 
     @Tag("archive")

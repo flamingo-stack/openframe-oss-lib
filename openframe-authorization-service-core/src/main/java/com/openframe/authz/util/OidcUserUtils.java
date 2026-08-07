@@ -24,6 +24,22 @@ public final class OidcUserUtils {
     }
 
     /**
+     * Whether the provider's {@code email_verified} claim permits treating the email as verified.
+     * Missing claim counts as verified — Microsoft often omits it for org accounts; an explicit
+     * {@code false} (boolean or string) never does.
+     */
+    public static boolean emailVerifiedClaimAllows(OidcUser user) {
+        Object claim = user.getClaims().get("email_verified");
+        if (claim instanceof Boolean b) {
+            return b;
+        }
+        if (claim instanceof String s) {
+            return !"false".equalsIgnoreCase(s);
+        }
+        return true;
+    }
+
+    /**
      * Returns string if non-blank, otherwise null.
      */
     public static String stringClaim(Object value) {

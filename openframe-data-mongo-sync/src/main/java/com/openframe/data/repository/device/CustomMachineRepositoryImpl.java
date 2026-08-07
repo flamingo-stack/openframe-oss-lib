@@ -2,13 +2,14 @@ package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.rmm.OsType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Slf4j
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
@@ -47,10 +49,16 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     );
     private static final String DEFAULT_SORT_FIELD = "_id";
 
+    private static final String TENANT_ID_FIELD = "tenantId";
+
     private final MongoTemplate mongoTemplate;
 
     public CustomMachineRepositoryImpl(MongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
+    }
+
+    private static Query withTenant(String tenantId, Query query) {
+        return query.addCriteria(Criteria.where(TENANT_ID_FIELD).is(tenantId));
     }
 
     private List<Machine> findMachinesWithCursor(Query query, String cursor, int limit,
@@ -85,9 +93,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         List<String> assigned = assignedMachineIds == null ? List.of() : new ArrayList<>(assignedMachineIds);
 
         List<AggregationOperation> ops = new ArrayList<>();
-        // $match: the platform/filter/search predicate already assembled in the Query.
-        Document match = baseQuery.getQueryObject();
-        ops.add(ctx -> new Document("$match", match));
+        // $match: the tenant + platform/filter/search predicate already assembled in the Query
+        // (tenantId is added by the caller via withTenant(...) — aggregate() bypasses the
+        // wrapping template's auto-scope, so we can't rely on that here).
+        ops.add(ctx -> new Document("$match", baseQuery.getQueryObject()));
         // $addFields: bucket 0..3 = (assigned ? 0 : 2) + (ONLINE ? 0 : 1).
         ops.add(bucketAddFieldsStage(assigned));
         // Keyset cursor over (bucket, _id), then the matching sort.
@@ -192,35 +201,36 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     @Override
-    public long countMachines(MachineQueryFilter filter, String search) {
-        return mongoTemplate.count(buildDeviceQuery(filter, search), Machine.class);
+    public long countMachines(String tenantId, MachineQueryFilter filter, String search) {
+        return mongoTemplate.count(withTenant(tenantId, buildDeviceQuery(filter, search)), Machine.class);
     }
 
     @Override
-    public List<String> findMachineIds(MachineQueryFilter filter, String search) {
-        return mongoTemplate.findDistinct(buildDeviceQuery(filter, search),
+    public List<String> findMachineIds(String tenantId, MachineQueryFilter filter, String search) {
+        return mongoTemplate.findDistinct(withTenant(tenantId, buildDeviceQuery(filter, search)),
                 MACHINE_ID_FIELD, Machine.class, String.class);
     }
 
     @Override
-    public List<Machine> findMachinesWithCursor(MachineQueryFilter filter, String search,
+    public List<Machine> findMachinesWithCursor(String tenantId, MachineQueryFilter filter, String search,
                                                 String cursor, int limit,
                                                 String sortField, String sortDirection) {
-        return findMachinesWithCursor(buildDeviceQuery(filter, search),
+        return findMachinesWithCursor(withTenant(tenantId, buildDeviceQuery(filter, search)),
                 cursor, limit, sortField, sortDirection);
     }
 
     @Override
-    public List<Machine> findAvailableForScheduleWithCursor(MachineQueryFilter filter, String search,
+    public List<Machine> findAvailableForScheduleWithCursor(String tenantId, MachineQueryFilter filter, String search,
                                                             Collection<String> assignedMachineIds,
                                                             String cursor, int limit) {
-        return findAvailableForScheduleWithCursor(buildDeviceQuery(filter, search),
+        return findAvailableForScheduleWithCursor(withTenant(tenantId, buildDeviceQuery(filter, search)),
                 assignedMachineIds, cursor, limit);
     }
 
     @Override
-    public Map<String, Integer> facet(MachineQueryFilter filter, String search, String field) {
-        Query query = buildDeviceQuery(filter, search, field);
+    public Map<String, Integer> facet(String tenantId, MachineQueryFilter filter, String search, DeviceFacetDimension dimension) {
+        String field = dimension.fieldName();
+        Query query = withTenant(tenantId, buildDeviceQuery(filter, search, field));
         Aggregation agg = Aggregation.newAggregation(
                 ctx -> new Document("$match", query.getQueryObject()),
                 Aggregation.group(field).count().as(COUNT_FIELD));
@@ -280,12 +290,8 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                     && filter.getDeviceTypes() != null && !filter.getDeviceTypes().isEmpty()) {
                 criteriaList.add(Criteria.where("type").in(filter.getDeviceTypes()));
             }
-            if (!OS_TYPE_FIELD.equals(excludeField)
-                    && filter.getOsTypes() != null && !filter.getOsTypes().isEmpty()) {
-                List<Criteria> perOs = osTypeCriteriaList(filter.getOsTypes());
-                if (!perOs.isEmpty()) {
-                    criteriaList.add(new Criteria().orOperator(perOs.toArray(new Criteria[0])));
-                }
+            if (!OS_TYPE_FIELD.equals(excludeField)) {
+                osTypeOrCriteria(filter.getOsTypes()).ifPresent(criteriaList::add);
             }
             if (!ORGANIZATION_ID_FIELD.equals(excludeField)
                     && filter.getOrganizationIds() != null && !filter.getOrganizationIds().isEmpty()) {
@@ -303,13 +309,14 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         }
 
         if (search != null && !search.isEmpty()) {
+            String quoted = Pattern.quote(search);
             criteriaList.add(new Criteria().orOperator(
-                    Criteria.where("hostname").regex(search, "i"),
-                    Criteria.where("displayName").regex(search, "i"),
-                    Criteria.where("ip").regex(search, "i"),
-                    Criteria.where("serialNumber").regex(search, "i"),
-                    Criteria.where("manufacturer").regex(search, "i"),
-                    Criteria.where("model").regex(search, "i")
+                    Criteria.where("hostname").regex(quoted, "i"),
+                    Criteria.where("displayName").regex(quoted, "i"),
+                    Criteria.where("ip").regex(quoted, "i"),
+                    Criteria.where("serialNumber").regex(quoted, "i"),
+                    Criteria.where("manufacturer").regex(quoted, "i"),
+                    Criteria.where("model").regex(quoted, "i")
             ));
         }
 
@@ -334,11 +341,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         List<String> valid = filterNonNull(osTypeScope);
         return valid.isEmpty() ? Optional.empty()
                 : Optional.of(Criteria.where(OS_TYPE_FIELD).in(valid));
-    }
-
-    private static List<Criteria> osTypeCriteriaList(Collection<String> osTypeScope) {
-        List<String> valid = filterNonNull(osTypeScope);
-        return valid.isEmpty() ? List.of() : List.of(Criteria.where(OS_TYPE_FIELD).in(valid));
     }
 
     private static List<String> filterNonNull(Collection<String> values) {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { render, fireEvent, screen } from '@testing-library/react'
 import { mockReplace, setMockSearchParams } from '../../../../vitest.setup'
 import { TabNavigation, type TabItem } from '../tab-navigation'
@@ -154,6 +154,38 @@ describe('TabNavigation with urlSync', () => {
       setMockSearchParams(new URLSearchParams('tab=nonsense'))
       nav.rerenderWith(TABS)
       expect(nav.active).toBe('general')
+    })
+  })
+  describe('the underline', () => {
+    it('is sized in real pixels rather than a scaled 1px bar', () => {
+      // Regression guard. The underline used to be `w-px` stretched with
+      // `scaleX(width)`, which is only exact when one CSS pixel lands on a whole
+      // device pixel. At 125%/150% OS scaling or any browser zoom the base is
+      // rasterized to the nearest whole device pixel and `scaleX` multiplies
+      // that rounding by the tab's width, so the bar rendered visibly shorter or
+      // longer than the tab it underlines — while `offsetWidth` had been right
+      // all along. Asserting the STYLE (not the pixels, which jsdom has none of)
+      // is what keeps the multiplier from coming back.
+      const widthSpy = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(120)
+      const leftSpy = vi.spyOn(HTMLElement.prototype, 'offsetLeft', 'get').mockReturnValue(40)
+
+      try {
+        setMockSearchParams(new URLSearchParams('tab=general'))
+        const { container } = render(
+          <TabNavigation tabs={TABS} urlSync>
+            {() => null}
+          </TabNavigation>
+        )
+
+        const underline = container.querySelector('[aria-hidden]') as HTMLElement
+        expect(underline.style.width).toBe('120px')
+        expect(underline.style.transform).toBe('translateX(40px)')
+        expect(underline.style.transform).not.toContain('scaleX')
+        expect(underline.className).not.toContain('w-px')
+      } finally {
+        widthSpy.mockRestore()
+        leftSpy.mockRestore()
+      }
     })
   })
 })

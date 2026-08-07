@@ -2,6 +2,7 @@ package com.openframe.authz.security.flow;
 
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
+import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.security.SsoRegistrationConstants;
 import com.openframe.authz.security.SsoTenantRegCookiePayload;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
@@ -46,7 +47,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
         SsoTenantRegCookiePayload payload = ssoCookieCodec.decodeTenant(cookie.getValue())
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
-        String[] names = resolveNames(user);
+        String[] names = resolveNames(request, authentication, user);
         String givenName = names[0];
         String familyName = names[1];
 
@@ -63,6 +64,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
                 .pictureUrl(resolvePictureUrl(user))
                 .tenantName(payload.tenantName())
                 .tenantDomain(payload.tenantDomain().toLowerCase(Locale.ROOT))
+                .emailPreVerified(OidcUserUtils.emailVerifiedClaimAllows(user))
                 .attribution(payload.attribution())
                 .build();
 

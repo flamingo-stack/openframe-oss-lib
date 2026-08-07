@@ -9,6 +9,7 @@
  */
 
 import type {
+  AskOptionData,
   MessageSegment,
   ToolExecutionSegment,
   ApprovalRequestSegment,
@@ -160,6 +161,17 @@ export class MessageSegmentAccumulator {
       this.segments.push({ type: 'guide', text })
     }
 
+    return this.getSegments()
+  }
+
+  /**
+   * Add a clarification (ask) card. Unlike the three delta streams an ask
+   * arrives whole in one chunk, so it is always a NEW segment — never merged
+   * into a trailing one. Consecutive cards stay separate segments; the renderer
+   * is what pages through a run of them.
+   */
+  addAsk(question: string, options: AskOptionData[]): MessageSegment[] {
+    this.segments.push({ type: 'ask', question, options })
     return this.getSegments()
   }
 
@@ -529,6 +541,9 @@ export class MessageSegmentAccumulator {
           break
         case 'guide':
           if (segment.text) this.appendGuide(segment.text)
+          break
+        case 'ask':
+          this.addAsk(segment.question, segment.options)
           break
         case 'tool_execution':
           this.addToolExecution(segment)

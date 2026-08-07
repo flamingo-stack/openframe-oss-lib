@@ -172,9 +172,15 @@ public class AuthorizationServerConfig {
             AuthUser user = userService.findActiveByEmailAndTenant(username.toLowerCase(Locale.ROOT), tenantId)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
+            // SSO-provisioned users may have no usable password hash; {noop} here would make the
+            // EMPTY password valid for them. Absent hash = password login unavailable, full stop.
+            if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) {
+                throw new UsernameNotFoundException("Password login not available for: " + username);
+            }
+
             return User.builder()
                     .username(user.getEmail())
-                    .password(user.getPasswordHash() != null ? user.getPasswordHash() : "{noop}")
+                    .password(user.getPasswordHash())
                     .authorities(user.getRoles().stream()
                             .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
                             .toList())
