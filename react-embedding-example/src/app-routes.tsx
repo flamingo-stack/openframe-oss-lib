@@ -12,6 +12,8 @@ import { LegalPage } from './pages/legal'
 import { ContactPage } from './pages/contact'
 import { CaseStudiesPage } from './pages/case-studies'
 import { TicketsPage } from './pages/tickets'
+import { ScheduleACallPage } from './pages/schedule-a-call'
+import { SingleLinkEmbedPage } from './pages/single-link-embed'
 import { AuthorsPage } from './pages/authors'
 import { FaqsPage } from './pages/faqs'
 import { KnowledgeBasePage } from './pages/knowledge-base'
@@ -38,6 +40,9 @@ export function AppRoutes() {
         <Route path="contact" element={<ContactPage />} />
         <Route path="case-studies" element={<CaseStudiesPage />} />
         <Route path="tickets" element={<TicketsPage />} />
+        <Route path="schedule-a-call" element={<ScheduleACallPage />} />
+        <Route path="schedule-a-call/*" element={<ScheduleACallPage />} />
+        <Route path="single-link-embed" element={<SingleLinkEmbedPage />} />
         {/* DocsHubPage embed proof — same component the hub mounts at
          *  flamingo.so/knowledge-base and openframe.so/knowledge-base.
          *  Path read from `DOCS_BASE_ROUTE` so `ask-ai.tsx`'s chat baseRoute

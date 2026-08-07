@@ -17,6 +17,7 @@ import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Repository
@@ -72,9 +73,10 @@ public class CustomEventRepositoryImpl implements CustomEventRepository {
         }
 
         if (search != null && !search.trim().isEmpty()) {
+            String quoted = Pattern.quote(search);
             Criteria searchCriteria = new Criteria().orOperator(
-                    Criteria.where("type").regex(search, "i"),
-                    Criteria.where("data").regex(search, "i")
+                    Criteria.where("type").regex(quoted, "i"),
+                    Criteria.where("data").regex(quoted, "i")
             );
             query.addCriteria(searchCriteria);
         }

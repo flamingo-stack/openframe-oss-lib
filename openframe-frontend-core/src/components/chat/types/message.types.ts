@@ -11,6 +11,7 @@ export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
   THINKING: 'THINKING',
   GUIDE: 'GUIDE',
+  ASK: 'ASK',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
   APPROVAL_REQUEST: 'APPROVAL_REQUEST',
@@ -159,6 +160,16 @@ export interface ApprovalBatchData {
   executions?: Record<string, ApprovalBatchExecutionState>
 }
 
+/** Approve/reject handler stamped onto approval segments. MAY resolve a
+ *  boolean success flag — `false` means the confirm FAILED (expired
+ *  proposal, network error); batch approve-all loops use it to tick the
+ *  row's failure cross. `void` (legacy transports) is treated as
+ *  success. Single source of truth for this signature — component
+ *  props, accumulator callbacks, and adapters all reference it. */
+export type ApprovalResolutionHandler = (
+  requestId?: string,
+) => void | boolean | Promise<void | boolean>
+
 // ========== Message Segment Types ==========
 
 export type TextSegment = {
@@ -180,6 +191,28 @@ export type GuideSegment = {
   text: string
 }
 
+/** One reading the assistant offers in an `ask` card. `label` is BOTH the row's
+ *  headline and the exact text sent back when the row is picked — the backend's
+ *  guide classifier resolves the user's next message against the labels it
+ *  offered, so the reply must be the label verbatim. `description` is a short
+ *  clarifying line rendered under it. */
+export type AskOptionData = {
+  label: string
+  description?: string
+}
+
+/** Clarification card — the assistant asking WHICH reading of an ambiguous
+ *  question it should answer, rendered as a heading plus a list of clickable
+ *  options instead of prose bullets. NATS-only (the `ASK` chunk); the intro
+ *  sentence riding the same chunk becomes an ordinary `text` segment in front
+ *  of the card, so it goes through the normal markdown body pipeline. Unlike
+ *  the three delta streams an ask arrives whole — it is never coalesced. */
+export type AskSegment = {
+  type: 'ask'
+  question: string
+  options: AskOptionData[]
+}
+
 export type ToolExecutionSegment = {
   type: 'tool_execution'
   data: ToolExecutionData
@@ -192,8 +225,8 @@ export type ApprovalRequestSegment = {
   /** Display name of the user who resolved the request; baked into the client
    *  variant's full-text status pill ("Approved by {name}"). */
   resolvedByName?: string | null
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
 }
 
 export type ApprovalBatchSegment = {
@@ -202,8 +235,8 @@ export type ApprovalBatchSegment = {
   status?: ChatApprovalStatus
   /** Display name of the user who resolved the request; set when the batch is resolved (null/absent for system actions). */
   resolvedByName?: string | null
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
 }
 
 export type ErrorSegment = {
@@ -218,7 +251,7 @@ export type ContextCompactionSegment = {
   summary?: string
 }
 
-export type MessageSegment = TextSegment | ThinkingSegment | GuideSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | ErrorSegment | ContextCompactionSegment
+export type MessageSegment = TextSegment | ThinkingSegment | GuideSegment | AskSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | ErrorSegment | ContextCompactionSegment
 
 export type MessageContent = string | MessageSegment[]
 
@@ -241,6 +274,16 @@ export interface ThinkingMessageData extends MessageDataBase {
 export interface GuideMessageData extends MessageDataBase {
   type: 'GUIDE'
   text?: string
+}
+
+/** Persisted `ASK` row (GraphQL `AskData`). `text` is the intro sentence, which
+ *  history replays as a text segment ahead of the card — same split the live
+ *  `ASK` chunk carries. */
+export interface AskMessageData extends MessageDataBase {
+  type: 'ASK'
+  text?: string
+  question?: string
+  options?: AskOptionData[]
 }
 
 export interface ExecutingToolMessageData extends MessageDataBase {
@@ -325,6 +368,7 @@ export type MessageData =
   | TextMessageData
   | ThinkingMessageData
   | GuideMessageData
+  | AskMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData
   | ApprovalRequestMessageData

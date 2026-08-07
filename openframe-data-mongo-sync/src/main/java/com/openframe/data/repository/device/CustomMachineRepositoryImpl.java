@@ -1,21 +1,29 @@
 package com.openframe.data.repository.device;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
-import com.openframe.data.util.MachineOsClassifier;
+import com.openframe.data.document.rmm.OsType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Slf4j
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
@@ -23,6 +31,14 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String SORT_DESC = "DESC";
     private static final String ID_FIELD = "_id";
     private static final String OS_TYPE_FIELD = "osType";
+    private static final String MACHINE_ID_FIELD = "machineId";
+    private static final String STATUS_FIELD = "status";
+    private static final String TYPE_FIELD = "type";
+    private static final String ORGANIZATION_ID_FIELD = "organizationId";
+    private static final String COUNT_FIELD = "count";
+    private static final String BUCKET_FIELD = "_availableBucket";
+    private static final String ONLINE_STATUS = "ONLINE";
+    private static final String CURSOR_SEPARATOR = "|";
 
     private static final List<String> SORTABLE_FIELDS = List.of(
             "_id",
@@ -33,14 +49,19 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     );
     private static final String DEFAULT_SORT_FIELD = "_id";
 
+    private static final String TENANT_ID_FIELD = "tenantId";
+
     private final MongoTemplate mongoTemplate;
 
     public CustomMachineRepositoryImpl(MongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
     }
 
-    @Override
-    public List<Machine> findMachinesWithCursor(Query query, String cursor, int limit,
+    private static Query withTenant(String tenantId, Query query) {
+        return query.addCriteria(Criteria.where(TENANT_ID_FIELD).is(tenantId));
+    }
+
+    private List<Machine> findMachinesWithCursor(Query query, String cursor, int limit,
                                                  String sortField, String sortDirection) {
         boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
         Sort.Direction mongoSortDirection = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
@@ -65,6 +86,69 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         }
 
         return mongoTemplate.find(query, Machine.class);
+    }
+
+    private List<Machine> findAvailableForScheduleWithCursor(Query baseQuery, Collection<String> assignedMachineIds,
+                                                            String cursor, int limit) {
+        List<String> assigned = assignedMachineIds == null ? List.of() : new ArrayList<>(assignedMachineIds);
+
+        List<AggregationOperation> ops = new ArrayList<>();
+        // $match: the tenant + platform/filter/search predicate already assembled in the Query
+        // (tenantId is added by the caller via withTenant(...) — aggregate() bypasses the
+        // wrapping template's auto-scope, so we can't rely on that here).
+        ops.add(ctx -> new Document("$match", baseQuery.getQueryObject()));
+        // $addFields: bucket 0..3 = (assigned ? 0 : 2) + (ONLINE ? 0 : 1).
+        ops.add(bucketAddFieldsStage(assigned));
+        // Keyset cursor over (bucket, _id), then the matching sort.
+        appendBucketCursor(ops, cursor);
+        ops.add(ctx -> new Document("$sort", new Document(BUCKET_FIELD, 1).append(ID_FIELD, 1)));
+        ops.add(Aggregation.limit(limit));
+
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(Aggregation.newAggregation(ops), Machine.class, Document.class);
+        return results.getMappedResults().stream()
+                .map(d -> mongoTemplate.getConverter().read(Machine.class, d))
+                .toList();
+    }
+
+    private static AggregationOperation bucketAddFieldsStage(List<String> assignedMachineIds) {
+        Document assignedRank = new Document("$cond", List.of(
+                new Document("$in", List.of("$" + MACHINE_ID_FIELD, assignedMachineIds)), 0, 2));
+        Document statusRank = new Document("$cond", List.of(
+                new Document("$eq", List.of("$" + STATUS_FIELD, ONLINE_STATUS)), 0, 1));
+        Document bucket = new Document("$add", List.of(assignedRank, statusRank));
+        Document addFields = new Document("$addFields", new Document(BUCKET_FIELD, bucket));
+        return ctx -> addFields;
+    }
+
+    /** Compound keyset on ascending (bucket, _id): rows strictly after the cursor. Format "bucket|objectIdHex". */
+    private static void appendBucketCursor(List<AggregationOperation> ops, String cursor) {
+        if (cursor == null || cursor.isBlank()) {
+            return;
+        }
+        int separator = cursor.lastIndexOf(CURSOR_SEPARATOR);
+        if (separator < 0) {
+            log.warn("Invalid availableDevices cursor (no separator): '{}' — falling back to first page", cursor);
+            return;
+        }
+        ObjectId cursorId;
+        try {
+            cursorId = new ObjectId(cursor.substring(separator + 1));
+        } catch (IllegalArgumentException ex) {
+            log.warn("Invalid availableDevices cursor id: '{}' — falling back to first page", cursor);
+            return;
+        }
+        int bucket;
+        try {
+            bucket = Integer.parseInt(cursor.substring(0, separator));
+        } catch (NumberFormatException ex) {
+            log.warn("Unparseable availableDevices bucket in cursor '{}' — falling back to first page", cursor);
+            return;
+        }
+        Document orExpr = new Document("$or", List.of(
+                new Document(BUCKET_FIELD, new Document("$gt", bucket)),
+                new Document(BUCKET_FIELD, bucket).append(ID_FIELD, new Document("$gt", cursorId))));
+        ops.add(ctx -> new Document("$match", orExpr));
     }
 
     private void applyCursorCriteria(Query query, ObjectId cursorId, String sortField, boolean isDesc) {
@@ -117,25 +201,65 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     @Override
-    public List<String> findMachineIds(Query query) {
-        return mongoTemplate.findDistinct(query, "machineId", Machine.class, String.class);
+    public long countMachines(String tenantId, MachineQueryFilter filter, String search) {
+        return mongoTemplate.count(withTenant(tenantId, buildDeviceQuery(filter, search)), Machine.class);
     }
 
     @Override
-    public long countMachines(Query query) {
-        return mongoTemplate.count(query, Machine.class);
+    public List<String> findMachineIds(String tenantId, MachineQueryFilter filter, String search) {
+        return mongoTemplate.findDistinct(withTenant(tenantId, buildDeviceQuery(filter, search)),
+                MACHINE_ID_FIELD, Machine.class, String.class);
+    }
+
+    @Override
+    public List<Machine> findMachinesWithCursor(String tenantId, MachineQueryFilter filter, String search,
+                                                String cursor, int limit,
+                                                String sortField, String sortDirection) {
+        return findMachinesWithCursor(withTenant(tenantId, buildDeviceQuery(filter, search)),
+                cursor, limit, sortField, sortDirection);
+    }
+
+    @Override
+    public List<Machine> findAvailableForScheduleWithCursor(String tenantId, MachineQueryFilter filter, String search,
+                                                            Collection<String> assignedMachineIds,
+                                                            String cursor, int limit) {
+        return findAvailableForScheduleWithCursor(withTenant(tenantId, buildDeviceQuery(filter, search)),
+                assignedMachineIds, cursor, limit);
+    }
+
+    @Override
+    public Map<String, Integer> facet(String tenantId, MachineQueryFilter filter, String search, DeviceFacetDimension dimension) {
+        String field = dimension.fieldName();
+        Query query = withTenant(tenantId, buildDeviceQuery(filter, search, field));
+        Aggregation agg = Aggregation.newAggregation(
+                ctx -> new Document("$match", query.getQueryObject()),
+                Aggregation.group(field).count().as(COUNT_FIELD));
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(agg, Machine.class, Document.class);
+
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (Document doc : results.getMappedResults()) {
+            Object id = doc.get(ID_FIELD);
+            if (id == null) {
+                // Rows with a null group key (e.g. a device with no organizationId) are not an option.
+                continue;
+            }
+            counts.put(id.toString(), ((Number) doc.get(COUNT_FIELD)).intValue());
+        }
+        return counts;
     }
 
     @Override
     public List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter,
                                                  Collection<String> osTypeScope) {
-        return findMachineIds(buildCriteriaQuery(tenantId, filter, osTypeScope));
+        return mongoTemplate.findDistinct(buildCriteriaQuery(tenantId, filter, osTypeScope),
+                MACHINE_ID_FIELD, Machine.class, String.class);
     }
 
     @Override
     public long countMachinesByCriteria(String tenantId, MachineQueryFilter filter,
                                         Collection<String> osTypeScope) {
-        return countMachines(buildCriteriaQuery(tenantId, filter, osTypeScope));
+        return mongoTemplate.count(buildCriteriaQuery(tenantId, filter, osTypeScope), Machine.class);
     }
 
     private Query buildCriteriaQuery(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope) {
@@ -145,36 +269,54 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return query;
     }
 
-    @Override
-    public Query buildDeviceQuery(MachineQueryFilter filter, String search) {
+    Query buildDeviceQuery(MachineQueryFilter filter, String search) {
+        return buildDeviceQuery(filter, search, null);
+    }
+
+    Query buildDeviceQuery(MachineQueryFilter filter, String search, String excludeField) {
         List<Criteria> criteriaList = new ArrayList<>();
+        boolean statusExcluded = STATUS_FIELD.equals(excludeField);
+        boolean callerConstrainsStatus = !statusExcluded && filter != null
+                && filter.getStatuses() != null && !filter.getStatuses().isEmpty();
+        if (!callerConstrainsStatus) {
+            criteriaList.add(Criteria.where("status").ne(DeviceStatus.DELETED));
+        }
 
         if (filter != null) {
-            if (filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
+            if (!statusExcluded && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
                 criteriaList.add(Criteria.where("status").in(filter.getStatuses()));
             }
-            if (filter.getDeviceTypes() != null && !filter.getDeviceTypes().isEmpty()) {
+            if (!TYPE_FIELD.equals(excludeField)
+                    && filter.getDeviceTypes() != null && !filter.getDeviceTypes().isEmpty()) {
                 criteriaList.add(Criteria.where("type").in(filter.getDeviceTypes()));
             }
-            if (filter.getOsTypes() != null && !filter.getOsTypes().isEmpty()) {
-                List<Criteria> perOs = osTypeCriteriaList(filter.getOsTypes());
-                if (!perOs.isEmpty()) {
-                    criteriaList.add(new Criteria().orOperator(perOs.toArray(new Criteria[0])));
-                }
+            if (!OS_TYPE_FIELD.equals(excludeField)) {
+                osTypeOrCriteria(filter.getOsTypes()).ifPresent(criteriaList::add);
             }
-            if (filter.getOrganizationIds() != null && !filter.getOrganizationIds().isEmpty()) {
+            if (!ORGANIZATION_ID_FIELD.equals(excludeField)
+                    && filter.getOrganizationIds() != null && !filter.getOrganizationIds().isEmpty()) {
                 criteriaList.add(Criteria.where("organizationId").in(filter.getOrganizationIds()));
+            }
+            osTypeOrCriteria(filter.getPlatformNames()).ifPresent(criteriaList::add);
+            Collection<String> restrict = filter.getRestrictToMachineIds();
+            if (restrict != null) {
+                if (restrict.isEmpty()) {
+                    criteriaList.add(Criteria.where(MACHINE_ID_FIELD).exists(false));
+                } else {
+                    criteriaList.add(Criteria.where(MACHINE_ID_FIELD).in(restrict));
+                }
             }
         }
 
         if (search != null && !search.isEmpty()) {
+            String quoted = Pattern.quote(search);
             criteriaList.add(new Criteria().orOperator(
-                    Criteria.where("hostname").regex(search, "i"),
-                    Criteria.where("displayName").regex(search, "i"),
-                    Criteria.where("ip").regex(search, "i"),
-                    Criteria.where("serialNumber").regex(search, "i"),
-                    Criteria.where("manufacturer").regex(search, "i"),
-                    Criteria.where("model").regex(search, "i")
+                    Criteria.where("hostname").regex(quoted, "i"),
+                    Criteria.where("displayName").regex(quoted, "i"),
+                    Criteria.where("ip").regex(quoted, "i"),
+                    Criteria.where("serialNumber").regex(quoted, "i"),
+                    Criteria.where("manufacturer").regex(quoted, "i"),
+                    Criteria.where("model").regex(quoted, "i")
             ));
         }
 
@@ -196,25 +338,12 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     private static Optional<Criteria> osTypeOrCriteria(Collection<String> osTypeScope) {
-        if (osTypeScope == null || osTypeScope.isEmpty()) {
-            return Optional.empty();
-        }
-        List<Document> perPlatform = osTypeScope.stream()
-                .filter(Objects::nonNull)
-                .map(name -> osTypeCriteria(name).getCriteriaObject())
-                .toList();
-        return perPlatform.isEmpty() ? Optional.empty()
-                : Optional.of(Criteria.where("$or").is(perPlatform));
+        List<String> valid = filterNonNull(osTypeScope);
+        return valid.isEmpty() ? Optional.empty()
+                : Optional.of(Criteria.where(OS_TYPE_FIELD).in(valid));
     }
 
-    private static List<Criteria> osTypeCriteriaList(Collection<String> osTypeScope) {
-        return osTypeScope.stream()
-                .filter(Objects::nonNull)
-                .map(CustomMachineRepositoryImpl::osTypeCriteria)
-                .toList();
-    }
-
-    private static Criteria osTypeCriteria(String rawOsType) {
-        return Criteria.where(OS_TYPE_FIELD).regex(MachineOsClassifier.matchRegex(rawOsType), "i");
+    private static List<String> filterNonNull(Collection<String> values) {
+        return values == null ? List.of() : values.stream().filter(Objects::nonNull).toList();
     }
 }

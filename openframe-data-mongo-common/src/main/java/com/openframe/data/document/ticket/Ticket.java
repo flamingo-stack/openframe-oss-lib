@@ -55,6 +55,7 @@ public class Ticket implements TenantScoped {
     @Indexed
     private String assignedTo;
     private String assignedName;
+    private Boolean escalatedByUser;
     private String order;
     @CreatedDate
     private Instant createdAt;

@@ -1,5 +1,7 @@
 export { EmbedIframe } from './embed-iframe'
 export type { EmbedIframeProps } from './embed-iframe'
+export { EmbedViewerFrame } from './embed-viewer-frame'
+export type { EmbedViewerFrameProps } from './embed-viewer-frame'
 
 export { PdfViewer } from './pdf-viewer'
 export type { PdfViewerProps } from './pdf-viewer'

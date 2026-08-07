@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
+import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
@@ -14,7 +15,7 @@ import com.openframe.api.mapper.ScriptScheduleMapper;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -97,7 +98,7 @@ class ScriptScheduleServiceTest {
     @Test
     @DisplayName("create: persists and returns the mapped response when the name is unique, stamping createdBy")
     void create_whenNameUnique_persistsAndReturnsResponse() {
-        createInput.setSupportedPlatforms(List.of(ScriptPlatform.WINDOWS));
+        createInput.setSupportedPlatforms(List.of(OsType.WINDOWS));
         createInput.setScriptIds(List.of("sc-1", "sc-2"));
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(TENANT_ID, createInput.getName(), UNIQUE_STATUSES)).thenReturn(false);
         when(scheduleRepository.save(any())).thenAnswer(inv -> {
@@ -131,7 +132,7 @@ class ScriptScheduleServiceTest {
     @Test
     @DisplayName("create: a script whose platforms exclude the schedule's platform is rejected (macOS schedule + Windows-only script)")
     void create_scriptPlatformMismatch_rejected() {
-        createInput.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
+        createInput.setSupportedPlatforms(List.of(OsType.MAC_OS));
         createInput.setScriptIds(List.of("sc-win"));
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
         when(scriptService.getScriptsByIds(any())).thenReturn(List.of(
@@ -146,12 +147,12 @@ class ScriptScheduleServiceTest {
     @Test
     @DisplayName("create: a script that supports the schedule's platform (among others) is accepted")
     void create_scriptPlatformCompatible_accepted() {
-        createInput.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
+        createInput.setSupportedPlatforms(List.of(OsType.MAC_OS));
         createInput.setScriptIds(List.of("sc-cross"));
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
         when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(scriptService.getScriptsByIds(any())).thenReturn(List.of(
-                ScriptResponse.builder().id("sc-cross").name("cross").supportedPlatforms(List.of("WINDOWS", "MACOS")).build()));
+                ScriptResponse.builder().id("sc-cross").name("cross").supportedPlatforms(List.of("WINDOWS", "MAC_OS")).build()));
 
         assertThat(scheduleService.create(createInput, "user-1")).isNotNull();
         verify(scheduleRepository).save(any());
@@ -160,7 +161,7 @@ class ScriptScheduleServiceTest {
     @Test
     @DisplayName("create: a platform-agnostic script (no declared platforms) is allowed on any schedule")
     void create_scriptNoPlatforms_allowed() {
-        createInput.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
+        createInput.setSupportedPlatforms(List.of(OsType.MAC_OS));
         createInput.setScriptIds(List.of("sc-any"));
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
         when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -169,6 +170,55 @@ class ScriptScheduleServiceTest {
 
         assertThat(scheduleService.create(createInput, "user-1")).isNotNull();
         verify(scheduleRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("create: custom params referencing a scriptId not in the schedule are rejected (400)")
+    void create_customParamsOrphanScriptId_rejected() {
+        createInput.setScriptIds(List.of("sc-1"));
+        createInput.setScriptCustomParams(List.of(customParams("sc-999")));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("sc-999");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: two custom-params entries for the same scriptId are rejected (400)")
+    void create_customParamsDuplicateScriptId_rejected() {
+        createInput.setScriptIds(List.of("sc-1"));
+        createInput.setScriptCustomParams(List.of(customParams("sc-1"), customParams("sc-1")));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Duplicate");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: valid custom params (scriptId in the schedule) are persisted on the entity")
+    void create_customParamsValid_persisted() {
+        createInput.setScriptIds(List.of("sc-1", "sc-2"));
+        ScheduledScriptCustomParamsInput cp = customParams("sc-1");
+        cp.setArgs(List.of("--custom"));
+        createInput.setScriptCustomParams(List.of(cp));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ScriptScheduleResponse result = scheduleService.create(createInput, "user-1");
+
+        assertThat(result.getScriptCustomParams()).hasSize(1);
+        assertThat(result.getScriptCustomParams().get(0).getScriptId()).isEqualTo("sc-1");
+        assertThat(result.getScriptCustomParams().get(0).getArgs()).containsExactly("--custom");
+    }
+
+    private static ScheduledScriptCustomParamsInput customParams(String scriptId) {
+        ScheduledScriptCustomParamsInput cp = new ScheduledScriptCustomParamsInput();
+        cp.setScriptId(scriptId);
+        return cp;
     }
 
     @Test
@@ -228,10 +278,14 @@ class ScriptScheduleServiceTest {
     @DisplayName("list: API filter is translated into a data-layer ScriptScheduleQueryFilter and forwarded")
     void list_filterForwardedToRepository() {
         stubSortDefault();
+        Instant startFrom = Instant.parse("2026-04-01T00:00:00Z");
+        Instant startTo = Instant.parse("2026-05-01T00:00:00Z");
         ScriptScheduleFilterInput filter = ScriptScheduleFilterInput.builder()
                 .statuses(List.of(ScriptStatus.ACTIVE))
-                .supportedPlatforms(List.of(ScriptPlatform.WINDOWS))
+                .supportedPlatforms(List.of(OsType.WINDOWS))
                 .authorIds(List.of("user-7"))
+                .startAtFrom(startFrom)
+                .startAtTo(startTo)
                 .build();
         when(scheduleRepository.countForTenant(eq(TENANT_ID), any(), any())).thenReturn(0L);
         when(scheduleRepository.findPageForTenant(any(), any(), any(), any(), any(), any(), eq(false), eq(21)))
@@ -244,8 +298,10 @@ class ScriptScheduleServiceTest {
                 eq("_id"), eq(Sort.Direction.DESC), eq(null), eq(false), eq(21));
         ScriptScheduleQueryFilter forwarded = captor.getValue();
         assertThat(forwarded.getStatuses()).containsExactly(ScriptStatus.ACTIVE);
-        assertThat(forwarded.getSupportedPlatforms()).containsExactly(ScriptPlatform.WINDOWS);
+        assertThat(forwarded.getSupportedPlatforms()).containsExactly(OsType.WINDOWS);
         assertThat(forwarded.getCreatedByIds()).containsExactly("user-7");
+        assertThat(forwarded.getStartAtFrom()).isEqualTo(startFrom);
+        assertThat(forwarded.getStartAtTo()).isEqualTo(startTo);
     }
 
     @Test

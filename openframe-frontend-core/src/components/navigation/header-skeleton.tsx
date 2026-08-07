@@ -21,20 +21,20 @@ export function HeaderSkeleton({ config }: HeaderSkeletonProps) {
     <div className="sticky top-0 z-[50] w-full">
       <header
         className={cn(
-          'flex h-12 w-full items-center border-b border-t border-ods-border md:h-14 md:border-t-0',
+          'flex h-[72px] w-full items-center border-b border-t border-ods-border md:border-t-0',
           config?.backgroundColor || 'bg-ods-card',
           config?.className,
         )}
       >
         {/* Leading cells: admin toggle / burger */}
         {showLeftActions && (
-          <div className="flex h-full w-12 items-center justify-center border-r border-ods-border md:w-14">
+          <div className="flex h-full w-[72px] items-center justify-center border-r border-ods-border">
             <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
           </div>
         )}
         {showMobileMenu && (
-          <div className="flex h-full w-12 items-center justify-center border-r border-ods-border md:w-14 lg:hidden">
-            <div className="h-4 w-4 animate-pulse rounded bg-ods-border md:h-6 md:w-6" />
+          <div className="flex h-full w-[72px] items-center justify-center border-r border-ods-border lg:hidden">
+            <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
           </div>
         )}
 

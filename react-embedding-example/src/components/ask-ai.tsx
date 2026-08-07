@@ -8,6 +8,11 @@ import { DOCS_BASE_ROUTE } from '../config/content'
  * Identity (Michael) is resolved server-side via the proxy's act-as headers, so the
  * greeting just works.
  *
+ * ENTRY POINT: the shared header's Mingo launcher (`HeaderConfig.mingo` in
+ * app-shell.tsx) — the same `ask-ai:open` event bus the hub uses. The lib's
+ * floating internal trigger is disabled (`showInternalTrigger={false}`),
+ * matching the hub's retired-dock model.
+ *
  * OpenFrame AGENT MODE (Fae / Mingo): the demo chooser below sets `activeAgentSlug`.
  * Agent mode reuses the same `<EmbeddableChat>` — it just OVERRIDES the empty-state
  * config URL, fetching the agent's display config (greeting + suggested prompts +
@@ -32,8 +37,10 @@ export function AskAi() {
   return (
     <>
       {/* Demo-only chooser: flip the SAME chat between Guide mode and an
-          OpenFrame AI agent. A real embedder might hardcode one agent slug. */}
-      <div className="fixed top-20 left-4 z-[60] flex gap-1 rounded-lg border border-ods-border bg-ods-card p-1 shadow-lg">
+          OpenFrame AI agent. A real embedder might hardcode one agent slug.
+          Bottom-RIGHT — opposite corner from the floating walkthrough-video
+          widget (bottom-left), so neither covers the other. */}
+      <div className="fixed bottom-4 right-4 z-[60] flex gap-1 rounded-lg border border-ods-border bg-ods-card p-1 shadow-lg">
         {AGENT_CHOICES.map((choice) => (
           <button
             key={choice.label}
@@ -50,10 +57,15 @@ export function AskAi() {
         ))}
       </div>
 
+      {/* Headless panel — the floating internal trigger is DISABLED (same as
+          the hub): the shared header's MingoAiButton (HeaderConfig.mingo in
+          app-shell.tsx) is the ONLY chat entry; it dispatches `ask-ai:open`
+          and this always-mounted panel listens. */}
       <EmbeddableChat
         modes={{ guide: {} }}
         defaultActiveMode="guide"
         baseRoute={DOCS_BASE_ROUTE}
+        showInternalTrigger={false}
         activeAgentSlug={activeAgentSlug}
         onAgentChange={setActiveAgentSlug}
       />

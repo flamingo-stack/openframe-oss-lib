@@ -4,6 +4,12 @@
  */
 
 import { stripInlineMarkdown } from './markdown-to-plain'
+import {
+  createHeadingIdDeduper,
+  scanHeadings,
+  slugifyHeadingBase,
+  stripHeadingEmojis,
+} from './markdown-heading-id'
 
 export interface MarkdownSection {
   id: string
@@ -38,68 +44,47 @@ export function extractSections(
 ): MarkdownSection[] {
   const opts = { ...DEFAULT_OPTIONS, ...options }
   const sections: MarkdownSection[] = []
-  const lines = markdown.split('\n')
-  const idCounts: Record<string, number> = {}
+  const dedupe = createHeadingIdDeduper()
 
-  let inCodeBlock = false
-  let inYamlBlock = false
+  // ONE scanner, shared with the renderer's heading-id map
+  // (utils/markdown-heading-id.ts). This file used to carry its own
+  // line loop — `line.startsWith('```')` for fences (blind to `~~~`, to
+  // longer backtick runs and to the CommonMark 0..3-space indent) and a
+  // bare `line === '---'` YAML toggle (which a mid-document thematic break
+  // or setext underline tripped, swallowing every heading after it). Both
+  // produced sections the renderer emitted no id for.
+  const scanned = scanHeadings(markdown, {
+    skipFrontmatter: opts.skipCodeAndYamlBlocks,
+    skipFences: opts.skipCodeAndYamlBlocks,
+  })
 
-  for (const line of lines) {
-    if (opts.skipCodeAndYamlBlocks) {
-      if (line.startsWith('```')) {
-        inCodeBlock = !inCodeBlock
-        continue
-      }
-      if (line === '---') {
-        inYamlBlock = !inYamlBlock
-        continue
-      }
-      if (inCodeBlock || inYamlBlock) continue
-    }
+  for (const heading of scanned) {
+    if (heading.level > opts.maxLevel) continue
 
-    const pattern = new RegExp(`^(#{1,${opts.maxLevel}})\\s+(.+)`)
-    const match = line.match(pattern)
-    if (!match) continue
-
-    const level = match[1].length
-    if (level > opts.maxLevel) continue
-
-    let title = match[2].trim()
-
+    let title = heading.text
     if (opts.stripFormattingMarkers) {
       title = stripInlineMarkdown(title).trim()
     }
 
-    let baseId = title
+    // Slug chain SSOT — shared with the renderers' heading-id generator
+    // (see utils/markdown-heading-id.ts). Extractor and renderers MUST
+    // agree or deep-link anchors silently diverge.
+    const baseId = slugifyHeadingBase(
+      opts.removeEmojis ? stripHeadingEmojis(title) : title,
+    )
 
-    if (opts.removeEmojis) {
-      baseId = baseId
-        .replace(
-          /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu,
-          '',
-        )
-        .trim()
-    }
-
-    baseId = baseId
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/^-+|-+$/g, '')
-
+    // Symbol-only heading fallback: the 1-based ordinal among the headings
+    // this extractor EMITS (levels ≤ maxLevel). The renderer's heading-id
+    // generator mirrors this exact counter for levels ≤ 2
+    // (components/ui/markdown/heading-ids.ts) — the two must agree or
+    // deep-link anchors diverge for symbol-only headings.
     const cleanId = baseId || `section-${sections.length + 1}`
 
-    let id = cleanId
-    if (opts.handleDuplicateIds) {
-      if (idCounts[cleanId]) {
-        idCounts[cleanId]++
-        id = `${cleanId}-${idCounts[cleanId]}`
-      } else {
-        idCounts[cleanId] = 1
-      }
-    }
-
-    sections.push({ id, title, level })
+    sections.push({
+      id: opts.handleDuplicateIds ? dedupe(cleanId) : cleanId,
+      title,
+      level: heading.level,
+    })
   }
 
   return sections

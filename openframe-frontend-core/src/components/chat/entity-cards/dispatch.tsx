@@ -36,6 +36,7 @@ import type { ChatRef } from '../chat-ref.types'
 import { useChatCardItem } from '../hooks/use-chat-card-item'
 import { handleChatNavClick } from '../utils/nav-click-handler'
 import { resolveSourceRowCTA, resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta'
+import { resolveFetchedCardHref, readFetchedCardTitle } from '../utils/resolve-fetched-card-href'
 import { resolveHrefForRuntime } from '../utils/chat-nav-resolution'
 import {
   computeIsNewTab,
@@ -48,6 +49,7 @@ import { SourceActionButton } from '../source-action-button'
 import { NavLinkAnchorViaRuntime } from '../nav-link-anchor-via-runtime'
 import { defaultBuildProductReleaseCardProps } from './product-release-card-defaults'
 import { ChatVideoEntityCard } from './chat-video-entity-card'
+import { DeletedDataCard } from './deleted-data-card'
 import { BlockCard } from './block-card'
 import { BlogCardSkeleton } from './blog-card'
 import { CaseStudyCardSkeleton } from './case-study-card'
@@ -1000,8 +1002,15 @@ type ChatCardRegistryEntry =
        *  resolved ref — so the wrapper sees a non-null `href`, the
        *  pre-computed `isNewTab` reflects the actual destination, and
        *  the click goes through `handleChatNavClick` (no silent
-       *  bypass of embed-mode / close-on-nav). */
+       *  bypass of embed-mode / close-on-nav). Takes precedence over the
+       *  `composeContentUrl` fallback below. */
       fallbackHref?: (item: any) => string | null
+      /** Opt OUT of the post-fetch `composeContentUrl` fallback (see
+       *  `resolveFetchedCardHref`). Set for types with NO public destination
+       *  — the seam would otherwise synthesize `<contentOrigin>/<type>/<id>`
+       *  from its default branch and hand the user a 404. Types with a real
+       *  route (hosted, or covered by a host `override`) leave it unset. */
+      noComposedHref?: boolean
     }
 
 interface FinancialCardConfig {
@@ -1017,24 +1026,32 @@ const FINANCIAL_CARD_CONFIGS: Record<string, FinancialCardConfig> = {
   balance_sheet: { label: 'Balance sheet', icon: () => <BankIcon size={24} /> },
   cash_flow: { label: 'Cash flow', icon: () => <CoinsExchangeCurrencyIcon size={24} /> },
 }
-function financialRegistryEntries(): Record<string, ChatCardRegistryEntry> {
+/** Expand a per-family config map into registry entries — ONE loop shell
+ *  for every card family (financial, github, program, roadmap); adding a
+ *  family is a config map + one `registryEntries(...)` call. */
+function registryEntries<C>(
+  configs: Record<string, C>,
+  build: (cfg: C) => ChatCardRegistryEntry,
+): Record<string, ChatCardRegistryEntry> {
   const out: Record<string, ChatCardRegistryEntry> = {}
-  for (const [docType, cfg] of Object.entries(FINANCIAL_CARD_CONFIGS)) {
-    out[docType] = {
-      mode: 'no-fetch',
-      label: cfg.label,
-      bareInline: true,
-      render: (chatRef, opts) => (
-        <GenericFinancialChatCard
-          chatRef={chatRef}
-          icon={cfg.icon()}
-          isNewTab={opts.isNewTab}
-          discuss={opts.discuss}
-        />
-      ),
-    }
-  }
+  for (const [docType, cfg] of Object.entries(configs)) out[docType] = build(cfg)
   return out
+}
+
+function financialRegistryEntries(): Record<string, ChatCardRegistryEntry> {
+  return registryEntries(FINANCIAL_CARD_CONFIGS, (cfg) => ({
+    mode: 'no-fetch',
+    label: cfg.label,
+    bareInline: true,
+    render: (chatRef, opts) => (
+      <GenericFinancialChatCard
+        chatRef={chatRef}
+        icon={cfg.icon()}
+        isNewTab={opts.isNewTab}
+        discuss={opts.discuss}
+      />
+    ),
+  }))
 }
 
 interface GitHubCardConfig {
@@ -1050,19 +1067,15 @@ const GITHUB_CARD_CONFIGS: Record<string, GitHubCardConfig> = {
   github_pr_review_public: { label: 'GitHub review (public)', kind: 'pr_review' },
 }
 function githubRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  const out: Record<string, ChatCardRegistryEntry> = {}
-  for (const [docType, cfg] of Object.entries(GITHUB_CARD_CONFIGS)) {
-    out[docType] = {
-      mode: 'no-fetch',
-      label: cfg.label,
-      bareInline: true,
-      render: (chatRef, opts) => (
-        <GitHubChatCard chatRef={chatRef} kind={cfg.kind} isNewTab={opts.isNewTab}
-          discuss={opts.discuss} />
-      ),
-    }
-  }
-  return out
+  return registryEntries(GITHUB_CARD_CONFIGS, (cfg) => ({
+    mode: 'no-fetch',
+    label: cfg.label,
+    bareInline: true,
+    render: (chatRef, opts) => (
+      <GitHubChatCard chatRef={chatRef} kind={cfg.kind} isNewTab={opts.isNewTab}
+        discuss={opts.discuss} />
+    ),
+  }))
 }
 
 type ProgramConfigKey = 'podcast' | 'webinar' | 'event'
@@ -1077,28 +1090,24 @@ const PROGRAM_CARD_CONFIGS: Record<string, ProgramCardConfig> = {
   event: { label: 'Event', configKey: 'event', contentRefType: 'event' },
 }
 function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  const out: Record<string, ChatCardRegistryEntry> = {}
-  for (const [docType, cfg] of Object.entries(PROGRAM_CARD_CONFIGS)) {
-    out[docType] = {
-      mode: 'fetch',
-      label: cfg.label,
-      contentRefType: cfg.contentRefType,
-      bareInline: true,
-      skeleton: () => <ProgramCardSkeleton size="sm" />,
-      render: (item, chatRef, opts) => (
-        <ProgramChatCard
-          item={item}
-          chatRef={chatRef}
-          isNewTab={opts.isNewTab}
-          discuss={opts.discuss}
-          configKey={cfg.configKey}
-          label={cfg.configKey.charAt(0).toUpperCase() + cfg.configKey.slice(1)}
-          ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
-        />
-      ),
-    }
-  }
-  return out
+  return registryEntries(PROGRAM_CARD_CONFIGS, (cfg) => ({
+    mode: 'fetch',
+    label: cfg.label,
+    contentRefType: cfg.contentRefType,
+    bareInline: true,
+    skeleton: () => <ProgramCardSkeleton size="sm" />,
+    render: (item, chatRef, opts) => (
+      <ProgramChatCard
+        item={item}
+        chatRef={chatRef}
+        isNewTab={opts.isNewTab}
+        discuss={opts.discuss}
+        configKey={cfg.configKey}
+        label={cfg.configKey.charAt(0).toUpperCase() + cfg.configKey.slice(1)}
+        ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
+      />
+    ),
+  }))
 }
 
 type RoadmapCardType = 'roadmap_item' | 'delivery_item' | 'internal_task'
@@ -1106,6 +1115,8 @@ interface RoadmapEntryConfig {
   label: string
   cardType: RoadmapCardType
   contentRefType: string
+  /** See `ChatCardRegistryEntry.noComposedHref`. */
+  noComposedHref?: boolean
 }
 const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
   roadmap_item: { label: 'Roadmap item', cardType: 'roadmap_item', contentRefType: 'roadmap_item' },
@@ -1118,34 +1129,50 @@ const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
     label: 'Internal task',
     cardType: 'internal_task',
     contentRefType: 'internal_task',
+    // Internal ClickUp work has no public destination on any platform — the
+    // seam's default branch would synthesize `<hub>/internal_task/<id>`.
+    noComposedHref: true,
   },
 }
 function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  const out: Record<string, ChatCardRegistryEntry> = {}
-  for (const [docType, cfg] of Object.entries(ROADMAP_CARD_CONFIGS)) {
-    out[docType] = {
-      mode: 'fetch',
-      label: cfg.label,
-      contentRefType: cfg.contentRefType,
-      bareInline: true,
-      skeleton: () => <RoadmapCardSkeleton size="sm" />,
-      render: (item, chatRef, opts) => (
-        <RoadmapChatCard
-          item={item}
-          chatRef={chatRef}
-          isNewTab={opts.isNewTab}
-          discuss={opts.discuss}
-          cardType={cfg.cardType}
-        />
-      ),
-    }
-  }
-  return out
+  return registryEntries(ROADMAP_CARD_CONFIGS, (cfg) => ({
+    mode: 'fetch',
+    label: cfg.label,
+    contentRefType: cfg.contentRefType,
+    bareInline: true,
+    ...(cfg.noComposedHref ? { noComposedHref: true } : {}),
+    skeleton: () => <RoadmapCardSkeleton size="sm" />,
+    render: (item, chatRef, opts) => (
+      <RoadmapChatCard
+        item={item}
+        chatRef={chatRef}
+        isNewTab={opts.isNewTab}
+        discuss={opts.discuss}
+        cardType={cfg.cardType}
+      />
+    ),
+  }))
 }
 
 const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   // ───────── no-fetch: ChatRef carries everything ─────────
   ...githubRegistryEntries(),
+  // Generic TOMBSTONE for entities a chat action deleted (ClickUp task
+  // today; any deletable entity tomorrow). No fetch, no navigation —
+  // the entity no longer resolves anywhere; the placeholder keeps the
+  // thread's integrity (Teams/Slack "This message was deleted" pattern).
+  deleted_data: {
+    mode: 'no-fetch',
+    label: 'Deleted',
+    bareInline: true,
+    render: (chatRef) => (
+      <DeletedDataCard
+        title={chatRef.title ?? null}
+        entityLabel={(chatRef.metadata?.entity_label as string | undefined) ?? null}
+        recoveryNote={(chatRef.metadata?.recovery_note as string | undefined) ?? null}
+      />
+    ),
+  },
   slack_message: {
     mode: 'no-fetch',
     label: 'Slack message',
@@ -1420,6 +1447,17 @@ function ChatCardNavWrap({
   const onClickCapture = (e: React.MouseEvent<HTMLElement>) => {
     if (!href) return
     const targetEl = e.target as HTMLElement
+    // Only claim clicks that physically happened INSIDE this card.
+    //
+    // The card's "⋯" menu renders through a React PORTAL: its DOM lives in the
+    // panel's portal host, but React still bubbles its events through this
+    // subtree — so this capture handler sees them first and, being a capture
+    // phase, runs BEFORE the menu row's own `stopPropagation`. That swallowed
+    // the menu's trailing "↗ Open in new tab" button: `executeNavigation`
+    // called `preventDefault()` and routed the card's href in the SAME tab,
+    // so the anchor's `target="_blank"` never applied.
+    const host = e.currentTarget as HTMLElement | null
+    if (!host?.contains(targetEl)) return
     // Buttons rendered INSIDE the card's outer `<a>` (e.g. RoadmapCard
     // vote buttons, ImageGallery thumbnails) bubble up with
     // `closest('a')` truthy — without this guard, clicking them would
@@ -1516,24 +1554,60 @@ export function ChatCardLoader({
   // `contentRefType` is empty so the hook returns `isLoading=false` and
   // `item=undefined`, which we ignore.
   const fetchEntry = entry && entry.mode === 'fetch' ? entry : null
-  const { item, isLoading } = useChatCardItem<any>(
+  const { item, isLoading, isError, isFetched } = useChatCardItem<any>(
     fetchEntry?.contentRefType ?? '',
     fetchEntry ? resolvedChatRef.id : '',
   )
   if (!entry) return null
 
-  // Apply per-type fallback URL AFTER fetch (e.g. campaign → /admin/...).
+  // Apply the post-fetch URL fallback (the ref carried no `externalUrl`).
   // We mutate `resolvedChatRef.url` BEFORE computing isNewTab so the
   // wrapper's interceptor sees the destination the user will actually
   // visit. `safeHref` blocks `javascript:` / `data:` payloads even
   // though the registry callers compose hub-internal strings today.
-  const finalChatRef: ChatRef =
+  //
+  // Two sources, in order:
+  //   1. the registry's per-type `fallbackHref` — an explicit non-content
+  //      destination (marketing campaign → `/admin/...`);
+  //   2. the host's `composeContentUrl` seam via `resolveFetchedCardHref` —
+  //      the SAME resolver page cards and SSE chat cards go through. This is
+  //      what makes Mingo/NATS cards clickable: that transport ships bare
+  //      `[card://type:id]` markers with no refs metadata, so the ref reaches
+  //      us with `url: null` and `resolveSourceRowCTA` has nothing to route.
+  const composedHref =
+    fetchEntry && !resolvedChatRef.url && item && !fetchEntry.fallbackHref && !fetchEntry.noComposedHref
+      ? resolveFetchedCardHref({
+          contentRefType: fetchEntry.contentRefType,
+          id: resolvedChatRef.id,
+          item,
+          composeContentUrl: runtime.composeContentUrl,
+        })
+      : null
+  const hrefResolvedChatRef: ChatRef =
     fetchEntry && !resolvedChatRef.url && item && fetchEntry.fallbackHref
       ? {
           ...resolvedChatRef,
           url: safeHref(fetchEntry.fallbackHref(item)),
         }
-      : resolvedChatRef
+      : composedHref
+        ? {
+            ...resolvedChatRef,
+            url: safeHref(composedHref.href),
+            targetPlatform: composedHref.targetPlatform ?? resolvedChatRef.targetPlatform ?? null,
+          }
+        : resolvedChatRef
+
+  // Title enrichment, same synthetic-ref gap as the href above: a Mingo
+  // `[card://type:id]` marker produces `title: <id>` because the transport
+  // ships no ref metadata. Downstream consumers that read `ref.title` — most
+  // visibly the "Ask Mingo" prompt, which would otherwise send
+  // "Tell me more about 86ad3qvv5" — get the row's real title once it loads.
+  // A ref that already carries a distinct title (the SSE path) is untouched.
+  const fetchedTitle = fetchEntry && item ? readFetchedCardTitle(item) : null
+  const finalChatRef: ChatRef =
+    fetchedTitle && (!hrefResolvedChatRef.title || hrefResolvedChatRef.title === hrefResolvedChatRef.id)
+      ? { ...hrefResolvedChatRef, title: fetchedTitle }
+      : hrefResolvedChatRef
 
   // Pre-compute new-tab decision ONCE here (the same rule chips use).
   // Render branches that pass `target` / `rel` to their card pull this
@@ -1590,6 +1664,23 @@ export function ChatCardLoader({
       {children}
     </ChatCardNavWrap>
   )
+  // ONE render tail for both modes — bare-inline cards skip the discuss
+  // wrapper; everything else gets the ChatCardWithDiscuss chrome. Kept
+  // here (not per-branch) so the two paths can never drift on the
+  // discuss-menu wiring.
+  const finish = (node: React.ReactNode) =>
+    entry.bareInline ? (
+      <>{navWrap(node)}</>
+    ) : (
+      <ChatCardWithDiscuss
+        chatRef={finalChatRef}
+        onDiscuss={onDiscuss}
+        onDisplay={onDisplay}
+        displayAction={entry.displayAction}
+      >
+        {navWrap(node)}
+      </ChatCardWithDiscuss>
+    )
   if (entry.mode === 'no-fetch') {
     // Synthetic-ref gate. `chat-message-enhanced.tsx` builds a minimal
     // `{ type, id, title: cardId, url: null }` ChatRef when the LLM
@@ -1612,35 +1703,47 @@ export function ChatCardLoader({
     // Fetch-mode types already handle this gracefully: a synthetic
     // id leads to a fetch miss → `!item` → null at line ~1034.
     if (!finalChatRef.sourceRepo) return null
-    if (entry.bareInline) {
-      return navWrap(entry.render(finalChatRef, renderOpts))
-    }
-    return (
-      <ChatCardWithDiscuss
-        chatRef={finalChatRef}
-        onDiscuss={onDiscuss}
-        onDisplay={onDisplay}
-        displayAction={entry.displayAction}
-      >
-        {navWrap(entry.render(finalChatRef, renderOpts))}
-      </ChatCardWithDiscuss>
-    )
+    return finish(entry.render(finalChatRef, renderOpts))
   }
   if (isLoading) return <>{entry.skeleton()}</>
-  if (!item) return null
-  if (entry.bareInline) {
-    return <>{navWrap(entry.render(item, finalChatRef, renderOpts))}</>
+  if (!item) {
+    // FETCH FAILURE (non-OK response — auth blip, 5xx, rate limit) is
+    // NOT evidence of deletion: render nothing rather than a false
+    // "deleted" claim. Only a SUCCESSFUL fetch that lacks the id
+    // reaches the tombstone below.
+    if (isError) return null
+    // NEVER-FETCHED (query disabled — no list URL registered for this
+    // type, or an empty id): no request was made, so absence of `item`
+    // proves nothing. Render nothing rather than a false "deleted".
+    if (!isFetched) return null
+    // FETCH MISS. Two distinct cases, split by ref provenance:
+    //
+    //   - SERVER-BUILT ref (`sourceRepo` present — the entity provably
+    //     existed when the answer was written, its ref was persisted
+    //     with the message): the entity is GONE now (deleted /
+    //     tombstoned). Render the generic deleted-data TOMBSTONE so the
+    //     thread keeps its integrity instead of a silent gap — works
+    //     for ANY fetch-mode entity type, no per-type wiring.
+    //
+    //   - SYNTHETIC client-built ref (bare marker with no refs entry —
+    //     possibly a hallucinated id): keep the existing hide-it
+    //     behavior; a "deleted" placeholder would assert an existence
+    //     we can't vouch for.
+    if (finalChatRef.sourceRepo) {
+      return (
+        <DeletedDataCard
+          title={finalChatRef.title ?? null}
+          entityLabel={entry.label}
+          recoveryNote={
+            (finalChatRef.metadata as Record<string, unknown> | null | undefined)
+              ?.recovery_note as string | undefined ?? null
+          }
+        />
+      )
+    }
+    return null
   }
-  return (
-    <ChatCardWithDiscuss
-      chatRef={finalChatRef}
-      onDiscuss={onDiscuss}
-      onDisplay={onDisplay}
-      displayAction={entry.displayAction}
-    >
-      {navWrap(entry.render(item, finalChatRef, renderOpts))}
-    </ChatCardWithDiscuss>
-  )
+  return finish(entry.render(item, finalChatRef, renderOpts))
 }
 
 // =============================================================================

@@ -13,6 +13,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Slf4j
 public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBaseItemRepository {
@@ -44,7 +45,7 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         query.addCriteria(Criteria.where(FIELD_TYPE).is(KnowledgeBaseItemType.FOLDER));
 
         if (StringUtils.hasText(search)) {
-            query.addCriteria(Criteria.where(FIELD_NAME).regex(search, "i"));
+            query.addCriteria(Criteria.where(FIELD_NAME).regex(Pattern.quote(search), "i"));
         }
 
         if (itemIds != null) {
@@ -147,9 +148,10 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         List<Criteria> composites = new ArrayList<>();
 
         if (StringUtils.hasText(search)) {
+            String quoted = Pattern.quote(search);
             composites.add(new Criteria().orOperator(
-                    Criteria.where(FIELD_NAME).regex(search, "i"),
-                    Criteria.where(FIELD_SUMMARY).regex(search, "i")));
+                    Criteria.where(FIELD_NAME).regex(quoted, "i"),
+                    Criteria.where(FIELD_SUMMARY).regex(quoted, "i")));
         }
 
         Criteria cursorCriteria = buildCursorCriteria(cursor);

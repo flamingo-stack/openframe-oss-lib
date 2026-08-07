@@ -11,6 +11,7 @@ import { BellIcon } from '../icons-v2-generated/interface/bell-icon';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui';
 import { HeaderButton } from './header-button';
 import { HeaderGlobalSearch } from './header-global-search';
+import { TicketAlertsButton } from './ticket-alerts-button';
 import { HeaderMingoButton } from './header-mingo-button';
 import { HeaderOrganizationFilter } from './header-organization-filter';
 import { TopNavigation } from './top-navigation';
@@ -24,6 +25,19 @@ export interface AppHeaderProps {
   onOrgChange?: (id: string) => void;
   showNotifications?: boolean;
   unreadCount?: number;
+  /** Render the support-ticket alerts cell (`TicketAlertsButton`).
+   *  Attention-only: even when true it renders nothing unless a
+   *  `<TicketLiveProvider>` is mounted, the viewer is signed in, AND
+   *  there are unread support replies. */
+  showTicketAlerts?: boolean;
+  /** BASE path of the tickets surface (any nesting prefix allowed —
+   *  '/help-center/tickets', '/support/portal/tickets'). The cell builds
+   *  the SSOT deep link `<href>?ticket=<id>` for the newest-unread
+   *  ticket before navigating. */
+  ticketAlertsHref?: string;
+  /** Host navigation (router push) — receives the FULL computed href.
+   *  Defaults to `window.location.assign`. */
+  onTicketAlerts?: (href: string) => void;
   /** Render the time-tracker button + popup. Requires wrapping the app in `<TimeTrackerProvider>`. */
   showTimeTracker?: boolean;
   /** Render the "Mingo AI" launcher button (drawer-style trigger for an
@@ -110,6 +124,9 @@ export const AppHeader = React.memo(function AppHeader({
   onOrgChange,
   showNotifications,
   unreadCount = 0,
+  showTicketAlerts = false,
+  ticketAlertsHref,
+  onTicketAlerts,
   showTimeTracker = false,
   showMingoAI = false,
   onMingoAI,
@@ -145,6 +162,7 @@ export const AppHeader = React.memo(function AppHeader({
             showOrganizations && 'icon-lg',
             showTimeTracker && 'icon',
             showNotifications && 'icon',
+            showTicketAlerts && 'icon',
             showUser && 'icon-md',
             showMingoAI && 'wide',
           ].filter(Boolean) as HeaderLoadingCell[])
@@ -169,7 +187,7 @@ export const AppHeader = React.memo(function AppHeader({
           <HeaderButton
             onClick={onToggleMobileMenu}
             isActive={isMobileMenuOpen}
-            icon={isMobileMenuOpen ? <XmarkIcon className="w-4 h-4" /> : <Menu01Icon className="w-4 h-4" />}
+            icon={isMobileMenuOpen ? <XmarkIcon className="w-6 h-6" /> : <Menu01Icon className="w-6 h-6" />}
             aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={isMobileMenuOpen}
             className="border-r border-ods-border"
@@ -195,7 +213,7 @@ export const AppHeader = React.memo(function AppHeader({
           {/* Mobile: Search button */}
           {showSearch && (
             <HeaderButton
-              icon={<SearchIcon className="w-4 h-4 md:w-6 md:h-6" />}
+              icon={<SearchIcon className="w-6 h-6" />}
               aria-label="Search"
               className={cn('md:hidden', cellDivider, dimmedClass)}
               disabled={disabled}
@@ -221,6 +239,18 @@ export const AppHeader = React.memo(function AppHeader({
               fallbackUnreadCount={unreadCount}
               disabled={disabled}
               dimmedClass={cn(cellDivider, dimmedClass)}
+            />
+          )}
+
+          {/* Support-ticket alerts (Help Center) — attention-only: renders
+              nothing unless there are unread replies (and a
+              <TicketLiveProvider> is mounted). */}
+          {showTicketAlerts && (
+            <TicketAlertsButton
+              href={ticketAlertsHref ?? '/tickets'}
+              onNavigate={onTicketAlerts}
+              disabled={disabled}
+              className={cn(cellDivider, dimmedClass)}
             />
           )}
 
@@ -322,18 +352,10 @@ function NotificationsHeaderButton({ fallbackUnreadCount, disabled, dimmedClass 
 
   return (
     <HeaderButton
-      icon={
-        isActive ? (
-          <XmarkIcon className="w-4 h-4 md:w-6 md:h-6" />
-        ) : (
-          <div className="relative w-4 h-4 md:w-6 md:h-6">
-            <BellIcon className="w-full h-full" />
-            {hasUnread && (
-              <span className="absolute top-0 right-0 bg-ods-warning rounded-full w-1.5 h-1.5 md:w-2 md:h-2" />
-            )}
-          </div>
-        )
-      }
+      icon={isActive ? <XmarkIcon className="w-6 h-6" /> : <BellIcon className="w-6 h-6" />}
+      // Shared dot primitive on the cell — same markup every indicator
+      // cell renders (see HeaderButton.showUnreadDot / <UnreadDot>).
+      showUnreadDot={!isActive && hasUnread}
       aria-label={isActive ? 'Close notifications' : 'Notifications'}
       onClick={onClick}
       isActive={isActive}
@@ -357,11 +379,11 @@ function HeaderCellSkeleton({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'flex h-full w-12 shrink-0 items-center justify-center border-l border-ods-border md:w-14',
+        'flex h-full w-14 shrink-0 items-center justify-center border-l border-ods-border',
         className,
       )}
     >
-      <div className="h-4 w-4 animate-pulse rounded bg-ods-border md:h-6 md:w-6" />
+      <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
     </div>
   );
 }
@@ -376,8 +398,8 @@ function HeaderCellSkeleton({ className }: { className?: string }) {
  */
 function HeaderWideCellSkeleton() {
   return (
-    <div className="flex h-full w-12 shrink-0 items-center justify-center gap-2 border-l border-ods-border md:w-[140px] md:px-4">
-      <div className="h-4 w-4 shrink-0 animate-pulse rounded bg-ods-border md:h-6 md:w-6" />
+    <div className="flex h-full w-14 shrink-0 items-center justify-center gap-2 border-l border-ods-border md:w-[140px] md:px-4">
+      <div className="h-6 w-6 shrink-0 animate-pulse rounded bg-ods-border" />
       <div className="hidden h-5 animate-pulse rounded bg-ods-border md:block md:w-[72px]" />
     </div>
   );
@@ -411,8 +433,8 @@ function AppHeaderSkeleton({
       aria-busy="true"
       leading={
         // Burger cell: mobile only, in CSS.
-        <div className="flex h-full w-12 shrink-0 items-center justify-center border-r border-ods-border md:hidden">
-          <div className="h-4 w-4 animate-pulse rounded bg-ods-border" />
+        <div className="flex h-full w-14 shrink-0 items-center justify-center border-r border-ods-border md:hidden">
+          <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
         </div>
       }
       logo={

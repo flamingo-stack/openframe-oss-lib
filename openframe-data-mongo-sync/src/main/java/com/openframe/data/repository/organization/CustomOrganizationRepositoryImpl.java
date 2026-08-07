@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Custom repository implementation for organization queries with MongoDB filtering.
@@ -61,7 +62,8 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
 
             // Category filter
             if (filter.getCategory() != null) {
-                criteriaList.add(Criteria.where("category").regex("^" + filter.getCategory() + "$", "i"));
+                criteriaList.add(Criteria.where("category")
+                        .regex("^" + Pattern.quote(filter.getCategory()) + "$", "i"));
             }
 
             // Employee range filters
@@ -108,10 +110,11 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
 
         // Search filter (name, organizationId or category)
         if (search != null && !search.trim().isEmpty()) {
+            String quoted = Pattern.quote(search);
             criteriaList.add(new Criteria().orOperator(
-                    Criteria.where("name").regex(search, "i"),
-                    Criteria.where("organizationId").regex(search, "i"),
-                    Criteria.where("category").regex(search, "i")
+                    Criteria.where("name").regex(quoted, "i"),
+                    Criteria.where("organizationId").regex(quoted, "i"),
+                    Criteria.where("category").regex(quoted, "i")
             ));
         }
 

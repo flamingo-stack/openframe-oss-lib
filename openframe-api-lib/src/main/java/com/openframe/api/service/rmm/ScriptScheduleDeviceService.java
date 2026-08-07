@@ -5,7 +5,7 @@ import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -14,7 +14,6 @@ import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
-import com.openframe.data.util.MachineOsClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -128,6 +127,17 @@ public class ScriptScheduleDeviceService {
         log.info("Removed {} device(s) from script schedule id={} tenantId={}", removed, scheduleId, tenantId);
     }
 
+    public void removeDeviceFromAllSchedules(String tenantId, String machineId) {
+        if (tenantId == null || machineId == null) {
+            return;
+        }
+        long removed = assignedRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
+        if (removed > 0) {
+            log.info("Removed deleted device {} from {} schedule assignment(s) tenantId={}",
+                    machineId, removed, tenantId);
+        }
+    }
+
     /**
      * The current target machineIds for a single schedule (empty if none / schedule missing).
      * Mode-aware: SPECIFIC schedules read their join rows, CRITERIA schedules resolve dynamically.
@@ -238,13 +248,13 @@ public class ScriptScheduleDeviceService {
      *       a {@link ScriptScheduleMachineAssigned} row; here it is rejected instead.</li>
      *   <li><b>Platform compatibility</b> (only when the schedule declares platforms) — each device's
      *       {@code Machine.osType} (e.g. "windows"/"macos") must match one of the schedule's
-     *       {@code supportedPlatforms}, case-insensitively (osType is lowercase, {@link ScriptPlatform}
+     *       {@code supportedPlatforms}, case-insensitively (osType is lowercase, {@link OsType}
      *       names are upper). A device with no known osType is allowed (can't determine). Prevents e.g.
      *       assigning a Windows device to a macOS schedule.</li>
      * </ol>
      * No-op when nothing is being assigned.
      */
-    private void validateDevices(String tenantId, List<ScriptPlatform> schedulePlatforms, Set<String> machineIds) {
+    private void validateDevices(String tenantId, List<OsType> schedulePlatforms, Set<String> machineIds) {
         if (machineIds.isEmpty()) {
             return;
         }
@@ -263,18 +273,13 @@ public class ScriptScheduleDeviceService {
         if (schedulePlatforms == null || schedulePlatforms.isEmpty()) {
             return;
         }
-        Set<ScriptPlatform> allowed = new HashSet<>(schedulePlatforms);
+        Set<OsType> allowed = new HashSet<>(schedulePlatforms);
 
+        // osType is now a typed enum — direct compare against the schedule's supported set. A
+        // null osType (legacy pre-migration doc) is treated as "unknown → can't determine" and
+        // is allowed through, matching the previous silent-pass-through behaviour.
         List<String> incompatible = machines.stream()
-                .filter(m -> {
-                    String os = m.getOsType();
-                    if (os == null || os.isBlank()) {
-                        return false;
-                    }
-                    return MachineOsClassifier.classify(os)
-                            .map(platform -> !allowed.contains(platform))
-                            .orElse(true);
-                })
+                .filter(m -> m.getOsType() != null && !allowed.contains(m.getOsType()))
                 .map(m -> m.getHostname() != null ? m.getHostname() : m.getMachineId())
                 .toList();
 
