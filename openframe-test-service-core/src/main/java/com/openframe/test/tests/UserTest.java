@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("Users")
 public class UserTest extends BaseTest {
 
+    @Tag("feature")
     @Tag("read")
     @Test
     @DisplayName("List users")
@@ -34,6 +35,7 @@ public class UserTest extends BaseTest {
         });
     }
 
+    @Tag("feature")
     @Tag("read")
     @Test
     @DisplayName("Get user")

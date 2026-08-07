@@ -27,6 +27,7 @@ public class DevicesTest extends BaseTest {
     private static final String TAG_VALUE = "auto_test";
     private static final String TAGGED_DEVICE = "vm115982";
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -49,6 +50,7 @@ public class DevicesTest extends BaseTest {
         assertThat(filters.getFilteredCount()).as("Device filter filteredCount should not be zero").isNotZero();
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -80,6 +82,7 @@ public class DevicesTest extends BaseTest {
         });
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -132,6 +135,7 @@ public class DevicesTest extends BaseTest {
         }
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -149,6 +153,7 @@ public class DevicesTest extends BaseTest {
         assertThat(mesh.getLastConnectAddr()).as("No lastConnectAddr for " + meshId).isNotBlank();
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -161,6 +166,7 @@ public class DevicesTest extends BaseTest {
         assertThat(device.getHostname()).as("Searched device hostname should match").isEqualTo(hostnames.getFirst());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -173,6 +179,7 @@ public class DevicesTest extends BaseTest {
         });
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test

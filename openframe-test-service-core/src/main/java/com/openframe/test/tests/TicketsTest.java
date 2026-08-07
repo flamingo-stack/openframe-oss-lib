@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TicketsTest extends BaseTest {
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -44,6 +45,7 @@ public class TicketsTest extends BaseTest {
                 });
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -57,6 +59,7 @@ public class TicketsTest extends BaseTest {
         });
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Reorder ticket")
     @Order(3)
@@ -101,6 +104,7 @@ public class TicketsTest extends BaseTest {
         assertThat(reordered.getOrder()).as("Order key should change after reorder").isNotEqualTo(originalOrder);
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Create ticket")
     @Order(1)
@@ -139,6 +143,7 @@ public class TicketsTest extends BaseTest {
         assertThat(ticket.getLabels()).extracting(TicketLabel::getId).as("Label should be attached").contains(label.getId());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -156,6 +161,7 @@ public class TicketsTest extends BaseTest {
                 .contains(existing.getId());
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Resolve ticket")
     @Order(4)
@@ -177,6 +183,7 @@ public class TicketsTest extends BaseTest {
         assertThat(resolved.getResolvedAt()).as("resolvedAt should be set when moving to a RESOLVED-kind status").isNotNull();
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Archive non-resolved ticket is rejected")
     public void testArchiveActiveTicketRejected() {
@@ -203,6 +210,7 @@ public class TicketsTest extends BaseTest {
         assertThat(unchanged.getStatusDefinition().getKind()).as("Status kind must be unchanged after a rejected transition").isEqualTo(kindBefore);
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Archive ticket")
     @Order(5)
@@ -224,6 +232,7 @@ public class TicketsTest extends BaseTest {
         assertThat(archived.getStatusDefinition().getKind()).as("Status kind should be ARCHIVED").isEqualTo("ARCHIVED");
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Create ticket status")
     @Order(7)
@@ -245,6 +254,7 @@ public class TicketsTest extends BaseTest {
         assertThat(TicketApi.deleteTicketStatus(created.getId())).as("Cleanup delete should succeed").isTrue();
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Delete ticket status")
     @Order(8)
@@ -259,6 +269,7 @@ public class TicketsTest extends BaseTest {
                 .as("Deleted status should no longer appear in ticketStatuses").doesNotContain(created.getId());
     }
 
+    @Tag("feature")
     @Test
     @DisplayName("Delete system status is rejected")
     public void testDeleteSystemStatusRejected() {
@@ -275,6 +286,7 @@ public class TicketsTest extends BaseTest {
                 .as("System status must still exist after a rejected delete").contains(resolvedStatusId);
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
