@@ -1,5 +1,6 @@
 package com.openframe.api.dto.device;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -24,7 +25,8 @@ public enum DeviceFilterFacet {
     FILTERED_COUNT("filteredCount");
 
     /** Every facet — the behaviour non-GraphQL callers (the external REST API) still want. */
-    public static final Set<DeviceFilterFacet> ALL = EnumSet.allOf(DeviceFilterFacet.class);
+    public static final Set<DeviceFilterFacet> ALL =
+            Collections.unmodifiableSet(EnumSet.allOf(DeviceFilterFacet.class));
 
     private final String graphQlField;
 

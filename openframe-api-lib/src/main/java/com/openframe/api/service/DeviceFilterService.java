@@ -112,7 +112,7 @@ public class DeviceFilterService {
      * Submits one facet query, or short-circuits to {@code null} when the caller didn't ask for it.
      *
      * The executor is explicit on purpose — see {@link DeviceFilterExecutorConfig} for why the
-     * default {@code ForkJoinPool.commonPool()} silently ran these serially on tenant pods.
+     * {@code supplyAsync} default is wrong for these blocking Pinot calls.
      */
     private <T> CompletableFuture<T> facetQuery(Set<DeviceFilterFacet> facets,
                                                 DeviceFilterFacet facet,
