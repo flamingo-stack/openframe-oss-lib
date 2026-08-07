@@ -29,7 +29,6 @@ public class DeviceOnlineScheduleTriggerService {
             log.info("First DEVICE_ONLINE recorded: machineId={} tenantId={} — pending dispatch",
                     machineId, tenantId);
         } catch (DuplicateKeyException e) {
-            // Already recorded — subsequent OFFLINE→ONLINE events must NOT re-fire schedules.
             log.debug("Machine already onboarded (skip): machineId={} tenantId={}", machineId, tenantId);
         }
     }
