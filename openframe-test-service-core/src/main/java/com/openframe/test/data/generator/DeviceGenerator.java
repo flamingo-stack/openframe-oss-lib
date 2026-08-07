@@ -54,6 +54,18 @@ public class DeviceGenerator {
                 .build();
     }
 
+    /**
+     * Devices carrying {@code key:value}, e.g. {@code purpose:auto_test}. The API filters on key and
+     * value as separate lists rather than a single "key:value" string, which is only how the UI renders
+     * the chip.
+     */
+    public static DeviceFilterInput tagDevicesFilter(String key, String value) {
+        return DeviceFilterInput.builder()
+                .tagKeys(List.of(key))
+                .tagValues(List.of(value))
+                .build();
+    }
+
     public static DeviceFilterInput statusDevicesFilter(DeviceStatus... statuses) {
         return DeviceFilterInput.builder()
                 .statuses(List.of(statuses))
