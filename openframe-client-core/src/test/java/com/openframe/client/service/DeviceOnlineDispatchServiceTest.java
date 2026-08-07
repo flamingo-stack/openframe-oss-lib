@@ -61,7 +61,7 @@ class DeviceOnlineDispatchServiceTest {
     void setUp() {
         // @Value fields don't get populated by @InjectMocks — set explicitly.
         ReflectionTestUtils.setField(service, "batchSize", 500);
-        // Default: bulk update reports "everything you sent got matched" — the healthy case.
+        // Default: bulk update reports "everything you sent got modified" — the healthy case.
         // Individual tests override this only to exercise the mismatch canary.
         lenient().when(dispatchRepository.markDispatchedIn(anyCollection(), any(Instant.class)))
                 .thenAnswer(inv -> (long) ((Collection<?>) inv.getArgument(0)).size());

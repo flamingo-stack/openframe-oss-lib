@@ -67,10 +67,10 @@ public class DeviceOnlineDispatchService {
         }
 
         if (!dispatchedRowIds.isEmpty()) {
-            long matched = dispatchRepository.markDispatchedIn(dispatchedRowIds, Instant.now());
-            if (matched != dispatchedRowIds.size()) {
-                log.error("DEVICE_ONLINE dispatch: bulk-mark mismatch — sent {} ids, matched {} (updateMulti degraded?)",
-                        dispatchedRowIds.size(), matched);
+            long modified = dispatchRepository.markDispatchedIn(dispatchedRowIds, Instant.now());
+            if (modified != dispatchedRowIds.size()) {
+                log.error("DEVICE_ONLINE dispatch: bulk-mark mismatch — sent {} ids, modified {} (updateMulti degraded?)",
+                        dispatchedRowIds.size(), modified);
             }
         }
     }
@@ -79,6 +79,9 @@ public class DeviceOnlineDispatchService {
         Set<String> machineIds = tenantRows.stream()
                 .map(MachineFirstOnlineDispatch::getMachineId).collect(toSet());
 
+        // Three tenant-wide reads — everything downstream is pure Java.
+        // Explicit-tenant queries: this sweep runs across tenants (findByDispatchedAtIsNull is
+        // tenant-agnostic), so we never rely on TenantAwareMongoTemplate's ambient scope.
         Map<String, Machine> machinesById = machineRepository
                 .findByTenantIdAndMachineIdIn(tenantId, machineIds).stream()
                 .collect(toMap(Machine::getMachineId, m -> m));
@@ -104,6 +107,11 @@ public class DeviceOnlineDispatchService {
         return dispatched;
     }
 
+    /**
+     * @return row id if it should be marked dispatched (delivery attempted, or explicitly no-op
+     *         because no schedules apply). Empty when the row must stay pending — missing machine,
+     *         machine currently offline, or fire threw (bubbles to caller).
+     */
     private Optional<String> processOne(MachineFirstOnlineDispatch row,
                                         Map<String, Machine> machinesById,
                                         Map<String, Set<String>> assignedScheduleIdsByMachine,
@@ -131,6 +139,11 @@ public class DeviceOnlineDispatchService {
         return Optional.of(row.getId());
     }
 
+    /**
+     * From the tenant's active DEVICE_ONLINE schedules, keep only those that apply to this machine:
+     * CRITERIA schedules via {@link ScheduleDeviceTargetResolver}, everything else via explicit
+     * (schedule, machine) assignment rows. Single pass, unique by construction.
+     */
     private List<ScriptSchedule> dueSchedulesFor(Machine machine,
                                                  List<ScriptSchedule> tenantSchedules,
                                                  Set<String> assignedIds) {
