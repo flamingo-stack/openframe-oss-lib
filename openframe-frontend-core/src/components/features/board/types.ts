@@ -36,6 +36,13 @@ export interface BoardTicket {
   createdAt?: string
   hasNewMessage?: boolean
   pendingApproval?: BoardTicketPendingApproval
+  /**
+   * The client asked for a human and confirmed the handoff, so this ticket
+   * reached its lane by escalation rather than an inactivity auto-escalation or
+   * an admin takeover. Called out on the card because it changes how urgently a
+   * technician should pick it up.
+   */
+  escalatedByUser?: boolean
 }
 
 export interface BoardColumnDef {
