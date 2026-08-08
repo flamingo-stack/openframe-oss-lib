@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useEffect, useState } from "react"
-import { usePreventScroll } from "@react-aria/overlays"
+import { RemoveScroll } from "react-remove-scroll"
 import { XmarkIcon } from "../icons-v2-generated"
 import { cn } from "../../utils/cn"
 
@@ -142,14 +142,19 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       return () => clearTimeout(timeout)
     }, [isOpen])
 
-    // Shared ref-counted scroll lock (react-aria) — restores prior styles on
-    // release instead of clobbering to 'unset'.
-    usePreventScroll({ isDisabled: !isOpen })
+    // Scroll lock via the SAME library Radix primitives use internally
+    // (react-remove-scroll is ref-counted and composes with itself). The
+    // previous react-aria lock FOUGHT the lock a Radix Select opened inside
+    // the modal added on top — body jumped and the page behind went black
+    // while the select was open.
 
     // Escape key (document-level: top-of-stack semantics for modals)
     useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Escape') {
+        // A nested Radix layer (Select, DropdownMenu) preventDefaults the
+        // Escape it consumes — without this check, closing a select inside
+        // the modal closed the WHOLE modal.
+        if (event.key === 'Escape' && !event.defaultPrevented) {
           onClose()
         }
       }
@@ -165,6 +170,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
     const state = isOpen ? "open" : "closed"
 
     return (
+      <RemoveScroll enabled={isOpen} removeScrollBar={false}>
       <div className="fixed inset-0 z-[1300] flex items-end md:items-center justify-center">
         <div
           data-state={state}
@@ -218,6 +224,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           </ModalContext.Provider>
         </div>
       </div>
+      </RemoveScroll>
     )
   }
 )
