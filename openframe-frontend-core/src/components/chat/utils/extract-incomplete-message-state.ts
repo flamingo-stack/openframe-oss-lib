@@ -109,6 +109,16 @@ export function extractIncompleteMessageState(
         break
       }
 
+      case 'escalation_offer':
+        // A pending offer leaves the turn unfinished so the reducer holds the
+        // card and the resolution chunk can flip it in place. It never sets
+        // `agentBusy`: Fae is blocked on the user's decision, and on approval
+        // she goes SILENT rather than resuming — there is no work to spin for.
+        if (!segment.status || segment.status === 'pending') {
+          hasIncompleteState = true
+        }
+        break
+
       case 'context_compaction':
         if (segment.status === 'started') {
           hasIncompleteState = true

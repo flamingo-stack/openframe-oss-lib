@@ -27,10 +27,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Immune to the searchMachines online-flap — no machine is involved.
  */
 @Tag("ai")
+@Tag("mingo")
 @DisplayName("Mingo — directory & web")
 public class MingoEntityQueryTest extends MingoBaseTest {
 
 
+    @Tag("feature")
     @Test
     @Tag("directory")
     @DisplayName("Mingo finds an organization")
@@ -73,13 +75,12 @@ public class MingoEntityQueryTest extends MingoBaseTest {
     @Tag("directory")
     @DisplayName("Mingo lists Windows machines")
     public void testListWindowsMachines() {
-        // Ground truth from the device API: hostnames of the currently-ONLINE Windows machines.
-        List<String> onlineWindowsHosts = DeviceApi.getDevices(DeviceGenerator.onlineDevicesFilter()).stream()
+        // Ground truth from the device API: the currently-ONLINE Windows machines.
+        List<Machine> onlineWindows = DeviceApi.getDevices(DeviceGenerator.onlineDevicesFilter()).stream()
                 .filter(m -> m.getOsType() != null && m.getOsType().toLowerCase().contains("win"))
-                .map(Machine::getHostname)
-                .filter(h -> h != null && !h.isBlank())
+                .filter(m -> m.getHostname() != null && !m.getHostname().isBlank())
                 .toList();
-        assertThat(onlineWindowsHosts).as("Tenant should have at least one online Windows machine").isNotEmpty();
+        assertThat(onlineWindows).as("Tenant should have at least one online Windows machine").isNotEmpty();
 
         RunResult result = prompt("List all Windows machines that are currently online.");
 
@@ -87,11 +88,32 @@ public class MingoEntityQueryTest extends MingoBaseTest {
                 .as("Assistant should use the searchMachines tool.\n%s", result)
                 .isTrue();
         String reply = result.finalText() == null ? "" : result.finalText();
-        for (String hostname : onlineWindowsHosts) {
-            assertThat(reply)
-                    .as("Reply should include online Windows machine %s.\n%s", hostname, result)
-                    .containsIgnoringCase(hostname);
+        for (Machine machine : onlineWindows) {
+            assertThat(referencesMachine(reply, machine))
+                    .as("Reply should reference online Windows machine %s (hostname, or an "
+                                    + "@device: mention of id %s / machineId %s).\n%s",
+                            machine.getHostname(), machine.getId(), machine.getMachineId(), result)
+                    .isTrue();
         }
+    }
+
+    /**
+     * Whether a reply identifies this machine — by hostname, or by one of its ids.
+     *
+     * <p>The assistant renders a device either as its hostname or as an {@code @device:<id>} mention
+     * that the UI turns into a chip; both name the same machine, so either satisfies the case. Matching
+     * on the bare id rather than the {@code @device:} prefix keeps this working if the mention syntax
+     * changes again — what matters is that the right machine was named, not how it was decorated.
+     */
+    private static boolean referencesMachine(String reply, Machine machine) {
+        return containsIgnoringCase(reply, machine.getHostname())
+                || containsIgnoringCase(reply, machine.getId())
+                || containsIgnoringCase(reply, machine.getMachineId());
+    }
+
+    private static boolean containsIgnoringCase(String haystack, String needle) {
+        return needle != null && !needle.isBlank()
+                && haystack.toLowerCase().contains(needle.toLowerCase());
     }
 
     @Test

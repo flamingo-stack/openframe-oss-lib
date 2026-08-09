@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Slf4j
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
@@ -108,7 +109,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         if (search == null || search.trim().isEmpty()) {
             return;
         }
-        String searchTrimmed = search.trim();
+        String searchTrimmed = Pattern.quote(search.trim());
         Criteria searchCriteria = new Criteria().orOperator(
                 Criteria.where(FIELD_TITLE).regex(searchTrimmed, "i"),
                 Criteria.where(FIELD_DEVICE_HOSTNAME).regex(searchTrimmed, "i"),

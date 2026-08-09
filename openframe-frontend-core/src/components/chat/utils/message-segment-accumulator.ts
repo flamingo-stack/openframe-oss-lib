@@ -16,6 +16,9 @@ import type {
   ApprovalBatchSegment,
   ApprovalBatchExecutionState,
   ApprovalResolutionHandler,
+  EscalationOfferSegment,
+  TicketEscalatedData,
+  TicketEscalatedSegment,
   ContextCompactionSegment,
   ErrorSegment,
   PendingApproval,
@@ -35,6 +38,12 @@ export interface AccumulatorCallbacks {
    *  approve/reject signature incl. the boolean failure flag. */
   onApprove?: ApprovalResolutionHandler
   onReject?: ApprovalResolutionHandler
+  /** Escalation offers resolve through the ticket-escalation mutations, NOT
+   *  the tool-approval endpoint, so they carry their own pair of handlers.
+   *  Sharing `onApprove`/`onReject` would POST an offer id to the approval
+   *  endpoint, which has no record of it. */
+  onEscalationApprove?: ApprovalResolutionHandler
+  onEscalationReject?: ApprovalResolutionHandler
 }
 
 /**
@@ -432,11 +441,73 @@ export class MessageSegmentAccumulator {
   }
 
   /**
-   * Update status of an existing approval segment (single or batch).
+   * Add a ticket-escalation offer block. Upserts by `offerId` for the same
+   * reason `addApprovalBatch` does: the consumer-store replay path feeds
+   * `[existing..., new...]` back through `replaySegments`, which would
+   * otherwise yield two cards for one offer.
+   */
+  addEscalationOffer(
+    offerId: string,
+    text: string,
+    origin: string | undefined,
+    status: ChatApprovalStatus = 'pending',
+    resolvedByName?: string | null,
+  ): MessageSegment[] {
+    const existingIndex = this.segments.findIndex(
+      (s): s is EscalationOfferSegment =>
+        s.type === 'escalation_offer' && s.data.offerId === offerId,
+    )
+    const existing =
+      existingIndex !== -1 ? (this.segments[existingIndex] as EscalationOfferSegment) : undefined
+
+    const segment: EscalationOfferSegment = {
+      type: 'escalation_offer',
+      // The resolved chunk carries no text/origin — a redelivered offer must
+      // not blank the card the PENDING chunk already painted.
+      data: { offerId, text: text || existing?.data.text || '', origin: origin ?? existing?.data.origin },
+      status,
+      resolvedByName: resolvedByName ?? existing?.resolvedByName,
+      onApprove: this.callbacks.onEscalationApprove,
+      onReject: this.callbacks.onEscalationReject,
+    }
+
+    if (existingIndex !== -1) {
+      this.segments[existingIndex] = segment
+      return this.getSegments()
+    }
+
+    this.segments.push(segment)
+    return this.getSegments()
+  }
+
+  /**
+   * Add the handoff receipt. Upserts by `ticketId` so a redelivered block
+   * (JetStream catch-up over hydrated history) can't stack a second notice.
+   */
+  addTicketEscalated(data: TicketEscalatedData): MessageSegment[] {
+    const segment: TicketEscalatedSegment = { type: 'ticket_escalated', data }
+    const existingIndex = this.segments.findIndex(
+      (s) => s.type === 'ticket_escalated' && s.data.ticketId === data.ticketId,
+    )
+    if (existingIndex !== -1) {
+      this.segments[existingIndex] = segment
+      return this.getSegments()
+    }
+    this.segments.push(segment)
+    return this.getSegments()
+  }
+
+  /**
+   * Update status of an existing approval segment (single, batch, or
+   * escalation offer).
    * `resolvedByName` (when provided) is stamped onto the matching batch segment so the
    * resolved card shows "by {name}"; omit it to leave any existing value untouched.
    */
-  updateApprovalStatus(requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null): MessageSegment[] {
+  updateApprovalStatus(
+    requestId: string,
+    status: ChatApprovalStatus,
+    resolvedByName?: string | null,
+  ): MessageSegment[] {
     // ONE rule, two containers: `applyApprovalStatusToSegment` is the
     // same predicate the message-array projection uses
     // (`projectApprovalResolutionToMessages`) — anchor status flip AND
@@ -571,6 +642,14 @@ export class MessageSegmentAccumulator {
           )
           break
         }
+        case 'escalation_offer': {
+          const { data, status, resolvedByName } = segment
+          this.addEscalationOffer(data.offerId, data.text, data.origin, status, resolvedByName)
+          break
+        }
+        case 'ticket_escalated':
+          this.addTicketEscalated(segment.data)
+          break
         case 'error':
           this.addError(segment.title, segment.details)
           break

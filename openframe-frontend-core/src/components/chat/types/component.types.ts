@@ -544,6 +544,10 @@ export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivEleme
    *  `'client'` = end-client (Fae desktop app) card with only the
    *  BE-generated title (`explanation`) + actions/status pill. */
   variant?: ApprovalBlockVariant
+  /** Render the footer Approve/Reject row (or the resolved-status tag).
+   *  Turn off when the viewer cannot resolve this card — matches
+   *  `ApprovalBatchMessageProps.showFooterActions`. Default true. */
+  showFooterActions?: boolean
   /** Display name of the user who resolved the request; baked into the
    *  client variant's full-text status pill ("Approved by {name}"). */
   resolvedByName?: string | null

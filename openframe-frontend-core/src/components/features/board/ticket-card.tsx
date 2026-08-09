@@ -4,7 +4,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import Link from '../../../embed-shims/next-link'
 import * as React from 'react'
-import { LaptopIcon, Flag02Icon, MessagesIcon } from '../../icons-v2-generated'
+import { LaptopIcon, Flag02Icon, MessagesIcon, UserCheckIcon } from '../../icons-v2-generated'
 import { DeletedUserAvatar } from '../../ui/deleted-user-avatar'
 import { SquareAvatar } from '../../ui/square-avatar'
 import { Tag } from '../../ui/tag'
@@ -118,6 +118,12 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
             <TooltipContent>{tooltipLabel}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+      )}
+      {ticket.escalatedByUser && (
+        <div className="flex items-center gap-[var(--spacing-system-xxs)] text-h6 text-ods-open-yellow">
+          <UserCheckIcon className="size-4 shrink-0" />
+          <span className="truncate">Escalated by User</span>
+        </div>
       )}
       {showNewMessage && (
         <Tag

@@ -25,6 +25,7 @@ import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class KnowledgeBaseTest extends BaseTest {
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(1)
@@ -39,6 +40,7 @@ public class KnowledgeBaseTest extends BaseTest {
         assertThat(folder.getParentId()).as("Root folder parentId should be null").isNull();
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(2)
@@ -74,6 +76,7 @@ public class KnowledgeBaseTest extends BaseTest {
 //                .extracting(KnowledgeBaseTag::getId).contains(tag.getId());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -109,6 +112,7 @@ public class KnowledgeBaseTest extends BaseTest {
         });
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -127,6 +131,7 @@ public class KnowledgeBaseTest extends BaseTest {
                 .extracting(KnowledgeBaseItem::getId).contains(rootFolder.getId());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -143,6 +148,7 @@ public class KnowledgeBaseTest extends BaseTest {
                 });
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -165,6 +171,7 @@ public class KnowledgeBaseTest extends BaseTest {
         assertThat(fetchedArticle.getName()).as("Fetched article name should match").isEqualTo(article.getName());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(8)
@@ -200,6 +207,7 @@ public class KnowledgeBaseTest extends BaseTest {
         assertThat((long) downloaded.length).as("Downloaded file size should equal the generated file size").isEqualTo(input.getFileSize());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(9)
@@ -215,6 +223,7 @@ public class KnowledgeBaseTest extends BaseTest {
         assertThat(renamed.getName()).as("Renamed folder name should match input").isEqualTo(newName);
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(10)
@@ -231,6 +240,7 @@ public class KnowledgeBaseTest extends BaseTest {
         assertThat(moved.getParentId()).as("Moved folder parentId should be the new parent").isEqualTo(parent.getId());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(11)
@@ -252,6 +262,7 @@ public class KnowledgeBaseTest extends BaseTest {
         assertThat(updated.getUpdatedAt()).as("updatedAt should change after update").isNotEqualTo(article.getUpdatedAt());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(12)
@@ -267,6 +278,7 @@ public class KnowledgeBaseTest extends BaseTest {
         assertThat(published.getUpdatedAt()).as("updatedAt should not be blank after publish").isNotBlank();
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(13)
@@ -284,6 +296,7 @@ public class KnowledgeBaseTest extends BaseTest {
                 .extracting(KnowledgeBaseItem::getId).contains(article.getId());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(14)
@@ -302,6 +315,7 @@ public class KnowledgeBaseTest extends BaseTest {
         assertThat(unarchived.getParentId()).as("Unarchive should restore parentId to the supplied folder").isEqualTo(targetFolder.getId());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(15)
@@ -346,6 +360,7 @@ public class KnowledgeBaseTest extends BaseTest {
                 });
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(16)
@@ -388,6 +403,7 @@ public class KnowledgeBaseTest extends BaseTest {
         assertThat((long) downloaded.length).as("Downloaded file size should equal the generated file size").isEqualTo(input.getFileSize());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Test
     @Order(17)
