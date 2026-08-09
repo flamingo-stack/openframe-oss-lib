@@ -70,25 +70,31 @@ export interface JsonDetailListProps {
 }
 
 export function JsonDetailList({ data, depth = 0 }: JsonDetailListProps) {
+  let parseFailed = false
   const obj =
     typeof data === 'string'
       ? (() => {
           try {
             return JSON.parse(data) as unknown
           } catch {
+            parseFailed = true
             return null
           }
         })()
       : data
 
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
-    // Not an object — render whatever it is faithfully.
-    return typeof data === 'string' ? (
-      <p className="whitespace-pre-wrap text-h6 text-ods-text-primary">{data}</p>
-    ) : (
-      <pre className="whitespace-pre-wrap text-code text-ods-text-secondary">
-        {JSON.stringify(data, null, 2)}
-      </pre>
+    // A string that ISN'T JSON is prose — show it as-is.
+    if (typeof data === 'string' && parseFailed) {
+      return <p className="whitespace-pre-wrap text-h6 text-ods-text-primary">{data}</p>
+    }
+    // Everything else is a real (parsed or given) non-object VALUE — an array,
+    // scalar, or null. Render the value through `Value`, never the source
+    // string: `'["a","b"]'` must render as the array, not as raw JSON text.
+    return (
+      <div className="text-h6">
+        <Value value={obj} depth={depth} />
+      </div>
     )
   }
 

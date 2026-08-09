@@ -153,8 +153,15 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       const handleKeyDown = (event: KeyboardEvent) => {
         // A nested Radix layer (Select, DropdownMenu) preventDefaults the
         // Escape it consumes — without this check, closing a select inside
-        // the modal closed the WHOLE modal.
-        if (event.key === 'Escape' && !event.defaultPrevented) {
+        // the modal closed the WHOLE modal. The stack check keeps Escape a
+        // topmost-only affair: every open modal registers this listener, so
+        // with stacked modals (confirm above a form) one Escape would
+        // otherwise close BOTH.
+        if (
+          event.key === 'Escape' &&
+          !event.defaultPrevented &&
+          modalStack[modalStack.length - 1] === stackIdRef.current
+        ) {
           onClose()
         }
       }

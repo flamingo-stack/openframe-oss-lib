@@ -30,7 +30,7 @@ export interface DropdownButtonProps {
   variant?: ButtonProps['variant']
   /** Button size for the `variant` trigger. Ignored without `variant`. */
   size?: ButtonProps['size']
-  /** Spinner state for the `variant` trigger. Ignored without `variant`. */
+  /** Spinner state for the trigger (either look). */
   loading?: boolean
   disabled?: boolean
   className?: string
@@ -51,11 +51,12 @@ export interface DropdownButtonProps {
  * `ActionsMenu`. One component, so the trigger styling, chevron, and menu
  * chrome cannot drift between surfaces.
  *
- * Two trigger looks:
- * - default (no `variant`): the card-colored seam trigger — label and chevron
- *   separated by a divider, whole surface one click target, chevron rotates
- *   while open. Used standalone or via `PageActions` when a `PageActionButton`
- *   has `dropdownItems` set.
+ * Two trigger looks — BOTH render through the unified `Button`:
+ * - default (no `variant`): the card-colored seam trigger — `Button
+ *   variant="outline"` with the chevron in its `splitIcon` slot, so the label
+ *   and chevron are separated by a divider, the whole surface is one click
+ *   target, and the chevron rotates while open. Used standalone or via
+ *   `PageActions` when a `PageActionButton` has `dropdownItems` set.
  * - `variant="outline"` (or any Button variant): a standard `Button` with the
  *   chevron as its right icon, so the trigger matches sibling buttons in the
  *   same row — including `loading` and `leftIcon` support.
@@ -80,9 +81,16 @@ export function DropdownButton({
 }: DropdownButtonProps) {
   const [open, setOpen] = React.useState(false)
 
+  // If the trigger becomes disabled/loading WHILE the menu is open, close it —
+  // and only ever block OPEN transitions below, so Escape/outside-click can
+  // still dismiss an already-open menu.
+  React.useEffect(() => {
+    if (disabled || loading) setOpen(false)
+  }, [disabled, loading])
+
   const handleOpenChange = React.useCallback(
     (next: boolean) => {
-      if (disabled || loading) return
+      if (next && (disabled || loading)) return
       setOpen(next)
     },
     [disabled, loading]
@@ -109,35 +117,25 @@ export function DropdownButton({
       {label}
     </Button>
   ) : (
-    <button
+    // The unified `Button`'s split layout IS the seam anatomy (label, full-height
+    // divider, trailing glyph, one click target) — no bespoke <button> here, so
+    // the trigger can't drift from the house button chrome.
+    <Button
       type="button"
+      variant="outline"
       disabled={disabled}
+      loading={loading}
       aria-label={resolvedAriaLabel}
-      onPointerDown={disabled ? (e) => e.preventDefault() : undefined}
-      className={cn(
-        'inline-flex h-12 items-stretch rounded-md border border-ods-border overflow-hidden transition-colors',
-        'text-ods-text-primary',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
-        open ? 'bg-ods-bg-hover' : 'bg-ods-card',
-        !disabled && !open && 'hover:bg-ods-bg-hover',
-        disabled && 'opacity-50 cursor-not-allowed',
-        className
-      )}
-    >
-      <span className="flex items-center gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3">
-        {icon && (
-          <span className="flex items-center justify-center [&_svg]:w-6 [&_svg]:h-6">
-            {icon}
-          </span>
-        )}
-        <span className="whitespace-nowrap">{label}</span>
-      </span>
-      <span className="flex items-center justify-center border-l border-ods-border p-[var(--spacing-system-sf)] [&_svg]:w-6 [&_svg]:h-6">
+      leftIcon={icon}
+      splitIcon={
         <Chevron02DownIcon
           className={cn('transition-transform duration-fast', open && 'rotate-180')}
         />
-      </span>
-    </button>
+      }
+      className={cn(open && 'bg-ods-bg-hover', className)}
+    >
+      {label}
+    </Button>
   )
 
   return (

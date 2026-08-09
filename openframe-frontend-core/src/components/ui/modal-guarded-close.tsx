@@ -41,6 +41,9 @@ export function useConfirm() {
     resolve: (ok: boolean) => void
   } | null>(null)
   const askingRef = React.useRef(false)
+  // Mirror of the active request, so unmount cleanup can settle it without
+  // depending on (already-frozen) state.
+  const pendingRef = React.useRef<{ resolve: (ok: boolean) => void } | null>(null)
   const ask = React.useCallback((title: string, body: string) => {
     return new Promise<boolean>((resolve) => {
       if (askingRef.current) {
@@ -48,18 +51,33 @@ export function useConfirm() {
         return
       }
       askingRef.current = true
-      setPending({ title, body, resolve })
+      const entry = { title, body, resolve }
+      pendingRef.current = entry
+      setPending(entry)
       setOpen(true)
     })
   }, [])
   const decide = React.useCallback(
     (ok: boolean) => {
       askingRef.current = false
+      // Clear the ref FIRST so a later unmount cleanup can't re-resolve a
+      // request the user already decided.
+      pendingRef.current = null
       setOpen(false)
       pending?.resolve(ok)
       setPending(null)
     },
     [pending]
+  )
+  // Host unmounted while the confirmation was open: the decision UI is gone,
+  // so settle the promise as "no" — otherwise the caller awaits forever.
+  React.useEffect(
+    () => () => {
+      pendingRef.current?.resolve(false)
+      pendingRef.current = null
+      askingRef.current = false
+    },
+    []
   )
 
   const dialog = pending ? (

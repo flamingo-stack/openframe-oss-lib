@@ -21,7 +21,7 @@ export interface FieldProps {
   /** Definition shown in a hover `InfoHint` next to the label. */
   hint?: React.ReactNode
   required?: boolean
-  children: React.ReactNode | ((props: FieldRenderProps) => React.ReactNode)
+  children: (props: FieldRenderProps) => React.ReactNode
   error?: string | null
 }
 
@@ -35,11 +35,12 @@ export interface FieldProps {
  * the bottom of the sibling's ERROR text, detaching it from its own label.
  *
  * The label is tied to its control with a generated id, so clicking the label
- * focuses the input and assistive tech announces the field by name. ALWAYS use
- * the render-prop form — `{(f) => <Input {...f} />}` — and spread what it gives
- * you onto the control. Passing a plain node leaves `htmlFor` pointing at an id
- * that exists on no element, which is worse than no association at all: the
- * label looks wired up and announces nothing.
+ * focuses the input and assistive tech announces the field by name. `children`
+ * is a REQUIRED render function — `{(f) => <Input {...f} />}` — spread what it
+ * gives you onto the control. A plain-node escape hatch would leave `htmlFor`
+ * pointing at an id that exists on no element, which is worse than no
+ * association at all (the label looks wired up and announces nothing), so the
+ * type doesn't offer one.
  */
 export function Field({ label, hint, required, children, error }: FieldProps) {
   const controlId = React.useId()
@@ -60,7 +61,7 @@ export function Field({ label, hint, required, children, error }: FieldProps) {
         {hint && <InfoHint label={label}>{hint}</InfoHint>}
       </div>
       <div className="pt-[var(--spacing-system-xxs)]">
-        {typeof children === 'function' ? children(renderProps) : children}
+        {children(renderProps)}
       </div>
       {/* `role="alert"` + the id the control points at: a validation message
           rendered as plain text is never announced. */}

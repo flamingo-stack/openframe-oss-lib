@@ -36,7 +36,9 @@ export function InfoHint({ children, label, side = 'top', className }: InfoHintP
         side={side}
         as="span"
         triggerClassName="inline-flex shrink-0 items-center"
-        className="max-w-[280px] text-h6"
+        // Width comes from FloatingTooltip's shared max-w-xs default — no
+        // per-cap override, so every hint wraps like every other tooltip.
+        className="text-h6"
       >
         {/*
           `icon-inline` is a Button variant, not a className stack. The hint sits

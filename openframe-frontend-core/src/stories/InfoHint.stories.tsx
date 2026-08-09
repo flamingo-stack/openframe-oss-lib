@@ -31,7 +31,7 @@ export const Default: Story = {
     children: 'Judged rules are evaluated by an LLM against the diff; deterministic rules run as code.',
   },
   render: args => (
-    <div className="flex min-h-[160px] items-center justify-center">
+    <div className="flex min-h-40 items-center justify-center">
       <span className="inline-flex items-center gap-1.5 text-h6 text-ods-text-primary">
         Judged rules
         <InfoHint {...args} />
@@ -49,7 +49,7 @@ export const InALabelRow: Story = {
     children: 'Placeholder',
   },
   render: () => (
-    <div className="flex min-h-[160px] flex-col items-start justify-center gap-[var(--spacing-system-sf)]">
+    <div className="flex min-h-40 flex-col items-start justify-center gap-[var(--spacing-system-sf)]">
       <span className="inline-flex items-center gap-1.5 text-h6 text-ods-text-primary">
         Observe
         <InfoHint label="Observe">Runs the rule and records the outcome without blocking the PR.</InfoHint>
