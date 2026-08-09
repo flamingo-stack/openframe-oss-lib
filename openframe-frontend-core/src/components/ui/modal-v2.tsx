@@ -43,6 +43,20 @@ interface ModalFooterProps {
 // TOP one may contain focus, or they fight each other.
 const modalStack: symbol[] = []
 
+// Radix popups (Select/DropdownMenu/Popover content) PORTAL to <body>, so a
+// dropdown opened from inside the modal focuses nodes OUTSIDE the panel.
+// Focus landing there is NOT an escape — yanking it back (containFocus /
+// reasserts / Tab trap) fights Radix's own item-focus management and strands
+// stale `data-highlighted` on items it never got to blur-clean (observed:
+// two or three select options painted "hovered" simultaneously). Popper-based
+// layers carry `data-radix-popper-content-wrapper`; the default item-aligned
+// Select content doesn't, hence the role fallbacks.
+const isInPortaledLayer = (node: Node | null): boolean =>
+  node instanceof Element &&
+  node.closest(
+    '[data-radix-popper-content-wrapper], [role="listbox"], [role="menu"]',
+  ) !== null
+
 const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
   ({ isOpen, onClose, children, className }, ref) => {
     // Keep the modal mounted while the exit animation plays.
@@ -79,7 +93,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         const panel = panelRef.current
         if (!panel) return
         const target = event.target as Node | null
-        if (target && panel.contains(target)) return
+        if (target && (panel.contains(target) || isInPortaledLayer(target))) return
         panel.focus()
       }
       document.addEventListener('focusin', containFocus)
@@ -90,7 +104,11 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           if (modalStack[modalStack.length - 1] !== stackId) return
           const panel = panelRef.current
           if (!panel) return
-          if (!panel.contains(document.activeElement)) panel.focus()
+          if (
+            !panel.contains(document.activeElement) &&
+            !isInPortaledLayer(document.activeElement)
+          )
+            panel.focus()
         }, ms),
       )
       return () => {
@@ -110,6 +128,10 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         if (event.key !== 'Tab') return
         const panel = panelRef.current
         if (!panel) return
+        // Focus inside a portaled Radix layer (open Select/menu): Tab is that
+        // layer's affair — trapping it back into the panel closes nothing and
+        // steals focus mid-interaction.
+        if (isInPortaledLayer(document.activeElement)) return
         const focusables = Array.from(
           panel.querySelectorAll<HTMLElement>(
             'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
