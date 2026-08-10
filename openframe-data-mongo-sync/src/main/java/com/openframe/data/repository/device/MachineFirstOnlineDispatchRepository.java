@@ -1,6 +1,7 @@
 package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.MachineFirstOnlineDispatch;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.Update;
@@ -17,7 +18,7 @@ public interface MachineFirstOnlineDispatchRepository extends MongoRepository<Ma
 
     long deleteByTenantIdAndMachineId(String tenantId, String machineId);
 
-    List<MachineFirstOnlineDispatch> findByDispatchedAtIsNull();
+    List<MachineFirstOnlineDispatch> findByDispatchedAtIsNull(Pageable pageable);
 
     @Query("{ '_id': { '$in': ?0 } }")
     @Update("{ '$set': { 'dispatchedAt': ?1 } }")
