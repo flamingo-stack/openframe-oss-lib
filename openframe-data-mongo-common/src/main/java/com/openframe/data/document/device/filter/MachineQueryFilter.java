@@ -1,5 +1,6 @@
 package com.openframe.data.document.device.filter;
 
+import com.openframe.data.document.rmm.OsType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

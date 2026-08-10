@@ -84,7 +84,7 @@ public class ScriptDispatchService {
                 .scriptId(script.getId())
                 .machineId(input.getMachineId())
                 .code(script.getScriptBody())
-                .shell(ScriptShell.valueOf(script.getShell()))
+                .shell(script.getShell())
                 .privilegeLevel(input.getPrivilegeLevel())
                 .args(ScriptArgsTokenizer.tokenize(input.getArgs() != null ? input.getArgs() : script.getDefaultArgs()))
                 .timeoutSeconds(timeoutSeconds)
@@ -154,7 +154,7 @@ public class ScriptDispatchService {
         // dispatched; a schedule can outlive some of its scripts (deleted/archived), and
         // those are skipped rather than failing the run.
         Map<String, ScriptResponse> scriptsById = scriptService.getScriptsByIds(scriptIds).stream()
-                .filter(script -> ScriptStatus.ACTIVE.name().equals(script.getStatus()))
+                .filter(script -> ScriptStatus.ACTIVE.equals(script.getStatus()))
                 .collect(Collectors.toMap(ScriptResponse::getId, Function.identity(), (a, b) -> a));
 
         // Preserve run order; dedup (a shared executionId can't carry the same
@@ -209,7 +209,7 @@ public class ScriptDispatchService {
                     return ScriptScheduleExecutionItem.builder()
                             .scriptId(script.getId())
                             .code(script.getScriptBody())
-                            .shell(ScriptShell.valueOf(script.getShell()))
+                            .shell(script.getShell())
                             .privilegeLevel(script.getPrivilegeLevel())
                             .args(ScriptArgsTokenizer.tokenize(effectiveArgs))
                             .timeoutSeconds(script.getDefaultTimeoutSeconds())
@@ -244,7 +244,6 @@ public class ScriptDispatchService {
         // per-execution stuck-threshold from it.
         scriptExecutionService.createBatch(executionId, script.getId(), null, machineIds, privilegeLevel, timeoutSeconds, initiatedBy);
 
-        ScriptShell shell = ScriptShell.valueOf(script.getShell());
         List<String> args = ScriptArgsTokenizer.tokenize(argsOverride != null ? argsOverride : script.getDefaultArgs());
         List<ScriptEnvVar> envVars = mergeEnvVars(script.getEnvVars(), envVarsOverride);
 
@@ -255,7 +254,7 @@ public class ScriptDispatchService {
                         .scriptId(script.getId())
                         .machineId(machineId)
                         .code(script.getScriptBody())
-                        .shell(shell)
+                        .shell(script.getShell())
                         .privilegeLevel(privilegeLevel)
                         .args(args)
                         .timeoutSeconds(timeoutSeconds)

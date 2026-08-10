@@ -1,10 +1,12 @@
 package com.openframe.api.dto.rmm.schedule;
 
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
 import lombok.Data;
 
@@ -23,7 +25,8 @@ public class ScriptScheduleResponse {
     private String name;
     private String description;
 
-    private List<String> supportedPlatforms;
+    @NotBlank
+    private List<OsType> supportedPlatforms;
 
     private List<String> scriptIds;
 

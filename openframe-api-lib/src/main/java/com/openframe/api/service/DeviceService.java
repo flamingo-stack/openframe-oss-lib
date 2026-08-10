@@ -15,9 +15,11 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.device.MachineFirstOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
@@ -50,6 +52,7 @@ import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 public class DeviceService {
 
     private final MachineRepository machineRepository;
+    private final MachineFirstOnlineDispatchRepository machineFirstOnlineDispatchRepository;
     private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
@@ -88,15 +91,15 @@ public class DeviceService {
         return paginate(machineFilter(filterOptions, null, scope), search, paginationCriteria, sort);
     }
 
-    public CountedGenericQueryResult<Machine> queryDevicesForPlatforms(Collection<String> platformNames,
+    public CountedGenericQueryResult<Machine> queryDevicesForPlatforms(Collection<OsType> osTypes,
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
                                                   String search,
                                                   SortInput sort) {
-        return paginate(machineFilter(filterOptions, platformNames, null), search, paginationCriteria, sort);
+        return paginate(machineFilter(filterOptions, osTypes, null), search, paginationCriteria, sort);
     }
 
-    public CountedGenericQueryResult<Machine> queryAvailableDevicesForSchedule(Collection<String> platformNames,
+    public CountedGenericQueryResult<Machine> queryAvailableDevicesForSchedule(Collection<OsType> platformNames,
                                                   Collection<String> assignedMachineIds,
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
@@ -130,7 +133,7 @@ public class DeviceService {
         return deviceFilters(machineFilter(filterOptions, null, scope), search);
     }
 
-    public DeviceFilters getAvailableDeviceFilters(Collection<String> platformNames,
+    public DeviceFilters getAvailableDeviceFilters(Collection<OsType> platformNames,
                                                    DeviceFilterCriteria filterOptions, String search) {
         return deviceFilters(machineFilter(filterOptions, platformNames, null), search);
     }
@@ -151,7 +154,7 @@ public class DeviceService {
      * All machineIds of devices matching {@code filter}/{@code search} within the given platforms —
      * backs "Add all devices" for a schedule (resolve the whole filtered set at once, unpaginated).
      */
-    public List<String> findDeviceIdsForPlatforms(Collection<String> platformNames,
+    public List<String> findDeviceIdsForPlatforms(Collection<OsType> platformNames,
                                                   DeviceFilterCriteria filterOptions, String search) {
         return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
                 machineFilter(filterOptions, platformNames, null), search);
@@ -213,7 +216,7 @@ public class DeviceService {
     }
 
     private MachineQueryFilter machineFilter(DeviceFilterCriteria filter,
-                                             Collection<String> platformNames,
+                                             Collection<OsType> platformNames,
                                              Collection<String> restrictToMachineIds) {
         MachineQueryFilter out = new MachineQueryFilter();
         if (filter != null) {
@@ -223,7 +226,7 @@ public class DeviceService {
             out.setOrganizationIds(filter.getOrganizationIds());
         }
         if (platformNames != null && !platformNames.isEmpty()) {
-            out.setPlatformNames(new ArrayList<>(platformNames));
+            out.setPlatformNames(new ArrayList<>(platformNames.stream().map(Enum::name).toList()));
         }
         List<String> tagMachineIds = filter != null ? resolveTagFilterToMachineIds(filter) : null;
         out.setRestrictToMachineIds(intersectMachineIds(tagMachineIds, restrictToMachineIds));
@@ -302,6 +305,10 @@ public class DeviceService {
         }
         if (status == DeviceStatus.DELETED) {
             scriptScheduleDeviceService.removeDeviceFromAllSchedules(machine.getTenantId(), machineId);
+            long removedDispatch = machineFirstOnlineDispatchRepository.deleteByTenantIdAndMachineId(machine.getTenantId(), machineId);
+            if (removedDispatch > 0) {
+                log.info("Removed first-online dispatch record(s) for deleted machineId={}, count={}", machineId, removedDispatch);
+            }
         }
 
         machine.setStatus(status);

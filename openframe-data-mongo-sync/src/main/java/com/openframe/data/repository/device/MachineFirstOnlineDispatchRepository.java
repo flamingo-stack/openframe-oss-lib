@@ -15,6 +15,8 @@ public interface MachineFirstOnlineDispatchRepository extends MongoRepository<Ma
 
     boolean existsByTenantIdAndMachineId(String tenantId, String machineId);
 
+    long deleteByTenantIdAndMachineId(String tenantId, String machineId);
+
     List<MachineFirstOnlineDispatch> findByDispatchedAtIsNull();
 
     @Query("{ '_id': { '$in': ?0 } }")
