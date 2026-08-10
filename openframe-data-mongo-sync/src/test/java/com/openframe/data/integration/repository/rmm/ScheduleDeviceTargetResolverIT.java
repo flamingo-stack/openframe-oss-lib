@@ -25,6 +25,7 @@ import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
 
+import static com.openframe.data.document.rmm.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -64,33 +65,21 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("CRITERIA: osType is matched case-insensitively against supportedPlatforms (lowercase 'windows' == WINDOWS)")
     void criteria_osTypeCaseInsensitive() {
-        machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
+        machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-mac", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
 
-        ScriptSchedule schedule = criteria(List.of(OsType.WINDOWS), ScheduleDeviceCriteria.builder().build());
+        ScriptSchedule schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-win");
     }
 
     @Test
-    @DisplayName("CRITERIA: an osType value with regex metacharacters is matched literally, not as a pattern ('.*' resolves nothing)")
-    void criteria_osTypeMetacharacter_matchedLiterally() {
-        machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
-        machine("m-mac", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
-
-        // no supportedPlatforms → scope = criteria osTypes; a raw ".*" must NOT resolve every device
-        ScriptSchedule schedule = criteria(null, ScheduleDeviceCriteria.builder().osTypes(List.of(".*")).build());
-
-        assertThat(resolver.resolveTargetMachineIds(schedule)).isEmpty();
-    }
-
-    @Test
     @DisplayName("CRITERIA: deviceTypes filters by the Machine.type enum (stored as its name)")
     void criteria_deviceTypeFilter() {
-        machine("m-lap", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
-        machine("m-desk", TENANT_A, "org-1", DeviceType.DESKTOP, OsType.WINDOWS);
+        machine("m-lap", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
+        machine("m-desk", TENANT_A, "org-1", DeviceType.DESKTOP, WINDOWS);
 
-        ScriptSchedule schedule = criteria(List.of(OsType.WINDOWS),
+        ScriptSchedule schedule = criteria(List.of(WINDOWS),
                 ScheduleDeviceCriteria.builder().deviceTypes(List.of(DeviceType.LAPTOP)).build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-lap");
@@ -99,10 +88,10 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("CRITERIA: organizationIds scopes to the chosen customers")
     void criteria_organizationFilter() {
-        machine("m1", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
-        machine("m2", TENANT_A, "org-2", DeviceType.LAPTOP, OsType.WINDOWS);
+        machine("m1", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
+        machine("m2", TENANT_A, "org-2", DeviceType.LAPTOP, WINDOWS);
 
-        ScriptSchedule schedule = criteria(List.of(OsType.WINDOWS),
+        ScriptSchedule schedule = criteria(List.of(WINDOWS),
                 ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m1");
@@ -111,10 +100,10 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("CRITERIA: results are tenant-scoped — a matching device in another tenant does not leak in")
     void criteria_tenantIsolated() {
-        machine("m-a", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
-        machine("m-b", TENANT_B, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
+        machine("m-a", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
+        machine("m-b", TENANT_B, "org-1", DeviceType.LAPTOP, WINDOWS);
 
-        ScriptSchedule schedule = criteria(List.of(OsType.WINDOWS), ScheduleDeviceCriteria.builder().build());
+        ScriptSchedule schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-a");
     }
@@ -122,11 +111,11 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("CRITERIA: an osTypes criterion narrows within supportedPlatforms")
     void criteria_osTypesNarrowsWithinSupported() {
-        machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
+        machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-mac", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
 
-        ScriptSchedule schedule = criteria(List.of(OsType.WINDOWS, OsType.MAC_OS),
-                ScheduleDeviceCriteria.builder().osTypes(List.of("WINDOWS")).build());
+        ScriptSchedule schedule = criteria(List.of(WINDOWS, OsType.MAC_OS),
+                ScheduleDeviceCriteria.builder().osTypes(List.of(WINDOWS)).build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-win");
     }
@@ -134,12 +123,11 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("CRITERIA: an osTypes criterion disjoint from supportedPlatforms matches nothing (contradictory scope)")
     void criteria_contradictoryOsScope_matchesNothing() {
-        machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
+        machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-mac", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
 
-        // schedule supports only MACOS, but the rule asks for WINDOWS → no device can satisfy both
         ScriptSchedule schedule = criteria(List.of(OsType.MAC_OS),
-                ScheduleDeviceCriteria.builder().osTypes(List.of("WINDOWS")).build());
+                ScheduleDeviceCriteria.builder().osTypes(List.of(WINDOWS)).build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).isEmpty();
     }
@@ -147,10 +135,10 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("CRITERIA: a device with no osType is excluded once a platform scope applies (regex can't match a missing field)")
     void criteria_missingOsType_excludedUnderPlatformScope() {
-        machine("m-known", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
+        machine("m-known", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-null", TENANT_A, "org-1", DeviceType.LAPTOP, null);
 
-        ScriptSchedule schedule = criteria(List.of(OsType.WINDOWS), ScheduleDeviceCriteria.builder().build());
+        ScriptSchedule schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-known");
     }
@@ -158,16 +146,16 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("CRITERIA: customer + type + OS are ANDed — only the device satisfying all three matches")
     void criteria_allDimensionsAnded() {
-        machine("hit", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
-        machine("wrong-org", TENANT_A, "org-2", DeviceType.LAPTOP, OsType.WINDOWS);
-        machine("wrong-type", TENANT_A, "org-1", DeviceType.SERVER, OsType.WINDOWS);
+        machine("hit", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
+        machine("wrong-org", TENANT_A, "org-2", DeviceType.LAPTOP, WINDOWS);
+        machine("wrong-type", TENANT_A, "org-1", DeviceType.SERVER, WINDOWS);
         machine("wrong-os", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
 
-        ScriptSchedule schedule = criteria(List.of(OsType.WINDOWS, OsType.MAC_OS),
+        ScriptSchedule schedule = criteria(List.of(WINDOWS, OsType.MAC_OS),
                 ScheduleDeviceCriteria.builder()
                         .organizationIds(List.of("org-1"))
                         .deviceTypes(List.of(DeviceType.LAPTOP))
-                        .osTypes(List.of("WINDOWS"))
+                        .osTypes(List.of(WINDOWS))
                         .build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("hit");
@@ -176,9 +164,9 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("CRITERIA: no supportedPlatforms and an empty rule matches every device in the tenant")
     void criteria_unconstrained_matchesAllInTenant() {
-        machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
+        machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-lin", TENANT_A, "org-2", DeviceType.SERVER, null);
-        machine("m-other-tenant", TENANT_B, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
+        machine("m-other-tenant", TENANT_B, "org-1", DeviceType.LAPTOP, WINDOWS);
 
         ScriptSchedule schedule = criteria(null, ScheduleDeviceCriteria.builder().build());
 
@@ -188,11 +176,11 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("countCriteriaMachines: returns the same count as the resolved id set, via a count query")
     void criteria_countMatchesResolvedSet() {
-        machine("m-win1", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
-        machine("m-win2", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
+        machine("m-win1", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
+        machine("m-win2", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-mac", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.MAC_OS);   // excluded by platform scope
 
-        ScriptSchedule schedule = criteria(List.of(OsType.WINDOWS), ScheduleDeviceCriteria.builder().build());
+        ScriptSchedule schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
 
         assertThat(resolver.countCriteriaMachines(schedule)).isEqualTo(2L);
         assertThat(resolver.resolveTargetMachineIds(schedule)).hasSize(2);   // count agrees with the id set
@@ -219,9 +207,9 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("resolveTargetMachineIds returns the machineId value, not the Mongo _id")
     void criteria_returnsMachineIdNotObjectId() {
-        machine("device-serial-123", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
+        machine("device-serial-123", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
 
-        ScriptSchedule schedule = criteria(List.of(OsType.WINDOWS), ScheduleDeviceCriteria.builder().build());
+        ScriptSchedule schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
 
         List<String> ids = resolver.resolveTargetMachineIds(schedule);
         assertThat(ids).containsExactly("device-serial-123");

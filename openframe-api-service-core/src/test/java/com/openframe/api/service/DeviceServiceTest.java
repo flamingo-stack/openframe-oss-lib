@@ -109,7 +109,7 @@ class DeviceServiceTest {
         service().queryDevicesForPlatforms(List.of(MAC_OS), null,
                 CursorPaginationCriteria.builder().limit(10).build(), null, null);
 
-        assertThat(capturedFilter().getPlatformNames()).containsExactly("MAC_OS");
+        assertThat(capturedFilter().getPlatformNames()).containsExactly(MAC_OS);
     }
 
     @Test
@@ -133,7 +133,7 @@ class DeviceServiceTest {
         assertThat(ids).containsExactly("m1", "m2");
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         verify(machineRepository).findMachineIds(any(), captor.capture(), any());
-        assertThat(captor.getValue().getPlatformNames()).containsExactly("MAC_OS");
+        assertThat(captor.getValue().getPlatformNames()).containsExactly(MAC_OS);
     }
 
     @Test

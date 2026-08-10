@@ -226,7 +226,7 @@ public class DeviceService {
             out.setOrganizationIds(filter.getOrganizationIds());
         }
         if (platformNames != null && !platformNames.isEmpty()) {
-            out.setPlatformNames(new ArrayList<>(platformNames.stream().map(Enum::name).toList()));
+            out.setPlatformNames(new ArrayList<>(platformNames));
         }
         List<String> tagMachineIds = filter != null ? resolveTagFilterToMachineIds(filter) : null;
         out.setRestrictToMachineIds(intersectMachineIds(tagMachineIds, restrictToMachineIds));

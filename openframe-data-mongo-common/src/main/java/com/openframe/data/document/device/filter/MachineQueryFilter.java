@@ -16,8 +16,8 @@ import java.util.List;
 public class MachineQueryFilter {
     private List<String> statuses;
     private List<String> deviceTypes;
-    private List<String> osTypes;
+    private List<OsType> osTypes;
     private List<String> organizationIds;
-    private List<String> platformNames;
+    private List<OsType> platformNames;
     private Collection<String> restrictToMachineIds;
 }
