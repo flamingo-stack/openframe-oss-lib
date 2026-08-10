@@ -35,4 +35,13 @@ public class NotificationContextDescriptorRegistry {
         NotificationContextDescriptor descriptor = byType.get(context.getType());
         return descriptor == null ? NotificationCategory.GENERIC : descriptor.category(context);
     }
+
+    /** Null when the type has no checkbox (unknown types included) — such notifications are always delivered. */
+    public NotificationSettingGroup settingsGroupOf(NotificationContext context) {
+        if (context == null) {
+            return null;
+        }
+        NotificationContextDescriptor descriptor = byType.get(context.getType());
+        return descriptor == null ? null : descriptor.settingsGroup(context);
+    }
 }

@@ -1,10 +1,16 @@
 package com.openframe.api.service;
 
+import com.openframe.api.dto.NotificationSettingsView;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSettings;
 import com.openframe.data.repository.notification.NotificationSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -12,16 +18,37 @@ public class NotificationSettingsService {
 
     private final NotificationSettingsRepository settingsRepository;
 
-    public NotificationSettings get(String userId) {
-        return settingsRepository.findByUserId(userId)
-                .orElseGet(() -> NotificationSettings.builder().build());
+    public NotificationSettingsView get(String userId) {
+        return NotificationSettingsView.from(settingsRepository.findByUserId(userId)
+                .orElseGet(() -> NotificationSettings.builder().build()));
     }
 
-    public NotificationSettings update(String userId, Boolean pushEnabled) {
-        if (pushEnabled == null) {
-            throw new BadRequestException("pushEnabled is required");
+    /**
+     * {@code enabled} wins over the legacy {@code pushEnabled} when both arrive; a null
+     * {@code typeSettings} means "not sent" and keeps the stored group overrides.
+     */
+    public NotificationSettingsView update(String userId, Boolean enabled,
+                                           List<NotificationSettingsView.TypeSetting> typeSettings,
+                                           Boolean legacyPushEnabled) {
+        Boolean master = enabled != null ? enabled : legacyPushEnabled;
+        if (master == null) {
+            throw new BadRequestException("enabled is required");
         }
-        settingsRepository.setPushEnabled(userId, pushEnabled);
-        return NotificationSettings.builder().pushEnabled(pushEnabled).build();
+        settingsRepository.saveSettings(userId, master, toMap(typeSettings));
+        return get(userId);
+    }
+
+    private static Map<NotificationSettingGroup, Boolean> toMap(List<NotificationSettingsView.TypeSetting> typeSettings) {
+        if (typeSettings == null) {
+            return null;
+        }
+        Map<NotificationSettingGroup, Boolean> map = new EnumMap<>(NotificationSettingGroup.class);
+        for (NotificationSettingsView.TypeSetting setting : typeSettings) {
+            if (setting.group() == null) {
+                throw new BadRequestException("typeSettings entries require a group");
+            }
+            map.put(setting.group(), setting.enabled());
+        }
+        return map;
     }
 }

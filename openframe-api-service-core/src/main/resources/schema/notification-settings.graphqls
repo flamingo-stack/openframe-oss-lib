@@ -3,10 +3,35 @@ extend type Query {
 }
 
 extend type Mutation {
-    updateNotificationSettings(pushEnabled: Boolean!): NotificationSettings!
+    "The modal saves full state: enabled + typeSettings. pushEnabled alone still works as a legacy master-switch write."
+    updateNotificationSettings(enabled: Boolean, typeSettings: [NotificationTypeSettingInput!], pushEnabled: Boolean): NotificationSettings!
 }
 
-# Will grow additively (per-type toggles below the master switch in the design) — do not assume a single field.
+"The 'Notify about' checkboxes. A notification type outside every group cannot be muted."
+enum NotificationSettingGroup {
+    TICKET_ASSIGNED
+    TICKET_STATUS_CHANGED
+    CUSTOMER_REPLIED
+    ADMIN_REPLIED
+    MINGO_MESSAGES
+    APPROVAL_TICKET
+    APPROVAL_MINGO
+}
+
+type NotificationTypeSetting {
+    group: NotificationSettingGroup!
+    enabled: Boolean!
+}
+
+input NotificationTypeSettingInput {
+    group: NotificationSettingGroup!
+    enabled: Boolean!
+}
+
 type NotificationSettings {
-    pushEnabled: Boolean!
+    "Master switch over ALL notifications — in-app and push alike."
+    enabled: Boolean!
+    "Every group exactly once, defaults already resolved."
+    typeSettings: [NotificationTypeSetting!]!
+    pushEnabled: Boolean! @deprecated(reason: "The master switch covers all channels now — read enabled.")
 }

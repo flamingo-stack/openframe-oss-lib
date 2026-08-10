@@ -2,18 +2,23 @@ package com.openframe.data.nats.service;
 
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.data.document.notification.NotificationReadState;
+import com.openframe.data.document.notification.NotificationSettingGroup;
+import com.openframe.data.document.notification.NotificationSettings;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
+import com.openframe.data.repository.notification.NotificationSettingsRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -28,6 +33,7 @@ public class NotificationBroadcaster {
     private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
     private final NotificationChannelDispatcher channelDispatcher;
+    private final Optional<NotificationSettingsRepository> settingsRepository;
 
     @Value("${openframe.features.notifications.enabled:false}")
     private boolean notificationsEnabled;
@@ -51,7 +57,7 @@ public class NotificationBroadcaster {
         log.debug("Persisted notification {} (admins={}, machines={})",
                 saved.getId(), command.getAdminAudience().size(), command.getMachineAudience().size());
 
-        Set<String> admins = command.getAdminAudience();
+        Set<String> admins = withoutOptedOut(command.getAdminAudience(), command.getContext());
         Set<String> machines = command.getMachineAudience();
         String title = command.getTitle();
         try {
@@ -90,6 +96,36 @@ public class NotificationBroadcaster {
         }
 
         return saved;
+    }
+
+    /**
+     * User notification settings applied at the AUDIENCE level: an opted-out admin gets no read-state
+     * row, no card, no NATS message, no push — the notification never existed for them, and it does
+     * not appear after re-enabling. Machines have no settings. Absence of a document and every
+     * failure mode default to delivery — a settings hiccup must not lose notifications.
+     */
+    private Set<String> withoutOptedOut(Set<String> admins, NotificationContext context) {
+        if (admins.isEmpty() || settingsRepository.isEmpty()) {
+            return admins;
+        }
+        NotificationSettingGroup group = descriptorRegistry.settingsGroupOf(context);
+        try {
+            List<NotificationSettings> rows = settingsRepository.get().findByUserIdIn(admins);
+            if (rows.isEmpty()) {
+                return admins;
+            }
+            Set<String> kept = new HashSet<>(admins);
+            for (NotificationSettings row : rows) {
+                if (!row.allows(group)) {
+                    kept.remove(row.getUserId());
+                }
+            }
+            return kept;
+        } catch (RuntimeException ex) {
+            log.warn("Notification settings lookup failed — delivering to all {} admin(s): {}",
+                    admins.size(), ex.getMessage());
+            return admins;
+        }
     }
 
     /**

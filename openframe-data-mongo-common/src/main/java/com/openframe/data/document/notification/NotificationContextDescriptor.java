@@ -22,4 +22,13 @@ public interface NotificationContextDescriptor {
     default NotificationCategory category(NotificationContext context) {
         return category();
     }
+
+    /**
+     * Which "Notify about" checkbox governs this notification. Null (the default) means no checkbox:
+     * the type cannot be muted and is always delivered — deliberately fail-open, so a type whose
+     * descriptor forgot to map a group loses mutability, never delivery.
+     */
+    default NotificationSettingGroup settingsGroup(NotificationContext context) {
+        return null;
+    }
 }
