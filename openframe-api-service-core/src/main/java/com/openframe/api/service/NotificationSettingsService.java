@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.NotificationSettingsView;
+import com.openframe.api.dto.NotificationTypeSetting;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSettings;
@@ -25,19 +26,19 @@ public class NotificationSettingsService {
     }
 
     public NotificationSettingsView update(String userId, boolean enabled,
-                                           List<NotificationSettingsView.TypeSetting> typeSettings) {
+                                           List<NotificationTypeSetting> typeSettings) {
         Map<NotificationSettingGroup, Boolean> groupOverrides = toGroupOverrides(typeSettings);
         settingsRepository.saveSettings(userId, enabled, groupOverrides);
         return get(userId);
     }
 
     /** Null means "not sent" — a legacy master-only write keeps the stored group overrides. */
-    private static Map<NotificationSettingGroup, Boolean> toGroupOverrides(List<NotificationSettingsView.TypeSetting> typeSettings) {
+    private static Map<NotificationSettingGroup, Boolean> toGroupOverrides(List<NotificationTypeSetting> typeSettings) {
         if (typeSettings == null) {
             return null;
         }
         Map<NotificationSettingGroup, Boolean> overrides = new EnumMap<>(NotificationSettingGroup.class);
-        for (NotificationSettingsView.TypeSetting setting : typeSettings) {
+        for (NotificationTypeSetting setting : typeSettings) {
             NotificationSettingGroup group = setting.getGroup();
             if (group == null) {
                 throw new BadRequestException("typeSettings entries require a group");

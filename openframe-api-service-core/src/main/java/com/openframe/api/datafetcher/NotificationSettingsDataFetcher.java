@@ -5,6 +5,7 @@ import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.NotificationSettingsView;
+import com.openframe.api.dto.NotificationTypeSetting;
 import com.openframe.api.service.NotificationSettingsService;
 import com.openframe.api.support.CurrentPrincipalSupport;
 import com.openframe.security.authentication.AuthPrincipal;
@@ -28,8 +29,8 @@ public class NotificationSettingsDataFetcher {
     @DgsMutation
     public NotificationSettingsView updateNotificationSettings(
             @InputArgument Boolean enabled,
-            @InputArgument(collectionType = NotificationSettingsView.TypeSetting.class)
-            List<NotificationSettingsView.TypeSetting> typeSettings,
+            @InputArgument(collectionType = NotificationTypeSetting.class)
+            List<NotificationTypeSetting> typeSettings,
             @AuthenticationPrincipal AuthPrincipal principal) {
         String userId = CurrentPrincipalSupport.requireHumanUserId(principal);
         return notificationSettingsService.update(userId, enabled, typeSettings);

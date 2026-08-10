@@ -3,9 +3,7 @@ package com.openframe.api.dto;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSettings;
 import lombok.AllArgsConstructor;
-import lombok.Data;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,22 +14,14 @@ import java.util.List;
 public class NotificationSettingsView {
 
     private final boolean enabled;
-    private final List<TypeSetting> typeSettings;
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TypeSetting {
-        private NotificationSettingGroup group;
-        private boolean enabled;
-    }
+    private final List<NotificationTypeSetting> typeSettings;
 
     public static NotificationSettingsView from(NotificationSettings settings) {
         boolean master = settings.isMasterEnabled();
-        List<TypeSetting> groups = new ArrayList<>();
+        List<NotificationTypeSetting> groups = new ArrayList<>();
         for (NotificationSettingGroup group : NotificationSettingGroup.values()) {
             boolean groupEnabled = settings.isGroupEnabled(group);
-            groups.add(new TypeSetting(group, groupEnabled));
+            groups.add(new NotificationTypeSetting(group, groupEnabled));
         }
         return new NotificationSettingsView(master, groups);
     }

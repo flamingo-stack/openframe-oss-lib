@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.NotificationSettingsView;
+import com.openframe.api.dto.NotificationTypeSetting;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSettings;
@@ -46,7 +47,7 @@ class NotificationSettingsServiceTest {
 
         assertThat(view.isEnabled()).isTrue();
         assertThat(view.getTypeSettings()).hasSize(NotificationSettingGroup.values().length);
-        assertThat(view.getTypeSettings()).allMatch(NotificationSettingsView.TypeSetting::isEnabled);
+        assertThat(view.getTypeSettings()).allMatch(NotificationTypeSetting::isEnabled);
     }
 
     @Test
@@ -60,8 +61,8 @@ class NotificationSettingsServiceTest {
         NotificationSettingsView view = service.get("user-1");
 
         assertThat(view.getTypeSettings()).contains(
-                new NotificationSettingsView.TypeSetting(NotificationSettingGroup.MINGO_MESSAGES, false),
-                new NotificationSettingsView.TypeSetting(NotificationSettingGroup.TICKET_ASSIGNED, true));
+                new NotificationTypeSetting(NotificationSettingGroup.MINGO_MESSAGES, false),
+                new NotificationTypeSetting(NotificationSettingGroup.TICKET_ASSIGNED, true));
     }
 
     @Test
@@ -71,7 +72,7 @@ class NotificationSettingsServiceTest {
                 .userId("user-1").enabled(false).build()));
 
         NotificationSettingsView view = service.update("user-1", false,
-                List.of(new NotificationSettingsView.TypeSetting(NotificationSettingGroup.APPROVAL_MINGO, false)));
+                List.of(new NotificationTypeSetting(NotificationSettingGroup.APPROVAL_MINGO, false)));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<NotificationSettingGroup, Boolean>> map = ArgumentCaptor.forClass(Map.class);
@@ -93,8 +94,8 @@ class NotificationSettingsServiceTest {
     @Test
     @DisplayName("Given a typeSettings entry without a group, when updating, then BadRequestException — an override must name its checkbox")
     void groupless_override_is_rejected() {
-        List<NotificationSettingsView.TypeSetting> broken =
-                List.of(new NotificationSettingsView.TypeSetting(null, false));
+        List<NotificationTypeSetting> broken =
+                List.of(new NotificationTypeSetting(null, false));
 
         assertThatThrownBy(() -> service.update("user-1", true, broken))
                 .isInstanceOf(BadRequestException.class);
