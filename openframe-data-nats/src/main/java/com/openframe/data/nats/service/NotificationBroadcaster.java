@@ -35,7 +35,7 @@ public class NotificationBroadcaster {
     private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
     private final NotificationChannelDispatcher channelDispatcher;
-    private final Optional<NotificationSettingsRepository> settingsRepository;
+    private final NotificationSettingsRepository settingsRepository;
 
     @Value("${openframe.features.notifications.enabled:false}")
     private boolean notificationsEnabled;
@@ -107,12 +107,9 @@ public class NotificationBroadcaster {
         if (admins.isEmpty()) {
             return admins;
         }
-        if (settingsRepository.isEmpty()) {
-            return admins;
-        }
         NotificationSettingGroup group = descriptorRegistry.settingsGroupOf(context);
         try {
-            List<NotificationSettings> rows = settingsRepository.get().findByUserIdIn(admins);
+            List<NotificationSettings> rows = settingsRepository.findByUserIdIn(admins);
             if (rows.isEmpty()) {
                 return admins;
             }

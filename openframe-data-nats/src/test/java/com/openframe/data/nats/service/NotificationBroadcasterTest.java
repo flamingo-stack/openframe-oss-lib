@@ -453,7 +453,7 @@ class NotificationBroadcasterTest {
     private NotificationBroadcaster newBroadcaster(Optional<NotificationNatsPublisher> publisher, boolean notificationsEnabled) {
         NotificationBroadcaster bc = new NotificationBroadcaster(
                 notificationRepository, readStateService, descriptorRegistry, publisher, channelDispatcher,
-                Optional.of(settingsRepository));
+                settingsRepository);
         ReflectionTestUtils.setField(bc, "notificationsEnabled", notificationsEnabled);
         return bc;
     }
