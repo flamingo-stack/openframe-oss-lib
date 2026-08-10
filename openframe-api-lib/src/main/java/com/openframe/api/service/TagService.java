@@ -233,7 +233,8 @@ public class TagService {
 
         if (key != null) {
             TagEntityType entityType = tag.getEntityType();
-            if (tagRepository.existsByKeyIgnoreCaseAndEntityTypeAndIdNot(key, entityType, tagId)) {
+            boolean duplicateExists = tagRepository.existsByKeyIgnoreCaseAndEntityTypeAndIdNot(key, entityType, tagId);
+            if (duplicateExists) {
                 throw new IllegalArgumentException(
                         "Tag with key '" + key + "' already exists for " + entityType);
             }
