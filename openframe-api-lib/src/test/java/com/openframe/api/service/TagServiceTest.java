@@ -95,23 +95,10 @@ class TagServiceTest {
     void updateTagRejectsRenameCollidingWithCaseVariantOfAnotherTag() {
         Tag other = Tag.builder().id("tag-2").key("Printers").entityType(KNOWLEDGE_ARTICLE).build();
         when(tagRepository.findById("tag-2")).thenReturn(Optional.of(other));
-        when(tagRepository.findByKeyAndEntityType("NEWTAG", KNOWLEDGE_ARTICLE)).thenReturn(null);
-        when(tagRepository.findByEntityType(KNOWLEDGE_ARTICLE)).thenReturn(List.of(newTag, other));
+        when(tagRepository.existsByKeyIgnoreCaseAndEntityTypeAndIdNot("NEWTAG", KNOWLEDGE_ARTICLE, "tag-2"))
+                .thenReturn(true);
 
         assertThatThrownBy(() -> tagService.updateTag("tag-2", "NEWTAG", null, null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("NewTag");
-        verify(tagRepository, never()).save(any());
-    }
-
-    @Test
-    void updateTagRejectsCaseRenameWhenLegacyDuplicateExistsAfterSelf() {
-        Tag legacyDup = Tag.builder().id("tag-2").key("NEWTAG").entityType(KNOWLEDGE_ARTICLE).build();
-        when(tagRepository.findById("tag-1")).thenReturn(Optional.of(newTag));
-        when(tagRepository.findByKeyAndEntityType("newtag", KNOWLEDGE_ARTICLE)).thenReturn(null);
-        when(tagRepository.findByEntityType(KNOWLEDGE_ARTICLE)).thenReturn(List.of(newTag, legacyDup));
-
-        assertThatThrownBy(() -> tagService.updateTag("tag-1", "newtag", null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("NEWTAG");
         verify(tagRepository, never()).save(any());
@@ -120,8 +107,8 @@ class TagServiceTest {
     @Test
     void updateTagAllowsChangingCaseOfOwnKey() {
         when(tagRepository.findById("tag-1")).thenReturn(Optional.of(newTag));
-        when(tagRepository.findByKeyAndEntityType("NEWTAG", KNOWLEDGE_ARTICLE)).thenReturn(null);
-        when(tagRepository.findByEntityType(KNOWLEDGE_ARTICLE)).thenReturn(List.of(newTag));
+        when(tagRepository.existsByKeyIgnoreCaseAndEntityTypeAndIdNot("NEWTAG", KNOWLEDGE_ARTICLE, "tag-1"))
+                .thenReturn(false);
         when(tagRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Tag result = tagService.updateTag("tag-1", "NEWTAG", null, null);

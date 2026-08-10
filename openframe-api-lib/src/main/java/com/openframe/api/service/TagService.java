@@ -232,13 +232,9 @@ public class TagService {
                 .orElseThrow(() -> new IllegalArgumentException("Tag not found: " + tagId));
 
         if (key != null) {
-            Tag conflict = findAllByKeyIgnoreCase(key, tag.getEntityType()).stream()
-                    .filter(t -> !t.getId().equals(tagId))
-                    .findFirst()
-                    .orElse(null);
-            if (conflict != null) {
+            if (tagRepository.existsByKeyIgnoreCaseAndEntityTypeAndIdNot(key, tag.getEntityType(), tagId)) {
                 throw new IllegalArgumentException(
-                        "Tag with key '" + conflict.getKey() + "' already exists for " + tag.getEntityType());
+                        "Tag with key '" + key + "' already exists for " + tag.getEntityType());
             }
             tag.setKey(key);
         }
@@ -262,15 +258,10 @@ public class TagService {
         if (exact != null) {
             return exact;
         }
-        return findAllByKeyIgnoreCase(key, entityType).stream()
-                .findFirst()
-                .orElse(null);
-    }
-
-    private List<Tag> findAllByKeyIgnoreCase(String key, TagEntityType entityType) {
         return tagRepository.findByEntityType(entityType).stream()
                 .filter(t -> t.getKey() != null && t.getKey().equalsIgnoreCase(key))
-                .toList();
+                .findFirst()
+                .orElse(null);
     }
 
     @Transactional
