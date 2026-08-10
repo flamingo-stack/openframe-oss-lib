@@ -51,6 +51,60 @@ function videoPerfDebugEnabled(): boolean {
 }
 
 // =============================================================================
+// Mux viewer identity without a cookie
+// =============================================================================
+//
+// Mux Data keeps `mux_viewer_id` (stable viewer) and a rolling session id in a
+// `muxData` cookie, 365-day expiry. That cookie rides on EVERY request to the
+// origin, and its punctuation trips Cloud Armor's restricted-SQL-character
+// cookie counters (CRS 942420/942421) — 245 preview-DENY events in a 6-hour
+// census. `disableCookies` alone stops the beacons carrying any viewer id at
+// all (`viewerData = disableCookies ? {} : Ae()` in mux-embed), which would
+// turn every page load into a new "unique viewer".
+//
+// So we keep the identity and drop the cookie: the id lives in localStorage and
+// is handed to Mux as `metadata.viewer_user_id`. No coverage is lost — Mux's
+// cookie is host-only (`Cookies.set` with `{path:'/'}` and no `domain`), and
+// localStorage is origin-scoped, so the two cover exactly the same surface.
+//
+// What does NOT come back: `session_id`/`session_start`, which group views into
+// a 25-minute session — mux-embed derives those internally and exposes no way
+// to supply them. Per-view metrics, QoE and viewer counts are unaffected.
+// `mux_sample_number` is also dropped, which is harmless at the default
+// `sampleRate: 1` (the beacon check is `(sample ?? 0) >= sampleRate`).
+const MUX_VIEWER_ID_KEY = 'mux:viewer_id';
+
+function muxViewerId(): string | undefined {
+  try {
+    if (typeof localStorage === 'undefined') return undefined;
+    const existing = localStorage.getItem(MUX_VIEWER_ID_KEY);
+    if (existing) return existing;
+    const generated =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(MUX_VIEWER_ID_KEY, generated);
+    return generated;
+  } catch {
+    // Private mode / storage disabled — Mux falls back to per-view identity.
+    return undefined;
+  }
+}
+
+// One-time removal of the legacy `muxData` cookie. `disableCookies` stops NEW
+// writes but never clears what was already issued, and at 365 days those
+// browsers would keep tripping 942420/942421 for a year. Module-level so it runs
+// on import, before any player mounts. Host-only, so no `domain` attribute —
+// that is what Mux set. Remove this once the census reads zero.
+if (typeof document !== 'undefined') {
+  try {
+    document.cookie = 'muxData=; path=/; max-age=0';
+  } catch {
+    // Non-blocking: a failed cleanup only means the census decays slower.
+  }
+}
+
+// =============================================================================
 // Suppress Google Cast SDK loading (CSP-friendly)
 // =============================================================================
 //
@@ -930,16 +984,11 @@ function FilePlayer({
       playsInline
       muted={muted}
       preferCmcd="header"
-      // Mux Data writes a first-party `muxData` cookie on the registrable
-      // domain to keep one viewer id across sessions. It rides on every request
-      // to the app origin, and its punctuation density trips Cloud Armor's
-      // restricted-SQL-character cookie counters (CRS 942420/942421) — 245
-      // preview-DENY events in a 6-hour census, 233 of them on tenant hosts
-      // where the player never even renders. Playback and per-session QoE
-      // metrics are unaffected; what is lost is cross-session viewer identity,
-      // so "unique viewers" becomes "unique sessions". That is the right trade
-      // for a player used on onboarding steps and help-center releases.
+      // No `muxData` cookie — the viewer id moves to localStorage and rides in
+      // `metadata` below instead. See the "Mux viewer identity without a
+      // cookie" block at the top of this file.
       disableCookies
+      metadata={{ viewer_user_id: muxViewerId() }}
       // MuxPlayer's built-in default is `#fa50b5` (Mux brand pink) — when
       // its `--media-accent-color` resolves to nothing the player falls
       // through to that hardcoded pink. The `var(--ods-accent,
