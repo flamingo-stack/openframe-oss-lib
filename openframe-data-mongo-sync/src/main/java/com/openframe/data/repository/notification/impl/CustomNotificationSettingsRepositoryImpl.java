@@ -25,7 +25,6 @@ public class CustomNotificationSettingsRepositoryImpl extends TenantAwareReposit
         implements CustomNotificationSettingsRepository {
 
     private static final String FIELD_USER_ID = "userId";
-    private static final String FIELD_PUSH_ENABLED = "pushEnabled";
     private static final String FIELD_ENABLED = "enabled";
     private static final String FIELD_TYPE_SETTINGS = "typeSettings";
     private static final String FIELD_CREATED_AT = "createdAt";
@@ -41,7 +40,6 @@ public class CustomNotificationSettingsRepositoryImpl extends TenantAwareReposit
         Instant now = Instant.now();
         Update update = new Update()
                 .set(FIELD_ENABLED, enabled)
-                .set(FIELD_PUSH_ENABLED, enabled)
                 .set(FIELD_UPDATED_AT, now)
                 .setOnInsert(FIELD_CREATED_AT, now);
         if (typeSettings != null) {

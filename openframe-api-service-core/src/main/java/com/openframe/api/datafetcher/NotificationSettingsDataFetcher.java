@@ -30,9 +30,8 @@ public class NotificationSettingsDataFetcher {
             @InputArgument Boolean enabled,
             @InputArgument(collectionType = NotificationSettingsView.TypeSetting.class)
             List<NotificationSettingsView.TypeSetting> typeSettings,
-            @InputArgument Boolean pushEnabled,
             @AuthenticationPrincipal AuthPrincipal principal) {
         String userId = CurrentPrincipalSupport.requireHumanUserId(principal);
-        return notificationSettingsService.update(userId, enabled, typeSettings, pushEnabled);
+        return notificationSettingsService.update(userId, enabled, typeSettings);
     }
 }

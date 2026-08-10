@@ -3,8 +3,8 @@ extend type Query {
 }
 
 extend type Mutation {
-    "The modal saves full state: enabled + typeSettings. pushEnabled alone still works as a legacy master-switch write."
-    updateNotificationSettings(enabled: Boolean, typeSettings: [NotificationTypeSettingInput!], pushEnabled: Boolean): NotificationSettings!
+    "The modal saves full state; omitting typeSettings keeps the stored group overrides."
+    updateNotificationSettings(enabled: Boolean!, typeSettings: [NotificationTypeSettingInput!]): NotificationSettings!
 }
 
 "The 'Notify about' checkboxes. A notification type outside every group cannot be muted."
@@ -33,5 +33,4 @@ type NotificationSettings {
     enabled: Boolean!
     "Every group exactly once, defaults already resolved."
     typeSettings: [NotificationTypeSetting!]!
-    pushEnabled: Boolean! @deprecated(reason: "The master switch covers all channels now — read enabled.")
 }

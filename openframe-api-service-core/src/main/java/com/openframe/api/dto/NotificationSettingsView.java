@@ -17,7 +17,6 @@ public class NotificationSettingsView {
 
     private final boolean enabled;
     private final List<TypeSetting> typeSettings;
-    private final boolean pushEnabled;
 
     @Data
     @NoArgsConstructor
@@ -34,6 +33,6 @@ public class NotificationSettingsView {
             boolean groupEnabled = settings.isGroupEnabled(group);
             groups.add(new TypeSetting(group, groupEnabled));
         }
-        return new NotificationSettingsView(master, groups, master);
+        return new NotificationSettingsView(master, groups);
     }
 }

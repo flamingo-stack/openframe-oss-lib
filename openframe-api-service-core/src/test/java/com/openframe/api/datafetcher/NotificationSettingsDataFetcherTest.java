@@ -45,11 +45,11 @@ class NotificationSettingsDataFetcherTest {
     void update_delegates_with_the_principal_id() {
         List<NotificationSettingsView.TypeSetting> typeSettings =
                 List.of(new NotificationSettingsView.TypeSetting(NotificationSettingGroup.MINGO_MESSAGES, false));
-        when(service.update("user-1", false, typeSettings, null)).thenReturn(view(false));
+        when(service.update("user-1", false, typeSettings)).thenReturn(view(false));
 
-        assertThat(fetcher.updateNotificationSettings(false, typeSettings, null, principal("user-1")).isEnabled())
+        assertThat(fetcher.updateNotificationSettings(false, typeSettings, principal("user-1")).isEnabled())
                 .isFalse();
-        verify(service).update("user-1", false, typeSettings, null);
+        verify(service).update("user-1", false, typeSettings);
     }
 
     @Test
@@ -58,13 +58,13 @@ class NotificationSettingsDataFetcherTest {
         AuthPrincipal agent = AuthPrincipal.builder().id("machine-7").actorType(ActorType.AGENT).build();
 
         assertThatThrownBy(() -> fetcher.notificationSettings(agent)).isInstanceOf(UnauthorizedException.class);
-        assertThatThrownBy(() -> fetcher.updateNotificationSettings(false, null, null, agent))
+        assertThatThrownBy(() -> fetcher.updateNotificationSettings(false, null, agent))
                 .isInstanceOf(UnauthorizedException.class);
         verifyNoInteractions(service);
     }
 
     private static NotificationSettingsView view(boolean enabled) {
-        return new NotificationSettingsView(enabled, List.of(), enabled);
+        return new NotificationSettingsView(enabled, List.of());
     }
 
     private static AuthPrincipal principal(String userId) {

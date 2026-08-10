@@ -33,8 +33,8 @@ class CustomNotificationSettingsRepositoryImplTest {
     }
 
     @Test
-    @DisplayName("saveSettings upserts by userId (the template adds the tenant), mirrors enabled into legacy pushEnabled and sets createdAt only on insert")
-    void save_upserts_and_mirrors_the_legacy_field() {
+    @DisplayName("saveSettings upserts by userId (the template adds the tenant) and sets createdAt only on insert")
+    void save_upserts_by_user_id() {
         when(mongoTemplate.upsert(any(Query.class), any(Update.class), eq(NotificationSettings.class)))
                 .thenReturn(mock(UpdateResult.class));
 
@@ -45,7 +45,7 @@ class CustomNotificationSettingsRepositoryImplTest {
         verify(mongoTemplate).upsert(query.capture(), update.capture(), eq(NotificationSettings.class));
         assertThat(query.getValue().getQueryObject().toJson()).contains("alice");
         String set = update.getValue().getUpdateObject().get("$set").toString();
-        assertThat(set).contains("enabled=false").contains("pushEnabled=false").contains("typeSettings");
+        assertThat(set).contains("enabled=false").contains("typeSettings");
         assertThat(update.getValue().getUpdateObject().get("$setOnInsert").toString()).contains("createdAt");
     }
 

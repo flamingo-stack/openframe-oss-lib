@@ -50,15 +50,6 @@ class NotificationSettingsServiceTest {
     }
 
     @Test
-    @DisplayName("Given a legacy document (pushEnabled=false, no enabled field), when read, then the master resolves from the legacy field")
-    void legacy_document_feeds_the_master_switch() {
-        when(repository.findByUserId("user-1")).thenReturn(Optional.of(
-                NotificationSettings.builder().userId("user-1").pushEnabled(false).build()));
-
-        assertThat(service.get("user-1").isEnabled()).isFalse();
-    }
-
-    @Test
     @DisplayName("Given a stored group override, when read, then that group is disabled and the ones never saved stay enabled")
     void group_override_resolves_and_absent_groups_default_on() {
         when(repository.findByUserId("user-1")).thenReturn(Optional.of(NotificationSettings.builder()
@@ -80,7 +71,7 @@ class NotificationSettingsServiceTest {
                 .userId("user-1").enabled(false).build()));
 
         NotificationSettingsView view = service.update("user-1", false,
-                List.of(new NotificationSettingsView.TypeSetting(NotificationSettingGroup.APPROVAL_MINGO, false)), null);
+                List.of(new NotificationSettingsView.TypeSetting(NotificationSettingGroup.APPROVAL_MINGO, false)));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<NotificationSettingGroup, Boolean>> map = ArgumentCaptor.forClass(Map.class);
@@ -90,29 +81,22 @@ class NotificationSettingsServiceTest {
     }
 
     @Test
-    @DisplayName("Given only the legacy pushEnabled argument, when updating, then it drives the master and the stored group overrides are left alone (null map)")
-    void legacy_argument_still_updates_the_master() {
+    @DisplayName("Given a master-only write (null typeSettings), when updating, then the stored group overrides are left alone")
+    void master_only_write_keeps_stored_overrides() {
         when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
 
-        service.update("user-1", null, null, false);
+        service.update("user-1", false, null);
 
         verify(repository).saveSettings(eq("user-1"), eq(false), isNull());
     }
 
     @Test
-    @DisplayName("Given both enabled and legacy pushEnabled, when updating, then enabled wins")
-    void enabled_wins_over_the_legacy_argument() {
-        when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
+    @DisplayName("Given a typeSettings entry without a group, when updating, then BadRequestException — an override must name its checkbox")
+    void groupless_override_is_rejected() {
+        List<NotificationSettingsView.TypeSetting> broken =
+                List.of(new NotificationSettingsView.TypeSetting(null, false));
 
-        service.update("user-1", true, null, false);
-
-        verify(repository).saveSettings(eq("user-1"), eq(true), isNull());
-    }
-
-    @Test
-    @DisplayName("Given neither enabled nor pushEnabled, when updating, then BadRequestException — a write without a master value has no meaning")
-    void missing_master_is_rejected() {
-        assertThatThrownBy(() -> service.update("user-1", null, null, null))
+        assertThatThrownBy(() -> service.update("user-1", true, broken))
                 .isInstanceOf(BadRequestException.class);
         verify(repository, never()).saveSettings(anyString(), anyBoolean(), any());
     }

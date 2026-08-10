@@ -28,11 +28,7 @@ public class NotificationSettings implements TenantScoped {
 
     private String userId;
 
-    /** Legacy push-era master, mirrored on every write so a rolled-back reader still honours the switch. */
-    @Builder.Default
-    private boolean pushEnabled = true;
-
-    /** Master over ALL delivery (in-app, NATS, push); null = legacy document, fall back to pushEnabled. */
+    /** Master over ALL delivery (in-app, NATS, push); absent = enabled. */
     private Boolean enabled;
 
     /** Only explicit false mutes; an absent key — including groups added after this document was saved — is enabled. */
@@ -43,7 +39,7 @@ public class NotificationSettings implements TenantScoped {
     private Instant updatedAt;
 
     public boolean isMasterEnabled() {
-        return enabled != null ? enabled : pushEnabled;
+        return enabled == null || enabled;
     }
 
     public boolean isGroupEnabled(NotificationSettingGroup group) {

@@ -24,23 +24,11 @@ public class NotificationSettingsService {
         return NotificationSettingsView.from(settings);
     }
 
-    public NotificationSettingsView update(String userId, Boolean enabled,
-                                           List<NotificationSettingsView.TypeSetting> typeSettings,
-                                           Boolean legacyPushEnabled) {
-        boolean master = resolveMaster(enabled, legacyPushEnabled);
+    public NotificationSettingsView update(String userId, boolean enabled,
+                                           List<NotificationSettingsView.TypeSetting> typeSettings) {
         Map<NotificationSettingGroup, Boolean> groupOverrides = toGroupOverrides(typeSettings);
-        settingsRepository.saveSettings(userId, master, groupOverrides);
+        settingsRepository.saveSettings(userId, enabled, groupOverrides);
         return get(userId);
-    }
-
-    private static boolean resolveMaster(Boolean enabled, Boolean legacyPushEnabled) {
-        if (enabled != null) {
-            return enabled;
-        }
-        if (legacyPushEnabled != null) {
-            return legacyPushEnabled;
-        }
-        throw new BadRequestException("enabled is required");
     }
 
     /** Null means "not sent" — a legacy master-only write keeps the stored group overrides. */
