@@ -1,0 +1,63 @@
+name: "Bump Revision"
+description: "Opens an auto-merged PR aligning the <revision> property in pom.xml with the released version. Bails out if the diff is anything but that one line."
+
+inputs:
+  version:
+    description: "Released version to write into <revision>"
+    required: true
+  token:
+    description: "GitHub App token with contents:write and pull-requests:write on this repository"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout main
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        token: ${{ inputs.token }}
+        path: bump-revision-workspace
+
+    - name: Open and merge revision PR
+      shell: bash
+      working-directory: bump-revision-workspace
+      env:
+        NEW_VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        git config user.name "github-actions"
+        git config user.email "github-actions@users.noreply.github.com"
+
+        CURRENT=$(grep -m1 -oP '(?<=<revision>)[^<]+' pom.xml || true)
+        echo "revision: ${CURRENT:-<none>} -> ${NEW_VERSION}"
+        [ -n "$CURRENT" ] || { echo "::error::No <revision> property in pom.xml"; exit 1; }
+        if [ "$CURRENT" = "$NEW_VERSION" ]; then echo "Already up to date, nothing to do"; exit 0; fi
+
+        sed -i "0,/<revision>.*<\/revision>/s//<revision>${NEW_VERSION}<\/revision>/" pom.xml
+
+        ACTUAL=$(git diff -U0 | { grep -E '^[-+][^-+]' || true; } | tr -d '[:space:]')
+        EXPECTED="-<revision>${CURRENT}</revision>+<revision>${NEW_VERSION}</revision>"
+        if [ "$(git diff --name-only)" != pom.xml ] || [ "$ACTUAL" != "$EXPECTED" ]; then
+          echo "::error::Refusing to auto-merge, the diff is not just the revision line"
+          git diff
+          exit 1
+        fi
+
+        BRANCH="chore/revision-${NEW_VERSION}"
+        git checkout -qb "$BRANCH"
+        git commit -qam "chore: set revision to ${NEW_VERSION}"
+        git push -qu origin HEAD --force
+
+        if PR=$(gh pr view "$BRANCH" --json url --jq '.url' 2>/dev/null); then
+          echo "PR already open, branch updated"
+        else
+          PR=$(gh pr create --base main --head "$BRANCH" \
+            --title "Set revision to ${NEW_VERSION} (automatically generated PR)" \
+            --body "Align the \`revision\` property in pom.xml with the released version ${NEW_VERSION}.")
+        fi
+        gh pr merge "$PR" --squash --auto || {
+          echo "Auto-merge unavailable, merging directly"
+          gh pr merge "$PR" --squash
+        }

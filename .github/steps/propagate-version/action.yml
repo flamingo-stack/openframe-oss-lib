@@ -1,0 +1,66 @@
+name: "Propagate Version"
+description: "Opens a PR in every listed downstream repository bumping the given Maven property to the version just released here. One failing repository does not stop the rest."
+
+inputs:
+  repositories:
+    description: "Downstream repository names, one per line"
+    required: true
+  version:
+    description: "Released version to write into the property"
+    required: true
+  property:
+    description: "Maven property holding this library's version downstream"
+    required: true
+  token:
+    description: "Token with write access to the downstream repositories"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Open version bump PRs
+      shell: bash
+      env:
+        REPOSITORIES: ${{ inputs.repositories }}
+        NEW_VERSION: ${{ inputs.version }}
+        PROPERTY: ${{ inputs.property }}
+        OWNER: ${{ github.repository_owner }}
+        LIB: ${{ github.event.repository.name }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        set -uo pipefail
+        BRANCH="chore/${LIB}-${NEW_VERSION}"
+        FAILED=""
+
+        for NAME in $REPOSITORIES; do
+          echo "::group::${NAME}"
+          (
+            set -euo pipefail
+            rm -rf "${RUNNER_TEMP:?}/${NAME}"
+            git clone -q --depth 1 -b main "https://x-access-token:${GH_TOKEN}@github.com/${OWNER}/${NAME}.git" "${RUNNER_TEMP}/${NAME}"
+            cd "${RUNNER_TEMP}/${NAME}"
+            git config user.name "github-actions"
+            git config user.email "github-actions@users.noreply.github.com"
+
+            CURRENT=$(grep -m1 -oP "(?<=<${PROPERTY}>)[^<]+" pom.xml || true)
+            echo "${PROPERTY}: ${CURRENT:-<none>} -> ${NEW_VERSION}"
+            [ -n "$CURRENT" ] || { echo "::error::No <${PROPERTY}> property in ${NAME}/pom.xml"; exit 1; }
+            if [ "$CURRENT" = "$NEW_VERSION" ]; then echo "Already up to date, nothing to do"; exit 0; fi
+
+            sed -i "s|<${PROPERTY}>[^<]*</${PROPERTY}>|<${PROPERTY}>${NEW_VERSION}</${PROPERTY}>|g" pom.xml
+            CHANGED=$(git diff --name-only | tr '\n' ' ')
+            [ "$CHANGED" = "pom.xml " ] || { echo "::error::Unexpected files changed: ${CHANGED}"; exit 1; }
+
+            git checkout -qb "$BRANCH"
+            git commit -qam "chore(deps): ${LIB} ${NEW_VERSION}"
+            git push -qu origin HEAD --force
+            if gh pr view "$BRANCH" --json url --jq '.url' 2>/dev/null; then echo "PR already open, branch updated"; exit 0; fi
+            gh pr create --base main --head "$BRANCH" \
+              --title "${LIB} ${NEW_VERSION} (automatically generated PR)" \
+              --body "Bump \`${PROPERTY}\` to ${NEW_VERSION}, released from ${RUN_URL}."
+          ) || FAILED="${FAILED} ${NAME}"
+          echo "::endgroup::"
+        done
+
+        [ -z "$FAILED" ] || { echo "::error::Version bump failed for:${FAILED}"; exit 1; }
