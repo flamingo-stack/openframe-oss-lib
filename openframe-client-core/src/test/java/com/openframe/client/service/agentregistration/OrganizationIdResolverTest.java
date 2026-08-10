@@ -71,6 +71,6 @@ class OrganizationIdResolverTest {
 
     private Organization organization(String organizationId) {
         return new Organization("id", null, "name", organizationId, true,
-                null, null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
     }
 }

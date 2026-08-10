@@ -1,15 +1,15 @@
 package com.openframe.data.document.organization;
+import com.openframe.data.document.AuditableDocument;
 import com.openframe.data.document.TenantScoped;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.math.BigDecimal;
@@ -20,11 +20,12 @@ import java.time.LocalDate;
  * Contains business-related information such as revenue, employees, and contract details.
  */
 @Data
+@EqualsAndHashCode(callSuper = true)
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "organizations")
-public class Organization implements TenantScoped {
+public class Organization extends AuditableDocument implements TenantScoped {
     @Id
     private String id;
     @Indexed
@@ -80,10 +81,6 @@ public class Organization implements TenantScoped {
      * Contract end date
      */
     private LocalDate contractEndDate;
-    @CreatedDate
-    private Instant createdAt;
-    @LastModifiedDate
-    private Instant updatedAt;
     /**
      * Organization status. Defaults to ACTIVE.
      * ARCHIVED - organization is hidden from normal queries but remains in the database.
