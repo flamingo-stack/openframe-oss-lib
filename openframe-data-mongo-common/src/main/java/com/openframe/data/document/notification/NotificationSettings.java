@@ -10,7 +10,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
-import java.util.Map;
+import java.util.Set;
 
 /** No document means everything is enabled — readers must treat absence as the default, so no backfill is ever needed. */
 @Document(collection = "notification_settings")
@@ -31,8 +31,8 @@ public class NotificationSettings implements TenantScoped {
     /** Master over ALL delivery (in-app, NATS, push); absent = enabled. */
     private Boolean enabled;
 
-    /** Only explicit false mutes; an absent key — including groups added after this document was saved — is enabled. */
-    private Map<NotificationSettingGroup, Boolean> typeSettings;
+    /** Membership mutes; an absent group — including groups added after this document was saved — is enabled. */
+    private Set<NotificationSettingGroup> mutedGroups;
 
     private Instant createdAt;
 

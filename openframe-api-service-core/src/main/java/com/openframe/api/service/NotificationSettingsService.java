@@ -9,9 +9,9 @@ import com.openframe.data.repository.notification.NotificationSettingsRepository
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -27,25 +27,27 @@ public class NotificationSettingsService {
 
     public NotificationSettingsView update(String userId, boolean enabled,
                                            List<NotificationTypeSetting> typeSettings) {
-        Map<NotificationSettingGroup, Boolean> groupOverrides = toGroupOverrides(typeSettings);
-        settingsRepository.saveSettings(userId, enabled, groupOverrides);
+        Set<NotificationSettingGroup> mutedGroups = toMutedGroups(typeSettings);
+        settingsRepository.saveSettings(userId, enabled, mutedGroups);
         return get(userId);
     }
 
-    /** Null means "not sent" — a legacy master-only write keeps the stored group overrides. */
-    private static Map<NotificationSettingGroup, Boolean> toGroupOverrides(List<NotificationTypeSetting> typeSettings) {
+    /** Null means "not sent" — a legacy master-only write keeps the stored muted set. */
+    private static Set<NotificationSettingGroup> toMutedGroups(List<NotificationTypeSetting> typeSettings) {
         if (typeSettings == null) {
             return null;
         }
-        Map<NotificationSettingGroup, Boolean> overrides = new EnumMap<>(NotificationSettingGroup.class);
+        Set<NotificationSettingGroup> muted = EnumSet.noneOf(NotificationSettingGroup.class);
         for (NotificationTypeSetting setting : typeSettings) {
             NotificationSettingGroup group = setting.getGroup();
             if (group == null) {
                 throw new BadRequestException("typeSettings entries require a group");
             }
-            overrides.put(group, setting.isEnabled());
+            if (!setting.isEnabled()) {
+                muted.add(group);
+            }
         }
-        return overrides;
+        return muted;
     }
 
     private static NotificationSettings defaults() {

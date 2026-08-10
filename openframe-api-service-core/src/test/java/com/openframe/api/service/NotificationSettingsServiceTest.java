@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -55,7 +55,7 @@ class NotificationSettingsServiceTest {
     void group_override_resolves_and_absent_groups_default_on() {
         when(repository.findByUserId("user-1")).thenReturn(Optional.of(NotificationSettings.builder()
                 .userId("user-1").enabled(true)
-                .typeSettings(Map.of(NotificationSettingGroup.MINGO_MESSAGES, false))
+                .mutedGroups(Set.of(NotificationSettingGroup.MINGO_MESSAGES))
                 .build()));
 
         NotificationSettingsView view = service.get("user-1");
@@ -66,24 +66,39 @@ class NotificationSettingsServiceTest {
     }
 
     @Test
-    @DisplayName("update persists the full state and answers the read-back — the response is what the store now holds, not an echo of the input")
-    void update_persists_and_reads_back() {
+    @DisplayName("update stores only the disabled entries as the muted set and answers the read-back — the response is what the store now holds, not an echo of the input")
+    void update_persists_muted_set_and_reads_back() {
         when(repository.findByUserId("user-1")).thenReturn(Optional.of(NotificationSettings.builder()
                 .userId("user-1").enabled(false).build()));
 
-        NotificationSettingsView view = service.update("user-1", false,
-                List.of(new NotificationTypeSetting(NotificationSettingGroup.APPROVAL_MINGO, false)));
+        NotificationSettingsView view = service.update("user-1", false, List.of(
+                new NotificationTypeSetting(NotificationSettingGroup.APPROVAL_MINGO, false),
+                new NotificationTypeSetting(NotificationSettingGroup.TICKET_ASSIGNED, true)));
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<NotificationSettingGroup, Boolean>> map = ArgumentCaptor.forClass(Map.class);
-        verify(repository).saveSettings(eq("user-1"), eq(false), map.capture());
-        assertThat(map.getValue()).containsEntry(NotificationSettingGroup.APPROVAL_MINGO, false);
+        ArgumentCaptor<Set<NotificationSettingGroup>> muted = ArgumentCaptor.forClass(Set.class);
+        verify(repository).saveSettings(eq("user-1"), eq(false), muted.capture());
+        assertThat(muted.getValue()).containsExactly(NotificationSettingGroup.APPROVAL_MINGO);
         assertThat(view.isEnabled()).isFalse();
     }
 
     @Test
-    @DisplayName("Given a master-only write (null typeSettings), when updating, then the stored group overrides are left alone")
-    void master_only_write_keeps_stored_overrides() {
+    @DisplayName("An all-enabled list writes an empty muted set — clearing every mute, not skipping the write")
+    void all_enabled_list_clears_the_muted_set() {
+        when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
+
+        service.update("user-1", true,
+                List.of(new NotificationTypeSetting(NotificationSettingGroup.MINGO_MESSAGES, true)));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Set<NotificationSettingGroup>> muted = ArgumentCaptor.forClass(Set.class);
+        verify(repository).saveSettings(eq("user-1"), eq(true), muted.capture());
+        assertThat(muted.getValue()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Given a master-only write (null typeSettings), when updating, then the stored muted set is left alone")
+    void master_only_write_keeps_stored_muted_set() {
         when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
 
         service.update("user-1", false, null);

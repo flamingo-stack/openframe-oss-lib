@@ -22,7 +22,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -357,7 +356,7 @@ class NotificationBroadcasterTest {
         when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class)))
                 .thenReturn(NotificationSettingGroup.TICKET_ASSIGNED);
         when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
-                settings("muter", true, Map.of(NotificationSettingGroup.TICKET_ASSIGNED, false))));
+                settings("muter", true, Set.of(NotificationSettingGroup.TICKET_ASSIGNED))));
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Assigned")
                 .severity(NotificationSeverity.INFO)
@@ -397,7 +396,7 @@ class NotificationBroadcasterTest {
     void ungrouped_type_ignores_group_mutes() {
         when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(null);
         when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
-                settings("a1", true, Map.of(NotificationSettingGroup.TICKET_ASSIGNED, false))));
+                settings("a1", true, Set.of(NotificationSettingGroup.TICKET_ASSIGNED))));
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("X")
                 .severity(NotificationSeverity.INFO)
@@ -468,8 +467,8 @@ class NotificationBroadcasterTest {
     }
 
     private static NotificationSettings settings(String userId, boolean enabled,
-                                                 Map<NotificationSettingGroup, Boolean> typeSettings) {
-        return NotificationSettings.builder().userId(userId).enabled(enabled).typeSettings(typeSettings).build();
+                                                 Set<NotificationSettingGroup> mutedGroups) {
+        return NotificationSettings.builder().userId(userId).enabled(enabled).mutedGroups(mutedGroups).build();
     }
 
     private static NotificationReadState recipient(String recipientId, RecipientType type, ReadStatus status) {

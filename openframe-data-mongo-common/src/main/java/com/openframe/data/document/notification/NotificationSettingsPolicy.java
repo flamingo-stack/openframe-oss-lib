@@ -1,8 +1,8 @@
 package com.openframe.data.document.notification;
 
-import java.util.Map;
+import java.util.Set;
 
-/** Defaulting rules: absent field or absent group key means enabled — only an explicit false mutes. */
+/** Defaulting rules: absence means enabled — only listing a group in mutedGroups mutes it. */
 public final class NotificationSettingsPolicy {
 
     private NotificationSettingsPolicy() {
@@ -14,8 +14,8 @@ public final class NotificationSettingsPolicy {
     }
 
     public static boolean isGroupEnabled(NotificationSettings settings, NotificationSettingGroup group) {
-        Map<NotificationSettingGroup, Boolean> typeSettings = settings.getTypeSettings();
-        return group == null || typeSettings == null || typeSettings.getOrDefault(group, true);
+        Set<NotificationSettingGroup> mutedGroups = settings.getMutedGroups();
+        return group == null || mutedGroups == null || !mutedGroups.contains(group);
     }
 
     public static boolean isEnabledFor(NotificationSettings settings, NotificationSettingGroup group) {

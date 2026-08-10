@@ -13,7 +13,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
-import java.util.Map;
+import java.util.Set;
 
 /**
  * Writes use {@code upsert}: atomic insert-or-update on the {tenantId, userId} unique index. tenantId
@@ -26,7 +26,7 @@ public class CustomNotificationSettingsRepositoryImpl extends TenantAwareReposit
 
     private static final String FIELD_USER_ID = "userId";
     private static final String FIELD_ENABLED = "enabled";
-    private static final String FIELD_TYPE_SETTINGS = "typeSettings";
+    private static final String FIELD_MUTED_GROUPS = "mutedGroups";
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String FIELD_UPDATED_AT = "updatedAt";
 
@@ -35,16 +35,16 @@ public class CustomNotificationSettingsRepositoryImpl extends TenantAwareReposit
     }
 
     @Override
-    public void saveSettings(String userId, boolean enabled, Map<NotificationSettingGroup, Boolean> typeSettings) {
+    public void saveSettings(String userId, boolean enabled, Set<NotificationSettingGroup> mutedGroups) {
         Query byUser = new Query(Criteria.where(FIELD_USER_ID).is(userId));
         Instant now = Instant.now();
         Update update = new Update()
                 .set(FIELD_ENABLED, enabled)
                 .set(FIELD_UPDATED_AT, now)
                 .setOnInsert(FIELD_CREATED_AT, now);
-        if (typeSettings != null) {
-            // Null means "not sent" (a legacy master-only write) — existing group overrides survive.
-            update.set(FIELD_TYPE_SETTINGS, typeSettings);
+        if (mutedGroups != null) {
+            // Null means "not sent" (a legacy master-only write) — the stored muted set survives.
+            update.set(FIELD_MUTED_GROUPS, mutedGroups);
         }
         try {
             mongoTemplate.upsert(byUser, update, NotificationSettings.class);
@@ -52,7 +52,7 @@ public class CustomNotificationSettingsRepositoryImpl extends TenantAwareReposit
             // Lost an insert race on the unique index; the row exists now, so a plain update settles it.
             mongoTemplate.updateFirst(byUser, update, NotificationSettings.class);
         }
-        log.debug("Notification settings saved for user {} (enabled={}, {} group override(s))",
-                userId, enabled, typeSettings == null ? 0 : typeSettings.size());
+        log.debug("Notification settings saved for user {} (enabled={}, {} muted group(s))",
+                userId, enabled, mutedGroups == null ? 0 : mutedGroups.size());
     }
 }
