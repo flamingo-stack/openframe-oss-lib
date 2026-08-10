@@ -930,6 +930,16 @@ function FilePlayer({
       playsInline
       muted={muted}
       preferCmcd="header"
+      // Mux Data writes a first-party `muxData` cookie on the registrable
+      // domain to keep one viewer id across sessions. It rides on every request
+      // to the app origin, and its punctuation density trips Cloud Armor's
+      // restricted-SQL-character cookie counters (CRS 942420/942421) — 245
+      // preview-DENY events in a 6-hour census, 233 of them on tenant hosts
+      // where the player never even renders. Playback and per-session QoE
+      // metrics are unaffected; what is lost is cross-session viewer identity,
+      // so "unique viewers" becomes "unique sessions". That is the right trade
+      // for a player used on onboarding steps and help-center releases.
+      disableCookies
       // MuxPlayer's built-in default is `#fa50b5` (Mux brand pink) — when
       // its `--media-accent-color` resolves to nothing the player falls
       // through to that hardcoded pink. The `var(--ods-accent,
