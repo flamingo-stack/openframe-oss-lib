@@ -31,7 +31,6 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -61,10 +60,11 @@ public class SecurityConfig {
                                                           JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory,
                                                           SsoProviderRegistry ssoProviderRegistry) throws Exception {
         return http
-                // Scoped to the one cookie-authenticated form POST on this chain. Everything else is
-                // either OAuth (client-authenticated or GET) or JSON-only, which a cross-site form
-                // cannot reach: it can't set application/json, and fetch preflights against disabled CORS.
-                .csrf(csrf -> csrf.requireCsrfProtectionMatcher(new AntPathRequestMatcher("/login", "POST")))
+                // CSRF disabled: the login POST is submitted programmatically by the React auth page
+                // (no server-rendered form, so no _csrf token available) — protecting it broke every
+                // password login. Re-enabling requires the SPA pattern (CookieCsrfTokenRepository +
+                // X-XSRF-TOKEN header in the frontend) shipped together with a frontend release.
+                .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
