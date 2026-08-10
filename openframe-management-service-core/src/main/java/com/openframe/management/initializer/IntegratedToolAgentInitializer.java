@@ -26,6 +26,7 @@ import java.util.Optional;
 public class IntegratedToolAgentInitializer implements ApplicationRunner {
 
     private static final String OSQUERY_ASSET_ID = "osqueryd";
+    private static final String MESHCENTRAL_CORE_MODULE_ASSET_ID = "meshcentral-core-module";
 
     private final ObjectMapper objectMapper;
     private final IntegratedToolAgentService integratedToolAgentService;
@@ -103,6 +104,7 @@ public class IntegratedToolAgentInitializer implements ApplicationRunner {
             @Override
             void apply(IntegratedToolAgentConfiguration configuration, ClientVersionsProperties versions) {
                 configuration.setVersion(versions.getMesh());
+                applyAssetVersion(configuration, MESHCENTRAL_CORE_MODULE_ASSET_ID, versions.getMesh());
             }
         },
         FLEETMDM("fleetmdm-agent") {

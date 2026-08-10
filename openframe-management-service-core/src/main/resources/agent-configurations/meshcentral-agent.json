@@ -40,6 +40,21 @@
   "assets": [
     {
       "id": "meshcentral-core-module",
+      "source": "GITHUB",
+      "downloadConfigurations": [
+        {
+          "os": "windows",
+          "linkTemplate": "https://github.com/flamingo-stack/meshagent/releases/download/{version}/meshagent-windows-amd64.zip",
+          "fileName": "meshagent-windows-amd64.zip",
+          "targetFileName": "CoreModule.js"
+        },
+        {
+          "os": "macos",
+          "linkTemplate": "https://github.com/flamingo-stack/meshagent/releases/download/{version}/meshagent-macos-universal.tar.gz",
+          "fileName": "meshagent-macos-universal.tar.gz",
+          "targetFileName": "CoreModule.js"
+        }
+      ],
       "localFilenameConfiguration": [
         {
           "filename": "CoreModule.js",
@@ -50,7 +65,6 @@
           "os": "macos"
         }
       ],
-      "source": "ARTIFACTORY",
       "executable": false
     },
     {
