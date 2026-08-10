@@ -174,6 +174,15 @@ public enum UnifiedEventType {
     M365_AUDIT_FAILURE(Severity.WARNING, "Microsoft 365 failed directory operation"),
     M365_AUDIT_OTHER(Severity.INFO, "Microsoft 365 directory audit event"),
 
+    // Google Workspace directory audit events
+    GWS_USER_MANAGEMENT(Severity.INFO, "Google Workspace user management"),
+    GWS_GROUP_MANAGEMENT(Severity.INFO, "Google Workspace group management"),
+    GWS_SECURITY_SETTINGS(Severity.WARNING, "Google Workspace security settings change"),
+    GWS_DOMAIN_SETTINGS(Severity.INFO, "Google Workspace domain settings change"),
+    GWS_DELEGATED_ADMIN(Severity.WARNING, "Google Workspace delegated admin change"),
+    GWS_AUDIT_FAILURE(Severity.WARNING, "Google Workspace failed directory operation"),
+    GWS_AUDIT_OTHER(Severity.INFO, "Google Workspace directory audit event"),
+
     // Unknown events
     UNKNOWN(Severity.WARNING, "Unknown event");
 
