@@ -37,12 +37,28 @@ public class IdpConfigurationScheduler {
     @Value("${security.oauth2.token.refresh.expiration-seconds}")
     private long refreshTokenExpirationSeconds;
 
+    /** Grant used by the native Sign in with Apple exchange (see AppleNativeGrantAuthenticationToken). */
+    private static final String APPLE_NATIVE_GRANT = "urn:openframe:params:oauth:grant-type:apple-native";
+
     @Scheduled(fixedDelay = Long.MAX_VALUE, initialDelay = 5000)
     @SchedulerLock(name = "IdpConfigurationScheduler_initializeDefaultIdp", lockAtMostFor = "10m", lockAtLeastFor = "1m")
     public void initializeDefaultIdp() {
         try {
-            if (registeredClientMongoRepository.findByClientId(gatewayClientId).isPresent()) {
-                log.info("Registered OAuth client already exists: {}", gatewayClientId);
+            var existing = registeredClientMongoRepository.findByClientId(gatewayClientId);
+            if (existing.isPresent()) {
+                // Existing deployments predate the apple-native grant — upsert it, or the token
+                // endpoint rejects the exchange with unauthorized_client.
+                MongoRegisteredClient client = existing.get();
+                if (client.getGrantTypes() == null || !client.getGrantTypes().contains(APPLE_NATIVE_GRANT)) {
+                    java.util.Set<String> grants = new java.util.HashSet<>(
+                            client.getGrantTypes() != null ? client.getGrantTypes() : Set.of());
+                    grants.add(APPLE_NATIVE_GRANT);
+                    client.setGrantTypes(grants);
+                    registeredClientMongoRepository.save(client);
+                    log.info("Added '{}' grant to existing RegisteredClient: {}", APPLE_NATIVE_GRANT, gatewayClientId);
+                } else {
+                    log.info("Registered OAuth client already exists: {}", gatewayClientId);
+                }
                 return;
             }
 
@@ -52,7 +68,7 @@ public class IdpConfigurationScheduler {
                 .clientId(gatewayClientId)
                 .clientSecret(encodedSecret)
                 .authenticationMethods(Set.of("none", "client_secret_basic"))
-                .grantTypes(Set.of("authorization_code", "refresh_token"))
+                .grantTypes(Set.of("authorization_code", "refresh_token", APPLE_NATIVE_GRANT))
                 .redirectUris(Set.of(gatewayRedirectUri))
                 .scopes(Set.of("openid", "profile", "email", "offline_access"))
                 .requireProofKey(true)

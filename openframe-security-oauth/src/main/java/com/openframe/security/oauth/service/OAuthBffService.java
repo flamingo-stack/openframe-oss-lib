@@ -204,6 +204,47 @@ public class OAuthBffService {
                 .bodyToMono(TokenResponse.class);
     }
 
+    /**
+     * Native Sign in with Apple: forwards the iOS app's identity token + single-use authorization
+     * code to the auth server's token endpoint under the apple-native grant, authenticated with
+     * this gateway's client credentials. Tokens come back exactly like any other grant.
+     */
+    public Mono<TokenResponse> appleNativeExchange(String tenantId,
+                                                   String identityToken,
+                                                   String authorizationCode,
+                                                   String nonce,
+                                                   String firstName,
+                                                   String lastName,
+                                                   ServerHttpRequest request) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "urn:openframe:params:oauth:grant-type:apple-native");
+        form.add("identity_token", identityToken);
+        form.add("authorization_code", authorizationCode);
+        if (nonce != null && !nonce.isBlank()) form.add("nonce", nonce);
+        if (firstName != null && !firstName.isBlank()) form.add("first_name", firstName);
+        if (lastName != null && !lastName.isBlank()) form.add("last_name", lastName);
+
+        return webClientBuilder.build()
+                .post()
+                .uri(String.format("%s/%s/oauth2/token", authServerUrl, tenantId))
+                .headers(h -> {
+                    h.add(com.openframe.core.constants.HttpHeaders.AUTHORIZATION, basicAuth(clientId, clientSecret));
+                    headersContributor.contribute(h, request);
+                })
+                .header(ACCEPT, "application/json")
+                .body(BodyInserters.fromFormData(form))
+                .retrieve()
+                .onStatus(st -> st.is4xxClientError() || st.is5xxServerError(), resp ->
+                        resp.bodyToMono(String.class).defaultIfEmpty("")
+                                .flatMap(body -> {
+                                    log.warn("Apple native exchange rejected for tenant {} ({}): {}",
+                                            tenantId, resp.statusCode(), body);
+                                    return Mono.error(new IllegalStateException("Apple sign-in failed. Please try again."));
+                                })
+                )
+                .bodyToMono(TokenResponse.class);
+    }
+
     private Mono<TokenResponse> refreshTokens(String tenantId, String refreshToken, ServerHttpRequest request) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "refresh_token");
