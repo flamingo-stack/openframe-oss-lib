@@ -102,7 +102,7 @@ public class NotificationBroadcaster {
         return saved;
     }
 
-    /** Settings bite at the audience: an opted-out admin gets no row/card/NATS/push and nothing arrives retroactively; absence and failures always deliver. */
+    /** Settings bite at the audience: an opted-out admin gets no row/card/NATS/push and nothing arrives retroactively. Absent settings deliver; a failed lookup drops every admin — like every other Mongo failure in broadcast, it must not deliver against unknown preferences. */
     private Set<String> withoutOptedOut(Set<String> admins, NotificationContext context) {
         if (admins.isEmpty()) {
             return admins;
@@ -121,9 +121,8 @@ public class NotificationBroadcaster {
             }
             return kept;
         } catch (RuntimeException ex) {
-            log.warn("Notification settings lookup failed — delivering to all {} admin(s): {}",
-                    admins.size(), ex.getMessage());
-            return admins;
+            log.error("Notification settings lookup failed — dropping all {} admin(s) from this dispatch", admins.size(), ex);
+            return Set.of();
         }
     }
 

@@ -411,8 +411,8 @@ class NotificationBroadcasterTest {
     }
 
     @Test
-    @DisplayName("Given the settings lookup throws, when broadcast runs, then every admin is delivered — a settings hiccup must not lose notifications")
-    void settings_lookup_failure_fails_open() {
+    @DisplayName("Given the settings lookup throws, when broadcast runs, then no admin is delivered — like any other Mongo failure in broadcast, we never deliver against unknown preferences")
+    void settings_lookup_failure_drops_all_admins() {
         when(settingsRepository.findByUserIdIn(anyCollection())).thenThrow(new RuntimeException("mongo down"));
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("X")
@@ -423,8 +423,8 @@ class NotificationBroadcasterTest {
 
         broadcaster.broadcast(cmd);
 
-        verify(readStateService).createForAudience(
-                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), eq(Set.of("a1", "a2")));
+        verify(readStateService, never()).createForAudience(
+                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
     }
 
     @Test
