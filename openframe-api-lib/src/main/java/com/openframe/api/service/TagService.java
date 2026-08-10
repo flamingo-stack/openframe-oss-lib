@@ -208,7 +208,7 @@ public class TagService {
     public Tag createTag(String key, TagEntityType entityType, String description, String color) {
         log.info("Creating tag '{}' with entityType: {}", key, entityType);
 
-        Tag existing = tagRepository.findByKeyAndEntityType(key, entityType);
+        Tag existing = findByKeyIgnoreCase(key, entityType);
         if (existing != null) {
             return existing;
         }
@@ -232,6 +232,11 @@ public class TagService {
                 .orElseThrow(() -> new IllegalArgumentException("Tag not found: " + tagId));
 
         if (key != null) {
+            Tag existing = findByKeyIgnoreCase(key, tag.getEntityType());
+            if (existing != null && !existing.getId().equals(tagId)) {
+                throw new IllegalArgumentException(
+                        "Tag with key '" + existing.getKey() + "' already exists for " + tag.getEntityType());
+            }
             tag.setKey(key);
         }
         if (description != null) {
@@ -242,6 +247,21 @@ public class TagService {
         }
 
         return tagRepository.save(tag);
+    }
+
+    /**
+     * The tags unique index (tenantId+key+entityType) has no collation, so this lookup is the only
+     * guard against case-variant duplicates ("NEWTAG" vs "NewTag").
+     */
+    private Tag findByKeyIgnoreCase(String key, TagEntityType entityType) {
+        Tag exact = tagRepository.findByKeyAndEntityType(key, entityType);
+        if (exact != null) {
+            return exact;
+        }
+        return tagRepository.findByEntityType(entityType).stream()
+                .filter(t -> t.getKey() != null && t.getKey().equalsIgnoreCase(key))
+                .findFirst()
+                .orElse(null);
     }
 
     @Transactional
