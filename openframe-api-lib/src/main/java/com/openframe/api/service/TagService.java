@@ -232,9 +232,10 @@ public class TagService {
                 .orElseThrow(() -> new IllegalArgumentException("Tag not found: " + tagId));
 
         if (key != null) {
-            if (tagRepository.existsByKeyIgnoreCaseAndEntityTypeAndIdNot(key, tag.getEntityType(), tagId)) {
+            TagEntityType entityType = tag.getEntityType();
+            if (tagRepository.existsByKeyIgnoreCaseAndEntityTypeAndIdNot(key, entityType, tagId)) {
                 throw new IllegalArgumentException(
-                        "Tag with key '" + key + "' already exists for " + tag.getEntityType());
+                        "Tag with key '" + key + "' already exists for " + entityType);
             }
             tag.setKey(key);
         }
@@ -248,20 +249,19 @@ public class TagService {
         return tagRepository.save(tag);
     }
 
-    /**
-     * The tags unique index (tenantId+key+entityType) has no collation, so this lookup is the only
-     * guard against case-variant duplicates ("NEWTAG" vs "NewTag"). Prefers the exact-case match so
-     * legacy databases that already hold case-duplicates keep resolving deterministically.
-     */
     private Tag findByKeyIgnoreCase(String key, TagEntityType entityType) {
         Tag exact = tagRepository.findByKeyAndEntityType(key, entityType);
         if (exact != null) {
             return exact;
         }
         return tagRepository.findByEntityType(entityType).stream()
-                .filter(t -> t.getKey() != null && t.getKey().equalsIgnoreCase(key))
+                .filter(tag -> hasKeyIgnoreCase(tag, key))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private boolean hasKeyIgnoreCase(Tag tag, String key) {
+        return tag.getKey() != null && tag.getKey().equalsIgnoreCase(key);
     }
 
     @Transactional
