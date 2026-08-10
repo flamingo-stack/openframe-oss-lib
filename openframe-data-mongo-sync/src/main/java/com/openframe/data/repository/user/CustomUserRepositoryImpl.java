@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 import static org.springframework.util.StringUtils.hasText;
 
@@ -45,10 +46,10 @@ public class CustomUserRepositoryImpl implements CustomUserRepository {
         }
         if (hasText(filter.getEmailRegex())) {
             query.addCriteria(Criteria.where(FIELD_EMAIL)
-                    .regex(filter.getEmailRegex(), REGEX_FLAG_CASE_INSENSITIVE));
+                    .regex(Pattern.quote(filter.getEmailRegex()), REGEX_FLAG_CASE_INSENSITIVE));
         }
         if (hasText(filter.getNameRegex())) {
-            String pattern = filter.getNameRegex();
+            String pattern = Pattern.quote(filter.getNameRegex());
             query.addCriteria(new Criteria().orOperator(
                     Criteria.where(FIELD_FIRST_NAME).regex(pattern, REGEX_FLAG_CASE_INSENSITIVE),
                     Criteria.where(FIELD_LAST_NAME).regex(pattern, REGEX_FLAG_CASE_INSENSITIVE)

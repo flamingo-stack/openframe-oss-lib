@@ -47,6 +47,19 @@ export interface MessageProcessingOptions {
   chatTypeFilter?: string
   /** Map of approval statuses by request ID */
   approvalStatuses?: Record<string, ChatApprovalStatus>
+  /**
+   * Terminal escalation-offer states by offer id, from live chunks the host
+   * has already seen. Needed because an offer and its resolution are two
+   * separate persisted rows: SUPERSEDED is published *because* the client
+   * typed, so a user message always separates them and the two rows land in
+   * different assistant envelopes.
+   */
+  escalationOfferStates?: Record<string, ChatApprovalStatus>
+  /** Escalation approve handler; distinct from `onApprove` because offers
+   *  resolve through the ticket-escalation mutations. */
+  onEscalationApprove?: (offerId?: string) => Promise<void> | void
+  /** Escalation reject handler. See `onEscalationApprove`. */
+  onEscalationReject?: (offerId?: string) => Promise<void> | void
   /** Approval types to display directly (others get escalated) - defaults to all types */
   displayApprovalTypes?: string[]
   /**

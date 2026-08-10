@@ -1,6 +1,7 @@
 import type {
   ApprovalBatchSegment,
   ApprovalRequestSegment,
+  EscalationOfferSegment,
   MessageContent,
   ToolExecutionSegment,
 } from '../types'
@@ -106,6 +107,12 @@ function turnRequestKeys(content: MessageContent): Set<string> {
     } else if (seg.type === 'approval_request') {
       const id = (seg as ApprovalRequestSegment).data?.requestId
       if (id) keys.add(id)
+    } else if (seg.type === 'escalation_offer') {
+      const id = (seg as EscalationOfferSegment).data?.offerId
+      if (id) keys.add(id)
+      // `ticket_escalated` is deliberately absent: its only id is the ticketId,
+      // which is dialog-scoped, so a re-escalated dialog would false-match an
+      // older bubble and slice the newest persisted turn out of the thread.
     } else if (seg.type === 'approval_batch') {
       const data = (seg as ApprovalBatchSegment).data
       if (data?.approvalRequestId) keys.add(data.approvalRequestId)

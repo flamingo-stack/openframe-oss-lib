@@ -76,10 +76,36 @@ export function updateTrailingAssistant(
 }
 
 /**
+ * Identity of a block that must upsert rather than stack when re-appended,
+ * namespaced so two kinds can never collide. `null` for segments that coalesce
+ * by adjacency (text/thinking/guide) or are pushed raw. Legacy approval cards
+ * share one requestId across an unfolded batch, hence the command in the key.
+ *
+ * `ticket_escalated` keys on its dialog-scoped ticketId, which is safe HERE
+ * (two receipts inside one trailing bubble can only be a redelivery) but is NOT
+ * a turn identity — see the deliberate omissions in `turnRequestKeys` and the
+ * host's thread-global dedupe.
+ */
+function upsertKey(seg: MessageSegment): string | null {
+  switch (seg.type) {
+    case 'approval_batch':
+      return `batch:${seg.data.approvalRequestId}`
+    case 'approval_request':
+      return `req:${seg.data.requestId}:${seg.data.command}`
+    case 'escalation_offer':
+      return `offer:${seg.data.offerId}`
+    case 'ticket_escalated':
+      return `escalated:${seg.data.ticketId}`
+    default:
+      return null
+  }
+}
+
+/**
  * Append-mode counterpart of `updateTrailingAssistant` for post-MESSAGE_END
  * continuation fragments (`SegmentsUpdateMetadata.append`). Coalesces
- * trailing fragments of the same type, mirroring the accumulator; approval
- * deltas upsert by request id so a replayed emit stays idempotent.
+ * trailing fragments of the same type, mirroring the accumulator; block deltas
+ * upsert by identity (see `upsertKey`) so a replayed emit stays idempotent.
  */
 export function appendToTrailingAssistant(
   prev: UnifiedChatMessage[],
@@ -96,30 +122,18 @@ export function appendToTrailingAssistant(
   const merged = [...(last.segments ?? [])]
   for (const seg of segments) {
     const tail = merged[merged.length - 1]
+    const key = upsertKey(seg)
     if (seg.type === 'text' && tail?.type === 'text') {
       merged[merged.length - 1] = { type: 'text', text: tail.text + seg.text }
     } else if (seg.type === 'thinking' && tail?.type === 'thinking') {
       merged[merged.length - 1] = { type: 'thinking', text: tail.text + seg.text }
     } else if (seg.type === 'guide' && tail?.type === 'guide') {
       merged[merged.length - 1] = { type: 'guide', text: tail.text + seg.text }
-    } else if (seg.type === 'approval_batch') {
-      // Approval deltas must be IDEMPOTENT: the escalated-result emit can be
-      // seen twice (live + catch-up replay over hydrated history), so upsert
-      // by request id instead of raw-appending a duplicate card.
-      const idx = merged.findIndex(
-        (m) => m.type === 'approval_batch' && m.data.approvalRequestId === seg.data.approvalRequestId,
-      )
-      if (idx !== -1) merged[idx] = seg
-      else merged.push(seg)
-    } else if (seg.type === 'approval_request') {
-      // Legacy cards share one requestId across an unfolded batch — key on
-      // (requestId, command) so each tool's card upserts its own twin.
-      const idx = merged.findIndex(
-        (m) =>
-          m.type === 'approval_request' &&
-          m.data.requestId === seg.data.requestId &&
-          m.data.command === seg.data.command,
-      )
+    } else if (key) {
+      // Block deltas must be IDEMPOTENT: an emit can be seen twice (live plus
+      // the JetStream catch-up replay over hydrated history), so upsert on the
+      // block's identity instead of raw-appending a duplicate card.
+      const idx = merged.findIndex((m) => upsertKey(m) === key)
       if (idx !== -1) merged[idx] = seg
       else merged.push(seg)
     } else {
@@ -177,6 +191,10 @@ function mapSegments(
  *   - `approval_batch` ROW (`toolCalls[].toolExecutionRequestId`) →
  *     tick that row's execution (check on approved, cross otherwise)
  *     without touching the batch status.
+ *   - `escalation_offer` matched on `data.offerId` → status flip +
+ *     resolver stamp. Escalation offers are backed by the SAME
+ *     `ToolApprovalRequest` collection as command approvals, so the two id
+ *     spaces are one and a cross-match is impossible.
  * Returns the SAME reference when nothing matched or changed.
  */
 export function applyApprovalStatusToSegment(
@@ -187,6 +205,15 @@ export function applyApprovalStatusToSegment(
 ): MessageSegment {
   if (s.type === 'approval_request' && s.data.requestId === requestId && s.status !== status) {
     return { ...s, status }
+  }
+  if (s.type === 'escalation_offer') {
+    if (s.data.offerId !== requestId) return s
+    const nextResolvedBy = resolvedByName ?? s.resolvedByName
+    // Status alone is not enough to early-out: the host overlay flips the
+    // status first and the persisted row supplies the resolver name after, so
+    // bailing on an unchanged status drops the "by {name}" stamp.
+    if (s.status === status && nextResolvedBy === s.resolvedByName) return s
+    return { ...s, status, resolvedByName: nextResolvedBy }
   }
   if (s.type !== 'approval_batch') return s
   const isAnchor = s.data.approvalRequestId === requestId

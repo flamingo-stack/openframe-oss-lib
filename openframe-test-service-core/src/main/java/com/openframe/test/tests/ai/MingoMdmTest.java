@@ -32,12 +32,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * only to resolve its Fleet host id).
  */
 @Tag("ai")
+@Tag("mingo")
 @DisplayName("Mingo — Fleet MDM")
 public class MingoMdmTest extends MingoBaseTest {
 
     private final List<Integer> policyIds = new ArrayList<>();
     private final List<Integer> queryIds = new ArrayList<>();
 
+    @Tag("feature")
     @Test
     @Tag("mdm")
     @DisplayName("Mingo creates a policy")

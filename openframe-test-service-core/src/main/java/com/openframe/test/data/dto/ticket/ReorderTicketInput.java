@@ -15,4 +15,5 @@ public class ReorderTicketInput {
     private String id;
     private String afterTicketId;
     private String beforeTicketId;
+    private String statusId;
 }

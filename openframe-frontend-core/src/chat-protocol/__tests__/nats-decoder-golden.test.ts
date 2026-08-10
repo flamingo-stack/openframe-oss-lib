@@ -29,6 +29,29 @@ const CORPUS: Record<string, unknown> = {
   guide_empty_string: { type: 'GUIDE', text: '' },
   guide_missing_text: { type: 'GUIDE' },
 
+  // ASK — the guide-routing clarification card. `text` is the intro sentence
+  // riding the same chunk; a card without a question or without usable options
+  // is dropped (nothing the user could answer).
+  ask: {
+    type: 'ASK',
+    text: 'Do you want the OpenFrame docs on scripts, or the scripts in your own workspace?',
+    question: 'What do you want to work on?',
+    options: [
+      { label: 'Find documentation', description: 'How scripting works and how to set it up' },
+      { label: 'Your scripts', description: 'List, edit or run the scripts in your workspace' },
+    ],
+  },
+  ask_without_intro: { type: 'ASK', question: 'Which one?', options: [{ label: 'Docs' }] },
+  ask_missing_question: { type: 'ASK', options: [{ label: 'Docs' }] },
+  ask_blank_question: { type: 'ASK', question: '   ', options: [{ label: 'Docs' }] },
+  ask_no_options: { type: 'ASK', question: 'Which one?', options: [] },
+  ask_options_not_array: { type: 'ASK', question: 'Which one?', options: 'Docs' },
+  ask_unusable_option_rows: {
+    type: 'ASK',
+    question: 'Which one?',
+    options: [{ label: '   ' }, { description: 'no label' }, null, 'Docs'],
+  },
+
   ai_metadata_full: {
     type: 'AI_METADATA',
     modelDisplayName: 'Claude Sonnet',
@@ -137,6 +160,38 @@ const CORPUS: Record<string, unknown> = {
     toolCalls: [],
     command: 'echo hi',
   },
+
+  escalation_offer_pending: {
+    type: 'ESCALATION_OFFER',
+    offerId: 'offer-1',
+    state: 'PENDING',
+    text: 'This ticket can be handed off to a technician.',
+    origin: 'MANUAL',
+  },
+  escalation_offer_approved: {
+    type: 'ESCALATION_OFFER',
+    offerId: 'offer-1',
+    state: 'APPROVED',
+    displayName: 'John Smith',
+  },
+  escalation_offer_superseded: {
+    type: 'ESCALATION_OFFER',
+    offerId: 'offer-1',
+    state: 'SUPERSEDED',
+    resolvedByName: 'John Smith',
+  },
+  escalation_offer_unknown_state: { type: 'ESCALATION_OFFER', offerId: 'offer-1', state: 'WAT' },
+  escalation_offer_missing_id: { type: 'ESCALATION_OFFER', state: 'PENDING' },
+
+  ticket_escalated: {
+    type: 'TICKET_ESCALATED',
+    ticketId: 'ticket-1',
+    ticketNumber: 1002,
+    reason: 'INACTIVITY',
+    text: 'Automatically escalated to a human technician.',
+  },
+  ticket_escalated_missing_reason: { type: 'TICKET_ESCALATED', ticketId: 'ticket-1' },
+  ticket_escalated_missing_ticket_id: { type: 'TICKET_ESCALATED', reason: 'INACTIVITY' },
 
   approval_result_approved: {
     type: 'APPROVAL_RESULT',

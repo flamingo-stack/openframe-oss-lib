@@ -53,6 +53,13 @@ public class FleetHost {
 
     private String status;
 
+    // Refetch / policy evaluation state
+    @JsonProperty("refetch_requested")
+    private boolean refetchRequested;
+
+    @JsonProperty("policy_updated_at")
+    private String policyUpdatedAt;
+
     private long memory;
     private long uptime;
 
