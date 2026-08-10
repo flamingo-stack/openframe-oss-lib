@@ -1,7 +1,6 @@
 package com.openframe.api.service;
 
 import com.openframe.data.document.tag.Tag;
-import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,7 +55,7 @@ class TagServiceTest {
     @Test
     void createTagReturnsCaseVariantMatchWithoutSaving() {
         when(tagRepository.findByKeyAndEntityType("NEWTAG", KNOWLEDGE_ARTICLE)).thenReturn(null);
-        when(tagRepository.findByEntityType(KNOWLEDGE_ARTICLE)).thenReturn(List.of(newTag));
+        when(tagRepository.findByKeyIgnoreCaseAndEntityType("NEWTAG", KNOWLEDGE_ARTICLE)).thenReturn(List.of(newTag));
 
         Tag result = tagService.createTag("NEWTAG", KNOWLEDGE_ARTICLE, null, null);
 
@@ -67,7 +66,7 @@ class TagServiceTest {
     @Test
     void createTagSavesWhenNoCaseVariantExists() {
         when(tagRepository.findByKeyAndEntityType("Printers", KNOWLEDGE_ARTICLE)).thenReturn(null);
-        when(tagRepository.findByEntityType(KNOWLEDGE_ARTICLE)).thenReturn(List.of(newTag));
+        when(tagRepository.findByKeyIgnoreCaseAndEntityType("Printers", KNOWLEDGE_ARTICLE)).thenReturn(List.of());
         when(tagRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Tag result = tagService.createTag("Printers", KNOWLEDGE_ARTICLE, "desc", "#FF8800");
@@ -78,17 +77,15 @@ class TagServiceTest {
     }
 
     @Test
-    void createTagIgnoresOtherEntityTypePools() {
-        Tag deviceTag = Tag.builder().id("tag-2").key("NEWTAG").entityType(TagEntityType.DEVICE).build();
-        when(tagRepository.findByKeyAndEntityType("NEWTAG", KNOWLEDGE_ARTICLE)).thenReturn(null);
-        when(tagRepository.findByEntityType(KNOWLEDGE_ARTICLE)).thenReturn(List.of());
-        when(tagRepository.findByEntityType(TagEntityType.DEVICE)).thenReturn(List.of(deviceTag));
-        when(tagRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    void createTagPrefersExactMatchOverCaseVariants() {
+        Tag legacyDup = Tag.builder().id("tag-2").key("NEWTAG").entityType(KNOWLEDGE_ARTICLE).build();
+        when(tagRepository.findByKeyAndEntityType("NEWTAG", KNOWLEDGE_ARTICLE)).thenReturn(legacyDup);
 
         Tag result = tagService.createTag("NEWTAG", KNOWLEDGE_ARTICLE, null, null);
 
-        assertThat(result.getId()).isNotEqualTo("tag-2");
-        verify(tagRepository).save(any());
+        assertThat(result).isSameAs(legacyDup);
+        verify(tagRepository, never()).findByKeyIgnoreCaseAndEntityType(any(), any());
+        verify(tagRepository, never()).save(any());
     }
 
     @Test

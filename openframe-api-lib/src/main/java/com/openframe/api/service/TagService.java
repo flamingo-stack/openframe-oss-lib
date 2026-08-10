@@ -254,14 +254,9 @@ public class TagService {
         if (exact != null) {
             return exact;
         }
-        return tagRepository.findByEntityType(entityType).stream()
-                .filter(tag -> hasKeyIgnoreCase(tag, key))
+        return tagRepository.findByKeyIgnoreCaseAndEntityType(key, entityType).stream()
                 .findFirst()
                 .orElse(null);
-    }
-
-    private boolean hasKeyIgnoreCase(Tag tag, String key) {
-        return tag.getKey() != null && tag.getKey().equalsIgnoreCase(key);
     }
 
     @Transactional

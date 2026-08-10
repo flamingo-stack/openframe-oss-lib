@@ -21,6 +21,8 @@ public interface TagRepository extends MongoRepository<Tag, String> {
 
     boolean existsByKeyIgnoreCaseAndEntityTypeAndIdNot(String key, TagEntityType entityType, String id);
 
+    List<Tag> findByKeyIgnoreCaseAndEntityType(String key, TagEntityType entityType);
+
     List<Tag> findByEntityTypeAndKeyContainingIgnoreCase(TagEntityType entityType, String key);
 
     @Query(value = "{ 'key': ?0, 'entityType': ?1 }", fields = "{ 'values': 1 }")
