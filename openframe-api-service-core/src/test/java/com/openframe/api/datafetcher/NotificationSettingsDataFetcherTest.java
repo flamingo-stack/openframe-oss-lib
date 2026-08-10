@@ -47,7 +47,7 @@ class NotificationSettingsDataFetcherTest {
                 List.of(new NotificationSettingsView.TypeSetting(NotificationSettingGroup.MINGO_MESSAGES, false));
         when(service.update("user-1", false, typeSettings, null)).thenReturn(view(false));
 
-        assertThat(fetcher.updateNotificationSettings(false, typeSettings, null, principal("user-1")).enabled())
+        assertThat(fetcher.updateNotificationSettings(false, typeSettings, null, principal("user-1")).isEnabled())
                 .isFalse();
         verify(service).update("user-1", false, typeSettings, null);
     }

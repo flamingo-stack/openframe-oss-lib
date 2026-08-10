@@ -41,7 +41,8 @@ public class NotificationContextDescriptorRegistry {
         if (context == null) {
             return null;
         }
-        NotificationContextDescriptor descriptor = byType.get(context.getType());
+        String type = context.getType();
+        NotificationContextDescriptor descriptor = byType.get(type);
         return descriptor == null ? null : descriptor.settingsGroup(context);
     }
 }

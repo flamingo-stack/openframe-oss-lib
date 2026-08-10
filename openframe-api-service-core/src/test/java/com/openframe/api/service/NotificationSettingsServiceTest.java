@@ -44,9 +44,9 @@ class NotificationSettingsServiceTest {
 
         NotificationSettingsView view = service.get("user-1");
 
-        assertThat(view.enabled()).isTrue();
-        assertThat(view.typeSettings()).hasSize(NotificationSettingGroup.values().length);
-        assertThat(view.typeSettings()).allMatch(NotificationSettingsView.TypeSetting::enabled);
+        assertThat(view.isEnabled()).isTrue();
+        assertThat(view.getTypeSettings()).hasSize(NotificationSettingGroup.values().length);
+        assertThat(view.getTypeSettings()).allMatch(NotificationSettingsView.TypeSetting::isEnabled);
     }
 
     @Test
@@ -55,7 +55,7 @@ class NotificationSettingsServiceTest {
         when(repository.findByUserId("user-1")).thenReturn(Optional.of(
                 NotificationSettings.builder().userId("user-1").pushEnabled(false).build()));
 
-        assertThat(service.get("user-1").enabled()).isFalse();
+        assertThat(service.get("user-1").isEnabled()).isFalse();
     }
 
     @Test
@@ -68,7 +68,7 @@ class NotificationSettingsServiceTest {
 
         NotificationSettingsView view = service.get("user-1");
 
-        assertThat(view.typeSettings()).contains(
+        assertThat(view.getTypeSettings()).contains(
                 new NotificationSettingsView.TypeSetting(NotificationSettingGroup.MINGO_MESSAGES, false),
                 new NotificationSettingsView.TypeSetting(NotificationSettingGroup.TICKET_ASSIGNED, true));
     }
@@ -86,7 +86,7 @@ class NotificationSettingsServiceTest {
         ArgumentCaptor<Map<NotificationSettingGroup, Boolean>> map = ArgumentCaptor.forClass(Map.class);
         verify(repository).saveSettings(eq("user-1"), eq(false), map.capture());
         assertThat(map.getValue()).containsEntry(NotificationSettingGroup.APPROVAL_MINGO, false);
-        assertThat(view.enabled()).isFalse();
+        assertThat(view.isEnabled()).isFalse();
     }
 
     @Test

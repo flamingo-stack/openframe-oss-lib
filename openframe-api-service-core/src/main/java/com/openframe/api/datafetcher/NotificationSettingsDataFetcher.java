@@ -21,7 +21,8 @@ public class NotificationSettingsDataFetcher {
 
     @DgsQuery
     public NotificationSettingsView notificationSettings(@AuthenticationPrincipal AuthPrincipal principal) {
-        return notificationSettingsService.get(CurrentPrincipalSupport.requireHumanUserId(principal));
+        String userId = CurrentPrincipalSupport.requireHumanUserId(principal);
+        return notificationSettingsService.get(userId);
     }
 
     @DgsMutation
@@ -31,7 +32,7 @@ public class NotificationSettingsDataFetcher {
             List<NotificationSettingsView.TypeSetting> typeSettings,
             @InputArgument Boolean pushEnabled,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        return notificationSettingsService.update(
-                CurrentPrincipalSupport.requireHumanUserId(principal), enabled, typeSettings, pushEnabled);
+        String userId = CurrentPrincipalSupport.requireHumanUserId(principal);
+        return notificationSettingsService.update(userId, enabled, typeSettings, pushEnabled);
     }
 }

@@ -19,36 +19,47 @@ public class NotificationSettingsService {
     private final NotificationSettingsRepository settingsRepository;
 
     public NotificationSettingsView get(String userId) {
-        return NotificationSettingsView.from(settingsRepository.findByUserId(userId)
-                .orElseGet(() -> NotificationSettings.builder().build()));
+        NotificationSettings settings = settingsRepository.findByUserId(userId)
+                .orElseGet(NotificationSettingsService::defaults);
+        return NotificationSettingsView.from(settings);
     }
 
-    /**
-     * {@code enabled} wins over the legacy {@code pushEnabled} when both arrive; a null
-     * {@code typeSettings} means "not sent" and keeps the stored group overrides.
-     */
     public NotificationSettingsView update(String userId, Boolean enabled,
                                            List<NotificationSettingsView.TypeSetting> typeSettings,
                                            Boolean legacyPushEnabled) {
-        Boolean master = enabled != null ? enabled : legacyPushEnabled;
-        if (master == null) {
-            throw new BadRequestException("enabled is required");
-        }
-        settingsRepository.saveSettings(userId, master, toMap(typeSettings));
+        boolean master = resolveMaster(enabled, legacyPushEnabled);
+        Map<NotificationSettingGroup, Boolean> groupOverrides = toGroupOverrides(typeSettings);
+        settingsRepository.saveSettings(userId, master, groupOverrides);
         return get(userId);
     }
 
-    private static Map<NotificationSettingGroup, Boolean> toMap(List<NotificationSettingsView.TypeSetting> typeSettings) {
+    private static boolean resolveMaster(Boolean enabled, Boolean legacyPushEnabled) {
+        if (enabled != null) {
+            return enabled;
+        }
+        if (legacyPushEnabled != null) {
+            return legacyPushEnabled;
+        }
+        throw new BadRequestException("enabled is required");
+    }
+
+    /** Null means "not sent" — a legacy master-only write keeps the stored group overrides. */
+    private static Map<NotificationSettingGroup, Boolean> toGroupOverrides(List<NotificationSettingsView.TypeSetting> typeSettings) {
         if (typeSettings == null) {
             return null;
         }
-        Map<NotificationSettingGroup, Boolean> map = new EnumMap<>(NotificationSettingGroup.class);
+        Map<NotificationSettingGroup, Boolean> overrides = new EnumMap<>(NotificationSettingGroup.class);
         for (NotificationSettingsView.TypeSetting setting : typeSettings) {
-            if (setting.group() == null) {
+            NotificationSettingGroup group = setting.getGroup();
+            if (group == null) {
                 throw new BadRequestException("typeSettings entries require a group");
             }
-            map.put(setting.group(), setting.enabled());
+            overrides.put(group, setting.isEnabled());
         }
-        return map;
+        return overrides;
+    }
+
+    private static NotificationSettings defaults() {
+        return NotificationSettings.builder().build();
     }
 }

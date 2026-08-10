@@ -57,7 +57,9 @@ public class NotificationBroadcaster {
         log.debug("Persisted notification {} (admins={}, machines={})",
                 saved.getId(), command.getAdminAudience().size(), command.getMachineAudience().size());
 
-        Set<String> admins = withoutOptedOut(command.getAdminAudience(), command.getContext());
+        Set<String> adminAudience = command.getAdminAudience();
+        NotificationContext context = command.getContext();
+        Set<String> admins = withoutOptedOut(adminAudience, context);
         Set<String> machines = command.getMachineAudience();
         String title = command.getTitle();
         try {
@@ -98,14 +100,12 @@ public class NotificationBroadcaster {
         return saved;
     }
 
-    /**
-     * User notification settings applied at the AUDIENCE level: an opted-out admin gets no read-state
-     * row, no card, no NATS message, no push — the notification never existed for them, and it does
-     * not appear after re-enabling. Machines have no settings. Absence of a document and every
-     * failure mode default to delivery — a settings hiccup must not lose notifications.
-     */
+    /** Settings bite at the audience: an opted-out admin gets no row/card/NATS/push and nothing arrives retroactively; absence and failures always deliver. */
     private Set<String> withoutOptedOut(Set<String> admins, NotificationContext context) {
-        if (admins.isEmpty() || settingsRepository.isEmpty()) {
+        if (admins.isEmpty()) {
+            return admins;
+        }
+        if (settingsRepository.isEmpty()) {
             return admins;
         }
         NotificationSettingGroup group = descriptorRegistry.settingsGroupOf(context);
@@ -116,7 +116,7 @@ public class NotificationBroadcaster {
             }
             Set<String> kept = new HashSet<>(admins);
             for (NotificationSettings row : rows) {
-                if (!row.allows(group)) {
+                if (!row.isEnabledFor(group)) {
                     kept.remove(row.getUserId());
                 }
             }

@@ -6,9 +6,6 @@ import java.util.Map;
 
 public interface CustomNotificationSettingsRepository {
 
-    /**
-     * Full-state upsert (the settings modal saves everything at once). {@code pushEnabled} is written
-     * as a mirror of {@code enabled} so not-yet-redeployed readers keep honouring the master switch.
-     */
+    /** pushEnabled is written as a mirror of enabled so a rolled-back reader keeps honouring the switch. */
     void saveSettings(String userId, boolean enabled, Map<NotificationSettingGroup, Boolean> typeSettings);
 }

@@ -2,26 +2,38 @@ package com.openframe.api.dto;
 
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSettings;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
-/**
- * The resolved contract shape: absent document/keys are already collapsed to their defaults, every
- * group present exactly once — the client renders state, it never re-implements the defaulting rules.
- */
-public record NotificationSettingsView(boolean enabled,
-                                       List<TypeSetting> typeSettings,
-                                       boolean pushEnabled) {
+// Defaults are collapsed server-side: every group exactly once — the client never re-implements the defaulting rules.
+@Getter
+@AllArgsConstructor
+public class NotificationSettingsView {
 
-    public record TypeSetting(NotificationSettingGroup group, boolean enabled) {
+    private final boolean enabled;
+    private final List<TypeSetting> typeSettings;
+    private final boolean pushEnabled;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TypeSetting {
+        private NotificationSettingGroup group;
+        private boolean enabled;
     }
 
     public static NotificationSettingsView from(NotificationSettings settings) {
-        boolean master = settings.masterEnabled();
-        List<TypeSetting> groups = Arrays.stream(NotificationSettingGroup.values())
-                .map(group -> new TypeSetting(group, settings.groupEnabled(group)))
-                .toList();
+        boolean master = settings.isMasterEnabled();
+        List<TypeSetting> groups = new ArrayList<>();
+        for (NotificationSettingGroup group : NotificationSettingGroup.values()) {
+            boolean groupEnabled = settings.isGroupEnabled(group);
+            groups.add(new TypeSetting(group, groupEnabled));
+        }
         return new NotificationSettingsView(master, groups, master);
     }
 }

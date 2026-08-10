@@ -33,8 +33,7 @@ public class NotificationChannelDispatcher {
         if (channels.isEmpty()) {
             return;
         }
-        // Settings are applied upstream at the audience level (NotificationBroadcaster) — every
-        // userId arriving here has already opted in.
+        // The audience arrives pre-filtered by settings (NotificationBroadcaster) — do not re-add a mute here.
         channels.forEach(channel ->
                 userIds.forEach(userId -> deliverSafely(channel, userId, notification, category)));
     }
