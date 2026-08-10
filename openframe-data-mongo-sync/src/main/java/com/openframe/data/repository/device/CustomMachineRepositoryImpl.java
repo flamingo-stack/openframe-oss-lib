@@ -331,7 +331,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                     && filter.getOrganizationIds() != null && !filter.getOrganizationIds().isEmpty()) {
                 criteriaList.add(Criteria.where("organizationId").in(filter.getOrganizationIds()));
             }
-            osTypeOrCriteria(filter.getPlatformNames()).ifPresent(criteriaList::add);
             Collection<String> restrict = filter.getRestrictToMachineIds();
             if (restrict != null) {
                 if (restrict.isEmpty()) {

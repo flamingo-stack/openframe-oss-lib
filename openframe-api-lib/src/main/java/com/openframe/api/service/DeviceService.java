@@ -216,22 +216,28 @@ public class DeviceService {
     }
 
     private MachineQueryFilter machineFilter(DeviceFilterCriteria filter,
-                                             Collection<OsType> platformNames,
+                                             Collection<OsType> osTypeScope,
                                              Collection<String> restrictToMachineIds) {
         MachineQueryFilter out = new MachineQueryFilter();
+        List<OsType> filterOsTypes = null;
         if (filter != null) {
             out.setStatuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null);
             out.setDeviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null);
-            out.setOsTypes(filter.getOsTypes());
             out.setOrganizationIds(filter.getOrganizationIds());
+            filterOsTypes = filter.getOsTypes();
         }
-        if (platformNames != null && !platformNames.isEmpty()) {
-            out.setPlatformNames(new ArrayList<>(platformNames));
-        }
+        out.setOsTypes(resolveOsTypes(filterOsTypes, osTypeScope));
         List<String> tagMachineIds = filter != null ? resolveTagFilterToMachineIds(filter) : null;
         out.setRestrictToMachineIds(intersectMachineIds(tagMachineIds, restrictToMachineIds));
 
         return out;
+    }
+
+    private static List<OsType> resolveOsTypes(Collection<OsType> filterOsTypes, Collection<OsType> osTypeScope) {
+        if (filterOsTypes != null && !filterOsTypes.isEmpty()) {
+            return new ArrayList<>(filterOsTypes);
+        }
+        return osTypeScope != null && !osTypeScope.isEmpty() ? new ArrayList<>(osTypeScope) : null;
     }
 
     /**

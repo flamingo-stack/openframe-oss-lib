@@ -18,6 +18,5 @@ public class MachineQueryFilter {
     private List<String> deviceTypes;
     private List<OsType> osTypes;
     private List<String> organizationIds;
-    private List<OsType> platformNames;
     private Collection<String> restrictToMachineIds;
 }
