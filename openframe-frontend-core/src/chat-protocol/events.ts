@@ -160,6 +160,69 @@ export interface ApprovalResolvedEvent extends ChatStreamEventBase {
   willAutoContinue?: boolean
 }
 
+/** The client is offered a handoff of this ticket to a human technician
+ *  (NATS `ESCALATION_OFFER` chunk in state PENDING). Distinct from
+ *  `approval-request`: it resolves through the ticket-escalation mutations,
+ *  never the tool-approval flow, and it is raised by four different origins
+ *  (Fae's own tool call, the client's header button, a deterministic
+ *  trigger, or a deferred surfacing at turn end) that all render alike. */
+export interface EscalationOfferEvent extends ChatStreamEventBase {
+  type: 'escalation-offer'
+  offerId: string
+  text: string
+  origin?: string
+}
+
+/** Wire vocabulary of `EscalationOfferData.state`. */
+export const ESCALATION_STATE = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  DECLINED: 'DECLINED',
+  SUPERSEDED: 'SUPERSEDED',
+} as const
+
+/** Terminal wire state → the shared `ChatApprovalStatus` vocabulary; `null`
+ *  for PENDING or anything unrecognized. Shared by BOTH decoders (live
+ *  chunks and persisted rows) so a state can never mean two things. */
+export function escalationResolvedStatus(
+  state: unknown,
+): EscalationOfferResolvedEvent['status'] | null {
+  switch (state) {
+    case ESCALATION_STATE.APPROVED:
+      return 'approved'
+    case ESCALATION_STATE.DECLINED:
+      return 'rejected'
+    case ESCALATION_STATE.SUPERSEDED:
+      return 'cancelled'
+    default:
+      return null
+  }
+}
+
+/** An escalation offer reached a terminal state. The wire's SUPERSEDED
+ *  (the client typed over a pending offer) maps onto `cancelled` so the
+ *  whole stack keeps ONE status vocabulary (`ChatApprovalStatus`). The
+ *  resolved chunk carries no text — consumers flip the existing block. */
+export interface EscalationOfferResolvedEvent extends ChatStreamEventBase {
+  type: 'escalation-offer-resolved'
+  offerId: string
+  status: 'approved' | 'rejected' | 'cancelled'
+  resolvedByName?: string | null
+}
+
+/** The conversation was handed off to a human technician (`TICKET_ESCALATED`).
+ *  A first-class block rather than something inferred from an offer's state,
+ *  so paths that raise no offer at all — the inactivity auto-escalation — still
+ *  produce a receipt. `text` is nullable on the wire; consumers supply the
+ *  fallback copy. */
+export interface TicketEscalatedEvent extends ChatStreamEventBase {
+  type: 'ticket-escalated'
+  ticketId: string
+  ticketNumber?: number
+  reason: string
+  text?: string
+}
+
 /** Per-turn metadata. Raw wire values pass through UNVALIDATED — the
  *  consumer replicates the legacy truthiness/typeof gates (so a
  *  malformed frame degrades identically to the pre-SSOT parser). */
@@ -265,6 +328,9 @@ export type ChatStreamEvent =
   | ToolExecutionEvent
   | ApprovalRequestEvent
   | ApprovalResolvedEvent
+  | EscalationOfferEvent
+  | EscalationOfferResolvedEvent
+  | TicketEscalatedEvent
   | ChatMetadataEvent
   | UsageEvent
   | TokenUsageEvent

@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("Logs")
 public class LogsTest extends BaseTest {
 
+    @Tag("feature")
     @Tag("read")
     @Test
     @DisplayName("Get log filters")
@@ -32,6 +33,7 @@ public class LogsTest extends BaseTest {
         assertThat(filters.getSeverities()).as("Expected at least one severity").isNotEmpty();
     }
 
+    @Tag("feature")
     @Tag("read")
     @Test
     @DisplayName("List logs")
@@ -48,6 +50,7 @@ public class LogsTest extends BaseTest {
         });
     }
 
+    @Tag("feature")
     @Tag("read")
     @Test
     @DisplayName("Get log details")
@@ -62,6 +65,7 @@ public class LogsTest extends BaseTest {
         assertThat(details.getToolType()).as("Log details toolType should match").isEqualTo(logEvent.getToolType());
     }
 
+    @Tag("feature")
     @Tag("read")
     @Test
     @DisplayName("Search logs")
@@ -74,6 +78,7 @@ public class LogsTest extends BaseTest {
         assertThat(searchResults.getFirst().getSummary()).as("Search result summary should contain " + searchWord).contains(searchWord);
     }
 
+    @Tag("feature")
     @Tag("read")
     @Test
     @DisplayName("Filter logs by severity")
@@ -88,6 +93,7 @@ public class LogsTest extends BaseTest {
         });
     }
 
+    @Tag("feature")
     @Tag("read")
     @Test
     @DisplayName("Sort logs by timestamp ascending")
@@ -97,6 +103,7 @@ public class LogsTest extends BaseTest {
         assertThat(timestamps).as("Logs should be sorted by timestamp oldest-first").isSorted();
     }
 
+    @Tag("feature")
     @Tag("read")
     @Test
     @DisplayName("Filter logs by timestamp range")

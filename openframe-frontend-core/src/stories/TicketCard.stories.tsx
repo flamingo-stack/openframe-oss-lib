@@ -151,6 +151,18 @@ export const WithNewMessage: Story = {
 }
 
 /**
+ * The client asked for a human and confirmed the handoff — an amber footer row
+ * distinguishing it from an inactivity auto-escalation or an admin takeover,
+ * which reach the same lane silently. Driven by the ticket's `escalatedByUser`
+ * field, not by a label.
+ */
+export const EscalatedByUser: Story = {
+  args: {
+    ticket: { ...BASE_TICKET, id: 'ticket-escalated', escalatedByUser: true },
+  },
+}
+
+/**
  * Pending CLIENT approval — collapsed grey "Pending client approval" row with a
  * loader glyph. Expand it to reach the shared approve/reject affordance.
  */

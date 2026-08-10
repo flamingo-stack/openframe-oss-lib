@@ -1,20 +1,31 @@
 package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class CustomMachineRepositoryImplTest {
+
+    private static final String TENANT_ID = "tenant-1";
 
     private final CustomMachineRepositoryImpl repo = new CustomMachineRepositoryImpl(mock(TenantAwareMongoTemplate.class));
 
@@ -177,6 +188,40 @@ class CustomMachineRepositoryImplTest {
         return null;
     }
 
+    private static Document runNicknameCursor(String cursorNickname, boolean asc) {
+        MongoTemplate tpl = mock(MongoTemplate.class);
+        CustomMachineRepositoryImpl r = new CustomMachineRepositoryImpl(tpl);
+        Machine cursorDoc = new Machine();
+        cursorDoc.setNickname(cursorNickname);
+        when(tpl.findById(any(ObjectId.class), eq(Machine.class))).thenReturn(cursorDoc);
+        when(tpl.find(any(Query.class), eq(Machine.class))).thenReturn(List.of());
+        r.findMachinesWithCursor(TENANT_ID, null, null, new ObjectId().toHexString(), 10,
+                "nickname", asc ? "ASC" : "DESC");
+        ArgumentCaptor<Query> qc = ArgumentCaptor.forClass(Query.class);
+        verify(tpl).find(qc.capture(), eq(Machine.class));
+        return qc.getValue().getQueryObject();
+    }
+
+    private static boolean nickHasOp(Document q, String op) {
+        return anyNode(q, d -> d.get("nickname") instanceof Document nn && nn.containsKey(op));
+    }
+
+    private static boolean nickIsNull(Document q) {
+        return anyNode(q, d -> d.containsKey("nickname") && d.get("nickname") == null);
+    }
+
+    private static boolean anyNode(Object node, java.util.function.Predicate<Document> pred) {
+        if (node instanceof Document d) {
+            return pred.test(d) || d.values().stream().anyMatch(v -> anyNode(v, pred));
+        }
+        if (node instanceof List<?> list) {
+            return list.stream().anyMatch(v -> anyNode(v, pred));
+        }
+        return false;
+    }
+
+    // ---- cursor null-key boundary regression (nickname is nullable + sortable) ----
+
     @Test
     @DisplayName("buildDeviceQuery: search input is regex-quoted — metacharacters match literally and hostile patterns like (a+)+$ never reach the regex engine unescaped")
     void searchInputIsRegexQuoted() {
@@ -189,5 +234,62 @@ class CustomMachineRepositoryImplTest {
             assertThat(pattern).as(field).isNotNull();
             assertThat(pattern.pattern()).as(field).isEqualTo(Pattern.quote(hostile));
         }
+    }
+
+    @Test
+    @DisplayName("buildDeviceQuery: a search term matches nickname (alongside hostname and displayName)")
+    void searchMatchesNickname() {
+        Document q = repo.buildDeviceQuery(null, "reception").getQueryObject();
+
+        assertThat(mentionsField(q, "nickname")).isTrue();
+        assertThat(mentionsField(q, "hostname")).isTrue();
+        assertThat(mentionsField(q, "displayName")).isTrue();
+    }
+
+    @Test
+    @DisplayName("no search term → the name $or (and nickname) is absent")
+    void noSearchNoNicknameClause() {
+        Document q = repo.buildDeviceQuery(null, null).getQueryObject();
+
+        assertThat(mentionsField(q, "nickname")).isFalse();
+    }
+
+    @Test
+    @DisplayName("nickname is a sortable field")
+    void nicknameIsSortable() {
+        assertThat(repo.isSortableField("nickname")).isTrue();
+    }
+
+    @Test
+    @DisplayName("cursor ASC at a null-nickname boundary: keeps every non-null row (regression: they were dropped)")
+    void ascNullNicknameCursor_keepsNonNullRows() {
+        Document q = runNicknameCursor(null, true);
+        assertThat(nickHasOp(q, "$ne")).as("all-non-null arm present").isTrue();
+        assertThat(nickIsNull(q)).as("remaining-null-rows arm present").isTrue();
+    }
+
+    @Test
+    @DisplayName("cursor DESC at a null-nickname boundary: only remaining null rows, no non-null re-included")
+    void descNullNicknameCursor_onlyNullRows() {
+        Document q = runNicknameCursor(null, false);
+        assertThat(nickIsNull(q)).isTrue();
+        assertThat(nickHasOp(q, "$ne")).isFalse();
+    }
+
+    @Test
+    @DisplayName("cursor DESC at a non-null nickname: trailing null rows are included (regression: they were dropped)")
+    void descNonNullNicknameCursor_includesTrailingNulls() {
+        Document q = runNicknameCursor("m-nick", false);
+        assertThat(nickHasOp(q, "$lt")).isTrue();
+        assertThat(nickIsNull(q)).as("trailing null arm present").isTrue();
+    }
+
+    @Test
+    @DisplayName("cursor ASC at a non-null nickname: pure keyset — nulls already emitted, not re-included")
+    void ascNonNullNicknameCursor_noNullArm() {
+        Document q = runNicknameCursor("m-nick", true);
+        assertThat(nickHasOp(q, "$gt")).isTrue();
+        assertThat(nickIsNull(q)).isFalse();
+        assertThat(nickHasOp(q, "$ne")).isFalse();
     }
 }

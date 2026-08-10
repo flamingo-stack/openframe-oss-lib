@@ -897,7 +897,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     const lastSegment = lastSegments?.[lastSegments.length - 1]
     const isPausedOnApproval =
       !!lastSegment &&
-      (lastSegment.type === 'approval_request' || lastSegment.type === 'approval_batch') &&
+      (lastSegment.type === 'approval_request' ||
+        lastSegment.type === 'approval_batch' ||
+        lastSegment.type === 'escalation_offer') &&
       (lastSegment.status === undefined || lastSegment.status === 'pending')
     const showStreamingLoader =
       isTyping &&
