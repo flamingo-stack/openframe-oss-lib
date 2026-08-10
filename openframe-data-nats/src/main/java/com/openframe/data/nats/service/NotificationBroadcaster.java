@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.openframe.data.document.notification.NotificationSettingsPolicy.isEnabledFor;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -116,7 +118,7 @@ public class NotificationBroadcaster {
             }
             Set<String> kept = new HashSet<>(admins);
             for (NotificationSettings row : rows) {
-                if (!row.isEnabledFor(group)) {
+                if (!isEnabledFor(row, group)) {
                     kept.remove(row.getUserId());
                 }
             }

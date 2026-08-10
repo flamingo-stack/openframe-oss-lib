@@ -37,16 +37,4 @@ public class NotificationSettings implements TenantScoped {
     private Instant createdAt;
 
     private Instant updatedAt;
-
-    public boolean isMasterEnabled() {
-        return enabled == null || enabled;
-    }
-
-    public boolean isGroupEnabled(NotificationSettingGroup group) {
-        return group == null || typeSettings == null || typeSettings.getOrDefault(group, true);
-    }
-
-    public boolean isEnabledFor(NotificationSettingGroup group) {
-        return isMasterEnabled() && isGroupEnabled(group);
-    }
 }

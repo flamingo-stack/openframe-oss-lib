@@ -8,6 +8,9 @@ import lombok.Getter;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.openframe.data.document.notification.NotificationSettingsPolicy.isGroupEnabled;
+import static com.openframe.data.document.notification.NotificationSettingsPolicy.isMasterEnabled;
+
 // Defaults are collapsed server-side: every group exactly once — the client never re-implements the defaulting rules.
 @Getter
 @AllArgsConstructor
@@ -17,10 +20,10 @@ public class NotificationSettingsView {
     private final List<NotificationTypeSetting> typeSettings;
 
     public static NotificationSettingsView from(NotificationSettings settings) {
-        boolean master = settings.isMasterEnabled();
+        boolean master = isMasterEnabled(settings);
         List<NotificationTypeSetting> groups = new ArrayList<>();
         for (NotificationSettingGroup group : NotificationSettingGroup.values()) {
-            boolean groupEnabled = settings.isGroupEnabled(group);
+            boolean groupEnabled = isGroupEnabled(settings, group);
             groups.add(new NotificationTypeSetting(group, groupEnabled));
         }
         return new NotificationSettingsView(master, groups);
