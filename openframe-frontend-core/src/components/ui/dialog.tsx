@@ -38,7 +38,18 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-[9999] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-1/2 data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-1/2 md:rounded-lg",
+        // Centered on the KEYBOARD-FREE area, not the layout viewport: nothing
+        // resizes the viewport when a mobile software keyboard opens, so a
+        // plain top-[50%] leaves the lower half of the dialog behind it. See
+        // modal-v2.tsx for the full reasoning; --of-keyboard-inset is published
+        // by the app (keyboard-inset.ts) and 0 everywhere else.
+        //
+        // Deliberately NO max-height/overflow here, unlike AlertDialogContent:
+        // the close button below is `absolute` against this box, so making it a
+        // scroll container scrolls the X away with the content. Capping the
+        // height needs the overflow to move to a wrapper around `children`, and
+        // that collapses the `gap-4` this grid gives header/body/footer.
+        "fixed left-[50%] top-[calc(50%_-_var(--of-keyboard-inset,0px)/2)] z-[9999] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-1/2 data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-1/2 md:rounded-lg",
         className,
       )}
       {...props}

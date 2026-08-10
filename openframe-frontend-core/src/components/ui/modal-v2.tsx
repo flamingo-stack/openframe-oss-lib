@@ -200,7 +200,22 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
 
     return (
       <RemoveScroll enabled={isOpen} removeScrollBar={false}>
-      <div className="fixed inset-0 z-[1300] flex items-end md:items-center justify-center">
+      {/* SOFTWARE KEYBOARD — padding, not a shrunken box. Neither mobile shell
+          shrinks the LAYOUT viewport when the keyboard opens (WKWebView keeps
+          its frame; Android's window is edge-to-edge so the IME arrives as a
+          WindowInsets type), so `inset-0` and every vh/% height keep reporting
+          the full screen and this bottom-anchored panel opened entirely BEHIND
+          the keyboard. Padding leaves the backdrop full-screen while the flex
+          CONTENT box — which is what `items-end` anchors to and what the
+          panel's percentage max-height resolves against — stops above it.
+          `--of-keyboard-inset` is published by the app (keyboard-inset.ts);
+          unset everywhere else, hence the 0px fallback. The 200ms below is
+          mirrored there as INSET_TRANSITION_MS — it delays the app's
+          scroll-the-focused-field re-assert until this transition settles. */}
+      <div
+        className="fixed inset-0 z-[1300] flex items-end md:items-center justify-center transition-[padding] duration-200"
+        style={{ paddingBottom: 'var(--of-keyboard-inset, 0px)' }}
+      >
         <div
           data-state={state}
           className={cn(
@@ -231,7 +246,14 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
             // max-w-* overrides via className still win at every breakpoint.
             "relative z-10 w-full min-w-0 max-w-[min(28rem,calc(100vw-2rem))] flex flex-col",
             "mx-4 mb-4 md:mb-0",
-            "max-h-[90vh]",
+            // dvh, not vh: vh ignores a mobile browser's retracting URL bar, so
+            // 90vh already overflowed behind Safari's toolbar. The `100%-2rem`
+            // arm resolves against the keyboard-padded wrapper above and caps
+            // the panel to what's left of it, less the 1rem `mb-4` and a
+            // matching 1rem of breathing room at the top — header and footer
+            // stay pinned, ModalV2Content scrolls. min() picks 90dvh on any
+            // viewport over 320px tall, so desktop is untouched.
+            "max-h-[min(90dvh,100%-2rem)]",
             "bg-ods-bg md:bg-ods-card",
             "border border-ods-border rounded-md shadow-xl",
             "p-[var(--spacing-system-xl)] gap-[var(--spacing-system-l)]",
