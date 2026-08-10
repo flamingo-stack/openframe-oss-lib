@@ -34,4 +34,24 @@ class EventTypeMapperTest {
         assertEquals(UnifiedEventType.UNKNOWN,
                 EventTypeMapper.mapToUnifiedType(IntegratedToolType.FLEET, "UserManagement"));
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "USER_SETTINGS, GWS_USER_MANAGEMENT",
+            "GROUP_SETTINGS, GWS_GROUP_MANAGEMENT",
+            "SECURITY_SETTINGS, GWS_SECURITY_SETTINGS",
+            "DOMAIN_SETTINGS, GWS_DOMAIN_SETTINGS",
+            "DELEGATED_ADMIN_SETTINGS, GWS_DELEGATED_ADMIN"
+    })
+    void mapsGoogleWorkspaceEventTypesToUnifiedTypes(String eventType, UnifiedEventType expected) {
+        assertEquals(expected, EventTypeMapper.mapToUnifiedType(IntegratedToolType.GOOGLE_WORKSPACE, eventType));
+    }
+
+    @Test
+    void googleWorkspaceMappingIsToolScoped() {
+        assertEquals(UnifiedEventType.UNKNOWN,
+                EventTypeMapper.mapToUnifiedType(IntegratedToolType.GOOGLE_WORKSPACE, "UserManagement"));
+        assertEquals(UnifiedEventType.UNKNOWN,
+                EventTypeMapper.mapToUnifiedType(IntegratedToolType.MICROSOFT_365, "USER_SETTINGS"));
+    }
 }

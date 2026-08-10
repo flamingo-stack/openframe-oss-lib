@@ -277,5 +277,12 @@ public class EventTypeMapper {
         registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.ROLE_MANAGEMENT, UnifiedEventType.M365_ROLE_MANAGEMENT);
         registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.POLICY, UnifiedEventType.M365_POLICY);
         registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.DIRECTORY_MANAGEMENT, UnifiedEventType.M365_DIRECTORY_MANAGEMENT);
+
+        // Google Workspace directory audit mappings (admin application event types)
+        registerMapping(IntegratedToolType.GOOGLE_WORKSPACE, SourceEventTypes.GoogleWorkspace.USER_SETTINGS, UnifiedEventType.GWS_USER_MANAGEMENT);
+        registerMapping(IntegratedToolType.GOOGLE_WORKSPACE, SourceEventTypes.GoogleWorkspace.GROUP_SETTINGS, UnifiedEventType.GWS_GROUP_MANAGEMENT);
+        registerMapping(IntegratedToolType.GOOGLE_WORKSPACE, SourceEventTypes.GoogleWorkspace.SECURITY_SETTINGS, UnifiedEventType.GWS_SECURITY_SETTINGS);
+        registerMapping(IntegratedToolType.GOOGLE_WORKSPACE, SourceEventTypes.GoogleWorkspace.DOMAIN_SETTINGS, UnifiedEventType.GWS_DOMAIN_SETTINGS);
+        registerMapping(IntegratedToolType.GOOGLE_WORKSPACE, SourceEventTypes.GoogleWorkspace.DELEGATED_ADMIN_SETTINGS, UnifiedEventType.GWS_DELEGATED_ADMIN);
     }
 }

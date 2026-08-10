@@ -263,4 +263,16 @@ public interface SourceEventTypes {
         String POLICY = "Policy";
         String DIRECTORY_MANAGEMENT = "DirectoryManagement";
     }
+
+    /**
+     * Google Workspace directory audit event types (Reports API {@code admin} application event types).
+     */
+    interface GoogleWorkspace {
+
+        String USER_SETTINGS = "USER_SETTINGS";
+        String GROUP_SETTINGS = "GROUP_SETTINGS";
+        String SECURITY_SETTINGS = "SECURITY_SETTINGS";
+        String DOMAIN_SETTINGS = "DOMAIN_SETTINGS";
+        String DELEGATED_ADMIN_SETTINGS = "DELEGATED_ADMIN_SETTINGS";
+    }
 }
