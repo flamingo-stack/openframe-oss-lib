@@ -1,6 +1,5 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -35,7 +34,5 @@ public interface ScriptScheduleRepository
 
     List<ScriptSchedule> findByStatusAndNextRunAtLessThanEqual(ScriptStatus status, Instant cutoff);
 
-    List<ScriptSchedule> findByTenantIdAndSelectionModeAndTriggerAndStatus(
-            String tenantId, ScheduleDeviceSelectionMode selectionMode,
-            ScriptScheduleTrigger trigger, ScriptStatus status);
+    List<ScriptSchedule> findByTenantIdAndTriggerAndStatus(String tenantId, ScriptScheduleTrigger trigger, ScriptStatus status);
 }

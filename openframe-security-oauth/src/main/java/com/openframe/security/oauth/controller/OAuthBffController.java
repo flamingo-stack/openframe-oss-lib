@@ -136,6 +136,38 @@ public class OAuthBffController {
         return revoke.then(Mono.just(ResponseEntity.noContent().headers(headers).build()));
     }
 
+    /**
+     * Native Sign in with Apple (iOS): exchanges the credential from ASAuthorizationController for
+     * OpenFrame tokens. Response mirrors dev-exchange — Access-Token / Refresh-Token headers (plus
+     * auth cookies) — so the app's existing token-storage path is reused unchanged.
+     */
+    @PostMapping("/apple/native-exchange")
+    public Mono<ResponseEntity<Void>> appleNativeExchange(@RequestBody AppleNativeExchangeRequest body,
+                                                          ServerHttpRequest request) {
+        if (!mobileAuthEnabled) {
+            return Mono.just(ResponseEntity.status(404).build());
+        }
+        if (!hasText(body.tenantId()) || !hasText(body.identityToken()) || !hasText(body.authorizationCode())) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+        return oauthBffService.appleNativeExchange(
+                        body.tenantId(), body.identityToken(), body.authorizationCode(),
+                        body.nonce(), body.firstName(), body.lastName(), request)
+                .map(tokens -> buildNoContentWithCookies(tokens, true))
+                .onErrorResume(e -> {
+                    log.warn("Apple native exchange failed: {}", e.getMessage());
+                    return Mono.just(ResponseEntity.status(401).<Void>build());
+                });
+    }
+
+    public record AppleNativeExchangeRequest(String tenantId,
+                                             String identityToken,
+                                             String authorizationCode,
+                                             String nonce,
+                                             String firstName,
+                                             String lastName) {
+    }
+
     @GetMapping("/dev-exchange")
     public Mono<ResponseEntity<Object>> devExchange(@RequestParam("ticket") String ticket) {
         if (!devTicketEnabled && !mobileAuthEnabled) {

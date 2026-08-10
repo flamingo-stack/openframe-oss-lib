@@ -25,4 +25,12 @@ public class AppleSSOProperties extends AbstractOidcProviderProperties {
 
     /** Key ID of the .p8 key — the {@code kid} header of the client-secret JWT. */
     private String defaultKeyId;
+
+    /**
+     * iOS app bundle ids accepted as {@code aud} by the native identity-token exchange
+     * (e.g. {@code ai.openframe.mobile.dev}). The native Sign in with Apple sheet issues tokens
+     * whose audience is the app's bundle id, NOT the web flow's Services ID. Empty list disables
+     * the native exchange.
+     */
+    private java.util.List<String> nativeClientIds = java.util.List.of();
 }

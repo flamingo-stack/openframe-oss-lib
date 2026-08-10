@@ -116,6 +116,36 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
         registrationProcessor.postProcessAutoProvision(authUser, pictureUrl);
     }
 
+    /**
+     * Resolve an existing active user, or provision one under the SAME rules as the web SSO login:
+     * only when the tenant has a per-tenant config for the provider with auto-provisioning enabled
+     * and the email's domain on its allowlist. Used by the native Apple exchange; the web flow keeps
+     * its own path through {@link #loadUser}.
+     */
+    public java.util.Optional<AuthUser> resolveOrProvision(String tenantId,
+                                                           String provider,
+                                                           String email,
+                                                           String firstName,
+                                                           String lastName) {
+        String normalizedEmail = email.trim().toLowerCase(ROOT);
+        java.util.Optional<AuthUser> existing = userService.findActiveByEmailAndTenant(normalizedEmail, tenantId);
+        if (existing.isPresent()) {
+            return existing;
+        }
+        boolean provisionable = ssoConfigService.getSSOConfig(tenantId, provider)
+                .filter(SSOPerTenantConfig::isEnabled)
+                .filter(SSOPerTenantConfig::isAutoProvisionUsers)
+                .map(cfg -> isEmailAllowedByDomains(cfg.getAllowedDomains(), normalizedEmail))
+                .orElse(false);
+        if (!provisionable) {
+            return java.util.Optional.empty();
+        }
+        AuthUser user = userService.registerOrReactivateFromSso(
+                tenantId, normalizedEmail, firstName, lastName, List.of(ADMIN), provider);
+        registrationProcessor.postProcessAutoProvision(user, null);
+        return java.util.Optional.of(user);
+    }
+
     private AuthUser registerUser(String tenantId, String email, OidcUser user, String provider) {
         // Apple's ID token never carries names; the helper falls back to the one-time "user" form
         // parameter of the current (form_post callback) request when the provider is Apple.
