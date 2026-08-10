@@ -47,6 +47,15 @@ public class NotificationBroadcaster {
         }
 
         NotificationCategory category = descriptorRegistry.categoryOf(command.getContext());
+        Set<String> adminAudience = command.getAdminAudience();
+        NotificationContext context = command.getContext();
+        Set<String> admins = withoutOptedOut(adminAudience, context);
+        Set<String> machines = command.getMachineAudience();
+        if (admins.isEmpty() && machines.isEmpty()) {
+            log.info("No recipients left after settings filtering — nothing persisted for '{}'", command.getTitle());
+            return null;
+        }
+
         Notification notification = Notification.builder()
                 .severity(command.getSeverity())
                 .category(category)
@@ -57,12 +66,8 @@ public class NotificationBroadcaster {
                 .build();
         Notification saved = notificationRepository.save(notification);
         log.debug("Persisted notification {} (admins={}, machines={})",
-                saved.getId(), command.getAdminAudience().size(), command.getMachineAudience().size());
+                saved.getId(), admins.size(), machines.size());
 
-        Set<String> adminAudience = command.getAdminAudience();
-        NotificationContext context = command.getContext();
-        Set<String> admins = withoutOptedOut(adminAudience, context);
-        Set<String> machines = command.getMachineAudience();
         String title = command.getTitle();
         try {
             if (!admins.isEmpty()) {
@@ -107,8 +112,8 @@ public class NotificationBroadcaster {
         if (admins.isEmpty()) {
             return admins;
         }
-        NotificationSettingGroup group = descriptorRegistry.settingsGroupOf(context);
         try {
+            NotificationSettingGroup group = descriptorRegistry.settingsGroupOf(context);
             List<NotificationSettings> rows = settingsRepository.findByUserIdIn(admins);
             if (rows.isEmpty()) {
                 return admins;
@@ -121,7 +126,7 @@ public class NotificationBroadcaster {
             }
             return kept;
         } catch (RuntimeException ex) {
-            log.error("Notification settings lookup failed — dropping all {} admin(s) from this dispatch", admins.size(), ex);
+            log.error("Notification settings resolution failed — dropping all {} admin(s) from this dispatch", admins.size(), ex);
             return Set.of();
         }
     }

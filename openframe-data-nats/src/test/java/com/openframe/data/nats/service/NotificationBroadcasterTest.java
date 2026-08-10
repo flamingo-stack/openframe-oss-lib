@@ -425,6 +425,46 @@ class NotificationBroadcasterTest {
 
         verify(readStateService, never()).createForAudience(
                 anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    @DisplayName("Given a descriptor whose settingsGroup throws, when broadcast runs, then the admins are dropped like on any settings failure — a buggy descriptor must not crash broadcast after persistence")
+    void settings_group_resolution_failure_drops_all_admins() {
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenThrow(new RuntimeException("buggy descriptor"));
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("X")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("X"))
+                .adminAudience(Set.of("a1"))
+                .build();
+
+        broadcaster.broadcast(cmd);
+
+        verify(readStateService, never()).createForAudience(
+                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    @DisplayName("Given every admin opted out and no machine audience, when broadcast runs, then nothing is persisted at all — no invisible orphan docs")
+    void fully_muted_dispatch_persists_nothing() {
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(null);
+        when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
+                settings("a1", false, null)));
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("X")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("X"))
+                .adminAudience(Set.of("a1"))
+                .build();
+
+        Notification result = broadcaster.broadcast(cmd);
+
+        assertThat(result).isNull();
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(readStateService, never()).createForAudience(
+                anyString(), any(NotificationCategory.class), anyString(), any(RecipientType.class), any());
     }
 
     @Test
