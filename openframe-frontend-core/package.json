@@ -393,7 +393,8 @@
     "tailwindcss-animate": "^1.0.7",
     "unist-util-visit": "^5.0.0",
     "use-stick-to-bottom": "^1.1.4",
-    "vaul": "^1.1.2"
+    "vaul": "^1.1.2",
+    "react-remove-scroll": "^2.7.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.4",

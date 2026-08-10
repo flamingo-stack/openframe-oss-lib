@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useEffect, useState } from "react"
-import { usePreventScroll } from "@react-aria/overlays"
+import { RemoveScroll } from "react-remove-scroll"
 import { XmarkIcon } from "../icons-v2-generated"
 import { cn } from "../../utils/cn"
 
@@ -43,6 +43,20 @@ interface ModalFooterProps {
 // TOP one may contain focus, or they fight each other.
 const modalStack: symbol[] = []
 
+// Radix popups (Select/DropdownMenu/Popover content) PORTAL to <body>, so a
+// dropdown opened from inside the modal focuses nodes OUTSIDE the panel.
+// Focus landing there is NOT an escape — yanking it back (containFocus /
+// reasserts / Tab trap) fights Radix's own item-focus management and strands
+// stale `data-highlighted` on items it never got to blur-clean (observed:
+// two or three select options painted "hovered" simultaneously). Popper-based
+// layers carry `data-radix-popper-content-wrapper`; the default item-aligned
+// Select content doesn't, hence the role fallbacks.
+const isInPortaledLayer = (node: Node | null): boolean =>
+  node instanceof Element &&
+  node.closest(
+    '[data-radix-popper-content-wrapper], [role="listbox"], [role="menu"]',
+  ) !== null
+
 const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
   ({ isOpen, onClose, children, className }, ref) => {
     // Keep the modal mounted while the exit animation plays.
@@ -79,7 +93,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         const panel = panelRef.current
         if (!panel) return
         const target = event.target as Node | null
-        if (target && panel.contains(target)) return
+        if (target && (panel.contains(target) || isInPortaledLayer(target))) return
         panel.focus()
       }
       document.addEventListener('focusin', containFocus)
@@ -90,7 +104,11 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           if (modalStack[modalStack.length - 1] !== stackId) return
           const panel = panelRef.current
           if (!panel) return
-          if (!panel.contains(document.activeElement)) panel.focus()
+          if (
+            !panel.contains(document.activeElement) &&
+            !isInPortaledLayer(document.activeElement)
+          )
+            panel.focus()
         }, ms),
       )
       return () => {
@@ -110,6 +128,10 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         if (event.key !== 'Tab') return
         const panel = panelRef.current
         if (!panel) return
+        // Focus inside a portaled Radix layer (open Select/menu): Tab is that
+        // layer's affair — trapping it back into the panel closes nothing and
+        // steals focus mid-interaction.
+        if (isInPortaledLayer(document.activeElement)) return
         const focusables = Array.from(
           panel.querySelectorAll<HTMLElement>(
             'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
@@ -142,14 +164,26 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       return () => clearTimeout(timeout)
     }, [isOpen])
 
-    // Shared ref-counted scroll lock (react-aria) — restores prior styles on
-    // release instead of clobbering to 'unset'.
-    usePreventScroll({ isDisabled: !isOpen })
+    // Scroll lock via the SAME library Radix primitives use internally
+    // (react-remove-scroll is ref-counted and composes with itself). The
+    // previous react-aria lock FOUGHT the lock a Radix Select opened inside
+    // the modal added on top — body jumped and the page behind went black
+    // while the select was open.
 
     // Escape key (document-level: top-of-stack semantics for modals)
     useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Escape') {
+        // A nested Radix layer (Select, DropdownMenu) preventDefaults the
+        // Escape it consumes — without this check, closing a select inside
+        // the modal closed the WHOLE modal. The stack check keeps Escape a
+        // topmost-only affair: every open modal registers this listener, so
+        // with stacked modals (confirm above a form) one Escape would
+        // otherwise close BOTH.
+        if (
+          event.key === 'Escape' &&
+          !event.defaultPrevented &&
+          modalStack[modalStack.length - 1] === stackIdRef.current
+        ) {
           onClose()
         }
       }
@@ -165,7 +199,23 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
     const state = isOpen ? "open" : "closed"
 
     return (
-      <div className="fixed inset-0 z-[1300] flex items-end md:items-center justify-center">
+      <RemoveScroll enabled={isOpen} removeScrollBar={false}>
+      {/* SOFTWARE KEYBOARD — padding, not a shrunken box. Neither mobile shell
+          shrinks the LAYOUT viewport when the keyboard opens (WKWebView keeps
+          its frame; Android's window is edge-to-edge so the IME arrives as a
+          WindowInsets type), so `inset-0` and every vh/% height keep reporting
+          the full screen and this bottom-anchored panel opened entirely BEHIND
+          the keyboard. Padding leaves the backdrop full-screen while the flex
+          CONTENT box — which is what `items-end` anchors to and what the
+          panel's percentage max-height resolves against — stops above it.
+          `--of-keyboard-inset` is published by the app (keyboard-inset.ts);
+          unset everywhere else, hence the 0px fallback. The 200ms below is
+          mirrored there as INSET_TRANSITION_MS — it delays the app's
+          scroll-the-focused-field re-assert until this transition settles. */}
+      <div
+        className="fixed inset-0 z-[1300] flex items-end md:items-center justify-center transition-[padding] duration-200"
+        style={{ paddingBottom: 'var(--of-keyboard-inset, 0px)' }}
+      >
         <div
           data-state={state}
           className={cn(
@@ -196,7 +246,14 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
             // max-w-* overrides via className still win at every breakpoint.
             "relative z-10 w-full min-w-0 max-w-[min(28rem,calc(100vw-2rem))] flex flex-col",
             "mx-4 mb-4 md:mb-0",
-            "max-h-[90vh]",
+            // dvh, not vh: vh ignores a mobile browser's retracting URL bar, so
+            // 90vh already overflowed behind Safari's toolbar. The `100%-2rem`
+            // arm resolves against the keyboard-padded wrapper above and caps
+            // the panel to what's left of it, less the 1rem `mb-4` and a
+            // matching 1rem of breathing room at the top — header and footer
+            // stay pinned, ModalV2Content scrolls. min() picks 90dvh on any
+            // viewport over 320px tall, so desktop is untouched.
+            "max-h-[min(90dvh,100%-2rem)]",
             "bg-ods-bg md:bg-ods-card",
             "border border-ods-border rounded-md shadow-xl",
             "p-[var(--spacing-system-xl)] gap-[var(--spacing-system-l)]",
@@ -218,6 +275,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           </ModalContext.Provider>
         </div>
       </div>
+      </RemoveScroll>
     )
   }
 )

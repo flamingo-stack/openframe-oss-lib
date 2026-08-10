@@ -52,6 +52,8 @@ export interface ActionsMenuItem {
 	danger?: boolean;
 	/** Optional URL for navigation items */
 	href?: string;
+	/** Open the main-row `href` in a new tab (external app deep-links). */
+	openInNewTab?: boolean;
 	/**
 	 * Optional secondary action — a 40px-wide button on the right of the row
 	 * with a vertical divider. The main row keeps its primary click target;
@@ -257,6 +259,8 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 				<Link
 					href={item.href}
 					prefetch={false}
+					target={item.openInNewTab ? "_blank" : undefined}
+					rel={item.openInNewTab ? "noopener noreferrer" : undefined}
 					className={itemClasses}
 					onClick={handleLinkClick}
 					aria-disabled={item.disabled}
