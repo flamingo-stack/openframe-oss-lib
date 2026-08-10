@@ -105,6 +105,19 @@ class TagServiceTest {
     }
 
     @Test
+    void updateTagRejectsCaseRenameWhenLegacyDuplicateExistsAfterSelf() {
+        Tag legacyDup = Tag.builder().id("tag-2").key("NEWTAG").entityType(KNOWLEDGE_ARTICLE).build();
+        when(tagRepository.findById("tag-1")).thenReturn(Optional.of(newTag));
+        when(tagRepository.findByKeyAndEntityType("newtag", KNOWLEDGE_ARTICLE)).thenReturn(null);
+        when(tagRepository.findByEntityType(KNOWLEDGE_ARTICLE)).thenReturn(List.of(newTag, legacyDup));
+
+        assertThatThrownBy(() -> tagService.updateTag("tag-1", "newtag", null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("NEWTAG");
+        verify(tagRepository, never()).save(any());
+    }
+
+    @Test
     void updateTagAllowsChangingCaseOfOwnKey() {
         when(tagRepository.findById("tag-1")).thenReturn(Optional.of(newTag));
         when(tagRepository.findByKeyAndEntityType("NEWTAG", KNOWLEDGE_ARTICLE)).thenReturn(null);

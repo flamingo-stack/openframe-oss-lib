@@ -232,10 +232,13 @@ public class TagService {
                 .orElseThrow(() -> new IllegalArgumentException("Tag not found: " + tagId));
 
         if (key != null) {
-            Tag existing = findByKeyIgnoreCase(key, tag.getEntityType());
-            if (existing != null && !existing.getId().equals(tagId)) {
+            Tag conflict = findAllByKeyIgnoreCase(key, tag.getEntityType()).stream()
+                    .filter(t -> !t.getId().equals(tagId))
+                    .findFirst()
+                    .orElse(null);
+            if (conflict != null) {
                 throw new IllegalArgumentException(
-                        "Tag with key '" + existing.getKey() + "' already exists for " + tag.getEntityType());
+                        "Tag with key '" + conflict.getKey() + "' already exists for " + tag.getEntityType());
             }
             tag.setKey(key);
         }
@@ -251,17 +254,23 @@ public class TagService {
 
     /**
      * The tags unique index (tenantId+key+entityType) has no collation, so this lookup is the only
-     * guard against case-variant duplicates ("NEWTAG" vs "NewTag").
+     * guard against case-variant duplicates ("NEWTAG" vs "NewTag"). Prefers the exact-case match so
+     * legacy databases that already hold case-duplicates keep resolving deterministically.
      */
     private Tag findByKeyIgnoreCase(String key, TagEntityType entityType) {
         Tag exact = tagRepository.findByKeyAndEntityType(key, entityType);
         if (exact != null) {
             return exact;
         }
-        return tagRepository.findByEntityType(entityType).stream()
-                .filter(t -> t.getKey() != null && t.getKey().equalsIgnoreCase(key))
+        return findAllByKeyIgnoreCase(key, entityType).stream()
                 .findFirst()
                 .orElse(null);
+    }
+
+    private List<Tag> findAllByKeyIgnoreCase(String key, TagEntityType entityType) {
+        return tagRepository.findByEntityType(entityType).stream()
+                .filter(t -> t.getKey() != null && t.getKey().equalsIgnoreCase(key))
+                .toList();
     }
 
     @Transactional
