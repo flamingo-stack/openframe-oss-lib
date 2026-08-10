@@ -197,6 +197,7 @@ export interface ChatReducerEffect {
     | 'onEscalatedApproval'
     | 'onEscalatedApprovalResult'
     | 'onApprovalResolved'
+    | 'onEscalationOfferResolved'
     | 'onToolExecuted'
     | 'onAgentBusy'
     | 'onDialogClosed'
@@ -1041,6 +1042,33 @@ export function createChatStreamReducer(
         break
       }
 
+      // A clarification card arrives whole, not as deltas. The intro sentence
+      // riding the same chunk goes in FIRST as ordinary answer text so it runs
+      // through the markdown body pipeline (and coalesces with any preamble the
+      // turn already streamed); the card follows as its own segment. Both land
+      // in one emit, so the bubble never shows the card ahead of its lead-in.
+      case 'ask': {
+        if (event.text) accumulator.appendText(event.text)
+        const segments = accumulator.addAsk(event.question, event.options)
+        if (isInStream || !hasEverStreamed) {
+          emitSegments(segments)
+          applySegmentsToState(segments, withSeqMeta(undefined))
+          break
+        }
+        // Post-MESSAGE_END: the delta is spelled out rather than sliced off the
+        // accumulator. `appendText` COALESCES into a trailing text segment, so a
+        // slice would silently drop the intro whenever the continuation already
+        // had text in flight; `appendToTrailingAssistant` re-coalesces it here
+        // instead, exactly like a `text-delta`.
+        const delta: MessageSegment[] = [
+          ...(event.text ? [{ type: 'text' as const, text: event.text }] : []),
+          { type: 'ask' as const, question: event.question, options: event.options },
+        ]
+        emitSegments(delta, { append: true })
+        applySegmentsToState(delta, withSeqMeta({ append: true }))
+        break
+      }
+
       case 'tool-execution': {
         const segment: ToolExecutionSegment = { type: 'tool_execution', data: event.data }
         // A starting tool run means the agent's turn is in progress even
@@ -1245,6 +1273,55 @@ export function createChatStreamReducer(
         )
         mirrorApprovalStatus(requestId, status)
         emit('onApprovalResolved', requestId, status, approvalType, resolvedByName)
+        break
+      }
+
+      case 'escalation-offer': {
+        // MUST route through `applyAccumulated`. The block reaches a client
+        // in three shapes — inline in Fae's live turn (tool origin), or with
+        // NO preceding MESSAGE_START when the backend surfaces a deferred
+        // offer at turn end or honours the header button while idle. In the
+        // latter shapes a cumulative emit would replace the trailing bubble's
+        // segments with the lone card, wiping the reply the user is reading.
+        const status = (approvalStatuses[event.offerId] || 'pending') as ChatApprovalStatus
+        const before = accumulator.getSegments().length
+        const segments = accumulator.addEscalationOffer(
+          event.offerId,
+          event.text,
+          event.origin,
+          status,
+        )
+        applyAccumulated(before, segments)
+        break
+      }
+
+      case 'escalation-offer-resolved': {
+        const { offerId, status, resolvedByName: offerResolvedBy } = event
+        // Approving hands the ticket to a human; Fae goes silent rather than
+        // resuming, so — unlike an approved command — there is no work to
+        // signal and the busy lock stays untouched.
+        accumulator.updateApprovalStatus(offerId, status, offerResolvedBy)
+        setMessagesInternal(
+          projectApprovalResolutionToMessages(messages, offerId, status, offerResolvedBy),
+        )
+        mirrorApprovalStatus(offerId, status)
+        emit('onEscalationOfferResolved', offerId, status, offerResolvedBy)
+        break
+      }
+
+      case 'ticket-escalated': {
+        // Same `applyAccumulated` routing as the offer, and for the same
+        // reason: the inactivity auto-escalation fires from a scheduler with
+        // no turn open at all, so this block routinely arrives with no
+        // preceding MESSAGE_START.
+        const before = accumulator.getSegments().length
+        const segments = accumulator.addTicketEscalated({
+          ticketId: event.ticketId,
+          ticketNumber: event.ticketNumber,
+          reason: event.reason,
+          text: event.text,
+        })
+        applyAccumulated(before, segments)
         break
       }
 

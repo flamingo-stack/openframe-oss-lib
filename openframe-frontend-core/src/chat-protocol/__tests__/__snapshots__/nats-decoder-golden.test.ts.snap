@@ -112,6 +112,36 @@ exports[`decodeNatsChunk — golden corpus > maps the full recorded corpus to no
     "status": "rejected",
     "type": "approval-resolved",
   },
+  "ask": {
+    "options": [
+      {
+        "description": "How scripting works and how to set it up",
+        "label": "Find documentation",
+      },
+      {
+        "description": "List, edit or run the scripts in your workspace",
+        "label": "Your scripts",
+      },
+    ],
+    "question": "What do you want to work on?",
+    "text": "Do you want the OpenFrame docs on scripts, or the scripts in your own workspace?",
+    "type": "ask",
+  },
+  "ask_blank_question": null,
+  "ask_missing_question": null,
+  "ask_no_options": null,
+  "ask_options_not_array": null,
+  "ask_unusable_option_rows": null,
+  "ask_without_intro": {
+    "options": [
+      {
+        "description": undefined,
+        "label": "Docs",
+      },
+    ],
+    "question": "Which one?",
+    "type": "ask",
+  },
   "context_compaction_end": {
     "phase": "end",
     "summary": "Compacted 34 messages",
@@ -149,6 +179,26 @@ exports[`decodeNatsChunk — golden corpus > maps the full recorded corpus to no
     "title": "Agent crashed",
     "type": "error",
   },
+  "escalation_offer_approved": {
+    "offerId": "offer-1",
+    "resolvedByName": "John Smith",
+    "status": "approved",
+    "type": "escalation-offer-resolved",
+  },
+  "escalation_offer_missing_id": null,
+  "escalation_offer_pending": {
+    "offerId": "offer-1",
+    "origin": "MANUAL",
+    "text": "This ticket can be handed off to a technician.",
+    "type": "escalation-offer",
+  },
+  "escalation_offer_superseded": {
+    "offerId": "offer-1",
+    "resolvedByName": "John Smith",
+    "status": "cancelled",
+    "type": "escalation-offer-resolved",
+  },
+  "escalation_offer_unknown_state": null,
   "executed_tool": {
     "data": {
       "integratedToolType": "TACTICAL_RMM",
@@ -277,6 +327,15 @@ exports[`decodeNatsChunk — golden corpus > maps the full recorded corpus to no
     "type": "thinking-delta",
   },
   "thinking_missing_text": null,
+  "ticket_escalated": {
+    "reason": "INACTIVITY",
+    "text": "Automatically escalated to a human technician.",
+    "ticketId": "ticket-1",
+    "ticketNumber": 1002,
+    "type": "ticket-escalated",
+  },
+  "ticket_escalated_missing_reason": null,
+  "ticket_escalated_missing_ticket_id": null,
   "token_usage": {
     "contextSize": 180000,
     "inputTokensSize": 1200,

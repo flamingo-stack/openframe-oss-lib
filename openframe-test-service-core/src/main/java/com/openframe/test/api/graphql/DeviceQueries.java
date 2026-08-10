@@ -112,6 +112,11 @@ public class DeviceQueries {
                             lastSeen
                             registeredAt
                             updatedAt
+                            tags {
+                                id
+                                key
+                                values
+                            }
                         }
                     }
                     filteredCount

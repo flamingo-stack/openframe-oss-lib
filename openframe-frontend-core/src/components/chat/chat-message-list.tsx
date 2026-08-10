@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useCallback, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from "react"
+import { useRef, useState, useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, forwardRef } from "react"
 import { useStickToBottom } from "use-stick-to-bottom"
 import { cn } from "../../utils/cn"
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
@@ -129,6 +129,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       resolveContextIcon,
       renderContextItem,
       renderMention,
+      onAskSelect,
       NavLinkAnchor,
       ...props
     },
@@ -147,6 +148,21 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         resize: 'smooth',
         initial: false,
       })
+
+    // ---- Ask cards go stale once answered ------------------------------
+    // A clarification card asks about the turn it belongs to. The moment the
+    // user says ANYTHING after it — clicking an option, or typing their own
+    // reply in the composer — the question is answered and the card is
+    // history: clicking it again would send a stale label into a conversation
+    // that already moved on. So the handler reaches only messages that no user
+    // message follows, which also locks every card in replayed history for
+    // free (each one is followed by the reply it produced).
+    const lastUserMessageIndex = useMemo(() => {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'user') return i
+      }
+      return -1
+    }, [messages])
 
     // ---- Overlay guard: don't move the ground under an open menu -------
     // A ⋯ menu inside a bubble stays anchored to its trigger. While a reply
@@ -881,7 +897,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     const lastSegment = lastSegments?.[lastSegments.length - 1]
     const isPausedOnApproval =
       !!lastSegment &&
-      (lastSegment.type === 'approval_request' || lastSegment.type === 'approval_batch') &&
+      (lastSegment.type === 'approval_request' ||
+        lastSegment.type === 'approval_batch' ||
+        lastSegment.type === 'escalation_offer') &&
       (lastSegment.status === undefined || lastSegment.status === 'pending')
     const showStreamingLoader =
       isTyping &&
@@ -984,6 +1002,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     renderContextItem={renderContextItem}
                     renderMention={renderMention}
                     renderEntityCard={renderEntityCard}
+                    onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}
                     NavLinkAnchor={NavLinkAnchor}
                   />
                 )

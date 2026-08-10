@@ -77,7 +77,7 @@ function ApprovalCardBody({
 const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessageProps>(
   // `assistantType` is accepted for prop-parity with the batch card (so hosts
   // can forward it uniformly); the viewer variant is driven by `variant`.
-  ({ className, data, onApprove, onReject, status = 'pending', assistantType: _assistantType, variant = 'admin', resolvedByName, ...props }, ref) => {
+  ({ className, data, onApprove, onReject, status = 'pending', assistantType: _assistantType, variant = 'admin', resolvedByName, showFooterActions = true, ...props }, ref) => {
     const [isProcessing, setIsProcessing] = useState(false)
 
     const handleApprove = async () => {
@@ -114,13 +114,13 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
           <p className="text-h4 text-ods-text-primary whitespace-pre-line break-words w-full">
             {data.explanation?.trim() || "Approval required"}
           </p>
-          {status === 'pending' ? (
+          {!showFooterActions ? null : status === 'pending' ? (
             <div className="flex gap-[var(--spacing-system-mf)] items-center w-full">
               <Button
                 size="small-legacy"
                 variant="accent"
                 onClick={handleApprove}
-                disabled={isProcessing}
+                disabled={isProcessing || !onApprove}
                 className={cn(
                   "bg-ods-accent hover:bg-ods-accent/90",
                   "text-h5 text-ods-bg",
@@ -133,7 +133,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
                 size="small-legacy"
                 variant="outline"
                 onClick={handleReject}
-                disabled={isProcessing}
+                disabled={isProcessing || !onReject}
                 className={cn(
                   "bg-ods-card border-ods-border",
                   "text-h5 text-ods-text-primary",
@@ -162,13 +162,13 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
         {...props}
       >
         <ApprovalCardBody data={data} />
-        {status === 'pending' ? (
+        {!showFooterActions ? null : status === 'pending' ? (
           <div className="flex gap-[var(--spacing-system-mf)] items-center">
             <Button
               size="small-legacy"
               variant="accent"
               onClick={handleApprove}
-              disabled={isProcessing}
+              disabled={isProcessing || !onApprove}
               className={cn(
                 "bg-ods-accent hover:bg-ods-accent/90",
                 "text-h5 text-ods-bg",
@@ -181,7 +181,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
               size="small-legacy"
               variant="outline"
               onClick={handleReject}
-              disabled={isProcessing}
+              disabled={isProcessing || !onReject}
               className={cn(
                 "bg-ods-card border-ods-border",
                 "text-h5 text-ods-text-primary",

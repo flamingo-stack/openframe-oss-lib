@@ -231,12 +231,29 @@ const TabBar = memo(function TabBar({
     return { background: c }
   }, [leftFade, rightFade])
 
-  // A 1px bar scaled to width, rather than an animated `left`/`width` pair:
-  // transform and opacity are the only two properties the compositor can
-  // animate without laying the strip out again on every frame.
+  // Real width, moved by `translateX`. This used to be a 1px bar stretched with
+  // `scaleX(width)` — transform and opacity being the only properties the
+  // compositor can animate without laying out again — but scaling from a ONE
+  // PIXEL base turns that pixel into an error multiplier.
+  //
+  // A CSS pixel only lands on a whole device pixel at integer scale factors. At
+  // 125% / 150% OS scaling, a scaled Mac resolution, or any browser zoom, the
+  // base is rasterized at the nearest whole device pixel — call it 0.8 or 1.33
+  // CSS px — and `scaleX(150)` multiplies that rounding by 150. The underline
+  // then renders a fifth short or a third long, per tab, with `measureIndicator`
+  // having been perfectly correct all along. It shows up from the SECOND tab
+  // change on, because that is when the transition promotes the bar into its own
+  // composited layer, where it is rasterized in its own 1×4 coordinate space and
+  // only then stretched.
+  //
+  // Animating `width` costs a layout per frame for this one element — it is
+  // `absolute`, so nothing else in the strip is laid out with it, and 200ms of
+  // that for a 4px-tall bar is not measurable. Correctness at every zoom level
+  // is worth more than keeping one property on the compositor.
   const isPlaced = indicator.width > 0
   const indicatorStyle: React.CSSProperties = {
-    transform: `translateX(${indicator.left}px) scaleX(${indicator.width})`,
+    width: `${indicator.width}px`,
+    transform: `translateX(${indicator.left}px)`,
     opacity: isPlaced ? 1 : 0,
   }
   const shouldAnimateIndicator = hasPlacedIndicatorRef.current
@@ -302,13 +319,13 @@ const TabBar = memo(function TabBar({
         })}
 
         {/* One underline for the whole strip, sliding between tabs. Inside the
-            scroll container so it travels with the content; `origin-left` +
-            `w-px` make scaleX(n) read as "n pixels wide". */}
+            scroll container so it travels with the content. Width comes from the
+            style below in real pixels — see why it is not a scaled 1px bar. */}
         <div
           aria-hidden
           className={cn(
-            "pointer-events-none absolute bottom-0 left-0 h-1 w-px origin-left bg-ods-accent",
-            shouldAnimateIndicator && "transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none"
+            "pointer-events-none absolute bottom-0 left-0 h-1 bg-ods-accent",
+            shouldAnimateIndicator && "transition-[transform,width,opacity] duration-200 ease-out motion-reduce:transition-none"
           )}
           style={indicatorStyle}
         />
