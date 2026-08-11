@@ -82,6 +82,7 @@ import {
   type UseUnifiedChatModes,
 } from './hooks/use-unified-chat'
 import type { UnifiedChatState } from './types/unified-chat-state.types'
+import type { MessageSegment } from './types/message.types'
 import type {
   UseNatsChatAdapterConfig,
   FetchDialogsParams,
@@ -208,6 +209,19 @@ export interface EmbeddableChatProps {
    * `modes.mingo` (Guide-mode wiring via `modes.guide` is unaffected).
    */
   mingoState?: UnifiedChatState
+
+  /**
+   * Approval cards to pin as the sticky footer under the thread.
+   *
+   * Hosts that lift PENDING approvals out of the message list (mingo does:
+   * a pending card is filtered out of its bubble so an interrupted retry cannot
+   * render the same request twice) must hand them back here — otherwise the
+   * card exists in the reducer, is stripped on the way to the view, and is
+   * displayed nowhere at all. `ChatMessageList` renders them with the same
+   * component the inline path uses, so the approve/reject handlers stamped on
+   * the segments keep working.
+   */
+  pendingApprovals?: MessageSegment[]
 
   /**
    * Dialog-management capabilities for injected Mingo mode (`mingoState`).
@@ -909,6 +923,7 @@ function EmbeddableChatInner({
   tableIdForDocumentType,
   modes,
   mingoState,
+  pendingApprovals,
   mingoDialogCapabilities,
   activeMode: controlledActiveMode,
   onActiveModeChange,
@@ -2350,6 +2365,9 @@ function EmbeddableChatInner({
                     <ChatMessageList
                       messages={messages}
                       isTyping={chatLoading}
+                      // Sticky footer for approvals the host lifted out of the
+                      // thread — see the prop's docblock.
+                      pendingApprovals={pendingApprovals}
                       // Real drawer: the library's smart follow. Passive in-page
                       // demo (previewMode): deterministic hard pin instead — a
                       // scripted assistant-only stream from a cold mount never
