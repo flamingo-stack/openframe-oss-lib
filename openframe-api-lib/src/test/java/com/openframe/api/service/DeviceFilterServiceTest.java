@@ -7,15 +7,19 @@ import com.openframe.data.pinot.repository.PinotDeviceRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.openframe.data.document.rmm.OsType.MAC_OS;
+import static com.openframe.data.document.rmm.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -121,5 +125,33 @@ class DeviceFilterServiceTest {
 
         verify(pinotDeviceRepository).getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any());
         verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void nullOsTypesCriteria_doesNotNpe_passesEmptyOsTypesToPinot() {
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> osTypes = ArgumentCaptor.forClass(List.class);
+        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(0);
+
+        service().getDeviceFilters(DeviceFilterCriteria.builder().build(),
+                Set.of(DeviceFilterFacet.FILTERED_COUNT)).join();
+
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), osTypes.capture(), any(), any(), any());
+        assertThat(osTypes.getValue()).isEmpty();
+    }
+
+    @Test
+    void osTypesCriteria_mappedToEnumNamesForPinot() {
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> osTypes = ArgumentCaptor.forClass(List.class);
+        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(0);
+
+        service().getDeviceFilters(DeviceFilterCriteria.builder().osTypes(List.of(MAC_OS, WINDOWS)).build(),
+                Set.of(DeviceFilterFacet.FILTERED_COUNT)).join();
+
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), osTypes.capture(), any(), any(), any());
+        assertThat(osTypes.getValue()).containsExactly("MAC_OS", "WINDOWS");
     }
 }
