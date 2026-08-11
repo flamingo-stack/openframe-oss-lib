@@ -8,6 +8,7 @@ import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.repository.device.MachineFirstOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
@@ -26,6 +27,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import static com.openframe.data.document.rmm.OsType.MAC_OS;
+import static com.openframe.data.document.rmm.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,6 +47,7 @@ class DeviceServiceTest {
     private static final String TENANT_ID = "tenant-1";
 
     @Mock private MachineRepository machineRepository;
+    @Mock private MachineFirstOnlineDispatchRepository machineFirstOnlineDispatchRepository;
     @Mock private MachineWriter machineWriter;
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
@@ -54,7 +58,8 @@ class DeviceServiceTest {
     private TenantIdProvider tenantIdProvider;
 
     private DeviceService service() {
-        DeviceService s = new DeviceService(machineRepository, machineWriter, tagRepository, tagAssignmentRepository,
+        DeviceService s = new DeviceService(machineRepository, machineFirstOnlineDispatchRepository, machineWriter,
+                tagRepository, tagAssignmentRepository,
                 deviceStatusProcessor, scriptScheduleDeviceService, deviceFilterOptionMapper, tenantIdProvider);
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         lenient().when(machineRepository.countMachines(any(), any(MachineQueryFilter.class), any())).thenReturn(0L);
@@ -100,36 +105,77 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("queryDevicesForPlatforms: passes platform names on the filter — repo expands to osType $in")
+    @DisplayName("queryDevicesForPlatforms: the platform scope lands on the filter's osTypes — repo expands to osType $in")
     void scopesToPlatforms() {
-        service().queryDevicesForPlatforms(List.of("MAC_OS"), null,
+        service().queryDevicesForPlatforms(List.of(MAC_OS), null,
                 CursorPaginationCriteria.builder().limit(10).build(), null, null);
 
-        assertThat(capturedFilter().getPlatformNames()).containsExactly("MAC_OS");
+        assertThat(capturedFilter().getOsTypes()).containsExactly(MAC_OS);
     }
 
     @Test
-    @DisplayName("queryDevicesForPlatforms: empty platform list → no platformNames on the filter")
+    @DisplayName("queryDevicesForPlatforms: empty platform scope → no osTypes constraint on the filter")
     void noPlatforms_noConstraint() {
         service().queryDevicesForPlatforms(List.of(), null,
                 CursorPaginationCriteria.builder().limit(10).build(), null, null);
 
-        assertThat(capturedFilter().getPlatformNames()).isNullOrEmpty();
+        assertThat(capturedFilter().getOsTypes()).isNullOrEmpty();
     }
 
     @Test
-    @DisplayName("findDeviceIdsForPlatforms: delegates to repo.findMachineIds with a filter carrying platformNames")
+    @DisplayName("queryDevicesForPlatforms: an explicit osType filter narrows within the scope (filter wins, single osTypes constraint)")
+    void filterOsTypesNarrowScope() {
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
+                .osTypes(List.of(WINDOWS)).build();
+
+        service().queryDevicesForPlatforms(List.of(WINDOWS, MAC_OS), filter,
+                CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        assertThat(capturedFilter().getOsTypes()).containsExactly(WINDOWS);
+    }
+
+    @Test
+    @DisplayName("queryDevices: the user's osType filter alone reaches the repo (no schedule scope)")
+    void queryDevices_filterOsTypesOnly() {
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder().osTypes(List.of(MAC_OS)).build();
+
+        service().queryDevices(filter, CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        assertThat(capturedFilter().getOsTypes()).containsExactly(MAC_OS);
+    }
+
+    @Test
+    @DisplayName("queryDevices: no filter and no scope → no osTypes constraint")
+    void queryDevices_noFilterNoScope_noOsTypes() {
+        service().queryDevices(null, CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        assertThat(capturedFilter().getOsTypes()).isNullOrEmpty();
+    }
+
+    @Test
+    @DisplayName("queryDevicesForPlatforms: an empty osType filter is unconstrained → falls back to the schedule scope")
+    void emptyFilterOsTypes_fallsBackToScope() {
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder().osTypes(List.of()).build();
+
+        service().queryDevicesForPlatforms(List.of(MAC_OS), filter,
+                CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        assertThat(capturedFilter().getOsTypes()).containsExactly(MAC_OS);
+    }
+
+    @Test
+    @DisplayName("findDeviceIdsForPlatforms: delegates to repo.findMachineIds with a filter carrying the osTypes scope")
     void findDeviceIdsForPlatforms_returnsIds() {
         DeviceService s = service();
         when(machineRepository.findMachineIds(any(), any(MachineQueryFilter.class), any()))
                 .thenReturn(List.of("m1", "m2"));
 
-        List<String> ids = s.findDeviceIdsForPlatforms(List.of("MAC_OS"), null, null);
+        List<String> ids = s.findDeviceIdsForPlatforms(List.of(MAC_OS), null, null);
 
         assertThat(ids).containsExactly("m1", "m2");
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         verify(machineRepository).findMachineIds(any(), captor.capture(), any());
-        assertThat(captor.getValue().getPlatformNames()).containsExactly("MAC_OS");
+        assertThat(captor.getValue().getOsTypes()).containsExactly(MAC_OS);
     }
 
     @Test
@@ -138,7 +184,7 @@ class DeviceServiceTest {
         DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
                 .statuses(List.of(DeviceStatus.DELETED)).build();
 
-        service().findDeviceIdsForPlatforms(List.of("MAC_OS"), filter, null);
+        service().findDeviceIdsForPlatforms(List.of(MAC_OS), filter, null);
 
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         verify(machineRepository).findMachineIds(any(), captor.capture(), any());
@@ -195,6 +241,7 @@ class DeviceServiceTest {
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
         verify(scriptScheduleDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
+        verify(machineFirstOnlineDispatchRepository).deleteByTenantIdAndMachineId("t-1", "m-del");
     }
 
     @Test
@@ -230,6 +277,7 @@ class DeviceServiceTest {
         service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
         verify(scriptScheduleDeviceService, never()).removeDeviceFromAllSchedules(any(), any());
+        verify(machineFirstOnlineDispatchRepository, never()).deleteByTenantIdAndMachineId(any(), any());
     }
 
 

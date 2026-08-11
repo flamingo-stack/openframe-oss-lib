@@ -21,8 +21,8 @@ import java.time.Instant;
         def = "{'tenantId': 1, 'machineId': 1}",
         unique = true)
 @CompoundIndex(
-        name = "dispatchedAt_pending",
-        def = "{'dispatchedAt': 1}")
+        name = "pending_by_first_seen",
+        def = "{'dispatchedAt': 1, 'firstSeenAt': 1}")
 public class MachineFirstOnlineDispatch implements TenantScoped {
 
     @Id

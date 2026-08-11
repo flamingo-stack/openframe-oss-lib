@@ -23,6 +23,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -71,7 +73,7 @@ class DeviceOnlineDispatchServiceTest {
     void firesActiveDeviceOnlineOnly() {
         MachineFirstOnlineDispatch row = pendingRow();
         ScriptSchedule s = schedule("s1");
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
+        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(row));
         stubTenantReads(TENANT, List.of(onlineMachine()), List.of(assignment(MACHINE, "s1")), List.of(s));
 
         service.processPending();
@@ -86,7 +88,7 @@ class DeviceOnlineDispatchServiceTest {
         MachineFirstOnlineDispatch row = pendingRow();
         Machine offline = onlineMachine();
         offline.setStatus(DeviceStatus.OFFLINE);
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
+        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(row));
         stubTenantReads(TENANT, List.of(offline), List.of(), List.of());
 
         service.processPending();
@@ -99,7 +101,7 @@ class DeviceOnlineDispatchServiceTest {
     @DisplayName("machine missing → skipped, row stays pending")
     void missingMachine_leavesRowPending() {
         MachineFirstOnlineDispatch row = pendingRow();
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
+        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(row));
         stubTenantReads(TENANT, List.of(), List.of(), List.of());
 
         service.processPending();
@@ -112,7 +114,7 @@ class DeviceOnlineDispatchServiceTest {
     @DisplayName("no schedules due → row STILL bulk-marked (drains pending set)")
     void noSchedulesDue_stillMarksDispatched() {
         MachineFirstOnlineDispatch row = pendingRow();
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
+        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(row));
         stubTenantReads(TENANT, List.of(onlineMachine()), List.of(), List.of());
 
         service.processPending();
@@ -126,7 +128,7 @@ class DeviceOnlineDispatchServiceTest {
     void criteriaScheduleFiresWithoutAssignment() {
         MachineFirstOnlineDispatch row = pendingRow();
         ScriptSchedule criteria = criteriaSchedule("c1");
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(row));
+        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(row));
         stubTenantReads(TENANT, List.of(onlineMachine()), List.of(), List.of(criteria));
         when(targetResolver.matchesCriteria(eq(criteria), any(Machine.class))).thenReturn(true);
 
@@ -142,7 +144,7 @@ class DeviceOnlineDispatchServiceTest {
         MachineFirstOnlineDispatch bad = row("row-bad", "m-bad");
         MachineFirstOnlineDispatch ok = row("row-ok", "m-ok");
         ScriptSchedule s = schedule("s1");
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(bad, ok));
+        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(bad, ok));
         stubTenantReads(TENANT,
                 List.of(onlineMachine("m-bad"), onlineMachine("m-ok")),
                 List.of(assignment("m-bad", "s1"), assignment("m-ok", "s1")),
@@ -161,7 +163,7 @@ class DeviceOnlineDispatchServiceTest {
     @Test
     @DisplayName("empty pending set → no work")
     void nothingPending_noWork() {
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of());
+        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of());
 
         service.processPending();
 
@@ -170,16 +172,20 @@ class DeviceOnlineDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("batch cap: pending > batchSize → over-cap rows NOT read this tick")
-    void batchSizeCapsPerTick() {
+    @DisplayName("batch cap: the pending query is bounded at the DB by batchSize, ordered oldest-first")
+    void batchSizeCapsPerTick_boundedAtDb() {
         ReflectionTestUtils.setField(service, "batchSize", 2);
         MachineFirstOnlineDispatch a = row("row-a", "m-a");
         MachineFirstOnlineDispatch b = row("row-b", "m-b");
-        MachineFirstOnlineDispatch c = row("row-c", "m-c");
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(a, b, c));
+        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(a, b));
         stubTenantReads(TENANT, List.of(), List.of(), List.of());
 
         service.processPending();
+
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(dispatchRepository).findByDispatchedAtIsNull(pageable.capture());
+        assertThat(pageable.getValue().getPageSize()).isEqualTo(2);
+        assertThat(pageable.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.ASC, "firstSeenAt"));
 
         ArgumentCaptor<Collection<String>> machineIds = ArgumentCaptor.forClass(Collection.class);
         verify(machineRepository).findByTenantIdAndMachineIdIn(eq(TENANT), machineIds.capture());
@@ -192,7 +198,7 @@ class DeviceOnlineDispatchServiceTest {
         MachineFirstOnlineDispatch a = row("row-a", "m-a");
         MachineFirstOnlineDispatch b = row("row-b", "m-b");
         MachineFirstOnlineDispatch c = row("row-c", "m-c");
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(a, b, c));
+        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(a, b, c));
         stubTenantReads(TENANT,
                 List.of(onlineMachine("m-a"), onlineMachine("m-b"), onlineMachine("m-c")),
                 List.of(), List.of());
@@ -213,7 +219,7 @@ class DeviceOnlineDispatchServiceTest {
     void multiTenantIsolation() {
         MachineFirstOnlineDispatch a = row("row-a", "m-a", TENANT);
         MachineFirstOnlineDispatch b = row("row-b", "m-b", OTHER_TENANT);
-        when(dispatchRepository.findByDispatchedAtIsNull()).thenReturn(List.of(a, b));
+        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(a, b));
         stubTenantReads(TENANT, List.of(onlineMachine("m-a", TENANT)), List.of(), List.of());
         stubTenantReads(OTHER_TENANT, List.of(onlineMachine("m-b", OTHER_TENANT)), List.of(), List.of());
 
