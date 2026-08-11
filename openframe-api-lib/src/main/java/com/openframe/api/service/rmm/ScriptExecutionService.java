@@ -9,6 +9,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptExecutionMapper;
+import com.openframe.data.document.rmm.ExecutionSource;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
@@ -66,13 +67,14 @@ public class ScriptExecutionService {
                                           String machineId,
                                           PrivilegeLevel privilegeLevel,
                                           Integer timeoutSeconds,
-                                          String initiatedBy) {
+                                          String initiatedBy,
+                                          ExecutionSource source) {
         Instant now = Instant.now();
         // Single ad-hoc run (runScript) never originates from a schedule → scheduleId null.
-        ScriptExecution scriptExecution = buildRunningRow(executionId, scriptId, null, machineId, privilegeLevel, timeoutSeconds, initiatedBy, now);
+        ScriptExecution scriptExecution = buildRunningRow(executionId, scriptId, null, machineId, privilegeLevel, timeoutSeconds, initiatedBy, source, now);
         ScriptExecution saved = scriptExecutionRepository.save(scriptExecution);
-        log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} status=RUNNING",
-                executionId, scriptId, machineId, initiatedBy);
+        log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} source={} status=RUNNING",
+                executionId, scriptId, machineId, initiatedBy, source);
         return scriptExecutionMapper.toResponse(saved);
     }
 
@@ -90,14 +92,15 @@ public class ScriptExecutionService {
                                                      List<String> machineIds,
                                                      PrivilegeLevel privilegeLevel,
                                                      Integer timeoutSeconds,
-                                                     String initiatedBy) {
+                                                     String initiatedBy,
+                                                     ExecutionSource source) {
         Instant now = Instant.now();
         List<ScriptExecution> rows = machineIds.stream()
-                .map(machineId -> buildRunningRow(executionId, scriptId, scheduleId, machineId, privilegeLevel, timeoutSeconds, initiatedBy, now))
+                .map(machineId -> buildRunningRow(executionId, scriptId, scheduleId, machineId, privilegeLevel, timeoutSeconds, initiatedBy, source, now))
                 .toList();
         List<ScriptExecution> saved = scriptExecutionRepository.saveAll(rows);
-        log.info("Persisted batch execution rows: executionId={} scriptId={} scheduleId={} machineCount={} initiatedBy={} status=RUNNING",
-                executionId, scriptId, scheduleId, machineIds.size(), initiatedBy);
+        log.info("Persisted batch execution rows: executionId={} scriptId={} scheduleId={} machineCount={} initiatedBy={} source={} status=RUNNING",
+                executionId, scriptId, scheduleId, machineIds.size(), initiatedBy, source);
         return saved.stream().map(scriptExecutionMapper::toResponse).toList();
     }
 
@@ -120,6 +123,7 @@ public class ScriptExecutionService {
                                             PrivilegeLevel privilegeLevel,
                                             Integer timeoutSeconds,
                                             String initiatedBy,
+                                            ExecutionSource source,
                                             Instant now) {
         return ScriptExecution.builder()
                 .tenantId(tenantIdProvider.getTenantId())
@@ -130,6 +134,7 @@ public class ScriptExecutionService {
                 .privilegeLevel(privilegeLevel)
                 .timeoutSeconds(timeoutSeconds)
                 .initiatedBy(initiatedBy)
+                .source(source)
                 .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(now)
                 .statusChangedAt(now)

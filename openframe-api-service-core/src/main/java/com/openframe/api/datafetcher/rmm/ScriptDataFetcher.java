@@ -34,6 +34,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLScriptMapper;
 import com.openframe.api.service.rmm.ScriptDispatchService;
+import com.openframe.data.document.rmm.ExecutionSource;
 import com.openframe.api.service.rmm.ScriptFilterService;
 import com.openframe.api.service.rmm.ScriptService;
 import jakarta.validation.Valid;
@@ -136,13 +137,13 @@ public class ScriptDataFetcher {
     @DgsMutation
     public DispatchResponse runScript(@InputArgument @Valid RunScriptInput input) {
         input.setScriptId(decodeId(input.getScriptId()));
-        return scriptDispatchService.runScript(input, getCurrentUserId());
+        return scriptDispatchService.runScript(input, getCurrentUserId(), ExecutionSource.MANUAL);
     }
 
     @DgsMutation
     public DispatchResponse batchRunScript(@InputArgument @Valid BatchRunScriptInput input) {
         input.setScriptId(decodeId(input.getScriptId()));
-        return scriptDispatchService.batchRunScript(input, getCurrentUserId());
+        return scriptDispatchService.batchRunScript(input, getCurrentUserId(), ExecutionSource.MANUAL);
     }
 
     /** Returns the Relay global id (Base64 "Script:&lt;rawId&gt;") for the {@code id} field. */
