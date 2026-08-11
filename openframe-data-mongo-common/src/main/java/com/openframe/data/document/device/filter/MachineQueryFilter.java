@@ -1,5 +1,6 @@
 package com.openframe.data.document.device.filter;
 
+import com.openframe.data.document.rmm.OsType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,8 +16,7 @@ import java.util.List;
 public class MachineQueryFilter {
     private List<String> statuses;
     private List<String> deviceTypes;
-    private List<String> osTypes;
+    private List<OsType> osTypes;
     private List<String> organizationIds;
-    private List<String> platformNames;
     private Collection<String> restrictToMachineIds;
 }

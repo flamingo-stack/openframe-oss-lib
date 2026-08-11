@@ -11,6 +11,7 @@ import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.external.dto.device.DeviceFilterResponse;
 import com.openframe.external.dto.device.DeviceResponse;
@@ -81,7 +82,7 @@ public class DeviceController {
             @RequestParam(required = false) List<DeviceType> deviceTypes,
 
             @Parameter(description = "Operating system types to filter by")
-            @RequestParam(required = false) List<String> osTypes,
+            @RequestParam(required = false) List<OsType> osTypes,
 
             @Parameter(description = "Organization IDs to filter by")
             @RequestParam(required = false) List<String> organizationIds,
@@ -199,7 +200,7 @@ public class DeviceController {
             @RequestParam(required = false) List<DeviceType> deviceTypes,
 
             @Parameter(description = "Operating system types to filter by")
-            @RequestParam(required = false) List<String> osTypes,
+            @RequestParam(required = false) List<OsType> osTypes,
 
             @Parameter(description = "Organization IDs to filter by")
             @RequestParam(required = false) List<String> organizationIds,
