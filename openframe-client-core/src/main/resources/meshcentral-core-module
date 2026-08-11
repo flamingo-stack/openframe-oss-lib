@@ -742,6 +742,13 @@ function addOpenFrameHeaders(options) {
 
     if (!options.headers) options.headers = {};
 
+    // Native http adds Host only when no headers object exists; we made one, so set it.
+    if (options.host && !options.headers['Host']) {
+        var ofIsTLS = (options.protocol == 'wss:' || options.protocol == 'https:');
+        var ofPort = '' + options.port;
+        options.headers['Host'] = ((ofPort == '443' && ofIsTLS) || (ofPort == '80' && !ofIsTLS)) ? options.host : (options.host + ':' + options.port);
+    }
+
     // Add x-machine-id header
     var machineId = getOpenFrameMachineId();
     if (machineId) {
