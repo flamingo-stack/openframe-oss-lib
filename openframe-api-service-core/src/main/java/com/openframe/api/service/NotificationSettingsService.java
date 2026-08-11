@@ -4,8 +4,11 @@ import com.openframe.api.dto.NotificationSettingsView;
 import com.openframe.api.dto.NotificationTypeSetting;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.notification.NotificationSettingGroup;
+import com.openframe.data.document.notification.NotificationContentPolicy;
 import com.openframe.data.document.notification.NotificationSettings;
+import com.openframe.data.repository.notification.NotificationContentPolicyRepository;
 import com.openframe.data.repository.notification.NotificationSettingsRepository;
+import com.openframe.data.service.notification.NotificationContentRedactor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,11 +25,13 @@ import static com.openframe.data.document.notification.NotificationSettingsPolic
 public class NotificationSettingsService {
 
     private final NotificationSettingsRepository settingsRepository;
+    private final NotificationContentPolicyRepository contentPolicyRepository;
+    private final NotificationContentRedactor contentRedactor;
 
     public NotificationSettingsView get(String userId) {
         NotificationSettings settings = settingsRepository.findByUserId(userId)
                 .orElseGet(NotificationSettingsService::defaults);
-        return toView(settings);
+        return toView(settings, contentSuppressed());
     }
 
     public NotificationSettingsView update(String userId, boolean enabled,
@@ -34,6 +39,21 @@ public class NotificationSettingsService {
         Set<NotificationSettingGroup> mutedGroups = toMutedGroups(typeSettings);
         settingsRepository.saveSettings(userId, enabled, mutedGroups);
         return get(userId);
+    }
+
+    public NotificationSettingsView updateContentSuppression(String userId, Boolean suppressed) {
+        if (suppressed == null) {
+            throw new BadRequestException("suppressed is required");
+        }
+        contentPolicyRepository.setContentSuppressed(suppressed);
+        contentRedactor.invalidate();
+        return get(userId);
+    }
+
+    private boolean contentSuppressed() {
+        return contentPolicyRepository.find()
+                .map(NotificationContentPolicy::isContentSuppressed)
+                .orElse(false);
     }
 
     /** Null means "not sent" — a legacy master-only write keeps the stored muted set. */
@@ -54,14 +74,14 @@ public class NotificationSettingsService {
         return muted;
     }
 
-    private static NotificationSettingsView toView(NotificationSettings settings) {
+    private static NotificationSettingsView toView(NotificationSettings settings, boolean contentSuppressed) {
         boolean master = isMasterEnabled(settings);
         List<NotificationTypeSetting> groups = new ArrayList<>();
         for (NotificationSettingGroup group : NotificationSettingGroup.values()) {
             boolean groupEnabled = isGroupEnabled(settings, group);
             groups.add(new NotificationTypeSetting(group, groupEnabled));
         }
-        return new NotificationSettingsView(master, groups);
+        return new NotificationSettingsView(master, groups, contentSuppressed);
     }
 
     private static NotificationSettings defaults() {

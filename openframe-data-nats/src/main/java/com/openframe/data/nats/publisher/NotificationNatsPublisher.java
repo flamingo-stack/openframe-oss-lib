@@ -5,6 +5,7 @@ import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.nats.model.NotificationEventType;
 import com.openframe.data.nats.model.NotificationMessage;
+import com.openframe.data.service.notification.NotificationContentRedactor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -25,6 +26,7 @@ public class NotificationNatsPublisher {
     private static final String MACHINE_TOPIC_TEMPLATE = "machine.%s.notification";
 
     private final NatsMessagePublisher natsMessagePublisher;
+    private final NotificationContentRedactor contentRedactor;
 
     public void publishToUser(String userId, Notification notification, NotificationCategory category) {
         publishToUser(userId, notification, category, NotificationEventType.CREATED);
@@ -101,7 +103,7 @@ public class NotificationNatsPublisher {
                 .id(notification.getId())
                 .severity(notification.getSeverity())
                 .title(notification.getTitle())
-                .description(notification.getDescription())
+                .description(contentRedactor.descriptionFor(notification, category))
                 .createdAt(notification.getCreatedAt())
                 .category(category)
                 .context(notification.getContext())

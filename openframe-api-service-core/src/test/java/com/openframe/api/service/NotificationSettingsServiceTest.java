@@ -5,7 +5,10 @@ import com.openframe.api.dto.NotificationTypeSetting;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSettings;
+import com.openframe.data.document.notification.NotificationContentPolicy;
+import com.openframe.data.repository.notification.NotificationContentPolicyRepository;
 import com.openframe.data.repository.notification.NotificationSettingsRepository;
+import com.openframe.data.service.notification.NotificationContentRedactor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,12 +33,56 @@ import static org.mockito.Mockito.when;
 class NotificationSettingsServiceTest {
 
     private NotificationSettingsRepository repository;
+    private NotificationContentPolicyRepository contentPolicyRepository;
+    private NotificationContentRedactor contentRedactor;
     private NotificationSettingsService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(NotificationSettingsRepository.class);
-        service = new NotificationSettingsService(repository);
+        contentPolicyRepository = mock(NotificationContentPolicyRepository.class);
+        contentRedactor = mock(NotificationContentRedactor.class);
+        when(contentPolicyRepository.find()).thenReturn(Optional.empty());
+        service = new NotificationSettingsService(repository, contentPolicyRepository, contentRedactor);
+    }
+
+    @Test
+    @DisplayName("Given no content policy, when settings are read, then contentSuppressed is FALSE — absence means the informative default")
+    void absent_policy_answers_the_informative_default() {
+        when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
+
+        assertThat(service.get("user-1").isContentSuppressed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Given the tenant enabled suppression, when settings are read, then contentSuppressed is TRUE for every user in the tenant")
+    void stored_policy_is_reported() {
+        when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
+        when(contentPolicyRepository.find())
+                .thenReturn(Optional.of(NotificationContentPolicy.builder().contentSuppressed(true).build()));
+
+        assertThat(service.get("user-1").isContentSuppressed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("updateContentSuppression persists tenant-wide and drops the redactor cache so the change is visible immediately")
+    void suppression_update_persists_and_invalidates_the_cache() {
+        when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
+        when(contentPolicyRepository.find())
+                .thenReturn(Optional.of(NotificationContentPolicy.builder().contentSuppressed(true).build()));
+
+        NotificationSettingsView result = service.updateContentSuppression("user-1", true);
+
+        verify(contentPolicyRepository).setContentSuppressed(true);
+        verify(contentRedactor).invalidate();
+        assertThat(result.isContentSuppressed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Given a null suppressed flag, when updating, then BadRequestException — a null switch has no meaning")
+    void null_suppression_is_rejected() {
+        assertThatThrownBy(() -> service.updateContentSuppression("user-1", null))
+                .isInstanceOf(BadRequestException.class);
     }
 
     @Test

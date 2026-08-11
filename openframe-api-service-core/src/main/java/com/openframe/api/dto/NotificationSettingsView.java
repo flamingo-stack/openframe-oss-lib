@@ -12,4 +12,5 @@ public class NotificationSettingsView {
 
     private final boolean enabled;
     private final List<NotificationTypeSetting> typeSettings;
+    private final boolean contentSuppressed;
 }

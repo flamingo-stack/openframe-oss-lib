@@ -4,7 +4,10 @@ import com.openframe.core.exception.NatsException;
 import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationSeverity;
+import com.openframe.data.nats.model.NotificationEventType;
 import com.openframe.data.nats.model.NotificationMessage;
+import com.openframe.data.service.notification.NotificationContentRedactor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,12 +25,34 @@ import static org.mockito.Mockito.*;
 class NotificationNatsPublisherTest {
 
     private NatsMessagePublisher messagePublisher;
+    private NotificationContentRedactor contentRedactor;
     private NotificationNatsPublisher publisher;
 
     @BeforeEach
     void setUp() {
         messagePublisher = mock(NatsMessagePublisher.class);
-        publisher = new NotificationNatsPublisher(messagePublisher);
+        contentRedactor = mock(NotificationContentRedactor.class);
+        // Default: nothing suppressed — the payload carries the stored description through.
+        when(contentRedactor.descriptionFor(any(), any())).thenAnswer(invocation -> {
+            Notification argument = invocation.getArgument(0);
+            return argument == null ? null : argument.getDescription();
+        });
+        publisher = new NotificationNatsPublisher(messagePublisher, contentRedactor);
+    }
+
+    @Test
+    @DisplayName("Given the tenant suppresses content, when publishing, then the live payload carries the neutral description, not the stored one")
+    void publish_applies_content_suppression() {
+        Notification notification = persistedNotification();
+        when(contentRedactor.descriptionFor(notification, NotificationCategory.TICKETS))
+                .thenReturn("New activity on this ticket");
+
+        publisher.publishToUser("user-42", notification, NotificationCategory.TICKETS);
+
+        ArgumentCaptor<NotificationMessage> message = ArgumentCaptor.forClass(NotificationMessage.class);
+        verify(messagePublisher).publish(anyString(), message.capture());
+        assertThat(message.getValue().getDescription()).isEqualTo("New activity on this ticket");
+        assertThat(message.getValue().getTitle()).isEqualTo(notification.getTitle());
     }
 
     @Test
@@ -128,6 +153,33 @@ class NotificationNatsPublisherTest {
     void read_state_publish_rejects_blank_user() {
         assertThatThrownBy(() -> publisher.publishReadStateToUser(" ", java.util.List.of("n-1"), com.openframe.data.nats.model.NotificationEventType.READ))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("Given a stored notification, when it is published, then the live payload carries every displayed field verbatim — a live popup must match what a later query returns")
+    void live_payload_matches_the_stored_record_field_for_field() {
+        Notification stored = Notification.builder()
+                .id("notif-parity")
+                .severity(NotificationSeverity.WARNING)
+                .title("Ticket #1234 — Printer offline at front desk")
+                .description("Escalated by the user - waiting for a technician")
+                .createdAt(Instant.parse("2026-08-11T09:15:30Z"))
+                .context(GenericContext.builder().type("TICKET_ESCALATED_BY_USER").payload("{}").build())
+                .build();
+
+        publisher.publishToUser("user-42", stored, NotificationCategory.TICKETS);
+
+        ArgumentCaptor<NotificationMessage> message = ArgumentCaptor.forClass(NotificationMessage.class);
+        verify(messagePublisher).publish(anyString(), message.capture());
+        NotificationMessage published = message.getValue();
+        assertThat(published.getId()).isEqualTo(stored.getId());
+        assertThat(published.getTitle()).isEqualTo(stored.getTitle());
+        assertThat(published.getDescription()).isEqualTo(stored.getDescription());
+        assertThat(published.getCreatedAt()).isEqualTo(stored.getCreatedAt());
+        assertThat(published.getSeverity()).isEqualTo(stored.getSeverity());
+        assertThat(published.getContext()).isSameAs(stored.getContext());
+        assertThat(published.getCategory()).isEqualTo(NotificationCategory.TICKETS);
+        assertThat(published.getEventType()).isEqualTo(NotificationEventType.CREATED);
     }
 
     private static Notification persistedNotification() {
