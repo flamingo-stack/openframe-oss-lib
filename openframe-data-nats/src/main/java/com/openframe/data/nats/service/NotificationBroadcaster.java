@@ -2,21 +2,28 @@ package com.openframe.data.nats.service;
 
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.data.document.notification.NotificationReadState;
+import com.openframe.data.document.notification.NotificationSettingGroup;
+import com.openframe.data.document.notification.NotificationSettings;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
+import com.openframe.data.repository.notification.NotificationSettingsRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+
+import static com.openframe.data.document.notification.NotificationSettingsPolicy.isEnabledFor;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +35,7 @@ public class NotificationBroadcaster {
     private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
     private final NotificationChannelDispatcher channelDispatcher;
+    private final NotificationSettingsRepository settingsRepository;
 
     @Value("${openframe.features.notifications.enabled:false}")
     private boolean notificationsEnabled;
@@ -39,6 +47,15 @@ public class NotificationBroadcaster {
         }
 
         NotificationCategory category = descriptorRegistry.categoryOf(command.getContext());
+        Set<String> adminAudience = command.getAdminAudience();
+        NotificationContext context = command.getContext();
+        Set<String> admins = withoutOptedOut(adminAudience, context);
+        Set<String> machines = command.getMachineAudience();
+        if (admins.isEmpty() && machines.isEmpty()) {
+            log.info("No recipients left after settings filtering — nothing persisted for '{}'", command.getTitle());
+            return null;
+        }
+
         Notification notification = Notification.builder()
                 .severity(command.getSeverity())
                 .category(category)
@@ -49,10 +66,8 @@ public class NotificationBroadcaster {
                 .build();
         Notification saved = notificationRepository.save(notification);
         log.debug("Persisted notification {} (admins={}, machines={})",
-                saved.getId(), command.getAdminAudience().size(), command.getMachineAudience().size());
+                saved.getId(), admins.size(), machines.size());
 
-        Set<String> admins = command.getAdminAudience();
-        Set<String> machines = command.getMachineAudience();
         String title = command.getTitle();
         try {
             if (!admins.isEmpty()) {
@@ -90,6 +105,30 @@ public class NotificationBroadcaster {
         }
 
         return saved;
+    }
+
+    /** Settings bite at the audience: an opted-out admin gets no row/card/NATS/push and nothing arrives retroactively. Absent settings deliver; a failed lookup drops every admin — like every other Mongo failure in broadcast, it must not deliver against unknown preferences. */
+    private Set<String> withoutOptedOut(Set<String> admins, NotificationContext context) {
+        if (admins.isEmpty()) {
+            return admins;
+        }
+        try {
+            NotificationSettingGroup group = descriptorRegistry.settingsGroupOf(context).orElse(null);
+            List<NotificationSettings> rows = settingsRepository.findByUserIdIn(admins);
+            if (rows.isEmpty()) {
+                return admins;
+            }
+            Set<String> kept = new HashSet<>(admins);
+            for (NotificationSettings row : rows) {
+                if (!isEnabledFor(row, group)) {
+                    kept.remove(row.getUserId());
+                }
+            }
+            return kept;
+        } catch (RuntimeException ex) {
+            log.error("Notification settings resolution failed — dropping all {} admin(s) from this dispatch", admins.size(), ex);
+            return Set.of();
+        }
     }
 
     /**
