@@ -54,6 +54,7 @@ pub struct MeshSelfHealService {
 }
 
 impl MeshSelfHealService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         directory_manager: DirectoryManager,
         installed_tools: InstalledToolsService,

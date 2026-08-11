@@ -1,6 +1,7 @@
 use std::fs::{self};
 use std::io;
 #[cfg(unix)]
+#[allow(unused_imports)] // MetadataExt used by linux-only paths
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 // Windows std::fs::Permissions already has readonly flag setters; no extra trait needed
 use std::path::Path;
@@ -21,14 +22,17 @@ static ADMIN_PRIVILEGES_GRANTED: AtomicBool = AtomicBool::new(false);
 
 /// Default UID for root user
 #[cfg(unix)]
+#[allow(dead_code)] // reserved for unix root checks; not currently referenced
 const ROOT_UID: u32 = 0;
 /// Default GID for admin group on macOS
 #[cfg(unix)]
 const ADMIN_GID: u32 = 80;
 
 #[cfg(not(unix))]
+#[allow(dead_code)] // parity with unix consts; not referenced on non-unix
 const ROOT_UID: u32 = 0;
 #[cfg(not(unix))]
+#[allow(dead_code)] // parity with unix consts; not referenced on non-unix
 const ADMIN_GID: u32 = 0;
 
 #[derive(Debug)]
@@ -94,6 +98,8 @@ impl Permissions {
                 let metadata = fs::metadata(path)?;
                 let mut perms = metadata.permissions();
                 #[cfg(target_os = "windows")]
+                #[allow(clippy::permissions_set_readonly_false)]
+                // clearing readonly is intended on windows
                 {
                     // Use cross-platform readonly flag instead of Windows-only bits
                     if perms.readonly() {
@@ -116,6 +122,8 @@ impl Permissions {
         }
 
         #[cfg(not(unix))]
+        #[allow(unreachable_code)]
+        // windows returns early above; tail is the fallback for other non-unix targets
         {
             // On Windows, we can check if the file is read-only if that's what we care about
             #[cfg(target_os = "windows")]

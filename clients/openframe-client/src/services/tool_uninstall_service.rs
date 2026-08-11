@@ -278,14 +278,13 @@ impl ToolUninstallService {
         let started = Instant::now();
         let mut child = cmd
             .spawn()
-            .map_err(|e| {
+            .inspect_err(|_e| {
                 #[cfg(target_os = "windows")]
                 log_file_lock_info(
-                    &e,
+                    _e,
                     &agent_path.to_string_lossy(),
                     "execute uninstallation command",
                 );
-                e
             })
             .context("Failed to execute uninstallation command")?;
 
