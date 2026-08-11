@@ -1,5 +1,7 @@
 package com.openframe.data.document.notification;
 
+import java.util.Optional;
+
 public interface NotificationContextDescriptor {
 
     String type();
@@ -21,5 +23,15 @@ public interface NotificationContextDescriptor {
      */
     default NotificationCategory category(NotificationContext context) {
         return category();
+    }
+
+    /** Empty = no checkbox = cannot be muted — a type whose descriptor forgot the mapping loses mutability, never delivery. */
+    default Optional<NotificationSettingGroup> settingsGroup() {
+        return Optional.empty();
+    }
+
+    /** Mirrors the category pair: static mapping lives in {@link #settingsGroup()}; only payload-dependent descriptors override this. */
+    default Optional<NotificationSettingGroup> settingsGroup(NotificationContext context) {
+        return settingsGroup();
     }
 }
