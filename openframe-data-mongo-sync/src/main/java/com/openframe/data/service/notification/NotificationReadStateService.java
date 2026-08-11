@@ -29,6 +29,7 @@ public class NotificationReadStateService {
 
     private final NotificationReadStateRepository repository;
     private final TenantIdProvider tenantIdProvider;
+    private final List<NotificationReadEventListener> readEventListeners;
 
     public void createForAudience(@NotBlank String notificationId,
                                   @NotNull NotificationCategory category,
@@ -61,11 +62,22 @@ public class NotificationReadStateService {
     public boolean markRead(@NotBlank String recipientId,
                             @NotNull RecipientType recipientType,
                             @NotBlank String notificationId) {
-        return repository.markAsRead(recipientId, recipientType, notificationId) > 0;
+        boolean transitioned = repository.markAsRead(recipientId, recipientType, notificationId) > 0;
+        if (transitioned) {
+            publish(recipientId, recipientType, List.of(notificationId), NotificationReadEvent.Transition.READ);
+        }
+        return transitioned;
     }
 
     public long markAllAsRead(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
-        return repository.markAllAsRead(recipientId, recipientType);
+        // Snapshot BEFORE the flip: under concurrency the ids can drift from what the flip matches,
+        // in both directions. Deliberate — events are best-effort (a throwing listener already loses
+        // one) and listeners must be idempotent; exactness would need a transaction.
+        List<String> unreadIds = notificationIds(
+                repository.findByRecipientIdAndRecipientTypeAndStatus(recipientId, recipientType, ReadStatus.UNREAD));
+        long flipped = repository.markAllAsRead(recipientId, recipientType);
+        publish(recipientId, recipientType, unreadIds, NotificationReadEvent.Transition.READ);
+        return flipped;
     }
 
     /**
@@ -77,17 +89,33 @@ public class NotificationReadStateService {
      * @return number of recipient rows moved from UNREAD to READ
      */
     public long dismissForAllRecipients(@NotBlank String notificationId) {
-        return repository.markAllRecipientsRead(notificationId);
+        List<NotificationReadState> unreadRows = repository.findByNotificationId(notificationId).stream()
+                .filter(row -> row.getStatus() == ReadStatus.UNREAD)
+                .toList();
+        long flipped = repository.markAllRecipientsRead(notificationId);
+        for (NotificationReadState row : unreadRows) {
+            publish(row.getRecipientId(), row.getRecipientType(),
+                    List.of(notificationId), NotificationReadEvent.Transition.READ);
+        }
+        return flipped;
     }
 
     public boolean deleteNotification(@NotBlank String recipientId,
                                       @NotNull RecipientType recipientType,
                                       @NotBlank String notificationId) {
-        return repository.softDelete(recipientId, recipientType, notificationId) > 0;
+        boolean transitioned = repository.softDelete(recipientId, recipientType, notificationId) > 0;
+        if (transitioned) {
+            publish(recipientId, recipientType, List.of(notificationId), NotificationReadEvent.Transition.DELETED);
+        }
+        return transitioned;
     }
 
     public long deleteAllRead(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
-        return repository.softDeleteAllRead(recipientId, recipientType);
+        List<String> readIds = notificationIds(
+                repository.findByRecipientIdAndRecipientTypeAndStatus(recipientId, recipientType, ReadStatus.READ));
+        long deleted = repository.softDeleteAllRead(recipientId, recipientType);
+        publish(recipientId, recipientType, readIds, NotificationReadEvent.Transition.DELETED);
+        return deleted;
     }
 
     public Map<NotificationCategory, Long> unreadCountsByCategory(@NotBlank String recipientId,
@@ -100,5 +128,26 @@ public class NotificationReadStateService {
             }
         }
         return counts;
+    }
+
+    private void publish(String recipientId, RecipientType recipientType,
+                         List<String> notificationIds, NotificationReadEvent.Transition transition) {
+        if (notificationIds.isEmpty()) {
+            return;
+        }
+        NotificationReadEvent event =
+                new NotificationReadEvent(recipientId, recipientType, List.copyOf(notificationIds), transition);
+        for (NotificationReadEventListener listener : readEventListeners) {
+            try {
+                listener.onReadStateChanged(event);
+            } catch (Exception ex) {
+                log.warn("Read-event listener {} failed for recipient {} ({} notification(s)): {}",
+                        listener.getClass().getSimpleName(), recipientId, notificationIds.size(), ex.getMessage());
+            }
+        }
+    }
+
+    private static List<String> notificationIds(List<NotificationReadState> rows) {
+        return rows.stream().map(NotificationReadState::getNotificationId).toList();
     }
 }

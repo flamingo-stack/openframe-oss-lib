@@ -30,6 +30,9 @@ public class DeviceResponse {
     @Schema(description = "Device display name", example = "Production Server 01")
     private String displayName;
 
+    @Schema(description = "User-defined device nickname", example = "Reception iMac")
+    private String nickname;
+
     @Schema(description = "IP address", example = "192.168.1.100")
     private String ip;
 

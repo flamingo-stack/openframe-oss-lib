@@ -5,7 +5,7 @@ import { Button, ToggleGroup, ToggleGroupItem } from '../ui'
 import { FigmaIcon } from '../icons-v2-generated'
 import { ExternalLink, Play, LayoutGrid } from 'lucide-react'
 import { toFigmaEmbedUrl, toFigmaOriginalUrl, isFigmaSlidesUrl } from '../../utils/embed-url-converters'
-import { EmbedIframe } from './embed-iframe'
+import { EmbedViewerFrame } from './embed-viewer-frame'
 
 export interface FigmaEmbedProps {
   /** Any Figma URL (design/file/proto/board/slides/deck) or an already-resolved embed URL. */
@@ -76,12 +76,15 @@ function SlidesViewToggle({
  * Single source of truth for every Figma surface — the data-room document viewer
  * and in-article markdown both render this. A header (icon + title + "Open in
  * Figma") over an interactive Figma iframe, built from the canonical
- * `toFigmaEmbedUrl` / `toFigmaOriginalUrl` converters + the shared `<EmbedIframe>`.
+ * `toFigmaEmbedUrl` / `toFigmaOriginalUrl` converters + the shared
+ * `<EmbedViewerFrame>` (which owns the header/empty-state/iframe shell).
  * Only height/loading differ per surface.
  *
  * For Slides decks, a present/browse toggle (default = present) lets viewers flip
  * slides with Figma's native nav bar + keyboard, or switch to the thumbnail-rail
- * browse view.
+ * browse view. The toggle's state lives HERE (the frame's `actions` slot is a
+ * plain ReactNode) — flipping it recomputes `embedSrc`, and the frame's
+ * `EmbedIframe` remounts on the new src exactly as before the extraction.
  */
 export function FigmaEmbed({ url, title, height, loading = 'lazy' }: FigmaEmbedProps) {
   const [view, setView] = useState<SlidesView>('present')
@@ -102,14 +105,12 @@ export function FigmaEmbed({ url, title, height, loading = 'lazy' }: FigmaEmbedP
   const heading = title || 'Figma Design'
 
   return (
-    <div className="my-6 space-y-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <FigmaIcon className="w-5 h-5 shrink-0" />
-          <span className="text-h6 font-semibold text-ods-text-primary truncate">
-            {heading}
-          </span>
-        </div>
+    <EmbedViewerFrame
+      className="my-6 space-y-3"
+      icon={<FigmaIcon className="w-5 h-5 shrink-0" />}
+      title={heading}
+      titleVariant="h6"
+      actions={
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           {isSlides && embedSrc && <SlidesViewToggle view={view} onChange={setView} />}
           {originalUrl && (
@@ -126,22 +127,14 @@ export function FigmaEmbed({ url, title, height, loading = 'lazy' }: FigmaEmbedP
             </Button>
           )}
         </div>
-      </div>
-      {embedSrc ? (
-        <EmbedIframe
-          src={embedSrc}
-          title={heading}
-          allow="clipboard-write; clipboard-read; fullscreen"
-          loading={loading}
-          height={height}
-          allowFullScreen
-        />
-      ) : (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <FigmaIcon className="w-16 h-16 text-ods-text-secondary mb-4" />
-          <p className="text-ods-text-secondary">Figma URL not configured</p>
-        </div>
-      )}
-    </div>
+      }
+      src={embedSrc}
+      allow="clipboard-write; clipboard-read; fullscreen"
+      loading={loading}
+      height={height}
+      allowFullScreen
+      emptyIcon={<FigmaIcon className="w-16 h-16 text-ods-text-secondary mb-4" />}
+      emptyMessage="Figma URL not configured"
+    />
   )
 }

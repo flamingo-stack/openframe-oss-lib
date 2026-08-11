@@ -4,7 +4,7 @@ import { forwardRef, useState } from "react"
 
 import { cn } from "../../utils/cn"
 import { DotsLoaderIcon } from "../icons-v2-generated"
-import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
+import { SimpleMarkdownRenderer } from "../ui/markdown/simple-markdown-renderer"
 import { ExpandChevron } from "./expand-chevron"
 import { useCollapsible } from "./hooks/use-collapsible"
 import type { ThinkingDisplayProps } from "./types"

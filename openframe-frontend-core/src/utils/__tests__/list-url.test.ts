@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildListUrl } from '../list-url'
+import { buildListUrl, canonicalContentRefType } from '../list-url'
 
 /**
  * Byte-parity gate for the shared `buildListUrl`.
@@ -31,6 +31,16 @@ const BASELINE: Record<string, string> = {
 describe('buildListUrl — byte parity with the hub mappers', () => {
   it.each(Object.entries(BASELINE))('%s → exact prior listApi output', (type, expected) => {
     expect(buildListUrl(type, ['a', 'b'])).toBe(expected)
+  })
+
+  it('canonicalContentRefType: aliases resolve, prototype keys do not', () => {
+    expect(canonicalContentRefType('blog_post_existing')).toBe('blog_post')
+    expect(canonicalContentRefType('roadmap_item')).toBe('roadmap_item')
+    // A bare `ALIASES[key]` read returned `Object` here, which downstream
+    // interpolated into a URL path.
+    expect(canonicalContentRefType('constructor')).toBe('constructor')
+    expect(canonicalContentRefType('__proto__')).toBe('__proto__')
+    expect(canonicalContentRefType('toString')).toBe('toString')
   })
 
   it('un-aliases blog_post_existing → blog_post (mirrors hub LEGACY_TYPE_ALIASES)', () => {

@@ -1,24 +1,33 @@
 package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
-import org.springframework.data.mongodb.core.query.Query;
+import com.openframe.data.document.rmm.OsType;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 public interface CustomMachineRepository {
-    Query buildDeviceQuery(MachineQueryFilter filter, String search);
 
-    List<Machine> findMachinesWithCursor(Query query, String cursor, int limit, String sortField, String sortDirection);
+    long countMachines(String tenantId, MachineQueryFilter filter, String search);
 
-    List<String> findMachineIds(Query query);
+    Map<String, Integer> facet(String tenantId, MachineQueryFilter filter, String search, DeviceFacetDimension dimension);
 
-    List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope);
+    List<String> findMachineIds(String tenantId, MachineQueryFilter filter, String search);
 
-    long countMachinesByCriteria(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope);
+    List<Machine> findMachinesWithCursor(String tenantId, MachineQueryFilter filter, String search,
+                                         String cursor, int limit,
+                                         String sortField, String sortDirection);
 
-    long countMachines(Query query);
+    List<Machine> findAvailableForScheduleWithCursor(String tenantId, MachineQueryFilter filter, String search,
+                                                     Collection<String> assignedMachineIds,
+                                                     String cursor, int limit);
+
+    List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter, Collection<OsType> osTypeScope);
+
+    long countMachinesByCriteria(String tenantId, MachineQueryFilter filter, Collection<OsType> osTypeScope);
 
     boolean isSortableField(String field);
 

@@ -23,7 +23,7 @@ const logo = (
 const navLinks = (
   <nav className="flex items-center gap-2" aria-label="Main navigation">
     {['OpenFrame', 'OpenMSP', 'Resources', 'Pricing'].map(label => (
-      <Button key={label} variant="transparent" size="small-legacy" className="text-h3 font-bold tracking-[-0.36px]">
+      <Button key={label} variant="transparent" size="default" font="regular" className="text-h6">
         {label}
       </Button>
     ))}
@@ -79,6 +79,7 @@ const meta = {
   tags: ['autodocs'],
   argTypes: {
     centerBreakpoint: { control: 'radio', options: ['md', 'lg'] },
+    size: { control: 'radio', options: ['small', 'big'] },
     backgroundClassName: { control: 'text' },
     mobileTopBorder: { control: 'boolean' },
   },
@@ -112,6 +113,24 @@ export const MarketingFull: Story = {
       </Button>
     ),
     sideActions: sideActionCells,
+  },
+};
+
+/**
+ * The `big` (72px) bar every hub/marketing site renders — same zones, taller
+ * bar and 72px cells (Figma 2936-6812). `small` (56px) is the console size.
+ */
+export const MarketingBig: Story = {
+  args: {
+    ...MarketingFull.args,
+    size: 'big',
+    // Big bar carries the full default-size CTA (Figma 2936-6812), not the
+    // 32px mono control.
+    cta: (
+      <Button variant="accent" onClick={fn()}>
+        Try for Free
+      </Button>
+    ),
   },
 };
 

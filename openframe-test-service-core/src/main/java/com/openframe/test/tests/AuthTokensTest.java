@@ -9,6 +9,7 @@ import com.openframe.test.data.dto.user.MeResponse;
 import com.openframe.test.data.dto.user.User;
 import com.openframe.test.data.generator.AuthGenerator;
 import com.openframe.test.helpers.AuthHelper;
+import io.restassured.response.Response;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("Test Access tokens")
 public class AuthTokensTest extends BaseTest {
 
+    @Tag("feature")
     @Tag("token")
     @Test
     @DisplayName("Verify refresh of access tokens")
@@ -35,6 +37,7 @@ public class AuthTokensTest extends BaseTest {
         assertThat(response.isAuthenticated()).as("Access token not refreshed").isTrue();
     }
 
+    @Tag("feature")
     @Tag("token")
     @Test
     @DisplayName("Verify refresh of access tokens without tenantId")
@@ -48,6 +51,7 @@ public class AuthTokensTest extends BaseTest {
         assertThat(response.isAuthenticated()).as("Access token not refreshed").isTrue();
     }
 
+    @Tag("feature")
     @Tag("logout")
     @Test
     @DisplayName("Verify logout")
@@ -57,11 +61,11 @@ public class AuthTokensTest extends BaseTest {
         Map<String, String> oldCookies = AuthFlow.login(user);
         Map<String, String> newCookies = AuthApi.logout(tenantId, oldCookies);
         assertThat(newCookies).as("Access tokens not cleared").isEqualTo(AuthGenerator.clearedCookies());
-//      500 returned instead of 401 - needs fix
-//        Response response = attemptRefresh(user, oldCookies);
-//        assertThat(response.getStatusCode()).isEqualTo(401);
+        Response response = AuthApi.attemptRefresh(user, oldCookies);
+        assertThat(response.getStatusCode()).isEqualTo(401);
     }
 
+    @Tag("feature")
     @Tag("logout")
     @Test
     @DisplayName("Verify logout without tenantId")
@@ -70,9 +74,8 @@ public class AuthTokensTest extends BaseTest {
         Map<String, String> oldCookies = AuthFlow.login(user);
         Map<String, String> newCookies = AuthApi.logout(oldCookies);
         assertThat(newCookies).as("Access tokens not cleared").isEqualTo(AuthGenerator.clearedCookies());
-//      500 returned instead of 401 - needs fix
-//        Response response = attemptRefresh(user, oldCookies);
-//        assertThat(response.getStatusCode()).isEqualTo(401);
+        Response response = AuthApi.attemptRefresh(user, oldCookies);
+        assertThat(response.getStatusCode()).isEqualTo(401);
     }
 }
 

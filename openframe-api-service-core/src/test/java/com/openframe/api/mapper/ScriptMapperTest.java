@@ -7,7 +7,7 @@ import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static com.openframe.data.document.rmm.ScriptStatus.ACTIVE;
+import static com.openframe.data.document.rmm.ScriptStatus.ARCHIVED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -38,7 +40,7 @@ class ScriptMapperTest {
         input.setShell(ScriptShell.BASH);
         input.setPrivilegeLevel(PrivilegeLevel.ADMIN);
         input.setScriptBody("tar -czf backup.tgz /data");
-        input.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
+        input.setSupportedPlatforms(List.of(OsType.MAC_OS));
         input.setDefaultTimeoutSeconds(120);
         input.setDefaultArgs(List.of("--full"));
         input.setEnvVars(List.of(
@@ -52,7 +54,7 @@ class ScriptMapperTest {
         assertThat(entity.getShell()).isEqualTo(ScriptShell.BASH);
         assertThat(entity.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(entity.getScriptBody()).isEqualTo("tar -czf backup.tgz /data");
-        assertThat(entity.getSupportedPlatforms()).containsExactly(ScriptPlatform.MACOS);
+        assertThat(entity.getSupportedPlatforms()).containsExactly(OsType.MAC_OS);
         assertThat(entity.getDefaultTimeoutSeconds()).isEqualTo(120);
         assertThat(entity.getDefaultArgs()).containsExactly("--full");
         assertThat(entity.getEnvVars())
@@ -107,7 +109,7 @@ class ScriptMapperTest {
         input.setShell(ScriptShell.BASH);
         input.setPrivilegeLevel(PrivilegeLevel.ADMIN);
         input.setScriptBody("echo new");
-        input.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
+        input.setSupportedPlatforms(List.of(OsType.MAC_OS));
         input.setDefaultTimeoutSeconds(99);
         input.setDefaultArgs(List.of("--new"));
         input.setEnvVars(List.of(
@@ -121,7 +123,7 @@ class ScriptMapperTest {
         assertThat(existing.getShell()).isEqualTo(ScriptShell.BASH);
         assertThat(existing.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(existing.getScriptBody()).isEqualTo("echo new");
-        assertThat(existing.getSupportedPlatforms()).containsExactly(ScriptPlatform.MACOS);
+        assertThat(existing.getSupportedPlatforms()).containsExactly(OsType.MAC_OS);
         assertThat(existing.getDefaultTimeoutSeconds()).isEqualTo(99);
         assertThat(existing.getDefaultArgs()).containsExactly("--new");
         assertThat(existing.getEnvVars())
@@ -151,11 +153,11 @@ class ScriptMapperTest {
     @DisplayName("toResponse: maps the status enum to its name")
     void toResponse_mapsStatusName() {
         Script entity = fullyPopulated();
-        entity.setStatus(ScriptStatus.ARCHIVED);
+        entity.setStatus(ARCHIVED);
 
         ScriptResponse response = mapper.toResponse(entity);
 
-        assertThat(response.getStatus()).isEqualTo("ARCHIVED");
+        assertThat(response.getStatus()).isEqualTo(ARCHIVED);
     }
 
     @Test
@@ -190,7 +192,7 @@ class ScriptMapperTest {
 
         ScriptResponse response = mapper.toResponse(entity);
 
-        assertThat(response.getStatus()).isEqualTo("ACTIVE");
+        assertThat(response.getStatus()).isEqualTo(ACTIVE);
     }
 
     private static Script fullyPopulated() {
@@ -203,7 +205,7 @@ class ScriptMapperTest {
                 .privilegeLevel(PrivilegeLevel.USER)
                 .scriptBody("Restart-Service -Name spooler")
                 .createdBy("user-1")
-                .supportedPlatforms(List.of(ScriptPlatform.WINDOWS))
+                .supportedPlatforms(List.of(OsType.WINDOWS))
                 .defaultTimeoutSeconds(60)
                 .defaultArgs(List.of("spooler"))
                 .envVars(List.of(

@@ -1,10 +1,14 @@
 package com.openframe.api.integration.support;
 
+import com.openframe.api.service.DeviceFilterOptionMapper;
 import com.openframe.api.service.DeviceService;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
+import org.mockito.Mockito;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import com.openframe.data.service.machine.MachineWriter;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration;
@@ -32,6 +36,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 @EnableMongoRepositories(basePackageClasses = {MachineRepository.class, TagRepository.class})
 @Import({
         CustomMachineRepositoryImpl.class,
+        MachineWriter.class,
         DeviceService.class
 })
 public class DeviceServiceIntegrationTestApplication {
@@ -39,5 +44,15 @@ public class DeviceServiceIntegrationTestApplication {
     @Bean
     DeviceStatusProcessor deviceStatusProcessor() {
         return machine -> { /* no-op for tests */ };
+    }
+
+    @Bean
+    ScriptScheduleDeviceService scriptScheduleDeviceService() {
+        return Mockito.mock(ScriptScheduleDeviceService.class);
+    }
+
+    @Bean
+    DeviceFilterOptionMapper deviceFilterOptionMapper() {
+        return Mockito.mock(DeviceFilterOptionMapper.class);
     }
 }

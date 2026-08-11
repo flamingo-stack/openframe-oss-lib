@@ -61,7 +61,7 @@ class AgentControllerTest {
         registrationRequest.setIp("192.168.1.1");
         registrationRequest.setMacAddress("00:11:22:33:44:55");
         registrationRequest.setOsUuid("test-os-uuid");
-        registrationRequest.setOsType("linux");
+        registrationRequest.setOsType("WINDOWS");
         registrationRequest.setAgentVersion("1.0.0");
         registrationResponse = new AgentRegistrationResponse("test-machine-id", "client-id", "client-secret");
     }
@@ -168,7 +168,7 @@ class AgentControllerTest {
     @Test
     void register_MissingMandatoryHostname_ReturnsValidationError() throws Exception {
         AgentRegistrationRequest invalid = new AgentRegistrationRequest();
-        invalid.setOsType("linux");
+        invalid.setOsType("WINDOWS");
         invalid.setAgentVersion("1.0.0");
         // hostname omitted -> @NotBlank must reject
 

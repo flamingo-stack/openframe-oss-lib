@@ -1,22 +1,27 @@
-"use client"
+'use client';
 
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
-import Link from "../../../embed-shims/next-link"
-import React from "react"
+import { Slot } from '@radix-ui/react-slot';
+import { cva, type VariantProps } from 'class-variance-authority';
+import React from 'react';
+import Link from '../../../embed-shims/next-link';
 
-import { cn } from "../../../utils/cn"
-import { buttonSurfaceClasses, outlineBorderClasses, splitDividerColorClasses, splitGlyphSizeClasses } from "./button-styles"
+import { cn } from '../../../utils/cn';
+import {
+  buttonSurfaceClasses,
+  outlineBorderClasses,
+  splitDividerColorClasses,
+  splitGlyphSizeClasses,
+} from './button-styles';
 
 // Default layout: centered single content area, padding/gap on the button itself.
 const buttonVariants = cva(
   [
-    "relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)]",
-    "rounded-md whitespace-nowrap",
-    "transition-colors duration-200",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus",
-    "disabled:pointer-events-none",
-    "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:h-5 [&_svg]:w-5",
+    'relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)]',
+    'rounded-md whitespace-nowrap',
+    'transition-colors duration-200',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
+    'disabled:pointer-events-none',
+    '[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:h-5 [&_svg]:w-5',
   ],
   {
     variants: {
@@ -30,9 +35,9 @@ const buttonVariants = cva(
         overlay: buttonSurfaceClasses.overlay,
       },
       size: {
-        default: "py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 md:h-12 h-11",
-        small: "p-[var(--spacing-system-xs)] text-h5 h-6 md:h-8",
-        "small-legacy": "py-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] h-10 text-[14px] font-bold", // Temporary alias for "small" — deprecated; grep size="small-legacy" (lib + hub) and migrate the remaining consumers before removal
+        default: 'py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 md:h-12 h-11',
+        small: 'p-[var(--spacing-system-xs)] text-h5 h-6 md:h-8',
+        'small-legacy': 'py-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] h-10 text-[14px] font-bold', // Temporary alias for "small" — deprecated; grep size="small-legacy" (lib + hub) and migrate the remaining consumers before removal
         // 24px pill for slim strips (announcement/promo bars, inline banner
         // actions — Primer banner / Polaris banner / Vercel-bar convention).
         // The label matches the strip's MESSAGE type ramp exactly (DM Sans
@@ -42,47 +47,68 @@ const buttonVariants = cva(
         // mono-uppercase control style of "small" nor a heavier weight.
         // Pinned h-6 across breakpoints (24px = the WCAG 2.5.8 target-size
         // floor) with horizontal-dominant padding and a 14px glyph.
-        compact: "py-0 px-[var(--spacing-system-sf)] text-h6 font-normal h-6 [&_svg]:h-3.5 [&_svg]:w-3.5",
-        icon: "p-[var(--spacing-system-sf)] h-11 w-11 md:h-12 md:w-12 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6",
+        compact: 'py-0 px-[var(--spacing-system-sf)] text-h6 font-normal h-6 [&_svg]:h-3.5 [&_svg]:w-3.5',
+        icon: 'p-[var(--spacing-system-sf)] h-11 w-11 md:h-12 md:w-12 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6',
         // Quiet 32px icon target with a 16px glyph, fixed across breakpoints
         // (Carbon ghost sm / Primer medium / shadcn icon-sm all pin 32px;
         // ≥ the 24px WCAG 2.5.8 target floor). For icon actions that read as
         // metadata rather than CTAs — author-page social rows, share rows.
         // Pair with variant="transparent" for the ghost treatment.
-        "icon-sm": "p-[var(--spacing-system-xxs)] h-8 w-8 [&_svg]:h-4 [&_svg]:w-4",
+        'icon-sm': 'p-[var(--spacing-system-xxs)] h-8 w-8 [&_svg]:h-4 [&_svg]:w-4',
+        // 20px inline glyph for affordances that sit INSIDE a line of text —
+        // an info hint beside a badge, a copy glyph after an id. `icon-sm`'s
+        // 32px target is correct for a metadata row but visually swamps a
+        // 10px badge or a 14px label, so hosts were reaching for className
+        // overrides to shrink it. Below the WCAG 2.5.8 target floor on purpose:
+        // this is only for glyphs whose information is ALSO available another
+        // way (tooltip content mirrored into an aria-describedby node), never
+        // for a sole means of performing an action.
+        'icon-inline': 'p-0 h-5 w-5 min-h-0 min-w-0 shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5',
         // Bare 56px media glyph (play / unmute over video). A size variant so
         // hosts stop re-implementing a <button> to escape the 20px svg cap.
-        "icon-glyph": "p-0 h-14 w-14 [&_svg]:h-14 [&_svg]:w-14",
+        'icon-glyph': 'p-0 h-14 w-14 [&_svg]:h-14 [&_svg]:w-14',
+      },
+      // Label typography axis (Figma 133-740). `bold` is the classic h3-bold
+      // label; `regular` swaps the DEFAULT size's label to the h4 step
+      // (DM Sans 500, neutral tracking) — added for navigation buttons.
+      // `small` keeps its mono-uppercase h5 label on both fonts per the spec.
+      font: {
+        bold: '',
+        regular: '',
       },
       fullWidth: {
-        true: "w-full",
-        false: "",
+        true: 'w-full',
+        false: '',
       },
       noPaddingX: {
-        true: "px-0",
-        false: "",
+        true: 'px-0',
+        false: '',
       },
     },
     compoundVariants: [
-      { size: "small", class: "[&_svg]:h-4 [&_svg]:w-4" },
+      { size: 'small', class: '[&_svg]:h-4 [&_svg]:w-4' },
+      // Comes after the size classes, so cn()'s tailwind-merge resolves the
+      // ods-typography group in favour of text-h4.
+      { size: 'default', font: 'regular', class: 'text-h4' },
     ],
     defaultVariants: {
-      variant: "accent",
-      size: "default",
+      variant: 'accent',
+      size: 'default',
+      font: 'bold',
       fullWidth: false,
       noPaddingX: false,
     },
-  }
-)
+  },
+);
 
 // Split layout (used when `splitIcon` is provided): outer button has no padding;
 // inner slots own padding/gap so the divider can span full button height.
 const splitShellVariants = cva(
   [
-    "group relative inline-flex items-stretch overflow-hidden rounded-md whitespace-nowrap",
-    "transition-colors duration-200",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus",
-    "disabled:pointer-events-none",
+    'group relative inline-flex items-stretch overflow-hidden rounded-md whitespace-nowrap',
+    'transition-colors duration-200',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
+    'disabled:pointer-events-none',
   ],
   {
     variants: {
@@ -94,65 +120,86 @@ const splitShellVariants = cva(
         warning: buttonSurfaceClasses.warning,
       },
       size: {
-        default: "h-12 text-h3",
-        small: "h-6 md:h-8 text-h5",
+        default: 'h-12',
+        small: 'h-6 md:h-8 text-h5',
       },
-      fullWidth: { true: "w-full", false: "" },
+      // Same label-typography axis as the normal layout — `regular` swaps the
+      // default size's h3-bold label for the h4 (DM Sans 500) step.
+      font: { bold: '', regular: '' },
+      fullWidth: { true: 'w-full', false: '' },
     },
-    defaultVariants: { variant: "accent", size: "default", fullWidth: false },
-  }
-)
+    compoundVariants: [
+      { size: 'default', font: 'bold', class: 'text-h3' },
+      { size: 'default', font: 'regular', class: 'text-h4' },
+    ],
+    defaultVariants: { variant: 'accent', size: 'default', font: 'bold', fullWidth: false },
+  },
+);
 
 const splitSlotVariants = cva(
   // Glyph size lives per-size, not in the base: cva concatenates base + variant
   // without tailwind-merge, so a base `[&_svg]:h-5` and a variant `[&_svg]:h-4`
   // would both ship and the winner would come down to stylesheet order.
-  ["inline-flex items-center justify-center", "[&_svg]:shrink-0"],
+  ['inline-flex items-center justify-center', '[&_svg]:shrink-0'],
   {
     variants: {
       slot: {
-        main: "gap-[var(--spacing-system-xsf)]",
-        icon: "border-l",
+        main: 'gap-[var(--spacing-system-xsf)]',
+        icon: 'border-l',
       },
-      size: { default: splitGlyphSizeClasses, small: "[&_svg]:h-4 [&_svg]:w-4" },
-      variant: { accent: "", outline: "", transparent: "", destructive: "", warning: "" },
+      size: { default: splitGlyphSizeClasses, small: '[&_svg]:h-4 [&_svg]:w-4' },
+      variant: { accent: '', outline: '', transparent: '', destructive: '', warning: '' },
     },
     compoundVariants: [
-      { slot: "main", size: "default", class: "px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)]" },
-      { slot: "main", size: "small", class: "px-[var(--spacing-system-xs)]" },
-      { slot: "icon", size: "default", class: "w-10" },
-      { slot: "icon", size: "small", class: "w-6 md:w-8" },
-      { slot: "icon", variant: "accent", class: cn(
-        splitDividerColorClasses.accent,
-        "group-disabled:border-ods-disabled group-aria-disabled:border-ods-disabled",
-      ) },
-      { slot: "icon", variant: "outline", class: splitDividerColorClasses.outline },
-      { slot: "icon", variant: "transparent", class: splitDividerColorClasses.transparent },
-      { slot: "icon", variant: "destructive", class: cn(
-        splitDividerColorClasses.destructive,
-        "group-disabled:border-ods-disabled group-aria-disabled:border-ods-disabled",
-      ) },
-      { slot: "icon", variant: "warning", class: cn(
-        splitDividerColorClasses.warning,
-        "group-disabled:border-ods-disabled group-aria-disabled:border-ods-disabled",
-      ) },
+      { slot: 'main', size: 'default', class: 'px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)]' },
+      { slot: 'main', size: 'small', class: 'px-[var(--spacing-system-xs)]' },
+      { slot: 'icon', size: 'default', class: 'w-10' },
+      { slot: 'icon', size: 'small', class: 'w-6 md:w-8' },
+      {
+        slot: 'icon',
+        variant: 'accent',
+        class: cn(
+          splitDividerColorClasses.accent,
+          'group-disabled:border-ods-disabled group-aria-disabled:border-ods-disabled',
+        ),
+      },
+      { slot: 'icon', variant: 'outline', class: splitDividerColorClasses.outline },
+      { slot: 'icon', variant: 'transparent', class: splitDividerColorClasses.transparent },
+      {
+        slot: 'icon',
+        variant: 'destructive',
+        class: cn(
+          splitDividerColorClasses.destructive,
+          'group-disabled:border-ods-disabled group-aria-disabled:border-ods-disabled',
+        ),
+      },
+      {
+        slot: 'icon',
+        variant: 'warning',
+        class: cn(
+          splitDividerColorClasses.warning,
+          'group-disabled:border-ods-disabled group-aria-disabled:border-ods-disabled',
+        ),
+      },
     ],
-    defaultVariants: { slot: "main", size: "default", variant: "accent" },
-  }
-)
+    defaultVariants: { slot: 'main', size: 'default', variant: 'accent' },
+  },
+);
 
 /** @deprecated Use `size="small"` instead. Temporary alias kept for backward compatibility; will be removed in the future. */
-type DeprecatedButtonSize = "small-legacy"
+type DeprecatedButtonSize = 'small-legacy';
 
-type ButtonSize = Exclude<VariantProps<typeof buttonVariants>["size"], "small-legacy" | null | undefined> | DeprecatedButtonSize
+type ButtonSize =
+  | Exclude<VariantProps<typeof buttonVariants>['size'], 'small-legacy' | null | undefined>
+  | DeprecatedButtonSize;
 
 interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    Omit<VariantProps<typeof buttonVariants>, "size"> {
-  asChild?: boolean
-  href?: string
-  openInNewTab?: boolean
-  prefetch?: boolean
+    Omit<VariantProps<typeof buttonVariants>, 'size'> {
+  asChild?: boolean;
+  href?: string;
+  openInNewTab?: boolean;
+  prefetch?: boolean;
   /**
    * Pre-resolved anchor bundle (from `useNavLink({ href, targetPlatform })`).
    * When set, renders the Button as `<Link>` with `href` / `target` / `rel`
@@ -161,22 +208,22 @@ interface ButtonProps
    * gymnastics. Wins over the separate `href` / `openInNewTab` props.
    */
   linkProps?: {
-    href: string
-    target?: '_blank'
-    rel?: 'noopener noreferrer'
-    onClick?: React.MouseEventHandler<HTMLAnchorElement>
-  } | null
-  leftIcon?: React.ReactNode
-  rightIcon?: React.ReactNode
+    href: string;
+    target?: '_blank';
+    rel?: 'noopener noreferrer';
+    onClick?: React.MouseEventHandler<HTMLAnchorElement>;
+  } | null;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
   /**
    * Renders a vertical divider and trailing icon area inside the button.
    * The whole button stays a single click target — the icon is decorative
    * (`aria-hidden`). For two independent click targets, use `<SplitButton>`.
    * Only honored when `size` is `"default"` or `"small"`.
    */
-  splitIcon?: React.ReactNode
-  loading?: boolean
-  size?: ButtonSize
+  splitIcon?: React.ReactNode;
+  loading?: boolean;
+  size?: ButtonSize;
 }
 
 const Spinner = () => (
@@ -188,13 +235,14 @@ const Spinner = () => (
       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
     />
   </svg>
-)
+);
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
     className,
     variant,
     size,
+    font,
     fullWidth,
     noPaddingX,
     asChild,
@@ -213,25 +261,22 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   },
   ref,
 ) {
-  const isDisabled = disabled || loading
+  const isDisabled = disabled || loading;
 
   // splitIcon is only supported for default/small sizes. With other sizes
   // (icon, small-legacy) we silently fall back to the normal layout.
-  const useSplitLayout = !!splitIcon && (size === "default" || size === "small" || size === undefined)
+  const useSplitLayout = !!splitIcon && (size === 'default' || size === 'small' || size === undefined);
 
   if (useSplitLayout) {
-    const safeSize = (size ?? "default") as "default" | "small"
-    const safeVariant = (variant ?? "accent") as "accent" | "outline" | "transparent" | "destructive" | "warning"
-    const shellClasses = cn(
-      splitShellVariants({ variant: safeVariant, size: safeSize, fullWidth }),
-      className,
-    )
-    const mainSlotClass = splitSlotVariants({ slot: "main", size: safeSize, variant: safeVariant })
-    const iconSlotClass = splitSlotVariants({ slot: "icon", size: safeSize, variant: safeVariant })
+    const safeSize = (size ?? 'default') as 'default' | 'small';
+    const safeVariant = (variant ?? 'accent') as 'accent' | 'outline' | 'transparent' | 'destructive' | 'warning';
+    const shellClasses = cn(splitShellVariants({ variant: safeVariant, size: safeSize, font, fullWidth }), className);
+    const mainSlotClass = splitSlotVariants({ slot: 'main', size: safeSize, variant: safeVariant });
+    const iconSlotClass = splitSlotVariants({ slot: 'icon', size: safeSize, variant: safeVariant });
 
     const splitContent = (
       <>
-        <span className={cn("contents", loading && "invisible")}>
+        <span className={cn('contents', loading && 'invisible')}>
           <span className={mainSlotClass}>
             {leftIcon && <span className="inline-flex items-center">{leftIcon}</span>}
             {children}
@@ -247,17 +292,21 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
           </span>
         )}
       </>
-    )
+    );
 
     // `linkProps` (the pre-resolved bundle from `useNavLink({ href, targetPlatform })`)
     // wins over the legacy `href` + `openInNewTab` props so callers can thread
     // the unified nav decision directly. Either path produces the same `<Link>`.
-    const splitAnchor = linkProps ?? (href ? {
-      href,
-      target: openInNewTab ? '_blank' as const : undefined,
-      rel: openInNewTab ? 'noopener noreferrer' as const : undefined,
-      onClick: onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined,
-    } : null)
+    const splitAnchor =
+      linkProps ??
+      (href
+        ? {
+            href,
+            target: openInNewTab ? ('_blank' as const) : undefined,
+            rel: openInNewTab ? ('noopener noreferrer' as const) : undefined,
+            onClick: onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined,
+          }
+        : null);
     if (splitAnchor) {
       return (
         <Link
@@ -271,28 +320,22 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
           aria-label={props['aria-label']}
           aria-disabled={isDisabled || undefined}
           tabIndex={isDisabled ? -1 : undefined}
-          className={cn(shellClasses, isDisabled && "pointer-events-none")}
+          className={cn(shellClasses, isDisabled && 'pointer-events-none')}
           onClick={splitAnchor.onClick}
         >
           {splitContent}
         </Link>
-      )
+      );
     }
 
     return (
-      <button
-        ref={ref}
-        className={shellClasses}
-        disabled={isDisabled}
-        onClick={onClick}
-        {...props}
-      >
+      <button ref={ref} className={shellClasses} disabled={isDisabled} onClick={onClick} {...props}>
         {splitContent}
       </button>
-    )
+    );
   }
 
-  const classes = cn(buttonVariants({ variant, size, fullWidth, noPaddingX }), className)
+  const classes = cn(buttonVariants({ variant, size, font, fullWidth, noPaddingX }), className);
 
   // asChild: consumer fully controls the rendered element; we just stamp our classes.
   if (asChild) {
@@ -300,14 +343,14 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       <Slot ref={ref} className={classes} {...props}>
         {children}
       </Slot>
-    )
+    );
   }
 
   // Real content stays in layout (preserving width) but goes invisible while loading.
   // The spinner is absolutely positioned so it never shifts the button's size.
   const content = (
     <>
-      <span className={cn("contents", loading && "invisible")}>
+      <span className={cn('contents', loading && 'invisible')}>
         {leftIcon && <span className="inline-flex items-center">{leftIcon}</span>}
         {children}
         {rightIcon && <span className="inline-flex items-center">{rightIcon}</span>}
@@ -318,15 +361,19 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
         </span>
       )}
     </>
-  )
+  );
 
   // Same `linkProps`-wins-over-href resolution as the splitIcon branch.
-  const anchor = linkProps ?? (href ? {
-    href,
-    target: openInNewTab ? '_blank' as const : undefined,
-    rel: openInNewTab ? 'noopener noreferrer' as const : undefined,
-    onClick: onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined,
-  } : null)
+  const anchor =
+    linkProps ??
+    (href
+      ? {
+          href,
+          target: openInNewTab ? ('_blank' as const) : undefined,
+          rel: openInNewTab ? ('noopener noreferrer' as const) : undefined,
+          onClick: onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined,
+        }
+      : null);
   if (anchor) {
     return (
       <Link
@@ -339,25 +386,19 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
         aria-label={props['aria-label']}
         aria-disabled={isDisabled || undefined}
         tabIndex={isDisabled ? -1 : undefined}
-        className={cn(classes, isDisabled && "pointer-events-none")}
+        className={cn(classes, isDisabled && 'pointer-events-none')}
         onClick={anchor.onClick}
       >
         {content}
       </Link>
-    )
+    );
   }
 
   return (
-    <button
-      ref={ref}
-      className={classes}
-      disabled={isDisabled}
-      onClick={onClick}
-      {...props}
-    >
+    <button ref={ref} className={classes} disabled={isDisabled} onClick={onClick} {...props}>
       {content}
     </button>
-  )
-})
+  );
+});
 
-export { Button, buttonVariants, type ButtonProps }
+export { Button, buttonVariants, type ButtonProps };

@@ -9,11 +9,17 @@
  */
 
 import type {
+  AskOptionData,
   MessageSegment,
   ToolExecutionSegment,
+  ApprovalRequestField,
   ApprovalRequestSegment,
   ApprovalBatchSegment,
   ApprovalBatchExecutionState,
+  ApprovalResolutionHandler,
+  EscalationOfferSegment,
+  TicketEscalatedData,
+  TicketEscalatedSegment,
   ContextCompactionSegment,
   ErrorSegment,
   PendingApproval,
@@ -22,10 +28,23 @@ import type {
   ChatApprovalStatus,
   ExecutingToolState,
 } from '../types'
+import {
+  applyApprovalStatusToSegment,
+  nextBatchExecution,
+  withBatchExecution,
+} from '../stream/message-mutations'
 
 export interface AccumulatorCallbacks {
-  onApprove?: (requestId?: string) => Promise<void> | void
-  onReject?: (requestId?: string) => Promise<void> | void
+  /** See `ApprovalResolutionHandler` (message.types) — the SSOT for the
+   *  approve/reject signature incl. the boolean failure flag. */
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
+  /** Escalation offers resolve through the ticket-escalation mutations, NOT
+   *  the tool-approval endpoint, so they carry their own pair of handlers.
+   *  Sharing `onApprove`/`onReject` would POST an offer id to the approval
+   *  endpoint, which has no record of it. */
+  onEscalationApprove?: ApprovalResolutionHandler
+  onEscalationReject?: ApprovalResolutionHandler
 }
 
 /**
@@ -156,6 +175,17 @@ export class MessageSegmentAccumulator {
   }
 
   /**
+   * Add a clarification (ask) card. Unlike the three delta streams an ask
+   * arrives whole in one chunk, so it is always a NEW segment — never merged
+   * into a trailing one. Consecutive cards stay separate segments; the renderer
+   * is what pages through a run of them.
+   */
+  addAsk(question: string, options: AskOptionData[]): MessageSegment[] {
+    this.segments.push({ type: 'ask', question, options })
+    return this.getSegments()
+  }
+
+  /**
    * Add a tool execution segment.
    *
    * Routing:
@@ -244,25 +274,13 @@ export class MessageSegmentAccumulator {
       if (!hasCall) return seg
 
       const prev: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId]
-      // Never downgrade a done slot back to executing (redelivered EXECUTING
-      // after its EXECUTED already landed) — matched, but unchanged.
-      if (toolData.type === 'EXECUTING_TOOL' && prev?.status === 'done') {
-        matched = true
-        return seg
-      }
-      const next: ApprovalBatchExecutionState =
-        toolData.type === 'EXECUTED_TOOL'
-          ? { status: 'done', result: toolData.result, success: toolData.success }
-          : { status: 'executing', result: prev?.result, success: prev?.success }
-
+      // Shared rule (`nextBatchExecution` from message-mutations): the
+      // never-downgrade guard + EXECUTED/EXECUTING ternary — one
+      // implementation with the message-array projection.
+      const next = nextBatchExecution(prev, toolData)
       matched = true
-      return {
-        ...seg,
-        data: {
-          ...seg.data,
-          executions: { ...(seg.data.executions ?? {}), [execId]: next },
-        },
-      }
+      if (next === null) return seg
+      return withBatchExecution(seg, execId, next)
     })
     return matched
   }
@@ -307,23 +325,55 @@ export class MessageSegmentAccumulator {
     command: string,
     explanation: string | undefined,
     approvalType: string,
-    status: ChatApprovalStatus = 'pending'
+    status: ChatApprovalStatus = 'pending',
+    /** Structured label/value rows. The card prefers them over `explanation`
+     *  (see `ApprovalRequestData.fields`). Optional because the agent's own
+     *  approvals carry prose; a Product Guide card is almost entirely fields —
+     *  dropping them here left it as a bare title. */
+    fields?: ApprovalRequestField[],
+    /** Where the card came from; `'guide'` keeps it inline (see
+     *  `ApprovalRequestData.origin`). */
+    origin?: 'guide'
   ): MessageSegment[] {
-    const segment: ApprovalRequestSegment = {
+    this.segments.push(
+      this.buildApprovalRequestSegment(
+        requestId,
+        { command, explanation, approvalType, fields, origin },
+        status,
+      ),
+    )
+    return this.getSegments()
+  }
+
+  /**
+   * Build one approval-request segment — THE constructor for this segment type.
+   *
+   * Three paths produce these: `addApprovalRequest` (live stream and replay),
+   * `flushPendingApprovals` (tracked-but-unresolved after a history replay) and
+   * `processApprovalResult` (a result arriving for a tracked request). They used
+   * to hand-write the object each, which is how `fields` and `origin` reached
+   * the card down one path and not the others — the same proposal rendering as a
+   * bare title, or losing the marker that routes its buttons to the hub.
+   */
+  private buildApprovalRequestSegment(
+    requestId: string,
+    approval: PendingApproval,
+    status: ChatApprovalStatus,
+  ): ApprovalRequestSegment {
+    return {
       type: 'approval_request',
       data: {
-        command,
-        explanation,
+        command: approval.command,
+        explanation: approval.explanation,
         requestId,
-        approvalType,
+        approvalType: approval.approvalType,
+        ...(approval.fields && approval.fields.length > 0 ? { fields: approval.fields } : {}),
+        ...(approval.origin ? { origin: approval.origin } : {}),
       },
       status,
       onApprove: this.callbacks.onApprove,
       onReject: this.callbacks.onReject,
     }
-
-    this.segments.push(segment)
-    return this.getSegments()
   }
 
   /**
@@ -346,6 +396,9 @@ export class MessageSegmentAccumulator {
     status: ChatApprovalStatus = 'pending',
     executions?: Record<string, ApprovalBatchExecutionState>,
     resolvedByName?: string | null,
+    /** Where the batch came from; `'guide'` keeps it inline and routes it to
+     *  the hub, exactly as for a single card (see `ApprovalBatchData.origin`). */
+    origin?: 'guide',
   ): MessageSegment[] {
     const existingIndex = this.segments.findIndex(
       (s): s is ApprovalBatchSegment =>
@@ -355,6 +408,9 @@ export class MessageSegmentAccumulator {
     if (existingIndex !== -1) {
       const existing = this.segments[existingIndex] as ApprovalBatchSegment
       const mergedExecutions = executions ?? existing.data.executions
+      // An upsert must not strip the marker: the flip to `approved` comes from
+      // a later event that carries no origin of its own.
+      const mergedOrigin = origin ?? existing.data.origin
       this.segments[existingIndex] = {
         ...existing,
         data: {
@@ -362,6 +418,7 @@ export class MessageSegmentAccumulator {
           approvalType,
           toolCalls,
           ...(mergedExecutions ? { executions: mergedExecutions } : {}),
+          ...(mergedOrigin ? { origin: mergedOrigin } : {}),
         },
         status,
         resolvedByName: resolvedByName ?? existing.resolvedByName,
@@ -378,6 +435,7 @@ export class MessageSegmentAccumulator {
         approvalType,
         toolCalls,
         ...(executions ? { executions } : {}),
+        ...(origin ? { origin } : {}),
       },
       status,
       resolvedByName,
@@ -400,20 +458,17 @@ export class MessageSegmentAccumulator {
   ): { segment: ApprovalRequestSegment; pendingData: PendingApproval | null } | null {
     const pendingApproval = this.pendingApprovals.get(requestId)
     const status: ChatApprovalStatus = approved ? 'approved' : 'rejected'
-    
-    const segment: ApprovalRequestSegment = {
-      type: 'approval_request',
-      data: {
+
+    const segment = this.buildApprovalRequestSegment(
+      requestId,
+      {
+        ...pendingApproval,
         command: pendingApproval?.command || '',
-        explanation: pendingApproval?.explanation,
-        requestId,
         approvalType: pendingApproval?.approvalType || approvalType,
       },
       status,
-      onApprove: this.callbacks.onApprove,
-      onReject: this.callbacks.onReject,
-    }
-    
+    )
+
     this.segments.push(segment)
     
     if (pendingApproval) {
@@ -424,20 +479,81 @@ export class MessageSegmentAccumulator {
   }
 
   /**
-   * Update status of an existing approval segment (single or batch).
+   * Add a ticket-escalation offer block. Upserts by `offerId` for the same
+   * reason `addApprovalBatch` does: the consumer-store replay path feeds
+   * `[existing..., new...]` back through `replaySegments`, which would
+   * otherwise yield two cards for one offer.
+   */
+  addEscalationOffer(
+    offerId: string,
+    text: string,
+    origin: string | undefined,
+    status: ChatApprovalStatus = 'pending',
+    resolvedByName?: string | null,
+  ): MessageSegment[] {
+    const existingIndex = this.segments.findIndex(
+      (s): s is EscalationOfferSegment =>
+        s.type === 'escalation_offer' && s.data.offerId === offerId,
+    )
+    const existing =
+      existingIndex !== -1 ? (this.segments[existingIndex] as EscalationOfferSegment) : undefined
+
+    const segment: EscalationOfferSegment = {
+      type: 'escalation_offer',
+      // The resolved chunk carries no text/origin — a redelivered offer must
+      // not blank the card the PENDING chunk already painted.
+      data: { offerId, text: text || existing?.data.text || '', origin: origin ?? existing?.data.origin },
+      status,
+      resolvedByName: resolvedByName ?? existing?.resolvedByName,
+      onApprove: this.callbacks.onEscalationApprove,
+      onReject: this.callbacks.onEscalationReject,
+    }
+
+    if (existingIndex !== -1) {
+      this.segments[existingIndex] = segment
+      return this.getSegments()
+    }
+
+    this.segments.push(segment)
+    return this.getSegments()
+  }
+
+  /**
+   * Add the handoff receipt. Upserts by `ticketId` so a redelivered block
+   * (JetStream catch-up over hydrated history) can't stack a second notice.
+   */
+  addTicketEscalated(data: TicketEscalatedData): MessageSegment[] {
+    const segment: TicketEscalatedSegment = { type: 'ticket_escalated', data }
+    const existingIndex = this.segments.findIndex(
+      (s) => s.type === 'ticket_escalated' && s.data.ticketId === data.ticketId,
+    )
+    if (existingIndex !== -1) {
+      this.segments[existingIndex] = segment
+      return this.getSegments()
+    }
+    this.segments.push(segment)
+    return this.getSegments()
+  }
+
+  /**
+   * Update status of an existing approval segment (single, batch, or
+   * escalation offer).
    * `resolvedByName` (when provided) is stamped onto the matching batch segment so the
    * resolved card shows "by {name}"; omit it to leave any existing value untouched.
    */
-  updateApprovalStatus(requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null): MessageSegment[] {
-    this.segments = this.segments.map(segment => {
-      if (segment.type === 'approval_request' && segment.data.requestId === requestId) {
-        return { ...segment, status }
-      }
-      if (segment.type === 'approval_batch' && segment.data.approvalRequestId === requestId) {
-        return { ...segment, status, resolvedByName: resolvedByName ?? segment.resolvedByName }
-      }
-      return segment
-    })
+  updateApprovalStatus(
+    requestId: string,
+    status: ChatApprovalStatus,
+    resolvedByName?: string | null,
+  ): MessageSegment[] {
+    // ONE rule, two containers: `applyApprovalStatusToSegment` is the
+    // same predicate the message-array projection uses
+    // (`projectApprovalResolutionToMessages`) — anchor status flip AND
+    // batch-row execution tick, so this flat-list path can never drift
+    // from the projection again (it previously missed the row case).
+    this.segments = this.segments.map((segment) =>
+      applyApprovalStatusToSegment(segment, requestId, status, resolvedByName),
+    )
     return this.getSegments()
   }
 
@@ -460,22 +576,11 @@ export class MessageSegmentAccumulator {
    */
   flushPendingApprovals(): ApprovalRequestSegment[] {
     const segments: ApprovalRequestSegment[] = []
-    
+
     this.pendingApprovals.forEach((approval, requestId) => {
-      segments.push({
-        type: 'approval_request',
-        data: {
-          command: approval.command,
-          explanation: approval.explanation,
-          requestId,
-          approvalType: approval.approvalType,
-        },
-        status: 'pending',
-        onApprove: this.callbacks.onApprove,
-        onReject: this.callbacks.onReject,
-      })
+      segments.push(this.buildApprovalRequestSegment(requestId, approval, 'pending'))
     })
-    
+
     return segments
   }
 
@@ -535,6 +640,9 @@ export class MessageSegmentAccumulator {
         case 'guide':
           if (segment.text) this.appendGuide(segment.text)
           break
+        case 'ask':
+          this.addAsk(segment.question, segment.options)
+          break
         case 'tool_execution':
           this.addToolExecution(segment)
           break
@@ -546,6 +654,8 @@ export class MessageSegmentAccumulator {
             data.explanation,
             data.approvalType || '',
             status,
+            data.fields,
+            data.origin,
           )
           break
         }
@@ -558,9 +668,18 @@ export class MessageSegmentAccumulator {
             status,
             data.executions,
             resolvedByName,
+            data.origin,
           )
           break
         }
+        case 'escalation_offer': {
+          const { data, status, resolvedByName } = segment
+          this.addEscalationOffer(data.offerId, data.text, data.origin, status, resolvedByName)
+          break
+        }
+        case 'ticket_escalated':
+          this.addTicketEscalated(segment.data)
+          break
         case 'error':
           this.addError(segment.title, segment.details)
           break

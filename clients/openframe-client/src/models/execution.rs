@@ -43,6 +43,48 @@ pub struct ScriptEnvVar {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ScriptSpec {
+    pub code: String,
+    pub shell: ScriptShell,
+    #[serde(default)]
+    pub privilege_level: Option<PrivilegeLevel>,
+    #[serde(default)]
+    pub args: Option<Vec<String>>,
+    #[serde(default)]
+    pub timeout_seconds: Option<u64>,
+    #[serde(default)]
+    pub env_vars: Option<Vec<ScriptEnvVar>>,
+}
+
+impl ScriptSpec {
+    fn to_request<'a>(
+        &'a self,
+        execution_id: &'a str,
+        script_id: Option<&'a str>,
+        schedule_id: Option<&'a str>,
+    ) -> ExecutionRequest<'a> {
+        ExecutionRequest {
+            execution_id,
+            code: &self.code,
+            shell: self.shell,
+            privilege: self.privilege_level.unwrap_or(PrivilegeLevel::Admin),
+            args: self.args.as_deref().unwrap_or(&[]),
+            timeout_secs: self.timeout_seconds.unwrap_or_else(default_timeout),
+            env_vars: self
+                .env_vars
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .map(|e| format!("{}={}", e.name, e.value))
+                .collect(),
+            script_id,
+            schedule_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ScriptMessage {
     pub execution_id: String,
     #[serde(default)]
@@ -51,16 +93,30 @@ pub struct ScriptMessage {
     pub schedule_id: Option<String>,
     #[serde(default)]
     pub script_id: Option<String>,
-    pub code: String,
-    pub shell: ScriptShell,
+    #[serde(flatten)]
+    pub spec: ScriptSpec,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptScheduleExecutionItem {
+    pub script_id: String,
+    #[serde(flatten)]
+    pub spec: ScriptSpec,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptScheduleExecutionMessage {
+    pub execution_id: String,
     #[serde(default)]
-    pub privilege_level: Option<PrivilegeLevel>,
+    pub schedule_id: Option<String>,
     #[serde(default)]
-    pub args: Vec<String>,
-    #[serde(default = "default_timeout")]
-    pub timeout_seconds: u64,
+    pub machine_id: Option<String>,
     #[serde(default)]
-    pub env_vars: Vec<ScriptEnvVar>,
+    pub initiated_by: Option<String>,
+    #[serde(default)]
+    pub scripts: Vec<ScriptScheduleExecutionItem>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -110,10 +166,12 @@ pub struct ExecutionRequest<'a> {
 
 pub trait ExecutionMessage: Sized + Send {
     const KIND: &'static str;
+    const RESULT_KIND: &'static str = Self::KIND;
+    const DURABLE: bool = false;
 
     fn from_payload(payload: &str) -> Result<Self>;
     fn execution_id(&self) -> &str;
-    fn to_request(&self) -> ExecutionRequest<'_>;
+    fn to_requests(&self) -> Vec<ExecutionRequest<'_>>;
 
     fn schedule_id(&self) -> Option<&str> {
         None
@@ -131,8 +189,8 @@ impl ExecutionMessage for CommandMessage {
         &self.execution_id
     }
 
-    fn to_request(&self) -> ExecutionRequest<'_> {
-        ExecutionRequest {
+    fn to_requests(&self) -> Vec<ExecutionRequest<'_>> {
+        vec![ExecutionRequest {
             execution_id: &self.execution_id,
             code: &self.code,
             shell: self.shell,
@@ -142,7 +200,7 @@ impl ExecutionMessage for CommandMessage {
             env_vars: Vec::new(),
             script_id: None,
             schedule_id: None,
-        }
+        }]
     }
 }
 
@@ -161,102 +219,46 @@ impl ExecutionMessage for ScriptMessage {
         self.schedule_id.as_deref()
     }
 
-    fn to_request(&self) -> ExecutionRequest<'_> {
-        ExecutionRequest {
-            execution_id: &self.execution_id,
-            code: &self.code,
-            shell: self.shell,
-            privilege: self.privilege_level.unwrap_or(PrivilegeLevel::Admin),
-            args: &self.args,
-            timeout_secs: self.timeout_seconds,
-            env_vars: self
-                .env_vars
-                .iter()
-                .map(|e| format!("{}={}", e.name, e.value))
-                .collect(),
-            script_id: self.script_id.as_deref(),
-            schedule_id: self.schedule_id.as_deref(),
-        }
+    fn to_requests(&self) -> Vec<ExecutionRequest<'_>> {
+        vec![self.spec.to_request(
+            &self.execution_id,
+            self.script_id.as_deref(),
+            self.schedule_id.as_deref(),
+        )]
+    }
+}
+
+impl ExecutionMessage for ScriptScheduleExecutionMessage {
+    const KIND: &'static str = "script-schedule-execution";
+    const RESULT_KIND: &'static str = ScriptMessage::KIND;
+    const DURABLE: bool = true;
+
+    fn from_payload(payload: &str) -> Result<Self> {
+        Ok(serde_json::from_str(payload)?)
+    }
+
+    fn execution_id(&self) -> &str {
+        &self.execution_id
+    }
+
+    fn schedule_id(&self) -> Option<&str> {
+        self.schedule_id.as_deref()
+    }
+
+    fn to_requests(&self) -> Vec<ExecutionRequest<'_>> {
+        self.scripts
+            .iter()
+            .map(|item| {
+                item.spec.to_request(
+                    &self.execution_id,
+                    Some(&item.script_id),
+                    self.schedule_id.as_deref(),
+                )
+            })
+            .collect()
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_command_message_camel_case() {
-        let m = CommandMessage::from_payload(
-            r#"{"executionId":"e","code":"echo hi","shell":"BASH","privilegeLevel":"ADMIN","timeout":30}"#,
-        )
-        .unwrap();
-        assert_eq!(m.execution_id, "e");
-        assert!(matches!(m.shell, ScriptShell::Bash));
-        assert_eq!(m.timeout, 30);
-    }
-
-    #[test]
-    fn parses_script_message_with_env_and_args() {
-        let m = ScriptMessage::from_payload(
-            r#"{"executionId":"e","machineId":"mac","scheduleId":"sch-1","scriptId":"scr-1","code":"x","shell":"POWERSHELL","privilegeLevel":"USER","args":["-v"],"timeoutSeconds":60,"envVars":[{"name":"FOO","value":"bar"}]}"#,
-        )
-        .unwrap();
-        let req = m.to_request();
-        assert_eq!(req.timeout_secs, 60);
-        assert_eq!(req.args, &["-v".to_string()]);
-        assert_eq!(req.env_vars, vec!["FOO=bar".to_string()]);
-        assert!(matches!(req.privilege, PrivilegeLevel::User));
-        assert_eq!(req.script_id, Some("scr-1"));
-        assert_eq!(req.schedule_id, Some("sch-1"));
-    }
-
-    #[test]
-    fn script_message_without_script_id_still_parses() {
-        let m = ScriptMessage::from_payload(r#"{"executionId":"e","code":"x","shell":"BASH"}"#)
-            .unwrap();
-        assert!(m.script_id.is_none());
-        assert!(m.to_request().script_id.is_none());
-    }
-
-    #[test]
-    fn missing_privilege_defaults_to_admin() {
-        let m = CommandMessage::from_payload(r#"{"executionId":"e","code":"x","shell":"CMD"}"#)
-            .unwrap();
-        assert!(matches!(m.to_request().privilege, PrivilegeLevel::Admin));
-        assert_eq!(m.timeout, 900);
-    }
-
-    #[test]
-    fn result_serializes_snake_case() {
-        let r = RmmResult {
-            execution_id: "e".into(),
-            machine_id: "m".into(),
-            stdout: "o".into(),
-            stderr: String::new(),
-            exit_code: 0,
-            execution_time_ms: 1,
-            timed_out: false,
-            error: None,
-            script_id: Some("scr-1".into()),
-            schedule_id: None,
-        };
-        let v = serde_json::to_value(&r).unwrap();
-        assert!(v.get("execution_id").is_some());
-        assert!(v.get("exit_code").is_some());
-        assert!(v.get("execution_time_ms").is_some());
-        assert!(v.get("timed_out").is_some());
-        assert!(v.get("error").is_none(), "None error must be omitted");
-        assert_eq!(v.get("script_id").and_then(|s| s.as_str()), Some("scr-1"));
-        assert!(
-            v.get("schedule_id").is_none(),
-            "None schedule_id must be omitted"
-        );
-    }
-
-    #[test]
-    fn shell_maps_to_param() {
-        assert_eq!(ScriptShell::Powershell.as_param(), "powershell");
-        assert_eq!(ScriptShell::Cmd.as_param(), "cmd");
-        assert_eq!(ScriptShell::Shell.as_param(), "sh");
-    }
-}
+#[path = "execution_tests.rs"]
+mod tests;

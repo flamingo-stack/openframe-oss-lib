@@ -1,6 +1,6 @@
 "use client"
 
-import React, { forwardRef, memo, useMemo, useRef } from "react"
+import React, { forwardRef, memo, useEffect, useMemo, useRef } from "react"
 import { cn } from "../../utils/cn"
 import { isToday } from "../../utils/date-utils"
 import { formatDate, formatTime } from "../../utils/format-date"
@@ -8,17 +8,21 @@ import { SquareAvatar } from "../ui/square-avatar"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
 import { ApprovalBatchMessage } from "./approval-batch-message"
+import { EscalationOfferMessage } from "./escalation-offer-message"
+import { TicketEscalatedMessage } from "./ticket-escalated-message"
 import { ErrorMessageDisplay } from "./error-message-display"
 import { ContextCompactionDisplay } from "./context-compaction-display"
 import { ThinkingDisplay } from "./thinking-display"
 import { GuideDisplay } from "./guide-display"
-import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
+import { AskDisplay } from "./ask-display"
+import { SimpleMarkdownRenderer } from "../ui/markdown/simple-markdown-renderer"
 import type { ChatRef } from "./chat-ref.types"
 import { remarkCardLinks } from "./remark-card-links"
+import { remarkStripCitations } from "./remark-strip-citations"
 import { remarkMentionChips } from "./remark-mention-chips"
 import { BlockCard, type BlockCardProps } from "./entity-cards/block-card"
 import { ChatContextChipStrip } from "./chat-context-picker"
-import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
+import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
 
 /** Inline `@marker:id` mention token in the message body (sibling of the
  *  `[card://]` grammar) — used to filter out items rendered inline from the
@@ -27,8 +31,9 @@ import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from ".
  *  (e.g. it matches `x@device:1` mid-word, which the plugin skips), so a context
  *  item would be stripped from the chip strip yet never rendered inline — lost
  *  from display entirely. The id is capture group 2 (group 1 is the boundary).
- *  Marker lowercase; id is the mention-token charset. */
-const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g
+ *  Marker `[a-zA-Z]+` (markers are mostly lowercase but not all — e.g.
+ *  `scheduledScript`); id is the mention-token charset. */
+const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-zA-Z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g
 
 /**
  * Same regex shape as `remarkCardLinks` — kept in lockstep so the
@@ -53,8 +58,32 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
   return content
 }
 
+/**
+ * A RUN of consecutive `ask` segments is one paged card, not a stack of
+ * near-identical ones. Returns the run keyed by the index of its FIRST segment;
+ * the render draws the card there and skips every later index of the same run
+ * (an `ask` index missing from this map is a tail member).
+ */
+function groupAskRuns(segments: MessageSegment[]): Map<number, AskSegment[]> {
+  const runs = new Map<number, AskSegment[]>()
+  let headIndex = -1
+  segments.forEach((segment, index) => {
+    if (segment.type !== 'ask') {
+      headIndex = -1
+      return
+    }
+    if (headIndex === -1) {
+      headIndex = index
+      runs.set(index, [segment])
+      return
+    }
+    runs.get(headIndex)?.push(segment)
+  })
+  return runs
+}
+
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, approvalVariant, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, approvalVariant, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, onAskSelect, NavLinkAnchor, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
@@ -75,6 +104,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     const hasMarkerSupport = !!chatRefs || !!renderEntityCard
 
     const segments = useMemo(() => normalizeContent(content), [content])
+
+    const askRuns = useMemo(() => groupAskRuns(segments), [segments])
 
     // Inline `@marker:id` mentions: the composer commits these tokens when the
     // user picks context via the `@`-flow, and the ASSISTANT routinely echoes
@@ -109,7 +140,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // (user). Each is gated independently so neither fires without its data.
     const cardRemarkPlugins = useMemo(
       () => [
-        ...(hasMarkerSupport ? [remarkCardLinks] : []),
+        ...(hasMarkerSupport ? [remarkCardLinks, remarkStripCitations] : []),
         ...(hasMentionSupport ? [remarkMentionChips] : []),
       ],
       [hasMarkerSupport, hasMentionSupport],
@@ -164,9 +195,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         | { kind: 'text'; text: string }
         | { kind: 'block'; key: string; node: React.ReactNode }
       const partsBySegment = new Map<number, SegmentPart[]>()
-      if (!render) return { inlineByKey, partsBySegment }
-      const cache = renderedCardNodeCache.current
       const usedKeys = new Set<string>()
+      if (!render) return { inlineByKey, partsBySegment, usedKeys }
+      const cache = renderedCardNodeCache.current
       // Card keys already emitted as a hoisted block (`b-<key>`). The same
       // marker can legitimately appear twice in one message (LLM references
       // the same entity twice); we hoist the FIRST occurrence and skip the
@@ -281,20 +312,99 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           partsBySegment.set(segIdx, parts)
         }
       })
-      // Drop cached nodes for markers no longer present so the cache can't
-      // grow unbounded as a long message's markers change.
-      if (cache.size > usedKeys.size) {
-        for (const k of cache.keys()) {
-          if (!usedKeys.has(k)) cache.delete(k)
-        }
-      }
-      return { inlineByKey, partsBySegment }
+      return { inlineByKey, partsBySegment, usedKeys }
     }, [hasMarkerSupport, chatRefs, renderEntityCard, segments])
+
+    // Drop cached nodes for markers no longer present so the cache can't grow
+    // unbounded as a long message's markers change. Deliberately an EFFECT,
+    // not part of the memo above: pruning is a mutation, and doing it in the
+    // render phase is non-idempotent (StrictMode's double-invoke, or a render
+    // React throws away, would evict nodes the committed tree still uses and
+    // remount the cards it was built to preserve).
+    useEffect(() => {
+      const cache = renderedCardNodeCache.current
+      const usedKeys = renderingPlan?.usedKeys
+      if (!usedKeys) return
+      if (cache.size <= usedKeys.size) return
+      for (const k of [...cache.keys()]) {
+        if (!usedKeys.has(k)) cache.delete(k)
+      }
+    }, [renderingPlan])
+
+    // The plan is read through a REF inside the `<a>` override, not captured
+    // in the override's closure. `renderingPlan` is rebuilt on every text
+    // delta (its `segments` dep is a fresh array per delta), so depending on
+    // it here would give `cardComponentOverrides` a new identity every token
+    // — which re-creates the markdown engine's `components` memo and defeats
+    // its per-block `StreamingBlockRenderer` memoization for the WHOLE
+    // message, on every token. The ref keeps the override identity stable
+    // while still reading the current plan at call time.
+    const renderingPlanRef = useRef(renderingPlan)
+    renderingPlanRef.current = renderingPlan
+    const chatRefsRef = useRef(chatRefs)
+    chatRefsRef.current = chatRefs
+
+    // Ref-SET token. The override reads `chatRefsRef` at CALL time, but the
+    // markdown engine memoizes completed blocks on the override map's
+    // identity — so on a COMPLETED (no longer streaming) message, a ref that
+    // resolves late would never be re-read: nothing else about the renderer's
+    // props changes, the engine's memo bails, and the pill stays stuck on its
+    // fallback (`refMatch.title`, or the raw cardId) forever. Streaming is
+    // covered because `card://` blocks are excluded from the block cache; the
+    // completed path has no other escape.
+    //
+    // The token fingerprints VALUES, not just the key set: a later refs frame
+    // REPLACES the whole map for a send index, and the enrichment case that
+    // matters most — a `title` going from the raw cardId to the resolved
+    // document title — keeps the key set IDENTICAL. A key-only token would be
+    // unchanged, the override map would keep its identity, the engine's
+    // completed-block memo would bail, and the pill would stay on its fallback
+    // forever. Every `ChatRef` field is included because the host's
+    // `renderEntityCard` receives the whole ref and may render any of them.
+    //
+    // Still STABLE per text delta (the refs map doesn't change while tokens
+    // stream), and the cost is one pass over a handful of refs per CHANGED
+    // `chatRefs` identity — the dep list is unchanged.
+    //
+    // Fields are joined by `JSON.stringify`, NOT by a separator character.
+    // `title`, `preview` and `url` are free-form HOST strings, so any
+    // delimiter we pick is one the data may also contain: joined with a plain
+    // space, `title: 'a b'` + empty `url` fingerprints identically to
+    // `title: 'a'` + `url: 'b'`, silently reintroducing the stale-pill memo
+    // bail this token exists to fix. (An earlier revision used a literal NUL
+    // byte as the separator: collision-free in practice, but it made the
+    // source file itself binary to grep and diff tooling.) `JSON.stringify`
+    // escapes every field, so no value can forge a boundary.
+    //
+    // Caveat worth stating: `JSON.stringify` on `metadata` is key-ORDER
+    // dependent: two structurally equal objects built in different insertion
+    // orders fingerprint differently. Acceptable here because every refs map
+    // arrives from ONE decoder with a fixed field order, and the failure mode
+    // is a redundant re-render, never a stale pill.
+    const refsKey = useMemo(
+      () =>
+        Object.entries(chatRefs ?? {})
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) =>
+            JSON.stringify([
+              k,
+              v.type,
+              v.sourceRepo ?? null,
+              v.id,
+              v.title,
+              v.url ?? null,
+              v.targetPlatform ?? null,
+              v.date ?? null,
+              v.preview ?? null,
+              v.metadata ?? null,
+            ]),
+          )
+          .join('|'),
+      [chatRefs],
+    )
 
     const cardComponentOverrides = useMemo(() => {
       if (!hasMarkerSupport && !hasMentionSupport) return undefined
-      const refs = chatRefs ?? {}
-      const inlineByKey = renderingPlan?.inlineByKey
       return {
         // Override `<a>` to detect `card://` URLs emitted by `remarkCardLinks`.
         // The render result was pre-computed in `renderingPlan` so block-level
@@ -322,7 +432,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               const cardType = stripped.slice(0, sepIdx)
               const cardId = stripped.slice(sepIdx + 1)
               const key = `${cardType}:${cardId}`
-              const inline = inlineByKey?.get(key)
+              const inline = renderingPlanRef.current?.inlineByKey.get(key)
               if (inline != null) return inline
               // Three fallback cases — keep them DISTINCT, never blur them
               // together. Mixing them up (which the old code did by reaching
@@ -346,7 +456,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               //       title from an unrelated ref — that hides the bug and
               //       deceives the reader into thinking they're looking at
               //       a real card.
-              const refMatch: ChatRef | undefined = refs[key]
+              const refMatch: ChatRef | undefined = chatRefsRef.current?.[key]
               if (refMatch) {
                 return <span className="text-ods-text-primary">{refMatch.title}</span>
               }
@@ -388,7 +498,13 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           )
         },
       }
-    }, [hasMarkerSupport, hasMentionSupport, renderMention, chatRefs, renderingPlan, NavLinkAnchor])
+      // DEPS ARE DELIBERATELY MINIMAL — every one of them is stable across a
+      // streaming turn (booleans + host-stable fn/component identities, both
+      // enforced by this file's `memo` comparator). The rendering plan and the
+      // refs MAP are read through refs above precisely so they do NOT appear
+      // here; `refsKey` is the one ref-derived dep, and it only moves when the
+      // ref set OR any ref VALUE does (see its definition).
+    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor, refsKey])
 
     /**
      * Body of a markdown-bearing segment (`text` / `guide`).
@@ -403,8 +519,13 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
      * end). Stable React keys come from the card key (block) and chunk position
      * (text); streaming token-by-token reuses the same React instances so
      * `<Video>` doesn't remount mid-play.
+     *
+     * `isStreaming` opts the segment into the markdown engine's streaming path
+     * (atomic-block memoization + fence tail-completion + aria-live). Only the
+     * actively streaming segment gets it, and within a marker-split segment
+     * only the LAST text chunk — the earlier chunks are already final.
      */
-    const renderSegmentBody = (segIndex: number, text: string) => {
+    const renderSegmentBody = (segIndex: number, text: string, isStreaming: boolean) => {
       const parts = renderingPlan?.partsBySegment.get(segIndex)
       if (!parts || parts.length === 0) {
         return (
@@ -413,6 +534,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             textSize="compact"
             additionalRemarkPlugins={cardRemarkPlugins}
             componentOverrides={cardComponentOverrides}
+            streaming={isStreaming}
           />
         )
       }
@@ -425,6 +547,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               textSize="compact"
               additionalRemarkPlugins={cardRemarkPlugins}
               componentOverrides={cardComponentOverrides}
+              streaming={isStreaming && pIdx === parts.length - 1}
             />
           )
         }
@@ -539,6 +662,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           {/* Message segments — hidden for system messages without content */}
           {(!isSystem || segments.length > 0) && <div className="flex flex-col gap-2">
             {segments.map((segment, index) => {
+                // The engine's streaming path (atomic-block memoization +
+                // fence tail-completion + aria-live) applies ONLY to the
+                // actively streaming segment: last segment of a message that
+                // is still typing. On completion `isTyping` flips false and
+                // the engine does one authoritative whole-document parse.
+                const segmentIsStreaming = index === segments.length - 1 && !!isTyping
                 if (segment.type === 'text') {
                   return (
                     <div
@@ -548,11 +677,21 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                         isError ? "text-ods-error" : "text-ods-text-primary",
                       )}
                     >
-                      {renderSegmentBody(index, segment.text)}
+                      {renderSegmentBody(index, segment.text, segmentIsStreaming)}
                     </div>
                   )
                 } else if (segment.type === 'guide') {
-                  return <GuideDisplay key={index}>{renderSegmentBody(index, segment.text)}</GuideDisplay>
+                  return (
+                    <GuideDisplay key={index}>
+                      {renderSegmentBody(index, segment.text, segmentIsStreaming)}
+                    </GuideDisplay>
+                  )
+                } else if (segment.type === 'ask') {
+                  // Only the run's head draws — the tail segments are pages of
+                  // the card already rendered above them.
+                  const run = askRuns.get(index)
+                  if (!run) return null
+                  return <AskDisplay key={index} cards={run} onSelect={onAskSelect} />
                 } else if (segment.type === 'tool_execution') {
                   return (
                     <ToolExecutionDisplay
@@ -588,6 +727,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       variant={approvalVariant}
                     />
                   )
+                } else if (segment.type === 'escalation_offer') {
+                  return (
+                    <EscalationOfferMessage
+                      key={index}
+                      data={segment.data}
+                      status={segment.status}
+                      resolvedByName={segment.resolvedByName}
+                      onApprove={segment.onApprove}
+                      onReject={segment.onReject}
+                    />
+                  )
+                } else if (segment.type === 'ticket_escalated') {
+                  return <TicketEscalatedMessage key={index} data={segment.data} timestamp={timestamp} />
                 } else if (segment.type === 'error') {
                   return (
                     <ErrorMessageDisplay
@@ -663,6 +815,10 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // equality holds across streaming chunks.
     prevProps.renderMention === nextProps.renderMention &&
     prevProps.renderEntityCard === nextProps.renderEntityCard &&
+    // Same stability contract as the renderers above: hosts pass a `useCallback`
+    // (EmbeddableChat passes its memoized `handleSend`), so this holds across
+    // streaming chunks instead of re-rendering every ask card per chunk.
+    prevProps.onAskSelect === nextProps.onAskSelect &&
     prevProps.NavLinkAnchor === nextProps.NavLinkAnchor
   )
 })

@@ -26,11 +26,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Immune to the searchMachines online-flap that affects device cases — these never touch a machine.
  */
 @Tag("ai")
+@Tag("mingo")
 @DisplayName("Mingo — ticketing")
 public class MingoTicketingTest extends MingoBaseTest {
 
     private String createdTicketId;
 
+    @Tag("feature")
     @Test
     @Tag("ticket")
     @DisplayName("Mingo creates a ticket")

@@ -18,5 +18,5 @@ public class ScheduleDeviceCriteria {
 
     private List<DeviceType> deviceTypes;
 
-    private List<String> osTypes;
+    private List<OsType> osTypes;
 }

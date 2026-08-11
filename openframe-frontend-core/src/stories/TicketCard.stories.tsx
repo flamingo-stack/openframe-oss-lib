@@ -6,6 +6,7 @@ import {
   TicketCard,
   type TicketCardProps,
   type BoardTicket,
+  type BoardTicketActivityKind,
 } from '../components/features/board'
 import type { PendingToolCallData } from '../components/chat/types'
 
@@ -147,6 +148,56 @@ export const WithNewMessage: Story = {
   args: {
     ticket: { ...BASE_TICKET, id: 'ticket-new-msg', hasNewMessage: true },
     columnColor: '#2890fa',
+  },
+}
+
+/**
+ * The client asked for a human and confirmed the handoff — an amber footer row
+ * distinguishing it from an inactivity auto-escalation or an admin takeover,
+ * which reach the same lane silently. Driven by the ticket's `escalatedByUser`
+ * field, not by a label.
+ */
+export const EscalatedByUser: Story = {
+  args: {
+    ticket: { ...BASE_TICKET, id: 'ticket-escalated', escalatedByUser: true },
+  },
+}
+
+/**
+ * The `activity` footer row, one card per kind. The three live kinds (animated
+ * dots loader + grey text) fall back to their built-in labels; `stale` (clock +
+ * amber text) carries a consumer-computed duration label, since only the
+ * consumer knows the ticket's idle time — and keeps it ticking.
+ */
+export const ActivityIndicators: Story = {
+  render: () => {
+    const activities: { kind: BoardTicketActivityKind; label?: string }[] = [
+      { kind: 'ai-working' },
+      { kind: 'user-typing' },
+      { kind: 'waiting-external' },
+      { kind: 'stale', label: 'No activity for 2 hours' },
+    ]
+    return (
+      <DndContext>
+        <SortableContext items={activities.map((a) => `ticket-activity-${a.kind}`)}>
+          <div className="flex w-[320px] flex-col gap-[var(--spacing-system-sf)] rounded-lg bg-ods-card p-[var(--spacing-system-sf)]">
+            {activities.map((activity) => (
+              <TicketCard
+                key={activity.kind}
+                columnId="ACTIVE"
+                ticket={{
+                  ...BASE_TICKET,
+                  id: `ticket-activity-${activity.kind}`,
+                  priority: undefined,
+                  tags: undefined,
+                  activity,
+                }}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+    )
   },
 }
 

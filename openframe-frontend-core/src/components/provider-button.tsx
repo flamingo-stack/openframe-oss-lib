@@ -3,7 +3,7 @@ import { Button } from "./ui/button"
 import { cn } from "../utils/cn"
 
 interface ProviderButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  provider: 'google' | 'microsoft' | 'slack' | 'github';
+  provider: 'google' | 'microsoft' | 'slack' | 'github' | 'apple';
   variant?: 'accent' | 'outline';
   size?: 'default' | 'small-legacy';
   loading?: boolean;
@@ -15,7 +15,8 @@ const ProviderButton = React.forwardRef<HTMLButtonElement, ProviderButtonProps>(
       google: 'Google',
       microsoft: 'Microsoft',
       slack: 'Slack',
-      github: 'GitHub'
+      github: 'GitHub',
+      apple: 'Apple'
     };
 
     return (

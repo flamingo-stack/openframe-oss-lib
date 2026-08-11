@@ -5,6 +5,17 @@ import { cn } from '../../utils/cn';
 
 export type TopNavigationCenterBreakpoint = 'md' | 'lg';
 
+export type TopNavigationSize = 'small' | 'big';
+
+// Bar height + square-cell width per size (Figma 2797-5978 `size` axis).
+// Heights are FIXED across breakpoints. `--top-nav-cell` is consumed by
+// `HeaderButton` (and any custom cell) so cell widths follow the size without
+// each cell knowing about it.
+const SIZE_CLASSES: Record<TopNavigationSize, string> = {
+  small: 'h-14 [--top-nav-cell:3.5rem]',
+  big: 'h-[72px] [--top-nav-cell:4.5rem]',
+};
+
 // Literal class maps — Tailwind's scanner needs the full class strings.
 const CENTER_VISIBILITY: Record<TopNavigationCenterBreakpoint, string> = {
   md: 'hidden md:flex',
@@ -52,6 +63,9 @@ export interface TopNavigationProps extends React.HTMLAttributes<HTMLElement> {
   backgroundClassName?: string;
   /** Top border on mobile (the ODS spec bar shows it below md). Default true. */
   mobileTopBorder?: boolean;
+  /** Bar size (Figma 2797-5978 `size` axis): `small` = 56px (console),
+   *  `big` = 72px (marketing/hub sites). Fixed across breakpoints. */
+  size?: TopNavigationSize;
 }
 
 const hasContent = (node: React.ReactNode): boolean => node !== null && node !== undefined && node !== false;
@@ -80,6 +94,7 @@ export function TopNavigation({
   sideActions,
   backgroundClassName,
   mobileTopBorder = true,
+  size = 'small',
   className,
   children,
   ...props
@@ -87,7 +102,8 @@ export function TopNavigation({
   return (
     <header
       className={cn(
-        'flex h-12 w-full items-center border-b border-ods-border md:h-14',
+        'flex w-full items-center border-b border-ods-border',
+        SIZE_CLASSES[size],
         mobileTopBorder && 'border-t md:border-t-0',
         backgroundClassName ?? 'bg-ods-card',
         className,

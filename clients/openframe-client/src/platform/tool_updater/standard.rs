@@ -3,8 +3,8 @@ use async_trait::async_trait;
 use tracing::info;
 
 use super::{
-    backup_binary, cleanup_backup, download_and_write_binary, restore_from_backup, ToolUpdater,
-    ToolUpdaterDeps, UpdateContext,
+    backup_binary, cleanup_backup, clear_aside_binary, download_and_write_binary,
+    log_update_survivors, restore_from_backup, ToolUpdater, ToolUpdaterDeps, UpdateContext,
 };
 use crate::models::{DownloadConfiguration, Installation, InstalledTool};
 
@@ -32,6 +32,9 @@ impl ToolUpdater for StandardToolUpdater {
             .with_context(|| format!("Failed to stop tool: {}", tool_agent_id))?;
 
         let agent_path = self.deps.directory_manager.get_agent_path(tool_agent_id);
+        clear_aside_binary(&agent_path, tool_agent_id).await;
+        log_update_survivors(&self.deps, tool).await;
+
         let backup_path = backup_binary(&agent_path, tool_agent_id).await?;
 
         Ok(UpdateContext {

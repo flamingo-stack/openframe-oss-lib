@@ -20,6 +20,15 @@ export const ELAPSED_MS_FIELD = 'form_elapsed_ms'
 /** Default minimum fill time (ms). A submit faster than this is treated as a bot. */
 export const DEFAULT_MIN_FILL_MS = 700
 
+/**
+ * Every humanity-signal key that rides in a public form's POST body.
+ * Server-side handlers that forward form payloads upstream (HubSpot booking,
+ * CRM pushes, …) MUST strip by THIS array — never hand-typed strings — so a
+ * field rename here propagates everywhere and the honeypot value can never
+ * silently leak into an upstream record.
+ */
+export const HUMANITY_SIGNAL_KEYS = [HONEYPOT_FIELD, ELAPSED_MS_FIELD] as const
+
 /** Keyed wire object produced by `useHumanitySignals().getSignals()` and spread into the POST body. */
 export type HumanitySignals = Record<string, string | number>
 
