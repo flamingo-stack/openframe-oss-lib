@@ -9,9 +9,13 @@ import com.openframe.data.repository.notification.NotificationSettingsRepository
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+
+import static com.openframe.data.document.notification.NotificationSettingsPolicy.isGroupEnabled;
+import static com.openframe.data.document.notification.NotificationSettingsPolicy.isMasterEnabled;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +26,7 @@ public class NotificationSettingsService {
     public NotificationSettingsView get(String userId) {
         NotificationSettings settings = settingsRepository.findByUserId(userId)
                 .orElseGet(NotificationSettingsService::defaults);
-        return NotificationSettingsView.from(settings);
+        return toView(settings);
     }
 
     public NotificationSettingsView update(String userId, boolean enabled,
@@ -48,6 +52,16 @@ public class NotificationSettingsService {
             }
         }
         return muted;
+    }
+
+    private static NotificationSettingsView toView(NotificationSettings settings) {
+        boolean master = isMasterEnabled(settings);
+        List<NotificationTypeSetting> groups = new ArrayList<>();
+        for (NotificationSettingGroup group : NotificationSettingGroup.values()) {
+            boolean groupEnabled = isGroupEnabled(settings, group);
+            groups.add(new NotificationTypeSetting(group, groupEnabled));
+        }
+        return new NotificationSettingsView(master, groups);
     }
 
     private static NotificationSettings defaults() {
