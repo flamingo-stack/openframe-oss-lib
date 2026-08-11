@@ -113,7 +113,7 @@ public class NotificationBroadcaster {
             return admins;
         }
         try {
-            NotificationSettingGroup group = descriptorRegistry.settingsGroupOf(context);
+            NotificationSettingGroup group = descriptorRegistry.settingsGroupOf(context).orElse(null);
             List<NotificationSettings> rows = settingsRepository.findByUserIdIn(admins);
             if (rows.isEmpty()) {
                 return admins;

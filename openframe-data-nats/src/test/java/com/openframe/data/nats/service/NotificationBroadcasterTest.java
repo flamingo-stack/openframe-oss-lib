@@ -354,7 +354,7 @@ class NotificationBroadcasterTest {
     @DisplayName("Given an admin whose settings mute the notification's group, when broadcast runs, then that admin gets NO read-state row, NO socket message and NO push — the others are untouched")
     void opted_out_admin_never_existed_for_this_notification() {
         when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class)))
-                .thenReturn(NotificationSettingGroup.TICKET_ASSIGNED);
+                .thenReturn(Optional.of(NotificationSettingGroup.TICKET_ASSIGNED));
         when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
                 settings("muter", true, Set.of(NotificationSettingGroup.TICKET_ASSIGNED))));
         NotificationCommand cmd = NotificationCommand.builder()
@@ -375,7 +375,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given an admin whose MASTER switch is off, when broadcast runs, then they are dropped whatever the group — even for a type with no checkbox at all")
     void master_off_mutes_everything_including_ungrouped_types() {
-        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(null);
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(Optional.empty());
         when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
                 settings("off", false, null)));
         NotificationCommand cmd = NotificationCommand.builder()
@@ -394,7 +394,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given a muted GROUP but a type with no checkbox, when broadcast runs, then the admin still receives it — an unmapped type cannot be muted, deliberately fail-open")
     void ungrouped_type_ignores_group_mutes() {
-        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(null);
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(Optional.empty());
         when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
                 settings("a1", true, Set.of(NotificationSettingGroup.TICKET_ASSIGNED))));
         NotificationCommand cmd = NotificationCommand.builder()
@@ -449,7 +449,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given every admin opted out and no machine audience, when broadcast runs, then nothing is persisted at all — no invisible orphan docs")
     void fully_muted_dispatch_persists_nothing() {
-        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(null);
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(Optional.empty());
         when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
                 settings("a1", false, null)));
         NotificationCommand cmd = NotificationCommand.builder()
@@ -470,7 +470,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given every admin opted out, when broadcast runs, then no USER rows, no user publishes and no dispatch — but machines still receive theirs")
     void all_admins_opted_out_still_serves_machines() {
-        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(null);
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(Optional.empty());
         when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
                 settings("a1", false, null)));
         NotificationCommand cmd = NotificationCommand.builder()
