@@ -23,11 +23,31 @@ export interface ManagedFileEntry {
   error?: string
 }
 
-export interface FileUploadProps {
+/**
+ * The metadata this component needs to validate and list a file. A browser
+ * `File` satisfies it structurally, and so can a host's own file handle: a
+ * native shell's OS picker hands back a path plus metadata and never a `File`,
+ * because the bytes deliberately stay outside the WebView. See `pickFiles`.
+ */
+export interface FileUploadCandidate {
+  name: string
+  size: number
+  type: string
+}
+
+/**
+ * A file this component can hand back. Dropping, and the built-in
+ * `<input type="file">`, always produce browser `File`s no matter what
+ * `pickFiles` returns — so `File` is part of the contract even when `T` is a
+ * host's own handle type. Collapses to plain `File` in the default case.
+ */
+export type FileUploadValue<T extends FileUploadCandidate = File> = T | File
+
+export interface FileUploadProps<T extends FileUploadCandidate = File> {
   /** Currently selected file(s) — use for simple, synchronous file handling */
-  value?: File | File[]
+  value?: FileUploadValue<T> | FileUploadValue<T>[]
   /** Callback when files change — used with `value` for simple mode */
-  onChange: (files: File | File[] | undefined) => void
+  onChange: (files: FileUploadValue<T> | FileUploadValue<T>[] | undefined) => void
   /**
    * Managed file entries for async upload workflows.
    * When provided, the file list renders from these entries instead of `value`.
@@ -68,6 +88,18 @@ export interface FileUploadProps {
    * where this is the only drop target. Default: false.
    */
   acceptWindowDrops?: boolean
+  /**
+   * Replaces the built-in `<input type="file">` as the source of files. When set,
+   * clicking the dropzone calls this instead of opening the input, and whatever it
+   * resolves with runs through the same accept/size/count validation before
+   * reaching `onChange`. Resolve with an empty array when the user cancels; a
+   * rejection surfaces in this component's own error slot.
+   *
+   * For hosts whose picker a WebView cannot provide — a native shell's OS picker
+   * returns file handles rather than `File` objects, which is what widens `T`.
+   * Leave unset on the web, where the built-in input is the right answer.
+   */
+  pickFiles?: () => Promise<T[]>
 }
 
 function formatFileSize(bytes: number): string {
@@ -78,7 +110,7 @@ function formatFileSize(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
-function matchesAccept(file: File, accept: string): boolean {
+function matchesAccept(file: FileUploadCandidate, accept: string): boolean {
   if (!accept || accept === "*/*") return true
   const patterns = accept
     .split(",")
@@ -103,7 +135,7 @@ function dragHasFiles(e: DragEvent): boolean {
   return false
 }
 
-export function FileUpload({
+export function FileUpload<T extends FileUploadCandidate = File>({
   value,
   onChange,
   managedFiles,
@@ -122,7 +154,8 @@ export function FileUpload({
   icon,
   maxListHeight,
   acceptWindowDrops = false,
-}: FileUploadProps) {
+  pickFiles,
+}: FileUploadProps<T>) {
   const [dragActive, setDragActive] = React.useState(false)
   const [validationError, setValidationError] = React.useState<string | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -137,8 +170,8 @@ export function FileUpload({
   const currentCount = isManaged ? managedFiles.length : files.length
 
   const validateFiles = (
-    incoming: File[],
-  ): { accepted: File[]; error: string | null } => {
+    incoming: FileUploadValue<T>[],
+  ): { accepted: FileUploadValue<T>[]; error: string | null } => {
     if (incoming.length === 0) return { accepted: [], error: null }
 
     const candidates = multiple ? incoming : incoming.slice(0, 1)
@@ -165,9 +198,9 @@ export function FileUpload({
     return { accepted: candidates, error: null }
   }
 
-  const handleFiles = (incoming: FileList | File[]) => {
+  const handleFiles = (incoming: FileList | FileUploadValue<T>[]) => {
     setValidationError(null)
-    const fileArray = Array.from(incoming)
+    const fileArray: FileUploadValue<T>[] = Array.isArray(incoming) ? incoming : Array.from(incoming)
     if (fileArray.length === 0) return
 
     const { accepted, error: validationErr } = validateFiles(fileArray)
@@ -284,7 +317,18 @@ export function FileUpload({
 
   const openDialog = async () => {
     if (disabled) return
-    fileInputRef.current?.click()
+    if (!pickFiles) {
+      fileInputRef.current?.click()
+      return
+    }
+    // A host picker is a real async operation that can fail (a second picker
+    // already on screen, an unreadable selection), and this runs from a click
+    // handler where a rejection would go unhandled.
+    try {
+      handleFiles(await pickFiles())
+    } catch (err) {
+      setValidationError(err instanceof Error ? err.message : "Could not open the file picker")
+    }
   }
 
   const displayError = error || validationError || undefined
@@ -295,6 +339,10 @@ export function FileUpload({
 
   return (
     <FieldWrapper label={fieldLabel} error={displayError} className={className}>
+      {/* Rendered even when `pickFiles` supersedes it: whether a host has a
+          native picker is only knowable on the client, and dropping this node
+          from the tree would make the prerendered HTML and the hydrated render
+          disagree. It is inert — nothing clicks it once `pickFiles` is set. */}
       <input
         ref={fileInputRef}
         type="file"

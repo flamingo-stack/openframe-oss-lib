@@ -9,8 +9,11 @@ import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
+import com.openframe.data.document.notification.NotificationSettingGroup;
+import com.openframe.data.document.notification.NotificationSettings;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
+import com.openframe.data.repository.notification.NotificationSettingsRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,12 +21,14 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -41,6 +46,7 @@ class NotificationBroadcasterTest {
     private NotificationContextDescriptorRegistry descriptorRegistry;
     private NotificationNatsPublisher natsPublisher;
     private NotificationChannelDispatcher channelDispatcher;
+    private NotificationSettingsRepository settingsRepository;
     private NotificationBroadcaster broadcaster;
 
     @BeforeEach
@@ -50,6 +56,7 @@ class NotificationBroadcasterTest {
         descriptorRegistry = mock(NotificationContextDescriptorRegistry.class);
         natsPublisher = mock(NotificationNatsPublisher.class);
         channelDispatcher = mock(NotificationChannelDispatcher.class);
+        settingsRepository = mock(NotificationSettingsRepository.class);
         broadcaster = newBroadcaster(Optional.of(natsPublisher), true);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
             Notification arg = inv.getArgument(0);
@@ -343,9 +350,150 @@ class NotificationBroadcasterTest {
         verifyNoInteractions(notificationRepository, readStateService, natsPublisher);
     }
 
+    @Test
+    @DisplayName("Given an admin whose settings mute the notification's group, when broadcast runs, then that admin gets NO read-state row, NO socket message and NO push — the others are untouched")
+    void opted_out_admin_never_existed_for_this_notification() {
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class)))
+                .thenReturn(Optional.of(NotificationSettingGroup.TICKET_ASSIGNED));
+        when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
+                settings("muter", true, Set.of(NotificationSettingGroup.TICKET_ASSIGNED))));
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Assigned")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("TICKET_ASSIGNED"))
+                .adminAudience(Set.of("muter", "keeper"))
+                .build();
+
+        broadcaster.broadcast(cmd);
+
+        verify(readStateService).createForAudience(
+                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), eq(Set.of("keeper")));
+        verify(natsPublisher, never()).publishToUser(eq("muter"), any(Notification.class), any(NotificationCategory.class));
+        verify(channelDispatcher).dispatch(eq(Set.of("keeper")), any(Notification.class), any(NotificationCategory.class));
+    }
+
+    @Test
+    @DisplayName("Given an admin whose MASTER switch is off, when broadcast runs, then they are dropped whatever the group — even for a type with no checkbox at all")
+    void master_off_mutes_everything_including_ungrouped_types() {
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(Optional.empty());
+        when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
+                settings("off", false, null)));
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("X")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("X"))
+                .adminAudience(Set.of("off", "on"))
+                .build();
+
+        broadcaster.broadcast(cmd);
+
+        verify(readStateService).createForAudience(
+                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), eq(Set.of("on")));
+    }
+
+    @Test
+    @DisplayName("Given a muted GROUP but a type with no checkbox, when broadcast runs, then the admin still receives it — an unmapped type cannot be muted, deliberately fail-open")
+    void ungrouped_type_ignores_group_mutes() {
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(Optional.empty());
+        when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
+                settings("a1", true, Set.of(NotificationSettingGroup.TICKET_ASSIGNED))));
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("X")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("UNMAPPED"))
+                .adminAudience(Set.of("a1"))
+                .build();
+
+        broadcaster.broadcast(cmd);
+
+        verify(readStateService).createForAudience(
+                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), eq(Set.of("a1")));
+    }
+
+    @Test
+    @DisplayName("Given the settings lookup throws, when broadcast runs, then no admin is delivered — like any other Mongo failure in broadcast, we never deliver against unknown preferences")
+    void settings_lookup_failure_drops_all_admins() {
+        when(settingsRepository.findByUserIdIn(anyCollection())).thenThrow(new RuntimeException("mongo down"));
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("X")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("X"))
+                .adminAudience(Set.of("a1", "a2"))
+                .build();
+
+        broadcaster.broadcast(cmd);
+
+        verify(readStateService, never()).createForAudience(
+                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    @DisplayName("Given a descriptor whose settingsGroup throws, when broadcast runs, then the admins are dropped like on any settings failure — a buggy descriptor must not crash broadcast after persistence")
+    void settings_group_resolution_failure_drops_all_admins() {
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenThrow(new RuntimeException("buggy descriptor"));
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("X")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("X"))
+                .adminAudience(Set.of("a1"))
+                .build();
+
+        broadcaster.broadcast(cmd);
+
+        verify(readStateService, never()).createForAudience(
+                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    @DisplayName("Given every admin opted out and no machine audience, when broadcast runs, then nothing is persisted at all — no invisible orphan docs")
+    void fully_muted_dispatch_persists_nothing() {
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(Optional.empty());
+        when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
+                settings("a1", false, null)));
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("X")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("X"))
+                .adminAudience(Set.of("a1"))
+                .build();
+
+        Notification result = broadcaster.broadcast(cmd);
+
+        assertThat(result).isNull();
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(readStateService, never()).createForAudience(
+                anyString(), any(NotificationCategory.class), anyString(), any(RecipientType.class), any());
+    }
+
+    @Test
+    @DisplayName("Given every admin opted out, when broadcast runs, then no USER rows, no user publishes and no dispatch — but machines still receive theirs")
+    void all_admins_opted_out_still_serves_machines() {
+        when(descriptorRegistry.settingsGroupOf(any(NotificationContext.class))).thenReturn(Optional.empty());
+        when(settingsRepository.findByUserIdIn(anyCollection())).thenReturn(List.of(
+                settings("a1", false, null)));
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("X")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("X"))
+                .adminAudience(Set.of("a1"))
+                .machineAudience(Set.of("m-1"))
+                .build();
+
+        broadcaster.broadcast(cmd);
+
+        verify(readStateService, never()).createForAudience(
+                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
+        verify(readStateService).createForAudience(
+                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.MACHINE), eq(Set.of("m-1")));
+        verify(channelDispatcher, never()).dispatch(any(), any(Notification.class), any(NotificationCategory.class));
+    }
+
     private NotificationBroadcaster newBroadcaster(Optional<NotificationNatsPublisher> publisher, boolean notificationsEnabled) {
         NotificationBroadcaster bc = new NotificationBroadcaster(
-                notificationRepository, readStateService, descriptorRegistry, publisher, channelDispatcher);
+                notificationRepository, readStateService, descriptorRegistry, publisher, channelDispatcher,
+                settingsRepository);
         ReflectionTestUtils.setField(bc, "notificationsEnabled", notificationsEnabled);
         return bc;
     }
@@ -356,6 +504,11 @@ class NotificationBroadcasterTest {
 
     private static Notification updatedNotification() {
         return Notification.builder().id("notif-id-1").category(NotificationCategory.TICKETS).build();
+    }
+
+    private static NotificationSettings settings(String userId, boolean enabled,
+                                                 Set<NotificationSettingGroup> mutedGroups) {
+        return NotificationSettings.builder().userId(userId).enabled(enabled).mutedGroups(mutedGroups).build();
     }
 
     private static NotificationReadState recipient(String recipientId, RecipientType type, ReadStatus status) {

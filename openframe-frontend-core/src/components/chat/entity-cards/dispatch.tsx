@@ -78,6 +78,8 @@ import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon'
 import { QuestionCircleIcon } from '../../icons-v2-generated/signs-and-symbols/question-circle-icon'
 import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon'
+import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon'
+import { clickupTaskUrl } from '../utils/external-app-urls'
 import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon'
 import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-ver-icon'
 import { ChartPieIcon } from '../../icons-v2-generated/charts/chart-pie-icon'
@@ -260,12 +262,22 @@ export interface CardDiscussAction {
   run: () => void
 }
 
+/** External-app deep-link row for a card's "⋯" menu (e.g. "Open in ClickUp").
+ *  Always opens in a new tab — the destination is a third-party app, never a
+ *  hub route. */
+export interface CardExternalLink {
+  label: string
+  icon: React.ReactNode
+  href: string
+}
+
 /** Overflow-menu groups for a card (Figma `7740:55075`): the optional "Ask
  *  Mingo"/"Display" item (when the host supplied a handler) followed by "Open
  *  Details" — whose main row navigates to the card (same tab) and whose trailing
- *  ↗ side-button opens it in a new tab. Returns `undefined` when neither applies
- *  so the "⋯" button is omitted entirely. The href is already absolute
- *  (ChatCardLoader pre-resolves it). */
+ *  ↗ side-button opens it in a new tab — then the optional external-app
+ *  deep-link row (new tab). Returns `undefined` when none applies so the "⋯"
+ *  button is omitted entirely. The href is already absolute (ChatCardLoader
+ *  pre-resolves it). */
 function cardMenuGroups(
   href: string | null | undefined,
   discuss?: CardDiscussAction,
@@ -274,6 +286,9 @@ function cardMenuGroups(
    *  in the entity's own terms and mirrors the card's leading icon. Defaults to
    *  a generic "Open Details" + eye glyph. */
   openDetails?: { label: string; icon: React.ReactNode },
+  /** Optional trailing deep-link into the entity's own third-party app
+   *  (ClickUp task, …). Rendered after "Open Details", always new-tab. */
+  externalLink?: CardExternalLink,
 ) {
   const items: ActionsMenuGroup['items'] = []
   if (discuss) {
@@ -298,6 +313,15 @@ function cardMenuGroups(
         href,
         openInNewTab: true,
       },
+    })
+  }
+  if (externalLink) {
+    items.push({
+      id: 'open-external',
+      label: externalLink.label,
+      icon: externalLink.icon,
+      href: externalLink.href,
+      openInNewTab: true,
     })
   }
   return items.length ? [{ items }] : undefined
@@ -629,6 +653,8 @@ function EntityMingoCard({
   isNewTab,
   menuAriaLabel,
   discuss,
+  openDetails,
+  externalLink,
 }: {
   title: React.ReactNode
   description?: React.ReactNode
@@ -639,6 +665,10 @@ function EntityMingoCard({
   isNewTab: boolean
   menuAriaLabel: string
   discuss?: CardDiscussAction
+  /** See `cardMenuGroups` — per-entity "Open Details" row override. */
+  openDetails?: { label: string; icon: React.ReactNode }
+  /** See `cardMenuGroups` — trailing third-party-app deep-link row. */
+  externalLink?: CardExternalLink
 }) {
   return (
     <MingoInfoCard
@@ -649,7 +679,7 @@ function EntityMingoCard({
       icon={fallbackIcon}
       status={status}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
-      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss, openDetails, externalLink)}
       menuAriaLabel={menuAriaLabel}
     />
   )
@@ -958,6 +988,14 @@ function RoadmapChatCard({
   ) : (
     defaultIcon
   )
+  // Every card here is a mirrored ClickUp task whose ref id IS the ClickUp
+  // task id, so the "⋯" menu deep-links into ClickUp. internal_task's card
+  // URL already IS that deep link (its mapper resolves no public
+  // destination) — there we relabel the existing "Open Details" row instead
+  // of adding a duplicate second ClickUp row.
+  const clickupHref = clickupTaskUrl(chatRef.id)
+  const clickupIcon = <ClickupLogoIcon size={20} />
+  const cardUrlIsClickup = cardType === 'internal_task'
   return (
     <EntityMingoCard
       title={item?.title ?? ''}
@@ -968,6 +1006,14 @@ function RoadmapChatCard({
       isNewTab={isNewTab}
       discuss={discuss}
       menuAriaLabel="Roadmap actions"
+      openDetails={
+        cardUrlIsClickup ? { label: 'Open in ClickUp', icon: clickupIcon } : undefined
+      }
+      externalLink={
+        !cardUrlIsClickup && clickupHref
+          ? { label: 'Open in ClickUp', icon: clickupIcon, href: clickupHref }
+          : undefined
+      }
     />
   )
 }

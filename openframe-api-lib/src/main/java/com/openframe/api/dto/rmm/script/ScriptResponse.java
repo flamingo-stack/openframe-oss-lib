@@ -1,17 +1,15 @@
 package com.openframe.api.dto.rmm.script;
 
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.PrivilegeLevel;
+import com.openframe.data.document.rmm.ScriptShell;
+import com.openframe.data.document.rmm.ScriptStatus;
 import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
 import java.util.List;
 
-/**
- * API representation of a script. The internal {@code tenantId} is omitted —
- * the caller's tenant context is already known from authentication and never
- * needs to round-trip through the wire.
- */
 @Data
 @Builder
 public class ScriptResponse {
@@ -20,26 +18,20 @@ public class ScriptResponse {
     private String name;
     private String description;
 
-    /** Shell enum name (e.g. {@code POWERSHELL}). */
-    private String shell;
-
-    /** Privilege the script runs as (USER / ADMIN). */
+    private ScriptShell shell;
     private PrivilegeLevel privilegeLevel;
 
     private String scriptBody;
 
-    /** Supported platforms, serialized as their enum names. */
-    private List<String> supportedPlatforms;
+    private List<OsType> supportedPlatforms;
 
     private Integer defaultTimeoutSeconds;
     private List<String> defaultArgs;
     private List<ScriptEnvVarInput> envVars;
 
-    /** Id of the creating user; resolved to a User via the GraphQL {@code author} field. */
     private String createdBy;
 
-    /** Lifecycle status enum name (e.g. {@code ACTIVE}). */
-    private String status;
+    private ScriptStatus status;
 
     private Instant statusChangedAt;
     private Instant createdAt;

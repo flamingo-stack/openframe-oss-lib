@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static com.openframe.data.document.rmm.ScriptStatus.ACTIVE;
+import static com.openframe.data.document.rmm.ScriptStatus.ARCHIVED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -151,11 +153,11 @@ class ScriptMapperTest {
     @DisplayName("toResponse: maps the status enum to its name")
     void toResponse_mapsStatusName() {
         Script entity = fullyPopulated();
-        entity.setStatus(ScriptStatus.ARCHIVED);
+        entity.setStatus(ARCHIVED);
 
         ScriptResponse response = mapper.toResponse(entity);
 
-        assertThat(response.getStatus()).isEqualTo("ARCHIVED");
+        assertThat(response.getStatus()).isEqualTo(ARCHIVED);
     }
 
     @Test
@@ -190,7 +192,7 @@ class ScriptMapperTest {
 
         ScriptResponse response = mapper.toResponse(entity);
 
-        assertThat(response.getStatus()).isEqualTo("ACTIVE");
+        assertThat(response.getStatus()).isEqualTo(ACTIVE);
     }
 
     private static Script fullyPopulated() {

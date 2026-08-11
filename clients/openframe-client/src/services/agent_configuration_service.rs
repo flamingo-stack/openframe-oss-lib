@@ -61,6 +61,11 @@ impl AgentConfigurationService {
         Ok(config.machine_id.clone())
     }
 
+    pub fn get_registration_credentials(&self) -> Result<(String, String)> {
+        let config = self.get()?;
+        Ok((config.machine_id, config.client_secret))
+    }
+
     pub async fn get_client_credentials(&self) -> Result<(String, String)> {
         let config = self.get()?;
         Ok((config.client_id.clone(), config.client_secret.clone()))
