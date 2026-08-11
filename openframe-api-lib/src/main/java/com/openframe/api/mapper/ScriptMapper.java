@@ -56,15 +56,15 @@ public class ScriptMapper {
                 .id(entity.getId())
                 .name(entity.getName())
                 .description(entity.getDescription())
-                .shell(entity.getShell() != null ? entity.getShell().name() : null)
+                .shell(entity.getShell())
                 .privilegeLevel(entity.getPrivilegeLevel() != null ? entity.getPrivilegeLevel() : PrivilegeLevel.USER)
                 .scriptBody(entity.getScriptBody())
-                .supportedPlatforms(mapPlatformsToResponse(entity.getSupportedPlatforms()))
+                .supportedPlatforms(entity.getSupportedPlatforms())
                 .defaultTimeoutSeconds(entity.getDefaultTimeoutSeconds())
                 .defaultArgs(entity.getDefaultArgs())
                 .envVars(mapEnvVarsToResponse(entity.getEnvVars()))
                 .createdBy(entity.getCreatedBy())
-                .status(entity.getStatus() != null ? entity.getStatus().name() : ScriptStatus.ACTIVE.name())
+                .status(entity.getStatus() != null ? entity.getStatus() : ScriptStatus.ACTIVE)
                 .statusChangedAt(entity.getStatusChangedAt())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -85,10 +85,4 @@ public class ScriptMapper {
                 .toList();
     }
 
-    private List<String> mapPlatformsToResponse(List<OsType> platforms) {
-        if (platforms == null) {
-            return null;
-        }
-        return platforms.stream().map(OsType::name).toList();
-    }
 }

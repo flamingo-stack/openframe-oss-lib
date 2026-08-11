@@ -61,7 +61,7 @@ public class ScriptScheduleMapper {
                 .id(entity.getId())
                 .name(entity.getName())
                 .description(entity.getDescription())
-                .supportedPlatforms(mapPlatformsToResponse(entity.getSupportedPlatforms()))
+                .supportedPlatforms(entity.getSupportedPlatforms())
                 .scriptIds(entity.getScriptIds())
                 .scriptCustomParams(entity.getScriptCustomParams())
                 .selectionMode(defaultSelectionMode(entity.getSelectionMode()))
@@ -77,13 +77,6 @@ public class ScriptScheduleMapper {
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
-    }
-
-    private List<String> mapPlatformsToResponse(List<OsType> platforms) {
-        if (platforms == null) {
-            return null;
-        }
-        return platforms.stream().map(OsType::name).toList();
     }
 
     private static List<ScheduledScriptCustomParams> toCustomParams(List<ScheduledScriptCustomParamsInput> input) {

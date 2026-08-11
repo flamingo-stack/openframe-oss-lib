@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+import static com.openframe.data.document.rmm.OsType.MAC_OS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -104,7 +105,7 @@ class CustomMachineRepositoryImplTest {
         MachineQueryFilter filter = new MachineQueryFilter();
         filter.setStatuses(List.of("ONLINE"));
         filter.setDeviceTypes(List.of("WORKSTATION"));
-        filter.setOsTypes(List.of("macos"));
+        filter.setOsTypes(List.of(MAC_OS));
         filter.setOrganizationIds(List.of("org-1"));
         return filter;
     }
