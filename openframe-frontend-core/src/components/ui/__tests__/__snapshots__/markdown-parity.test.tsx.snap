@@ -1,9 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`RichMarkdownRenderer golden parity > renders fixture: audit-reddit-embed-bq 1`] = `
-"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><div data-mock="reddit" data-url="https://www.reddit.com/r/msp/comments/abc/post/"></div>
-&lt;script async src="https://embed.reddit.com/widgets.js" charset="UTF-8"&gt;&lt;/script&gt;</article></div></div>"
-`;
+exports[`RichMarkdownRenderer golden parity > renders fixture: audit-reddit-embed-bq 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><div data-mock="reddit" data-url="https://www.reddit.com/r/msp/comments/abc/post/"></div></article></div></div>"`;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: audit-style-attrs 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><div class="takeaway" style="padding: 8px;">Key point</div>
@@ -160,7 +157,6 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: hostile-onerror 1
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: hostile-script 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">before</p>
-<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;script&gt;alert(1)&lt;/script&gt;</p>
 <p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">after</p></article></div></div>"
 `;
 
