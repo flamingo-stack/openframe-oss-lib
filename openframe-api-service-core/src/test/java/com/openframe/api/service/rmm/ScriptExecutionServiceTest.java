@@ -3,6 +3,7 @@ package com.openframe.api.service.rmm;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.data.document.rmm.ExecutionSource;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.api.mapper.ScriptExecutionMapper;
@@ -66,7 +67,7 @@ class ScriptExecutionServiceTest {
         when(scriptExecutionRepository.save(any(ScriptExecution.class))).thenAnswer(inv -> inv.getArgument(0));
         Instant before = Instant.now().minus(Duration.ofSeconds(1));
 
-        ScriptExecutionResponse result = service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY);
+        ScriptExecutionResponse result = service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL);
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
@@ -102,7 +103,7 @@ class ScriptExecutionServiceTest {
     @Test
     @DisplayName("create: tenantId is taken from TenantIdProvider, NOT from any caller-supplied input — locks in the pod-scoped tenant contract")
     void create_alwaysUsesTenantIdProvider() {
-        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL);
 
         verify(tenantIdProvider).getTenantId();
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
@@ -113,7 +114,7 @@ class ScriptExecutionServiceTest {
     @Test
     @DisplayName("create: a null initiatedBy is accepted and persisted as null — defensive fallback so an authenticated request without a fully-formed principal still produces a History row instead of NPE-ing the whole dispatch")
     void create_acceptsNullInitiatedBy() {
-        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, null);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, null, ExecutionSource.MANUAL);
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
@@ -124,7 +125,7 @@ class ScriptExecutionServiceTest {
     @Test
     @DisplayName("create: privilegeLevel is forwarded verbatim — USER vs ADMIN reaches the row exactly as the dispatch carried it")
     void create_forwardsPrivilegeLevelVerbatim() {
-        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL);
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
@@ -138,7 +139,7 @@ class ScriptExecutionServiceTest {
         List<String> machines = List.of("m-1", "m-2", "m-3");
         Instant before = Instant.now().minus(Duration.ofSeconds(1));
 
-        service.createBatch(EXECUTION_ID, SCRIPT_ID, "sched-1", machines, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY);
+        service.createBatch(EXECUTION_ID, SCRIPT_ID, "sched-1", machines, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.SCHEDULED);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ScriptExecution>> captor = ArgumentCaptor.forClass(List.class);
