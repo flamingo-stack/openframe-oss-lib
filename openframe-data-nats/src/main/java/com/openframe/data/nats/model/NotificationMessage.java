@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.List;
 
 @Getter
 @Setter
@@ -26,4 +27,6 @@ public class NotificationMessage {
     private NotificationCategory category;
     private NotificationContext context;
     private NotificationEventType eventType;
+
+    private List<String> notificationIds;
 }

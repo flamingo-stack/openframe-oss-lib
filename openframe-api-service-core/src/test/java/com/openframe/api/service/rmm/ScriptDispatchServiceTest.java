@@ -11,9 +11,12 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.PrivilegeLevel;
+import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
+import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
+import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +30,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 
+import static com.openframe.data.document.rmm.ScriptShell.BASH;
+import static com.openframe.data.document.rmm.ScriptStatus.ACTIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -82,7 +87,7 @@ class ScriptDispatchServiceTest {
         ScriptResponse script = ScriptResponse.builder()
                 .id(SCRIPT_ID)
                 .name("disk usage")
-                .shell("BASH")
+                .shell(BASH)
                 .scriptBody("df -h")
                 .defaultArgs(List.of("-a"))
                 .defaultTimeoutSeconds(60)
@@ -172,7 +177,7 @@ class ScriptDispatchServiceTest {
         assertThat(sent.getExecutionId()).isEqualTo(response.getExecutionId());
         assertThat(sent.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(sent.getCode()).isEqualTo("df -h");
-        assertThat(sent.getShell()).isEqualTo(ScriptShell.BASH);
+        assertThat(sent.getShell()).isEqualTo(BASH);
         assertThat(sent.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(sent.getEnvVars())
                 .singleElement()
@@ -319,7 +324,7 @@ class ScriptDispatchServiceTest {
                 .allSatisfy(m -> {
                     assertThat(m.getExecutionId()).isEqualTo(response.getExecutionId());
                     assertThat(m.getCode()).isEqualTo("df -h");
-                    assertThat(m.getShell()).isEqualTo(ScriptShell.BASH);
+                    assertThat(m.getShell()).isEqualTo(BASH);
                 })
                 .extracting(ScriptMessage::getMachineId)
                 .containsExactlyInAnyOrderElementsOf(machines);
@@ -369,7 +374,7 @@ class ScriptDispatchServiceTest {
                         .id(scheduleId)
                         .scriptIds(List.of(SCRIPT_ID))
                         .scriptCustomParams(List.of(
-                                com.openframe.data.document.rmm.ScheduledScriptCustomParams.builder()
+                                ScheduledScriptCustomParams.builder()
                                         .scriptId(SCRIPT_ID)
                                         .args(List.of("--custom", "42"))
                                         .envVars(List.of(new ScriptEnvVar("OVERRIDE", "v", false)))
@@ -379,8 +384,8 @@ class ScriptDispatchServiceTest {
         when(scriptScheduleDeviceService.getMachineIds(scheduleId)).thenReturn(List.of(MACHINE_ID));
         when(scriptService.getScriptsByIds(List.of(SCRIPT_ID))).thenReturn(List.of(
                 ScriptResponse.builder()
-                        .id(SCRIPT_ID).name("disk").shell("BASH").scriptBody("df -h")
-                        .status("ACTIVE")
+                        .id(SCRIPT_ID).name("disk").shell(BASH).scriptBody("df -h")
+                        .status(ACTIVE)
                         .defaultArgs(List.of("-a")).defaultTimeoutSeconds(60)
                         .envVars(List.of(ScriptEnvVarInput.builder().name("BASE").value("b").secret(false).build()))
                         .privilegeLevel(PrivilegeLevel.USER)
@@ -389,11 +394,10 @@ class ScriptDispatchServiceTest {
 
         scriptDispatchService.runSchedule(scheduleId, USER_ID);
 
-        ArgumentCaptor<com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage> msgCaptor =
-                ArgumentCaptor.forClass(com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage.class);
+        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
+                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
         verify(scriptScheduleNatsPublisher).publish(eq(MACHINE_ID), msgCaptor.capture());
-        com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem item =
-                msgCaptor.getValue().getScripts().get(0);
+        ScriptScheduleExecutionItem item = msgCaptor.getValue().getScripts().get(0);
         assertThat(item.getArgs()).containsExactly("--custom", "42");
         assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("OVERRIDE");
         assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).doesNotContain("BASE");

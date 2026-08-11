@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Repository
@@ -56,9 +57,10 @@ public class CustomIntegratedToolRepositoryImpl implements CustomIntegratedToolR
         }
 
         if (search != null && !search.trim().isEmpty()) {
+            String quoted = Pattern.quote(search);
             Criteria searchCriteria = new Criteria().orOperator(
-                    Criteria.where("name").regex(search, "i"),
-                    Criteria.where("description").regex(search, "i")
+                    Criteria.where("name").regex(quoted, "i"),
+                    Criteria.where("description").regex(quoted, "i")
             );
             query.addCriteria(searchCriteria);
         }

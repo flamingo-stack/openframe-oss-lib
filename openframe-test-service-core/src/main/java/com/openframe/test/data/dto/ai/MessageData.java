@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * Flattened view of the AI agent's {@code messageData} union. The GraphQL query selects the fields the
  * harness needs across several concrete types (TextData, ExecutedToolData, ApprovalRequestData,
@@ -31,6 +33,8 @@ public class MessageData {
     // ApprovalRequestData
     private String approvalRequestId;
     private String command;
+    private ApprovalType approvalType;
+    private List<PendingToolCall> toolCalls;
 
     // ErrorData
     private String error;

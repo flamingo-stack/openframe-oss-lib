@@ -22,6 +22,24 @@ export interface BoardTicketAssignee {
   deleted?: boolean
 }
 
+/**
+ * Live-activity footer indicator on a board card. Indicators are mutually
+ * exclusive by design — the consumer decides which single one a ticket shows
+ * (staleness has the lowest priority and must be suppressed when any other
+ * signal — new message, approval, escalation — is present).
+ */
+export type BoardTicketActivityKind = 'ai-working' | 'user-typing' | 'waiting-external' | 'stale'
+
+export interface BoardTicketActivity {
+  kind: BoardTicketActivityKind
+  /**
+   * Overrides the built-in label for the kind. Required in practice for
+   * 'stale', whose label carries the computed duration ("No activity for
+   * 2 hours") that only the consumer can know — and tick over time.
+   */
+  label?: string
+}
+
 export interface BoardTicket {
   id: string
   title: string
@@ -36,6 +54,15 @@ export interface BoardTicket {
   createdAt?: string
   hasNewMessage?: boolean
   pendingApproval?: BoardTicketPendingApproval
+  /**
+   * The client asked for a human and confirmed the handoff, so this ticket
+   * reached its lane by escalation rather than an inactivity auto-escalation or
+   * an admin takeover. Called out on the card because it changes how urgently a
+   * technician should pick it up.
+   */
+  escalatedByUser?: boolean
+  /** Single live-activity indicator rendered as the card's footer row. */
+  activity?: BoardTicketActivity
 }
 
 export interface BoardColumnDef {

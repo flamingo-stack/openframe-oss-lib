@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * resolves it via its own {@code searchMachines} tool — so no ticket binding is needed.
  */
 @Tag("ai")
+@Tag("mingo")
 @DisplayName("Mingo — device")
 public class MingoDeviceTest extends MingoBaseTest {
 
@@ -54,6 +55,7 @@ public class MingoDeviceTest extends MingoBaseTest {
 
     // ---- A. File operations ---------------------------------------------------------------------
 
+    @Tag("feature")
     @Test
     @Tag("create")
     @DisplayName("Mingo creates a file")
@@ -71,6 +73,7 @@ public class MingoDeviceTest extends MingoBaseTest {
         assertNoFalseSuccess(result, path);
     }
 
+    @Tag("feature")
     @Test
     @Tag("read")
     @DisplayName("Mingo reads a file")
@@ -271,6 +274,7 @@ public class MingoDeviceTest extends MingoBaseTest {
                 .contains(content);
     }
 
+    @Tag("feature")
     @Test
     @Tag("script")
     @DisplayName("Mingo runs a saved script")

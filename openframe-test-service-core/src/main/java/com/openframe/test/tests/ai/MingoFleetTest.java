@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * when none is configured. Both boxes are subject to the searchMachines online-flap (left unguarded).
  */
 @Tag("ai")
+@Tag("mingo")
 @Tag("fleet")
 @DisplayName("Mingo — multi-host")
 public class MingoFleetTest extends MingoBaseTest {

@@ -3,6 +3,7 @@ package com.openframe.test.helpers.ai;
 import com.openframe.test.api.ApprovalApi;
 import com.openframe.test.api.DialogApi;
 import com.openframe.test.api.MessageApi;
+import com.openframe.test.data.dto.ai.ApprovalType;
 import com.openframe.test.data.dto.ai.ChatType;
 import com.openframe.test.data.dto.ai.DialogStreamState;
 import com.openframe.test.data.dto.ai.Message;
@@ -11,6 +12,7 @@ import com.openframe.test.data.dto.ai.MessageData;
 import com.openframe.test.data.dto.ai.MessageDataType;
 import com.openframe.test.data.dto.ai.MessageEdge;
 import com.openframe.test.data.dto.ai.MessageOwnerType;
+import com.openframe.test.helpers.RequestSpecHelper;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
@@ -81,9 +83,16 @@ public class RunWaiter {
                         log.info("Approval {} pending; returning to test (MANUAL policy)", reqId);
                         return ordered;
                     }
+                    if (isUnresolvableByCaller(d)) {
+                        log.info("Approval {} is ADMIN-typed (technician approval) and this run is acting as "
+                                + "an AGENT, which is not entitled to resolve it — ending the run here with "
+                                + "the request left pending", reqId);
+                        return ordered;
+                    }
                     boolean approve = policy == ApprovalPolicy.AUTO_APPROVE;
-                    log.info("{} approval request {} (command: {})", approve ? "Approving" : "Rejecting", reqId, d.getCommand());
-                    ApprovalApi.approve(reqId, approve);
+                    log.info("{} approval request {} (approvalType: {}, command: {})",
+                            approve ? "Approving" : "Rejecting", reqId, d.getApprovalType(), d.getCommand());
+                    resolve(reqId, approve, d.getApprovalType());
                     handledApprovals.add(reqId);
                     idleConfirmations = 0;
                 }
@@ -111,6 +120,42 @@ public class RunWaiter {
                         timeoutSeconds, dialogId, new RunResult(ordered)));
             }
             sleep();
+        }
+    }
+
+    /**
+     * Whether the current actor structurally cannot resolve this approval, making the attempt pointless.
+     * <p>
+     * The tenant escalates some commands to technician approval, which surfaces as
+     * {@link ApprovalType#ADMIN}; {@code DialogApprovalAccessValidator} then rejects any non-ADMIN actor
+     * resolving it. Because that rejection is an unmapped {@code AccessDeniedException}, the endpoint
+     * answers {@code 500 INTERNAL_ERROR} rather than 403 — so calling it does not merely fail, it fails in
+     * a way that reads as a server fault and kills the case before any assertion runs.
+     * <p>
+     * Whether a given command escalates is <b>not stable across runs</b> — the same prompt has produced a
+     * CLIENT approval once and an ADMIN one minutes later — so this cannot be handled by marking known-bad
+     * cases. It has to be decided per request, from the type on the request itself.
+     * <p>
+     * An ADMIN actor is unaffected: it is entitled to resolve both types, and only an AGENT run (bearer
+     * token installed) is held back here.
+     */
+    private static boolean isUnresolvableByCaller(MessageData approvalRequest) {
+        return approvalRequest.getApprovalType() == ApprovalType.ADMIN && RequestSpecHelper.hasBearerToken();
+    }
+
+    /**
+     * Resolves one approval, naming the request's {@link ApprovalType} if the endpoint still refuses.
+     * <p>
+     * {@link #isUnresolvableByCaller} already filters out the case we know cannot succeed, so reaching this
+     * failure means something outside that pattern went wrong — the type is included because it is the
+     * first thing worth knowing.
+     */
+    private static void resolve(String approvalRequestId, boolean approve, ApprovalType approvalType) {
+        try {
+            ApprovalApi.approve(approvalRequestId, approve);
+        } catch (AssertionError e) {
+            throw new AssertionError(e.getMessage()
+                    + String.format("%nThe request's approvalType was %s.", approvalType), e);
         }
     }
 

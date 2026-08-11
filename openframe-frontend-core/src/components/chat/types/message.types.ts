@@ -11,10 +11,13 @@ export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
   THINKING: 'THINKING',
   GUIDE: 'GUIDE',
+  ASK: 'ASK',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
   APPROVAL_REQUEST: 'APPROVAL_REQUEST',
   APPROVAL_RESULT: 'APPROVAL_RESULT',
+  ESCALATION_OFFER: 'ESCALATION_OFFER',
+  TICKET_ESCALATED: 'TICKET_ESCALATED',
   ERROR: 'ERROR',
   MESSAGE_START: 'MESSAGE_START',
   MESSAGE_END: 'MESSAGE_END',
@@ -120,6 +123,35 @@ export interface ApprovalResultData {
   resolvedByName?: string | null
 }
 
+// ========== Escalation Offer Types ==========
+
+export interface EscalationOfferData {
+  offerId: string
+  /** Backend-fixed card copy; the client never composes it. */
+  text: string
+  /** Why the offer was raised (`TOOL`, `MANUAL`, a trigger reason). Carried
+   *  for telemetry — every origin renders the same card. */
+  origin?: string
+}
+
+// ========== Ticket Escalated Types ==========
+
+/** Open union: the wire currently defines only `INACTIVITY`, and the block
+ *  renders from `text` rather than branching on this, so a reason added
+ *  server-side needs no client change. */
+export type TicketEscalationReason = 'INACTIVITY' | (string & {})
+
+/** The handoff receipt — a real block on the wire, not something the client
+ *  infers from an escalation offer's state. */
+export interface TicketEscalatedData {
+  ticketId: string
+  ticketNumber?: number
+  reason: TicketEscalationReason
+  /** Backend-authored explanation; the card falls back to generic copy when
+   *  the wire omits it (the field is nullable). */
+  text?: string
+}
+
 /**
  * Single tool call inside a batch approval request.
  * Mirrors backend PendingToolCallDto.
@@ -190,6 +222,28 @@ export type GuideSegment = {
   text: string
 }
 
+/** One reading the assistant offers in an `ask` card. `label` is BOTH the row's
+ *  headline and the exact text sent back when the row is picked — the backend's
+ *  guide classifier resolves the user's next message against the labels it
+ *  offered, so the reply must be the label verbatim. `description` is a short
+ *  clarifying line rendered under it. */
+export type AskOptionData = {
+  label: string
+  description?: string
+}
+
+/** Clarification card — the assistant asking WHICH reading of an ambiguous
+ *  question it should answer, rendered as a heading plus a list of clickable
+ *  options instead of prose bullets. NATS-only (the `ASK` chunk); the intro
+ *  sentence riding the same chunk becomes an ordinary `text` segment in front
+ *  of the card, so it goes through the normal markdown body pipeline. Unlike
+ *  the three delta streams an ask arrives whole — it is never coalesced. */
+export type AskSegment = {
+  type: 'ask'
+  question: string
+  options: AskOptionData[]
+}
+
 export type ToolExecutionSegment = {
   type: 'tool_execution'
   data: ToolExecutionData
@@ -216,6 +270,35 @@ export type ApprovalBatchSegment = {
   onReject?: ApprovalResolutionHandler
 }
 
+/**
+ * Ticket-escalation offer block. Visually the client approval card (same
+ * Figma component), but a SEPARATE segment type on purpose: it resolves
+ * through the ticket-escalation GraphQL mutations rather than the tool
+ * approval endpoint, and hosts that hide pending tool approvals from the
+ * thread must still render this one inline.
+ *
+ * `cancelled` is the wire's SUPERSEDED — the client typed over the offer.
+ */
+export type EscalationOfferSegment = {
+  type: 'escalation_offer'
+  data: EscalationOfferData
+  status?: ChatApprovalStatus
+  resolvedByName?: string | null
+  onApprove?: ApprovalResolutionHandler
+  onReject?: ApprovalResolutionHandler
+}
+
+/**
+ * The conversation was handed off to a human technician. Decoded from the
+ * `TICKET_ESCALATED` block, so it appears for every escalation path the
+ * backend emits it for — including the inactivity auto-escalation, which
+ * raises no offer and therefore has no offer state to infer from.
+ */
+export type TicketEscalatedSegment = {
+  type: 'ticket_escalated'
+  data: TicketEscalatedData
+}
+
 export type ErrorSegment = {
   type: 'error'
   title: string
@@ -228,7 +311,7 @@ export type ContextCompactionSegment = {
   summary?: string
 }
 
-export type MessageSegment = TextSegment | ThinkingSegment | GuideSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | ErrorSegment | ContextCompactionSegment
+export type MessageSegment = TextSegment | ThinkingSegment | GuideSegment | AskSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | EscalationOfferSegment | TicketEscalatedSegment | ErrorSegment | ContextCompactionSegment
 
 export type MessageContent = string | MessageSegment[]
 
@@ -251,6 +334,16 @@ export interface ThinkingMessageData extends MessageDataBase {
 export interface GuideMessageData extends MessageDataBase {
   type: 'GUIDE'
   text?: string
+}
+
+/** Persisted `ASK` row (GraphQL `AskData`). `text` is the intro sentence, which
+ *  history replays as a text segment ahead of the card — same split the live
+ *  `ASK` chunk carries. */
+export interface AskMessageData extends MessageDataBase {
+  type: 'ASK'
+  text?: string
+  question?: string
+  options?: AskOptionData[]
 }
 
 export interface ExecutingToolMessageData extends MessageDataBase {
@@ -296,6 +389,29 @@ export interface ApprovalResultMessageData extends MessageDataBase {
   resolvedByName?: string | null
 }
 
+/**
+ * Persisted escalation-offer row. The PENDING row carries `text`/`origin`;
+ * the resolution is a SECOND row with the same `offerId`, state
+ * APPROVED/DECLINED/SUPERSEDED and no text — matched on replay by id.
+ */
+export interface EscalationOfferMessageData extends MessageDataBase {
+  type: 'ESCALATION_OFFER'
+  offerId?: string
+  state?: string
+  text?: string
+  origin?: string
+  resolvedByUserId?: string | null
+  resolvedByName?: string | null
+}
+
+export interface TicketEscalatedMessageData extends MessageDataBase {
+  type: 'TICKET_ESCALATED'
+  ticketId?: string
+  ticketNumber?: number
+  reason?: TicketEscalationReason
+  text?: string
+}
+
 export interface ErrorMessageData extends MessageDataBase {
   type: 'ERROR'
   error?: string
@@ -335,10 +451,13 @@ export type MessageData =
   | TextMessageData
   | ThinkingMessageData
   | GuideMessageData
+  | AskMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData
   | ApprovalRequestMessageData
   | ApprovalResultMessageData
+  | EscalationOfferMessageData
+  | TicketEscalatedMessageData
   | ErrorMessageData
   | AIMetadataMessageData
   | SystemMessageData

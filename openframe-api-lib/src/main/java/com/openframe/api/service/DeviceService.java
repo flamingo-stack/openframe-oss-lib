@@ -13,19 +13,24 @@ import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.device.MachineFirstOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import com.openframe.data.service.machine.MachineWriteResult;
+import com.openframe.data.service.machine.MachineWriter;
+import com.openframe.data.service.TenantIdProvider;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
@@ -37,23 +42,24 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.service.machine.MachineFields.NICKNAME;
+import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
+
 @Service
 @Slf4j
 @Validated
 @RequiredArgsConstructor
 public class DeviceService {
 
-    private static final String FACET_STATUS = "status";
-    private static final String FACET_TYPE = "type";
-    private static final String FACET_OS_TYPE = "osType";
-    private static final String FACET_ORGANIZATION_ID = "organizationId";
-
     private final MachineRepository machineRepository;
+    private final MachineFirstOnlineDispatchRepository machineFirstOnlineDispatchRepository;
+    private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final DeviceStatusProcessor deviceStatusProcessor;
     private final ScriptScheduleDeviceService scriptScheduleDeviceService;
     private final DeviceFilterOptionMapper deviceFilterOptionMapper;
+    private final TenantIdProvider tenantIdProvider;
 
     public Optional<Machine> findByMachineId(@NotBlank String machineId) {
         log.debug("Finding machine by ID: {}", machineId);
@@ -85,25 +91,26 @@ public class DeviceService {
         return paginate(machineFilter(filterOptions, null, scope), search, paginationCriteria, sort);
     }
 
-    public CountedGenericQueryResult<Machine> queryDevicesForPlatforms(Collection<String> platformNames,
+    public CountedGenericQueryResult<Machine> queryDevicesForPlatforms(Collection<OsType> osTypes,
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
                                                   String search,
                                                   SortInput sort) {
-        return paginate(machineFilter(filterOptions, platformNames, null), search, paginationCriteria, sort);
+        return paginate(machineFilter(filterOptions, osTypes, null), search, paginationCriteria, sort);
     }
 
-    public CountedGenericQueryResult<Machine> queryAvailableDevicesForSchedule(Collection<String> platformNames,
+    public CountedGenericQueryResult<Machine> queryAvailableDevicesForSchedule(Collection<OsType> platformNames,
                                                   Collection<String> assignedMachineIds,
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
                                                   String search) {
+        String tenantId = tenantIdProvider.getTenantId();
         MachineQueryFilter filter = machineFilter(filterOptions, platformNames, null);
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
 
-        long totalFilteredCount = machineRepository.countMachines(filter, search);
+        long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
         List<Machine> page = machineRepository.findAvailableForScheduleWithCursor(
-                filter, search, assignedMachineIds, normalized.getCursor(), normalized.getLimit() + 1);
+                tenantId, filter, search, assignedMachineIds, normalized.getCursor(), normalized.getLimit() + 1);
         boolean hasNextPage = page.size() > normalized.getLimit();
         if (hasNextPage) {
             page = page.subList(0, normalized.getLimit());
@@ -126,19 +133,20 @@ public class DeviceService {
         return deviceFilters(machineFilter(filterOptions, null, scope), search);
     }
 
-    public DeviceFilters getAvailableDeviceFilters(Collection<String> platformNames,
+    public DeviceFilters getAvailableDeviceFilters(Collection<OsType> platformNames,
                                                    DeviceFilterCriteria filterOptions, String search) {
         return deviceFilters(machineFilter(filterOptions, platformNames, null), search);
     }
 
     private DeviceFilters deviceFilters(MachineQueryFilter filter, String search) {
+        String tenantId = tenantIdProvider.getTenantId();
         return DeviceFilters.builder()
-                .statuses(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, FACET_STATUS)))
-                .deviceTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, FACET_TYPE)))
-                .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(filter, search, FACET_OS_TYPE)))
-                .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(filter, search, FACET_ORGANIZATION_ID)))
+                .statuses(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.STATUS)))
+                .deviceTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.DEVICE_TYPE)))
+                .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.OS_TYPE)))
+                .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.ORGANIZATION_ID)))
                 .tagKeys(List.of())
-                .filteredCount((int) machineRepository.countMachines(filter, search))
+                .filteredCount((int) machineRepository.countMachines(tenantId, filter, search))
                 .build();
     }
 
@@ -146,9 +154,10 @@ public class DeviceService {
      * All machineIds of devices matching {@code filter}/{@code search} within the given platforms —
      * backs "Add all devices" for a schedule (resolve the whole filtered set at once, unpaginated).
      */
-    public List<String> findDeviceIdsForPlatforms(Collection<String> platformNames,
+    public List<String> findDeviceIdsForPlatforms(Collection<OsType> platformNames,
                                                   DeviceFilterCriteria filterOptions, String search) {
-        return machineRepository.findMachineIds(machineFilter(filterOptions, platformNames, null), search);
+        return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
+                machineFilter(filterOptions, platformNames, null), search);
     }
 
     /**
@@ -163,20 +172,22 @@ public class DeviceService {
         if (filterOptions == null && (search == null || search.isBlank())) {
             return List.copyOf(machineIds);
         }
-        return machineRepository.findMachineIds(machineFilter(filterOptions, null, machineIds), search);
+        return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
+                machineFilter(filterOptions, null, machineIds), search);
     }
 
     private CountedGenericQueryResult<Machine> paginate(MachineQueryFilter filter, String search,
                                                         CursorPaginationCriteria paginationCriteria,
                                                         SortInput sort) {
+        String tenantId = tenantIdProvider.getTenantId();
         CursorPaginationCriteria normalizedPagination = paginationCriteria.normalize();
         String sortField = validateSortField(sort != null ? sort.getField() : null);
         SortDirection sortDirection = (sort != null && sort.getDirection() != null) ?
                 sort.getDirection() : SortDirection.DESC;
 
-        long totalFilteredCount = machineRepository.countMachines(filter, search);
+        long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
 
-        List<Machine> allWithOne = machineRepository.findMachinesWithCursor(filter, search,
+        List<Machine> allWithOne = machineRepository.findMachinesWithCursor(tenantId, filter, search,
                 normalizedPagination.getCursor(), normalizedPagination.getLimit() + 1,
                 sortField, sortDirection.name());
         List<Machine> pageItems = allWithOne.size() > normalizedPagination.getLimit()
@@ -205,22 +216,28 @@ public class DeviceService {
     }
 
     private MachineQueryFilter machineFilter(DeviceFilterCriteria filter,
-                                             Collection<String> platformNames,
+                                             Collection<OsType> osTypeScope,
                                              Collection<String> restrictToMachineIds) {
         MachineQueryFilter out = new MachineQueryFilter();
+        List<OsType> filterOsTypes = null;
         if (filter != null) {
             out.setStatuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null);
             out.setDeviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null);
-            out.setOsTypes(filter.getOsTypes());
             out.setOrganizationIds(filter.getOrganizationIds());
+            filterOsTypes = filter.getOsTypes();
         }
-        if (platformNames != null && !platformNames.isEmpty()) {
-            out.setPlatformNames(new ArrayList<>(platformNames));
-        }
+        out.setOsTypes(resolveOsTypes(filterOsTypes, osTypeScope));
         List<String> tagMachineIds = filter != null ? resolveTagFilterToMachineIds(filter) : null;
         out.setRestrictToMachineIds(intersectMachineIds(tagMachineIds, restrictToMachineIds));
 
         return out;
+    }
+
+    private static List<OsType> resolveOsTypes(Collection<OsType> filterOsTypes, Collection<OsType> osTypeScope) {
+        if (filterOsTypes != null && !filterOsTypes.isEmpty()) {
+            return new ArrayList<>(filterOsTypes);
+        }
+        return osTypeScope != null && !osTypeScope.isEmpty() ? new ArrayList<>(osTypeScope) : null;
     }
 
     /**
@@ -294,6 +311,10 @@ public class DeviceService {
         }
         if (status == DeviceStatus.DELETED) {
             scriptScheduleDeviceService.removeDeviceFromAllSchedules(machine.getTenantId(), machineId);
+            long removedDispatch = machineFirstOnlineDispatchRepository.deleteByTenantIdAndMachineId(machine.getTenantId(), machineId);
+            if (removedDispatch > 0) {
+                log.info("Removed first-online dispatch record(s) for deleted machineId={}, count={}", machineId, removedDispatch);
+            }
         }
 
         machine.setStatus(status);
@@ -306,6 +327,23 @@ public class DeviceService {
         } catch (Exception e) {
             log.error("Post-processor failed for machineId={}: {}", machineId, e.getMessage(), e);
         }
+    }
+
+    public Machine updateNickname(@NotBlank String machineId, String nickname) {
+        log.info("Updating device nickname. machineId={}", machineId);
+        MachineWriteResult result = machineWriter
+                .update(machineId, machineUpdate().set(NICKNAME, normalizeNickname(nickname)))
+                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
+        log.info("Device {} nickname updated", machineId);
+        return result.after();
+    }
+
+    private String normalizeNickname(String nickname) {
+        if (nickname == null) {
+            return null;
+        }
+        String trimmed = nickname.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private String validateSortField(String field) {

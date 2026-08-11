@@ -6,11 +6,11 @@ import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
-import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.mapper.ScriptScheduleMapper;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
@@ -32,6 +32,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import static com.openframe.data.document.rmm.OsType.MAC_OS;
+import static com.openframe.data.document.rmm.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -98,7 +100,7 @@ class ScriptScheduleServiceTest {
     @Test
     @DisplayName("create: persists and returns the mapped response when the name is unique, stamping createdBy")
     void create_whenNameUnique_persistsAndReturnsResponse() {
-        createInput.setSupportedPlatforms(List.of(OsType.WINDOWS));
+        createInput.setSupportedPlatforms(List.of(WINDOWS));
         createInput.setScriptIds(List.of("sc-1", "sc-2"));
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(TENANT_ID, createInput.getName(), UNIQUE_STATUSES)).thenReturn(false);
         when(scheduleRepository.save(any())).thenAnswer(inv -> {
@@ -113,7 +115,7 @@ class ScriptScheduleServiceTest {
         assertThat(result.getName()).isEqualTo("Nightly Maintenance");
         assertThat(result.getCreatedBy()).isEqualTo("user-1");
         assertThat(result.getScriptIds()).containsExactly("sc-1", "sc-2");
-        assertThat(result.getSupportedPlatforms()).containsExactly("WINDOWS");
+        assertThat(result.getSupportedPlatforms()).containsExactly(WINDOWS);
         assertThat(result.getStatus()).isEqualTo(ScriptStatus.ACTIVE);
     }
 
@@ -132,11 +134,11 @@ class ScriptScheduleServiceTest {
     @Test
     @DisplayName("create: a script whose platforms exclude the schedule's platform is rejected (macOS schedule + Windows-only script)")
     void create_scriptPlatformMismatch_rejected() {
-        createInput.setSupportedPlatforms(List.of(OsType.MAC_OS));
+        createInput.setSupportedPlatforms(List.of(MAC_OS));
         createInput.setScriptIds(List.of("sc-win"));
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
         when(scriptService.getScriptsByIds(any())).thenReturn(List.of(
-                ScriptResponse.builder().id("sc-win").name("win-only").supportedPlatforms(List.of("WINDOWS")).build()));
+                ScriptResponse.builder().id("sc-win").name("win-only").supportedPlatforms(List.of(WINDOWS)).build()));
 
         assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
                 .isInstanceOf(BadRequestException.class)
@@ -147,12 +149,12 @@ class ScriptScheduleServiceTest {
     @Test
     @DisplayName("create: a script that supports the schedule's platform (among others) is accepted")
     void create_scriptPlatformCompatible_accepted() {
-        createInput.setSupportedPlatforms(List.of(OsType.MAC_OS));
+        createInput.setSupportedPlatforms(List.of(MAC_OS));
         createInput.setScriptIds(List.of("sc-cross"));
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
         when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(scriptService.getScriptsByIds(any())).thenReturn(List.of(
-                ScriptResponse.builder().id("sc-cross").name("cross").supportedPlatforms(List.of("WINDOWS", "MAC_OS")).build()));
+                ScriptResponse.builder().id("sc-cross").name("cross").supportedPlatforms(List.of(WINDOWS, MAC_OS)).build()));
 
         assertThat(scheduleService.create(createInput, "user-1")).isNotNull();
         verify(scheduleRepository).save(any());
@@ -161,7 +163,7 @@ class ScriptScheduleServiceTest {
     @Test
     @DisplayName("create: a platform-agnostic script (no declared platforms) is allowed on any schedule")
     void create_scriptNoPlatforms_allowed() {
-        createInput.setSupportedPlatforms(List.of(OsType.MAC_OS));
+        createInput.setSupportedPlatforms(List.of(MAC_OS));
         createInput.setScriptIds(List.of("sc-any"));
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
         when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -278,10 +280,14 @@ class ScriptScheduleServiceTest {
     @DisplayName("list: API filter is translated into a data-layer ScriptScheduleQueryFilter and forwarded")
     void list_filterForwardedToRepository() {
         stubSortDefault();
+        Instant startFrom = Instant.parse("2026-04-01T00:00:00Z");
+        Instant startTo = Instant.parse("2026-05-01T00:00:00Z");
         ScriptScheduleFilterInput filter = ScriptScheduleFilterInput.builder()
                 .statuses(List.of(ScriptStatus.ACTIVE))
-                .supportedPlatforms(List.of(OsType.WINDOWS))
+                .supportedPlatforms(List.of(WINDOWS))
                 .authorIds(List.of("user-7"))
+                .startAtFrom(startFrom)
+                .startAtTo(startTo)
                 .build();
         when(scheduleRepository.countForTenant(eq(TENANT_ID), any(), any())).thenReturn(0L);
         when(scheduleRepository.findPageForTenant(any(), any(), any(), any(), any(), any(), eq(false), eq(21)))
@@ -294,8 +300,10 @@ class ScriptScheduleServiceTest {
                 eq("_id"), eq(Sort.Direction.DESC), eq(null), eq(false), eq(21));
         ScriptScheduleQueryFilter forwarded = captor.getValue();
         assertThat(forwarded.getStatuses()).containsExactly(ScriptStatus.ACTIVE);
-        assertThat(forwarded.getSupportedPlatforms()).containsExactly(OsType.WINDOWS);
+        assertThat(forwarded.getSupportedPlatforms()).containsExactly(WINDOWS);
         assertThat(forwarded.getCreatedByIds()).containsExactly("user-7");
+        assertThat(forwarded.getStartAtFrom()).isEqualTo(startFrom);
+        assertThat(forwarded.getStartAtTo()).isEqualTo(startTo);
     }
 
     @Test

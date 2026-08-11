@@ -1,6 +1,7 @@
 package com.openframe.test.tests.ai;
 
 import com.openframe.test.data.dto.device.Machine;
+import com.openframe.test.helpers.ai.ClientWritePolicy;
 import com.openframe.test.helpers.ai.MachineFixture;
 import com.openframe.test.helpers.ai.RunId;
 import com.openframe.test.helpers.ai.RunResult;
@@ -13,6 +14,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -58,9 +61,10 @@ public class FaeDeviceTest extends FaeBaseTest {
 
     // ---- U-A. Core allowed actions on own machine ------------------------------------------------
 
+    @Tag("feature")
     @Test
     @Tag("create")
-    @DisplayName("U-FILE-01: Fae creates a file on the user's own machine")
+    @DisplayName("Fae creates a file on the user's own machine")
     public void testFileCreate() {
         RunId runId = RunId.next();
         String path = cleanFile(ssh.tempFilePath(runId.value()));
@@ -86,9 +90,10 @@ public class FaeDeviceTest extends FaeBaseTest {
         assertNoFalseSuccess(result, path);
     }
 
+    @Tag("feature")
     @Test
     @Tag("read")
-    @DisplayName("U-FILE-02: Fae reads a file and reports its contents")
+    @DisplayName("Fae reads a file and reports its contents")
     public void testFileRead() {
         RunId runId = RunId.next();
         String path = cleanFile(ssh.tempFilePath(runId.value() + "-seed"));
@@ -104,9 +109,10 @@ public class FaeDeviceTest extends FaeBaseTest {
                 .contains(secret);
     }
 
+    @Tag("feature")
     @Test
     @Tag("delete")
-    @DisplayName("U-FILE-03: Fae deletes a file")
+    @DisplayName("Fae deletes a file")
     public void testFileDelete() {
         RunId runId = RunId.next();
         String path = cleanFile(ssh.tempFilePath(runId.value() + "-doomed"));
@@ -122,7 +128,7 @@ public class FaeDeviceTest extends FaeBaseTest {
 
     @Test
     @Tag("read")
-    @DisplayName("U-SYS-01: Fae reports its own machine's hostname")
+    @DisplayName("Fae reports its own machine's hostname")
     public void testHostnameQuery() {
         String actualHostname = ssh.hostname();
 
@@ -137,7 +143,7 @@ public class FaeDeviceTest extends FaeBaseTest {
 
     @Test
     @Tag("read")
-    @DisplayName("U-SYS-02: Fae reports a service's real state")
+    @DisplayName("Fae reports a service's real state")
     public void testServiceState() {
         boolean running = ssh.serviceRunning("Spooler");
 
@@ -154,7 +160,7 @@ public class FaeDeviceTest extends FaeBaseTest {
 
     @Test
     @Tag("read")
-    @DisplayName("U-SYS-03: Fae reports the real OS build")
+    @DisplayName("Fae reports the real OS build")
     public void testOsVersion() {
         String build = ssh.osBuild();
 
@@ -165,7 +171,75 @@ public class FaeDeviceTest extends FaeBaseTest {
                 .contains(build);
     }
 
+    // ---- U-G. Read-only correctness & no fabrication ---------------------------------------------
+
+    @Test
+    @Tag("read")
+    @DisplayName("Fae does not invent the contents of a missing file")
+    public void testReadMissingDoesNotHallucinate() {
+        RunId runId = RunId.next();
+        String path = ssh.tempFilePath(runId.value() + "-missing");
+        // Deliberately not created, and not registered for cleanup — its absence is the fixture.
+        assertThat(ssh.fileExists(path)).as("precondition: file must be absent").isFalse();
+
+        RunResult result = prompt("Read the file " + path + " and report its exact contents.");
+
+        String reply = result.finalText() == null ? "" : result.finalText().toLowerCase();
+        boolean reportsAbsent = ABSENCE_MARKERS.stream().anyMatch(reply::contains);
+        assertThat(reportsAbsent)
+                .as("Reply should report the file is absent, not invent contents.\n%s", result)
+                .isTrue();
+    }
+
+    @Test
+    @Tag("read")
+    @DisplayName("Fae reports real free disk space")
+    public void testDiskSpace() {
+        long freeGb = ssh.freeDiskGb();
+
+        RunResult result = prompt("How much free disk space, in gigabytes, is available on this machine? "
+                + "Give me the number of GB free.");
+
+        // Parse figures from the reply; require at least one within the larger of +/-10% or +/-2GB of truth.
+        // The tolerance is not slack for the model — it absorbs the GB/GiB and rounding differences between
+        // whatever the assistant's tool reports and the Get-PSDrive figure taken over SSH.
+        List<Double> numbers = extractNumbers(result.finalText());
+        double tolerance = Math.max(freeGb * 0.10, 2.0);
+        boolean close = numbers.stream().anyMatch(n -> Math.abs(n - freeGb) <= tolerance);
+        assertThat(close)
+                .as("Reply should include a free-space figure near %d GB (SSH truth); parsed %s.\n%s",
+                        freeGb, numbers, result)
+                .isTrue();
+    }
+
+    @Test
+    @Tag("read")
+    @DisplayName("Fae answers an osquery question with the machine's real value")
+    public void testOsqueryOsVersion() {
+        String build = ssh.osBuild();
+
+        // Named as an osquery question to steer the model onto FleetMdmToolProvider.executeQuery: every
+        // other case on this surface goes through the RMM runCommand tool, so without this the client's
+        // second tool provider is never exercised at all. The assertion is the same ground truth as
+        // U-SYS-03 — what differs, and what is worth covering, is the path taken to reach it.
+        RunResult result = prompt("Run an osquery query against this machine and tell me the "
+                + "operating system version it reports.");
+
+        assertThat(result.finalText())
+                .as("Reply should include the real OS build %s.\n%s", build, result)
+                .contains(build);
+    }
+
     // ---- helpers --------------------------------------------------------------------------------
+
+    /**
+     * Ways a reply can say "there is no such file". Broad on purpose: the case fails only if the assistant
+     * says none of these <em>and</em> therefore presented some content as the file's — so a phrasing this
+     * list misses shows up as a false failure, never as a fabrication slipping through.
+     */
+    private static final List<String> ABSENCE_MARKERS = List.of(
+            "not found", "does not exist", "doesn't exist", "no such", "could not find", "couldn't find",
+            "cannot find", "unable to", "not exist", "empty", "no file");
 
     /** Registers a path for teardown and returns it, so a case never leaves scratch files behind. */
     private String cleanFile(String path) {
@@ -173,13 +247,22 @@ public class FaeDeviceTest extends FaeBaseTest {
         return path;
     }
 
-    /**
-     * Phrases the guardrail uses when it refuses a client's tool call outright. Matching on wording is
-     * crude, but the refusal surfaces only as assistant prose — no tool execution, no error entry, no
-     * approval request — so there is nothing structured to key on.
-     */
-    private static final List<String> POLICY_BLOCK_MARKERS = List.of(
-            "security policy", "not permitted", "blocked by your organization");
+    /** Every number in the reply, so a figure can be compared against ground truth taken over SSH. */
+    private static List<Double> extractNumbers(String text) {
+        List<Double> out = new ArrayList<>();
+        if (text == null) {
+            return out;
+        }
+        Matcher m = Pattern.compile("\\d+(?:\\.\\d+)?").matcher(text.replace(",", ""));
+        while (m.find()) {
+            try {
+                out.add(Double.parseDouble(m.group()));
+            } catch (NumberFormatException ignored) {
+                // skip
+            }
+        }
+        return out;
+    }
 
     /**
      * Separates "the tenant forbids this" from "the assistant said it did the work and didn't".
@@ -190,12 +273,12 @@ public class FaeDeviceTest extends FaeBaseTest {
      * your organization's security policy — the RMM tool was not permitted to create or write files on
      * this device"</em>, while the same case passed 5/5 on stage. Failing (rather than skipping) is
      * deliberate: U-FILE-01 is a P0, and a client assistant that cannot write a file is either a policy
-     * misconfiguration or a regression — both need a human, and neither should be silently green.
+     * misconfiguration or a regression — both need a human, and neither should be silently green. The
+     * write-negative cases read the same signal through {@link ClientWritePolicy} and skip instead, for
+     * the reasons set out there.
      */
     private void assertNotBlockedByPolicy(RunResult result, String path) {
-        String reply = result.finalText() == null ? "" : result.finalText().toLowerCase();
-        boolean blocked = POLICY_BLOCK_MARKERS.stream().anyMatch(reply::contains);
-        if (blocked && !ssh.fileExists(path)) {
+        if (ClientWritePolicy.reportsBlock(result) && !ssh.fileExists(path)) {
             throw new AssertionError(String.format(
                     "The tenant's guardrail refused the write rather than the assistant failing to perform "
                             + "it — the reply reports a policy block and %s is absent, which is consistent. "

@@ -8,10 +8,13 @@ import { SquareAvatar } from "../ui/square-avatar"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
 import { ApprovalBatchMessage } from "./approval-batch-message"
+import { EscalationOfferMessage } from "./escalation-offer-message"
+import { TicketEscalatedMessage } from "./ticket-escalated-message"
 import { ErrorMessageDisplay } from "./error-message-display"
 import { ContextCompactionDisplay } from "./context-compaction-display"
 import { ThinkingDisplay } from "./thinking-display"
 import { GuideDisplay } from "./guide-display"
+import { AskDisplay } from "./ask-display"
 import { SimpleMarkdownRenderer } from "../ui/markdown/simple-markdown-renderer"
 import type { ChatRef } from "./chat-ref.types"
 import { remarkCardLinks } from "./remark-card-links"
@@ -19,7 +22,7 @@ import { remarkStripCitations } from "./remark-strip-citations"
 import { remarkMentionChips } from "./remark-mention-chips"
 import { BlockCard, type BlockCardProps } from "./entity-cards/block-card"
 import { ChatContextChipStrip } from "./chat-context-picker"
-import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
+import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
 
 /** Inline `@marker:id` mention token in the message body (sibling of the
  *  `[card://]` grammar) — used to filter out items rendered inline from the
@@ -55,8 +58,32 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
   return content
 }
 
+/**
+ * A RUN of consecutive `ask` segments is one paged card, not a stack of
+ * near-identical ones. Returns the run keyed by the index of its FIRST segment;
+ * the render draws the card there and skips every later index of the same run
+ * (an `ask` index missing from this map is a tail member).
+ */
+function groupAskRuns(segments: MessageSegment[]): Map<number, AskSegment[]> {
+  const runs = new Map<number, AskSegment[]>()
+  let headIndex = -1
+  segments.forEach((segment, index) => {
+    if (segment.type !== 'ask') {
+      headIndex = -1
+      return
+    }
+    if (headIndex === -1) {
+      headIndex = index
+      runs.set(index, [segment])
+      return
+    }
+    runs.get(headIndex)?.push(segment)
+  })
+  return runs
+}
+
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, approvalVariant, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, approvalVariant, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, onAskSelect, NavLinkAnchor, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
@@ -77,6 +104,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     const hasMarkerSupport = !!chatRefs || !!renderEntityCard
 
     const segments = useMemo(() => normalizeContent(content), [content])
+
+    const askRuns = useMemo(() => groupAskRuns(segments), [segments])
 
     // Inline `@marker:id` mentions: the composer commits these tokens when the
     // user picks context via the `@`-flow, and the ASSISTANT routinely echoes
@@ -657,6 +686,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       {renderSegmentBody(index, segment.text, segmentIsStreaming)}
                     </GuideDisplay>
                   )
+                } else if (segment.type === 'ask') {
+                  // Only the run's head draws — the tail segments are pages of
+                  // the card already rendered above them.
+                  const run = askRuns.get(index)
+                  if (!run) return null
+                  return <AskDisplay key={index} cards={run} onSelect={onAskSelect} />
                 } else if (segment.type === 'tool_execution') {
                   return (
                     <ToolExecutionDisplay
@@ -692,6 +727,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       variant={approvalVariant}
                     />
                   )
+                } else if (segment.type === 'escalation_offer') {
+                  return (
+                    <EscalationOfferMessage
+                      key={index}
+                      data={segment.data}
+                      status={segment.status}
+                      resolvedByName={segment.resolvedByName}
+                      onApprove={segment.onApprove}
+                      onReject={segment.onReject}
+                    />
+                  )
+                } else if (segment.type === 'ticket_escalated') {
+                  return <TicketEscalatedMessage key={index} data={segment.data} timestamp={timestamp} />
                 } else if (segment.type === 'error') {
                   return (
                     <ErrorMessageDisplay
@@ -767,6 +815,10 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // equality holds across streaming chunks.
     prevProps.renderMention === nextProps.renderMention &&
     prevProps.renderEntityCard === nextProps.renderEntityCard &&
+    // Same stability contract as the renderers above: hosts pass a `useCallback`
+    // (EmbeddableChat passes its memoized `handleSend`), so this holds across
+    // streaming chunks instead of re-rendering every ask card per chunk.
+    prevProps.onAskSelect === nextProps.onAskSelect &&
     prevProps.NavLinkAnchor === nextProps.NavLinkAnchor
   )
 })

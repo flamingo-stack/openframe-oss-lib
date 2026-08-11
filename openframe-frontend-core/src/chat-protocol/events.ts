@@ -15,6 +15,11 @@ import type {
   DecisionResolvedFrame,
   UsageTelemetry,
 } from './frames'
+// The ask card's option shape is the SEGMENT's shape — the decoder hands the
+// rows straight to the accumulator, so restating them here would be two
+// declarations of one wire contract. Type-only import from a React-free
+// module; `nats-decoder.ts` already depends on the same file for MESSAGE_TYPE.
+import type { AskOptionData } from '../components/chat/types/message.types'
 
 /** Optional envelope on every event. `seq` carries the transport's
  *  stream sequence (JetStream `streamSeq` on NATS; unused on SSE). */
@@ -63,6 +68,20 @@ export interface ThinkingDeltaEvent extends ChatStreamEventBase {
 export interface GuideDeltaEvent extends ChatStreamEventBase {
   type: 'guide-delta'
   text: string
+}
+
+/** Clarification card (NATS `ASK` chunk) — the assistant asking which reading
+ *  of an ambiguous question to answer. NOT a delta: the chunk carries the
+ *  finished card, so consumers push it whole instead of coalescing. `text` is
+ *  the intro sentence the same chunk rides along with; consumers render it as
+ *  ordinary answer text BEFORE the card. NATS-only — the SSE frame grammar has
+ *  no ask frame — but it lives in the shared union because the reducer is
+ *  transport-agnostic. */
+export interface AskEvent extends ChatStreamEventBase {
+  type: 'ask'
+  text?: string
+  question: string
+  options: AskOptionData[]
 }
 
 export interface StatusEvent extends ChatStreamEventBase {
@@ -139,6 +158,69 @@ export interface ApprovalResolvedEvent extends ChatStreamEventBase {
   marker?: string
   result?: DecisionResolvedFrame['result']
   willAutoContinue?: boolean
+}
+
+/** The client is offered a handoff of this ticket to a human technician
+ *  (NATS `ESCALATION_OFFER` chunk in state PENDING). Distinct from
+ *  `approval-request`: it resolves through the ticket-escalation mutations,
+ *  never the tool-approval flow, and it is raised by four different origins
+ *  (Fae's own tool call, the client's header button, a deterministic
+ *  trigger, or a deferred surfacing at turn end) that all render alike. */
+export interface EscalationOfferEvent extends ChatStreamEventBase {
+  type: 'escalation-offer'
+  offerId: string
+  text: string
+  origin?: string
+}
+
+/** Wire vocabulary of `EscalationOfferData.state`. */
+export const ESCALATION_STATE = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  DECLINED: 'DECLINED',
+  SUPERSEDED: 'SUPERSEDED',
+} as const
+
+/** Terminal wire state → the shared `ChatApprovalStatus` vocabulary; `null`
+ *  for PENDING or anything unrecognized. Shared by BOTH decoders (live
+ *  chunks and persisted rows) so a state can never mean two things. */
+export function escalationResolvedStatus(
+  state: unknown,
+): EscalationOfferResolvedEvent['status'] | null {
+  switch (state) {
+    case ESCALATION_STATE.APPROVED:
+      return 'approved'
+    case ESCALATION_STATE.DECLINED:
+      return 'rejected'
+    case ESCALATION_STATE.SUPERSEDED:
+      return 'cancelled'
+    default:
+      return null
+  }
+}
+
+/** An escalation offer reached a terminal state. The wire's SUPERSEDED
+ *  (the client typed over a pending offer) maps onto `cancelled` so the
+ *  whole stack keeps ONE status vocabulary (`ChatApprovalStatus`). The
+ *  resolved chunk carries no text — consumers flip the existing block. */
+export interface EscalationOfferResolvedEvent extends ChatStreamEventBase {
+  type: 'escalation-offer-resolved'
+  offerId: string
+  status: 'approved' | 'rejected' | 'cancelled'
+  resolvedByName?: string | null
+}
+
+/** The conversation was handed off to a human technician (`TICKET_ESCALATED`).
+ *  A first-class block rather than something inferred from an offer's state,
+ *  so paths that raise no offer at all — the inactivity auto-escalation — still
+ *  produce a receipt. `text` is nullable on the wire; consumers supply the
+ *  fallback copy. */
+export interface TicketEscalatedEvent extends ChatStreamEventBase {
+  type: 'ticket-escalated'
+  ticketId: string
+  ticketNumber?: number
+  reason: string
+  text?: string
 }
 
 /** Per-turn metadata. Raw wire values pass through UNVALIDATED — the
@@ -241,10 +323,14 @@ export type ChatStreamEvent =
   | TextDeltaEvent
   | ThinkingDeltaEvent
   | GuideDeltaEvent
+  | AskEvent
   | StatusEvent
   | ToolExecutionEvent
   | ApprovalRequestEvent
   | ApprovalResolvedEvent
+  | EscalationOfferEvent
+  | EscalationOfferResolvedEvent
+  | TicketEscalatedEvent
   | ChatMetadataEvent
   | UsageEvent
   | TokenUsageEvent

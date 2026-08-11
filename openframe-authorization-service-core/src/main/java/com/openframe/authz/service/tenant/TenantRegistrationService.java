@@ -48,14 +48,13 @@ public class TenantRegistrationService {
         String reservedTenantId = registrationProcessor.reserveTenantIdForRegistration(request);
         Tenant tenant = tenantService.createTenant(reservedTenantId, request.getTenantName(), tenantDomain);
 
-        AuthUser user = userService.registerUser(
-                tenant.getId(),
-                userEmail,
-                request.getFirstName(),
-                request.getLastName(),
-                request.getPassword(),
-                List.of(OWNER)
-        );
+        // Verified-at-creation when the SSO flow proved the email, so downstream post-processing
+        // (e.g. the SaaS verification email) sees the final state rather than racing an update.
+        AuthUser user = request.isEmailPreVerified()
+                ? userService.registerVerifiedUser(tenant.getId(), userEmail, request.getFirstName(),
+                        request.getLastName(), request.getPassword(), List.of(OWNER))
+                : userService.registerUser(tenant.getId(), userEmail, request.getFirstName(),
+                        request.getLastName(), request.getPassword(), List.of(OWNER));
 
         tenant.setOwnerId(user.getId());
 

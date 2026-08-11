@@ -16,30 +16,28 @@ public class DeviceDetailsPage {
 
     private static final String DEVICE_NAME_HEADING = "main h1";
 
-    // The status badge is an ODS `Tag` — its markup is owned by the design
-    // system (openframe-frontend-core src/components/ui/tag.tsx) and is the one
-    // part of this header that does not drift:
+    // The status badge is an ODS `Tag` (openframe-frontend-core src/components/ui/tag.tsx). Match the
+    // pill's own container and take the first one in <main>: the status badge precedes all tab content.
+    //
+    // Everything about this header's *layout* drifts, so do not anchor on it. Three attempts have now
+    // broken here, each for a different reason:
+    //
+    //   1. Sibling-of-h1 ("main h1 + span span.truncate") — `TitleBlock` wraps the <h1> in
+    //      FloatingTooltip's own <div ref=setReference>, so the <h1> has no element sibling at all.
+    //   2. Scoped to a "div.flex.items-center.flex-wrap.py-4" status row — that div no longer exists.
+    //   3. A `>` child combinator between the pill and its text span — Tag now nests the text one level
+    //      deeper, and a direct-child match silently returns nothing.
+    //
+    // (3) is the current shape, verified against a captured failure DOM:
     //   <div class="inline-flex items-center justify-center rounded-md …">
-    //     <span class="truncate" title="ONLINE">ONLINE</span>
-    //   </div>
+    //     <span class="min-w-0 max-w-full">
+    //       <span class="truncate block">ONLINE</span>   <-- was a direct child, now a grandchild
     //
-    // FIX: sibling-of-h1 anchoring ("main h1 + span span.truncate") cannot
-    // match. `TitleBlock` (frozen ODS chrome) wraps the <h1> in the
-    // FloatingTooltip's own <div ref=setReference> — see
-    // openframe-frontend-core src/components/layout/title-block.tsx and
-    // src/components/ui/floating-tooltip.tsx — so the <h1> has NO element
-    // sibling at all; a `titleAdornment` span is a sibling of that wrapper div,
-    // not of the h1. Hence the 30s innerText() timeout.
-    //
-    // Match the Tag pill itself instead. Two forms, tried in order: scoped to
-    // the status/tags row rendered under the title block, then the first pill
-    // anywhere in <main> (the status badge precedes all tab content). Both are
-    // parent-chain independent enough to survive header re-layouts, which the
-    // previous two attempts were not.
+    // Hence a descendant combinator, and no layout scope. The only structural assumption left is the
+    // Tag container's own utility classes, which come from the component rather than from this page.
+    // Measured on that DOM: this matches the ONLINE badge first, the log row's INFO pill second.
     private static final String STATUS_PILL =
-            "div.inline-flex.items-center.justify-center.rounded-md > span.truncate";
-    private static final String STATUS_BADGE =
-            "main div.flex.items-center.flex-wrap.py-4 " + STATUS_PILL;
+            "div.inline-flex.items-center.justify-center.rounded-md span.truncate";
     private static final String STATUS_BADGE_ANY = "main " + STATUS_PILL;
 
     // Radix `DropdownMenuContent` — a DIV with role="menu", portalled to the
@@ -309,17 +307,12 @@ public class DeviceDetailsPage {
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /**
-     * Returns the first status-badge locator that currently resolves to an
-     * element, or {@code null} if none does. Never waits.
+     * Returns the status-badge locator if it currently resolves to an element, or {@code null}.
+     * Never waits — callers decide whether a miss means "not loaded yet" or "wait for it".
      */
     private Locator resolvedStatusBadge() {
-        for (String selector : new String[]{STATUS_BADGE, STATUS_BADGE_ANY}) {
-            Locator candidate = page.locator(selector).first();
-            if (candidate.count() > 0) {
-                return candidate;
-            }
-        }
-        return null;
+        Locator candidate = page.locator(STATUS_BADGE_ANY).first();
+        return candidate.count() > 0 ? candidate : null;
     }
 
     /**

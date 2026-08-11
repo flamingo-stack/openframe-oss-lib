@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Collection;
 import java.util.List;
 
+import static com.openframe.data.document.rmm.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -58,7 +59,7 @@ class ScheduleDeviceTargetResolverTest {
     void criteria_delegatesToRepository() {
         ScriptSchedule schedule = ScriptSchedule.builder()
                 .id(SCHEDULE_ID).tenantId(TENANT)
-                .supportedPlatforms(List.of(OsType.WINDOWS))
+                .supportedPlatforms(List.of(WINDOWS))
                 .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
                 .deviceCriteria(ScheduleDeviceCriteria.builder()
                         .organizationIds(List.of("org-1"))
@@ -71,11 +72,11 @@ class ScheduleDeviceTargetResolverTest {
 
         ArgumentCaptor<MachineQueryFilter> filterCaptor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<Collection<String>> scopeCaptor = ArgumentCaptor.forClass(Collection.class);
+        ArgumentCaptor<Collection<OsType>> scopeCaptor = ArgumentCaptor.forClass(Collection.class);
         verify(machineRepository).findMachineIdsByCriteria(eq(TENANT), filterCaptor.capture(), scopeCaptor.capture());
         assertThat(filterCaptor.getValue().getOrganizationIds()).containsExactly("org-1");
-        assertThat(filterCaptor.getValue().getDeviceTypes()).containsExactly("LAPTOP");   // enum → name
-        assertThat(scopeCaptor.getValue()).containsExactly("WINDOWS");                     // supportedPlatforms scope
+        assertThat(filterCaptor.getValue().getDeviceTypes()).containsExactly("LAPTOP");
+        assertThat(scopeCaptor.getValue()).containsExactly(WINDOWS);
         verifyNoInteractions(assignedRepository);
     }
 
@@ -84,7 +85,7 @@ class ScheduleDeviceTargetResolverTest {
     void countCriteria_delegatesToRepositoryCount() {
         ScriptSchedule schedule = ScriptSchedule.builder()
                 .id(SCHEDULE_ID).tenantId(TENANT)
-                .supportedPlatforms(List.of(OsType.WINDOWS))
+                .supportedPlatforms(List.of(WINDOWS))
                 .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
                 .deviceCriteria(ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build())
                 .build();
@@ -94,10 +95,10 @@ class ScheduleDeviceTargetResolverTest {
 
         ArgumentCaptor<MachineQueryFilter> filterCaptor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<Collection<String>> scopeCaptor = ArgumentCaptor.forClass(Collection.class);
+        ArgumentCaptor<Collection<OsType>> scopeCaptor = ArgumentCaptor.forClass(Collection.class);
         verify(machineRepository).countMachinesByCriteria(eq(TENANT), filterCaptor.capture(), scopeCaptor.capture());
         assertThat(filterCaptor.getValue().getOrganizationIds()).containsExactly("org-1");
-        assertThat(scopeCaptor.getValue()).containsExactly("WINDOWS");
+        assertThat(scopeCaptor.getValue()).containsExactly(WINDOWS);
     }
 
     @Test
@@ -107,7 +108,7 @@ class ScheduleDeviceTargetResolverTest {
                 .id(SCHEDULE_ID).tenantId(TENANT)
                 .supportedPlatforms(List.of(OsType.MAC_OS))
                 .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
-                .deviceCriteria(ScheduleDeviceCriteria.builder().osTypes(List.of("WINDOWS")).build())
+                .deviceCriteria(ScheduleDeviceCriteria.builder().osTypes(List.of(WINDOWS)).build())
                 .build();
 
         assertThat(resolver.countCriteriaMachines(schedule)).isZero();
@@ -121,7 +122,7 @@ class ScheduleDeviceTargetResolverTest {
                 .id(SCHEDULE_ID).tenantId(TENANT)
                 .supportedPlatforms(List.of(OsType.MAC_OS))
                 .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
-                .deviceCriteria(ScheduleDeviceCriteria.builder().osTypes(List.of("WINDOWS")).build())
+                .deviceCriteria(ScheduleDeviceCriteria.builder().osTypes(List.of(WINDOWS)).build())
                 .build();
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).isEmpty();
@@ -131,12 +132,12 @@ class ScheduleDeviceTargetResolverTest {
     @Test
     @DisplayName("matchesCriteria: true when customer + type + OS all match (OS case-insensitive)")
     void matches_allDimensions() {
-        ScriptSchedule schedule = criteria(List.of(OsType.WINDOWS),
+        ScriptSchedule schedule = criteria(List.of(WINDOWS),
                 ScheduleDeviceCriteria.builder()
                         .organizationIds(List.of("org-1"))
                         .deviceTypes(List.of(DeviceType.LAPTOP))
                         .build());
-        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, OsType.WINDOWS))).isTrue();
+        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, WINDOWS))).isTrue();
     }
 
     @Test
@@ -144,7 +145,7 @@ class ScheduleDeviceTargetResolverTest {
     void matches_falseForSpecific() {
         ScriptSchedule schedule = ScriptSchedule.builder()
                 .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).build();
-        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, OsType.WINDOWS))).isFalse();
+        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, WINDOWS))).isFalse();
     }
 
     @Test
@@ -152,7 +153,7 @@ class ScheduleDeviceTargetResolverTest {
     void matches_orgMismatch() {
         ScriptSchedule schedule = criteria(null,
                 ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build());
-        assertThat(resolver.matchesCriteria(schedule, machine("org-2", DeviceType.LAPTOP, OsType.WINDOWS))).isFalse();
+        assertThat(resolver.matchesCriteria(schedule, machine("org-2", DeviceType.LAPTOP, WINDOWS))).isFalse();
     }
 
     @Test
@@ -160,7 +161,7 @@ class ScheduleDeviceTargetResolverTest {
     void matches_osOutsideSupportedPlatforms() {
         ScriptSchedule schedule = criteria(List.of(OsType.MAC_OS),
                 ScheduleDeviceCriteria.builder().build());   // no OS criterion → scope = supported (MACOS)
-        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, OsType.WINDOWS))).isFalse();
+        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, WINDOWS))).isFalse();
     }
 
     @Test
@@ -168,22 +169,6 @@ class ScheduleDeviceTargetResolverTest {
     void matches_noConstraints() {
         ScriptSchedule schedule = criteria(null, ScheduleDeviceCriteria.builder().build());
         assertThat(resolver.matchesCriteria(schedule, machine("any", DeviceType.SERVER, null))).isTrue();
-    }
-
-    @Test
-    @DisplayName("resolveTargetMachineIds: criteria.osTypes with an unknown enum name (e.g. 'FreeBSD') is silently dropped — a value the enum has never heard of doesn't leak into the Mongo query")
-    void criteria_unknownOsTypeName_droppedFromScope() {
-        ScriptSchedule schedule = ScriptSchedule.builder()
-                .id(SCHEDULE_ID).tenantId(TENANT)
-                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
-                .deviceCriteria(ScheduleDeviceCriteria.builder()
-                        .osTypes(List.of("FreeBSD"))    // not a valid OsType name
-                        .build())
-                .build();
-
-        // Empty criteria scope + no supportedPlatforms → contradictory (nothing to match).
-        assertThat(resolver.resolveTargetMachineIds(schedule)).isEmpty();
-        verifyNoInteractions(machineRepository, assignedRepository);
     }
 
     private static ScriptSchedule criteria(List<OsType> platforms, ScheduleDeviceCriteria criteria) {

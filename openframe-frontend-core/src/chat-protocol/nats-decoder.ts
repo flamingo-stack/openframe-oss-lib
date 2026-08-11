@@ -17,6 +17,8 @@
  */
 
 import { MESSAGE_TYPE } from '../components/chat/types/message.types'
+import type { AskOptionData } from '../components/chat/types/message.types'
+import { ESCALATION_STATE, escalationResolvedStatus } from './events'
 import type { ApprovalToolCall, ChatStreamEvent } from './events'
 
 /** Minimal structural view of a NATS chunk (see `ChunkData` in
@@ -43,6 +45,20 @@ function normalizeToolCalls(raw: unknown): ApprovalToolCall[] {
           ? (item.toolCallArguments as Record<string, any>)
           : null,
     }))
+}
+
+/** Coerce the wire's ask `options[]` into the card's row shape. Rows without a
+ *  usable `label` are dropped: the label is what gets SENT when the row is
+ *  picked, so a blank one would post an empty reply. */
+export function normalizeAskOptions(raw: unknown): AskOptionData[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((item): item is Record<string, any> => !!item && typeof item === 'object')
+    .map((item) => ({
+      label: typeof item.label === 'string' ? item.label.trim() : '',
+      description: typeof item.description === 'string' ? item.description : undefined,
+    }))
+    .filter((option) => option.label.length > 0)
 }
 
 /**
@@ -100,6 +116,23 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         return { type: 'guide-delta', text: data.text, ...seq }
       }
       return null
+
+    // An ask card is only an ask card with something to pick: a question and at
+    // least one option. Anything less is dropped rather than rendered as an
+    // empty card the user can't answer — the backend already falls back to a
+    // complete hardcoded card when the model returns a partial one.
+    case MESSAGE_TYPE.ASK: {
+      const question = typeof data.question === 'string' ? data.question.trim() : ''
+      const options = normalizeAskOptions(data.options)
+      if (!question || options.length === 0) return null
+      return {
+        type: 'ask',
+        ...(typeof data.text === 'string' && data.text ? { text: data.text } : {}),
+        question,
+        options,
+        ...seq,
+      }
+    }
 
     case MESSAGE_TYPE.EXECUTING_TOOL:
       return {
@@ -179,6 +212,52 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         status: data.approved === true ? 'approved' : 'rejected',
         approvalType: data.approvalType || 'CLIENT',
         resolvedByName,
+        ...seq,
+      }
+    }
+
+    case MESSAGE_TYPE.ESCALATION_OFFER: {
+      const offerId = typeof data.offerId === 'string' ? data.offerId : ''
+      if (!offerId) return null
+      if (data.state === ESCALATION_STATE.PENDING) {
+        return {
+          type: 'escalation-offer',
+          offerId,
+          text: typeof data.text === 'string' ? data.text : '',
+          origin: typeof data.origin === 'string' ? data.origin : undefined,
+          ...seq,
+        }
+      }
+      const status = escalationResolvedStatus(data.state)
+      if (!status) return null
+      // Same realtime/history field split as APPROVAL_RESULT: the chunk names
+      // the resolver `displayName`, the persisted row `resolvedByName`.
+      return {
+        type: 'escalation-offer-resolved',
+        offerId,
+        status,
+        resolvedByName:
+          typeof data.resolvedByName === 'string'
+            ? data.resolvedByName
+            : typeof data.displayName === 'string'
+              ? data.displayName
+              : undefined,
+        ...seq,
+      }
+    }
+
+    case MESSAGE_TYPE.TICKET_ESCALATED: {
+      const ticketId = typeof data.ticketId === 'string' ? data.ticketId : ''
+      const reason = typeof data.reason === 'string' ? data.reason : ''
+      // Both are non-null on the wire; a payload missing either is malformed
+      // rather than a variant to render.
+      if (!ticketId || !reason) return null
+      return {
+        type: 'ticket-escalated',
+        ticketId,
+        reason,
+        ticketNumber: typeof data.ticketNumber === 'number' ? data.ticketNumber : undefined,
+        text: typeof data.text === 'string' ? data.text : undefined,
         ...seq,
       }
     }

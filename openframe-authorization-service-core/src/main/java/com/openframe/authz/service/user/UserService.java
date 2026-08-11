@@ -61,6 +61,21 @@ public class UserService {
     }
 
     /**
+     * Register a user whose email is already proven — SSO signup where the IdP asserts the email,
+     * or invitation acceptance (control of the mailbox is implied by receiving the invite).
+     */
+    public AuthUser registerVerifiedUser(String tenantId,
+                                         String email,
+                                         String firstName,
+                                         String lastName,
+                                         String password,
+                                         List<UserRole> roles) {
+        AuthUser user = registerUser(tenantId, email, firstName, lastName, password, roles);
+        user.setEmailVerified(true);
+        return userRepository.save(user);
+    }
+
+    /**
      * Register a user via invitation.
      * Invitation acceptance implies control of the invited email address, so the created/reactivated user is verified.
      */
@@ -70,9 +85,7 @@ public class UserService {
                                               String lastName,
                                               String password,
                                               List<UserRole> roles) {
-        AuthUser user = registerUser(tenantId, email, firstName, lastName, password, roles);
-        user.setEmailVerified(true);
-        return userRepository.save(user);
+        return registerVerifiedUser(tenantId, email, firstName, lastName, password, roles);
     }
 
     public void deactivateUser(AuthUser user) {
