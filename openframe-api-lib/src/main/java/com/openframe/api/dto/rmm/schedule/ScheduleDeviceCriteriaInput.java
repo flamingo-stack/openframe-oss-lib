@@ -1,6 +1,7 @@
 package com.openframe.api.dto.rmm.schedule;
 
 import com.openframe.data.document.device.DeviceType;
+import com.openframe.data.document.rmm.OsType;
 import lombok.Data;
 
 import java.util.List;
@@ -12,5 +13,5 @@ public class ScheduleDeviceCriteriaInput {
 
     private List<DeviceType> deviceTypes;
 
-    private List<String> osTypes;
+    private List<OsType> osTypes;
 }

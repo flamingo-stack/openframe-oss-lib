@@ -3,6 +3,7 @@ package com.openframe.data.repository.device;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.document.rmm.OsType;
 
 import java.util.Collection;
 import java.util.List;
@@ -24,9 +25,9 @@ public interface CustomMachineRepository {
                                                      Collection<String> assignedMachineIds,
                                                      String cursor, int limit);
 
-    List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope);
+    List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter, Collection<OsType> osTypeScope);
 
-    long countMachinesByCriteria(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope);
+    long countMachinesByCriteria(String tenantId, MachineQueryFilter filter, Collection<OsType> osTypeScope);
 
     boolean isSortableField(String field);
 

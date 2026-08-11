@@ -4,6 +4,7 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.document.rmm.OsType;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -284,18 +285,18 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     @Override
     public List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter,
-                                                 Collection<String> osTypeScope) {
+                                                 Collection<OsType> osTypeScope) {
         return mongoTemplate.findDistinct(buildCriteriaQuery(tenantId, filter, osTypeScope),
                 MACHINE_ID_FIELD, Machine.class, String.class);
     }
 
     @Override
     public long countMachinesByCriteria(String tenantId, MachineQueryFilter filter,
-                                        Collection<String> osTypeScope) {
+                                        Collection<OsType> osTypeScope) {
         return mongoTemplate.count(buildCriteriaQuery(tenantId, filter, osTypeScope), Machine.class);
     }
 
-    private Query buildCriteriaQuery(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope) {
+    private Query buildCriteriaQuery(String tenantId, MachineQueryFilter filter, Collection<OsType> osTypeScope) {
         Query query = buildDeviceQuery(filter, null);
         query.addCriteria(Criteria.where("tenantId").is(tenantId));
         osTypeOrCriteria(osTypeScope).ifPresent(query::addCriteria);
@@ -330,7 +331,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                     && filter.getOrganizationIds() != null && !filter.getOrganizationIds().isEmpty()) {
                 criteriaList.add(Criteria.where("organizationId").in(filter.getOrganizationIds()));
             }
-            osTypeOrCriteria(filter.getPlatformNames()).ifPresent(criteriaList::add);
             Collection<String> restrict = filter.getRestrictToMachineIds();
             if (restrict != null) {
                 if (restrict.isEmpty()) {
@@ -371,13 +371,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return DEFAULT_SORT_FIELD;
     }
 
-    private static Optional<Criteria> osTypeOrCriteria(Collection<String> osTypeScope) {
-        List<String> valid = filterNonNull(osTypeScope);
+    private static Optional<Criteria> osTypeOrCriteria(Collection<OsType> osTypeScope) {
+        List<OsType> valid = osTypeScope == null ? List.of() : osTypeScope.stream().filter(Objects::nonNull).toList();
         return valid.isEmpty() ? Optional.empty()
                 : Optional.of(Criteria.where(OS_TYPE_FIELD).in(valid));
     }
 
-    private static List<String> filterNonNull(Collection<String> values) {
-        return values == null ? List.of() : values.stream().filter(Objects::nonNull).toList();
-    }
 }

@@ -16,6 +16,8 @@ import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -42,16 +44,18 @@ public class DeviceOnlineDispatchService {
     private final ScheduleDeviceTargetResolver targetResolver;
     private final ScheduleFireDispatcher fireDispatcher;
 
+    private static final String FIELD_FIRST_SEEN_AT = "firstSeenAt";
+
     @Value("${openframe.rmm.device-online.dispatch.batch-size:500}")
     private int batchSize;
 
     public void processPending() {
-        List<MachineFirstOnlineDispatch> pending = dispatchRepository.findByDispatchedAtIsNull();
-        if (pending.isEmpty()) {
+        List<MachineFirstOnlineDispatch> batch = dispatchRepository.findByDispatchedAtIsNull(
+                PageRequest.of(0, batchSize, Sort.by(Sort.Direction.ASC, FIELD_FIRST_SEEN_AT)));
+        if (batch.isEmpty()) {
             return;
         }
-        List<MachineFirstOnlineDispatch> batch = pending.stream().limit(batchSize).toList();
-        log.info("DEVICE_ONLINE dispatch tick: {} pending, processing up to {}", pending.size(), batch.size());
+        log.info("DEVICE_ONLINE dispatch tick: processing up to {} pending row(s) (oldest first)", batch.size());
 
         Map<String, List<MachineFirstOnlineDispatch>> rowsByTenant = batch.stream()
                 .collect(groupingBy(MachineFirstOnlineDispatch::getTenantId));
