@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import java.util.Optional;
@@ -26,10 +25,9 @@ public class AuditorAwareConfig {
     private String currentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication instanceof JwtAuthenticationToken jwtAuth) {
-            Jwt jwt = jwtAuth.getToken();
-            AuthPrincipal principal = AuthPrincipal.fromJwt(jwt);
-            if (principal != null && principal.getId() != null) {
-                return principal.getId();
+            String userId = AuthPrincipal.fromJwt(jwtAuth.getToken()).getId();
+            if (userId != null) {
+                return userId;
             }
         }
         return SYSTEM_AUDITOR;
