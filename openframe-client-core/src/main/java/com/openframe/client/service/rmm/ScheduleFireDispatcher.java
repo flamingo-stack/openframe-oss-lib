@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.data.document.rmm.ExecutionSource;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
@@ -138,6 +139,7 @@ public class ScheduleFireDispatcher {
                         .privilegeLevel(script.getPrivilegeLevel())
                         .timeoutSeconds(script.getDefaultTimeoutSeconds())
                         .initiatedBy(fire.initiatedBy())
+                        .source(ExecutionSource.SCHEDULED)
                         .status(ExecutionStatus.RUNNING)
                         .dispatchedAt(fire.now())
                         .statusChangedAt(fire.now())

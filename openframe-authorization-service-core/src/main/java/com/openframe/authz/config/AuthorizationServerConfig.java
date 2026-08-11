@@ -73,7 +73,20 @@ public class AuthorizationServerConfig {
     public SecurityFilterChain authorizationServerSecurityFilterChain(
             HttpSecurity http,
             SsoProviderRegistry ssoProviderRegistry,
-            AppleNativeGrantAuthenticationProvider appleNativeGrantAuthenticationProvider) throws Exception {
+            AppleNativeTokenVerifier appleNativeTokenVerifier,
+            AppleAuthorizationCodeClient appleAuthorizationCodeClient,
+            SsoOidcUserService ssoOidcUserService,
+            UserService userService,
+            OAuth2AuthorizationService authorizationService,
+            OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) throws Exception {
+
+        // Constructed inline ON PURPOSE — never expose an AuthenticationProvider as a bean: Spring
+        // Boot then makes it the global AuthenticationManager's ONLY provider and skips wiring the
+        // UserDetailsService DaoAuthenticationProvider, which silently breaks every password login
+        // with an instant ProviderNotFoundException.
+        var appleNativeGrantAuthenticationProvider = new AppleNativeGrantAuthenticationProvider(
+                appleNativeTokenVerifier, appleAuthorizationCodeClient, ssoOidcUserService,
+                userService, authorizationService, tokenGenerator);
 
         var as = new OAuth2AuthorizationServerConfigurer();
         AuthorizationServerSettings settings = AuthorizationServerSettings
@@ -146,18 +159,6 @@ public class AuthorizationServerConfig {
         jwtGenerator.setJwtCustomizer(tokenCustomizer);
         return new DelegatingOAuth2TokenGenerator(
                 jwtGenerator, new OAuth2AccessTokenGenerator(), new OAuth2RefreshTokenGenerator());
-    }
-
-    @Bean
-    public AppleNativeGrantAuthenticationProvider appleNativeGrantAuthenticationProvider(
-            AppleNativeTokenVerifier tokenVerifier,
-            AppleAuthorizationCodeClient codeClient,
-            SsoOidcUserService ssoOidcUserService,
-            UserService userService,
-            OAuth2AuthorizationService authorizationService,
-            OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) {
-        return new AppleNativeGrantAuthenticationProvider(
-                tokenVerifier, codeClient, ssoOidcUserService, userService, authorizationService, tokenGenerator);
     }
 
     @Bean

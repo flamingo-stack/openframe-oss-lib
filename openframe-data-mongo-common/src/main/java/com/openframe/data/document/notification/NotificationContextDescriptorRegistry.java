@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Component
 public class NotificationContextDescriptorRegistry {
@@ -34,5 +35,15 @@ public class NotificationContextDescriptorRegistry {
         }
         NotificationContextDescriptor descriptor = byType.get(context.getType());
         return descriptor == null ? NotificationCategory.GENERIC : descriptor.category(context);
+    }
+
+    /** Empty when the type has no checkbox (unknown types included) — such notifications are always delivered. */
+    public Optional<NotificationSettingGroup> settingsGroupOf(NotificationContext context) {
+        if (context == null) {
+            return Optional.empty();
+        }
+        String type = context.getType();
+        NotificationContextDescriptor descriptor = byType.get(type);
+        return descriptor == null ? Optional.empty() : descriptor.settingsGroup(context);
     }
 }

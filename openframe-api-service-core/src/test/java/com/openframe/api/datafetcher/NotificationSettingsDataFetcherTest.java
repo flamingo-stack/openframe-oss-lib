@@ -1,13 +1,17 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.api.dto.NotificationSettingsView;
+import com.openframe.api.dto.NotificationTypeSetting;
 import com.openframe.api.service.NotificationSettingsService;
 import com.openframe.core.exception.UnauthorizedException;
-import com.openframe.data.document.notification.NotificationSettings;
+import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,21 +34,23 @@ class NotificationSettingsDataFetcherTest {
     @Test
     @DisplayName("notificationSettings delegates to the service for the authenticated user")
     void query_delegates_with_the_principal_id() {
-        NotificationSettings settings = NotificationSettings.builder().pushEnabled(true).build();
-        when(service.get("user-1")).thenReturn(settings);
+        NotificationSettingsView view = view(true);
+        when(service.get("user-1")).thenReturn(view);
 
-        assertThat(fetcher.notificationSettings(principal("user-1"))).isSameAs(settings);
+        assertThat(fetcher.notificationSettings(principal("user-1"))).isSameAs(view);
         verify(service).get("user-1");
     }
 
     @Test
-    @DisplayName("updateNotificationSettings delegates the toggle for the authenticated user")
+    @DisplayName("updateNotificationSettings hands the full argument set to the service for the authenticated user")
     void update_delegates_with_the_principal_id() {
-        NotificationSettings updated = NotificationSettings.builder().pushEnabled(false).build();
-        when(service.update("user-1", false)).thenReturn(updated);
+        List<NotificationTypeSetting> typeSettings =
+                List.of(new NotificationTypeSetting(NotificationSettingGroup.MINGO_MESSAGES, false));
+        when(service.update("user-1", false, typeSettings)).thenReturn(view(false));
 
-        assertThat(fetcher.updateNotificationSettings(false, principal("user-1")).isPushEnabled()).isFalse();
-        verify(service).update("user-1", false);
+        assertThat(fetcher.updateNotificationSettings(false, typeSettings, principal("user-1")).isEnabled())
+                .isFalse();
+        verify(service).update("user-1", false, typeSettings);
     }
 
     @Test
@@ -53,8 +59,13 @@ class NotificationSettingsDataFetcherTest {
         AuthPrincipal agent = AuthPrincipal.builder().id("machine-7").actorType(ActorType.AGENT).build();
 
         assertThatThrownBy(() -> fetcher.notificationSettings(agent)).isInstanceOf(UnauthorizedException.class);
-        assertThatThrownBy(() -> fetcher.updateNotificationSettings(false, agent)).isInstanceOf(UnauthorizedException.class);
+        assertThatThrownBy(() -> fetcher.updateNotificationSettings(false, null, agent))
+                .isInstanceOf(UnauthorizedException.class);
         verifyNoInteractions(service);
+    }
+
+    private static NotificationSettingsView view(boolean enabled) {
+        return new NotificationSettingsView(enabled, List.of());
     }
 
     private static AuthPrincipal principal(String userId) {

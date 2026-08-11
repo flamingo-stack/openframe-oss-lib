@@ -199,7 +199,14 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
     const state = isOpen ? "open" : "closed"
 
     return (
-      <RemoveScroll enabled={isOpen} removeScrollBar={false}>
+      // `forwardProps` — RemoveScroll's default is to WRAP its children in a
+      // plain <div>. That wrapper is in normal flow, so a modal rendered inside
+      // a `flex`/`grid` container with a `gap` became an extra (zero-height)
+      // track the moment it opened, shifting every sibling below it down by one
+      // gap. Cloning onto the child instead leaves only the `fixed` overlay,
+      // which is out of flow and therefore not a flex/grid item at all.
+      // The child must stay a single element for `Children.only`.
+      <RemoveScroll enabled={isOpen} removeScrollBar={false} forwardProps>
       {/* SOFTWARE KEYBOARD — padding, not a shrunken box. Neither mobile shell
           shrinks the LAYOUT viewport when the keyboard opens (WKWebView keeps
           its frame; Android's window is edge-to-edge so the IME arrives as a

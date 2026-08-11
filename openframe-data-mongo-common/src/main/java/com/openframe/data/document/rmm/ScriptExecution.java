@@ -73,6 +73,7 @@ public class ScriptExecution implements TenantScoped {
     private Integer timeoutSeconds;
 
     private String initiatedBy;
+    private ExecutionSource source;
 
     private ExecutionStatus status;
 

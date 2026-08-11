@@ -1,6 +1,7 @@
 package com.openframe.api.mapper;
 
 import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
+import com.openframe.data.document.rmm.ExecutionSource;
 import com.openframe.data.document.rmm.ScriptExecution;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +22,7 @@ public class ScriptExecutionMapper {
                 .machineId(entity.getMachineId())
                 .privilegeLevel(entity.getPrivilegeLevel())
                 .initiatedBy(entity.getInitiatedBy())
+                .source(entity.getSource() != null ? entity.getSource() : ExecutionSource.MANUAL)
                 .status(entity.getStatus())
                 .dispatchedAt(entity.getDispatchedAt())
                 .statusChangedAt(entity.getStatusChangedAt())
