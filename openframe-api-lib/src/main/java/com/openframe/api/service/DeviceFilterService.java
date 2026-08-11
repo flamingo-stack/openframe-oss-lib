@@ -4,6 +4,7 @@ import com.openframe.api.config.DeviceFilterExecutorConfig;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilters;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.pinot.repository.PinotDeviceRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.extern.slf4j.Slf4j;
@@ -74,7 +75,8 @@ public class DeviceFilterService {
                 filters.getStatuses().stream().map(Enum::name).toList() : emptyList();
         List<String> deviceTypes = filters != null && filters.getDeviceTypes() != null ?
                 filters.getDeviceTypes().stream().map(Enum::name).toList() : emptyList();
-        List<String> osTypes = filters != null ? filters.getOsTypes() : emptyList();
+        List<String> osTypes = filters != null && filters.getOsTypes() != null ?
+                filters.getOsTypes().stream().map(Enum::name).toList() : emptyList();
         List<String> organizationIds = filters != null ? filters.getOrganizationIds() : emptyList();
         List<String> tagKeys = filters != null ? filters.getTagKeys() : emptyList();
         List<String> tagKeyValues = buildTagKeyValuesFilter(filters);

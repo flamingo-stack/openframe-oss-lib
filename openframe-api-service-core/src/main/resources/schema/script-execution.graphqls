@@ -50,6 +50,17 @@ enum ScriptExecutionStatus {
     FAILED
 }
 
+"""Where the execution was triggered from. Stamped server-side at dispatch — the client can't
+forge it via the API. Powers the "via Mingo" label in History for AI-initiated runs."""
+enum ExecutionSource {
+    "Technician clicked Run in the dashboard."
+    MANUAL
+    "A schedule fire — time-driven, DEVICE_ONLINE trigger, or dashboard Run Now on a schedule."
+    SCHEDULED
+    "The Mingo AI runner invoked the dispatch on the technician's behalf."
+    AI_ASSISTANT
+}
+
 input ScriptExecutionFilterInput {
     statuses: [ScriptExecutionStatus!]
     initiatorIds: [ID!]
@@ -74,6 +85,7 @@ type ScriptExecution implements Node {
     machine: Machine
     privilegeLevel: PrivilegeLevel!
     initiator: User
+    source: ExecutionSource!
     status: ScriptExecutionStatus!
     dispatchedAt: Instant!
     statusChangedAt: Instant
