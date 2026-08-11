@@ -24,7 +24,12 @@ public interface NotificationContextDescriptor {
     }
 
     /** Null = no checkbox = cannot be muted — a type whose descriptor forgot the mapping loses mutability, never delivery. */
-    default NotificationSettingGroup settingsGroup(NotificationContext context) {
+    default NotificationSettingGroup settingsGroup() {
         return null;
+    }
+
+    /** Mirrors the category pair: static mapping lives in {@link #settingsGroup()}; only payload-dependent descriptors override this. */
+    default NotificationSettingGroup settingsGroup(NotificationContext context) {
+        return settingsGroup();
     }
 }
