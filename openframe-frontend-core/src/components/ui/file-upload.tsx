@@ -35,11 +35,19 @@ export interface FileUploadCandidate {
   type: string
 }
 
+/**
+ * A file this component can hand back. Dropping, and the built-in
+ * `<input type="file">`, always produce browser `File`s no matter what
+ * `pickFiles` returns — so `File` is part of the contract even when `T` is a
+ * host's own handle type. Collapses to plain `File` in the default case.
+ */
+export type FileUploadValue<T extends FileUploadCandidate = File> = T | File
+
 export interface FileUploadProps<T extends FileUploadCandidate = File> {
   /** Currently selected file(s) — use for simple, synchronous file handling */
-  value?: T | T[]
+  value?: FileUploadValue<T> | FileUploadValue<T>[]
   /** Callback when files change — used with `value` for simple mode */
-  onChange: (files: T | T[] | undefined) => void
+  onChange: (files: FileUploadValue<T> | FileUploadValue<T>[] | undefined) => void
   /**
    * Managed file entries for async upload workflows.
    * When provided, the file list renders from these entries instead of `value`.
@@ -162,8 +170,8 @@ export function FileUpload<T extends FileUploadCandidate = File>({
   const currentCount = isManaged ? managedFiles.length : files.length
 
   const validateFiles = (
-    incoming: T[],
-  ): { accepted: T[]; error: string | null } => {
+    incoming: FileUploadValue<T>[],
+  ): { accepted: FileUploadValue<T>[]; error: string | null } => {
     if (incoming.length === 0) return { accepted: [], error: null }
 
     const candidates = multiple ? incoming : incoming.slice(0, 1)
@@ -190,15 +198,9 @@ export function FileUpload<T extends FileUploadCandidate = File>({
     return { accepted: candidates, error: null }
   }
 
-  const handleFiles = (incoming: FileList | T[]) => {
+  const handleFiles = (incoming: FileList | FileUploadValue<T>[]) => {
     setValidationError(null)
-    // Drops and the built-in input yield browser `File`s. A host that supplies
-    // `pickFiles` widens `T` to cover its own handles, and `File` stays part of
-    // that widening — dropping onto a native shell is still a browser drop.
-    // `T`'s constraint alone can't express that, hence the assertion.
-    const fileArray: T[] = Array.isArray(incoming)
-      ? incoming
-      : (Array.from(incoming) as unknown as T[])
+    const fileArray: FileUploadValue<T>[] = Array.isArray(incoming) ? incoming : Array.from(incoming)
     if (fileArray.length === 0) return
 
     const { accepted, error: validationErr } = validateFiles(fileArray)
