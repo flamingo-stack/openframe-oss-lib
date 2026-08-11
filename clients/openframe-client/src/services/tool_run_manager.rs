@@ -1,7 +1,9 @@
 use crate::models::installed_tool::{Installation, InstalledTool, ToolRecordState};
+use crate::platform::system_service;
 use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
 use crate::services::tool_kill_service::ToolKillService;
+use crate::utils::failure_log_backoff::FailureLogBackoff;
 use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
 use std::process::Stdio;
@@ -454,6 +456,57 @@ impl ToolRunManager {
         info!("Tool run manager: shutdown signalled, no new launches will occur");
     }
 
+    /// Reversibly stop every managed tool (kill processes / stop services) without uninstalling.
+    /// Used when the tenant is gone, to stop tools hammering their now-unreachable endpoints.
+    pub async fn stop_all(&self) -> Result<()> {
+        self.signal_shutdown();
+        // Clear supervision so a later restart_all()/run() can relaunch these tools (symmetry
+        // with restart_all): the shutdown-triggered loop break leaves ids in running_tools.
+        self.running_tools.write().await.clear();
+        let tools = self
+            .installed_tools_service
+            .get_all()
+            .await
+            .context("Failed to list installed tools for stop_all")?;
+        for tool in &tools {
+            if let Err(e) = self
+                .tool_kill_service
+                .stop_installed_tool(tool, false)
+                .await
+            {
+                warn!(tool_id = %tool.tool_agent_id, "stop_all: failed to stop tool: {:#}", e);
+            }
+        }
+        info!("Tool run manager: stopped {} tool(s)", tools.len());
+        Ok(())
+    }
+
+    /// Resume supervision and relaunch every managed tool after a [`stop_all`].
+    /// Clears the one-way shutdown flag and the running set, restarts OS-service tools
+    /// (which `run()` deliberately skips), then re-spawns the standard/GUI supervisors.
+    pub async fn restart_all(&self) -> Result<()> {
+        self.shutting_down.store(false, Ordering::Release);
+        self.running_tools.write().await.clear();
+
+        match self.installed_tools_service.get_all().await {
+            Ok(tools) => {
+                for tool in &tools {
+                    if let Installation::Service { service_name, .. } = &tool.installation {
+                        if let Err(e) = system_service::start_service(service_name).await {
+                            warn!(service = %service_name, "restart_all: failed to start service tool: {:#}", e);
+                        }
+                    }
+                }
+            }
+            Err(e) => warn!(
+                "restart_all: failed to list installed tools for service restart: {:#}",
+                e
+            ),
+        }
+
+        self.run().await
+    }
+
     pub async fn mark_client_update_pending(&self) {
         self.client_update_pending.mark().await;
         info!("Client update pending: new tool operations will be parked");
@@ -626,6 +679,7 @@ impl ToolRunManager {
         let mut installation = tool.installation.clone();
 
         tokio::spawn(async move {
+            let mut launch_backoff = FailureLogBackoff::new();
             loop {
                 // Self-update in progress — stop the loop entirely
                 if shutting_down.load(Ordering::Acquire) {
@@ -658,15 +712,22 @@ impl ToolRunManager {
                     break;
                 }
 
+                let log_attempt = launch_backoff.should_log();
+
                 let processed_args = match params_processor
                     .process(&tool.tool_agent_id, tool.run_command_args.clone())
                 {
                     Ok(args) => args,
                     Err(e) => {
-                        error!(
-                            "Failed to resolve tool {} run command args: {:#}",
-                            tool.tool_agent_id, e
-                        );
+                        let failures = launch_backoff.record_failure(log_attempt);
+                        if log_attempt {
+                            error!(
+                                failed_attempts = failures,
+                                "Failed to resolve tool {} run command args: {:#}",
+                                tool.tool_agent_id,
+                                e
+                            );
+                        }
                         sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
                         continue;
                     }
@@ -683,7 +744,7 @@ impl ToolRunManager {
                     .to_string_lossy()
                     .to_string();
 
-                if !std::path::Path::new(&command_path).exists() {
+                if log_attempt && !std::path::Path::new(&command_path).exists() {
                     warn!("Executable not found at: {}", command_path);
                 }
 
@@ -734,7 +795,9 @@ impl ToolRunManager {
                                 launch_as_user,
                             };
 
-                            info!(tool_id = %tool.tool_agent_id, "Launching as GuiApp on macOS");
+                            if log_attempt {
+                                info!(tool_id = %tool.tool_agent_id, "Launching as GuiApp on macOS");
+                            }
 
                             if is_process_running(&command_path).await {
                                 info!(tool_id = %tool.tool_agent_id, "Already running, skipping launch");
@@ -776,7 +839,9 @@ impl ToolRunManager {
 
                             match launch_as_user(&command_path, &launch_args, &user).await {
                                 Ok(mut child) => {
-                                    info!(tool_id = %tool.tool_agent_id, "Launched as user {}, PID: {:?}", user.username, child.id());
+                                    if log_attempt {
+                                        info!(tool_id = %tool.tool_agent_id, "Launched as user {}, PID: {:?}", user.username, child.id());
+                                    }
 
                                     if let Some(stdout) = child.stdout.take() {
                                         tokio::spawn(async move {
@@ -793,17 +858,33 @@ impl ToolRunManager {
 
                                     sleep(Duration::from_secs(3)).await;
                                     if is_process_running(&command_path).await {
-                                        info!(tool_id = %tool.tool_agent_id, "GuiApp verified running");
+                                        if let Some((failures, failing_for)) =
+                                            launch_backoff.record_success()
+                                        {
+                                            info!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                                  failing_for_secs = failing_for.as_secs(),
+                                                  "Tool process started after repeated launch failures");
+                                        }
+                                        info!(tool_id = %tool.tool_agent_id, pid = child.id().unwrap_or(0),
+                                              user = %user.username, "GuiApp verified running");
                                         running_tools.write().await.remove(&tool.tool_agent_id);
                                         return;
                                     }
 
-                                    warn!(tool_id = %tool.tool_agent_id, "GuiApp not running after launch, retrying");
+                                    let failures = launch_backoff.record_failure(log_attempt);
+                                    if log_attempt {
+                                        warn!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                              "GuiApp not running after launch, retrying");
+                                    }
                                     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
                                     continue;
                                 }
                                 Err(e) => {
-                                    error!(tool_id = %tool.tool_agent_id, "Failed to launch as user: {:#}", e);
+                                    let failures = launch_backoff.record_failure(log_attempt);
+                                    if log_attempt {
+                                        error!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                               "Failed to launch as user: {:#}", e);
+                                    }
                                     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
                                     continue;
                                 }
@@ -821,7 +902,9 @@ impl ToolRunManager {
                         return;
                     }
                     Installation::Standard { .. } => {
-                        info!(tool_id = %tool.tool_agent_id, "Launching as Standard (managed process)");
+                        if log_attempt {
+                            info!(tool_id = %tool.tool_agent_id, "Launching as Standard (managed process)");
+                        }
                     }
                 }
 
@@ -836,10 +919,20 @@ impl ToolRunManager {
                     .stderr(Stdio::piped())
                     .spawn()
                 {
-                    Ok(child) => child,
+                    Ok(child) => {
+                        if let Some((failures, failing_for)) = launch_backoff.record_success() {
+                            info!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                  failing_for_secs = failing_for.as_secs(),
+                                  "Tool process started after repeated launch failures");
+                        }
+                        child
+                    }
                     Err(e) => {
-                        error!(tool_id = %tool.tool_agent_id, error = %e,
-                               "Failed to start tool process - retrying in {} seconds", RETRY_DELAY_SECONDS);
+                        let failures = launch_backoff.record_failure(log_attempt);
+                        if log_attempt {
+                            error!(tool_id = %tool.tool_agent_id, error = %e, failed_attempts = failures,
+                                   "Failed to start tool process - retrying in {} seconds", RETRY_DELAY_SECONDS);
+                        }
                         sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
                         continue;
                     }
@@ -894,56 +987,5 @@ impl ToolRunManager {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::ClientUpdatePendingFlag;
-    use std::time::Duration;
-
-    const LONG_TTL: Duration = Duration::from_secs(3600);
-
-    #[tokio::test]
-    async fn not_pending_before_first_mark() {
-        let flag = ClientUpdatePendingFlag::default();
-        assert!(!flag.is_pending(LONG_TTL).await);
-    }
-
-    #[tokio::test]
-    async fn pending_after_mark_within_ttl() {
-        let flag = ClientUpdatePendingFlag::default();
-        flag.mark().await;
-        assert!(flag.is_pending(LONG_TTL).await);
-    }
-
-    #[tokio::test]
-    async fn expired_when_ttl_elapsed() {
-        let flag = ClientUpdatePendingFlag::default();
-        flag.mark().await;
-        assert!(!flag.is_pending(Duration::ZERO).await);
-    }
-
-    #[tokio::test]
-    async fn remark_refreshes_the_ttl() {
-        let flag = ClientUpdatePendingFlag::default();
-        flag.mark().await;
-        tokio::time::sleep(Duration::from_millis(30)).await;
-        assert!(!flag.is_pending(Duration::from_millis(10)).await);
-        flag.mark().await;
-        assert!(flag.is_pending(Duration::from_millis(10)).await);
-    }
-
-    #[tokio::test]
-    async fn clones_share_state() {
-        let flag = ClientUpdatePendingFlag::default();
-        let clone = flag.clone();
-        clone.mark().await;
-        assert!(flag.is_pending(LONG_TTL).await);
-    }
-
-    #[tokio::test]
-    async fn clear_releases_the_flag() {
-        let flag = ClientUpdatePendingFlag::default();
-        flag.mark().await;
-        assert!(flag.is_pending(LONG_TTL).await);
-        flag.clear().await;
-        assert!(!flag.is_pending(LONG_TTL).await);
-    }
-}
+#[path = "tool_run_manager_tests.rs"]
+mod tests;
