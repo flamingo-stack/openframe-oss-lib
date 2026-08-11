@@ -113,6 +113,12 @@ export interface ApprovalRequestData {
   requestId?: string
   approvalRequestId?: string
   approvalType?: string
+  /** `'guide'` when the card came from a Product Guide frame (see `GuideOrigin`
+   *  in `chat-protocol/events`). Carried onto the segment because hosts route
+   *  and filter approvals by where they came from: mingo lifts its OWN pending
+   *  cards into a sticky footer, and a guide card must stay inline in the turn
+   *  the way it does in the hub's chat. */
+  origin?: 'guide'
 }
 
 export interface ApprovalResultData {
@@ -189,6 +195,11 @@ export interface ApprovalBatchData {
    * batch itself is approved.
    */
   executions?: Record<string, ApprovalBatchExecutionState>
+  /** `'guide'` when the batch came from a Product Guide `approval_batch` frame.
+   *  Same contract and the same reasons as `ApprovalRequestData.origin` — the
+   *  hub groups multiple proposals into one card, and that card resolves
+   *  through the hub exactly like a single one. */
+  origin?: 'guide'
 }
 
 /** Approve/reject handler stamped onto approval segments. MAY resolve a
@@ -334,6 +345,10 @@ export interface ThinkingMessageData extends MessageDataBase {
 export interface GuideMessageData extends MessageDataBase {
   type: 'GUIDE'
   text?: string
+  /** Persisted Product Guide frame (GraphQL `GuideData.payload`, a JSON scalar)
+   *  for rows that carry a card instead of answer text — replayed through the
+   *  live path's `guideFrameEvent`. */
+  payload?: Record<string, unknown>
 }
 
 /** Persisted `ASK` row (GraphQL `AskData`). `text` is the intro sentence, which

@@ -59,6 +59,7 @@ import type { MessageSegment } from '../types/message.types'
 import { useSlashCommandRegistry, type SlashCommandSummary } from './use-slash-commands'
 import { chatAuthedFetch } from '../utils/chat-authed-fetch'
 import type { ScrollAnchor } from '../utils/scroll-anchor'
+import { buildConfirmToolBody, readServerErrorMessage } from '../../../chat-protocol/confirm-tool'
 import { createSseFrameDecoder } from '../../../chat-protocol/decode'
 import type { ChatStreamEvent } from '../../../chat-protocol/events'
 import {
@@ -437,13 +438,11 @@ export function useSseChatAdapter(
         ? endpointsRef.current.approvalToolUrl
         : endpointsRef.current.chatStreamUrl
       const requestBody = approvalAction
-        ? {
-            proposal_id: approvalAction.proposalId,
-            action: approvalAction.action,
-            // Always present here — an approval can only happen inside an
-            // established conversation (the proposal turn captured the id).
-            conversationId,
-          }
+        ? // Shared with every other transport that resolves a hub proposal —
+          // the body shape is the hub's, not this adapter's. `conversationId`
+          // is always present here: an approval can only happen inside an
+          // established conversation (the proposal turn captured the id).
+          buildConfirmToolBody({ ...approvalAction, conversationId })
         : {
             messages: [{ role: 'user', content: text }],
             ...(commandOverride ? { commandOverride } : {}),
@@ -476,15 +475,7 @@ export function useSseChatAdapter(
           // `{error, code}`) — a bare "Chat request failed: 409" told
           // the user nothing when e.g. a batch approval expired; the
           // server ships real copy ("This approval expired — ...").
-          let serverMessage: string | null = null
-          try {
-            const errBody = (await response.json()) as { error?: unknown }
-            if (typeof errBody?.error === 'string' && errBody.error.length > 0) {
-              serverMessage = errBody.error
-            }
-          } catch {
-            /* non-JSON error body — fall through to the generic copy */
-          }
+          const serverMessage = await readServerErrorMessage(response)
           throw new Error(serverMessage ?? `Chat request failed: ${response.status}`)
         }
         const reader = response.body?.getReader()
