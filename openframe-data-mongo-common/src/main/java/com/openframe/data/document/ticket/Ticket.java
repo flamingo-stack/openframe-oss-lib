@@ -62,11 +62,8 @@ public class Ticket implements TenantScoped {
     @LastModifiedDate
     private Instant updatedAt;
     private Instant resolvedAt;
-    /** Whether a technician or the AI assistant resolved the ticket. */
-    private TicketResolvedBy resolvedBy;
-    /** The technician's userId; null when the AI assistant resolved it, as it is not a user. */
+    private TicketResolver resolvedBy;
     private String resolvedById;
-    /** Resolver's display name as of the closing — people get renamed, the assistant is renamed per tenant. */
     private String resolvedByName;
     public boolean isAiDisabled() {
         return statusKind != null && statusKind != TicketStatusKind.AI_ASSISTANCE;
