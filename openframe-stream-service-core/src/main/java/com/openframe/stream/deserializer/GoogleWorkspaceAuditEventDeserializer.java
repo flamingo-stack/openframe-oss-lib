@@ -35,6 +35,13 @@ import java.util.Optional;
  * replays from the poller's cursor overlap window upsert idempotent per event. Events carry no
  * agent reference.
  * {@code connectionId}/{@code connectionName} (multi-connection orgs) are passed through into details.
+ * <p>
+ * {@code event.parameters[]} is an UNTOUCHED passthrough of the Reports API parameter union: each
+ * entry always has {@code name}, but its value key varies — {@code value} (string),
+ * {@code boolValue}, {@code intValue}, {@code multiValue} or {@code multiMessageValue}. The
+ * write-audit publisher (saas-lib {@code GoogleWorkspaceWriteAuditPublisher}) emits only the
+ * string {@code {name,value}} member of that union. Consumers rendering details must read
+ * {@code value ?? boolValue ?? intValue ?? multiValue}; nothing may assume {@code value} alone.
  */
 @Slf4j
 @Component
