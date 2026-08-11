@@ -31,7 +31,7 @@ public class TicketQueryFilter {
     // ===== Shared =====
     private List<String> organizationIds;
     private List<String> assigneeIds;
-    private List<String> labelIds;
+    private List<String> tagIds;
     private List<String> deviceIds;
     private List<TicketCreationSource> creationSources;
     private Instant createdAtFrom;

@@ -31,7 +31,7 @@ public class Ticket {
     private String assignedTo;
     private String assignedName;
     private TicketImage assigneeImage;
-    private List<TicketLabel> labels;
+    private List<TicketTag> tags;
     private TicketDialog dialog;
     private List<TicketAttachment> attachments;
     private List<TicketNote> notes;
