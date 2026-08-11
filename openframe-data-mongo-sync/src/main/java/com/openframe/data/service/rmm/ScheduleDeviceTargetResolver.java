@@ -75,11 +75,10 @@ public class ScheduleDeviceTargetResolver {
         if (isNotEmpty(deviceTypes) && (machine.getType() == null || !deviceTypes.contains(machine.getType()))) {
             return false;
         }
-        List<String> platformScope = platformScope(schedule);
-        if (platformScope != null) {                       // an OS constraint applies
+        List<OsType> platformScope = platformScope(schedule);
+        if (platformScope != null) {
             OsType osType = machine.getOsType();
-            // Direct enum match — no more raw-string classification, osType is typed now.
-            if (osType == null || platformScope.stream().noneMatch(osType.name()::equalsIgnoreCase)) {
+            if (osType == null || platformScope.stream().noneMatch(ps -> ps.equals(osType))) {
                 return false;
             }
         }
@@ -93,7 +92,7 @@ public class ScheduleDeviceTargetResolver {
      * from the schedule's platforms) matches nothing, short-circuited without a query.
      */
     private List<String> resolveCriteriaMachineIds(ScriptSchedule schedule) {
-        List<String> platformScope = platformScope(schedule);
+        List<OsType> platformScope = platformScope(schedule);
         if (platformScope != null && platformScope.isEmpty()) {
             return List.of();   // contradictory OS scope → no device can match
         }
@@ -102,7 +101,7 @@ public class ScheduleDeviceTargetResolver {
     }
 
     public long countCriteriaMachines(ScriptSchedule schedule) {
-        List<String> platformScope = platformScope(schedule);
+        List<OsType> platformScope = platformScope(schedule);
         if (platformScope != null && platformScope.isEmpty()) {
             return 0L;
         }
@@ -119,9 +118,9 @@ public class ScheduleDeviceTargetResolver {
         return filter;
     }
 
-    private List<String> platformScope(ScriptSchedule schedule) {
+    private List<OsType> platformScope(ScriptSchedule schedule) {
         ScheduleDeviceCriteria criteria = schedule.getDeviceCriteria();
-        List<String> osTypes = criteria == null ? null : criteria.getOsTypes();
+        List<OsType> osTypes = criteria == null ? null : criteria.getOsTypes();
         Set<OsType> supported = schedule.getSupportedPlatforms() == null
                 ? Set.of()
                 : schedule.getSupportedPlatforms().stream().collect(Collectors.toUnmodifiableSet());
@@ -131,19 +130,17 @@ public class ScheduleDeviceTargetResolver {
             return null;                                    // unconstrained
         }
         if (!hasOs) {
-            return supported.stream().map(Enum::name).toList();     // schedule platforms only
+            return supported.stream().toList();     // schedule platforms only
         }
         List<OsType> criteriaPlatforms = osTypes.stream()
-                .map(ScheduleDeviceTargetResolver::parseOsTypeSafely)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
         if (supported.isEmpty()) {
-            return criteriaPlatforms.stream().map(Enum::name).toList();   // criteria OS only
+            return criteriaPlatforms;   // criteria OS only
         }
         return criteriaPlatforms.stream()
                 .filter(supported::contains)
-                .map(Enum::name)
                 .toList();                                  // possibly empty → contradictory
     }
 
@@ -159,11 +156,4 @@ public class ScheduleDeviceTargetResolver {
         return list != null && !list.isEmpty();
     }
 
-    private static OsType parseOsTypeSafely(String value) {
-        try {
-            return OsType.valueOf(value);
-        } catch (IllegalArgumentException | NullPointerException e) {
-            return null;
-        }
-    }
 }

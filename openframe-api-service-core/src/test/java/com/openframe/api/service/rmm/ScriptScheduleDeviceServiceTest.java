@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.openframe.data.document.rmm.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -58,7 +59,7 @@ class ScriptScheduleDeviceServiceTest {
         // platform/existence tests override this stub with their own machines.
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenAnswer(inv -> {
             java.util.Collection<String> ids = inv.getArgument(1);
-            return ids.stream().map(id -> machine(id, id, OsType.WINDOWS)).toList();
+            return ids.stream().map(id -> machine(id, id, WINDOWS)).toList();
         });
     }
 
@@ -118,7 +119,7 @@ class ScriptScheduleDeviceServiceTest {
     void setDevices_deviceOsMismatch_rejected() {
         scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-win", "win-box", OsType.WINDOWS)));
+                .thenReturn(List.of(machine("m-win", "win-box", WINDOWS)));
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
                 .isInstanceOf(BadRequestException.class)
@@ -280,7 +281,7 @@ class ScriptScheduleDeviceServiceTest {
     void addDevices_platformMismatch_rejected() {
         scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-win", "win-box", OsType.WINDOWS)));
+                .thenReturn(List.of(machine("m-win", "win-box", WINDOWS)));
 
         assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
                 .isInstanceOf(BadRequestException.class);
@@ -293,7 +294,7 @@ class ScriptScheduleDeviceServiceTest {
         scheduleExists(ScriptStatus.ACTIVE);
         // only m-known resolves in this tenant; m-ghost is absent (unknown or belongs to another tenant)
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-known", "known-box", OsType.WINDOWS)));
+                .thenReturn(List.of(machine("m-known", "known-box", WINDOWS)));
 
         assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-known", "m-ghost"), "user-1"))
                 .isInstanceOf(BadRequestException.class)
@@ -306,7 +307,7 @@ class ScriptScheduleDeviceServiceTest {
     void setDevices_unknownMachineId_rejected() {
         scheduleExists(ScriptStatus.ACTIVE);
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-known", "known-box", OsType.WINDOWS)));
+                .thenReturn(List.of(machine("m-known", "known-box", WINDOWS)));
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-known", "m-ghost"), "user-1"))
                 .isInstanceOf(BadRequestException.class)
@@ -331,7 +332,7 @@ class ScriptScheduleDeviceServiceTest {
     void applyCriteria_setsModeAndPersists() {
         scheduleExists(ScriptStatus.ACTIVE);
         ScheduleDeviceCriteria criteria = ScheduleDeviceCriteria.builder()
-                .organizationIds(List.of("org-1")).osTypes(List.of("WINDOWS")).build();
+                .organizationIds(List.of("org-1")).osTypes(List.of(WINDOWS)).build();
 
         service.applyCriteria(SCHEDULE_ID, criteria, "user-1");
 
