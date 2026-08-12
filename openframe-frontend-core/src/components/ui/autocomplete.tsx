@@ -27,6 +27,7 @@ import { Loader2 } from "lucide-react"
 import { cn } from "../../utils/cn"
 import { TruncateText } from "./truncate-text"
 import { useAutoLimitTags } from "../../hooks/ui/use-auto-limit-tags"
+import { useKeyboardCollisionPadding } from "../../hooks/ui/use-keyboard-collision-padding"
 import { FieldWrapper } from "./field-wrapper"
 import { HiddenTagsPopup } from "./hidden-tags-popup"
 import { Tag } from "./tag"
@@ -190,6 +191,7 @@ function AutocompleteInner<T = string>(
 
   const [isOpen, setIsOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const keyboardPadding = useKeyboardCollisionPadding()
   const containerRef = useRef<HTMLDivElement>(null)
   const hiddenTagsPopupRef = useRef<HTMLDivElement>(null)
 
@@ -561,12 +563,17 @@ function AutocompleteInner<T = string>(
         className={cn(
           "z-50 w-[var(--radix-popover-trigger-width)] mt-1",
           "bg-ods-card border border-ods-border rounded-[4px]",
+          "flex flex-col overflow-hidden max-h-[var(--radix-popper-available-height)]",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
           dropdownClassName
         )}
         sideOffset={4}
         align="start"
+        // The anchor is the text field that raises the software keyboard, so
+        // this list is always positioned with the keyboard up — see
+        // useKeyboardCollisionPadding.
+        collisionPadding={{ bottom: keyboardPadding }}
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           autoLimitTags.inputRef.current?.focus()
@@ -578,8 +585,8 @@ function AutocompleteInner<T = string>(
           }
         }}
       >
-        <ScrollAreaPrimitive.Root className="overflow-hidden">
-          <ScrollAreaPrimitive.Viewport className="max-h-[240px] w-full [&>div]:!block">
+        <ScrollAreaPrimitive.Root className="flex min-h-0 flex-col overflow-hidden">
+          <ScrollAreaPrimitive.Viewport className="min-h-0 max-h-[240px] w-full [&>div]:!block">
             <div role="listbox">
               {loading ? (
                 <div className="px-3 py-2 text-ods-text-secondary text-h6">
