@@ -1,8 +1,9 @@
 package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.device.MachineFirstOnlineDispatch;
-import com.openframe.data.repository.device.MachineFirstOnlineDispatchRepository;
+import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
+import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -15,21 +16,27 @@ import java.time.Instant;
 @Slf4j
 public class DeviceOnlineScheduleTriggerService {
 
-    private final MachineFirstOnlineDispatchRepository dispatchRepository;
+    private final DeviceOnlineDispatchRepository dispatchRepository;
 
     public void onDeviceOnline(Machine machine) {
         String tenantId = machine.getTenantId();
         String machineId = machine.getMachineId();
+
+        if (dispatchRepository.existsByTenantIdAndMachineId(tenantId, machineId)) {
+            log.debug("Machine already onboarded (skip): machineId={} tenantId={}", machineId, tenantId);
+            return;
+        }
+
         try {
-            dispatchRepository.save(MachineFirstOnlineDispatch.builder()
+            dispatchRepository.save(DeviceFirstOnlineDispatch.builder()
                     .tenantId(tenantId)
                     .machineId(machineId)
                     .firstSeenAt(Instant.now())
+                    .status(DeviceOnlineDispatchStatus.NEW)
                     .build());
-            log.info("First DEVICE_ONLINE recorded: machineId={} tenantId={} — pending dispatch",
-                    machineId, tenantId);
+            log.info("First DEVICE_ONLINE recorded: machineId={} tenantId={} — pending dispatch", machineId, tenantId);
         } catch (DuplicateKeyException e) {
-            log.debug("Machine already onboarded (skip): machineId={} tenantId={}", machineId, tenantId);
+            log.debug("Machine already onboarded (race, skip): machineId={} tenantId={}", machineId, tenantId);
         }
     }
 }
