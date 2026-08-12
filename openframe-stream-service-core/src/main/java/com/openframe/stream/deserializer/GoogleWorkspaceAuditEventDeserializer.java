@@ -38,10 +38,14 @@ import java.util.Optional;
  * <p>
  * {@code event.parameters[]} is an UNTOUCHED passthrough of the Reports API parameter union: each
  * entry always has {@code name}, but its value key varies — {@code value} (string),
- * {@code boolValue}, {@code intValue}, {@code multiValue} or {@code multiMessageValue}. The
- * write-audit publisher (saas-lib {@code GoogleWorkspaceWriteAuditPublisher}) emits only the
- * string {@code {name,value}} member of that union. Consumers rendering details must read
- * {@code value ?? boolValue ?? intValue ?? multiValue}; nothing may assume {@code value} alone.
+ * {@code boolValue}, {@code intValue}, {@code multiValue} (array of strings) or
+ * {@code multiMessageValue}. The write-audit publisher (saas-lib
+ * {@code GoogleWorkspaceWriteAuditPublisher}) emits only the string {@code {name,value}} member of
+ * that union. Consumers rendering details must read
+ * {@code value ?? boolValue ?? intValue ?? multiValue} for the scalar/array members; nothing may
+ * assume {@code value} alone. {@code multiMessageValue} is deliberately NOT part of that fallback
+ * chain — it is an array of nested {@code {parameter: [{name, value, ...}]}} objects, so a consumer
+ * that needs it must render it recursively rather than coerce it to a scalar.
  */
 @Slf4j
 @Component
