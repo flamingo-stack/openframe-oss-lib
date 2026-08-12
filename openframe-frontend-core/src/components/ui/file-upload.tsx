@@ -325,7 +325,11 @@ export function FileUpload<T extends FileUploadCandidate = File>({
     // already on screen, an unreadable selection), and this runs from a click
     // handler where a rejection would go unhandled.
     try {
-      handleFiles(await pickFiles())
+      // Skip the empty (cancelled) case rather than routing it through
+      // handleFiles, whose first act is to clear a validation message the user
+      // may still be reading.
+      const picked = await pickFiles()
+      if (picked.length > 0) handleFiles(picked)
     } catch (err) {
       setValidationError(err instanceof Error ? err.message : "Could not open the file picker")
     }
