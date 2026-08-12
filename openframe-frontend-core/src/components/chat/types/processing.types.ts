@@ -3,37 +3,19 @@
  * Contains types for message parsing, accumulation, and processing
  */
 
-import type { MessageSegment, ProcessedMessage, ToolExecutionSegment, TokenUsageData, PendingToolCallData, ExecutingToolState } from './message.types'
+import type {
+  ApprovalRequestField,
+  MessageSegment,
+  PendingToolCallData,
+  ExecutingToolState,
+} from './message.types'
 import type { ChatApprovalStatus, AssistantType } from './chat.types'
-import type { ChunkData, NatsMessageType } from './network.types'
+import type { ChunkData } from './network.types'
 
-// ========== Parsed Chunk Result Types ==========
-
-export type ParsedChunkAction =
-  | { action: 'message_start' }
-  | { action: 'message_end' }
-  | { action: 'error'; error: string; details?: string }
-  | { action: 'metadata'; modelDisplayName: string; modelName: string; providerName: string; contextWindow: number }
-  | { action: 'text'; text: string }
-  | { action: 'thinking'; text: string }
-  | { action: 'tool_execution'; segment: ToolExecutionSegment }
-  | { action: 'approval_request'; requestId: string; command: string; explanation?: string; approvalType: string }
-  | { action: 'approval_batch'; requestId: string; approvalType: string; toolCalls: PendingToolCallData[] }
-  | { action: 'approval_result'; requestId: string; approved: boolean; approvalType: string; resolvedByName?: string | null }
-  | {
-      action: 'message_request'
-      text: string
-      ownerType?: string
-      displayName?: string
-      userId?: string
-      contextItems?: Array<{ type: string; id: string }>
-    }
-  | { action: 'token_usage'; data: TokenUsageData }
-  | { action: 'direct_message'; text: string; ownerType?: string; displayName?: string; userId?: string }
-  | { action: 'system'; text: string }
-  | { action: 'context_compaction_start' }
-  | { action: 'context_compaction_end'; summary?: string }
-  | { action: 'dialog_closed' }
+// NOTE: the `ParsedChunkAction` union that used to live here was DELETED
+// alongside the legacy `chunk-parser`. The wire → normalized-event
+// vocabulary is now `ChatStreamEvent` in `src/chat-protocol/events.ts`,
+// produced by `decodeNatsChunk`.
 
 // ========== Accumulator State ==========
 
@@ -41,6 +23,12 @@ export interface PendingApproval {
   command: string
   explanation?: string
   approvalType: string
+  /** Structured label/value rows — a Product Guide card is almost entirely
+   *  these, so a path that forgets them renders a bare title. */
+  fields?: ApprovalRequestField[]
+  /** Where the card came from; `'guide'` keeps it inline and routes its
+   *  buttons to the hub (see `ApprovalRequestData.origin`). */
+  origin?: 'guide'
 }
 
 export interface AccumulatorState {
@@ -70,6 +58,19 @@ export interface MessageProcessingOptions {
   chatTypeFilter?: string
   /** Map of approval statuses by request ID */
   approvalStatuses?: Record<string, ChatApprovalStatus>
+  /**
+   * Terminal escalation-offer states by offer id, from live chunks the host
+   * has already seen. Needed because an offer and its resolution are two
+   * separate persisted rows: SUPERSEDED is published *because* the client
+   * typed, so a user message always separates them and the two rows land in
+   * different assistant envelopes.
+   */
+  escalationOfferStates?: Record<string, ChatApprovalStatus>
+  /** Escalation approve handler; distinct from `onApprove` because offers
+   *  resolve through the ticket-escalation mutations. */
+  onEscalationApprove?: (offerId?: string) => Promise<void> | void
+  /** Escalation reject handler. See `onEscalationApprove`. */
+  onEscalationReject?: (offerId?: string) => Promise<void> | void
   /** Approval types to display directly (others get escalated) - defaults to all types */
   displayApprovalTypes?: string[]
   /**
@@ -81,30 +82,12 @@ export interface MessageProcessingOptions {
   batchApprovalsEnabled?: boolean
 }
 
-// ========== Chunk Processing Types ==========
-
-export interface ChunkProcessor {
-  processChunk: (chunk: ChunkData, messageType: NatsMessageType) => ParsedChunkAction | null
-  reset: () => void
-}
-
-export interface ChunkProcessorOptions {
-  onMessageStart?: () => void
-  onMessageEnd?: () => void
-  onError?: (error: string, details?: string) => void
-  onText?: (text: string) => void
-  onToolExecution?: (segment: MessageSegment) => void
-  onApprovalRequest?: (data: any) => void
-  onApprovalResult?: (data: any) => void
-  onMetadata?: (data: any) => void
-}
+// NOTE: `ChunkProcessorOptions` (the options bag of the deleted
+// `ChunkProcessor`) and `MessageTransformer` were DELETED — both were left
+// behind by the chunk-processor removal with zero references in lib, hub, or
+// app.
 
 // ========== Message Transformation Types ==========
-
-export interface MessageTransformer {
-  transform: (input: any) => ProcessedMessage | null
-  batch: (inputs: any[]) => ProcessedMessage[]
-}
 
 export interface TransformationOptions {
   preserveOriginal?: boolean

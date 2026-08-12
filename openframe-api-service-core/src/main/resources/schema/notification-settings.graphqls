@@ -1,0 +1,36 @@
+extend type Query {
+    notificationSettings: NotificationSettings!
+}
+
+extend type Mutation {
+    "The modal saves full state; omitting typeSettings keeps the stored group overrides."
+    updateNotificationSettings(enabled: Boolean!, typeSettings: [NotificationTypeSettingInput!]): NotificationSettings!
+}
+
+"The 'Notify about' checkboxes. A notification type outside every group cannot be muted."
+enum NotificationSettingGroup {
+    TICKET_ASSIGNED
+    TICKET_STATUS_CHANGED
+    CUSTOMER_REPLIED
+    ADMIN_REPLIED
+    MINGO_MESSAGES
+    APPROVAL_TICKET
+    APPROVAL_MINGO
+}
+
+type NotificationTypeSetting {
+    group: NotificationSettingGroup!
+    enabled: Boolean!
+}
+
+input NotificationTypeSettingInput {
+    group: NotificationSettingGroup!
+    enabled: Boolean!
+}
+
+type NotificationSettings {
+    "Master switch over ALL notifications — in-app and push alike."
+    enabled: Boolean!
+    "Every group exactly once, defaults already resolved."
+    typeSettings: [NotificationTypeSetting!]!
+}

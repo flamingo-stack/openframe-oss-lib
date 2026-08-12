@@ -4,7 +4,7 @@ import React from 'react'
 import { Button } from '../ui'
 import { ExternalLink } from 'lucide-react'
 import { GoogleSheetsIcon } from '../icons-v2-generated'
-import { EmbedIframe } from './embed-iframe'
+import { EmbedViewerFrame } from './embed-viewer-frame'
 import { toGoogleSheetsEmbedUrl, toGoogleSheetsOriginalUrl } from '../../utils/embed-url-converters'
 
 export interface GoogleSheetsViewerProps {
@@ -16,6 +16,8 @@ export interface GoogleSheetsViewerProps {
 export function GoogleSheetsViewer({ externalUrl, fileName, height }: GoogleSheetsViewerProps) {
   const displayName = fileName || 'Google Sheet'
 
+  // Historical shape: no URL at all → standalone empty state with NO header
+  // (the frame's empty body keeps the header — that's the figma behavior).
   if (!externalUrl) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -26,12 +28,10 @@ export function GoogleSheetsViewer({ externalUrl, fileName, height }: GoogleShee
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <GoogleSheetsIcon className="w-5 h-5 shrink-0" />
-          <h2 className="text-h3 text-ods-text-primary truncate">{displayName}</h2>
-        </div>
+    <EmbedViewerFrame
+      icon={<GoogleSheetsIcon className="w-5 h-5 shrink-0" />}
+      title={displayName}
+      actions={
         <Button
           variant="outline"
           size="small-legacy"
@@ -43,12 +43,9 @@ export function GoogleSheetsViewer({ externalUrl, fileName, height }: GoogleShee
         >
           Open in Google Sheets
         </Button>
-      </div>
-      <EmbedIframe
-        src={toGoogleSheetsEmbedUrl(externalUrl)}
-        title={displayName}
-        height={height}
-      />
-    </div>
+      }
+      src={toGoogleSheetsEmbedUrl(externalUrl)}
+      height={height}
+    />
   )
 }

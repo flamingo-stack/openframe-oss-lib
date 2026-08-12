@@ -4,10 +4,11 @@ import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
@@ -16,7 +17,7 @@ import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
-import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,7 @@ class ScheduleFireDispatcherTest {
     private static final String SCHEDULE_ID = "sched-1";
     private static final String OWNER = "user-1";
 
-    @Mock private ScriptScheduleMachineAssignedRepository assignedRepository;
+    @Mock private ScheduleDeviceTargetResolver targetResolver;
     @Mock private ScriptRepository scriptRepository;
     @Mock private ScriptExecutionRepository scriptExecutionRepository;
     @Mock private ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
@@ -61,7 +62,7 @@ class ScheduleFireDispatcherTest {
 
     @BeforeEach
     void setUp() {
-        dispatcher = new ScheduleFireDispatcher(assignedRepository, scriptRepository,
+        dispatcher = new ScheduleFireDispatcher(targetResolver, scriptRepository,
                 scriptExecutionRepository, scheduleScriptExecutionRepository, scriptScheduleNatsPublisher);
     }
 
@@ -70,8 +71,7 @@ class ScheduleFireDispatcherTest {
     void dispatch_fansOutOneBatchPerMachine() {
         Instant now = Instant.now();
         ScriptSchedule schedule = schedule(List.of("script-a", "script-b"));
-        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID))
-                .thenReturn(assigned(List.of("m1", "m2")));
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m1", "m2"));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(script("script-a", ScriptShell.BASH), script("script-b", ScriptShell.POWERSHELL)));
 
@@ -124,8 +124,7 @@ class ScheduleFireDispatcherTest {
     @Test
     @DisplayName("dispatch: no scripts or no assigned devices → nothing persisted or published")
     void dispatch_noScriptsOrDevices_isNoOp() {
-        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID))
-                .thenReturn(List.of());   // no devices
+        when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of());   // no devices
 
         dispatcher.dispatch(schedule(List.of("script-a")), Instant.now());
 
@@ -136,8 +135,7 @@ class ScheduleFireDispatcherTest {
     @Test
     @DisplayName("dispatch: all referenced scripts missing/inactive → resolved but nothing dispatched")
     void dispatch_noRunnableScripts_isNoOp() {
-        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID))
-                .thenReturn(assigned(List.of("m1")));
+        when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of());   // none resolve
 
         dispatcher.dispatch(schedule(List.of("gone")), Instant.now());
@@ -150,8 +148,7 @@ class ScheduleFireDispatcherTest {
     @Test
     @DisplayName("dispatch: a combined '-Name value' defaultArg is tokenized into separate argv tokens on the wire")
     void dispatch_tokenizesCombinedArgs() {
-        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID))
-                .thenReturn(assigned(List.of("m1")));
+        when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
         Script withArgs = Script.builder()
                 .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.POWERSHELL)
                 .privilegeLevel(PrivilegeLevel.USER).scriptBody("param($Bucket)")
@@ -177,11 +174,77 @@ class ScheduleFireDispatcherTest {
 
         dispatcher.dispatch(schedule, List.of("m9"), Instant.now());
 
-        verifyNoInteractions(assignedRepository);   // caller supplied the machine; no reverse lookup
+        verifyNoInteractions(targetResolver);   // caller supplied the machine; no reverse lookup
         ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
                 ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
         verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
         assertThat(msgCaptor.getValue().getMachineId()).isEqualTo("m9");
+    }
+
+    @Test
+    @DisplayName("dispatch: per-script custom params override args + env for that script only; others keep their defaults")
+    void dispatch_customParamsOverrideArgsAndEnv() {
+        when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
+        Script scriptA = Script.builder()
+                .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.BASH)
+                .privilegeLevel(PrivilegeLevel.USER).scriptBody("echo a")
+                .defaultArgs(List.of("--default"))
+                .envVars(List.of(new ScriptEnvVar("BASE", "base-val", false)))
+                .defaultTimeoutSeconds(120).status(ScriptStatus.ACTIVE).build();
+        Script scriptB = script("script-b", ScriptShell.POWERSHELL);   // no custom params → defaults
+        scriptB.setDefaultArgs(List.of("--b-default"));
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(scriptA, scriptB));
+
+        ScriptSchedule schedule = schedule(List.of("script-a", "script-b"));
+        schedule.setScriptCustomParams(List.of(ScheduledScriptCustomParams.builder()
+                .scriptId("script-a")
+                .args(List.of("--custom", "42"))
+                .envVars(List.of(new ScriptEnvVar("OVERRIDE", "custom-val", false)))
+                .build()));
+
+        dispatcher.dispatch(schedule, Instant.now());
+
+        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
+                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
+        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
+        List<ScriptScheduleExecutionItem> items = msgCaptor.getValue().getScripts();
+
+        ScriptScheduleExecutionItem a = items.stream().filter(i -> i.getScriptId().equals("script-a")).findFirst().orElseThrow();
+        assertThat(a.getArgs()).containsExactly("--custom", "42");                 // override args win
+        assertThat(a.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("OVERRIDE");  // full replace, not merge
+        assertThat(a.getEnvVars()).extracting(ScriptEnvVar::getName).doesNotContain("BASE");
+
+        ScriptScheduleExecutionItem b = items.stream().filter(i -> i.getScriptId().equals("script-b")).findFirst().orElseThrow();
+        assertThat(b.getArgs()).containsExactly("--b-default");                    // no custom params → stored default
+    }
+
+    @Test
+    @DisplayName("dispatch: a custom-params entry with null args/env inherits the script's defaults for that dimension")
+    void dispatch_customParamsNullFieldsInheritDefaults() {
+        when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
+        Script scriptA = Script.builder()
+                .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.BASH)
+                .privilegeLevel(PrivilegeLevel.USER).scriptBody("echo a")
+                .defaultArgs(List.of("--default"))
+                .envVars(List.of(new ScriptEnvVar("BASE", "base-val", false)))
+                .defaultTimeoutSeconds(120).status(ScriptStatus.ACTIVE).build();
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(scriptA));
+
+        ScriptSchedule schedule = schedule(List.of("script-a"));
+        schedule.setScriptCustomParams(List.of(ScheduledScriptCustomParams.builder()
+                .scriptId("script-a")
+                .args(List.of("--custom"))   // args overridden; envVars null → inherit
+                .envVars(null)
+                .build()));
+
+        dispatcher.dispatch(schedule, Instant.now());
+
+        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
+                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
+        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
+        ScriptScheduleExecutionItem a = msgCaptor.getValue().getScripts().get(0);
+        assertThat(a.getArgs()).containsExactly("--custom");
+        assertThat(a.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("BASE");   // inherited default env
     }
 
     private static ScriptSchedule schedule(List<String> scriptIds) {
@@ -193,16 +256,6 @@ class ScheduleFireDispatcherTest {
                 .createdBy(OWNER)
                 .scriptIds(scriptIds)
                 .build();
-    }
-
-    private static List<ScriptScheduleMachineAssigned> assigned(List<String> machineIds) {
-        return machineIds.stream()
-                .map(mid -> ScriptScheduleMachineAssigned.builder()
-                        .tenantId(TENANT)
-                        .scriptScheduleId(SCHEDULE_ID)
-                        .machineId(mid)
-                        .build())
-                .toList();
     }
 
     private static Script script(String id, ScriptShell shell) {

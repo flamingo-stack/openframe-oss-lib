@@ -103,9 +103,12 @@ export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
         className={cn(
           "fixed z-[9999] rounded-lg shadow-xl",
           config.className ? "" : "bg-ods-card border border-ods-border",
-          // Responsive positioning and sizing
-          "right-2 left-2 md:left-auto",
-          "md:right-6 md:w-[400px] md:max-w-[calc(100vw-3rem)]",
+          // Responsive positioning and sizing — LEFT-anchored from md, flush
+          // under the burger cell at the left edge of the unified
+          // top-navigation (a larger inset read as a stray gap between the
+          // burger and its panel).
+          "right-2 left-2 md:right-auto",
+          "md:left-2 md:w-[400px] md:max-w-[calc(100vw-1rem)]",
           // Small-viewport (svh) sizing anchored below the measured header —
           // 100vh overflowed under mobile browser chrome, leaving the bottom
           // entries and footer unreachable while the body was scroll-locked.

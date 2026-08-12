@@ -1,63 +1,35 @@
 package com.openframe.client.service.rmm;
 
-import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
-import com.openframe.data.document.rmm.ScriptStatus;
-import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
-import com.openframe.data.repository.rmm.ScriptScheduleRepository;
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.MachineFirstOnlineDispatch;
+import com.openframe.data.repository.device.MachineFirstOnlineDispatchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Objects;
 
-/**
- * DEVICE_ONLINE trigger: when an assigned device comes online (offline→online), fire — right
- * then — every ACTIVE, DEVICE_ONLINE-triggered schedule that targets that machine, on that one
- * machine only.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class DeviceOnlineScheduleTriggerService {
 
-    private final ScriptScheduleMachineAssignedRepository assignedRepository;
-    private final ScriptScheduleRepository scheduleRepository;
-    private final ScheduleFireDispatcher fireDispatcher;
+    private final MachineFirstOnlineDispatchRepository dispatchRepository;
 
-    /** Run the machine's assigned DEVICE_ONLINE schedules now, on that machine only. */
-    public void onDeviceOnline(String tenantId, String machineId) {
-        List<String> scheduleIds = assignedRepository
-                .findByTenantIdAndMachineId(tenantId, machineId).stream()
-                .map(ScriptScheduleMachineAssigned::getScriptScheduleId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-        if (scheduleIds.isEmpty()) {
-            return;
-        }
-
-        List<ScriptSchedule> due = scheduleRepository.findByTenantIdAndIdIn(tenantId, scheduleIds).stream()
-                .filter(s -> s.getTrigger() == ScriptScheduleTrigger.DEVICE_ONLINE)
-                .filter(s -> s.getStatus() == ScriptStatus.ACTIVE)
-                .toList();
-        if (due.isEmpty()) {
-            return;
-        }
-
-        log.info("Device online trigger: machineId={} tenantId={} firing {} DEVICE_ONLINE schedule(s)",
-                machineId, tenantId, due.size());
-        Instant now = Instant.now();
-        for (ScriptSchedule schedule : due) {
-            try {
-                fireDispatcher.dispatch(schedule, List.of(machineId), now);
-            } catch (Exception e) {
-                log.error("Failed to fire DEVICE_ONLINE schedule scheduleId={} for machineId={}",
-                        schedule.getId(), machineId, e);
-            }
+    public void onDeviceOnline(Machine machine) {
+        String tenantId = machine.getTenantId();
+        String machineId = machine.getMachineId();
+        try {
+            dispatchRepository.save(MachineFirstOnlineDispatch.builder()
+                    .tenantId(tenantId)
+                    .machineId(machineId)
+                    .firstSeenAt(Instant.now())
+                    .build());
+            log.info("First DEVICE_ONLINE recorded: machineId={} tenantId={} — pending dispatch",
+                    machineId, tenantId);
+        } catch (DuplicateKeyException e) {
+            log.debug("Machine already onboarded (skip): machineId={} tenantId={}", machineId, tenantId);
         }
     }
 }

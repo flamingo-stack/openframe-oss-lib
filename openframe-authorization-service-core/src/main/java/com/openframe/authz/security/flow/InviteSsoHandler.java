@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
@@ -30,6 +31,11 @@ public class InviteSsoHandler implements SsoFlowHandler {
     }
 
     @Override
+    public Optional<String> expectedState(Cookie cookie) {
+        return ssoCookieCodec.decodeInvite(cookie.getValue()).map(SsoInviteCookiePayload::s);
+    }
+
+    @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
         Cookie cookie = requireCookie(request);
         OidcUser user = requireOidcUser(authentication);
@@ -37,7 +43,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
         requireEmail(user); // ensure email present even if not directly used
-        String[] names = resolveNames(user);
+        String[] names = resolveNames(request, authentication, user);
         String givenName = names[0];
         String familyName = names[1];
 

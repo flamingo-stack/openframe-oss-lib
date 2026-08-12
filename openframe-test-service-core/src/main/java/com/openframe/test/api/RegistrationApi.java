@@ -11,11 +11,14 @@ import static io.restassured.RestAssured.given;
 public class RegistrationApi {
 
     private static final String REGISTER = getRegistrationUrl() + "sas/oauth/register";
+    /** Tells the platform this signup is ours: no Meta lead event, HubSpot records marked as test */
+    private static final String TEST_REGISTRATION_HEADER = "X-Test-Registration";
 
     public static UserRegistrationResponse registerUser(UserRegistrationRequest user) {
         Response response = given()
                 .log().ifValidationFails()
                 .relaxedHTTPSValidation()
+                .header(TEST_REGISTRATION_HEADER, "true")
                 .contentType(ContentType.JSON)
                 .body(user).post(REGISTER);
         return response
@@ -31,6 +34,7 @@ public class RegistrationApi {
     public static int attemptRegistration(UserRegistrationRequest user) {
         return given()
                 .relaxedHTTPSValidation()
+                .header(TEST_REGISTRATION_HEADER, "true")
                 .contentType(ContentType.JSON)
                 .body(user).post(REGISTER)
                 .then()

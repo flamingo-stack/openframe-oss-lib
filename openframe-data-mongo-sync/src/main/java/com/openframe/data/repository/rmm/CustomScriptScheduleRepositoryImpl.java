@@ -2,6 +2,7 @@ package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
+import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,6 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -49,19 +49,21 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_NAME = "name";
     private static final String FIELD_SUPPORTED_PLATFORMS = "supportedPlatforms";
-    private static final String FIELD_CREATED_AT = "createdAt";
-    private static final String FIELD_UPDATED_AT = "updatedAt";
+    private static final String FIELD_START_AT = "startAt";
     private static final String FIELD_CREATED_BY = "createdBy";
     private static final String FIELD_COUNT = "count";
     private static final String FIELD_REPEAT = "repeat";
     private static final String FIELD_DEVICE_COUNT = "deviceCount";
     private static final String FIELD_SCRIPT_SCHEDULE_ID = "scriptScheduleId";
+    private static final String FIELD_TRIGGER = "trigger";
+    private static final String FIELD_TRIGGER_BUCKET = "_triggerBucket";
+    private static final ScriptScheduleTrigger TRIGGER_LAST = ScriptScheduleTrigger.DEVICE_ONLINE;
     private static final String ASSIGNMENTS_COLLECTION = "script_schedules_machines_assigned";
     private static final String LOOKUP_ALIAS = "assignments";
     private static final String CURSOR_SEPARATOR = "|";
 
     private static final Set<String> SORTABLE_FIELDS =
-            Set.of(FIELD_ID, FIELD_NAME, FIELD_CREATED_AT, FIELD_UPDATED_AT, FIELD_REPEAT, FIELD_DEVICE_COUNT);
+            Set.of(FIELD_ID, FIELD_NAME, FIELD_START_AT, FIELD_REPEAT, FIELD_DEVICE_COUNT);
 
     private final MongoTemplate mongoTemplate;
 
@@ -78,6 +80,9 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
 
         if (FIELD_DEVICE_COUNT.equals(sortField)) {
             return findPageAggregatedByDeviceCount(tenantId, filter, search, effectiveDir, cursor, limit);
+        }
+        if (FIELD_START_AT.equals(sortField)) {
+            return findPageAggregatedByStartAtTriggerLast(tenantId, filter, search, effectiveDir, backward, cursor, limit);
         }
 
         Criteria criteria = buildBaseCriteria(tenantId, filter, search);
@@ -155,6 +160,86 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         ops.add(ctx -> new Document("$match", orExpr));
     }
 
+    private List<ScriptSchedule> findPageAggregatedByStartAtTriggerLast(String tenantId,
+                                                                        ScriptScheduleQueryFilter filter,
+                                                                        String search,
+                                                                        Sort.Direction effectiveDir,
+                                                                        boolean backward,
+                                                                        String cursor,
+                                                                        int limit) {
+        Sort.Direction bucketDir = backward ? Sort.Direction.DESC : Sort.Direction.ASC;
+
+        List<AggregationOperation> ops = new ArrayList<>();
+        ops.add(Aggregation.match(buildBaseCriteria(tenantId, filter, search)));
+        ops.add(triggerBucketAddFieldsStage());
+        appendStartAtTriggerCursor(ops, cursor, effectiveDir, bucketDir);
+        ops.add(Aggregation.sort(Sort.by(
+                new Sort.Order(bucketDir, FIELD_TRIGGER_BUCKET),
+                new Sort.Order(effectiveDir, FIELD_START_AT),
+                new Sort.Order(effectiveDir, FIELD_ID))));
+        ops.add(Aggregation.limit(limit));
+
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(Aggregation.newAggregation(ops), "script_schedules", Document.class);
+        return results.getMappedResults().stream().map(this::toSchedule).toList();
+    }
+
+    private static AggregationOperation triggerBucketAddFieldsStage() {
+        Document bucket = new Document("$cond", List.of(
+                new Document("$eq", List.of("$" + FIELD_TRIGGER, TRIGGER_LAST.name())), 1, 0));
+        Document addFields = new Document("$addFields", new Document(FIELD_TRIGGER_BUCKET, bucket));
+        return ctx -> addFields;
+    }
+
+    private static void appendStartAtTriggerCursor(List<AggregationOperation> ops, String cursor,
+                                                   Sort.Direction effectiveDir, Sort.Direction bucketDir) {
+        if (isBlank(cursor)) {
+            return;
+        }
+        String[] parts = cursor.split("\\" + CURSOR_SEPARATOR);
+        if (parts.length != 3) {
+            log.warn("Invalid startAt cursor (expected bucket|millis|id): '{}' — falling back to first page", cursor);
+            return;
+        }
+        ObjectId cursorId = parseObjectId(parts[2]);
+        if (cursorId == null) {
+            return;
+        }
+        int bucket;
+        Date startAt;   // null = the row's startAt was null; the whole bucket is null (DEVICE_ONLINE has no startAt)
+        try {
+            bucket = Integer.parseInt(parts[0]);
+            startAt = parts[1].isEmpty() ? null : new Date(Long.parseLong(parts[1]));
+        } catch (NumberFormatException ex) {
+            log.warn("Unparseable bucket/startAt in cursor '{}' — falling back to first page", cursor);
+            return;
+        }
+
+        String cmp = effectiveDir == Sort.Direction.ASC ? "$gt" : "$lt";
+        String bucketCmp = bucketDir == Sort.Direction.ASC ? "$gt" : "$lt";
+        boolean ascending = effectiveDir == Sort.Direction.ASC;
+
+        List<Document> arms = new ArrayList<>();
+        // Cross-bucket: everything past this bucket in bucket order (e.g. the whole DEVICE_ONLINE tail).
+        arms.add(new Document(FIELD_TRIGGER_BUCKET, new Document(bucketCmp, bucket)));
+        if (startAt == null) {
+            // Cursor sits in this bucket's null group: continue it by _id...
+            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, null)
+                    .append(FIELD_ID, new Document(cmp, cursorId)));
+            if (ascending) {
+                arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, new Document("$ne", null)));
+            }
+        } else {
+            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, new Document(cmp, startAt)));
+            arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, startAt)
+                    .append(FIELD_ID, new Document(cmp, cursorId)));
+            if (!ascending) {
+                arms.add(new Document(FIELD_TRIGGER_BUCKET, bucket).append(FIELD_START_AT, null));
+            }
+        }
+        ops.add(ctx -> new Document("$match", new Document("$or", arms)));
+    }
+
     private ScriptSchedule toSchedule(Document doc) {
         return mongoTemplate.getConverter().read(ScriptSchedule.class, doc);
     }
@@ -180,6 +265,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         applyStatusFilter(criteria, filter);
         applyPlatformsFilter(criteria, filter);
         applyCreatedByFilter(criteria, filter);
+        applyStartAtRangeFilter(criteria, filter);
         applySearch(criteria, search);
         return criteria;
     }
@@ -208,6 +294,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         if (!FIELD_CREATED_BY.equals(excludeField)) {
             applyCreatedByFilter(criteria, filter);
         }
+        applyStartAtRangeFilter(criteria, filter);
         return criteria;
     }
 
@@ -261,6 +348,28 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static void applyCreatedByFilter(Criteria criteria, ScriptScheduleQueryFilter filter) {
         if (filter != null && filter.getCreatedByIds() != null && !filter.getCreatedByIds().isEmpty()) {
             criteria.and(FIELD_CREATED_BY).in(filter.getCreatedByIds());
+        }
+    }
+
+    private static void applyStartAtRangeFilter(Criteria criteria, ScriptScheduleQueryFilter filter) {
+        if (filter == null) {
+            return;
+        }
+        // startAt is null for DEVICE_ONLINE schedules, so a startAt range naturally excludes
+        // them — a value window can't match a schedule that has no start.
+        applyRange(criteria, FIELD_START_AT, filter.getStartAtFrom(), filter.getStartAtTo());
+    }
+
+    private static void applyRange(Criteria criteria, String field, Instant from, Instant to) {
+        if (from == null && to == null) {
+            return;
+        }
+        Criteria range = criteria.and(field);
+        if (from != null) {
+            range.gte(from);
+        }
+        if (to != null) {
+            range.lte(to);
         }
     }
 
@@ -379,8 +488,6 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         }
         return switch (sortField) {
             case FIELD_REPEAT -> Long.parseLong(raw);
-            case FIELD_DEVICE_COUNT -> Integer.parseInt(raw);
-            case FIELD_CREATED_AT, FIELD_UPDATED_AT -> Date.from(Instant.ofEpochMilli(Long.parseLong(raw)));
             default -> raw;
         };
     }
@@ -393,7 +500,17 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         if (FIELD_ID.equals(sortField)) {
             return schedule.getId();
         }
+        if (FIELD_START_AT.equals(sortField)) {
+            // bucket|millis|id — millis empty when startAt is null (the whole DEVICE_ONLINE bucket).
+            Instant startAt = schedule.getStartAt();
+            String millis = startAt == null ? "" : String.valueOf(startAt.toEpochMilli());
+            return triggerBucket(schedule) + CURSOR_SEPARATOR + millis + CURSOR_SEPARATOR + schedule.getId();
+        }
         return encodeSortValue(schedule, sortField) + CURSOR_SEPARATOR + schedule.getId();
+    }
+
+    private static int triggerBucket(ScriptSchedule schedule) {
+        return schedule.getTrigger() == TRIGGER_LAST ? 1 : 0;
     }
 
     /**
@@ -404,19 +521,11 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private String encodeSortValue(ScriptSchedule schedule, String sortField) {
         Object value = switch (sortField) {
             case FIELD_NAME -> schedule.getName();
-            case FIELD_CREATED_AT -> schedule.getCreatedAt();
-            case FIELD_UPDATED_AT -> schedule.getUpdatedAt();
             case FIELD_REPEAT -> schedule.getRepeat();
             case FIELD_DEVICE_COUNT -> computeDeviceCount(schedule);
             default -> null;
         };
-        if (value == null) {
-            return "";
-        }
-        if (value instanceof Instant instant) {
-            return String.valueOf(instant.toEpochMilli());
-        }
-        return String.valueOf(value);
+        return value == null ? "" : String.valueOf(value);
     }
 
     private static Sort.Direction flip(Sort.Direction direction) {
@@ -429,9 +538,8 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
      * the whole list) come back in a stable, repeatable order instead of Mongo's arbitrary
      * one. Redundant when already sorting by {@code _id}.
      *
-     * <p>Note: the cursor predicate is still {@code _id}-only, so deep paging across a tie
-     * boundary on a non-{@code _id} sort can skip/repeat rows. Pre-existing for
-     * name/createdAt/updatedAt; a compound keyset cursor is the proper fix.
+     * <p>Applies to the plain-query sorts (name / repeat); the startAt and deviceCount sorts run
+     * through their own aggregation keyset instead.
      */
     private static Sort sortWithIdTiebreaker(Sort.Direction direction, String sortField) {
         if (FIELD_ID.equals(sortField)) {

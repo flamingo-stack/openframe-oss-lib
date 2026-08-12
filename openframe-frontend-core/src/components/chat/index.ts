@@ -3,9 +3,13 @@
 // Chat components exports
 export * from './approval-request-message'
 export * from './approval-batch-message'
+export * from './escalation-offer-message'
+export * from './ticket-escalated-message'
 export * from './context-compaction-display'
 export * from './expand-chevron'
 export * from './thinking-display'
+export * from './guide-display'
+export * from './ask-display'
 export * from './error-message-display'
 export * from './chat-container'
 export * from './chat-input'
@@ -74,6 +78,11 @@ export * from './types'
 
 // Chat hooks
 export * from './hooks'
+
+// Chat stream module — master reducer + dialog store + React wrapper
+// (Phase 3 of the chat unification; ONE accumulation path for SSE + NATS
+// + history replay).
+export * from './stream'
 
 // Chat utilities
 export * from './utils'

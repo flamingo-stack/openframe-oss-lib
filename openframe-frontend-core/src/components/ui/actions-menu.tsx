@@ -13,6 +13,16 @@ import {
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "./dropdown-menu";
+import {
+	COLLISION_PADDING_PX,
+	useCollisionBoundary,
+	usePortalContainer,
+} from "./portal-container";
+import { useReportOverlayOpen } from "./overlay-open-registry";
+
+/** Trigger movement (px) that counts as "the user scrolled away" rather than
+ *  touch-momentum jitter or the sub-pixel settle right after opening. */
+const SCROLL_DISMISS_THRESHOLD_PX = 12;
 
 export interface ActionsMenuItemIconAction {
 	icon: React.ReactNode;
@@ -42,6 +52,8 @@ export interface ActionsMenuItem {
 	danger?: boolean;
 	/** Optional URL for navigation items */
 	href?: string;
+	/** Open the main-row `href` in a new tab (external app deep-links). */
+	openInNewTab?: boolean;
 	/**
 	 * Optional secondary action — a 40px-wide button on the right of the row
 	 * with a vertical divider. The main row keeps its primary click target;
@@ -126,6 +138,10 @@ const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ acti
 };
 
 const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
+	// Submenus below portal + collide against the OWNING surface, matching the
+	// root menu (`DropdownMenuContent`). Read unconditionally — hooks first.
+	const portalContainer = usePortalContainer();
+	const collisionBoundary = useCollisionBoundary();
 	const activate = useCallback(() => {
 		if (item.disabled) return;
 		if (item.type === "checkbox") {
@@ -243,6 +259,8 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 				<Link
 					href={item.href}
 					prefetch={false}
+					target={item.openInNewTab ? "_blank" : undefined}
+					rel={item.openInNewTab ? "noopener noreferrer" : undefined}
 					className={itemClasses}
 					onClick={handleLinkClick}
 					aria-disabled={item.disabled}
@@ -265,9 +283,14 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 					>
 						{rowContent}
 					</DropdownMenuPrimitive.SubTrigger>
-					<DropdownMenuPrimitive.Portal>
+					<DropdownMenuPrimitive.Portal container={portalContainer ?? undefined}>
 						<DropdownMenuPrimitive.SubContent
 							sideOffset={4}
+							// Confine flip/shift (and the available-height this menu sizes
+							// itself by) to the owning surface — see `useCollisionBoundary`.
+							collisionBoundary={collisionBoundary ?? undefined}
+							collisionPadding={collisionBoundary ? COLLISION_PADDING_PX : undefined}
+							hideWhenDetached
 							className="z-[1500] min-w-[256px] max-h-[var(--radix-popper-available-height)] bg-ods-bg border border-ods-border rounded-md shadow-xl overflow-y-auto p-0"
 						>
 							{item.submenu.map((subItem, index) => (
@@ -377,6 +400,50 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
 		onChange: onOpenChange,
 	});
 
+	// Tell the surrounding surface an overlay is open, so it can stop moving
+	// the ground under it (the chat thread suspends its follow-the-bottom
+	// auto-scroll — see `OverlayOpenRegistryProvider`). Inert without a
+	// provider, so menus elsewhere are unaffected.
+	useReportOverlayOpen(open);
+
+	// Dismiss once the USER scrolls the trigger away.
+	//
+	// Two different situations, two different answers. Content moving on its own
+	// (a streaming reply) is handled above by suspending the auto-scroll — the
+	// menu must survive that, nobody asked for it to close. A deliberate scroll
+	// is the opposite: the reader left, and an anchored menu would ride along
+	// until it hovers over unrelated chrome. `hideWhenDetached` only kicks in
+	// once the trigger is FULLY clipped, so a half-scrolled trigger still drags
+	// a visible menu across the header.
+	//
+	// Scoped deliberately:
+	//   • only scrolls of containers that actually contain the trigger — a
+	//     scroll in a neighbouring column is none of our business;
+	//   • only past `SCROLL_DISMISS_THRESHOLD_PX` of movement, so touch
+	//     momentum and the ~1px settle after opening don't close the menu the
+	//     user is reaching for.
+	const triggerRef = React.useRef<HTMLButtonElement | null>(null);
+	React.useEffect(() => {
+		if (!open) return;
+		if (typeof document === "undefined") return;
+		const trigger = triggerRef.current;
+		if (!trigger) return;
+		const anchorTop = trigger.getBoundingClientRect().top;
+		const onScroll = (event: Event) => {
+			const target = event.target as Node | null;
+			// `document` fires for the page scroll and contains everything.
+			const scrolledTheTrigger =
+				target === document ||
+				(target instanceof Node && target.contains(trigger));
+			if (!scrolledTheTrigger) return;
+			const moved = Math.abs(trigger.getBoundingClientRect().top - anchorTop);
+			if (moved > SCROLL_DISMISS_THRESHOLD_PX) setOpen(false);
+		};
+		document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+		return () =>
+			document.removeEventListener("scroll", onScroll, { capture: true });
+	}, [open, setOpen]);
+
 	const handleItemClick = useCallback(
 		(item: ActionsMenuItem) => {
 			onItemClick?.(item);
@@ -393,7 +460,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
 
 	return (
 		<DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
-			<DropdownMenuTrigger asChild>
+			<DropdownMenuTrigger asChild ref={triggerRef}>
 				{customTrigger ?? (
 					<Button
 						variant="outline"

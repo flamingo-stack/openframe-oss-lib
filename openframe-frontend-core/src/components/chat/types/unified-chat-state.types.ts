@@ -145,6 +145,22 @@ export interface UnifiedChatMessage {
   segments?: MessageSegment[]
 
   /**
+   * Highest chunk `streamSeq` consumed into THIS row. Not render input — it is
+   * the per-message coverage signal `mergeHistoryWithRealtime` decides with:
+   * a live synthetic is a twin of a persisted row only once history reaches
+   * its seq.
+   *
+   * Load-bearing, not bookkeeping. Without it the merge falls through to its
+   * wall-clock fallback ("created before the fetch instant ⇒ history has it"),
+   * which is wrong for every turn the backend has not finished persisting: a
+   * history refetch mid-stream then drops every live bubble except the single
+   * `streamingMessageId`, collapsing the thread to the persisted user prompt.
+   * The reducer stamps it on the rows it owns; hosts stamp the persisted value
+   * on history rows.
+   */
+  streamSeq?: number
+
+  /**
    * Optional host-supplied message timestamp (creation/send time). Rendered
    * as the message-row time and, critically, fed into the memoized message's
    * equality check. Hosts SHOULD pass a stable value (the message's real
@@ -251,11 +267,20 @@ export interface UnifiedChatState {
   /** Granular phase for the "Thinking..."/"Streaming..." status row above input. */
   streamingPhase: StreamingPhase
 
+  /** True while the adapter is rebuilding the message list from the
+   *  server-side transcript store (SSE/Guide mount-time hydration). Optional —
+   *  transports without server hydration (NATS manages its own dialog
+   *  loading) never set it. */
+  isHydratingHistory?: boolean
+
   // ─── Actions ──────────────────────────────────────────────────────────────
+  /** Resolution MAY carry a boolean success flag (`false` = the request
+   *  failed) — consumed by batch approve-all loops to mark failed rows.
+   *  Callers that only await it are unaffected (`void` = success). */
   sendMessage: (
     text: string,
     options?: UnifiedSendMessageOptions,
-  ) => Promise<void>
+  ) => Promise<void | boolean>
 
   /** Abort the in-flight stream. No-op when idle. */
   stopMessage: () => void

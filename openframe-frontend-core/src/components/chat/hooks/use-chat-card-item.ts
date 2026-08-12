@@ -28,6 +28,9 @@ export interface UseChatCardItemResult<T = unknown> {
   item: T | undefined
   isLoading: boolean
   isError: boolean
+  /** True only after a fetch actually completed — false for disabled
+   *  queries (no list URL for the type / empty id). */
+  isFetched: boolean
 }
 
 // `extractItems` / `extractItemId` hoisted to `src/utils/extract-items.ts`
@@ -53,7 +56,12 @@ export function useChatCardItem<T = unknown>(
       // sent no credentials, so list endpoints behind the gateway returned
       // 401 and the card rendered blank.
       const res = await embedAuthedFetch(url)
-      if (!res.ok) return null
+      // THROW on non-OK (was `return null`): callers must be able to
+      // tell "fetched fine, entity absent" (→ deleted tombstone) from
+      // "fetch failed" (401 refresh miss, 5xx, 429 → transient; render
+      // nothing, never a false 'deleted' claim). TanStack surfaces the
+      // throw as `isError`.
+      if (!res.ok) throw new Error(`chat card fetch failed: ${res.status}`)
       const data = await res.json()
       const items = extractItems(data)
       const match = items.find((it) => extractItemId(type, it) === id)
@@ -79,5 +87,11 @@ export function useChatCardItem<T = unknown>(
     item: (query.data ?? undefined) as T | undefined,
     isLoading: query.isLoading,
     isError: query.isError,
+    // True only after the query actually completed a fetch. DISABLED
+    // queries (no list URL registered for the type, empty id) never
+    // fetch — `item` is undefined there as well, and callers must not
+    // read that as "fetched fine, entity absent" (tombstone gate in
+    // entity-cards/dispatch.tsx).
+    isFetched: query.isFetched,
   }
 }

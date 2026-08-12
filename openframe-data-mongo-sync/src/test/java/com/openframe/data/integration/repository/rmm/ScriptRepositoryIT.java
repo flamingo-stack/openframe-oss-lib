@@ -1,7 +1,7 @@
 package com.openframe.data.integration.repository.rmm;
 
 import com.openframe.data.document.rmm.Script;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
@@ -363,11 +363,11 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
     @DisplayName("Given supportedPlatforms filter, when findPageForTenant runs, then scripts whose platforms list contains ANY of the requested are returned")
     void findPageForTenant_filterByPlatform() {
         scriptRepository.save(Script.builder().tenantId(TENANT_A).name("win-only").shell(ScriptShell.POWERSHELL)
-                .scriptBody("...").supportedPlatforms(List.of(ScriptPlatform.WINDOWS)).build());
+                .scriptBody("...").supportedPlatforms(List.of(OsType.WINDOWS)).build());
         Script crossPlatform = scriptRepository.save(Script.builder().tenantId(TENANT_A).name("multi").shell(ScriptShell.BASH)
-                .scriptBody("...").supportedPlatforms(List.of(ScriptPlatform.LINUX, ScriptPlatform.MACOS)).build());
+                .scriptBody("...").supportedPlatforms(List.of(OsType.WINDOWS, OsType.MAC_OS)).build());
 
-        ScriptQueryFilter filter = ScriptQueryFilter.builder().supportedPlatforms(List.of(ScriptPlatform.LINUX)).build();
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().supportedPlatforms(List.of(OsType.MAC_OS)).build();
         List<Script> page = scriptRepository.findPageForTenant(
                 TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
 
@@ -525,13 +525,13 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
     @DisplayName("platformFacet: unwinds supportedPlatforms so a multi-platform script counts toward EACH of its platforms")
     void platformFacet_unwindsArray() {
         scriptRepository.save(Script.builder().tenantId(TENANT_A).name("a").shell(ScriptShell.BASH).scriptBody("...")
-                .supportedPlatforms(List.of(ScriptPlatform.LINUX, ScriptPlatform.MACOS)).build());
+                .supportedPlatforms(List.of(OsType.WINDOWS, OsType.MAC_OS)).build());
         scriptRepository.save(Script.builder().tenantId(TENANT_A).name("b").shell(ScriptShell.BASH).scriptBody("...")
-                .supportedPlatforms(List.of(ScriptPlatform.LINUX)).build());
+                .supportedPlatforms(List.of(OsType.WINDOWS)).build());
 
         var facet = scriptRepository.platformFacet(TENANT_A, ScriptQueryFilter.builder().build());
 
-        assertThat(facet).containsEntry("LINUX", 2).containsEntry("MACOS", 1);
+        assertThat(facet).containsEntry("WINDOWS", 2).containsEntry("MAC_OS", 1);
     }
 
     @Test

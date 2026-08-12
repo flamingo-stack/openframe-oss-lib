@@ -43,8 +43,15 @@ public class ScriptSchedule implements TenantScoped {
 
     private String description;
 
-    private List<ScriptPlatform> supportedPlatforms;
+    private List<OsType> supportedPlatforms;
     private List<String> scriptIds;
+
+    private List<ScheduledScriptCustomParams> scriptCustomParams;
+
+    @Builder.Default
+    private ScheduleDeviceSelectionMode selectionMode = ScheduleDeviceSelectionMode.SPECIFIC;
+
+    private ScheduleDeviceCriteria deviceCriteria;
 
     @Builder.Default
     private ScriptScheduleTrigger trigger = ScriptScheduleTrigger.DATE_TIME;

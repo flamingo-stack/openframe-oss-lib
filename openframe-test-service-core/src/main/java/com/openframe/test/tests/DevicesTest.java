@@ -22,6 +22,12 @@ import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class DevicesTest extends BaseTest {
 
+    /** The tag seeded on {@link #TAGGED_DEVICE}, rendered as the chip "purpose:auto_test" in the UI. */
+    private static final String TAG_KEY = "purpose";
+    private static final String TAG_VALUE = "auto_test";
+    private static final String TAGGED_DEVICE = "vm115982";
+
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -44,6 +50,7 @@ public class DevicesTest extends BaseTest {
         assertThat(filters.getFilteredCount()).as("Device filter filteredCount should not be zero").isNotZero();
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -75,6 +82,7 @@ public class DevicesTest extends BaseTest {
         });
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -127,6 +135,7 @@ public class DevicesTest extends BaseTest {
         }
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -144,6 +153,7 @@ public class DevicesTest extends BaseTest {
         assertThat(mesh.getLastConnectAddr()).as("No lastConnectAddr for " + meshId).isNotBlank();
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -156,6 +166,7 @@ public class DevicesTest extends BaseTest {
         assertThat(device.getHostname()).as("Searched device hostname should match").isEqualTo(hostnames.getFirst());
     }
 
+    @Tag("feature")
     @Tag("saas")
     @Tag("read")
     @Test
@@ -168,13 +179,38 @@ public class DevicesTest extends BaseTest {
         });
     }
 
+    @Tag("feature")
+    @Tag("saas")
+    @Tag("read")
+    @Test
+    @DisplayName("Filter devices by tag")
+    public void testFilterByTag() {
+        List<Machine> devices = DeviceApi.getDevices(tagDevicesFilter(TAG_KEY, TAG_VALUE));
+        assertThat(devices).as("No devices tagged %s:%s", TAG_KEY, TAG_VALUE).isNotEmpty();
+        assertThat(devices)
+                .as("Device %s should be among the %s:%s tagged devices", TAGGED_DEVICE, TAG_KEY, TAG_VALUE)
+                .extracting(Machine::getHostname)
+                .contains(TAGGED_DEVICE);
+        // Every match must actually carry the tag. The UI equivalent could only see that a row appeared,
+        // so a filter returning the right count of the wrong devices would have passed.
+        assertThat(devices).allSatisfy(device -> assertThat(device.getTags())
+                .as("Device %s matched the filter without carrying %s:%s",
+                        device.getHostname(), TAG_KEY, TAG_VALUE)
+                .anySatisfy(tag -> {
+                    assertThat(tag.getKey()).isEqualTo(TAG_KEY);
+                    assertThat(tag.getValues()).contains(TAG_VALUE);
+                }));
+    }
+
     @Tag("archive")
     @Order(1)
     @Test
     @DisplayName("Archive device")
     public void testArchiveDevice() {
-        List<Machine> devices = DeviceApi.getDevices(offlineDevicesFilter());
-        assertThat(devices).as("Expected at least one OFFLINE device to archive").isNotEmpty();
+        List<Machine> devices = DeviceApi.getDevices(pipelineScoped(offlineDevicesFilter()));
+        assertThat(devices)
+                .as("Expected at least one OFFLINE device to archive%s", orgSuffix())
+                .isNotEmpty();
         Machine device = devices.getLast();
         DeviceApi.archiveDevice(device);
         List<String> ids = DeviceApi.getDeviceIds(listedStatusesDevicesFilter());
@@ -186,13 +222,16 @@ public class DevicesTest extends BaseTest {
     @Test
     @DisplayName("Delete device")
     public void testDeleteDevice() {
-        // Archive (@Order(1)) moves the single enrolled device to ARCHIVED, so it no longer appears
+        // Archive (@Order(1)) moves this pipeline's enrolled device to ARCHIVED, so it no longer appears
         // in the OFFLINE listing. Delete operates on that archived device.
-        List<Machine> devices = DeviceApi.getDevices(archivedDevicesFilter());
-        assertThat(devices).as("Expected at least one ARCHIVED device to delete").isNotEmpty();
+        List<Machine> devices = DeviceApi.getDevices(pipelineScoped(archivedDevicesFilter()));
+        assertThat(devices)
+                .as("Expected at least one ARCHIVED device to delete%s", orgSuffix())
+                .isNotEmpty();
         Machine device = devices.getLast();
         DeviceApi.deleteDevice(device);
         List<String> ids = DeviceApi.getDeviceIds(listedStatusesDevicesFilter());
         assertThat(ids).as("Deleted device should not be in listed devices").doesNotContain(device.getMachineId());
     }
+
 }

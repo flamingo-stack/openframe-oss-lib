@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("Create Policy")
 public class CreatePolicyTest extends BaseTest {
 
+    @Tag("feature")
     @Tag("device")
     @Test
     @DisplayName("Add policy")
@@ -33,6 +34,7 @@ public class CreatePolicyTest extends BaseTest {
     }
 
 
+    @Tag("feature")
     @Tag("device")
     @Test
     @DisplayName("Select policy device")

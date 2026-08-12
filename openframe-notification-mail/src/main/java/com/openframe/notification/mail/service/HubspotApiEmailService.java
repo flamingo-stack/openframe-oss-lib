@@ -45,6 +45,12 @@ public class HubspotApiEmailService implements EmailService {
     @Value("${openframe.mail.hubspot.verify-email-id:}")
     private String verifyEmailId;
 
+    @Value("${openframe.mail.hubspot.owner-transfer-email-id:}")
+    private String ownerTransferEmailId;
+
+    @Value("${openframe.mail.hubspot.delete-account-email-id:}")
+    private String deleteAccountEmailId;
+
     @Value("${openframe.mail.hubspot.base-url}")
     private String baseUrl;
 
@@ -71,7 +77,21 @@ public class HubspotApiEmailService implements EmailService {
         sendWithTemplate(verifyEmailId, toEmail, "Verify your email and continue", link, "Email verification");
     }
 
+    @Override
+    public void sendOwnershipTransferEmail(String toEmail) {
+        send(ownerTransferEmailId, toEmail, "You're now the owner", Map.of(), "Ownership transfer");
+    }
+
+    @Override
+    public void sendAccountDeletedEmail(String toEmail) {
+        send(deleteAccountEmailId, toEmail, "Your account has been deleted", Map.of(), "Account deletion");
+    }
+
     private void sendWithTemplate(String emailTemplateId, String toEmail, String subject, String link, String debugContext) {
+        send(emailTemplateId, toEmail, subject, Map.of("link", link), debugContext);
+    }
+
+    private void send(String emailTemplateId, String toEmail, String subject, Map<String, Object> customProperties, String debugContext) {
         Map<String, Object> payload = Map.of(
                 "emailId", emailTemplateId,
                 "message", Map.of(
@@ -79,7 +99,7 @@ public class HubspotApiEmailService implements EmailService {
                         "from", from,
                         "subject", subject
                 ),
-                "customProperties", Map.of("link", link)
+                "customProperties", customProperties
         );
 
         if (log.isDebugEnabled()) {

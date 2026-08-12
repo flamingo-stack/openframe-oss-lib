@@ -16,6 +16,9 @@
  */
 
 export interface RoadmapItem {
+  /** Assignee display identities (name + avatar, never email) — see
+   *  `TaskAssigneeDisplay` in types/delivery.ts. Optional. */
+  assignees?: Array<{ id: number; name: string | null; avatarUrl: string | null }>
   id: string;
   title: string;
   description: string;

@@ -39,12 +39,25 @@ export {
   type TicketEngagementFile,
 } from './hooks/use-ticket-engagements'
 export {
+  TicketLiveProvider,
+  useTicketLive,
+  useOptionalTicketLive,
+  type TicketLiveContextValue,
+} from './ticket-live-provider'
+export {
   type TicketData,
   type TicketClickupSummary,
   type OptimisticTicket,
   type AnyTicket,
   type TicketActionErrorCode,
   type MappedTicketActionError,
+  type TicketStreamEvent,
+  type TicketStreamEventType,
+  type TicketMessageStreamData,
+  type TicketStatusStreamData,
+  type TicketUnreadSummary,
   TOAST_COPY as TICKET_TOAST_COPY,
   isOptimistic,
+  TICKET_OPEN_PARAM,
+  buildTicketOpenHref,
 } from './types'

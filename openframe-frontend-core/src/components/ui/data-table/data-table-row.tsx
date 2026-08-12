@@ -4,7 +4,7 @@ import Link from '../../../embed-shims/next-link'
 import React, { memo, useCallback, useRef, type ReactNode } from 'react'
 import { flexRender, type Row } from '@tanstack/react-table'
 import { cn } from '../../../utils/cn'
-import { ROW_HEIGHT_DESKTOP } from './data-table-skeleton'
+import { ROW_HEIGHT_DESKTOP, ROW_SHELL_CLASSES } from './data-table-skeleton'
 import { alignJustify, getHideClasses } from './utils'
 
 export interface DataTableRowProps<T> {
@@ -106,11 +106,12 @@ function DataTableRowImpl<T>({
   const cells = (
     <div
       className={cn(
-        'flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]',
+        'flex',
+        ROW_SHELL_CLASSES,
         compact
           ? 'py-[var(--spacing-system-xsf)]'
           : autoHeight
-            ? 'py-[var(--spacing-system-sf)] min-h-[68px] md:min-h-[80px]'
+            ? 'py-[var(--spacing-system-sf)] min-h-[66px] md:min-h-[78px]'
             : `py-0 ${ROW_HEIGHT_DESKTOP}`,
         hasSubRow && 'border-b border-ods-border',
       )}

@@ -4,7 +4,8 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import Link from '../../../embed-shims/next-link'
 import * as React from 'react'
-import { LaptopIcon, Flag02Icon, MessagesIcon } from '../../icons-v2-generated'
+import { ClockIcon, DotsLoaderIcon, LaptopIcon, Flag02Icon, MessagesIcon, UserCheckIcon } from '../../icons-v2-generated'
+import { DeletedUserAvatar } from '../../ui/deleted-user-avatar'
 import { SquareAvatar } from '../../ui/square-avatar'
 import { Tag } from '../../ui/tag'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip'
@@ -12,7 +13,7 @@ import { cn } from '../../../utils/cn'
 import { getReadableTextColor } from '../../../utils/ods-color-utils'
 import { formatTicketRelativeTime, formatTicketFullTimestamp } from '../../../utils/date-utils'
 import { BoardTicketApproval } from './board-ticket-approval'
-import type { BoardPriority, BoardTicket } from './types'
+import type { BoardPriority, BoardTicket, BoardTicketActivityKind } from './types'
 
 const PRIORITY_COLOR_CLASS: Record<BoardPriority, string> = {
   low: 'text-ods-text-secondary',
@@ -23,6 +24,13 @@ const PRIORITY_COLOR_CLASS: Record<BoardPriority, string> = {
 
 const MAX_VISIBLE_TAGS = 2
 const MAX_VISIBLE_ASSIGNEES = 3
+
+const ACTIVITY_DEFAULT_LABEL: Record<BoardTicketActivityKind, string> = {
+  'ai-working': 'AI assistant is working',
+  'user-typing': 'User typing',
+  'waiting-external': 'Waiting for client response',
+  stale: 'No activity',
+}
 
 /** Shared card shell (border / padding / bg). Same footprint for the draggable
  *  board card and the static {@link TicketCardView}. */
@@ -66,16 +74,20 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
         renderAssignSlot(ticket)
       ) : ticket.assignees?.length ? (
         <div className="flex -space-x-2">
-          {ticket.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map(a => (
-            <SquareAvatar
-              key={a.id}
-              src={a.avatarUrl}
-              alt={a.name ?? a.initials ?? a.id}
-              fallback={a.name ?? a.initials}
-              size="sm"
-              variant="round"
-            />
-          ))}
+          {ticket.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map(a =>
+            a.deleted ? (
+              <DeletedUserAvatar key={a.id} size="sm" accessibleLabel={`Deleted user: ${a.name ?? a.initials ?? a.id}`} />
+            ) : (
+              <SquareAvatar
+                key={a.id}
+                src={a.avatarUrl}
+                alt={a.name ?? a.initials ?? a.id}
+                fallback={a.name ?? a.initials}
+                size="sm"
+                variant="round"
+              />
+            ),
+          )}
           {ticket.assignees.length > MAX_VISIBLE_ASSIGNEES && (
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-h6 text-ods-text-secondary">
               +{ticket.assignees.length - MAX_VISIBLE_ASSIGNEES}
@@ -113,6 +125,27 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
             <TooltipContent>{tooltipLabel}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+      )}
+      {ticket.escalatedByUser && (
+        <div className="flex items-center gap-[var(--spacing-system-xxs)] text-h6 text-ods-open-yellow">
+          <UserCheckIcon className="size-4 shrink-0" />
+          <span className="truncate">Escalated by User</span>
+        </div>
+      )}
+      {ticket.activity && (
+        <div
+          className={cn(
+            'flex items-center gap-[var(--spacing-system-xxs)] text-h6',
+            ticket.activity.kind === 'stale' ? 'text-ods-open-yellow' : 'text-ods-text-secondary',
+          )}
+        >
+          {ticket.activity.kind === 'stale' ? (
+            <ClockIcon className="size-4 shrink-0" />
+          ) : (
+            <DotsLoaderIcon className="size-4 shrink-0" />
+          )}
+          <span className="truncate">{ticket.activity.label ?? ACTIVITY_DEFAULT_LABEL[ticket.activity.kind]}</span>
+        </div>
       )}
       {showNewMessage && (
         <Tag

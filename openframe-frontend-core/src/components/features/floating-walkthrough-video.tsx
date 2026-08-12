@@ -2,7 +2,8 @@
 
 /**
  * <FloatingWalkthroughVideo> — THE generic, embeddable per-platform demo-video
- * widget. A collapsed card pinned bottom-left (bite-identical hover grammar via
+ * widget. A collapsed card pinned to a bottom corner — left unless the video
+ * data says `position: 'right'` — (bite-identical hover grammar via
  * <VideoHoverPreviewSurface>) that opens a large in-page theater (Radix Dialog
  * primitives, NOT native fullscreen) showing ONLY the video: a bare 16:9 stage
  * with the player's own controls + captions. No card chrome, no summary.
@@ -56,6 +57,7 @@ import {
   isWalkthroughDismissed,
   dismissWalkthrough,
 } from '../../utils/dismissal-storage';
+import { WALKTHROUGH_OPEN_QUERY_PARAM } from '../../utils/walkthrough-deep-link';
 
 /** Wire-shape data for the widget. Kept as the shared contract the hub DAL
  *  re-exports as `PublicWalkthroughVideo & { id }`. `mainVideoUrl`/`youtubeUrl`
@@ -71,6 +73,9 @@ export interface WalkthroughVideoData {
   captionsUrl?: string | null;
   title?: string | null;
   presenterAvatarUrl?: string | null;
+  /** Which bottom corner the collapsed card pins to. Admin-controlled per
+   *  video; anything other than 'right' (including absent) means left. */
+  position?: 'left' | 'right' | null;
 }
 
 export interface FloatingWalkthroughVideoProps {
@@ -78,6 +83,23 @@ export interface FloatingWalkthroughVideoProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   defaultOpen?: boolean;
+  /** With `defaultOpen`: the initial theater starts PAUSED instead of
+   *  autoplaying — for deep links (`?walkthrough=1`), where the open has no
+   *  user gesture and unrequested audio/motion would be hostile. Applies to
+   *  the initial `defaultOpen` session only: it ends when the NEXT open —
+   *  gesture-driven (card click) or host-driven (`open` flipping true) —
+   *  mounts a fresh theater, which autoplays as usual. */
+  defaultOpenPaused?: boolean;
+  /** Query-param NAME that deep-links into the theater: when present in
+   *  `window.location.search` at first client render, the theater opens
+   *  immediately and PAUSED — `defaultOpen + defaultOpenPaused` decided
+   *  inside the component, so hosts don't defer their first render to read
+   *  the URL. Defaults to `WALKTHROUGH_OPEN_QUERY_PARAM` ('walkthrough');
+   *  pass '' to disable. Presence-based (any value counts), read ONCE at
+   *  mount (deep links arrive by full page load, not client navigation).
+   *  SSR-safe: the server renders closed, and the theater lives in a portal,
+   *  so the hydrated (non-portal) markup is identical either way. */
+  deepLinkParam?: string;
   label?: string;
   appearDelayMs?: number;
   /** Cookie-based dismissal (id-match, mirrors the announcement bar). `false`
@@ -107,6 +129,8 @@ export function FloatingWalkthroughVideo({
   open: openProp,
   onOpenChange,
   defaultOpen,
+  defaultOpenPaused,
+  deepLinkParam = WALKTHROUGH_OPEN_QUERY_PARAM,
   label = 'Play Demo Video',
   appearDelayMs = 3000,
   dismissal = {},
@@ -167,8 +191,29 @@ export function FloatingWalkthroughVideo({
   }, []);
 
   // --- controlled/uncontrolled open ---
-  const [openState, setOpenState] = useState(Boolean(defaultOpen));
+  // Deep link: read ONCE, synchronously, on the first client render — the
+  // theater's autoplay props are load-time, so the decision must exist before
+  // the render that mounts it (an effect would be one commit too late). The
+  // lazy initializer never re-runs, so client navigation can't re-trigger it.
+  const [deepLinkHit] = useState(() => {
+    if (!deepLinkParam || typeof window === 'undefined') return false;
+    try {
+      return new URLSearchParams(window.location.search).has(deepLinkParam);
+    } catch {
+      return false;
+    }
+  });
+  const [openState, setOpenState] = useState(Boolean(defaultOpen) || deepLinkHit);
   const open = openProp !== undefined ? openProp : openState;
+  // The paused deep-link session — see `defaultOpenPaused`. Load-time-safe:
+  // the theater player's autoplay props are read once at construction, and
+  // this is set before the first render that mounts it. Cleared on the next
+  // OPEN transition only (the prevOpen sync below), right before a fresh
+  // theater constructs — never on close, where the closing player is still
+  // mounted and a prop flip would restart it (see the sync's comment).
+  const [pausedOpenSession, setPausedOpenSession] = useState(
+    Boolean(defaultOpen && defaultOpenPaused) || deepLinkHit,
+  );
 
   // --- refs & continuation state ---
   const previewHandleRef = useRef<VideoPlayerHandle | null>(null);
@@ -396,6 +441,16 @@ export function FloatingWalkthroughVideo({
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
+    // RISING edge only: the paused deep-link session ends when the NEXT
+    // (gesture- or host-driven) open mounts a fresh theater — this re-render
+    // commits the cleared flag before that content constructs, so it
+    // autoplays as usual. NEVER clear on close: Radix keeps the closing
+    // theater mounted through its exit animation, and flipping the flag then
+    // flips `autoPlayUnmuted` false→true on the STILL-MOUNTED player, whose
+    // autoplay kick effect resurrects playback — audible after close and
+    // doubled against the card's resume player. Idempotent, so a
+    // discarded-and-retried render attempt decides the same way.
+    if (open && pausedOpenSession) setPausedOpenSession(false);
     // Compared, not cleared: React can discard and re-run a render attempt
     // (concurrent interruption, error retry, a host wrapping setOpen in
     // startTransition). A read-and-clear would decide differently on the
@@ -643,7 +698,22 @@ export function FloatingWalkthroughVideo({
         // receives pointer events — the media layer is pointer-events-none, so
         // a group inside it can never match :hover.
         'group/card pointer-events-auto relative overflow-hidden rounded-lg border border-ods-border bg-ods-card shadow-2xl',
-        'aspect-video w-60 sm:w-80 transition-opacity duration-200',
+        // MOBILE = PiP dimensions, not a shrunken desktop card. This is an
+        // UNINVITED overlay on the smallest screens, so it is sized against
+        // the corner-PiP conventions, NOT against system PiP (which is
+        // user-invoked content and is allowed ~60% of the shortest edge):
+        //   - AOSP's legacy corner spec asks for 23% of screen width, then
+        //     clamps up to `default_minimal_size_pip_resizable_task` (108dp in
+        //     BOTH dimensions) — at 16:9 that floor IS 192x108, and on any
+        //     modern phone the clamp is what actually applies. Hence the cap.
+        //   - 192x108 lands at ~6% of a 390x844 screen, inside the "small
+        //     player" band (<=20% of screen) rather than the "large" one.
+        // 52vw keeps it proportional on narrow devices (320px -> 166x93) and
+        // the 192px cap takes over from ~369px up, i.e. on most phones.
+        // Do NOT go below ~150px: the corner chrome (32px transport pair +
+        // 32px dismiss + the title pill) stops fitting, and the card's own
+        // controls — not the poster — are what set the real floor here.
+        'aspect-video w-[min(52vw,192px)] sm:w-80 transition-opacity duration-200',
         footerHidden ? 'opacity-0 pointer-events-none' : 'opacity-100',
         className,
       )}
@@ -699,7 +769,9 @@ export function FloatingWalkthroughVideo({
           isClone={false}
           badge="play"
           fit="cover"
-          posterSizes="320px"
+          // Mirrors the card's own responsive width above — a flat 320px hint
+          // made every phone fetch a poster ~1.7x wider than the box.
+          posterSizes="(max-width: 639px) 192px, 320px"
           preload="none"
           hideMutedBadge
           onMutedFallbackChange={onCardFallbackChange}
@@ -738,7 +810,9 @@ export function FloatingWalkthroughVideo({
         ) : (
           <VideoPlayBadge size="sm" className="h-5 w-5 shrink-0" />
         )}
-        <span className="truncate">{label}</span>
+        {/* The video's OWN title is the point of the pill; `label` is only the
+            generic fallback for a video that carries no title. */}
+        <span className="truncate">{summaryTitle || label}</span>
       </span>
 
       {/* BIG centred glyph — the muted-fallback prompt (bite grammar). It IS
@@ -747,7 +821,19 @@ export function FloatingWalkthroughVideo({
           unmounts and the same click lands on the hit layer and opens the
           theater. `size="icon-glyph"` keeps the glyph at its own 56px instead
           of the DS default `[&_svg]:h-5`; `variant="glyph"` means no button
-          surface paints behind a glyph that already carries its own scrim. */}
+          surface paints behind a glyph that already carries its own scrim.
+
+          BELOW `sm` IT IS NOT RENDERED — see the corner mute button's
+          mirrored `sm:hidden` below; the two form ONE breakpoint switch and
+          must always be edited together. At the mobile PiP height (~108px)
+          the 56px glyph physically cannot clear both the 32px transport band
+          and the title pill: the three need ~124px of vertical stack, which
+          16:9 does not give back until the card is ~224px wide — i.e. barely
+          smaller than the oversized card this sizing exists to fix. Nothing
+          is lost, because the ONLY state that shows this glyph is resume mode
+          (`cardMode !== 'poster'`), and resume mode always mounts the corner
+          transport pair, which offers the same play AND unmute actions at
+          32px — above the 24px WCAG 2.5.8 (AA) target floor. */}
       {showBigUnmute && (
         <Button
           variant="glyph"
@@ -756,7 +842,7 @@ export function FloatingWalkthroughVideo({
           title={controlIsPlay ? 'Play' : 'Unmute'}
           onPointerDown={e => e.stopPropagation()}
           onClick={onUnmuteOrPlay}
-          className="absolute inset-0 z-30 m-auto"
+          className="absolute inset-0 z-30 m-auto hidden sm:inline-flex"
         >
           {controlIsPlay ? <VideoPlayBadge /> : <VideoUnmuteGlyph />}
         </Button>
@@ -770,7 +856,14 @@ export function FloatingWalkthroughVideo({
       {showPlaybackControls && (
         <div className="absolute left-[var(--spacing-system-xsf)] top-[var(--spacing-system-xsf)] z-30 flex items-center gap-[var(--spacing-system-xxs)]">
           {/* Hidden while the big centre glyph owns unmuting, so the two are
-              never on screen with the same label and different behaviour. */}
+              never on screen with the same label and different behaviour —
+              but ONLY from `sm` up, because below `sm` that glyph is not
+              rendered at all (see its comment above). `sm:hidden`, not
+              `hidden`: a plain `hidden` here would combine with the glyph's
+              own `hidden sm:inline-flex` to leave the mobile card with NO
+              unmute affordance whatsoever — precisely the self-hiding dead
+              end called out in the state-model note at the top of this file.
+              These two classNames are ONE switch; never change one alone. */}
           <Button
             variant="overlay"
             size="icon-sm"
@@ -778,7 +871,7 @@ export function FloatingWalkthroughVideo({
             title={cardMuted ? 'Unmute' : 'Mute'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onToggleMute}
-            className={cn(showBigUnmute && !controlIsPlay && 'hidden')}
+            className={cn(showBigUnmute && !controlIsPlay && 'sm:hidden')}
           >
             {cardMuted ? <VolumeXmarkIcon /> : <VolumeUpIcon />}
           </Button>
@@ -814,7 +907,14 @@ export function FloatingWalkthroughVideo({
   return (
     <>
       {showCard && (
-        <div className={cn('pointer-events-none fixed bottom-0 left-0 p-[var(--spacing-system-mf)]', WALKTHROUGH_Z)} style={{ paddingBottom: 'max(var(--spacing-system-mf), env(safe-area-inset-bottom))' }}>
+        <div
+          className={cn(
+            'pointer-events-none fixed bottom-0 p-[var(--spacing-system-mf)]',
+            video.position === 'right' ? 'right-0' : 'left-0',
+            WALKTHROUGH_Z,
+          )}
+          style={{ paddingBottom: 'max(var(--spacing-system-mf), env(safe-area-inset-bottom))' }}
+        >
           {collapsed}
         </div>
       )}
@@ -861,11 +961,15 @@ export function FloatingWalkthroughVideo({
               playerHandleRef={theaterHandleRef}
               // Muted still means PLAYING: without this a deliberately muted
               // card opened a paused theater, breaking parity with the
-              // unmuted path.
-              autoPlay={theaterStart.muted}
-              autoPlayUnmuted={!theaterStart.muted}
+              // unmuted path. EXCEPT the paused deep-link session, which
+              // starts fully stopped: no autoplay flag at all, and for
+              // YouTube no autoActivate either — the activated iframe
+              // hardcodes `autoplay=1`, so staying on the facade IS the
+              // paused presentation (clicking it activates and plays).
+              autoPlay={theaterStart.muted && !pausedOpenSession}
+              autoPlayUnmuted={!theaterStart.muted && !pausedOpenSession}
               startMuted={theaterStart.muted}
-              autoActivate
+              autoActivate={!pausedOpenSession}
               suspended={suspended}
               onMutedFallbackChange={st => { theaterForcedMuteRef.current = st.muted; }}
               onEnded={() => { endedLatchRef.current = true; }}

@@ -1,5 +1,13 @@
 'use client'
 
+/**
+ * @deprecated Phase 3 of the chat unification moved the SSE adapter off this
+ * hook — its trailing-assistant merge + `decision_resolved` receipt path now
+ * live in `../stream/chat-stream-reducer` (transport: 'sse'). No lib-internal
+ * code consumes `useChat`/`useSSE` anymore; they remain exported for external
+ * consumers until Phase 4 migrates them, then get deleted (Phase 6).
+ */
+
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSSE, type StreamFn, type StreamFnExtraOptions } from './use-sse'
 import type {
@@ -477,6 +485,17 @@ export function useChat({
   }, [reset])
 
   /**
+   * Replace-or-prepend server-hydrated history. Called once by the SSE
+   * adapter after `GET /api/docs/chat/history` resolves. If the user already
+   * sent a message before hydration landed, the fetched history is PREPENDED
+   * so nothing typed is lost — correctness is unaffected either way because
+   * the server resolves LLM history from its own store, not from this state.
+   */
+  const hydrateMessages = useCallback((history: Message[]) => {
+    setMessages((prev) => (prev.length === 0 ? history : [...history, ...prev]))
+  }, [])
+
+  /**
    * Abort the in-flight streamed message. The fetch's AbortSignal terminates
    * the upstream Anthropic request (so billing stops); the `for await` loop
    * inside `sendMessage` exits via `useSSE`'s AbortError handling, leaving
@@ -496,6 +515,7 @@ export function useChat({
     stopMessage,
     handleQuickAction,
     clearMessages,
+    hydrateMessages,
     hasMessages: messages.length > 0,
   }
 }

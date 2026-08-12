@@ -16,19 +16,40 @@ public class DeviceDetailsPage {
 
     private static final String DEVICE_NAME_HEADING = "main h1";
 
-    // FIX: the ODS header was refactored. The status badge is now a pill
-    // <div class="... inline-flex items-center justify-center ...">
-    //   <span class="truncate" title="ONLINE">ONLINE</span>
-    // </div>
-    // rendered inside a <span class="shrink-0"> that is the immediate sibling
-    // of the device-name <h1>. The previous selector
-    // "main div.flex.gap-2.items-center span.truncate" no longer matched the
-    // badge — that class combo now belongs to the action-buttons row (Remote
-    // Control / Remote Shell), which has no truncate span, so getDeviceStatus()
-    // timed out. Anchor to the h1 instead so the selector is stable across
-    // ONLINE/OFFLINE/ARCHIVED (only the inner div's bg colour changes).
-    private static final String STATUS_BADGE =
-            "main h1 + span span.truncate";
+    // The status badge is an ODS `Tag` (openframe-frontend-core src/components/ui/tag.tsx). Match the
+    // pill's own container and take the first one in <main>: the status badge precedes all tab content.
+    //
+    // Everything about this header's *layout* drifts, so do not anchor on it. Three attempts have now
+    // broken here, each for a different reason:
+    //
+    //   1. Sibling-of-h1 ("main h1 + span span.truncate") — `TitleBlock` wraps the <h1> in
+    //      FloatingTooltip's own <div ref=setReference>, so the <h1> has no element sibling at all.
+    //   2. Scoped to a "div.flex.items-center.flex-wrap.py-4" status row — that div no longer exists.
+    //   3. A `>` child combinator between the pill and its text span — Tag now nests the text one level
+    //      deeper, and a direct-child match silently returns nothing.
+    //
+    // (3) is the current shape, verified against a captured failure DOM:
+    //   <div class="inline-flex items-center justify-center rounded-md …">
+    //     <span class="min-w-0 max-w-full">
+    //       <span class="truncate block">ONLINE</span>   <-- was a direct child, now a grandchild
+    //
+    // Hence a descendant combinator, and no layout scope. The only structural assumption left is the
+    // Tag container's own utility classes, which come from the component rather than from this page.
+    // Measured on that DOM: this matches the ONLINE badge first, the log row's INFO pill second.
+    private static final String STATUS_PILL =
+            "div.inline-flex.items-center.justify-center.rounded-md span.truncate";
+    private static final String STATUS_BADGE_ANY = "main " + STATUS_PILL;
+
+    // Radix `DropdownMenuContent` — a DIV with role="menu", portalled to the
+    // document body when open (and unmounted when closed, so at most one exists).
+    //
+    // The DIV qualifier is load-bearing: the app shell also mounts a media-chrome
+    // video player (the walkthrough video), whose <media-rendition-menu>,
+    // <media-playback-rate-menu>, <media-audio-track-menu> and
+    // <media-captions-menu> custom elements each carry role="menu" permanently.
+    // A bare "[role='menu']" therefore resolves to 5 elements and every strict
+    // locator call on it fails — regardless of which page or menu is open.
+    private static final String MENU = "div[role='menu']";
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -48,13 +69,17 @@ public class DeviceDetailsPage {
     /**
      * Returns the connectivity status badge text (e.g. "ONLINE", "OFFLINE",
      * "ARCHIVED").
-     * <p>
-     * FIX: The badge is a {@code <div>} whose only text child is a
-     * {@code <span class="truncate">}. The original selector targeted
-     * {@code span:text-matches(...)} which never matched the div wrapper.
      */
     public String getDeviceStatus() {
-        return page.locator(STATUS_BADGE).first().innerText().trim();
+        Locator badge = resolvedStatusBadge();
+        if (badge == null) {
+            // Nothing rendered yet — wait on the widest form so a genuinely slow
+            // header still passes, and a real DOM change fails with the selector
+            // named in the Playwright call log.
+            badge = page.locator(STATUS_BADGE_ANY).first();
+            badge.waitFor(new Locator.WaitForOptions().setTimeout(15_000));
+        }
+        return badge.innerText().trim();
     }
 
     /**
@@ -259,11 +284,36 @@ public class DeviceDetailsPage {
 
     // ── Loaded check ──────────────────────────────────────────────────────────
 
+    /**
+     * Same condition as before — device name and status badge both present and
+     * non-empty — but evaluated without ever blocking.
+     * <p>
+     * This is polled by {@link Page#waitForCondition}, so it must not call the
+     * auto-waiting accessors: a selector that matches nothing turns one poll
+     * into a 30s {@code innerText()} timeout that surfaces as a Playwright
+     * error from inside the wait instead of the wait simply not being satisfied.
+     * {@code count()} does not wait, and once it is non-zero the element exists,
+     * so {@code innerText()} on it returns immediately.
+     */
     public boolean isLoaded() {
-        return !getDeviceName().isEmpty() && !getDeviceStatus().isEmpty();
+        Locator name = page.locator(DEVICE_NAME_HEADING).first();
+        if (name.count() == 0 || name.innerText().trim().isEmpty()) {
+            return false;
+        }
+        Locator badge = resolvedStatusBadge();
+        return badge != null && !badge.innerText().trim().isEmpty();
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Returns the status-badge locator if it currently resolves to an element, or {@code null}.
+     * Never waits — callers decide whether a miss means "not loaded yet" or "wait for it".
+     */
+    private Locator resolvedStatusBadge() {
+        Locator candidate = page.locator(STATUS_BADGE_ANY).first();
+        return candidate.count() > 0 ? candidate : null;
+    }
 
     /**
      * Clicks the Remote Shell split-button to open its dropdown.
@@ -273,7 +323,7 @@ public class DeviceDetailsPage {
         page.locator("main button[aria-haspopup='menu']")
                 .filter(new Locator.FilterOptions().setHasText("Remote Shell"))
                 .click();
-        page.locator("[role='menu']").waitFor();
+        page.locator(MENU).waitFor();
     }
 
     /**
@@ -283,15 +333,14 @@ public class DeviceDetailsPage {
     private void openMoreActionsMenu() {
         page.getByRole(AriaRole.BUTTON,
                 new Page.GetByRoleOptions().setName("More actions")).click();
-        page.locator("[role='menu']").waitFor();
+        page.locator(MENU).waitFor();
     }
 
     /**
-     * Clicks an item inside the currently open {@code [role="menu"]} by its
-     * visible text.
+     * Clicks an item inside the currently open {@link #MENU} by its visible text.
      */
     private void clickMenuItemByText(String text) {
-        page.locator("[role='menu'] a, [role='menu'] [role='menuitem']")
+        page.locator(MENU + " a, " + MENU + " [role='menuitem']")
                 .filter(new Locator.FilterOptions().setHasText(text))
                 .last()
                 .click();

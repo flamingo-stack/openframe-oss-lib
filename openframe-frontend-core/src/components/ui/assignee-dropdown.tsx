@@ -1,11 +1,11 @@
 'use client'
 
-import * as PopoverPrimitive from '@radix-ui/react-popover'
 import * as React from 'react'
-import { CheckIcon, PenEditIcon, SearchIcon, UserIcon, UserPlusIcon } from '../icons-v2-generated'
+import { PenEditIcon, UserIcon, UserPlusIcon } from '../icons-v2-generated'
 import { cn } from '../../utils/cn'
 import { Autocomplete, type AutocompleteOption } from './autocomplete'
-import { Input } from './input'
+import { DeletedUserAvatar } from './deleted-user-avatar'
+import { SearchableSelect, type SearchableSelectOption } from './searchable-select'
 import { SquareAvatar } from './square-avatar'
 
 export interface TicketAssigneeOption {
@@ -19,6 +19,8 @@ export interface AssigneeDropdownProps {
     id: string
     name: string
     avatarSrc?: string
+    /** Deleted account (DELETED / SELF_DELETED) — renders the red user-x placeholder + red name. */
+    deleted?: boolean
   }
   options: TicketAssigneeOption[]
   isLoading?: boolean
@@ -42,31 +44,33 @@ function CompactAssigneeDropdown({
   onAssign,
   className,
 }: AssigneeDropdownProps) {
-  const [isOpen, setIsOpen] = React.useState(false)
-  const [search, setSearch] = React.useState('')
   const hasAssignee = !!currentAssignee
 
-  React.useEffect(() => {
-    if (!isOpen) setSearch('')
-  }, [isOpen])
-
-  const filtered = React.useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return options
-    return options.filter(o => o.label.toLowerCase().includes(q))
-  }, [options, search])
-
-  const orderedOptions = React.useMemo(() => {
-    if (!currentAssignee) return filtered
-    const current = filtered.find(o => o.value === currentAssignee.id)
-    if (!current) return filtered
-    return [current, ...filtered.filter(o => o.value !== currentAssignee.id)]
-  }, [filtered, currentAssignee])
+  // Current assignee first; SearchableSelect filters but never reorders.
+  const orderedOptions = React.useMemo<SearchableSelectOption[]>(() => {
+    const withAvatars = options.map(o => ({
+      value: o.value,
+      label: o.label,
+      icon: (
+        <SquareAvatar
+          src={o.imageUrl}
+          alt={o.label}
+          fallback={o.label}
+          size="sm"
+          variant="round"
+          className="h-6 w-6 shrink-0"
+        />
+      ),
+    }))
+    if (!currentAssignee) return withAvatars
+    const current = withAvatars.find(o => o.value === currentAssignee.id)
+    if (!current) return withAvatars
+    return [current, ...withAvatars.filter(o => o.value !== currentAssignee.id)]
+  }, [options, currentAssignee])
 
   const handleSelect = (userId: string) => {
-    const next = currentAssignee?.id === userId ? null : userId
-    onAssign(next)
-    setIsOpen(false)
+    // Selecting the current assignee again unassigns.
+    onAssign(currentAssignee?.id === userId ? null : userId)
   }
 
   const trigger = hasAssignee ? (
@@ -78,13 +82,17 @@ function CompactAssigneeDropdown({
         className,
       )}
     >
-      <SquareAvatar
-        src={currentAssignee.avatarSrc}
-        alt={currentAssignee.name}
-        fallback={currentAssignee.name || 'User'}
-        size="sm"
-        variant="round"
-      />
+      {currentAssignee.deleted ? (
+        <DeletedUserAvatar size="sm" accessibleLabel={`Deleted user: ${currentAssignee.name || currentAssignee.id}`} />
+      ) : (
+        <SquareAvatar
+          src={currentAssignee.avatarSrc}
+          alt={currentAssignee.name}
+          fallback={currentAssignee.name || 'User'}
+          size="sm"
+          variant="round"
+        />
+      )}
     </button>
   ) : (
     <button
@@ -102,73 +110,17 @@ function CompactAssigneeDropdown({
   )
 
   return (
-    <PopoverPrimitive.Root open={isOpen} onOpenChange={setIsOpen} modal={false}>
-      <PopoverPrimitive.Trigger asChild>{trigger}</PopoverPrimitive.Trigger>
-      <PopoverPrimitive.Portal>
-        <PopoverPrimitive.Content
-          align="end"
-          sideOffset={6}
-          className={cn(
-            'z-50 w-72 bg-ods-card border border-ods-border rounded-[6px] shadow-lg overflow-hidden',
-            'data-[state=open]:animate-in data-[state=closed]:animate-out',
-            'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-            'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-            'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
-          )}
-        >
-          <div className="border-b border-ods-border">
-            <Input
-              autoFocus
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search users..."
-              startAdornment={<SearchIcon className="size-4 text-ods-text-secondary" />}
-              className="rounded-none border-0"
-            />
-          </div>
-          <div className="max-h-80 overflow-y-auto py-[var(--spacing-system-xs)]" role="listbox">
-            {isLoading ? (
-              <div className="px-[var(--spacing-system-sf)] py-[var(--spacing-system-s)] text-h5 text-ods-text-secondary">
-                Loading…
-              </div>
-            ) : orderedOptions.length === 0 ? (
-              <div className="px-[var(--spacing-system-sf)] py-[var(--spacing-system-s)] text-h5 text-ods-text-secondary">
-                No users found
-              </div>
-            ) : (
-              orderedOptions.map(opt => {
-                const isCurrent = currentAssignee?.id === opt.value
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    role="option"
-                    aria-selected={isCurrent}
-                    onClick={() => handleSelect(opt.value)}
-                    className={cn(
-                      'flex items-center gap-[var(--spacing-system-xs)] w-full px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-left',
-                      'hover:bg-ods-bg-hover transition-colors',
-                      isCurrent && 'bg-ods-bg-hover',
-                    )}
-                  >
-                    <SquareAvatar
-                      src={opt.imageUrl}
-                      alt={opt.label}
-                      fallback={opt.label}
-                      size="sm"
-                      variant="round"
-                      className="h-6 w-6 shrink-0"
-                    />
-                    <span className="flex-1 truncate text-h4 text-ods-text-primary" title={opt.label}>{opt.label}</span>
-                    {isCurrent && <CheckIcon className="size-4 shrink-0 text-ods-accent" />}
-                  </button>
-                )
-              })
-            )}
-          </div>
-        </PopoverPrimitive.Content>
-      </PopoverPrimitive.Portal>
-    </PopoverPrimitive.Root>
+    <SearchableSelect
+      options={orderedOptions}
+      value={currentAssignee?.id ?? null}
+      onValueChange={handleSelect}
+      searchPlaceholder="Search users..."
+      emptyText="No users found"
+      isLoading={isLoading}
+      trigger={trigger}
+      align="end"
+      contentClassName="w-72"
+    />
   )
 }
 
@@ -214,14 +166,22 @@ function DefaultAssigneeDropdown({
           showChevron={false}
           startAdornment={
             hasAssignee ? (
-              <SquareAvatar
-                src={currentAssignee!.avatarSrc}
-                alt={currentAssignee!.name}
-                fallback={currentAssignee!.name || 'User'}
-                size="sm"
-                variant="round"
-                className="h-6 w-6"
-              />
+              currentAssignee!.deleted ? (
+                <DeletedUserAvatar
+                  size="sm"
+                  className="h-6 w-6"
+                  accessibleLabel={`Deleted user: ${currentAssignee!.name || currentAssignee!.id}`}
+                />
+              ) : (
+                <SquareAvatar
+                  src={currentAssignee!.avatarSrc}
+                  alt={currentAssignee!.name}
+                  fallback={currentAssignee!.name || 'User'}
+                  size="sm"
+                  variant="round"
+                  className="h-6 w-6"
+                />
+              )
             ) : (
               <UserIcon className="size-5 text-ods-text-secondary" />
             )
@@ -236,14 +196,18 @@ function DefaultAssigneeDropdown({
   if (hasAssignee) {
     return (
       <div className={cn('flex items-center gap-[var(--spacing-system-xs)] min-w-0', className)}>
-        <SquareAvatar
-          src={currentAssignee!.avatarSrc}
-          alt={currentAssignee!.name}
-          fallback={currentAssignee!.name || 'User'}
-          size="md"
-          variant="round"
-          className="shrink-0"
-        />
+        {currentAssignee!.deleted ? (
+          <DeletedUserAvatar size="md" accessibleLabel={`Deleted user: ${currentAssignee!.name || currentAssignee!.id}`} />
+        ) : (
+          <SquareAvatar
+            src={currentAssignee!.avatarSrc}
+            alt={currentAssignee!.name}
+            fallback={currentAssignee!.name || 'User'}
+            size="md"
+            variant="round"
+            className="shrink-0"
+          />
+        )}
         <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex flex-col justify-center">
             <div className="flex items-center gap-[var(--spacing-system-xxs)] w-full min-w-0">
@@ -253,7 +217,10 @@ function DefaultAssigneeDropdown({
                 className="flex items-center gap-[var(--spacing-system-xxs)] cursor-pointer group text-left"
               >
                 <PenEditIcon className="size-4 shrink-0 text-ods-text-secondary group-hover:text-ods-accent transition-colors" />
-                <span className="text-h4 text-ods-text-primary truncate" title={currentAssignee!.name}>{currentAssignee!.name}</span>
+                <span
+                  className={cn('text-h4 truncate', currentAssignee!.deleted ? 'text-ods-error' : 'text-ods-text-primary')}
+                  title={currentAssignee!.name}
+                >{currentAssignee!.name}</span>
               </button>
             </div>
             <span className="text-h6 text-ods-text-secondary truncate">Assigned</span>

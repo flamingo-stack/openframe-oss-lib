@@ -42,7 +42,14 @@ const SelectTrigger = React.forwardRef<
         "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
         !isInvalid && "data-[state=open]:border-ods-accent data-[state=open]:hover:border-ods-accent",
         "group",
+        // Disabled - match Input exactly: value greys out, placeholder dims
+        // further. The `data-[placeholder]` rule above is a class+attribute
+        // selector, so the disabled placeholder rule stacks `:disabled` on top
+        // of it to win on specificity rather than on source order.
         "disabled:!cursor-not-allowed disabled:bg-ods-bg",
+        "disabled:text-ods-text-disabled disabled:data-[placeholder]:text-ods-border",
+        // The chevron sets its own colour — grey it with the value.
+        "disabled:[&_svg]:text-ods-text-disabled",
         "transition-colors duration-200 cursor-pointer",
         "[&>span]:line-clamp-1",
         isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:active:border-ods-error data-[state=open]:border-ods-error",

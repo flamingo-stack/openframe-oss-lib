@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.api.datafetcher.rmm.ScriptDataFetcher;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -19,6 +20,7 @@ import com.openframe.api.mapper.GraphQLScriptMapper;
 import com.openframe.api.service.rmm.ScriptDispatchService;
 import com.openframe.api.service.rmm.ScriptFilterService;
 import com.openframe.api.service.rmm.ScriptService;
+import com.openframe.data.document.rmm.ExecutionSource;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import graphql.relay.Relay;
 
@@ -80,10 +82,10 @@ class ScriptDataFetcherTest {
         try {
             RunScriptInput input = new RunScriptInput();
             DispatchResponse response = DispatchResponse.builder().executionId("exec-1").build();
-            when(scriptDispatchService.runScript(input, "user-1")).thenReturn(response);
+            when(scriptDispatchService.runScript(input, "user-1", ExecutionSource.MANUAL)).thenReturn(response);
 
             assertThat(dataFetcher.runScript(input)).isSameAs(response);
-            verify(scriptDispatchService).runScript(input, "user-1");
+            verify(scriptDispatchService).runScript(input, "user-1", ExecutionSource.MANUAL);
         } finally {
             SecurityContextHolder.clearContext();
         }
@@ -98,10 +100,10 @@ class ScriptDataFetcherTest {
         try {
             BatchRunScriptInput input = new BatchRunScriptInput();
             DispatchResponse response = DispatchResponse.builder().executionId("exec-batch-1").build();
-            when(scriptDispatchService.batchRunScript(input, "user-1")).thenReturn(response);
+            when(scriptDispatchService.batchRunScript(input, "user-1", ExecutionSource.MANUAL)).thenReturn(response);
 
             assertThat(dataFetcher.batchRunScript(input)).isSameAs(response);
-            verify(scriptDispatchService).batchRunScript(input, "user-1");
+            verify(scriptDispatchService).batchRunScript(input, "user-1", ExecutionSource.MANUAL);
         } finally {
             SecurityContextHolder.clearContext();
         }

@@ -10,6 +10,8 @@
 
 import { describe, it, expect } from 'vitest'
 import { processHistoricalMessagesWithErrors } from '../process-historical-messages'
+import { decodeNatsChunk } from '../../../../chat-protocol/nats-decoder'
+import { createChatStreamReducer } from '../../stream/chat-stream-reducer'
 import type { HistoricalMessage, MessageSegment } from '../../types'
 
 const adminApprovalMessage = (id: string): HistoricalMessage => ({
@@ -93,5 +95,156 @@ describe('processHistoricalMessagesWithErrors — displayApprovalTypes', () => {
     const asst = out.find((m) => m.role === 'assistant')
     expect(asst?.id).toBe('a2')
     expect(asst?.streamSeq).toBe(50)
+  })
+})
+
+/**
+ * PAIRED-PATH contract. The history processor and the realtime reducer are the
+ * two halves of one pipeline, and they DISAGREE by default: history renders
+ * every approval type (the deliberate behaviour this file's header argues for),
+ * the reducer defaults to `['CLIENT']`. Each half is pinned on its own — above
+ * for history, in the reducer's own suite for realtime — but NOTHING asserted
+ * the pair, so aligning one default "for consistency" (or a host wiring the
+ * option into one call site only) changed observable behaviour with every test
+ * still green.
+ *
+ * These two fixtures state the divergence and its remedy in one place: omitted
+ * → the SAME approval is an inline card after a reload and invisible live;
+ * explicit list → both paths agree. Read the header for why the asymmetric
+ * defaults are the intended trade-off (a `['CLIENT']` history default made
+ * pending ADMIN cards vanish on every refetch).
+ */
+describe('displayApprovalTypes — history vs realtime default divergence', () => {
+  const liveApprovalSegments = (displayApprovalTypes?: string[]) => {
+    const effects: Array<{ name: string; args: unknown[] }> = []
+    const r = createChatStreamReducer({
+      transport: 'nats',
+      onEffect: (e) => effects.push(e),
+      ...(displayApprovalTypes ? { displayApprovalTypes } : {}),
+    })
+    r.apply({ type: 'turn-start' })
+    r.apply({
+      type: 'approval-request',
+      requestId: 'req-m1',
+      approvalType: 'ADMIN',
+      command: 'systemctl restart nats',
+    })
+    return {
+      rendered: r.state.messages.flatMap((m) => approvalSegments(m.segments)),
+      escalated: effects.filter((e) => e.name === 'onEscalatedApproval'),
+    }
+  }
+
+  it('OMITTED: history renders the ADMIN card inline, realtime escalates it', () => {
+    const history = processHistoricalMessagesWithErrors([adminApprovalMessage('m1')])
+    expect(history.messages.flatMap((m) => approvalSegments(m.content))).toHaveLength(1)
+    expect(history.escalatedApprovals.size).toBe(0)
+
+    const live = liveApprovalSegments()
+    expect(live.rendered).toHaveLength(0)
+    expect(live.escalated).toHaveLength(1)
+  })
+
+  it('EXPLICIT list: both paths render the same ADMIN card', () => {
+    const types = ['CLIENT', 'ADMIN']
+    const history = processHistoricalMessagesWithErrors([adminApprovalMessage('m1')], {
+      displayApprovalTypes: types,
+    })
+    expect(history.messages.flatMap((m) => approvalSegments(m.content))).toHaveLength(1)
+
+    const live = liveApprovalSegments(types)
+    expect(live.rendered).toHaveLength(1)
+    expect(live.escalated).toHaveLength(0)
+  })
+})
+
+/**
+ * A Product Guide card must survive a reload UNCHANGED.
+ *
+ * It arrives as a hub frame the agent re-streams into the dialog, so it is
+ * typed by TOOL and resolves through the hub's confirm route — the tier gate
+ * these tests are about simply does not apply to it. When the rule lived only
+ * in the realtime kernel, the same card rendered inline while streaming and
+ * then, on the next page load, was tier-gated: lifted out of its turn into the
+ * consumer's sticky pending-approvals envelope, stripped of the `fields` that
+ * are its entire body, and stripped of the `origin` that routes its buttons —
+ * so clicking Approve hit the agent's endpoint and 404'd.
+ */
+describe('Product Guide approvals — history and realtime agree', () => {
+  const guideProposalMessage = (id: string): HistoricalMessage => ({
+    id,
+    createdAt: '2026-07-17T12:00:00Z',
+    owner: { type: 'ASSISTANT' },
+    messageData: [
+      {
+        type: 'GUIDE',
+        payload: {
+          kind: 'approval_request',
+          proposalId: 'prop-1',
+          toolName: 'create_ticket',
+          title: 'Open a support ticket',
+          fields: [{ label: 'Subject', value: 'Agent will not enroll' }],
+        },
+      } as any,
+    ],
+  })
+
+  // The narrowest possible tier list: it excludes the guide's tool name, so a
+  // card that still renders proves the gate was bypassed, not merely satisfied.
+  const NARROW_TIERS = ['CLIENT']
+
+  it('renders inline on reload despite a tier list that excludes it', () => {
+    const { messages, escalatedApprovals } = processHistoricalMessagesWithErrors(
+      [guideProposalMessage('m1')],
+      { displayApprovalTypes: NARROW_TIERS },
+    )
+    const rendered = messages.flatMap((m) => approvalSegments(m.content))
+    expect(rendered).toHaveLength(1)
+    expect(escalatedApprovals.size).toBe(0)
+  })
+
+  it('keeps the card in its own turn, not in the sticky pending-approvals envelope', () => {
+    const { messages } = processHistoricalMessagesWithErrors([guideProposalMessage('m1')], {
+      displayApprovalTypes: NARROW_TIERS,
+    })
+    expect(messages.some((m) => String(m.id).startsWith('pending-approvals-'))).toBe(false)
+    const turn = messages.find((m) => m.id === 'm1')
+    expect(approvalSegments(turn?.content)).toHaveLength(1)
+  })
+
+  it('carries the same fields and origin as the live stream', () => {
+    /** The single card's `data`, narrowed off the segment union. */
+    const cardData = (segments: MessageSegment[]) => {
+      const card = segments.find((s) => s.type === 'approval_request')
+      return card?.type === 'approval_request' ? card.data : undefined
+    }
+
+    const { messages } = processHistoricalMessagesWithErrors([guideProposalMessage('m1')], {
+      displayApprovalTypes: NARROW_TIERS,
+    })
+    const replayed = cardData(messages.flatMap((m) => approvalSegments(m.content)))
+
+    const live = createChatStreamReducer({ transport: 'nats', displayApprovalTypes: NARROW_TIERS })
+    live.apply({ type: 'turn-start' })
+    live.apply(
+      decodeNatsChunk({
+        type: 'GUIDE',
+        payload: {
+          kind: 'approval_request',
+          proposalId: 'prop-1',
+          toolName: 'create_ticket',
+          title: 'Open a support ticket',
+          fields: [{ label: 'Subject', value: 'Agent will not enroll' }],
+        },
+      })!,
+    )
+    const streamed = cardData(live.state.messages.flatMap((m) => approvalSegments(m.segments)))
+
+    // Same card either way — down to the rows that ARE its body, and the marker
+    // that decides which backend its buttons talk to.
+    expect(replayed).toEqual(streamed)
+    expect(replayed?.origin).toBe('guide')
+    expect(replayed?.approvalType).toBe('create_ticket')
+    expect(replayed?.fields).toEqual([{ label: 'Subject', value: 'Agent will not enroll' }])
   })
 })

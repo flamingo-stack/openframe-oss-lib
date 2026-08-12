@@ -40,7 +40,8 @@ export function HeaderOrganizationFilter({
         <button
           className={cn(
             "flex items-center gap-4 h-full px-4",
-            "bg-ods-card border-l border-ods-border",
+            // Transparent so the cell inherits the bar's background.
+            "bg-transparent border-l border-ods-border",
             "w-[240px] shrink-0",
             "hover:bg-ods-bg-hover transition-colors",
             className

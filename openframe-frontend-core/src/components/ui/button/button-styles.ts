@@ -32,6 +32,17 @@ export const buttonSurfaceClasses = {
 export const outlineBorderClasses =
   "border border-ods-border hover:border-ods-border-hover active:border-ods-border-active disabled:border-ods-border aria-disabled:border-ods-border"
 
+// Glyph scale for the split-layout button family: 16px below md, 24px from md.
+//
+// Shared because the same page-header action renders through EITHER of the two
+// split layouts depending on its shape — `SplitButton` for two click targets, and
+// `Button` + `splitIcon` for one with a decorative trailing glyph — and the two sit
+// side by side in the same row. They used to disagree: `SplitButton` carried this
+// responsive scale while the `Button` split slots re-declared a flat 20px, so a
+// "submenu" action's icons rendered 4px smaller than its neighbour's on desktop.
+// `Button`'s own flat `[&_svg]:h-5` stays as it is for ordinary (non-split) buttons.
+export const splitGlyphSizeClasses = "[&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6"
+
 // Color of the vertical seam between the main and icon halves (split layouts).
 export const splitDividerColorClasses = {
   accent: "border-ods-accent-active",

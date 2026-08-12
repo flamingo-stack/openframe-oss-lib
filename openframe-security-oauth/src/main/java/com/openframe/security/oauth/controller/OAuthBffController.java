@@ -2,6 +2,7 @@ package com.openframe.security.oauth.controller;
 
 import com.openframe.security.cookie.CookieService;
 import com.openframe.security.oauth.dto.TokenResponse;
+import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
 import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
 import lombok.RequiredArgsConstructor;
@@ -106,7 +107,7 @@ public class OAuthBffController {
         boolean fromHeader = !hasText(refreshCookie);
         String token = fromHeader ? request.getHeaders().getFirst(REFRESH_TOKEN_HEADER) : refreshCookie;
         if (!hasText(token)) {
-            return Mono.just(ResponseEntity.status(401).build());
+            return Mono.just(unauthorizedWithClearedCookies());
         }
         boolean includeHeaders = devTicketEnabled || (fromHeader && mobileAuthEnabled);
         Mono<TokenResponse> tokensMono = hasText(tenantId)
@@ -115,7 +116,11 @@ public class OAuthBffController {
 
         return tokensMono
                 .map(tokens -> buildNoContentWithCookies(tokens, includeHeaders))
-                .switchIfEmpty(Mono.just(ResponseEntity.status(401).build()));
+                .switchIfEmpty(Mono.fromSupplier(this::unauthorizedWithClearedCookies))
+                .onErrorResume(InvalidRefreshTokenException.class, e -> {
+                    log.warn("Refresh rejected: {}", e.getMessage());
+                    return Mono.just(unauthorizedWithClearedCookies());
+                });
     }
 
     @GetMapping("/logout")
@@ -129,6 +134,38 @@ public class OAuthBffController {
                 ? oauthBffService.revokeRefreshToken(tenantId, refreshToken)
                 : oauthBffService.revokeRefreshTokenByLookup(refreshToken);
         return revoke.then(Mono.just(ResponseEntity.noContent().headers(headers).build()));
+    }
+
+    /**
+     * Native Sign in with Apple (iOS): exchanges the credential from ASAuthorizationController for
+     * OpenFrame tokens. Response mirrors dev-exchange — Access-Token / Refresh-Token headers (plus
+     * auth cookies) — so the app's existing token-storage path is reused unchanged.
+     */
+    @PostMapping("/apple/native-exchange")
+    public Mono<ResponseEntity<Void>> appleNativeExchange(@RequestBody AppleNativeExchangeRequest body,
+                                                          ServerHttpRequest request) {
+        if (!mobileAuthEnabled) {
+            return Mono.just(ResponseEntity.status(404).build());
+        }
+        if (!hasText(body.tenantId()) || !hasText(body.identityToken()) || !hasText(body.authorizationCode())) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+        return oauthBffService.appleNativeExchange(
+                        body.tenantId(), body.identityToken(), body.authorizationCode(),
+                        body.nonce(), body.firstName(), body.lastName(), request)
+                .map(tokens -> buildNoContentWithCookies(tokens, true))
+                .onErrorResume(e -> {
+                    log.warn("Apple native exchange failed: {}", e.getMessage());
+                    return Mono.just(ResponseEntity.status(401).<Void>build());
+                });
+    }
+
+    public record AppleNativeExchangeRequest(String tenantId,
+                                             String identityToken,
+                                             String authorizationCode,
+                                             String nonce,
+                                             String firstName,
+                                             String lastName) {
     }
 
     @GetMapping("/dev-exchange")
@@ -172,6 +209,12 @@ public class OAuthBffController {
         cookieService.addAuthCookies(headers, tokens.access_token(), tokens.refresh_token());
         cookieService.addClearOAuthStateCookie(headers, state);
         return ResponseEntity.status(FOUND).headers(headers).build();
+    }
+
+    private ResponseEntity<Void> unauthorizedWithClearedCookies() {
+        HttpHeaders headers = new HttpHeaders();
+        cookieService.addClearAuthCookies(headers);
+        return ResponseEntity.status(401).headers(headers).<Void>build();
     }
 
     private ResponseEntity<Void> buildNoContentWithCookies(TokenResponse tokens, boolean includeDevHeaders) {

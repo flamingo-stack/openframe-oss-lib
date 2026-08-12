@@ -1,6 +1,7 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.ScriptSchedule;
+import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
@@ -32,4 +33,6 @@ public interface ScriptScheduleRepository
     boolean existsByTenantIdAndNameAndIdNotAndStatusIn(String tenantId, String name, String excludeId, Collection<ScriptStatus> statuses);
 
     List<ScriptSchedule> findByStatusAndNextRunAtLessThanEqual(ScriptStatus status, Instant cutoff);
+
+    List<ScriptSchedule> findByTenantIdAndTriggerAndStatus(String tenantId, ScriptScheduleTrigger trigger, ScriptStatus status);
 }

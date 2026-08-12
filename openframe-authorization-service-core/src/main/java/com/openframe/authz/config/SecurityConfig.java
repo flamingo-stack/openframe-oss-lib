@@ -1,17 +1,11 @@
 package com.openframe.authz.config;
 
-import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.security.AuthSuccessHandler;
 import com.openframe.authz.security.SsoAuthorizationRequestResolver;
 import com.openframe.authz.security.SsoCookieCodec;
-import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
-import com.openframe.authz.service.processor.RegistrationProcessor;
-import com.openframe.authz.service.sso.SSOConfigService;
-import com.openframe.authz.service.user.UserService;
-import com.openframe.data.document.auth.AuthUser;
-import com.openframe.data.document.tenant.SSOPerTenantConfig;
+import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
+import com.openframe.authz.web.AuthErrorResponder;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -20,55 +14,41 @@ import org.springframework.security.config.annotation.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
-import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
-import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
-import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
+import org.springframework.security.oauth2.jwt.JwtDecoders;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.regex.Pattern;
-
-import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
-import static com.openframe.authz.util.OidcUserUtils.resolveNames;
-import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
-import static com.openframe.data.document.user.UserRole.ADMIN;
-import static java.util.Locale.ROOT;
+import java.util.Optional;
 
 /**
- * Security Configuration for Default Requests
- * This handles all non-Authorization Server requests
+ * Security configuration for all non-Authorization-Server requests: the login page, form login,
+ * and OAuth2/OIDC login against the external SSO providers.
+ * <p>
+ * User loading and auto-provisioning live in
+ * {@link com.openframe.authz.service.sso.SsoOidcUserService}; this class only wires the chain.
  */
 @Configuration
 @EnableWebSecurity
 @Slf4j
 public class SecurityConfig {
-
-    public static final String EMAIL = "email";
-    public static final String SUB = "sub";
-
-    @Value("${openframe.auth.error-url}")
-    private String authErrorUrl;
-    private static final Pattern MS_ISSUER_PATTERN =
-            Pattern.compile("^https://login\\.microsoftonline\\.com/[^/]+/v2\\.0/?$");
 
     @Bean
     @Order(2)
@@ -76,9 +56,15 @@ public class SecurityConfig {
                                                           OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService,
                                                           AuthSuccessHandler authSuccessHandler,
                                                           ClientRegistrationRepository clientRegistrationRepository,
-                                                          SsoCookieCodec ssoCookieCodec) throws Exception {
+                                                          SsoCookieCodec ssoCookieCodec,
+                                                          AuthenticationFailureHandler oauth2LoginFailureHandler,
+                                                          JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory,
+                                                          SsoProviderRegistry ssoProviderRegistry) throws Exception {
         return http
-                .csrf(AbstractHttpConfigurer::disable)
+                // Scoped to the one cookie-authenticated form POST on this chain. Everything else is
+                // either OAuth (client-authenticated or GET) or JSON-only, which a cross-site form
+                // cannot reach: it can't set application/json, and fetch preflights against disabled CORS.
+                .csrf(csrf -> csrf.requireCsrfProtectionMatcher(new AntPathRequestMatcher("/login", "POST")))
                 .cors(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -104,16 +90,16 @@ public class SecurityConfig {
                         .permitAll())
                 .oauth2Login(o -> o
                         .loginPage("/login")
-                        .failureHandler(oauth2LoginFailureHandler())
+                        .failureHandler(oauth2LoginFailureHandler)
                         .authorizationEndpoint(a -> a.authorizationRequestResolver(
-                                new SsoAuthorizationRequestResolver(clientRegistrationRepository, ssoCookieCodec)
+                                new SsoAuthorizationRequestResolver(clientRegistrationRepository, ssoCookieCodec, ssoProviderRegistry)
                         ))
                         .userInfoEndpoint(u -> u.oidcUserService(oidcUserService))
                         .successHandler(authSuccessHandler)
                         .withObjectPostProcessor(new ObjectPostProcessor<OidcAuthorizationCodeAuthenticationProvider>() {
                             @Override
                             public <O extends OidcAuthorizationCodeAuthenticationProvider> O postProcess(O provider) {
-                                provider.setJwtDecoderFactory(microsoftAwareJwtDecoderFactory());
+                                provider.setJwtDecoderFactory(ssoJwtDecoderFactory);
                                 return provider;
                             }
                         })
@@ -122,52 +108,30 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationFailureHandler oauth2LoginFailureHandler() {
-        return (HttpServletRequest request, HttpServletResponse response, org.springframework.security.core.AuthenticationException exception) -> {
-            String tenantId = TenantContext.getTenantId();
-            log.error("OAuth2 login failed. tenantId={}, requestUri={}, error={}",
-                    tenantId, request.getRequestURI(), exception.getMessage(), exception);
-            String msg = java.net.URLEncoder.encode(
-                    exception.getMessage() != null ? exception.getMessage() : "SSO login failed. Please try again.",
-                    java.nio.charset.StandardCharsets.UTF_8);
-            response.sendRedirect(authErrorUrl + "?error=" + msg);
-        };
+    public AuthenticationFailureHandler oauth2LoginFailureHandler(AuthErrorResponder authErrorResponder) {
+        return (HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) ->
+                authErrorResponder.send(response, request, "oauth2-login", exception,
+                        "SSO login failed. Please try again.");
     }
 
+    /**
+     * Builds the ID-token decoder for whichever provider the registration belongs to. Providers that
+     * need validation beyond the OIDC defaults supply it from their own strategy — see
+     * {@link com.openframe.authz.service.auth.strategy.ClientRegistrationStrategy#idTokenValidator}.
+     */
     @Bean
-    public OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService(SSOConfigService ssoConfigService,
-                                                                        UserService userService,
-                                                                        GlobalDomainPolicyLookup globalDomainPolicyLookup,
-                                                                        RegistrationProcessor registrationProcessor) {
-        OidcUserService delegate = new OidcUserService();
-        return userRequest -> {
-            OidcUser user = delegate.loadUser(userRequest);
-
-            autoProvisionIfNeeded(userRequest, user, ssoConfigService, userService, globalDomainPolicyLookup, registrationProcessor);
-
-            Set<GrantedAuthority> authorities = new HashSet<>(user.getAuthorities());
-
-            String nameKey = resolvePreferredPrincipalClaim(user);
-
-            OidcUserInfo userInfo = user.getUserInfo() != null
-                    ? user.getUserInfo()
-                    : new OidcUserInfo(user.getClaims());
-
-            return new DefaultOidcUser(authorities, userRequest.getIdToken(), userInfo, nameKey);
-        };
-    }
-
-    @Bean
-    public JwtDecoderFactory<ClientRegistration> microsoftAwareJwtDecoderFactory() {
+    public JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory(SsoProviderRegistry ssoProviderRegistry) {
         return clientRegistration -> {
-            String registrationId = clientRegistration.getRegistrationId();
             String issuer = clientRegistration.getProviderDetails().getIssuerUri();
             String jwkSetUri = clientRegistration.getProviderDetails().getJwkSetUri();
 
             log.debug("Building JWT decoder for provider='{}', configuredIssuer='{}', jwkSetUri='{}'",
-                    registrationId, issuer, jwkSetUri);
+                    clientRegistration.getRegistrationId(), issuer, jwkSetUri);
 
-            if (!"microsoft".equals(registrationId)) {
+            Optional<OAuth2TokenValidator<Jwt>> providerValidator =
+                    ssoProviderRegistry.idTokenValidator(clientRegistration);
+
+            if (providerValidator.isEmpty()) {
                 if (issuer != null && !issuer.isBlank()) {
                     return JwtDecoders.fromIssuerLocation(issuer);
                 }
@@ -175,121 +139,11 @@ public class SecurityConfig {
             }
 
             NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-            OAuth2TokenValidator<Jwt> timestamps = JwtValidators.createDefault();
-            OAuth2TokenValidator<Jwt> oidcStandard = new OidcIdTokenValidator(clientRegistration);
-            OAuth2TokenValidator<Jwt> microsoftIssuerPatternValidator = token -> {
-                String iss = token.getIssuer() != null ? token.getIssuer().toString() : null;
-                log.info("Microsoft ID token issuer: '{}', expected pattern: '{}'", iss, MS_ISSUER_PATTERN.pattern());
-                if (iss != null && MS_ISSUER_PATTERN.matcher(iss).matches()) {
-                    log.info("Microsoft issuer validation passed for issuer='{}'", iss);
-                    return OAuth2TokenValidatorResult.success();
-                }
-                log.error("Microsoft issuer validation FAILED: issuer='{}' does not match pattern='{}'",
-                        iss, MS_ISSUER_PATTERN.pattern());
-                return OAuth2TokenValidatorResult.failure(
-                        new OAuth2Error("invalid_id_token",
-                                "Invalid issuer for Microsoft multi-tenant. Received: " + iss, null));
-            };
-            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(timestamps, oidcStandard, microsoftIssuerPatternValidator));
+            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                    JwtValidators.createDefault(),
+                    new OidcIdTokenValidator(clientRegistration),
+                    providerValidator.get()));
             return decoder;
         };
-    }
-
-    private void autoProvisionIfNeeded(OidcUserRequest userRequest,
-                                       OidcUser user,
-                                       SSOConfigService ssoConfigService,
-                                       UserService userService,
-                                       GlobalDomainPolicyLookup globalDomainPolicyLookup,
-                                       RegistrationProcessor registrationProcessor) {
-        try {
-            String tenantId = TenantContext.getTenantId();
-            String provider = userRequest.getClientRegistration().getRegistrationId();
-            if (tenantId == null || provider == null) {
-                return;
-            }
-            String email = resolveEmail(user);
-            if (email == null || email.isBlank()) {
-                return;
-            }
-
-            String normalizedEmail = email.toLowerCase(ROOT);
-            String pictureUrl = resolvePictureUrl(user);
-
-            ssoConfigService
-                    .getSSOConfig(tenantId, provider)
-                    .filter(SSOPerTenantConfig::isEnabled)
-                    .ifPresentOrElse(cfg -> {
-                        if (!cfg.isAutoProvisionUsers()) {
-                            return;
-                        }
-                        if (isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
-                            provisionOrRefresh(userService, registrationProcessor, tenantId, email, normalizedEmail, user, provider, pictureUrl);
-                        }
-                    }, () -> {
-                        String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
-                        globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
-                                .ifPresent(mappedTenantId -> {
-                                    if (tenantId.equals(mappedTenantId)) {
-                                        provisionOrRefresh(userService, registrationProcessor, tenantId, email, normalizedEmail, user, provider, pictureUrl);
-                                    }
-                                });
-                    });
-        } catch (Exception ignored) {
-            // Do not block login flow if provisioning has a non-critical issue
-        }
-    }
-
-    private void provisionOrRefresh(UserService userService,
-                                    RegistrationProcessor registrationProcessor,
-                                    String tenantId,
-                                    String email,
-                                    String normalizedEmail,
-                                    OidcUser user,
-                                    String provider,
-                                    String pictureUrl) {
-        AuthUser authUser = userService.findActiveByEmailAndTenant(normalizedEmail, tenantId)
-                .orElseGet(() -> registerUser(userService, tenantId, email, user, provider));
-        registrationProcessor.postProcessAutoProvision(authUser, pictureUrl);
-    }
-
-    private AuthUser registerUser(UserService userService, String tenantId, String email, OidcUser user, String provider) {
-        String[] names = resolveNames(user);
-        return userService.registerOrReactivateFromSso(tenantId, email, names[0], names[1], List.of(ADMIN), provider);
-    }
-
-    /**
-     * Select the preferred claim to use as principal name:
-     * email -> preferred_username -> upn -> unique_name -> sub
-     */
-    private String resolvePreferredPrincipalClaim(OidcUser user) {
-        var claims = user.getClaims();
-        if (user.getEmail() != null && !user.getEmail().isBlank()) {
-            return EMAIL;
-        }
-        Object preferred = claims.get("preferred_username");
-        if (preferred instanceof String s && !s.isBlank()) {
-            return "preferred_username";
-        }
-        Object upn = claims.get("upn");
-        if (upn instanceof String s2 && !s2.isBlank()) {
-            return "upn";
-        }
-        Object uniq = claims.get("unique_name");
-        if (uniq instanceof String s3 && !s3.isBlank()) {
-            return "unique_name";
-        }
-        return SUB;
-    }
-
-
-    private boolean isEmailAllowedByDomains(List<String> allowedDomains, String email) {
-        if (allowedDomains == null || allowedDomains.isEmpty()) {
-            return false;
-        }
-        String domain = email.substring(email.lastIndexOf('@') + 1)
-                .toLowerCase(ROOT);
-        return allowedDomains.stream()
-                .map(d -> d.toLowerCase(ROOT))
-                .anyMatch(domain::equals);
     }
 }

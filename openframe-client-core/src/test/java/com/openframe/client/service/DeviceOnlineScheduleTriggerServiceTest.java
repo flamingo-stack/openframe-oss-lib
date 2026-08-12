@@ -1,30 +1,22 @@
 package com.openframe.client.service;
 
 import com.openframe.client.service.rmm.DeviceOnlineScheduleTriggerService;
-import com.openframe.client.service.rmm.ScheduleFireDispatcher;
-import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
-import com.openframe.data.document.rmm.ScriptStatus;
-import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
-import com.openframe.data.repository.rmm.ScriptScheduleRepository;
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.MachineFirstOnlineDispatch;
+import com.openframe.data.repository.device.MachineFirstOnlineDispatchRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
-import java.time.Instant;
-import java.util.List;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DeviceOnlineScheduleTriggerServiceTest {
@@ -32,78 +24,49 @@ class DeviceOnlineScheduleTriggerServiceTest {
     private static final String TENANT = "tenant-1";
     private static final String MACHINE = "m-1";
 
-    @Mock private ScriptScheduleMachineAssignedRepository assignedRepository;
-    @Mock private ScriptScheduleRepository scheduleRepository;
-    @Mock private ScheduleFireDispatcher fireDispatcher;
+    @Mock private MachineFirstOnlineDispatchRepository dispatchRepository;
 
     @InjectMocks private DeviceOnlineScheduleTriggerService service;
 
     @Test
-    @DisplayName("fires only ACTIVE + DEVICE_ONLINE schedules assigned to the machine, on that one machine")
-    void firesActiveDeviceOnlineOnly() {
-        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE))
-                .thenReturn(List.of(assignment("s1"), assignment("s2"), assignment("s3")));
-        ScriptSchedule deviceOnline = schedule("s1", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
-        ScriptSchedule wrongTrigger = schedule("s2", ScriptScheduleTrigger.DATE_TIME, ScriptStatus.ACTIVE);
-        ScriptSchedule archived = schedule("s3", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ARCHIVED);
-        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(deviceOnline, wrongTrigger, archived));
+    @DisplayName("first ONLINE for a machine → sentinel row inserted with (tenantId, machineId, firstSeenAt)")
+    void firstOnline_insertsSentinel() {
+        service.onDeviceOnline(machine());
 
-        service.onDeviceOnline(TENANT, MACHINE);
-
-        verify(fireDispatcher).dispatch(eq(deviceOnline), eq(List.of(MACHINE)), any(Instant.class));
-        verify(fireDispatcher, never()).dispatch(eq(wrongTrigger), any(), any(Instant.class));
-        verify(fireDispatcher, never()).dispatch(eq(archived), any(), any(Instant.class));
+        ArgumentCaptor<MachineFirstOnlineDispatch> captor = ArgumentCaptor.forClass(MachineFirstOnlineDispatch.class);
+        verify(dispatchRepository).save(captor.capture());
+        MachineFirstOnlineDispatch saved = captor.getValue();
+        assertThat(saved.getTenantId()).isEqualTo(TENANT);
+        assertThat(saved.getMachineId()).isEqualTo(MACHINE);
+        assertThat(saved.getFirstSeenAt()).isNotNull();
+        assertThat(saved.getDispatchedAt()).isNull();   // pending until the cron worker fires it
     }
 
     @Test
-    @DisplayName("no assignment for the machine → no schedule load, no dispatch")
-    void noAssignment_noOp() {
-        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE))
-                .thenReturn(List.of());
+    @DisplayName("subsequent OFFLINE→ONLINE for the same machine → duplicate insert swallowed, silent no-op (guarantees fire-once-ever)")
+    void subsequentOnline_duplicateKeyIsSwallowed() {
+        doThrow(new DuplicateKeyException("compound (tenantId, machineId) already exists"))
+                .when(dispatchRepository).save(org.mockito.ArgumentMatchers.any(MachineFirstOnlineDispatch.class));
 
-        service.onDeviceOnline(TENANT, MACHINE);
+        // Must NOT throw — the whole point of the sentinel is that a re-online is a no-op.
+        service.onDeviceOnline(machine());
 
-        verifyNoInteractions(scheduleRepository, fireDispatcher);
+        verify(dispatchRepository).save(org.mockito.ArgumentMatchers.any(MachineFirstOnlineDispatch.class));
     }
 
     @Test
-    @DisplayName("assigned but no DEVICE_ONLINE schedule → nothing fired")
-    void assignedButNoDeviceOnline_noDispatch() {
-        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE))
-                .thenReturn(List.of(assignment("s1")));
-        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(schedule("s1", ScriptScheduleTrigger.DATE_TIME, ScriptStatus.ACTIVE)));
-
-        service.onDeviceOnline(TENANT, MACHINE);
-
-        verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
+    @DisplayName("event handler never dispatches directly — that's the cron worker's job (no Thread.sleep, no fire on the caller thread)")
+    void neverDispatchesInline() {
+        service.onDeviceOnline(machine());
+        // dispatchRepository.save() is the ONLY side effect; nothing else on this service is
+        // wired to a NATS fire path. Absence of any dispatch collaborator here is the assertion.
+        verify(dispatchRepository, org.mockito.Mockito.only()).save(org.mockito.ArgumentMatchers.any());
     }
 
-    @Test
-    @DisplayName("one broken schedule does not stop the others from firing")
-    void errorIsolation() {
-        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE))
-                .thenReturn(List.of(assignment("s1"), assignment("s2")));
-        ScriptSchedule broken = schedule("s1", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
-        ScriptSchedule ok = schedule("s2", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
-        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(broken, ok));
-        doThrow(new RuntimeException("nats down")).when(fireDispatcher)
-                .dispatch(eq(broken), eq(List.of(MACHINE)), any(Instant.class));
-
-        service.onDeviceOnline(TENANT, MACHINE);
-
-        verify(fireDispatcher).dispatch(eq(ok), eq(List.of(MACHINE)), any(Instant.class));
-    }
-
-    private static ScriptScheduleMachineAssigned assignment(String scheduleId) {
-        return ScriptScheduleMachineAssigned.builder()
-                .tenantId(TENANT).scriptScheduleId(scheduleId).machineId(MACHINE).build();
-    }
-
-    private static ScriptSchedule schedule(String id, ScriptScheduleTrigger trigger, ScriptStatus status) {
-        return ScriptSchedule.builder()
-                .id(id).tenantId(TENANT).name(id).trigger(trigger).status(status)
-                .scriptIds(List.of("sc")).build();
+    private static Machine machine() {
+        Machine m = new Machine();
+        m.setTenantId(TENANT);
+        m.setMachineId(MACHINE);
+        return m;
     }
 }

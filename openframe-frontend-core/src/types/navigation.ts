@@ -56,6 +56,19 @@ export interface HeaderConfig {
      *  for the default "Mingo AI". */
     label?: string
   }
+  /** Support-ticket alerts cell (`TicketAlertsButton`), rendered before
+   *  the Mingo launcher in the flush cell row. Attention-only: renders
+   *  nothing unless a `<TicketLiveProvider>` is mounted AND there are
+   *  unread support replies — declaring it is side-effect-free. */
+  tickets?: {
+    /** BASE path of the tickets surface (any nesting prefix allowed —
+     *  '/tickets', '/support/portal/tickets'). The cell builds the SSOT
+     *  deep link `<href>?ticket=<id>` for the newest-unread ticket. */
+    href: string
+    /** Optional host navigation (router push) — receives the FULL
+     *  computed href. Defaults to `window.location.assign`. */
+    onClick?: (href: string) => void
+  }
   className?: string
   style?: React.CSSProperties
   autoHide?: boolean
@@ -92,6 +105,27 @@ export interface SlidingSidebarConfig {
  */
 export interface NavigationSidebarConfig {
   items: NavigationSidebarItem[]
+  /**
+   * Draw placeholder rows instead of `items`.
+   *
+   * For hosts whose navigation is not knowable at first paint — entries gated by
+   * server-loaded feature flags, permissions, or tenant config. Such a host has no
+   * good option without this: rendering the items it has yet means a nav that grows
+   * and shifts as answers arrive, and guessing the gated ones wrong shows entries
+   * that don't belong to the user (a flag that HIDES a legacy entry when enabled
+   * makes "not answered yet" indistinguishable from "off").
+   *
+   * The rows reuse the real entry's geometry and the sidebar's own minimized state,
+   * so the placeholder is correct in both the expanded and the minimized rail with
+   * nothing to pass in — and the handoff to the real nav moves nothing.
+   */
+  loading?: boolean
+  /**
+   * How many placeholder rows `loading` draws, per section. Defaults to 7 primary
+   * and 2 secondary — the shape of a typical console nav. Pass the counts the host
+   * expects so the placeholder and the loaded nav are the same height.
+   */
+  loadingRows?: { primary?: number; secondary?: number }
   minimized?: boolean
   onNavigate?: (path: string) => void
   onToggleMinimized?: () => void

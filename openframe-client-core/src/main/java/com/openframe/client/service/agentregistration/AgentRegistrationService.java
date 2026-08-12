@@ -12,6 +12,7 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
 import lombok.RequiredArgsConstructor;
@@ -161,9 +162,17 @@ public class AgentRegistrationService {
 
     private void applyRegistrationRequestFields(Machine machine, AgentRegistrationRequest request) {
         machine.setHostname(request.getHostname());
-        machine.setOsType(request.getOsType());
+        machine.setOsType(normalizeOsType(request.getOsType()));
         machine.setAgentVersion(request.getAgentVersion());
         machine.setLastSeen(Instant.now());
+    }
+
+    private static OsType normalizeOsType(String rawOsType) {
+        try {
+            return OsType.valueOf(rawOsType);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new IllegalArgumentException("Unsupported osType reported by agent: " + rawOsType);
+        }
     }
 
 }

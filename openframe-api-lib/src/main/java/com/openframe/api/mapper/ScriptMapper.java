@@ -7,7 +7,7 @@ import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptStatus;
 import org.springframework.stereotype.Component;
 
@@ -35,7 +35,7 @@ public class ScriptMapper {
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .defaultTimeoutSeconds(input.getDefaultTimeoutSeconds())
                 .defaultArgs(input.getDefaultArgs())
-                .envVars(mapEnvVarsToEntity(input.getEnvVars()))
+                .envVars(ScriptEnvVarMapper.toEntity(input.getEnvVars()))
                 .build();
     }
 
@@ -48,7 +48,7 @@ public class ScriptMapper {
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setDefaultTimeoutSeconds(input.getDefaultTimeoutSeconds());
         existing.setDefaultArgs(input.getDefaultArgs());
-        existing.setEnvVars(mapEnvVarsToEntity(input.getEnvVars()));
+        existing.setEnvVars(ScriptEnvVarMapper.toEntity(input.getEnvVars()));
     }
 
     public ScriptResponse toResponse(Script entity) {
@@ -56,32 +56,19 @@ public class ScriptMapper {
                 .id(entity.getId())
                 .name(entity.getName())
                 .description(entity.getDescription())
-                .shell(entity.getShell() != null ? entity.getShell().name() : null)
+                .shell(entity.getShell())
                 .privilegeLevel(entity.getPrivilegeLevel() != null ? entity.getPrivilegeLevel() : PrivilegeLevel.USER)
                 .scriptBody(entity.getScriptBody())
-                .supportedPlatforms(mapPlatformsToResponse(entity.getSupportedPlatforms()))
+                .supportedPlatforms(entity.getSupportedPlatforms())
                 .defaultTimeoutSeconds(entity.getDefaultTimeoutSeconds())
                 .defaultArgs(entity.getDefaultArgs())
                 .envVars(mapEnvVarsToResponse(entity.getEnvVars()))
                 .createdBy(entity.getCreatedBy())
-                .status(entity.getStatus() != null ? entity.getStatus().name() : ScriptStatus.ACTIVE.name())
+                .status(entity.getStatus() != null ? entity.getStatus() : ScriptStatus.ACTIVE)
                 .statusChangedAt(entity.getStatusChangedAt())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
-    }
-
-    private List<ScriptEnvVar> mapEnvVarsToEntity(List<ScriptEnvVarInput> envVars) {
-        if (envVars == null) {
-            return null;
-        }
-        return envVars.stream()
-                .map(v -> ScriptEnvVar.builder()
-                        .name(v.getName())
-                        .value(v.getValue())
-                        .secret(v.isSecret())
-                        .build())
-                .toList();
     }
 
     private List<ScriptEnvVarInput> mapEnvVarsToResponse(List<ScriptEnvVar> envVars) {
@@ -98,10 +85,4 @@ public class ScriptMapper {
                 .toList();
     }
 
-    private List<String> mapPlatformsToResponse(List<ScriptPlatform> platforms) {
-        if (platforms == null) {
-            return null;
-        }
-        return platforms.stream().map(ScriptPlatform::name).toList();
-    }
 }

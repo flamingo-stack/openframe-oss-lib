@@ -61,11 +61,12 @@ type Machine implements Node {
     organization: Organization
     hostname: String
     displayName: String
+    nickname: String
     serialNumber: String
     manufacturer: String
     model: String
     type: DeviceType
-    osType: String
+    osType: OsType!
     osVersion: String
     osBuild: String
     timezone: String
@@ -138,4 +139,9 @@ type InstalledAgent implements Node {
     version: String!
     createdAt: String
     updatedAt: String
+}
+
+extend type Mutation {
+
+    updateDeviceNickname(machineId: String!, nickname: String): Machine!
 }

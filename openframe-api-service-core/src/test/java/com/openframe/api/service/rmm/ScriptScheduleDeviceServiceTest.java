@@ -1,12 +1,19 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
+import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.openframe.data.document.rmm.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,15 +42,25 @@ class ScriptScheduleDeviceServiceTest {
 
     private ScriptScheduleMachineAssignedRepository assignedRepository;
     private ScriptScheduleRepository scheduleRepository;
+    private MachineRepository machineRepository;
+    private ScheduleDeviceTargetResolver targetResolver;
     private ScriptScheduleDeviceService service;
 
     @BeforeEach
     void setUp() {
         assignedRepository = mock(ScriptScheduleMachineAssignedRepository.class);
         scheduleRepository = mock(ScriptScheduleRepository.class);
+        machineRepository = mock(MachineRepository.class);
+        targetResolver = mock(ScheduleDeviceTargetResolver.class);
         TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
-        service = new ScriptScheduleDeviceService(assignedRepository, scheduleRepository, tenantIdProvider);
+        service = new ScriptScheduleDeviceService(assignedRepository, scheduleRepository, machineRepository, targetResolver, tenantIdProvider);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        // By default every requested machineId resolves to an in-tenant device (osType "windows");
+        // platform/existence tests override this stub with their own machines.
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenAnswer(inv -> {
+            java.util.Collection<String> ids = inv.getArgument(1);
+            return ids.stream().map(id -> machine(id, id, WINDOWS)).toList();
+        });
     }
 
     private void scheduleExists(ScriptStatus status) {
@@ -50,9 +68,26 @@ class ScriptScheduleDeviceServiceTest {
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
     }
 
+    private void scheduleExistsWithPlatforms(ScriptStatus status, List<OsType> platforms) {
+        ScriptSchedule schedule = ScriptSchedule.builder().id(SCHEDULE_ID).status(status).supportedPlatforms(platforms).build();
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
+    }
+
+    private static Machine machine(String machineId, String hostname, OsType osType) {
+        Machine m = new Machine();
+        m.setMachineId(machineId);
+        m.setHostname(hostname);
+        m.setOsType(osType);
+        return m;
+    }
+
     private static ScriptScheduleMachineAssigned pair(String machineId) {
+        return pairFor(SCHEDULE_ID, machineId);
+    }
+
+    private static ScriptScheduleMachineAssigned pairFor(String scheduleId, String machineId) {
         return ScriptScheduleMachineAssigned.builder()
-                .tenantId(TENANT_ID).scriptScheduleId(SCHEDULE_ID).machineId(machineId).build();
+                .tenantId(TENANT_ID).scriptScheduleId(scheduleId).machineId(machineId).build();
     }
 
     @Test
@@ -77,6 +112,45 @@ class ScriptScheduleDeviceServiceTest {
         });
         // Nothing to remove — deleteBy never called.
         verify(assignedRepository, never()).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("setDevices: a device whose OS is not among the schedule's platforms is rejected (Windows device on a macOS schedule)")
+    void setDevices_deviceOsMismatch_rejected() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-win", "win-box", WINDOWS)));
+
+        assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("win-box");
+        verify(assignedRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("setDevices: a device whose OS matches the schedule's platform is accepted (case-insensitive: macos == MACOS)")
+    void setDevices_deviceOsMatch_accepted() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-mac", "mac-box", OsType.MAC_OS)));
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.setDevices(SCHEDULE_ID, List.of("m-mac"), "user-1");
+
+        verify(assignedRepository).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("setDevices: a device with unknown/blank osType is allowed (can't determine platform)")
+    void setDevices_unknownOs_allowed() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-x", "x-box", null)));
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.setDevices(SCHEDULE_ID, List.of("m-x"), "user-1");
+
+        verify(assignedRepository).saveAll(any());
     }
 
     @Test
@@ -155,6 +229,10 @@ class ScriptScheduleDeviceServiceTest {
                 .scriptScheduleId("sch-2").machineId("m-2").build();
         ScriptScheduleMachineAssigned b2 = ScriptScheduleMachineAssigned.builder()
                 .scriptScheduleId("sch-2").machineId("m-3").build();
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(
+                        ScriptSchedule.builder().id("sch-1").status(ScriptStatus.ACTIVE).build(),
+                        ScriptSchedule.builder().id("sch-2").status(ScriptStatus.ACTIVE).build()));
         when(assignedRepository.findByTenantIdAndScriptScheduleIdIn(eq(TENANT_ID), any()))
                 .thenReturn(List.of(a1, a2, b1, b2));
 
@@ -181,6 +259,155 @@ class ScriptScheduleDeviceServiceTest {
     void getMachineIdsByScheduleIds_empty_noLookup() {
         assertThat(service.getMachineIdsByScheduleIds(List.of())).isEmpty();
         verify(assignedRepository, never()).findByTenantIdAndScriptScheduleIdIn(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("addDevices: inserts only NEW pairs, skips already-assigned (idempotent)")
+    void addDevices_skipsExisting() {
+        scheduleExists(ScriptStatus.ACTIVE);
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
+                .thenReturn(List.of(pair("m-1")));   // m-1 already assigned
+
+        service.addDevices(SCHEDULE_ID, List.of("m-1", "m-2"), "user-1");
+
+        ArgumentCaptor<List<ScriptScheduleMachineAssigned>> captor = ArgumentCaptor.forClass(List.class);
+        verify(assignedRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(ScriptScheduleMachineAssigned::getMachineId)
+                .containsExactly("m-2");   // only the new one
+    }
+
+    @Test
+    @DisplayName("addDevices: a platform-mismatched device is rejected (Windows device on a macOS schedule)")
+    void addDevices_platformMismatch_rejected() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-win", "win-box", WINDOWS)));
+
+        assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
+                .isInstanceOf(BadRequestException.class);
+        verify(assignedRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("addDevices: an unknown / cross-tenant machineId is rejected — never persisted as an assignment")
+    void addDevices_unknownMachineId_rejected() {
+        scheduleExists(ScriptStatus.ACTIVE);
+        // only m-known resolves in this tenant; m-ghost is absent (unknown or belongs to another tenant)
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-known", "known-box", WINDOWS)));
+
+        assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-known", "m-ghost"), "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("m-ghost");
+        verify(assignedRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("setDevices: an unknown / cross-tenant machineId is rejected before any write")
+    void setDevices_unknownMachineId_rejected() {
+        scheduleExists(ScriptStatus.ACTIVE);
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-known", "known-box", WINDOWS)));
+
+        assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-known", "m-ghost"), "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("m-ghost");
+        verify(assignedRepository, never()).saveAll(any());
+        verify(assignedRepository, never()).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("removeDevices: deletes the given pairs by machineId")
+    void removeDevices_deletesByIds() {
+        scheduleExists(ScriptStatus.ACTIVE);
+
+        service.removeDevices(SCHEDULE_ID, List.of("m-1", "m-2"), "user-1");
+
+        verify(assignedRepository).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(
+                eq(TENANT_ID), eq(SCHEDULE_ID), any());
+    }
+
+    @Test
+    @DisplayName("applyCriteria: switches the schedule to CRITERIA mode, stores the rule and saves it")
+    void applyCriteria_setsModeAndPersists() {
+        scheduleExists(ScriptStatus.ACTIVE);
+        ScheduleDeviceCriteria criteria = ScheduleDeviceCriteria.builder()
+                .organizationIds(List.of("org-1")).osTypes(List.of(WINDOWS)).build();
+
+        service.applyCriteria(SCHEDULE_ID, criteria, "user-1");
+
+        ArgumentCaptor<ScriptSchedule> captor = ArgumentCaptor.forClass(ScriptSchedule.class);
+        verify(scheduleRepository).save(captor.capture());
+        ScriptSchedule saved = captor.getValue();
+        assertThat(saved.getSelectionMode()).isEqualTo(ScheduleDeviceSelectionMode.CRITERIA);
+        assertThat(saved.getDeviceCriteria()).isEqualTo(criteria);
+    }
+
+    @Test
+    @DisplayName("getMachineIdsByScheduleIds: CRITERIA schedules resolve dynamically via the resolver, not the join rows")
+    void getMachineIdsByScheduleIds_criteriaViaResolver() {
+        ScriptSchedule criteriaSchedule = ScriptSchedule.builder()
+                .id(SCHEDULE_ID).status(ScriptStatus.ACTIVE)
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA).build();
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(criteriaSchedule));
+        when(targetResolver.resolveTargetMachineIds(criteriaSchedule)).thenReturn(List.of("m-9", "m-10"));
+
+        Map<String, List<String>> result = service.getMachineIdsByScheduleIds(List.of(SCHEDULE_ID));
+
+        assertThat(result.get(SCHEDULE_ID)).containsExactly("m-9", "m-10");
+        // criteria mode never touches the assignment join rows
+        verify(assignedRepository, never()).findByTenantIdAndScriptScheduleIdIn(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("getMachineCountsByScheduleIds: SPECIFIC counts join rows (batched), CRITERIA uses a count query — no ids fetched to size")
+    void getMachineCountsByScheduleIds_mixedModes() {
+        ScriptSchedule specific = ScriptSchedule.builder()
+                .id("sch-1").status(ScriptStatus.ACTIVE)
+                .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).build();
+        ScriptSchedule criteria = ScriptSchedule.builder()
+                .id("sch-2").status(ScriptStatus.ACTIVE)
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA).build();
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(specific, criteria));
+        when(assignedRepository.findByTenantIdAndScriptScheduleIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(pairFor("sch-1", "m-1"), pairFor("sch-1", "m-2")));
+        when(targetResolver.countCriteriaMachines(criteria)).thenReturn(5L);
+
+        Map<String, Integer> counts = service.getMachineCountsByScheduleIds(List.of("sch-1", "sch-2"));
+
+        assertThat(counts).containsEntry("sch-1", 2).containsEntry("sch-2", 5);
+        // criteria count must NOT go through the id resolver (no id materialisation)
+        verify(targetResolver, never()).resolveTargetMachineIds(criteria);
+    }
+
+    @Test
+    @DisplayName("getMachineCountsByScheduleIds: a SPECIFIC schedule with no assignments counts as 0")
+    void getMachineCountsByScheduleIds_specificNoRows_isZero() {
+        ScriptSchedule specific = ScriptSchedule.builder()
+                .id("sch-1").status(ScriptStatus.ACTIVE)
+                .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).build();
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any())).thenReturn(List.of(specific));
+        when(assignedRepository.findByTenantIdAndScriptScheduleIdIn(eq(TENANT_ID), any())).thenReturn(List.of());
+
+        assertThat(service.getMachineCountsByScheduleIds(List.of("sch-1"))).containsEntry("sch-1", 0);
+    }
+
+    @Test
+    @DisplayName("setDevices: flips a CRITERIA schedule back to SPECIFIC when devices are managed explicitly")
+    void setDevices_flipsCriteriaToSpecific() {
+        ScriptSchedule criteriaSchedule = ScriptSchedule.builder()
+                .id(SCHEDULE_ID).status(ScriptStatus.ACTIVE)
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA).build();
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(criteriaSchedule));
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.setDevices(SCHEDULE_ID, List.of("m-1"), "user-1");
+
+        ArgumentCaptor<ScriptSchedule> captor = ArgumentCaptor.forClass(ScriptSchedule.class);
+        verify(scheduleRepository).save(captor.capture());
+        assertThat(captor.getValue().getSelectionMode()).isEqualTo(ScheduleDeviceSelectionMode.SPECIFIC);
     }
 
     // Argument-matcher shortcuts for Collections (Mockito's `argThat` boilerplate collapsed).

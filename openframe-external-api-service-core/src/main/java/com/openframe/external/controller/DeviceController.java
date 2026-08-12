@@ -1,21 +1,23 @@
 package com.openframe.external.controller;
 
+import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceFilterService;
 import com.openframe.api.service.DeviceService;
 import com.openframe.api.service.TagService;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.device.DeviceStatus;
-import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
-import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.data.document.rmm.OsType;
+import com.openframe.data.document.tag.Tag;
 import com.openframe.external.dto.device.DeviceFilterResponse;
 import com.openframe.external.dto.device.DeviceResponse;
 import com.openframe.external.dto.device.DevicesResponse;
+import com.openframe.external.dto.device.UpdateDeviceNicknameRequest;
 import com.openframe.external.dto.device.UpdateDeviceStatusRequest;
-import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.dto.shared.SortInput;
 import com.openframe.external.mapper.DeviceMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -27,12 +29,21 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.springframework.http.HttpStatus.*;
+import static org.springframework.http.HttpStatus.NO_CONTENT;
+import static org.springframework.http.HttpStatus.OK;
 
 @RestController
 @RequestMapping("/api/v1/devices")
@@ -71,7 +82,7 @@ public class DeviceController {
             @RequestParam(required = false) List<DeviceType> deviceTypes,
 
             @Parameter(description = "Operating system types to filter by")
-            @RequestParam(required = false) List<String> osTypes,
+            @RequestParam(required = false) List<OsType> osTypes,
 
             @Parameter(description = "Organization IDs to filter by")
             @RequestParam(required = false) List<String> organizationIds,
@@ -189,7 +200,7 @@ public class DeviceController {
             @RequestParam(required = false) List<DeviceType> deviceTypes,
 
             @Parameter(description = "Operating system types to filter by")
-            @RequestParam(required = false) List<String> osTypes,
+            @RequestParam(required = false) List<OsType> osTypes,
 
             @Parameter(description = "Organization IDs to filter by")
             @RequestParam(required = false) List<String> organizationIds,
@@ -230,8 +241,26 @@ public class DeviceController {
             @RequestBody UpdateDeviceStatusRequest request,
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+
         log.info("Updating device {} status to {} - userId: {}, apiKeyId: {}", machineId, request.status(), userId, apiKeyId);
         deviceService.updateStatusByMachineId(machineId, request.status());
+    }
+
+    @Operation(
+            summary = "Update device nickname by machine ID",
+            description = "Set or clear the user-defined nickname for a device"
+    )
+    @PatchMapping("/{machineId}/nickname")
+    @ResponseStatus(NO_CONTENT)
+    public void updateDeviceNickname(
+            @Parameter(description = "Machine ID of the device")
+            @PathVariable String machineId,
+            @RequestBody UpdateDeviceNicknameRequest request,
+            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+
+        log.info("Updating device {} nickname - userId: {}, apiKeyId: {}", machineId, userId, apiKeyId);
+        deviceService.updateNickname(machineId, request.nickname());
     }
 
 }

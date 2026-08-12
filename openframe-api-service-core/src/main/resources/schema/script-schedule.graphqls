@@ -2,7 +2,7 @@
 #
 # Tenant scoping is implicit — the resolver extracts the tenant from the
 # authenticated principal, so clients never specify or see tenantId. Reuses the
-# ScriptPlatform / ScriptStatus / ScriptFilterOption / Script / User / Node /
+# OsType / ScriptStatus / ScriptFilterOption / Script / User / Node /
 # PageInfo / SortInput types defined elsewhere in the merged schema.
 
 extend type Query {
@@ -11,7 +11,9 @@ extend type Query {
 
     """Cursor-paginated list of schedules within the current tenant (Relay Connection Spec).
     Default order is newest-first by _id. Optional filter / search / sort.
-    Sortable fields: _id (default), name, createdAt, updatedAt, repeat, deviceCount.
+    Sortable fields: _id (default), name, startAt, repeat, deviceCount.
+    When sorting by startAt, DEVICE_ONLINE schedules are always ordered last
+    (they are event-driven and have no startAt).
     Ties are broken by _id so the order is stable. Search is a
     case-insensitive substring match on name."""
     scriptSchedules(
@@ -47,6 +49,30 @@ extend type Mutation {
     machineIds are Machine global ids. Returns the updated schedule. Throws if the schedule is not found or soft-deleted."""
     setScriptScheduleDevices(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
 
+    """Incrementally assign the given devices to a schedule (the "+" / "Add selected" actions).
+    Idempotent — already-assigned devices are skipped. machineIds are Machine global ids.
+    Rejects devices whose OS does not match the schedule's supportedPlatforms."""
+    addDevicesToSchedule(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
+
+    """Incrementally unassign the given devices (the trash / "Remove selected" actions).
+    Missing ids are no-ops. machineIds are Machine global ids."""
+    removeDevicesFromSchedule(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
+
+    """Assign ALL devices matching the Available-Devices filter/search (the "Add N Devices" action),
+    scoped to the schedule's platforms and resolved server-side. Already-assigned devices are skipped."""
+    addAllDevicesToSchedule(scheduleId: ID!, filter: DeviceFilterInput, search: String): ScriptSchedule!
+
+    """Unassign ALL currently-assigned devices matching the Selected-Devices filter/search (the
+    "Remove N Devices" action). With no filter this clears the whole assignment."""
+    removeAllDevicesFromSchedule(scheduleId: ID!, filter: DeviceFilterInput, search: String): ScriptSchedule!
+
+    """Switch a schedule to CRITERIA device selection and store its rule (customer / type / OS) — backs
+    "Select Devices by Criteria" → Save Devices. The target device set is then resolved live at
+    dispatch and display time, so devices registered later that match the rule are included
+    automatically (and DEVICE_ONLINE schedules fire on them when they come online). Returns the
+    updated schedule. Throws if the schedule is not found or soft-deleted."""
+    setScheduleDeviceCriteria(scheduleId: ID!, criteria: ScheduleDeviceCriteriaInput!): ScriptSchedule!
+
     """Run a schedule now: fan every script the schedule references out to all of its assigned
     devices over core NATS under a single run executionId (shared across all scripts and machines).
     Returns that one DispatchResponse."""
@@ -57,7 +83,11 @@ type ScriptSchedule implements Node {
     id: ID!
     name: String!
     description: String
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
+    """How this schedule targets devices: SPECIFIC (an explicit machine set, managed on the "Select Specific Devices" tab) or CRITERIA (a live rule; devices registered later that match are included automatically). Never null — legacy schedules read as SPECIFIC."""
+    selectionMode: ScheduleDeviceSelectionMode!
+    """The device-selection rule when selectionMode is CRITERIA (customer / type / OS). Null for SPECIFIC schedules."""
+    deviceCriteria: ScheduleDeviceCriteria
     """What fires this schedule: DATE_TIME (time-driven, uses startAt/repeat) or DEVICE_ONLINE (event-driven, fires when an assigned device comes online). Never null."""
     trigger: ScriptScheduleTrigger!
     """First scheduled run as an absolute UTC instant (the dashboard's Date + Time). Null if the schedule has no timing set (always null for DEVICE_ONLINE)."""
@@ -70,6 +100,10 @@ type ScriptSchedule implements Node {
     lastRunAt: Instant
     """The scripts this schedule runs, in run order (resolved from the stored script ids)."""
     scripts: [Script!]!
+    """Per-script custom args / env overrides for this schedule ("custom scripts"). Sparse — only the
+    scripts the user customised; every other script in `scripts` runs on its stored defaults. `scriptId`
+    is a Script global id (matches `scripts[].id`)."""
+    scriptCustomParams: [ScheduledScriptCustomParams!]!
     """Machines assigned to this schedule — a Relay connection with the same filter/search/sort/pagination
     as the top-level `devices` query, scoped to this schedule's assignments."""
     assignedDevices(
@@ -81,6 +115,28 @@ type ScriptSchedule implements Node {
         search: String,
         sort: SortInput
     ): DeviceConnection!
+    """Devices selectable for this schedule — the "Available Devices" picker. Scoped to this
+    schedule's supportedPlatforms so platform-mismatched devices are never shown (a Windows device
+    is not offered for a macOS schedule). Same filter/search/sort/pagination as the top-level
+    `devices` query. Each edge carries `assigned` = whether that device is already assigned to this
+    schedule, so the picker can pre-check it. No scheduleId argument — it is taken from the parent."""
+    availableDevices(
+        filter: DeviceFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): AvailableDeviceConnection!
+    """Faceted filter options (status / deviceType / osType / organization, each with counts) for the
+    "Assigned Devices" picker — the values actually present among this schedule's assigned devices,
+    narrowed by `filter`/`search`. Same shape as the top-level `deviceFilters` query so the same
+    filter panel can drive the picker. `tagKeys` is currently always empty for the pickers."""
+    assignedDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
+    """Faceted filter options for the "Available Devices" picker — like `assignedDeviceFilters` but
+    over this schedule's platform-scoped selectable set (matching the `availableDevices` picker)."""
+    availableDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
     """Number of machines assigned to this schedule (the DEVICES column)."""
     deviceCount: Int!
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
@@ -97,6 +153,28 @@ enum ScriptScheduleTrigger {
     DEVICE_ONLINE
 }
 
+enum ScheduleDeviceSelectionMode {
+    SPECIFIC
+    CRITERIA
+}
+
+"""The stored "Select Devices by Criteria" rule. Each list is a whitelist (empty/null = no constraint on that dimension); a device matches when it satisfies every non-empty dimension."""
+type ScheduleDeviceCriteria {
+    "Customer scope — raw organization ids (empty = all customers)."
+    organizationIds: [String!]
+    "Device-type scope (empty = all types)."
+    deviceTypes: [DeviceType!]
+    "OS scope, intersected with the schedule's supportedPlatforms (empty = all supported platforms)."
+    osTypes: [String!]
+}
+
+"""Input for setScheduleDeviceCriteria — mirrors the customer / type / OS filters of the picker."""
+input ScheduleDeviceCriteriaInput {
+    organizationIds: [String!]
+    deviceTypes: [DeviceType!]
+    osTypes: [String!]
+}
+
 type ScriptScheduleConnection {
     edges: [ScriptScheduleEdge!]!
     pageInfo: PageInfo!
@@ -109,20 +187,51 @@ type ScriptScheduleEdge {
     cursor: String!
 }
 
+"""Relay connection for the schedule's "Available Devices" picker. Same shape as DeviceConnection,
+but each edge additionally reports whether the device is already assigned to the schedule."""
+type AvailableDeviceConnection {
+    edges: [AvailableDeviceEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type AvailableDeviceEdge {
+    node: Machine!
+    cursor: String!
+    """True if this device is already assigned to the schedule (pre-checked in the picker)."""
+    assigned: Boolean!
+}
+
 type ScriptScheduleFilters {
     platforms: [ScriptFilterOption!]!
     authors: [ScriptFilterOption!]!
     filteredCount: Int!
 }
 
+type ScheduledScriptCustomParams {
+    scriptId: ID!
+    args: [String!]
+    envVars: [ScriptEnvVar!]
+}
+
+input ScheduledScriptCustomParamsInput {
+    scriptId: ID!
+    "Full replacement for the script's defaultArgs; null/omitted inherits the default."
+    args: [String!]
+    "Full replacement for the script's envVars; null/omitted inherits the default. NOT merged."
+    envVars: [ScriptEnvVarInput!]
+}
+
 input CreateScriptScheduleInput {
     name: String!
     description: String
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     "Ids of existing Scripts to run, in run order."
     scriptIds: [ID!]
+    "Optional per-script custom args / env overrides. Sparse; each scriptId must be in scriptIds."
+    scriptCustomParams: [ScheduledScriptCustomParamsInput!]
     trigger: ScriptScheduleTrigger!
-    "First scheduled run as an absolute UTC instant. Must fall on a 30-minute boundary (xx:00 or xx:30). Optional; a schedule with no startAt is never run until one is set."
+    "First scheduled run as an absolute UTC instant. Required when trigger is DATE_TIME (must fall on a 30-minute boundary, xx:00 or xx:30); must be null when trigger is DEVICE_ONLINE."
     startAt: Instant
     "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …); the runner ticks on that grid. Null means run once at startAt."
     repeat: Long
@@ -136,10 +245,14 @@ input UpdateScriptScheduleInput {
     id: ID!
     name: String!
     description: String
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     scriptIds: [ID!]
+    "Optional per-script custom args / env overrides. PUT semantics: fully replaces the stored custom params (null/empty clears them). Each scriptId must be in scriptIds."
+    scriptCustomParams: [ScheduledScriptCustomParamsInput!]
     trigger: ScriptScheduleTrigger!
-    "First scheduled run (absolute UTC instant). Must fall on a 30-minute boundary (xx:00 or xx:30). PUT semantics: null clears the timing; changing it reschedules the next run."
+    "How this schedule targets devices — SPECIFIC (an explicit machine set) or CRITERIA (a live rule). Null defaults to SPECIFIC, matching legacy documents. Flipping between modes leaves the join rows/rule untouched; whichever mode is active is what the resolver reads."
+    selectionMode: ScheduleDeviceSelectionMode
+    "First scheduled run (absolute UTC instant). Required when trigger is DATE_TIME (must fall on a 30-minute boundary, xx:00 or xx:30); must be null when trigger is DEVICE_ONLINE. Changing it reschedules the next run."
     startAt: Instant
     "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …). Null clears recurrence (one-shot)."
     repeat: Long
@@ -152,6 +265,9 @@ is used verbatim.
 """
 input ScriptScheduleFilterInput {
     statuses: [ScriptStatus!]
-    supportedPlatforms: [ScriptPlatform!]
+    supportedPlatforms: [OsType!]
     authorIds: [ID!]
+    "Filter by first-run instant (startAt). DEVICE_ONLINE schedules have no startAt, so a startAt range excludes them."
+    startAtFrom: Instant
+    startAtTo: Instant
 }

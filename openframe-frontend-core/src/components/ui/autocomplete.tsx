@@ -25,7 +25,9 @@ import { Chevron02DownIcon } from "../icons-v2-generated/arrows/chevron-02-down-
 
 import { Loader2 } from "lucide-react"
 import { cn } from "../../utils/cn"
+import { TruncateText } from "./truncate-text"
 import { useAutoLimitTags } from "../../hooks/ui/use-auto-limit-tags"
+import { useKeyboardCollisionPadding } from "../../hooks/ui/use-keyboard-collision-padding"
 import { FieldWrapper } from "./field-wrapper"
 import { HiddenTagsPopup } from "./hidden-tags-popup"
 import { Tag } from "./tag"
@@ -124,7 +126,8 @@ const innerInputStyles = cn(
   "flex-1 min-w-[60px] bg-transparent border-none outline-none",
   "text-h4",
   "text-ods-text-primary placeholder:text-ods-text-secondary",
-  "disabled:cursor-not-allowed"
+  // Disabled - match Input exactly (value greys out, placeholder dims further)
+  "disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border"
 )
 
 function AutocompleteInner<T = string>(
@@ -188,6 +191,7 @@ function AutocompleteInner<T = string>(
 
   const [isOpen, setIsOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const keyboardPadding = useKeyboardCollisionPadding()
   const containerRef = useRef<HTMLDivElement>(null)
   const hiddenTagsPopupRef = useRef<HTMLDivElement>(null)
 
@@ -421,6 +425,9 @@ function AutocompleteInner<T = string>(
     <PopoverPrimitive.Root open={isOpen} onOpenChange={handleOpenChange} modal={false}>
       <PopoverPrimitive.Anchor asChild>
         <div
+          // Same marker Input/Textarea/Select expose — it is how a form finds
+          // (and scrolls to) the first field that failed validation.
+          data-invalid={isInvalid || undefined}
           className={cn(
             // Layout — single line, no wrapping
             "flex items-center rounded-[6px] border min-h-11 md:min-h-12 cursor-text",
@@ -430,6 +437,14 @@ function AutocompleteInner<T = string>(
             "group",
             !disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
             disabled && "!cursor-not-allowed bg-ods-bg",
+            // Adornments / chevron carry their own colour — grey them with the
+            // value so a disabled field reads as one flat colour. Scoped to the
+            // DIRECT span child (the start adornment) on purpose: as a descendant
+            // rule it also hit the selected `Tag` chips in the middle zone, whose
+            // label is a span, and they went invisible against their own fill in
+            // the light theme. Anything nested inside the adornment that sets its
+            // own colour keeps it; anything that doesn't inherits the grey.
+            "has-[:disabled]:[&>span]:text-ods-text-disabled has-[:disabled]:[&_svg]:text-ods-text-disabled",
             isOpen && !isInvalid && "border-ods-accent hover:border-ods-accent",
             isInvalid && "border-ods-error hover:border-ods-error"
           )}
@@ -548,12 +563,17 @@ function AutocompleteInner<T = string>(
         className={cn(
           "z-50 w-[var(--radix-popover-trigger-width)] mt-1",
           "bg-ods-card border border-ods-border rounded-[4px]",
+          "flex flex-col overflow-hidden max-h-[var(--radix-popper-available-height)]",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
           dropdownClassName
         )}
         sideOffset={4}
         align="start"
+        // The anchor is the text field that raises the software keyboard, so
+        // this list is always positioned with the keyboard up — see
+        // useKeyboardCollisionPadding.
+        collisionPadding={{ bottom: keyboardPadding }}
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           autoLimitTags.inputRef.current?.focus()
@@ -565,8 +585,8 @@ function AutocompleteInner<T = string>(
           }
         }}
       >
-        <ScrollAreaPrimitive.Root className="overflow-hidden">
-          <ScrollAreaPrimitive.Viewport className="max-h-[240px] w-full [&>div]:!block">
+        <ScrollAreaPrimitive.Root className="flex min-h-0 flex-col overflow-hidden">
+          <ScrollAreaPrimitive.Viewport className="min-h-0 max-h-[240px] w-full [&>div]:!block">
             <div role="listbox">
               {loading ? (
                 <div className="px-3 py-2 text-ods-text-secondary text-h6">
@@ -589,7 +609,8 @@ function AutocompleteInner<T = string>(
                       )}
                       onClick={handleCreate}
                     >
-                      <span className="truncate" title={`+ Create "${inputValue.trim()}"`}>+ Create &quot;{inputValue.trim()}&quot;</span>
+                      {/* text-current: the row owns the typography/color (accent), not the TruncateText defaults. */}
+                      <TruncateText className="text-current">{`+ Create "${inputValue.trim()}"`}</TruncateText>
                     </div>
                   )
                 ) : (
@@ -623,7 +644,8 @@ function AutocompleteInner<T = string>(
                     >
                       {renderOption ? renderOption(option, isSelected) : (
                         <div className="flex items-center justify-between gap-[var(--spacing-system-xsf)] w-full min-w-0">
-                          <span className="truncate" title={option.label}>{option.label}</span>
+                          {/* text-current: selection state colors the row (accent vs primary); inherit it. */}
+                          <TruncateText className="text-current">{option.label}</TruncateText>
                           <div className="flex items-center gap-[var(--spacing-system-xsf)] shrink-0">
                             {isSelected && (
                               <CheckIcon className="text-ods-accent" size={20} />

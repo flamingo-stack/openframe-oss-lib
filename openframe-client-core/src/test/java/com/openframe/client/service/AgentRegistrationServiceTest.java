@@ -13,6 +13,7 @@ import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
+import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -144,7 +145,7 @@ class AgentRegistrationServiceTest {
         Machine savedMachine = machineCaptor.getValue();
         assertEquals(MACHINE_ID, savedMachine.getMachineId());
         assertEquals("test-hostname", savedMachine.getHostname());
-        assertEquals("linux", savedMachine.getOsType());
+        assertEquals(OsType.WINDOWS, savedMachine.getOsType());
         assertEquals("1.0.0", savedMachine.getAgentVersion());
         assertEquals(ORGANIZATION_ID, savedMachine.getOrganizationId());
         assertEquals(DeviceStatus.PENDING, savedMachine.getStatus());
@@ -243,7 +244,7 @@ class AgentRegistrationServiceTest {
         Machine savedMachine = machineCaptor.getValue();
         assertEquals(MACHINE_ID, savedMachine.getMachineId());
         assertEquals("test-hostname", savedMachine.getHostname());
-        assertEquals("linux", savedMachine.getOsType());
+        assertEquals(OsType.WINDOWS, savedMachine.getOsType());
         assertEquals("1.0.0", savedMachine.getAgentVersion());
         assertEquals("new-org", savedMachine.getOrganizationId()); // organization can change on reinstall
         assertEquals(DeviceStatus.PENDING, savedMachine.getStatus()); // reset to PENDING on reinstall
@@ -327,7 +328,7 @@ class AgentRegistrationServiceTest {
         request.setIp("192.168.1.1");
         request.setMacAddress("00:11:22:33:44:55");
         request.setOsUuid("test-os-uuid");
-        request.setOsType("linux");
+        request.setOsType("WINDOWS");   // agent contract: exact OsType enum name
         request.setAgentVersion("1.0.0");
         return request;
     }

@@ -2,6 +2,7 @@ package com.openframe.authz.security.flow;
 
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
+import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.security.SsoRegistrationConstants;
 import com.openframe.authz.security.SsoTenantRegCookiePayload;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
@@ -14,6 +15,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
@@ -32,6 +34,11 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
     }
 
     @Override
+    public Optional<String> expectedState(Cookie cookie) {
+        return ssoCookieCodec.decodeTenant(cookie.getValue()).map(SsoTenantRegCookiePayload::s);
+    }
+
+    @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
         Cookie cookie = requireCookie(request);
         OidcUser user = requireOidcUser(authentication);
@@ -40,7 +47,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
         SsoTenantRegCookiePayload payload = ssoCookieCodec.decodeTenant(cookie.getValue())
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
-        String[] names = resolveNames(user);
+        String[] names = resolveNames(request, authentication, user);
         String givenName = names[0];
         String familyName = names[1];
 
@@ -57,6 +64,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
                 .pictureUrl(resolvePictureUrl(user))
                 .tenantName(payload.tenantName())
                 .tenantDomain(payload.tenantDomain().toLowerCase(Locale.ROOT))
+                .emailPreVerified(OidcUserUtils.emailVerifiedClaimAllows(user))
                 .attribution(payload.attribution())
                 .build();
 

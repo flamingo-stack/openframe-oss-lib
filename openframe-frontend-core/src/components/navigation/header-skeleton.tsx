@@ -1,71 +1,74 @@
-import { cn } from '../../utils'
-import { HeaderConfig } from '../../types/navigation'
+import { HeaderConfig } from '../../types/navigation';
+import { cn } from '../../utils';
 
 export interface HeaderSkeletonProps {
-  config?: HeaderConfig
+  config?: HeaderConfig;
 }
 
+/**
+ * Loading skeleton mirroring the unified ODS top-navigation geometry
+ * (`TopNavigation`, Figma 2797-5978): 48px mobile / 56px md+, cell model.
+ * Keep in sync with `header.tsx` — a diverging skeleton makes the
+ * skeleton→live handoff jump.
+ */
 export function HeaderSkeleton({ config }: HeaderSkeletonProps) {
-  const showNavigation = config?.navigation && config.navigation.items.length > 0
-  const showActions = config?.actions?.right && config.actions.right.length > 0
-  const showMobileMenu = config?.mobile?.enabled
-  const isAdminHeader = config?.className?.includes('admin')
-  
+  const showNavigation = config?.navigation && config.navigation.items.length > 0;
+  const showActions = config?.actions?.right && config.actions.right.length > 0;
+  const showMobileMenu = config?.mobile?.enabled;
+  const showLeftActions = !!config?.actions?.left;
+
   return (
-    <div className="sticky top-0 z-40 w-full">
-      <header 
+    <div className="sticky top-0 z-[50] w-full">
+      <header
         className={cn(
-          "w-full flex items-center justify-between", 
-          "bg-ods-card border-b border-ods-border backdrop-blur-sm",
-          "px-6 py-3",
-          "transition-opacity duration-300 ease-in-out",
-          config?.className
+          'flex h-[72px] w-full items-center border-b border-t border-ods-border md:border-t-0',
+          config?.backgroundColor || 'bg-ods-card',
+          config?.className,
         )}
       >
-        {/* Left: Logo */}
-        <div className="flex items-center justify-start flex-shrink-0">
-          {isAdminHeader && config?.actions?.left && (
-            <div className="mr-4">
-              <div className="h-10 w-10 bg-ods-border rounded animate-pulse" />
-            </div>
-          )}
-          
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 bg-ods-border rounded animate-pulse" />
-            <div className="h-6 w-24 bg-ods-border rounded animate-pulse" />
+        {/* Leading cells: admin toggle / burger */}
+        {showLeftActions && (
+          <div className="flex h-full w-[72px] items-center justify-center border-r border-ods-border">
+            <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
           </div>
-        </div>
-
-        {/* Center: Navigation */}
-        {showNavigation && (
-          <nav className={cn(
-            "hidden md:flex items-center gap-2",
-            config?.navigation?.position === 'center' && "absolute left-1/2 transform -translate-x-1/2",
-            config?.navigation?.position === 'right' && "ml-auto mr-4"
-          )}>
-            {/* Navigation skeleton items */}
-            <div className="h-10 w-20 bg-ods-border rounded animate-pulse" />
-            <div className="h-10 w-28 bg-ods-border rounded animate-pulse" />
-            <div className="h-10 w-24 bg-ods-border rounded animate-pulse" />
-          </nav>
+        )}
+        {showMobileMenu && (
+          <div className="flex h-full w-[72px] items-center justify-center border-r border-ods-border lg:hidden">
+            <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
+          </div>
         )}
 
-        {/* Right: Actions */}
-        <div className="flex items-center justify-end gap-4 flex-shrink-0">
-          {/* Desktop Actions */}
-          {showActions && (
-            <div className="hidden md:flex items-center gap-4">
-              {/* Profile/Sign Up button skeleton */}
-              <div className="h-10 w-24 bg-ods-border rounded animate-pulse" />
-            </div>
-          )}
+        {/* Logo zone */}
+        <div className="flex h-full flex-1 items-center gap-2 p-[var(--spacing-system-m)] md:pl-[var(--spacing-system-l)] lg:flex-none lg:pl-[var(--spacing-system-xxl)]">
+          <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
+          <div className="h-5 w-24 animate-pulse rounded bg-ods-border" />
+        </div>
 
-          {/* Mobile Menu Toggle */}
-          {showMobileMenu && (
-            <div className="md:hidden h-10 w-10 bg-ods-border rounded animate-pulse" />
+        {/* Center: navigation links (desktop only) */}
+        <div className="hidden h-full min-w-0 flex-1 items-center justify-center gap-2 lg:flex">
+          {showNavigation && (
+            <>
+              <div className="h-8 w-20 animate-pulse rounded bg-ods-border" />
+              <div className="h-8 w-28 animate-pulse rounded bg-ods-border" />
+              <div className="h-8 w-24 animate-pulse rounded bg-ods-border" />
+            </>
           )}
         </div>
+
+        {/* CTA zone */}
+        {showActions && (
+          <div className="hidden h-full items-center px-[var(--spacing-system-m)] lg:flex">
+            <div className="h-8 w-24 animate-pulse rounded bg-ods-border" />
+          </div>
+        )}
+
+        {/* Mingo cell */}
+        {config?.mingo?.enabled && (
+          <div className="flex h-full items-center border-l border-ods-border px-[var(--spacing-system-l)]">
+            <div className="h-8 w-8 animate-pulse rounded bg-ods-border md:w-28" />
+          </div>
+        )}
       </header>
     </div>
-  )
+  );
 }

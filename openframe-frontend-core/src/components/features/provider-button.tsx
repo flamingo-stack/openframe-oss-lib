@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { Button } from "../ui/button";
-import { MicrosoftIcon, GoogleLogo, SlackIcon, GitHubIcon } from "../icons";
+import { MicrosoftIcon, GoogleLogo, SlackIcon, GitHubIcon, AppleIcon } from "../icons";
 
 interface ProviderButtonProps {
-  provider: 'microsoft' | 'google' | 'slack' | 'github';
+  provider: 'microsoft' | 'google' | 'slack' | 'github' | 'apple';
   onClick: () => Promise<void> | void;
   disabled?: boolean;
   loading?: boolean;
@@ -27,6 +27,10 @@ const PROVIDER_CONFIG = {
   github: {
     displayName: 'Continue with GitHub',
     icon: GitHubIcon,
+  },
+  apple: {
+    displayName: 'Continue with Apple',
+    icon: AppleIcon,
   },
 };
 

@@ -1,9 +1,12 @@
 package com.openframe.api.mapper;
 
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
+import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
-import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.OsType;
+import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -26,6 +29,7 @@ public class ScriptScheduleMapper {
                 .description(input.getDescription())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .scriptIds(input.getScriptIds())
+                .scriptCustomParams(toCustomParams(input.getScriptCustomParams()))
                 .trigger(defaultTrigger(input.getTrigger()))
                 .startAt(input.getStartAt())
                 .repeat(input.getRepeat())
@@ -37,7 +41,9 @@ public class ScriptScheduleMapper {
         existing.setDescription(input.getDescription());
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setScriptIds(input.getScriptIds());
+        existing.setScriptCustomParams(toCustomParams(input.getScriptCustomParams()));
         existing.setTrigger(defaultTrigger(input.getTrigger()));
+        existing.setSelectionMode(defaultSelectionMode(input.getSelectionMode()));
         existing.setStartAt(input.getStartAt());
         existing.setRepeat(input.getRepeat());
     }
@@ -46,30 +52,43 @@ public class ScriptScheduleMapper {
         return trigger != null ? trigger : ScriptScheduleTrigger.DATE_TIME;
     }
 
+    private static ScheduleDeviceSelectionMode defaultSelectionMode(ScheduleDeviceSelectionMode mode) {
+        return mode != null ? mode : ScheduleDeviceSelectionMode.SPECIFIC;
+    }
+
     public ScriptScheduleResponse toResponse(ScriptSchedule entity) {
         return ScriptScheduleResponse.builder()
                 .id(entity.getId())
                 .name(entity.getName())
                 .description(entity.getDescription())
-                .supportedPlatforms(mapPlatformsToResponse(entity.getSupportedPlatforms()))
+                .supportedPlatforms(entity.getSupportedPlatforms())
                 .scriptIds(entity.getScriptIds())
-                .trigger(defaultTrigger(entity.getTrigger()).name())
+                .scriptCustomParams(entity.getScriptCustomParams())
+                .selectionMode(defaultSelectionMode(entity.getSelectionMode()))
+                .deviceCriteria(entity.getDeviceCriteria())
+                .trigger(defaultTrigger(entity.getTrigger()))
                 .startAt(entity.getStartAt())
                 .repeat(entity.getRepeat())
                 .nextRunAt(entity.getNextRunAt())
                 .lastRunAt(entity.getLastRunAt())
                 .createdBy(entity.getCreatedBy())
-                .status(entity.getStatus() != null ? entity.getStatus().name() : ScriptStatus.ACTIVE.name())
+                .status(entity.getStatus() != null ? entity.getStatus() : ScriptStatus.ACTIVE)
                 .statusChangedAt(entity.getStatusChangedAt())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
     }
 
-    private List<String> mapPlatformsToResponse(List<ScriptPlatform> platforms) {
-        if (platforms == null) {
+    private static List<ScheduledScriptCustomParams> toCustomParams(List<ScheduledScriptCustomParamsInput> input) {
+        if (input == null) {
             return null;
         }
-        return platforms.stream().map(ScriptPlatform::name).toList();
+        return input.stream()
+                .map(p -> ScheduledScriptCustomParams.builder()
+                        .scriptId(p.getScriptId())
+                        .args(p.getArgs())
+                        .envVars(ScriptEnvVarMapper.toEntity(p.getEnvVars()))
+                        .build())
+                .toList();
     }
 }

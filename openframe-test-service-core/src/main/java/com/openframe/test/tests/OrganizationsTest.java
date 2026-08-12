@@ -23,7 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Slf4j
 public class OrganizationsTest extends BaseTest {
 
-    @Tag("create")
+    // Namespaced (paired with org-archive below) so the pipeline's bootstrap phase selector does not
+    // collide with the generic "create" sub-tag other suites use for their own creation cases.
+    @Tag("org-create")
     @Order(1)
     @Test
     @DisplayName("Create Organization")
@@ -56,6 +58,7 @@ public class OrganizationsTest extends BaseTest {
         }
     }
 
+    @Tag("feature")
     @Tag("read")
     @Order(2)
     @Test
@@ -72,6 +75,7 @@ public class OrganizationsTest extends BaseTest {
         });
     }
 
+    @Tag("feature")
     @Tag("read")
     @Order(3)
     @Test
@@ -86,6 +90,7 @@ public class OrganizationsTest extends BaseTest {
                 .isEqualTo(organizations.getFirst());
     }
 
+    @Tag("feature")
     @Tag("update")
     @Order(4)
     @Test
@@ -128,6 +133,7 @@ public class OrganizationsTest extends BaseTest {
         assertThat(organizations).as("Archived organization should not be in the list").doesNotContain(organization);
     }
 
+    @Tag("feature")
     @Tag("read")
     @Order(6)
     @Test
@@ -138,6 +144,7 @@ public class OrganizationsTest extends BaseTest {
         assertThat(lastActivity).as("Organizations should be sorted by last activity oldest-first").isSorted();
     }
 
+    @Tag("feature")
     @Tag("read")
     @Order(7)
     @Test

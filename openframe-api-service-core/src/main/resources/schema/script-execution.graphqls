@@ -18,6 +18,23 @@ extend type Query {
     ): ScriptExecutionConnection!
 
     scriptExecutionFilters(scriptId: ID!, filter: ScriptExecutionFilterInput, search: String): ScriptExecutionFilters!
+
+    """Execution History rows for one schedule — parallel to scriptExecutions but
+    scoped by scheduleId. Same ScriptExecutionConnection shape (rows are the same
+    ScriptExecution rows the schedule produced), same filter / search / sort options."""
+    scheduleExecutions(
+        scheduleId: ID!,
+        filter: ScriptExecutionFilterInput,
+        search: String,
+        sort: SortInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String
+    ): ScriptExecutionConnection!
+
+    """Facet options for a schedule's Execution History — parallel to scriptExecutionFilters."""
+    scheduleExecutionFilters(scheduleId: ID!, filter: ScriptExecutionFilterInput, search: String): ScriptExecutionFilters!
 }
 
 type ScriptExecutionFilters {
@@ -33,10 +50,25 @@ enum ScriptExecutionStatus {
     FAILED
 }
 
+"""Where the execution was triggered from. Stamped server-side at dispatch — the client can't
+forge it via the API. Powers the "via Mingo" label in History for AI-initiated runs."""
+enum ExecutionSource {
+    "Technician clicked Run in the dashboard."
+    MANUAL
+    "A schedule fire — time-driven, DEVICE_ONLINE trigger, or dashboard Run Now on a schedule."
+    SCHEDULED
+    "The Mingo AI runner invoked the dispatch on the technician's behalf."
+    AI_ASSISTANT
+}
+
 input ScriptExecutionFilterInput {
     statuses: [ScriptExecutionStatus!]
     initiatorIds: [ID!]
     machineIds: [String!]
+    "Inclusive lower bound on dispatchedAt (date-range picker start). Null = no lower bound."
+    dispatchedAtFrom: Instant
+    "Inclusive upper bound on dispatchedAt (date-range picker end). Null = no upper bound."
+    dispatchedAtTo: Instant
 }
 
 type ScriptExecution implements Node {
@@ -53,6 +85,7 @@ type ScriptExecution implements Node {
     machine: Machine
     privilegeLevel: PrivilegeLevel!
     initiator: User
+    source: ExecutionSource!
     status: ScriptExecutionStatus!
     dispatchedAt: Instant!
     statusChangedAt: Instant

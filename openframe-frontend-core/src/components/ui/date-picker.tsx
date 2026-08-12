@@ -7,6 +7,7 @@ import {
   DayPicker,
   type DateRange,
   type DayPickerProps,
+  type Matcher,
 } from "react-day-picker";
 import { useMdUp } from "../../hooks";
 import { cn } from "../../utils/cn";
@@ -94,16 +95,19 @@ const formatDateRange = (
 interface CalendarNavButtonProps {
   direction: "left" | "right";
   onClick?: () => void;
+  /** Set at a `fromDate` / `toDate` bound — there is nothing selectable past it. */
+  disabled?: boolean;
   "aria-label"?: string;
 }
 
-function CalendarNavButton({ direction, onClick, "aria-label": ariaLabel }: CalendarNavButtonProps) {
+function CalendarNavButton({ direction, onClick, disabled, "aria-label": ariaLabel }: CalendarNavButtonProps) {
   return (
     <Button
       type="button"
       variant="outline"
       size="icon"
       onClick={onClick}
+      disabled={disabled}
       aria-label={ariaLabel}
       leftIcon={direction === "left" ? <ChevronLeft className="size-6" /> : <ChevronRight className="size-6" />}
     />
@@ -233,7 +237,21 @@ function DatePickerCalendar({
       mode === "range" && "range-selected"
     ),
     outside: "text-ods-border opacity-50 hover:!bg-transparent",
-    disabled: "text-ods-border cursor-not-allowed hover:!bg-transparent",
+    // Out of bounds: greyed, un-hoverable, and not-allowed under the cursor.
+    //
+    // Every rule here is `!`, and the inner button is targeted explicitly —
+    // neither is decoration. react-day-picker CONCATENATES the modifier's classes
+    // onto the base `day` ones (no tailwind-merge), so `text-ods-text-disabled`
+    // and `text-ods-text-primary` both land on the cell and the winner comes down
+    // to their order in the generated stylesheet, not in the attribute; without
+    // `!` the disabled day rendered in full white, indistinguishable from a
+    // selectable one. The cursor needs the child selector on top of that: it is
+    // the `day_button` INSIDE the cell that carries `cursor-pointer`, and a
+    // `disabled` <button> does not inherit the cell's cursor on its own.
+    disabled: cn(
+      "!text-ods-text-disabled !cursor-not-allowed hover:!bg-transparent",
+      "[&>button]:!cursor-not-allowed [&>button]:!text-ods-text-disabled"
+    ),
     hidden: "invisible",
     // Range styles matching Figma design:
     // - range_start: bright yellow #ffc008, bold, left radius (full radius if single selection)
@@ -256,6 +274,42 @@ function DatePickerCalendar({
       ? (selected as Date) || today
       : (selected as DateRange)?.from || today
   );
+
+  /**
+   * `fromDate` / `toDate` → what react-day-picker **v9** actually understands.
+   *
+   * v8 took the bounds as props of those names and both disabled the days
+   * outside them and stopped the navigation there. v9 removed them: they are
+   * typed `@deprecated … has been removed` and the runtime never reads them —
+   * so forwarding them, as this calendar did after the v8 → v9 upgrade, silently
+   * dropped every bound. A "next 30 days" picker happily accepted last year, and
+   * the `disabled` class already defined in `classNames` below never applied to
+   * anything. Same shape of miss as the v8 `classNames` keys called out in
+   * `calendar.tsx` — the other half of that migration.
+   *
+   * The public API is unchanged: consumers keep passing `fromDate`/`toDate`, and
+   * this is the single place either is translated.
+   */
+  const disabledDays = React.useMemo<Matcher[]>(() => {
+    const matchers: Matcher[] = [];
+    if (fromDate) matchers.push({ before: fromDate });
+    if (toDate) matchers.push({ after: toDate });
+    return matchers;
+  }, [fromDate, toDate]);
+
+  // Out-of-bounds days are disabled, not hidden — a month keeps its shape, and
+  // the greyed-out day is what tells the user the bound exists. Navigation stops
+  // at the bound too (v8 did the same): past it there is nothing selectable, so
+  // paging further only walks through dead months. The nav is this component's
+  // own — `hideNavigation` turns off DayPicker's — so the limit is applied here
+  // rather than through `startMonth`/`endMonth`.
+  // Compared as a month ORDINAL, not as dates: the bound falls on some day of
+  // its month, and that month must stay reachable — a `fromDate` of the 20th
+  // still has to let the user page back to that month to pick the 25th.
+  const monthIndex = (date: Date): number => date.getFullYear() * 12 + date.getMonth();
+  const lastVisibleMonth = monthIndex(month) + (monthsToShow === 2 ? 1 : 0);
+  const canGoPrevious = !fromDate || monthIndex(month) > monthIndex(fromDate);
+  const canGoNext = !toDate || lastVisibleMonth < monthIndex(toDate);
 
   const handlePreviousMonth = () => {
     setMonth((prev) => {
@@ -323,6 +377,7 @@ function DatePickerCalendar({
           <CalendarNavButton
             direction="left"
             onClick={handlePreviousMonth}
+            disabled={!canGoPrevious}
             aria-label="Previous month"
           />
           <span className="text-h4 text-ods-text-primary">
@@ -331,6 +386,7 @@ function DatePickerCalendar({
           <CalendarNavButton
             direction="right"
             onClick={handleNextMonth}
+            disabled={!canGoNext}
             aria-label="Next month"
           />
         </div>
@@ -343,8 +399,7 @@ function DatePickerCalendar({
           classNames={classNames}
           showOutsideDays
           fixedWeeks
-          fromDate={fromDate}
-          toDate={toDate}
+          disabled={disabledDays}
           locale={locale}
           hideNavigation
         />
@@ -366,6 +421,7 @@ function DatePickerCalendar({
             <CalendarNavButton
               direction="left"
               onClick={handlePreviousMonth}
+              disabled={!canGoPrevious}
               aria-label="Previous month"
             />
             <span className="text-h4 text-ods-text-primary">
@@ -375,6 +431,7 @@ function DatePickerCalendar({
               <CalendarNavButton
                 direction="right"
                 onClick={handleNextMonth}
+                disabled={!canGoNext}
                 aria-label="Next month"
               />
             )}
@@ -392,8 +449,7 @@ function DatePickerCalendar({
             classNames={classNames}
             showOutsideDays
             fixedWeeks
-            fromDate={fromDate}
-            toDate={toDate}
+            disabled={disabledDays}
             locale={locale}
             hideNavigation
           />
@@ -410,6 +466,7 @@ function DatePickerCalendar({
               <CalendarNavButton
                 direction="right"
                 onClick={handleNextMonth}
+                disabled={!canGoNext}
                 aria-label="Next month"
               />
             </div>
@@ -424,8 +481,7 @@ function DatePickerCalendar({
               classNames={classNames}
               showOutsideDays
               fixedWeeks
-              fromDate={fromDate}
-              toDate={toDate}
+              disabled={disabledDays}
               locale={locale}
               hideNavigation
             />
@@ -451,8 +507,12 @@ const triggerButtonStyles = cn(
   // Hover & active (not disabled)
   "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
   "focus:outline-none",
-  // Disabled
+  // Disabled - match Input exactly. The value/placeholder span inside sets its
+  // own colour, so the child rule (higher specificity) greys it too. Scoped to
+  // DIRECT children like every other field, so nested content that owns its
+  // colour keeps it.
   "disabled:!cursor-not-allowed disabled:bg-ods-bg",
+  "disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled",
   // Animation
   "transition-colors duration-200"
 );
@@ -465,6 +525,7 @@ const timeSelectTriggerStyles = cn(
   "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
   "focus:outline-none",
   "disabled:!cursor-not-allowed disabled:bg-ods-bg",
+  "disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled",
   "transition-colors duration-200 cursor-pointer",
   "text-ods-text-primary"
 );
@@ -519,6 +580,9 @@ export function DatePicker(props: DatePickerProps) {
         <button
           type="button"
           disabled={disabled}
+          // Same marker Input/Textarea/Select expose — it is how a form finds
+          // (and scrolls to) the first field that failed validation.
+          data-invalid={isInvalid || undefined}
           className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", className)}
         >
           <Calendar className="size-6 text-ods-text-secondary shrink-0" />
@@ -692,6 +756,9 @@ export function DatePickerInput({
           <button
             type="button"
             disabled={disabled}
+            // Same marker Input/Textarea/Select expose — it is how a form finds
+            // (and scrolls to) the first field that failed validation.
+            data-invalid={isInvalid || undefined}
             className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", "flex-1")}
           >
             <Calendar className="size-6 text-ods-text-secondary shrink-0" />
@@ -923,6 +990,9 @@ export function DatePickerInputSimple({
           <button
             type="button"
             disabled={disabled}
+            // Same marker Input/Textarea/Select expose — it is how a form finds
+            // (and scrolls to) the first field that failed validation.
+            data-invalid={isInvalid || undefined}
             className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", "flex-1")}
           >
             <Calendar className="size-6 text-ods-text-secondary shrink-0" />

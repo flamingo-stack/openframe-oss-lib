@@ -21,7 +21,11 @@ public interface ScriptScheduleMachineAssignedRepository
 
     List<ScriptScheduleMachineAssigned> findByTenantIdAndMachineId(String tenantId, String machineId);
 
+    List<ScriptScheduleMachineAssigned> findByTenantIdAndMachineIdIn(String tenantId, Collection<String> machineIds);
+
     long deleteByTenantIdAndScriptScheduleId(String tenantId, String scriptScheduleId);
 
     long deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(String tenantId, String scriptScheduleId, Collection<String> machineIds);
+
+    long deleteByTenantIdAndMachineId(String tenantId, String machineId);
 }

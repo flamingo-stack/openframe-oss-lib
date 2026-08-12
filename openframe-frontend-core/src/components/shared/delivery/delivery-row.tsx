@@ -27,6 +27,7 @@
 import * as React from 'react'
 import Link from '../../../embed-shims/next-link'
 import { StatusBadge } from '../../ui/status-badge'
+import { AvatarStack } from '../../ui/avatar-stack'
 import { getStatusColorScheme } from '../../../utils'
 import {
   type DeliveryItem,
@@ -110,8 +111,13 @@ export function DeliveryRow({
         </div>
       </div>
 
-      {/* Right: status + task-type badges */}
-      <div className="flex-shrink-0 self-start flex flex-col gap-2">
+      {/* Right (desktop): badges + assignee stack in a right-aligned
+          column. Mobile: ONE horizontal footer row — badges lead,
+          avatars anchor the right edge (kanban-card convention: the
+          assignee owns the trailing slot of the meta row; a column of
+          right-aligned orphans under the description reads as clutter
+          on small screens). */}
+      <div className="flex-shrink-0 self-stretch md:self-start w-full md:w-auto flex flex-row md:flex-col items-center md:items-end gap-2">
         <StatusBadge
           text={item.status.toUpperCase()}
           colorScheme={statusBadgeScheme}
@@ -123,6 +129,17 @@ export function DeliveryRow({
           variant="card"
           className={`border border-ods-border ${typeBadgeTextColor}`}
         />
+        {item.assignees && item.assignees.length > 0 ? (
+          <AvatarStack
+            size="xs"
+            className="ml-auto md:ml-0"
+            people={item.assignees.map((a) => ({
+              key: a.id,
+              name: a.name ?? 'Unknown',
+              avatarUrl: a.avatarUrl,
+            }))}
+          />
+        ) : null}
       </div>
     </div>
   )

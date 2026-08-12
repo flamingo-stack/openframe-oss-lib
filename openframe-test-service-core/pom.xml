@@ -41,6 +41,8 @@
         <jedis.version>7.2.0</jedis.version>
         <slack.version>1.40.3</slack.version>
         <playwright.version>1.44.0</playwright.version>
+        <sshj.version>0.38.0</sshj.version>
+        <bouncycastle.version>1.78.1</bouncycastle.version>
     </properties>
 
     <dependencies>
@@ -155,5 +157,57 @@
             <artifactId>slack-api-client</artifactId>
             <version>${slack.version}</version>
         </dependency>
+
+        <!-- ========== SSH (channel B — verify device state on the box) ========== -->
+
+        <dependency>
+            <groupId>com.hierynomus</groupId>
+            <artifactId>sshj</artifactId>
+            <version>${sshj.version}</version>
+        </dependency>
+
+        <!-- sshj needs BouncyCastle for modern key-exchange / cipher suites used by OpenSSH servers -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
+        </dependency>
     </dependencies>
+
+    <profiles>
+        <!--
+          Opt-in profile for running the AI E2E cases from the CLI. These tests live in src/main/java
+          (this suite's custom-runner convention), so the default surefire scan of target/test-classes
+          never finds them. This profile points surefire at the main output dir and restricts it to the
+          tests/ai package, so it will not sweep the rest of the suite. Default `mvn` builds and the
+          runner service are unaffected because the profile is inactive unless requested with -Pai-test.
+
+          Usage (with TARGET_* + suite env exported, see set-dev-env.sh):
+            mvn test -Pai-test                                            # all tests/ai cases
+            mvn test -Pai-test -Dtest=MingoDeviceTest#testFileCreate       # one method
+        -->
+        <profile>
+            <id>ai-test</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>${maven-surefire.version}</version>
+                        <configuration>
+                            <testClassesDirectory>${project.build.outputDirectory}</testClassesDirectory>
+                            <includes>
+                                <include>**/tests/ai/*Test.java</include>
+                            </includes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

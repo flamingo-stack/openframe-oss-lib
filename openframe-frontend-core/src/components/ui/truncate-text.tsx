@@ -1,6 +1,7 @@
 'use client'
 
-import React, { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode } from 'react'
+import { useIsTruncated } from '../../hooks/ui/use-is-truncated'
 import { cn } from '../../utils/cn'
 import { FloatingTooltip } from './floating-tooltip'
 
@@ -25,6 +26,19 @@ export interface TruncateTextProps {
   tone?: TruncateTextTone
   /** Force the monospace (heading) font family — preserves the variant's size while swapping family. */
   mono?: boolean
+  /**
+   * Extra classes for the tooltip trigger wrapper — the element that becomes the
+   * flex/grid item in the caller's layout (e.g. `flex-1`). Merged after the
+   * built-in `min-w-0 max-w-full`, which is what lets the trigger shrink inside
+   * flex rows so the text ellipsizes instead of clipping.
+   */
+  triggerClassName?: string
+  /**
+   * Trigger wrapper element. Default `'div'`. Use `'span'` where a block element
+   * is invalid HTML — inside a `<p>`, a heading, or another `<span>`; the span
+   * trigger is `inline-block` so the inner truncation still measures.
+   */
+  as?: 'div' | 'span'
 }
 
 const VARIANT_CLASS: Record<TruncateTextVariant, string> = {
@@ -68,25 +82,11 @@ export function TruncateText({
   variant = 'h4',
   tone = 'primary',
   mono = false,
+  triggerClassName,
+  as = 'div',
 }: TruncateTextProps) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const [isTruncated, setIsTruncated] = useState(false)
   const isMultiLine = lines > 1
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const check = () => {
-      const overflows = isMultiLine
-        ? el.scrollHeight > el.clientHeight + 1
-        : el.scrollWidth > el.clientWidth + 1
-      setIsTruncated(overflows)
-    }
-    check()
-    const ro = new ResizeObserver(check)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [children, isMultiLine])
+  const { ref, isTruncated } = useIsTruncated<HTMLSpanElement>(children, { multiline: isMultiLine })
 
   const clampClass = isMultiLine
     ? LINE_CLAMP_CLASS[lines as Exclude<typeof lines, 1>]
@@ -98,6 +98,11 @@ export function TruncateText({
       side={side}
       disabled={!isTruncated}
       className="max-w-xs whitespace-pre-line [overflow-wrap:anywhere]"
+      as={as}
+      // min-w-0: a flex/grid item's automatic minimum size is content-based when
+      // overflow is visible, so without this the trigger refuses to shrink and the
+      // text clips with no ellipsis and no tooltip.
+      triggerClassName={cn('min-w-0 max-w-full', as === 'span' && 'inline-block align-bottom', triggerClassName)}
     >
       <span
         ref={ref}

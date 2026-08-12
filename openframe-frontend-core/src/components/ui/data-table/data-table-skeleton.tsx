@@ -2,10 +2,28 @@
 
 import { cn } from '../../../utils/cn'
 import { useDataTableContext } from './data-table'
+import { getHideClasses } from './utils'
 
-/** Consistent row heights — identical to legacy `Table`. */
-export const ROW_HEIGHT_DESKTOP = 'h-[68px] md:h-[80px]'
-export const ROW_HEIGHT_MOBILE = 'h-[68px]'
+/**
+ * Consistent INNER row heights. The row card wraps these in a 1px border on
+ * each side, so the outer block lands on the designed 68px / 80px total —
+ * hence the 66/78 values here.
+ */
+export const ROW_HEIGHT_DESKTOP = 'h-[66px] md:h-[78px]'
+export const ROW_HEIGHT_MOBILE = 'h-[66px]'
+
+/**
+ * The row shell's inset and column gap.
+ *
+ * Shared by the real row (`data-table-row`), the skeleton rows below and the
+ * pad rows in `data-table-body`, because a difference between them is a visible
+ * shift on load — and there WAS one: all three placeholders used
+ * `--spacing-system-sf` (12px) in their mobile variant while the real row uses
+ * `--spacing-system-mf` (16px) at every width, so a loading table sat 4px closer
+ * to the card edge than the loaded one and its content nudged over when data
+ * arrived. Kept as a constant rather than three copies so that cannot drift again.
+ */
+export const ROW_SHELL_CLASSES = 'items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]'
 
 export interface DataTableSkeletonProps {
   rows?: number
@@ -34,7 +52,8 @@ export function DataTableSkeleton({
         >
           <div
             className={cn(
-              'hidden md:flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] py-0',
+              'hidden md:flex py-0',
+              ROW_SHELL_CLASSES,
               ROW_HEIGHT_DESKTOP,
               rowClassName,
             )}
@@ -47,6 +66,12 @@ export function DataTableSkeleton({
                   className={cn(
                     'flex flex-col justify-center shrink-0',
                     meta?.width || 'flex-1',
+                    // Same responsive hiding the real header and row apply.
+                    // Without it a `hideAt` column was drawn in the skeleton and
+                    // absent from the loaded table, so below that breakpoint the
+                    // remaining columns were sized against a different total and
+                    // the whole row re-laid-out the moment data arrived.
+                    getHideClasses(meta?.hideAt),
                   )}
                 >
                   <div className="h-5 bg-ods-bg-surface rounded-sm w-3/4 mb-[var(--spacing-system-xxs)]" />
@@ -59,7 +84,8 @@ export function DataTableSkeleton({
           </div>
           <div
             className={cn(
-              'flex md:hidden gap-[var(--spacing-system-sf)] items-center justify-start px-[var(--spacing-system-sf)] py-0',
+              'flex md:hidden justify-start py-0',
+              ROW_SHELL_CLASSES,
               ROW_HEIGHT_MOBILE,
               rowClassName,
             )}

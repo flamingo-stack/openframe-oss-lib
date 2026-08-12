@@ -26,6 +26,18 @@ interface FloatingTooltipProps {
   delayDuration?: number
   /** Disable the tooltip without unmounting the trigger wrapper. */
   disabled?: boolean
+  /**
+   * Classes for the trigger wrapper — the element this component puts around
+   * `children` to anchor the tooltip. That element becomes the flex/grid item in
+   * the caller's layout, so anything the child needed there (`min-w-0`, `flex-1`)
+   * must move onto it. Omit it and the wrapper carries no class, exactly as before.
+   */
+  triggerClassName?: string
+  /**
+   * Trigger wrapper element. Default `'div'`. Use `'span'` where a block element
+   * is invalid HTML — inside a `<p>`, a heading, or another `<span>`.
+   */
+  as?: 'div' | 'span'
 }
 
 // Parse colored text markup like [YELLOW]text[/YELLOW] into JSX
@@ -85,6 +97,8 @@ export function FloatingTooltip({
   className,
   delayDuration = 0,
   disabled = false,
+  triggerClassName,
+  as: TriggerTag = 'div',
 }: FloatingTooltipProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const arrowRef = React.useRef<HTMLDivElement>(null)
@@ -151,9 +165,9 @@ export function FloatingTooltip({
 
   return (
     <>
-      <div ref={refs.setReference} {...getReferenceProps()}>
+      <TriggerTag ref={refs.setReference} className={triggerClassName} {...getReferenceProps()}>
         {children}
-      </div>
+      </TriggerTag>
       <FloatingPortal>
         {isOpen && (
           <div
