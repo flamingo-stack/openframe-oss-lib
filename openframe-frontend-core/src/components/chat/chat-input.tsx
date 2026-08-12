@@ -168,6 +168,13 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   } = rest as typeof rest & { rows?: number }
 
   const [value, setValue] = useState('')
+  // Whether the editor currently holds at least one committed mention chip —
+  // it alone needs the tall line box (see the editor's className). Read from the
+  // DOM, NOT by testing the draft against `MENTION_GLOBAL`: that regex also
+  // matches ordinary typed text (`meet @3:00`, `@prod:us-east`), which would
+  // switch the editor to a 36px line box with no chip on screen. Chips are only
+  // ever created by `rebuildDom`, so the two writers below cover every path.
+  const [hasChips, setHasChips] = useState(false)
   const [focused, setFocused] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
   // The ghost preview is dismissed as soon as the user edits the draft (typing
@@ -224,7 +231,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
         if (typeof caret === 'number') placeCaretAtOffset(el, caret)
         else placeCaretAtEnd(el)
       }
+      setHasChips(el.querySelector('[data-token]') !== null)
     }
+    // Advance the mirror HERE, not only on the next render: `fire` clears the
+    // draft and then reads it back within the same tick to decide whether a
+    // refused send may restore it.
+    valueRef.current = next
     setValue(next)
   }, [])
 
@@ -233,19 +245,31 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     (message: string) => {
       const can = (message.length > 0 || allowEmptySend) && !sending && !disabled
       if (!can || !onSend) return
-      const result = onSend(message)
-      const done = () => {
-        metaRef.current = new Map()
-        applyValue('')
-        shouldRefocusRef.current = true
-        focusEditor()
+      // Clear FIRST and put it back only if the host refuses, rather than
+      // clearing once the send settles. The editor stays typable while `sending`
+      // (see `contentEditable` below), and a host whose `onSend` is async —
+      // `TicketReplyComposer` awaits a round trip — leaves a window in which the
+      // user starts their next message; a deferred clear would silently delete
+      // it. Restoring is guarded on the box still being empty for the same
+      // reason. `applyValue` advances `valueRef` synchronously, so the guard
+      // reads the cleared draft even when `onSend` refuses in the same tick.
+      const sentMeta = metaRef.current
+      metaRef.current = new Map()
+      applyValue('')
+      shouldRefocusRef.current = true
+      focusEditor()
+      const restore = () => {
+        if (valueRef.current.length > 0) return
+        metaRef.current = sentMeta
+        applyValue(message)
       }
+      const result = onSend(message)
       if (result instanceof Promise) {
         void result.then((ok) => {
-          if (ok !== false) done()
+          if (ok === false) restore()
         })
-      } else if (result !== false) {
-        done()
+      } else if (result === false) {
+        restore()
       }
     },
     [allowEmptySend, sending, disabled, onSend, focusEditor, applyValue],
@@ -351,6 +375,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const syncFromDom = useCallback(() => {
     const el = editorRef.current
     if (!el) return
+    // Typing can DELETE a chip (they are atomic `contentEditable=false` nodes),
+    // so the flag has to be re-read here too, not just where chips are built.
+    setHasChips(el.querySelector('[data-token]') !== null)
     setValue(serialize(el))
   }, [])
 
@@ -452,14 +479,13 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const hasContent = value.trim().length > 0 || allowEmptySend
   const sendDisabled = sending || disabled || !hasContent
   const isEmpty = value.length === 0
-  const isDisabled = sending || disabled
   // Non-destructive ghost preview (e.g. a hovered quick-action's full prompt).
   // Shown whenever a `previewText` is set (even over an existing draft): the
   // editor's real value is NEVER touched — it's just visually hidden behind the
   // ghost while previewing, and reappears verbatim once `previewText` clears.
   // Declarative, no `setValue` / draft save-restore. Suppressed the moment the
   // user edits the draft (`previewDismissed`) so typing is never hidden.
-  const showPreview = !isDisabled && !!previewText && !previewDismissed
+  const showPreview = !sending && !disabled && !!previewText && !previewDismissed
 
   return (
     <div
@@ -493,24 +519,28 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
             }}
             className={cn(
               // `items-center` keeps the empty single-line text AND a mention chip
-              // vertically centered the same way. `py-1.5` (6px) pairs with the
-              // editor's `leading-9` (36px) → a single line is exactly 48px
-              // (36 + 2*6). The 36px line box is just barely above the 32px chip
-              // (incl. its ~3.5px vertical-align overhead), so there's almost no
-              // slack for the chip to drift in → it reads as centered, and the row
-              // never overflows past 48px.
+              // vertically centered the same way. With a chip in the box, `py-1.5`
+              // (6px) pairs with the editor's `leading-9` (36px) → that row is
+              // 36 + 2*6 = 48px. The 36px line box is just barely above the 32px
+              // chip (incl. its ~3.5px vertical-align overhead), so there's almost
+              // no slack for the chip to drift in → it reads as centered.
+              // A chipless row is shorter than its content box and the `min-h-*`
+              // here is what sets its height: 48px from `md` up, 44px below.
               "flex w-full items-center gap-2 px-3 py-1.5 min-h-11 md:min-h-12 cursor-text group transition-colors duration-200",
               !hideBorder && "rounded-[6px] border bg-ods-card border-ods-border",
-              !hideBorder && (focused ? "border-ods-accent" : !isDisabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover"),
-              !hideBorder && isDisabled && "!cursor-not-allowed bg-ods-bg",
+              !hideBorder && (focused ? "border-ods-accent" : !disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover"),
+              !hideBorder && disabled && "!cursor-not-allowed bg-ods-bg",
               hideBorder && "bg-transparent",
             )}
           >
             {startIcon && <span className="flex h-6 shrink-0 items-center">{startIcon}</span>}
 
             <div className="relative flex-1 min-w-0">
+              {/* No chip-line override on the placeholder: it only renders while
+                  the draft is EMPTY, so the editor is always on its plain line
+                  box here. */}
               {isEmpty && !showPreview && (
-                <span className="pointer-events-none absolute left-0 top-0 select-none text-h4 !leading-9 text-ods-text-secondary">
+                <span className="pointer-events-none absolute left-0 top-0 select-none text-h4 text-ods-text-secondary">
                   {disabled ? "Connection lost. Waiting to reconnect..." : placeholder}
                 </span>
               )}
@@ -525,7 +555,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                   text; clearing `previewText` restores the (opacity-hidden)
                   editor. */}
               {showPreview && (
-                <p className="pointer-events-none absolute inset-x-0 top-0 m-0 select-none truncate text-h4 !leading-9 text-ods-text-secondary">
+                <p className={cn("pointer-events-none absolute inset-x-0 top-0 m-0 select-none truncate text-h4 text-ods-text-secondary", hasChips && "!leading-9")}>
                   {previewText}
                 </p>
               )}
@@ -540,7 +570,21 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                 role="textbox"
                 aria-multiline="true"
                 aria-label={typeof placeholder === 'string' ? placeholder : 'Message'}
-                contentEditable={!isDisabled}
+                // `sending` blocks SENDING, never typing. Taking
+                // `contentEditable` away under a focused editor blurs it, and
+                // iOS dismisses the keyboard on blur; restoring it re-establishes
+                // the input session (and the refocus-after-send effect below
+                // re-presents the keyboard once more), so on a phone the keyboard
+                // flashed shut and open again around every send — repeatedly,
+                // because a host's `sending` toggles once per phase of a turn
+                // (`chatLoading` in `embeddable-chat` is `isTyping ||
+                // isCompacting`, and the legacy Mingo page adds dialog creation).
+                // Nothing is lost by staying editable: `fire()` and the send
+                // button are both gated on `sending` already, so a draft typed
+                // while a turn streams simply waits for its turn — Enter is a
+                // no-op until the send button lights back up. Only `disabled` —
+                // the transport is gone — takes the editor out of service.
+                contentEditable={!disabled}
                 suppressContentEditableWarning
                 spellCheck
                 onInput={handleInput}
@@ -558,17 +602,25 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                   // see the preview comment above) and is only made transparent;
                   // the absolutely-positioned single-line preview paints over it.
                   showPreview && "opacity-0",
-                  // `leading-9` (36px) sits just above the 32px chip's line-box need
-                  // (~35.5px incl. vertical-align overhead): the LINE drives row
-                  // height (deterministic 48px, no overflow) AND the near-zero slack
-                  // keeps the chip centered. ~4px gap between wrapped chip rows.
-                  // `min-h-9` pins that single-line box even when EMPTY: a non-editable
-                  // (`contentEditable=false`, i.e. disabled/sending) empty div would
-                  // otherwise collapse to 0px, and `items-center` would re-center the
-                  // shorter wrapper in the row — dropping the `top-0` placeholder down.
-                  "min-h-9 text-h4 text-ods-text-primary !leading-9",
+                  // WITH chips, `leading-9` (36px) sits just above the 32px chip's
+                  // line-box need (~35.5px incl. vertical-align overhead): the LINE
+                  // drives row height (deterministic 48px, no overflow) AND the
+                  // near-zero slack keeps the chip centered against the `align-top`
+                  // `h-9` wrapper `buildChipEl` gives it. ~4px gap between wrapped
+                  // chip rows.
+                  // WITHOUT chips there is nothing tall to center, and forcing the
+                  // same 36px box on 14px phone text (`text-h4`) put a blank line's
+                  // worth of air between every wrapped row — so plain drafts keep
+                  // `text-h4`'s own responsive line-height (20px / 24px at md).
+                  // `min-h-*` pins the single-line box even when EMPTY: a
+                  // non-editable (`contentEditable=false`, i.e. `disabled`) empty div
+                  // would otherwise collapse to 0px, and `items-center` would
+                  // re-center the shorter wrapper in the row — dropping the `top-0`
+                  // placeholder down.
+                  "text-h4 text-ods-text-primary",
+                  hasChips ? "min-h-9 !leading-9" : "min-h-[var(--font-line-space-h4-body)]",
                   "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
-                  isDisabled && "cursor-not-allowed",
+                  disabled && "cursor-not-allowed",
                 )}
               />
             </div>

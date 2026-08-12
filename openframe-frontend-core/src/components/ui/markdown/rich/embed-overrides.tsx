@@ -153,13 +153,15 @@ export function buildRichEmbedOverrides({
       return (standard.div as any)(divProps);
     },
 
-    // Reddit's OWN embed markup lives in 58 published blog posts as
-    // `<blockquote class="reddit-embed-bq">…<a href="post-url">` paired with
-    // a `<script src="embed.reddit.com/widgets.js">` loader. The sanitize
-    // stack strips the script (correctly), so the composition rehydrates the
-    // blockquote itself: extract the post URL from the first reddit link and
-    // render the RedditEmbedClient SSOT. Non-reddit blockquotes fall through
-    // to the engine's base blockquote.
+    // Pasted-from-the-platform embed markup lives in published blog posts as
+    // `<blockquote class="reddit-embed-bq">…<a href="post-url">` (58 blocks
+    // across 9 posts) — and Twitter's equivalent is
+    // `<blockquote class="twitter-tweet">…<a href="status-url">`. Each pair
+    // ships a `widgets.js` loader script, which `processShortcodes` strips
+    // from the source text (Step 1.5). The composition rehydrates the
+    // blockquote itself: extract the post URL from the first matching link
+    // and render the platform's embed-client SSOT. Other blockquotes fall
+    // through to the engine's base blockquote.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     blockquote: (bqProps: any) => {
       const { node, className } = bqProps;
@@ -167,6 +169,10 @@ export function buildRichEmbedOverrides({
       if (classNames.includes('reddit-embed-bq')) {
         const postUrl = findFirstHref(node, /reddit\.com/);
         if (postUrl) return <RedditEmbedClient url={postUrl} />;
+      }
+      if (classNames.includes('twitter-tweet')) {
+        const tweetUrl = findFirstHref(node, /(?:twitter\.com|x\.com)\/[^/]+\/status\//);
+        if (tweetUrl) return <TwitterEmbedClient url={tweetUrl} />;
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (standard.blockquote as any)(bqProps);
