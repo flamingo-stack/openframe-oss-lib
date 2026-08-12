@@ -5,6 +5,7 @@ import * as React from 'react'
 import { CheckIcon, SearchIcon } from '../icons-v2-generated'
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon'
 import { cn } from '../../utils/cn'
+import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding'
 import { Input } from './input'
 
 export interface SearchableSelectOption {
@@ -67,6 +68,7 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [search, setSearch] = React.useState('')
+  const keyboardPadding = useKeyboardCollisionPadding()
 
   React.useEffect(() => {
     if (!isOpen) setSearch('')
@@ -119,8 +121,13 @@ export function SearchableSelect({
         <PopoverPrimitive.Content
           align={align}
           sideOffset={6}
+          // The search field below raises the software keyboard the moment this
+          // opens — see useKeyboardCollisionPadding for why neither the collision
+          // viewport nor the available height knows about it otherwise.
+          collisionPadding={{ bottom: keyboardPadding }}
           className={cn(
             'z-50 min-w-[var(--radix-popover-trigger-width)] bg-ods-card border border-ods-border rounded-md shadow-lg overflow-hidden',
+            'flex flex-col max-h-[var(--radix-popper-available-height)]',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -128,7 +135,7 @@ export function SearchableSelect({
             contentClassName,
           )}
         >
-          <div className="border-b border-ods-border">
+          <div className="shrink-0 border-b border-ods-border">
             <Input
               autoFocus
               value={search}
@@ -138,7 +145,7 @@ export function SearchableSelect({
               className="rounded-none border-0"
             />
           </div>
-          <div className="max-h-80 overflow-y-auto py-[var(--spacing-system-xs)]" role="listbox">
+          <div className="min-h-0 max-h-80 overflow-y-auto py-[var(--spacing-system-xs)]" role="listbox">
             {isLoading ? (
               <div className="px-[var(--spacing-system-sf)] py-[var(--spacing-system-s)] text-h5 text-ods-text-secondary">
                 {loadingText}

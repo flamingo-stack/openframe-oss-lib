@@ -4,6 +4,7 @@ import * as React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { cn } from "../../utils/cn";
+import { useKeyboardCollisionPadding } from "../../hooks/ui/use-keyboard-collision-padding";
 import {
 	CheckIcon,
 	PencilIcon,
@@ -70,6 +71,7 @@ export function TagsManager({
 }: TagsManagerProps) {
 	const [open, setOpen] = React.useState(false);
 	const [search, setSearch] = React.useState("");
+	const keyboardPadding = useKeyboardCollisionPadding();
 	const [editingId, setEditingId] = React.useState<string | null>(null);
 	const [editingName, setEditingName] = React.useState("");
 	const editInputRef = React.useRef<HTMLInputElement>(null);
@@ -242,6 +244,7 @@ export function TagsManager({
 						className={cn(
 							"z-50 w-[var(--radix-popover-trigger-width)] mt-1",
 							"bg-ods-card border border-ods-border rounded",
+							"flex flex-col overflow-hidden max-h-[var(--radix-popper-available-height)]",
 							"data-[state=open]:animate-in data-[state=closed]:animate-out",
 							"data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
 							"data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -249,6 +252,10 @@ export function TagsManager({
 						)}
 						sideOffset={4}
 						align="start"
+						// The anchor is the tag field that raises the software keyboard, so
+						// this list is always positioned with the keyboard up — see
+						// useKeyboardCollisionPadding.
+						collisionPadding={{ bottom: keyboardPadding }}
 						onOpenAutoFocus={(e) => {
 							e.preventDefault();
 							inputRef.current?.focus();
@@ -259,8 +266,8 @@ export function TagsManager({
 							}
 						}}
 					>
-						<ScrollAreaPrimitive.Root className="overflow-hidden">
-							<ScrollAreaPrimitive.Viewport className="max-h-60 w-full">
+						<ScrollAreaPrimitive.Root className="flex min-h-0 flex-col overflow-hidden">
+							<ScrollAreaPrimitive.Viewport className="min-h-0 max-h-60 w-full">
 								<div role="listbox">
 									{filtered.map((tag) => {
 										const isSelected = selectedIds.includes(tag.id);
