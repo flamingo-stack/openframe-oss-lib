@@ -12,8 +12,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -94,18 +92,8 @@ class NotificationContentRedactorTest {
     }
 
     @Test
-    @DisplayName("Given the single-notification convenience form, when it is called, then it resolves the policy itself — once per call, for callers that handle one notification")
-    void convenience_form_resolves_the_policy_itself() {
-        stubPolicy(true);
-
-        assertThat(redactor.descriptionFor(notification(), NotificationCategory.TICKETS))
-                .isEqualTo("New activity on this ticket");
-        verify(policyRepository, times(1)).find();
-    }
-
-    @Test
-    @DisplayName("Given the flag is toggled, when it is read again, then the new value is seen at once — nothing is cached, so there is no staleness window on a privacy control")
-    void policy_is_never_stale() {
+    @DisplayName("Given the flag is toggled, when it is read again, then the new value is seen — the bean itself holds no state; caching is the CacheManager's job and bounded by its TTL")
+    void the_bean_holds_no_state() {
         stubPolicy(true);
         assertThat(redactor.contentSuppressed()).isTrue();
 

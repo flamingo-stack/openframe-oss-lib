@@ -6,6 +6,7 @@ import com.openframe.data.document.notification.NotificationContentPolicy;
 import com.openframe.data.repository.notification.NotificationContentPolicyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -15,6 +16,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Slf4j
 public class NotificationContentRedactor {
+    public static final String CONTENT_POLICY_CACHE = "notificationContentPolicy";
 
     private static final Map<NotificationCategory, String> SUPPRESSED_BY_CATEGORY = Map.of(
             NotificationCategory.TICKETS, "New activity on this ticket",
@@ -26,6 +28,7 @@ public class NotificationContentRedactor {
 
     private final NotificationContentPolicyRepository policyRepository;
 
+    @Cacheable(cacheNames = CONTENT_POLICY_CACHE)
     public boolean contentSuppressed() {
         try {
             return policyRepository.find()
@@ -45,10 +48,6 @@ public class NotificationContentRedactor {
             return notification.getDescription();
         }
         return SUPPRESSED_BY_CATEGORY.getOrDefault(resolveCategory(notification, category), SUPPRESSED_DEFAULT);
-    }
-
-    public String descriptionFor(Notification notification, NotificationCategory category) {
-        return descriptionFor(notification, category, contentSuppressed());
     }
 
     private static NotificationCategory resolveCategory(Notification notification, NotificationCategory category) {
