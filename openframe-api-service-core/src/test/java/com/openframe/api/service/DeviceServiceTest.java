@@ -8,7 +8,7 @@ import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
-import com.openframe.data.repository.rmm.DeviceFirstOnlineDispatchRepository;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
@@ -47,7 +47,7 @@ class DeviceServiceTest {
     private static final String TENANT_ID = "tenant-1";
 
     @Mock private MachineRepository machineRepository;
-    @Mock private DeviceFirstOnlineDispatchRepository deviceFirstOnlineDispatchRepository;
+    @Mock private DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
     @Mock private MachineWriter machineWriter;
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
@@ -58,7 +58,7 @@ class DeviceServiceTest {
     private TenantIdProvider tenantIdProvider;
 
     private DeviceService service() {
-        DeviceService s = new DeviceService(machineRepository, deviceFirstOnlineDispatchRepository, machineWriter,
+        DeviceService s = new DeviceService(machineRepository, deviceOnlineDispatchRepository, machineWriter,
                 tagRepository, tagAssignmentRepository,
                 deviceStatusProcessor, scriptScheduleDeviceService, deviceFilterOptionMapper, tenantIdProvider);
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
@@ -241,7 +241,7 @@ class DeviceServiceTest {
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
         verify(scriptScheduleDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
-        verify(deviceFirstOnlineDispatchRepository).deleteByTenantIdAndMachineId("t-1", "m-del");
+        verify(deviceOnlineDispatchRepository).deleteByTenantIdAndMachineId("t-1", "m-del");
     }
 
     @Test
@@ -277,7 +277,7 @@ class DeviceServiceTest {
         service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
         verify(scriptScheduleDeviceService, never()).removeDeviceFromAllSchedules(any(), any());
-        verify(deviceFirstOnlineDispatchRepository, never()).deleteByTenantIdAndMachineId(any(), any());
+        verify(deviceOnlineDispatchRepository, never()).deleteByTenantIdAndMachineId(any(), any());
     }
 
 

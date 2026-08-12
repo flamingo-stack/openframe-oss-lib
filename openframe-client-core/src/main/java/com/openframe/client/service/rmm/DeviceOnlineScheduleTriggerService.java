@@ -2,7 +2,8 @@ package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
-import com.openframe.data.repository.rmm.DeviceFirstOnlineDispatchRepository;
+import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -15,7 +16,7 @@ import java.time.Instant;
 @Slf4j
 public class DeviceOnlineScheduleTriggerService {
 
-    private final DeviceFirstOnlineDispatchRepository dispatchRepository;
+    private final DeviceOnlineDispatchRepository dispatchRepository;
 
     public void onDeviceOnline(Machine machine) {
         String tenantId = machine.getTenantId();
@@ -31,6 +32,7 @@ public class DeviceOnlineScheduleTriggerService {
                     .tenantId(tenantId)
                     .machineId(machineId)
                     .firstSeenAt(Instant.now())
+                    .status(DeviceOnlineDispatchStatus.NEW)
                     .build());
             log.info("First DEVICE_ONLINE recorded: machineId={} tenantId={} — pending dispatch", machineId, tenantId);
         } catch (DuplicateKeyException e) {

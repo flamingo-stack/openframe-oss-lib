@@ -1,10 +1,12 @@
 package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -55,6 +57,7 @@ public class ScriptExecutionStatusUpdateHandler
 
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionAggregator scheduleScriptExecutionAggregator;
+    private final DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
 
     @Override
     public EventHandlerType getType() {
@@ -101,6 +104,8 @@ public class ScriptExecutionStatusUpdateHandler
                             if (row.getScheduleId() != null) {
                                 scheduleScriptExecutionAggregator.aggregate(row.getTenantId(), row.getExecutionId());
                             }
+                            deviceOnlineDispatchRepository.markProcessed(row.getTenantId(), machineId,
+                                    DeviceOnlineDispatchStatus.DISPATCHED, DeviceOnlineDispatchStatus.PROCESSED);
                         },
                         () -> log.warn("No Execution row for executionId={} machineId={} scriptId={} — result arrived before dispatch persisted OR row was never created",
                                 executionId, machineId, scriptId));

@@ -22,7 +22,7 @@ import java.time.Instant;
         unique = true)
 @CompoundIndex(
         name = "pending_by_first_seen",
-        def = "{'dispatchedAt': 1, 'firstSeenAt': 1}")
+        def = "{'status': 1, 'firstSeenAt': 1}")
 public class DeviceFirstOnlineDispatch implements TenantScoped {
 
     @Id
@@ -35,4 +35,6 @@ public class DeviceFirstOnlineDispatch implements TenantScoped {
     private Instant firstSeenAt;
 
     private Instant dispatchedAt;
+
+    private DeviceOnlineDispatchStatus status;
 }

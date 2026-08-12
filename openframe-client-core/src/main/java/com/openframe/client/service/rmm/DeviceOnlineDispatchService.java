@@ -3,12 +3,13 @@ package com.openframe.client.service.rmm;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
+import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
-import com.openframe.data.repository.rmm.DeviceFirstOnlineDispatchRepository;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
@@ -37,7 +38,7 @@ import static java.util.stream.Collectors.toSet;
 @Slf4j
 public class DeviceOnlineDispatchService {
 
-    private final DeviceFirstOnlineDispatchRepository dispatchRepository;
+    private final DeviceOnlineDispatchRepository dispatchRepository;
     private final MachineRepository machineRepository;
     private final ScriptScheduleMachineAssignedRepository assignedRepository;
     private final ScriptScheduleRepository scheduleRepository;
@@ -49,16 +50,15 @@ public class DeviceOnlineDispatchService {
     @Value("${openframe.rmm.device-online.dispatch.batch-size:500}")
     private int batchSize;
 
-    public void processPending() {
-        List<DeviceFirstOnlineDispatch> batch = dispatchRepository.findByDispatchedAtIsNull(
-                PageRequest.of(0, batchSize, Sort.by(Sort.Direction.ASC, FIELD_FIRST_SEEN_AT)));
+    public void processDevicesBecameOnline() {
+        List<DeviceFirstOnlineDispatch> batch = dispatchRepository.findByStatus(
+                DeviceOnlineDispatchStatus.NEW, PageRequest.of(0, batchSize, Sort.by(Sort.Direction.ASC, FIELD_FIRST_SEEN_AT)));
         if (batch.isEmpty()) {
             return;
         }
         log.info("DEVICE_ONLINE dispatch tick: processing up to {} pending row(s) (oldest first)", batch.size());
 
-        Map<String, List<DeviceFirstOnlineDispatch>> rowsByTenant = batch.stream()
-                .collect(groupingBy(DeviceFirstOnlineDispatch::getTenantId));
+        Map<String, List<DeviceFirstOnlineDispatch>> rowsByTenant = batch.stream().collect(groupingBy(DeviceFirstOnlineDispatch::getTenantId));
 
         List<String> dispatchedRowIds = new ArrayList<>();
         for (Map.Entry<String, List<DeviceFirstOnlineDispatch>> e : rowsByTenant.entrySet()) {
@@ -66,7 +66,7 @@ public class DeviceOnlineDispatchService {
         }
 
         if (!dispatchedRowIds.isEmpty()) {
-            long modified = dispatchRepository.markDispatchedIn(dispatchedRowIds, Instant.now());
+            long modified = dispatchRepository.markDispatchedIn(dispatchedRowIds, Instant.now(), DeviceOnlineDispatchStatus.DISPATCHED);
             if (modified != dispatchedRowIds.size()) {
                 log.error("DEVICE_ONLINE dispatch: bulk-mark mismatch — sent {} ids, modified {} (updateMulti degraded?)",
                         dispatchedRowIds.size(), modified);

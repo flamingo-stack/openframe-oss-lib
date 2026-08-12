@@ -3,7 +3,8 @@ package com.openframe.client.service;
 import com.openframe.client.service.rmm.DeviceOnlineScheduleTriggerService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
-import com.openframe.data.repository.rmm.DeviceFirstOnlineDispatchRepository;
+import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +27,7 @@ class DeviceOnlineScheduleTriggerServiceTest {
     private static final String TENANT = "tenant-1";
     private static final String MACHINE = "m-1";
 
-    @Mock private DeviceFirstOnlineDispatchRepository dispatchRepository;
+    @Mock private DeviceOnlineDispatchRepository dispatchRepository;
 
     @InjectMocks private DeviceOnlineScheduleTriggerService service;
 
@@ -42,6 +43,7 @@ class DeviceOnlineScheduleTriggerServiceTest {
         assertThat(saved.getMachineId()).isEqualTo(MACHINE);
         assertThat(saved.getFirstSeenAt()).isNotNull();
         assertThat(saved.getDispatchedAt()).isNull();   // pending until the cron worker fires it
+        assertThat(saved.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
     }
 
     @Test
