@@ -13,7 +13,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class TicketLabel {
+public class TicketTag {
     private String id;
     private String key;
     private String description;

@@ -9,7 +9,7 @@ import com.openframe.test.data.dto.ticket.ReorderTicketInput;
 import com.openframe.test.data.dto.ticket.Ticket;
 import com.openframe.test.data.dto.ticket.TicketConnection;
 import com.openframe.test.data.dto.ticket.TicketFilterInput;
-import com.openframe.test.data.dto.ticket.TicketLabel;
+import com.openframe.test.data.dto.ticket.TicketTag;
 import com.openframe.test.data.dto.ticket.TicketStatusDefinition;
 import com.openframe.test.data.dto.ticket.TicketUserError;
 import com.openframe.test.data.dto.ticket.TransitionTicketInput;
@@ -26,7 +26,7 @@ import static com.openframe.test.api.graphql.TicketQueries.DELETE_TICKET_STATUS;
 import static com.openframe.test.api.graphql.TicketQueries.GET_TICKET;
 import static com.openframe.test.api.graphql.TicketQueries.GET_TICKETS;
 import static com.openframe.test.api.graphql.TicketQueries.REORDER_TICKET;
-import static com.openframe.test.api.graphql.TicketQueries.TICKET_LABELS;
+import static com.openframe.test.api.graphql.TicketQueries.TICKET_TAGS;
 import static com.openframe.test.api.graphql.TicketQueries.TICKET_STATUSES;
 import static com.openframe.test.api.graphql.TicketQueries.TRANSITION_TICKET;
 import static com.openframe.test.config.EnvironmentConfig.CHAT_GRAPHQL;
@@ -172,12 +172,12 @@ public class TicketApi {
         return mutateTicket(CREATE_TICKET, "createTicket", Map.of("input", input));
     }
 
-    public static List<TicketLabel> getTicketLabels() {
-        Map<String, Object> body = Map.of("query", TICKET_LABELS);
+    public static List<TicketTag> getTicketTags() {
+        Map<String, Object> body = Map.of("query", TICKET_TAGS);
         return given(getAuthorizedSpec())
                 .body(body).post(CHAT_GRAPHQL)
                 .then().spec(graphqlSuccess())
-                .extract().jsonPath().getList("data.ticketLabels", TicketLabel.class);
+                .extract().jsonPath().getList("data.ticketTags", TicketTag.class);
     }
 
     private static Ticket mutateTicket(String query, String mutationName, Map<String, Object> variables) {
