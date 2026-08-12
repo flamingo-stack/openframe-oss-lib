@@ -49,13 +49,13 @@ public class TicketsTest extends BaseTest {
     @Tag("saas")
     @Tag("read")
     @Test
-    @DisplayName("List ticket labels")
-    public void testListTicketLabels() {
-        List<TicketLabel> labels = TicketApi.getTicketLabels();
-        assertThat(labels).as("Expected at least one ticket label").isNotEmpty();
-        assertThat(labels).allSatisfy(label -> {
-            assertThat(label.getId()).as("No Id").isNotNull();
-            assertThat(label.getKey()).as("No key for " + label.getId()).isNotEmpty();
+    @DisplayName("List ticket tags")
+    public void testListTicketTags() {
+        List<TicketTag> tags = TicketApi.getTicketTags();
+        assertThat(tags).as("Expected at least one ticket tag").isNotEmpty();
+        assertThat(tags).allSatisfy(tag -> {
+            assertThat(tag.getId()).as("No Id").isNotNull();
+            assertThat(tag.getKey()).as("No key for " + tag.getId()).isNotEmpty();
         });
     }
 
@@ -79,11 +79,11 @@ public class TicketsTest extends BaseTest {
                 pipelineScoped(onlineDevicesFilter()), pipelineScoped(offlineDevicesFilter()));
         assertThat(reorderDevice).as("Expected at least one device%s", orgSuffix()).isNotNull();
 
-        List<TicketLabel> reorderLabels = TicketApi.getTicketLabels();
-        assertThat(reorderLabels).as("Expected at least one ticket label").isNotEmpty();
+        List<TicketTag> reorderTags = TicketApi.getTicketTags();
+        assertThat(reorderTags).as("Expected at least one ticket tag").isNotEmpty();
 
         TicketApi.createTicket(TicketGenerator.createTicketRequest(
-                reorderDevice.getOrganizationId(), reorderDevice, reorderAssigneeId, List.of(reorderLabels.getFirst())));
+                reorderDevice.getOrganizationId(), reorderDevice, reorderAssigneeId, List.of(reorderTags.getFirst())));
 
         // Order ranks are maintained per lifecycle column (statusId), and reorder anchors must belong
         // to the moved ticket's column. Reorder within a single column rather than across the
@@ -120,11 +120,11 @@ public class TicketsTest extends BaseTest {
                 pipelineScoped(onlineDevicesFilter()), pipelineScoped(offlineDevicesFilter()));
         assertThat(device).as("Expected at least one device%s", orgSuffix()).isNotNull();
 
-        List<TicketLabel> labels = TicketApi.getTicketLabels();
-        assertThat(labels).as("Expected at least one ticket label").isNotEmpty();
-        TicketLabel label = labels.getFirst();
+        List<TicketTag> tags = TicketApi.getTicketTags();
+        assertThat(tags).as("Expected at least one ticket tag").isNotEmpty();
+        TicketTag tag = tags.getFirst();
 
-        CreateTicketInput input = TicketGenerator.createTicketRequest(device.getOrganizationId(), device, assigneeId, List.of(label));
+        CreateTicketInput input = TicketGenerator.createTicketRequest(device.getOrganizationId(), device, assigneeId, List.of(tag));
 
         Ticket ticket = TicketApi.createTicket(input);
 
@@ -140,7 +140,7 @@ public class TicketsTest extends BaseTest {
         assertThat(ticket.getOwner()).as("Owner should be present").isNotNull();
         assertThat(ticket.getOwner().getType()).as("Owner type should be ADMIN").isEqualTo("ADMIN");
         assertThat(ticket.getOwner().getUserId()).as("Owner userId should be set").isNotEmpty();
-        assertThat(ticket.getLabels()).extracting(TicketLabel::getId).as("Label should be attached").contains(label.getId());
+        assertThat(ticket.getTags()).extracting(TicketTag::getId).as("Tag should be attached").contains(tag.getId());
     }
 
     @Tag("feature")
@@ -304,11 +304,11 @@ public class TicketsTest extends BaseTest {
     }
 
     // Tagged `feature` as a fixture, not for its own sake: three feature cases below read
-    // getTicketLabels() and would find it empty on a tenant this has never run against.
+    // getTicketTags() and would find it empty on a tenant this has never run against.
     @Tag("feature")
     @Tag("saas")
     @Test
-    @Order(0)   // before Create ticket (@Order 1): seeds a TICKET tag so getTicketLabels() is non-empty
+    @Order(0)   // before Create ticket (@Order 1): seeds a TICKET tag so getTicketTags() is non-empty
     @DisplayName("Create ticket tag")
     public void testCreateTicketTag() {
         // createTag is idempotent per (key, entityType): re-running returns the existing tag, so a

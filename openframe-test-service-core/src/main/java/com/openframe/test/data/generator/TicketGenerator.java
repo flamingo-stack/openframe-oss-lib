@@ -8,7 +8,7 @@ import com.openframe.test.data.dto.ticket.Ticket;
 import com.openframe.test.data.dto.ticket.TicketConnection;
 import com.openframe.test.data.dto.ticket.TicketEdge;
 import com.openframe.test.data.dto.ticket.TicketFilterInput;
-import com.openframe.test.data.dto.ticket.TicketLabel;
+import com.openframe.test.data.dto.ticket.TicketTag;
 import com.openframe.test.data.dto.user.AuthUser;
 import net.datafaker.Faker;
 
@@ -66,14 +66,14 @@ public class TicketGenerator {
     public static CreateTicketInput createTicketRequest(String organizationId,
                                                         Machine device,
                                                         String assigneeId,
-                                                        List<TicketLabel> labels) {
+                                                        List<TicketTag> tags) {
         return CreateTicketInput.builder()
                 .title("Test ticket")
                 .description("Manually created ticket for tests")
                 .organizationId(organizationId)
                 .deviceId(device.getMachineId())
                 .assigneeId(assigneeId)
-                .labelIds(labels.stream().map(TicketLabel::getId).toList())
+                .tagIds(tags.stream().map(TicketTag::getId).toList())
                 .build();
     }
 
