@@ -11,8 +11,8 @@ import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
-import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
@@ -29,12 +29,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -64,9 +64,16 @@ class DeviceOnlineDispatchServiceTest {
     void setUp() {
         // @Value fields don't get populated by @InjectMocks — set explicitly.
         ReflectionTestUtils.setField(service, "batchSize", 500);
-        // Default: bulk update reports "everything you sent got modified" — the healthy case.
-        lenient().when(dispatchRepository.markDispatchedIn(anyCollection(), any(Instant.class), any(DeviceOnlineDispatchStatus.class)))
-                .thenAnswer(inv -> (long) ((Collection<?>) inv.getArgument(0)).size());
+    }
+
+    private List<String> savedDispatchedIds() {
+        ArgumentCaptor<Iterable<DeviceFirstOnlineDispatch>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(dispatchRepository).saveAll(captor.capture());
+        List<DeviceFirstOnlineDispatch> saved = new ArrayList<>();
+        captor.getValue().forEach(saved::add);
+        assertThat(saved).allMatch(r -> r.getStatus() == DeviceOnlineDispatchStatus.DISPATCHED);
+        assertThat(saved).allMatch(r -> r.getDispatchedAt() != null);
+        return saved.stream().map(DeviceFirstOnlineDispatch::getId).toList();
     }
 
     @Test
@@ -80,7 +87,7 @@ class DeviceOnlineDispatchServiceTest {
         service.processDevicesBecameOnline();
 
         verify(fireDispatcher).dispatch(eq(s), eq(List.of(MACHINE)), any(Instant.class));
-        verify(dispatchRepository).markDispatchedIn(eq(List.of(ROW_ID)), any(Instant.class), eq(DeviceOnlineDispatchStatus.DISPATCHED));
+        assertThat(savedDispatchedIds()).containsExactly(ROW_ID);
     }
 
     @Test
@@ -95,7 +102,7 @@ class DeviceOnlineDispatchServiceTest {
         service.processDevicesBecameOnline();
 
         verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
-        verify(dispatchRepository, never()).markDispatchedIn(any(), any(Instant.class), any());
+        verify(dispatchRepository, never()).saveAll(any());
     }
 
     @Test
@@ -108,7 +115,7 @@ class DeviceOnlineDispatchServiceTest {
         service.processDevicesBecameOnline();
 
         verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
-        verify(dispatchRepository, never()).markDispatchedIn(any(), any(Instant.class), any());
+        verify(dispatchRepository, never()).saveAll(any());
     }
 
     @Test
@@ -121,7 +128,7 @@ class DeviceOnlineDispatchServiceTest {
         service.processDevicesBecameOnline();
 
         verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
-        verify(dispatchRepository).markDispatchedIn(eq(List.of(ROW_ID)), any(Instant.class), eq(DeviceOnlineDispatchStatus.DISPATCHED));
+        assertThat(savedDispatchedIds()).containsExactly(ROW_ID);
     }
 
     @Test
@@ -136,7 +143,7 @@ class DeviceOnlineDispatchServiceTest {
         service.processDevicesBecameOnline();
 
         verify(fireDispatcher).dispatch(eq(criteria), eq(List.of(MACHINE)), any(Instant.class));
-        verify(dispatchRepository).markDispatchedIn(eq(List.of(ROW_ID)), any(Instant.class), eq(DeviceOnlineDispatchStatus.DISPATCHED));
+        assertThat(savedDispatchedIds()).containsExactly(ROW_ID);
     }
 
     @Test
@@ -156,9 +163,7 @@ class DeviceOnlineDispatchServiceTest {
         service.processDevicesBecameOnline();
 
         verify(fireDispatcher).dispatch(eq(s), eq(List.of("m-ok")), any(Instant.class));
-        ArgumentCaptor<Collection<String>> ids = ArgumentCaptor.forClass(Collection.class);
-        verify(dispatchRepository).markDispatchedIn(ids.capture(), any(Instant.class), any(DeviceOnlineDispatchStatus.class));
-        assertThat(ids.getValue()).containsExactly("row-ok");
+        assertThat(savedDispatchedIds()).containsExactly("row-ok");
     }
 
     @Test
@@ -169,7 +174,7 @@ class DeviceOnlineDispatchServiceTest {
         service.processDevicesBecameOnline();
 
         verify(machineRepository, never()).findByTenantIdAndMachineIdIn(any(), any());
-        verify(dispatchRepository, never()).markDispatchedIn(any(), any(Instant.class), any());
+        verify(dispatchRepository, never()).saveAll(any());
     }
 
     @Test
@@ -210,9 +215,7 @@ class DeviceOnlineDispatchServiceTest {
         verify(assignedRepository, times(1)).findByTenantIdAndMachineIdIn(eq(TENANT), any());
         verify(scheduleRepository, times(1))
                 .findByTenantIdAndTriggerAndStatus(TENANT, ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
-        ArgumentCaptor<Collection<String>> ids = ArgumentCaptor.forClass(Collection.class);
-        verify(dispatchRepository, times(1)).markDispatchedIn(ids.capture(), any(Instant.class), any(DeviceOnlineDispatchStatus.class));
-        assertThat(ids.getValue()).containsExactlyInAnyOrder("row-a", "row-b", "row-c");
+        assertThat(savedDispatchedIds()).containsExactlyInAnyOrder("row-a", "row-b", "row-c");
     }
 
     @Test
@@ -228,9 +231,7 @@ class DeviceOnlineDispatchServiceTest {
 
         verify(machineRepository).findByTenantIdAndMachineIdIn(eq(TENANT), any());
         verify(machineRepository).findByTenantIdAndMachineIdIn(eq(OTHER_TENANT), any());
-        ArgumentCaptor<Collection<String>> ids = ArgumentCaptor.forClass(Collection.class);
-        verify(dispatchRepository, times(1)).markDispatchedIn(ids.capture(), any(Instant.class), any(DeviceOnlineDispatchStatus.class));
-        assertThat(ids.getValue()).containsExactlyInAnyOrder("row-a", "row-b");
+        assertThat(savedDispatchedIds()).containsExactlyInAnyOrder("row-a", "row-b");
     }
 
     // --- fixtures --------------------------------------------------------------------------------

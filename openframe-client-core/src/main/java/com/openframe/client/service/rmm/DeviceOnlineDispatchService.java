@@ -60,21 +60,22 @@ public class DeviceOnlineDispatchService {
 
         Map<String, List<DeviceFirstOnlineDispatch>> rowsByTenant = batch.stream().collect(groupingBy(DeviceFirstOnlineDispatch::getTenantId));
 
-        List<String> dispatchedRowIds = new ArrayList<>();
+        List<DeviceFirstOnlineDispatch> dispatchedRows = new ArrayList<>();
         for (Map.Entry<String, List<DeviceFirstOnlineDispatch>> e : rowsByTenant.entrySet()) {
-            dispatchedRowIds.addAll(processTenant(e.getKey(), e.getValue()));
+            dispatchedRows.addAll(processTenant(e.getKey(), e.getValue()));
         }
 
-        if (!dispatchedRowIds.isEmpty()) {
-            long modified = dispatchRepository.markDispatchedIn(dispatchedRowIds, Instant.now(), DeviceOnlineDispatchStatus.DISPATCHED);
-            if (modified != dispatchedRowIds.size()) {
-                log.error("DEVICE_ONLINE dispatch: bulk-mark mismatch — sent {} ids, modified {} (updateMulti degraded?)",
-                        dispatchedRowIds.size(), modified);
-            }
+        if (!dispatchedRows.isEmpty()) {
+            Instant now = Instant.now();
+            dispatchedRows.forEach(row -> {
+                row.setStatus(DeviceOnlineDispatchStatus.DISPATCHED);
+                row.setDispatchedAt(now);
+            });
+            dispatchRepository.saveAll(dispatchedRows);
         }
     }
 
-    private List<String> processTenant(String tenantId, List<DeviceFirstOnlineDispatch> tenantRows) {
+    private List<DeviceFirstOnlineDispatch> processTenant(String tenantId, List<DeviceFirstOnlineDispatch> tenantRows) {
         Set<String> machineIds = tenantRows.stream()
                 .map(DeviceFirstOnlineDispatch::getMachineId).collect(toSet());
 
@@ -90,7 +91,7 @@ public class DeviceOnlineDispatchService {
         List<ScriptSchedule> tenantSchedules = scheduleRepository
                 .findByTenantIdAndTriggerAndStatus(tenantId, ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
 
-        List<String> dispatched = new ArrayList<>(tenantRows.size());
+        List<DeviceFirstOnlineDispatch> dispatched = new ArrayList<>(tenantRows.size());
         for (DeviceFirstOnlineDispatch row : tenantRows) {
             try {
                 processOne(row, machinesById, assignedScheduleIdsByMachine, tenantSchedules)
@@ -103,7 +104,7 @@ public class DeviceOnlineDispatchService {
         return dispatched;
     }
 
-    private Optional<String> processOne(DeviceFirstOnlineDispatch row,
+    private Optional<DeviceFirstOnlineDispatch> processOne(DeviceFirstOnlineDispatch row,
                                         Map<String, Machine> machinesById,
                                         Map<String, Set<String>> assignedScheduleIdsByMachine,
                                         List<ScriptSchedule> tenantSchedules) {
@@ -127,7 +128,7 @@ public class DeviceOnlineDispatchService {
         }
         log.info("DEVICE_ONLINE dispatched: machineId={} tenantId={} schedules={}",
                 row.getMachineId(), row.getTenantId(), due.size());
-        return Optional.of(row.getId());
+        return Optional.of(row);
     }
 
     private List<ScriptSchedule> dueSchedulesFor(Machine machine,
