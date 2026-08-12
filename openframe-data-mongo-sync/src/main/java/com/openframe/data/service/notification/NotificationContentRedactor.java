@@ -6,7 +6,6 @@ import com.openframe.data.document.notification.NotificationContentPolicy;
 import com.openframe.data.repository.notification.NotificationContentPolicyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -16,8 +15,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Slf4j
 public class NotificationContentRedactor {
-    public static final String CONTENT_POLICY_CACHE = "notificationContentPolicy";
-
     private static final Map<NotificationCategory, String> SUPPRESSED_BY_CATEGORY = Map.of(
             NotificationCategory.TICKETS, "New activity on this ticket",
             NotificationCategory.MINGO, "New message",
@@ -28,7 +25,15 @@ public class NotificationContentRedactor {
 
     private final NotificationContentPolicyRepository policyRepository;
 
-    @Cacheable(cacheNames = CONTENT_POLICY_CACHE)
+    /**
+     * Reads the tenant policy. Callers that redact more than one notification — a page, a fan-out to
+     * many recipients — resolve this once and pass the result to
+     * {@link #descriptionFor(Notification, NotificationCategory, boolean)} rather than paying a lookup
+     * per item. Deliberately uncached: this is a privacy switch, and a stale {@code false} keeps
+     * message content flowing after an admin has turned suppression on.
+     *
+     * <p>Fail-open: a lookup that breaks must not blank out every notification in the tenant.
+     */
     public boolean contentSuppressed() {
         try {
             return policyRepository.find()
@@ -40,6 +45,7 @@ public class NotificationContentRedactor {
         }
     }
 
+    /** Applies an already-resolved policy. Pure — no lookup, so it is safe to call in a loop. */
     public String descriptionFor(Notification notification, NotificationCategory category, boolean contentSuppressed) {
         if (notification == null) {
             return null;
