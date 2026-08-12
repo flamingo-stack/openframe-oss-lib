@@ -19,7 +19,7 @@ import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
-import com.openframe.data.repository.device.MachineFirstOnlineDispatchRepository;
+import com.openframe.data.repository.rmm.DeviceFirstOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
@@ -52,7 +52,7 @@ import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 public class DeviceService {
 
     private final MachineRepository machineRepository;
-    private final MachineFirstOnlineDispatchRepository machineFirstOnlineDispatchRepository;
+    private final DeviceFirstOnlineDispatchRepository deviceFirstOnlineDispatchRepository;
     private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
@@ -311,7 +311,7 @@ public class DeviceService {
         }
         if (status == DeviceStatus.DELETED) {
             scriptScheduleDeviceService.removeDeviceFromAllSchedules(machine.getTenantId(), machineId);
-            long removedDispatch = machineFirstOnlineDispatchRepository.deleteByTenantIdAndMachineId(machine.getTenantId(), machineId);
+            long removedDispatch = deviceFirstOnlineDispatchRepository.deleteByTenantIdAndMachineId(machine.getTenantId(), machineId);
             if (removedDispatch > 0) {
                 log.info("Removed first-online dispatch record(s) for deleted machineId={}, count={}", machineId, removedDispatch);
             }

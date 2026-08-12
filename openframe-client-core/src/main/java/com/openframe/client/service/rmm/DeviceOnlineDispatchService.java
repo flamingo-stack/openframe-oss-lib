@@ -2,13 +2,13 @@ package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.device.MachineFirstOnlineDispatch;
+import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
-import com.openframe.data.repository.device.MachineFirstOnlineDispatchRepository;
+import com.openframe.data.repository.rmm.DeviceFirstOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
@@ -37,7 +37,7 @@ import static java.util.stream.Collectors.toSet;
 @Slf4j
 public class DeviceOnlineDispatchService {
 
-    private final MachineFirstOnlineDispatchRepository dispatchRepository;
+    private final DeviceFirstOnlineDispatchRepository dispatchRepository;
     private final MachineRepository machineRepository;
     private final ScriptScheduleMachineAssignedRepository assignedRepository;
     private final ScriptScheduleRepository scheduleRepository;
@@ -50,18 +50,18 @@ public class DeviceOnlineDispatchService {
     private int batchSize;
 
     public void processPending() {
-        List<MachineFirstOnlineDispatch> batch = dispatchRepository.findByDispatchedAtIsNull(
+        List<DeviceFirstOnlineDispatch> batch = dispatchRepository.findByDispatchedAtIsNull(
                 PageRequest.of(0, batchSize, Sort.by(Sort.Direction.ASC, FIELD_FIRST_SEEN_AT)));
         if (batch.isEmpty()) {
             return;
         }
         log.info("DEVICE_ONLINE dispatch tick: processing up to {} pending row(s) (oldest first)", batch.size());
 
-        Map<String, List<MachineFirstOnlineDispatch>> rowsByTenant = batch.stream()
-                .collect(groupingBy(MachineFirstOnlineDispatch::getTenantId));
+        Map<String, List<DeviceFirstOnlineDispatch>> rowsByTenant = batch.stream()
+                .collect(groupingBy(DeviceFirstOnlineDispatch::getTenantId));
 
         List<String> dispatchedRowIds = new ArrayList<>();
-        for (Map.Entry<String, List<MachineFirstOnlineDispatch>> e : rowsByTenant.entrySet()) {
+        for (Map.Entry<String, List<DeviceFirstOnlineDispatch>> e : rowsByTenant.entrySet()) {
             dispatchedRowIds.addAll(processTenant(e.getKey(), e.getValue()));
         }
 
@@ -74,9 +74,9 @@ public class DeviceOnlineDispatchService {
         }
     }
 
-    private List<String> processTenant(String tenantId, List<MachineFirstOnlineDispatch> tenantRows) {
+    private List<String> processTenant(String tenantId, List<DeviceFirstOnlineDispatch> tenantRows) {
         Set<String> machineIds = tenantRows.stream()
-                .map(MachineFirstOnlineDispatch::getMachineId).collect(toSet());
+                .map(DeviceFirstOnlineDispatch::getMachineId).collect(toSet());
 
         Map<String, Machine> machinesById = machineRepository
                 .findByTenantIdAndMachineIdIn(tenantId, machineIds).stream()
@@ -91,7 +91,7 @@ public class DeviceOnlineDispatchService {
                 .findByTenantIdAndTriggerAndStatus(tenantId, ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
 
         List<String> dispatched = new ArrayList<>(tenantRows.size());
-        for (MachineFirstOnlineDispatch row : tenantRows) {
+        for (DeviceFirstOnlineDispatch row : tenantRows) {
             try {
                 processOne(row, machinesById, assignedScheduleIdsByMachine, tenantSchedules)
                         .ifPresent(dispatched::add);
@@ -103,7 +103,7 @@ public class DeviceOnlineDispatchService {
         return dispatched;
     }
 
-    private Optional<String> processOne(MachineFirstOnlineDispatch row,
+    private Optional<String> processOne(DeviceFirstOnlineDispatch row,
                                         Map<String, Machine> machinesById,
                                         Map<String, Set<String>> assignedScheduleIdsByMachine,
                                         List<ScriptSchedule> tenantSchedules) {

@@ -1,7 +1,6 @@
 package com.openframe.client.listener;
 
 import com.openframe.client.event.DeviceCameOnlineEvent;
-import com.openframe.client.event.DeviceFirstConnectedEvent;
 import com.openframe.client.service.rmm.DeviceOnlineScheduleTriggerService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -13,7 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class DeviceOnlineScheduleTriggerListenerTest {
@@ -30,21 +28,8 @@ class DeviceOnlineScheduleTriggerListenerTest {
         verify(triggerService).onDeviceOnline(machine);
     }
 
-    @Test
-    @DisplayName("first connect that lands ONLINE triggers (fresh device joins its criteria schedules)")
-    void firstConnectedOnline_triggers() {
-        Machine machine = machine(DeviceStatus.ONLINE);
-        listener.onDeviceFirstConnected(new DeviceFirstConnectedEvent(this, machine));
-        verify(triggerService).onDeviceOnline(machine);
-    }
-
-    @Test
-    @DisplayName("first connect that lands OFFLINE does not trigger (device isn't online)")
-    void firstConnectedOffline_noTrigger() {
-        Machine machine = machine(DeviceStatus.OFFLINE);
-        listener.onDeviceFirstConnected(new DeviceFirstConnectedEvent(this, machine));
-        verifyNoInteractions(triggerService);
-    }
+    // First connect (registration, PENDING→ONLINE) intentionally does NOT fire the trigger:
+    // the listener has no handler for DeviceFirstConnectedEvent, so only reconnects reach the service.
 
     private static Machine machine(DeviceStatus status) {
         Machine m = new Machine();

@@ -1,4 +1,4 @@
-package com.openframe.data.document.device;
+package com.openframe.data.document.rmm;
 
 import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
@@ -23,7 +23,7 @@ import java.time.Instant;
 @CompoundIndex(
         name = "pending_by_first_seen",
         def = "{'dispatchedAt': 1, 'firstSeenAt': 1}")
-public class MachineFirstOnlineDispatch implements TenantScoped {
+public class DeviceFirstOnlineDispatch implements TenantScoped {
 
     @Id
     private String id;
