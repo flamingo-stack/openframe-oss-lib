@@ -28,9 +28,6 @@ class DeviceOnlineScheduleTriggerListenerTest {
         verify(triggerService).onDeviceOnline(machine);
     }
 
-    // First connect (registration, PENDING→ONLINE) intentionally does NOT fire the trigger:
-    // the listener has no handler for DeviceFirstConnectedEvent, so only reconnects reach the service.
-
     private static Machine machine(DeviceStatus status) {
         Machine m = new Machine();
         m.setMachineId("m-1");
