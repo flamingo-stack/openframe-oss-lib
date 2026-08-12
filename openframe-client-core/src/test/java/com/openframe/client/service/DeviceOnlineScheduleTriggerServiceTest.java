@@ -59,11 +59,9 @@ class DeviceOnlineScheduleTriggerServiceTest {
     @Test
     @DisplayName("race: exists-check said no but a concurrent insert won → DuplicateKeyException swallowed, silent no-op")
     void concurrentInsert_duplicateKeyIsSwallowed() {
-        // exists() defaults to false (the check passed), but the unique index rejects the racing insert.
         doThrow(new DuplicateKeyException("compound (tenantId, machineId) already exists"))
                 .when(dispatchRepository).save(any(DeviceFirstOnlineDispatch.class));
 
-        // Must NOT throw — a re-online / race is a no-op.
         service.onDeviceOnline(machine());
 
         verify(dispatchRepository).save(any(DeviceFirstOnlineDispatch.class));
@@ -73,7 +71,6 @@ class DeviceOnlineScheduleTriggerServiceTest {
     @DisplayName("event handler never dispatches directly — the only side effect is the sentinel insert; the cron worker fires (no inline NATS)")
     void neverDispatchesInline() {
         service.onDeviceOnline(machine());
-        // The service has no dispatch/NATS collaborator at all — a fresh sentinel is its only write.
         verify(dispatchRepository).save(any());
     }
 

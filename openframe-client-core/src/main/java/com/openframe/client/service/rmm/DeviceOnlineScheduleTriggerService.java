@@ -36,8 +36,6 @@ public class DeviceOnlineScheduleTriggerService {
                     .build());
             log.info("First DEVICE_ONLINE recorded: machineId={} tenantId={} — pending dispatch", machineId, tenantId);
         } catch (DuplicateKeyException e) {
-            // Race: a concurrent onDeviceOnline inserted between the exists-check and save;
-            // the unique (tenantId, machineId) index caught it, so just skip.
             log.debug("Machine already onboarded (race, skip): machineId={} tenantId={}", machineId, tenantId);
         }
     }
