@@ -106,6 +106,20 @@ class ScriptExecutionStatusUpdateHandlerTest {
     }
 
     @Test
+    @DisplayName("handle: no first-online sentinel for the machine → nothing to flip, no save")
+    void handle_noSentinel_doesNotSave() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+        when(deviceOnlineDispatchRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
+                .thenReturn(Optional.empty());
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
+
+        verify(deviceOnlineDispatchRepository, never()).save(any(DeviceFirstOnlineDispatch.class));
+    }
+
+    @Test
     @DisplayName("handle: sentinel already PROCESSED (or absent DISPATCHED) → guarded, no save")
     void handle_sentinelNotDispatched_doesNotSave() {
         ScriptExecution row = runningRow(EXECUTION_ID);
