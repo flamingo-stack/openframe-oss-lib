@@ -18,6 +18,7 @@ import java.time.Instant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -33,7 +34,7 @@ class NotificationNatsPublisherTest {
         messagePublisher = mock(NatsMessagePublisher.class);
         contentRedactor = mock(NotificationContentRedactor.class);
         // Default: nothing suppressed — the payload carries the stored description through.
-        when(contentRedactor.descriptionFor(any(), any())).thenAnswer(invocation -> {
+        when(contentRedactor.descriptionFor(any(), any(), anyBoolean())).thenAnswer(invocation -> {
             Notification argument = invocation.getArgument(0);
             return argument == null ? null : argument.getDescription();
         });
@@ -44,10 +45,11 @@ class NotificationNatsPublisherTest {
     @DisplayName("Given the tenant suppresses content, when publishing, then the live payload carries the neutral description, not the stored one")
     void publish_applies_content_suppression() {
         Notification notification = persistedNotification();
-        when(contentRedactor.descriptionFor(notification, NotificationCategory.TICKETS))
+        when(contentRedactor.descriptionFor(notification, NotificationCategory.TICKETS, true))
                 .thenReturn("New activity on this ticket");
 
-        publisher.publishToUser("user-42", notification, NotificationCategory.TICKETS);
+        // The flag is resolved once by the broadcaster and handed down — the publisher does not look it up.
+        publisher.publishToUser("user-42", notification, NotificationCategory.TICKETS, true);
 
         ArgumentCaptor<NotificationMessage> message = ArgumentCaptor.forClass(NotificationMessage.class);
         verify(messagePublisher).publish(anyString(), message.capture());
@@ -60,7 +62,7 @@ class NotificationNatsPublisherTest {
     void publish_to_user_routes_to_user_subject() {
         Notification notification = persistedNotification();
 
-        publisher.publishToUser("user-42", notification, NotificationCategory.TICKETS);
+        publisher.publishToUser("user-42", notification, NotificationCategory.TICKETS, false);
 
         ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<NotificationMessage> message = ArgumentCaptor.forClass(NotificationMessage.class);
@@ -76,7 +78,7 @@ class NotificationNatsPublisherTest {
     void publish_to_machine_routes_to_machine_subject() {
         Notification notification = persistedNotification();
 
-        publisher.publishToMachine("machine-7", notification, NotificationCategory.DEVICES);
+        publisher.publishToMachine("machine-7", notification, NotificationCategory.DEVICES, false);
 
         ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
         verify(messagePublisher).publish(subject.capture(), any());
@@ -89,7 +91,7 @@ class NotificationNatsPublisherTest {
         Notification notification = persistedNotification();
         doThrow(new NatsException("broker offline")).when(messagePublisher).publish(anyString(), any());
 
-        publisher.publishToUser("user-1", notification, NotificationCategory.GENERIC);
+        publisher.publishToUser("user-1", notification, NotificationCategory.GENERIC, false);
         // No exception escapes; nothing to assert on return — publish*() returns void now.
     }
 
@@ -97,7 +99,7 @@ class NotificationNatsPublisherTest {
     @DisplayName("Given a blank userId, when publishToUser is called, then IllegalArgumentException is raised before any broker call — blank ids would produce malformed subject `user..notification`")
     void blank_user_id_rejected() {
         Notification notification = persistedNotification();
-        assertThatThrownBy(() -> publisher.publishToUser("   ", notification, NotificationCategory.GENERIC))
+        assertThatThrownBy(() -> publisher.publishToUser("   ", notification, NotificationCategory.GENERIC, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("userId");
         verifyNoInteractions(messagePublisher);
@@ -107,7 +109,7 @@ class NotificationNatsPublisherTest {
     @DisplayName("Given a blank machineId, when publishToMachine is called, then IllegalArgumentException is raised before any broker call — same invariant as publishToUser")
     void blank_machine_id_rejected() {
         Notification notification = persistedNotification();
-        assertThatThrownBy(() -> publisher.publishToMachine("", notification, NotificationCategory.GENERIC))
+        assertThatThrownBy(() -> publisher.publishToMachine("", notification, NotificationCategory.GENERIC, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("machineId");
         verifyNoInteractions(messagePublisher);
@@ -122,7 +124,7 @@ class NotificationNatsPublisherTest {
                 .context(GenericContext.builder().type("welcome").build())
                 .build();
 
-        assertThatThrownBy(() -> publisher.publishToUser("user-1", unpersisted, NotificationCategory.GENERIC))
+        assertThatThrownBy(() -> publisher.publishToUser("user-1", unpersisted, NotificationCategory.GENERIC, false))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(messagePublisher);
     }
@@ -167,7 +169,7 @@ class NotificationNatsPublisherTest {
                 .context(GenericContext.builder().type("TICKET_ESCALATED_BY_USER").payload("{}").build())
                 .build();
 
-        publisher.publishToUser("user-42", stored, NotificationCategory.TICKETS);
+        publisher.publishToUser("user-42", stored, NotificationCategory.TICKETS, false);
 
         ArgumentCaptor<NotificationMessage> message = ArgumentCaptor.forClass(NotificationMessage.class);
         verify(messagePublisher).publish(anyString(), message.capture());

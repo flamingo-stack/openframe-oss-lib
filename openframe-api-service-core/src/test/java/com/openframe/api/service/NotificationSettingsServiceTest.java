@@ -8,7 +8,6 @@ import com.openframe.data.document.notification.NotificationSettings;
 import com.openframe.data.document.notification.NotificationContentPolicy;
 import com.openframe.data.repository.notification.NotificationContentPolicyRepository;
 import com.openframe.data.repository.notification.NotificationSettingsRepository;
-import com.openframe.data.service.notification.NotificationContentRedactor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,16 +33,14 @@ class NotificationSettingsServiceTest {
 
     private NotificationSettingsRepository repository;
     private NotificationContentPolicyRepository contentPolicyRepository;
-    private NotificationContentRedactor contentRedactor;
     private NotificationSettingsService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(NotificationSettingsRepository.class);
         contentPolicyRepository = mock(NotificationContentPolicyRepository.class);
-        contentRedactor = mock(NotificationContentRedactor.class);
         when(contentPolicyRepository.find()).thenReturn(Optional.empty());
-        service = new NotificationSettingsService(repository, contentPolicyRepository, contentRedactor);
+        service = new NotificationSettingsService(repository, contentPolicyRepository);
     }
 
     @Test
@@ -65,8 +62,8 @@ class NotificationSettingsServiceTest {
     }
 
     @Test
-    @DisplayName("updateContentSuppression persists tenant-wide and drops the redactor cache so the change is visible immediately")
-    void suppression_update_persists_and_invalidates_the_cache() {
+    @DisplayName("updateContentSuppression persists tenant-wide; nothing to invalidate, since the policy is read per request")
+    void suppression_update_persists() {
         when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
         when(contentPolicyRepository.find())
                 .thenReturn(Optional.of(NotificationContentPolicy.builder().contentSuppressed(true).build()));
@@ -74,7 +71,6 @@ class NotificationSettingsServiceTest {
         NotificationSettingsView result = service.updateContentSuppression("user-1", true);
 
         verify(contentPolicyRepository).setContentSuppressed(true);
-        verify(contentRedactor).invalidate();
         assertThat(result.isContentSuppressed()).isTrue();
     }
 

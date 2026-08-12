@@ -28,14 +28,14 @@ public class GraphQLNotificationMapper {
         return CursorPaginationCriteria.fromConnectionArgs(args);
     }
 
-    public NotificationView toView(Notification notification, boolean read) {
+    public NotificationView toView(Notification notification, boolean read, boolean contentSuppressed) {
         NotificationContext context = notification.getContext();
         NotificationCategory category = categoryOf(notification);
         return NotificationView.builder()
                 .id(notification.getId())
                 .severity(notification.getSeverity())
                 .title(notification.getTitle())
-                .description(contentRedactor.descriptionFor(notification, category))
+                .description(contentRedactor.descriptionFor(notification, category, contentSuppressed))
                 .createdAt(notification.getCreatedAt())
                 .category(category)
                 .context(context)

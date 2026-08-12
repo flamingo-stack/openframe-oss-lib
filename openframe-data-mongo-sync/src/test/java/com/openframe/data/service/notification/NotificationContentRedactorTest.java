@@ -7,15 +7,14 @@ import com.openframe.data.repository.notification.NotificationContentPolicyRepos
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class NotificationContentRedactorTest {
@@ -26,109 +25,99 @@ class NotificationContentRedactorTest {
     @BeforeEach
     void setUp() {
         policyRepository = mock(NotificationContentPolicyRepository.class);
-        redactor = new NotificationContentRedactor(Optional.of(policyRepository));
-        // Off by default so each test observes its own stubbing; the cache gets its own test.
-        ReflectionTestUtils.setField(redactor, "policyCacheSeconds", 0L);
+        redactor = new NotificationContentRedactor(policyRepository);
     }
 
     @Test
-    @DisplayName("Given no policy document, when a description is read, then the stored content passes through — absence means the informative default")
+    @DisplayName("Given no policy document, when the policy is read, then content is NOT suppressed — absence means the informative default")
     void absent_policy_is_not_suppressed() {
         when(policyRepository.find()).thenReturn(Optional.empty());
 
-        assertThat(redactor.descriptionFor(notification(), NotificationCategory.TICKETS))
-                .isEqualTo("The printer is offline again");
+        assertThat(redactor.contentSuppressed()).isFalse();
     }
 
     @Test
-    @DisplayName("Given suppression is off, when a description is read, then the stored content passes through")
-    void suppression_off_passes_content_through() {
-        stubPolicy(false);
+    @DisplayName("Given the policy lookup throws, when the policy is read, then content is NOT suppressed — a broken lookup must not blank the tenant")
+    void lookup_failure_fails_open() {
+        when(policyRepository.find()).thenThrow(new IllegalStateException("mongo down"));
 
-        assertThat(redactor.descriptionFor(notification(), NotificationCategory.TICKETS))
-                .isEqualTo("The printer is offline again");
+        assertThat(redactor.contentSuppressed()).isFalse();
     }
 
     @Test
-    @DisplayName("Given suppression is on, when a description is read, then a category-specific neutral line replaces the content")
-    void suppression_on_replaces_content_per_category() {
+    @DisplayName("Given a stored policy, when the policy is read, then its flag is reported")
+    void stored_policy_is_reported() {
         stubPolicy(true);
 
-        assertThat(redactor.descriptionFor(notification(), NotificationCategory.TICKETS))
+        assertThat(redactor.contentSuppressed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Given suppression is off, when a description is redacted, then the stored content passes through")
+    void suppression_off_passes_content_through() {
+        assertThat(redactor.descriptionFor(notification(), NotificationCategory.TICKETS, false))
+                .isEqualTo("The printer is offline again");
+    }
+
+    @Test
+    @DisplayName("Given suppression is on, when a description is redacted, then a category-specific neutral line replaces the content")
+    void suppression_on_replaces_content_per_category() {
+        assertThat(redactor.descriptionFor(notification(), NotificationCategory.TICKETS, true))
                 .isEqualTo("New activity on this ticket");
-        assertThat(redactor.descriptionFor(notification(), NotificationCategory.MINGO))
+        assertThat(redactor.descriptionFor(notification(), NotificationCategory.MINGO, true))
                 .isEqualTo("New message");
     }
 
     @Test
     @DisplayName("Given a category with no specific wording, when suppressed, then the generic default is used")
     void unmapped_category_falls_back_to_the_generic_line() {
-        stubPolicy(true);
-
-        assertThat(redactor.descriptionFor(notification(), NotificationCategory.GENERIC))
+        assertThat(redactor.descriptionFor(notification(), NotificationCategory.GENERIC, true))
                 .isEqualTo("New notification");
     }
 
     @Test
     @DisplayName("Given a null category argument, when suppressed, then the notification's own category decides the wording")
     void null_category_falls_back_to_the_stored_one() {
-        stubPolicy(true);
         Notification notification = notification();
         notification.setCategory(NotificationCategory.TICKETS);
 
-        assertThat(redactor.descriptionFor(notification, null)).isEqualTo("New activity on this ticket");
+        assertThat(redactor.descriptionFor(notification, null, true)).isEqualTo("New activity on this ticket");
     }
 
     @Test
-    @DisplayName("Given the policy lookup throws, when a description is read, then content is NOT suppressed — a broken lookup must not blank the tenant")
-    void lookup_failure_fails_open() {
-        when(policyRepository.find()).thenThrow(new IllegalStateException("mongo down"));
+    @DisplayName("Given an already-resolved policy, when descriptions are redacted, then Mongo is never touched — this is what lets a caller redact a whole page on one lookup")
+    void applying_a_resolved_policy_does_no_io() {
+        redactor.descriptionFor(notification(), NotificationCategory.TICKETS, true);
+        redactor.descriptionFor(notification(), NotificationCategory.MINGO, false);
 
-        assertThat(redactor.descriptionFor(notification(), NotificationCategory.TICKETS))
-                .isEqualTo("The printer is offline again");
+        verifyNoInteractions(policyRepository);
     }
 
     @Test
-    @DisplayName("Given no policy repository (a shared service), when a description is read, then content passes through and nothing is looked up")
-    void absent_repository_is_not_suppressed() {
-        NotificationContentRedactor withoutRepository = new NotificationContentRedactor(Optional.empty());
-
-        assertThat(withoutRepository.descriptionFor(notification(), NotificationCategory.TICKETS))
-                .isEqualTo("The printer is offline again");
-        assertThat(withoutRepository.contentSuppressed()).isFalse();
-    }
-
-    @Test
-    @DisplayName("Given a refresh window, when the policy is read repeatedly, then Mongo is hit once — the push outbox drains in batches")
-    void policy_is_cached_within_the_refresh_window() {
-        ReflectionTestUtils.setField(redactor, "policyCacheSeconds", 60L);
+    @DisplayName("Given the single-notification convenience form, when it is called, then it resolves the policy itself — once per call, for callers that handle one notification")
+    void convenience_form_resolves_the_policy_itself() {
         stubPolicy(true);
 
-        redactor.contentSuppressed();
-        redactor.contentSuppressed();
-        redactor.contentSuppressed();
-
+        assertThat(redactor.descriptionFor(notification(), NotificationCategory.TICKETS))
+                .isEqualTo("New activity on this ticket");
         verify(policyRepository, times(1)).find();
     }
 
     @Test
-    @DisplayName("Given the flag was toggled, when the cache is invalidated, then the next read sees the new value immediately")
-    void invalidate_forces_a_fresh_read() {
-        ReflectionTestUtils.setField(redactor, "policyCacheSeconds", 60L);
+    @DisplayName("Given the flag is toggled, when it is read again, then the new value is seen at once — nothing is cached, so there is no staleness window on a privacy control")
+    void policy_is_never_stale() {
         stubPolicy(true);
         assertThat(redactor.contentSuppressed()).isTrue();
 
         stubPolicy(false);
-        redactor.invalidate();
 
         assertThat(redactor.contentSuppressed()).isFalse();
-        verify(policyRepository, times(2)).find();
     }
 
     @Test
-    @DisplayName("Given a null notification, when a description is read, then null — nothing to redact")
+    @DisplayName("Given a null notification, when a description is redacted, then null — nothing to redact")
     void null_notification_is_passed_through() {
-        assertThat(redactor.descriptionFor(null, NotificationCategory.TICKETS)).isNull();
+        assertThat(redactor.descriptionFor(null, NotificationCategory.TICKETS, true)).isNull();
     }
 
     private void stubPolicy(boolean suppressed) {

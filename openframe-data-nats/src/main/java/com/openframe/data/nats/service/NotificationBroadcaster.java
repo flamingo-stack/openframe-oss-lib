@@ -12,6 +12,7 @@ import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.NotificationSettingsRepository;
+import com.openframe.data.service.notification.NotificationContentRedactor;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ public class NotificationBroadcaster {
     private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
     private final NotificationChannelDispatcher channelDispatcher;
+    private final NotificationContentRedactor contentRedactor;
     private final NotificationSettingsRepository settingsRepository;
 
     @Value("${openframe.features.notifications.enabled:false}")
@@ -92,11 +94,14 @@ public class NotificationBroadcaster {
         }
 
         natsPublisher.ifPresentOrElse(publisher -> {
+            boolean contentSuppressed = contentRedactor.contentSuppressed();
             for (String userId : admins) {
-                publishSafely(() -> publisher.publishToUser(userId, saved, category), saved.getId(), "user", userId);
+                publishSafely(() -> publisher.publishToUser(userId, saved, category, contentSuppressed),
+                        saved.getId(), "user", userId);
             }
             for (String machineId : machines) {
-                publishSafely(() -> publisher.publishToMachine(machineId, saved, category), saved.getId(), "machine", machineId);
+                publishSafely(() -> publisher.publishToMachine(machineId, saved, category, contentSuppressed),
+                        saved.getId(), "machine", machineId);
             }
         }, () -> log.debug("NATS publisher disabled — notification {} persisted only; clients reconcile via GraphQL catch-up", saved.getId()));
 
@@ -152,23 +157,25 @@ public class NotificationBroadcaster {
 
     private void republishToRecipients(NotificationNatsPublisher publisher, Notification saved, NotificationCategory category) {
         List<NotificationReadState> recipients = readStateService.findRecipients(saved.getId());
+        boolean contentSuppressed = contentRedactor.contentSuppressed();
         for (NotificationReadState recipient : recipients) {
             if (recipient.getStatus() == ReadStatus.DELETED) {
                 // The recipient removed this card; re-publishing UPDATED would resurrect it on their client.
                 continue;
             }
-            publishUpdateSafely(publisher, saved, category, recipient);
+            publishUpdateSafely(publisher, saved, category, recipient, contentSuppressed);
         }
     }
 
     private void publishUpdateSafely(NotificationNatsPublisher publisher, Notification saved,
-                                     NotificationCategory category, NotificationReadState recipient) {
+                                     NotificationCategory category, NotificationReadState recipient,
+                                     boolean contentSuppressed) {
         String recipientId = recipient.getRecipientId();
         if (recipient.getRecipientType() == RecipientType.MACHINE) {
-            publishSafely(() -> publisher.publishUpdateToMachine(recipientId, saved, category),
+            publishSafely(() -> publisher.publishUpdateToMachine(recipientId, saved, category, contentSuppressed),
                     saved.getId(), "machine", recipientId);
         } else {
-            publishSafely(() -> publisher.publishUpdateToUser(recipientId, saved, category),
+            publishSafely(() -> publisher.publishUpdateToUser(recipientId, saved, category, contentSuppressed),
                     saved.getId(), "user", recipientId);
         }
     }

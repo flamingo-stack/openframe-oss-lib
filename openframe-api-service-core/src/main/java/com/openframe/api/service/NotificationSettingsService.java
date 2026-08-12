@@ -8,7 +8,6 @@ import com.openframe.data.document.notification.NotificationContentPolicy;
 import com.openframe.data.document.notification.NotificationSettings;
 import com.openframe.data.repository.notification.NotificationContentPolicyRepository;
 import com.openframe.data.repository.notification.NotificationSettingsRepository;
-import com.openframe.data.service.notification.NotificationContentRedactor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -26,7 +25,6 @@ public class NotificationSettingsService {
 
     private final NotificationSettingsRepository settingsRepository;
     private final NotificationContentPolicyRepository contentPolicyRepository;
-    private final NotificationContentRedactor contentRedactor;
 
     public NotificationSettingsView get(String userId) {
         NotificationSettings settings = settingsRepository.findByUserId(userId)
@@ -46,7 +44,6 @@ public class NotificationSettingsService {
             throw new BadRequestException("suppressed is required");
         }
         contentPolicyRepository.setContentSuppressed(suppressed);
-        contentRedactor.invalidate();
         return get(userId);
     }
 
