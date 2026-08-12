@@ -1,5 +1,6 @@
 package com.openframe.data.nats.resolver;
 
+import com.openframe.core.service.AssetsBaseUrlProvider;
 import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
