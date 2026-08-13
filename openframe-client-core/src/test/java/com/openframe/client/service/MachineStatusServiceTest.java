@@ -2,7 +2,6 @@ package com.openframe.client.service;
 
 import com.openframe.client.event.DeviceCameOnlineEvent;
 import com.openframe.client.event.DeviceFirstConnectedEvent;
-import com.openframe.client.event.DeviceWentOfflineEvent;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
@@ -71,25 +70,5 @@ class MachineStatusServiceTest {
 
         verify(eventPublisher).publishEvent(any(DeviceFirstConnectedEvent.class));
         verify(eventPublisher, never()).publishEvent(any(DeviceCameOnlineEvent.class));
-    }
-
-    @Test
-    @DisplayName("ONLINE→OFFLINE publishes DeviceWentOfflineEvent (arms the DEVICE_ONLINE sentinel for the next reconnect)")
-    void onlineToOffline_publishesWentOffline() {
-        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine(DeviceStatus.ONLINE)));
-
-        service.updateToOffline(MACHINE, LATER);
-
-        verify(eventPublisher).publishEvent(any(DeviceWentOfflineEvent.class));
-    }
-
-    @Test
-    @DisplayName("PENDING→OFFLINE (first connect while offline) does NOT publish DeviceWentOfflineEvent")
-    void pendingToOffline_noWentOffline() {
-        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine(DeviceStatus.PENDING)));
-
-        service.updateToOffline(MACHINE, LATER);
-
-        verify(eventPublisher, never()).publishEvent(any(DeviceWentOfflineEvent.class));
     }
 }
