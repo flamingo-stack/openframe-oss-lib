@@ -408,12 +408,15 @@ function itemVideoMetadata(item: any): Record<string, string> | null {
   const m = (item?.metadata ?? {}) as Record<string, unknown>
   const out: Record<string, string> = {}
   const videoUrl = pick(m.videoUrl, item?.custom_video_url, item?.main_video_url)
-  const youtubeUrl = pick(m.youtubeUrl, item?.youtube_url)
+  // `testimonial_video_url` is the case-study mapper's youtube column.
+  const youtubeUrl = pick(m.youtubeUrl, item?.youtube_url, item?.testimonial_video_url)
   const highlightVideoUrl = pick(m.highlightVideoUrl, item?.highlight_video_url)
+  // `featured_image` is the customer-interview mapper's poster column.
   const videoPoster = pick(
     m.videoPoster,
     item?.main_video_thumbnail,
     item?.highlight_video_thumbnail,
+    item?.featured_image,
   )
   if (videoUrl) out.videoUrl = videoUrl
   if (youtubeUrl) out.youtubeUrl = youtubeUrl
@@ -1913,10 +1916,13 @@ export function ChatCardLoader({
       metadata: { ...(finalChatRef.metadata ?? {}), ...videoMeta },
     }
     return (
-      <>
+      // Same 12px rhythm as the message renderer's block-sibling wrapper
+      // (`my-3` in chat-message-enhanced) so card→player spacing matches
+      // the spacing between any two hoisted blocks.
+      <div className="flex min-w-0 flex-col gap-3">
         {finish(entry.render(item, finalChatRef, renderOpts))}
         <ChatVideoEntityCard chatRef={videoRef} />
-      </>
+      </div>
     )
   }
   return finish(entry.render(item, finalChatRef, renderOpts))
