@@ -350,46 +350,39 @@ function hubspotStatusToVariant(
   return 'grey'
 }
 
-/** Merge a fetched ChatRef-shaped item over the marker's ChatRef. The
- *  hydration endpoints (`/api/chat/entity-refs`, `/api/tickets`) return
- *  items minted by the SAME hub SSOTs that mint the live refs frame
- *  (`buildChatRefFromRow` / `buildHubspotTicketSelfRef`) — so this is a
- *  field-level overlay, not a translation. Fetched fields win (current
- *  status/title beat the values frozen into a replayed ref);
- *  `url`/`targetPlatform` stay the loader's job (`resolveSourceRowCTA`
- *  + `fallbackHref`). A null/absent item (the ref-only and `refFallback`
- *  render paths) passes the ref through untouched. */
-/** FAQ variant of the overlay — `/api/faqs?ids=` returns faq-shaped rows
- *  (`question`/`answer`/`section`), not ChatRefs. Same precedence rule:
- *  fetched fields win, the marker's ref fills the gaps. */
-function mergeFetchedFaqRef(item: unknown, chatRef: ChatRef): ChatRef {
-  if (!item || typeof item !== 'object') return chatRef
-  const it = item as { question?: unknown; answer?: unknown; section?: unknown }
-  const answer =
-    typeof it.answer === 'string' && it.answer.trim().length > 0 ? it.answer.trim() : null
+/** Build the display ref for a hydrated card PURELY from the fetched API
+ *  item — the item IS a ChatRef (minted server-side by the same SSOTs
+ *  that mint the live refs frame), so the API is the single display-data
+ *  layer. The marker's ref contributes ONLY the loader-resolved
+ *  `url`/`targetPlatform` (embed-origin prefixing of the item's own url
+ *  via `fallbackHref`) — never titles/previews/metadata. */
+function fetchedItemDisplayRef(item: unknown, chatRef: ChatRef): ChatRef {
+  const it = item as ChatRef
   return {
-    ...chatRef,
-    title: typeof it.question === 'string' && it.question ? it.question : chatRef.title,
-    preview: answer ? (answer.length > 400 ? `${answer.slice(0, 397)}…` : answer) : chatRef.preview,
-    metadata: {
-      ...(chatRef.metadata ?? {}),
-      ...(typeof it.section === 'string' && it.section ? { section: it.section } : {}),
-    },
+    ...it,
+    url: chatRef.url ?? it.url ?? null,
+    targetPlatform: chatRef.targetPlatform ?? it.targetPlatform ?? null,
   }
 }
 
-function mergeFetchedRefOverlay(item: unknown, chatRef: ChatRef): ChatRef {
-  if (!item || typeof item !== 'object') return chatRef
-  const it = item as Partial<ChatRef>
+/** FAQ variant — `/api/faqs?ids=` returns faq-shaped rows
+ *  (`question`/`answer`/`section`), not ChatRefs. Same single-layer rule:
+ *  display data comes from the API row only. */
+function fetchedFaqDisplayRef(item: unknown, chatRef: ChatRef): ChatRef {
+  const it = item as { question?: unknown; answer?: unknown; section?: unknown }
+  const answer =
+    typeof it?.answer === 'string' && it.answer.trim().length > 0 ? it.answer.trim() : null
   return {
-    ...chatRef,
-    title: typeof it.title === 'string' && it.title ? it.title : chatRef.title,
-    preview: typeof it.preview === 'string' && it.preview ? it.preview : chatRef.preview,
-    date: typeof it.date === 'string' && it.date ? it.date : chatRef.date,
-    metadata: {
-      ...(chatRef.metadata ?? {}),
-      ...(it.metadata && typeof it.metadata === 'object' ? it.metadata : {}),
-    },
+    type: 'faq',
+    id: chatRef.id,
+    sourceRepo: chatRef.sourceRepo,
+    title: typeof it?.question === 'string' && it.question ? it.question : chatRef.id,
+    url: chatRef.url ?? null,
+    ...(answer
+      ? { preview: answer.length > 400 ? `${answer.slice(0, 397)}…` : answer }
+      : {}),
+    metadata:
+      typeof it?.section === 'string' && it.section ? { section: it.section } : {},
   }
 }
 
@@ -1091,8 +1084,8 @@ interface ChatCardRegistryEntry {
   contentRefType?: string
   /** Required whenever `contentRefType` is set. */
   skeleton?: () => React.ReactNode
-  /** `item` is the fetched row (`undefined` on the ref-only and
-   *  `refFallback` render paths). */
+  /** `item` is the fetched row (`undefined` only on the ref-only render
+   *  path — `deleted_data` / `video`). */
   render: (item: any, chatRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode
   /** Optional post-fetch URL synthesizer. When `chatRef.url` is null
    *  AFTER `resolveSourceRowCTA`, the loader runs this against the
@@ -1111,29 +1104,17 @@ interface ChatCardRegistryEntry {
    *  from its default branch and hand the user a 404. Types with a real
    *  route (hosted, or covered by a host `override`) leave it unset. */
   noComposedHref?: boolean
-  /** The server-built ChatRef carries a FULL display payload
-   *  (title/preview/metadata/url — every type minted by the hub's
-   *  `buildChatRefFromRow` / `buildHubspotTicketSelfRef` SSOTs), so the
-   *  loader renders from the ref instead of hiding the card while the
-   *  fetch is UNRESOLVED: in-flight (`isLoading` — no skeleton flash on
-   *  the live path, where the ref arrived seconds ago) and failed
-   *  (`isError` — an auth blip / 5xx is not evidence of deletion). Gated
-   *  on `sourceRepo` so synthetic client-built refs (possible LLM
-   *  hallucinations) never render this way. A SUCCESSFUL fetch that
-   *  misses still goes to the tombstone — a confirmed miss means the
-   *  entity is gone, and the stale ref must not contradict that. */
-  refFallback?: boolean
 }
 
 /**
- * Entry preset for types hydrated by the hub's generic
- * `/api/chat/entity-refs` endpoint (and `hubspot_ticket_self` via
- * `/api/tickets`) — the fetched item IS a `ChatRef`, so the render
- * overlays it on the marker's ref (`mergeFetchedRefOverlay`) and the
- * shared flags apply: `item.url` is the canonical destination
+ * Entry preset for types hydrated by their per-object card route
+ * (`/api/github/commits`, `/api/slack-community/messages`, …;
+ * `hubspot_ticket_self` via `/api/tickets`) — the fetched item IS a
+ * `ChatRef`, and the API is the SINGLE display-data layer
+ * (`fetchedItemDisplayRef`): `item.url` is the canonical destination
  * (`fallbackHref`), no `<origin>/<type>/<id>` synthesis
- * (`noComposedHref`), and the ref renders while the fetch is unresolved
- * (`refFallback`).
+ * (`noComposedHref`). Loading shows the skeleton, exactly like every
+ * other fetch card.
  */
 function refHydratedEntry(
   docType: string,
@@ -1146,9 +1127,8 @@ function refHydratedEntry(
     contentRefType: docType,
     noComposedHref: true,
     fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
-    refFallback: true,
     skeleton: () => <MingoInfoCardSkeleton />,
-    render: (item, chatRef, opts) => renderRef(mergeFetchedRefOverlay(item, chatRef), opts),
+    render: (item, chatRef, opts) => renderRef(fetchedItemDisplayRef(item, chatRef), opts),
   }
 }
 
@@ -1307,9 +1287,9 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     <SlackChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
   )),
   // FAQ hydrates from its EXISTING public list API (`/api/faqs?ids=` —
-  // also feeding related-content rails, so its base path must not move
-  // to the generic endpoint). Rows are faq-shaped, not ChatRef-shaped,
-  // hence the bespoke overlay instead of `refHydratedEntry`.
+  // also feeding related-content rails, so its base path must not move).
+  // Rows are faq-shaped, not ChatRef-shaped, hence the bespoke row→display
+  // mapping instead of `refHydratedEntry`.
   faq: {
     label: 'FAQ',
     bareInline: true,
@@ -1317,10 +1297,9 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     noComposedHref: true,
     fallbackHref: (item: { id?: number | string }) =>
       item?.id != null ? `/faqs#${faqItemAnchor(item.id)}` : null,
-    refFallback: true,
     skeleton: () => <MingoInfoCardSkeleton />,
     render: (item, chatRef, opts) => (
-      <FaqChatCard chatRef={mergeFetchedFaqRef(item, chatRef)} isNewTab={opts.isNewTab}
+      <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab}
           discuss={opts.discuss} />
     ),
   },
@@ -1816,22 +1795,13 @@ export function ChatCardLoader({
     if (!finalChatRef.sourceRepo) return null
     return finish(entry.render(undefined, finalChatRef, renderOpts))
   }
-  // `refFallback` types render from the server-built ref while the fetch
-  // is UNRESOLVED (in-flight or failed) — the ref carries a full display
-  // payload, so showing it beats a skeleton on the live path and beats
-  // vanishing on a transient failure. Gated on `sourceRepo` (server-built
-  // refs only); the render fn treats the absent item as "ref-only".
-  const refFallbackNode =
-    fetchEntry.refFallback && finalChatRef.sourceRepo
-      ? () => finish(fetchEntry.render(undefined, finalChatRef, renderOpts))
-      : null
-  if (isLoading) return refFallbackNode ? refFallbackNode() : <>{fetchEntry.skeleton?.() ?? null}</>
+  if (isLoading) return <>{fetchEntry.skeleton?.() ?? null}</>
   if (!item) {
     // FETCH FAILURE (non-OK response — auth blip, 5xx, rate limit) is
     // NOT evidence of deletion: render nothing rather than a false
     // "deleted" claim. Only a SUCCESSFUL fetch that lacks the id
     // reaches the tombstone below.
-    if (isError) return refFallbackNode ? refFallbackNode() : null
+    if (isError) return null
     // NEVER-FETCHED (query disabled — no list URL registered for this
     // type, or an empty id): no request was made, so absence of `item`
     // proves nothing. Render nothing rather than a false "deleted".
