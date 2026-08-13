@@ -1328,6 +1328,8 @@ interface RoadmapEntryConfig {
   contentRefType: string
   /** See `ChatCardRegistryEntry.noComposedHref`. */
   noComposedHref?: boolean
+  /** See `ChatCardRegistryEntry.fallbackHref`. */
+  fallbackHref?: (item: any) => string | null
 }
 const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
   roadmap_item: { label: 'Roadmap item', cardType: 'roadmap_item', contentRefType: 'roadmap_item' },
@@ -1342,7 +1344,11 @@ const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
     contentRefType: 'internal_task',
     // Internal ClickUp work has no public destination on any platform — the
     // seam's default branch would synthesize `<hub>/internal_task/<id>`.
+    // The card's destination IS the ClickUp deep link, derived from the
+    // task id post-fetch (the refs frame used to carry it).
     noComposedHref: true,
+    fallbackHref: (item: { id?: unknown }) =>
+      item?.id != null ? clickupTaskUrl(String(item.id)) : null,
   },
 }
 function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
@@ -1351,6 +1357,7 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     contentRefType: cfg.contentRefType,
     bareInline: true,
     ...(cfg.noComposedHref ? { noComposedHref: true } : {}),
+    ...(cfg.fallbackHref ? { fallbackHref: cfg.fallbackHref } : {}),
     skeleton: () => <RoadmapCardSkeleton size="sm" />,
     render: (item, chatRef, opts) => (
       <RoadmapChatCard
