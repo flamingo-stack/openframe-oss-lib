@@ -1,0 +1,8 @@
+extend type Mutation {
+    """
+    Heartbeat from an active human session: marks the caller present for the presence TTL.
+    Sent by the frontend while the tab/app is visible, plus immediately on regaining focus.
+    An optional context argument can be added later without breaking existing clients.
+    """
+    recordPresence: Boolean!
+}
