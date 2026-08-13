@@ -43,12 +43,15 @@ public class NotificationSettingsService {
         if (suppressed == null) {
             throw new BadRequestException("suppressed is required");
         }
-        contentPolicyRepository.setContentSuppressed(suppressed);
+        NotificationContentPolicy policy = contentPolicyRepository.findFirstBy()
+                .orElseGet(NotificationContentPolicy::new);
+        policy.setContentSuppressed(suppressed);
+        contentPolicyRepository.save(policy);
         return get(userId);
     }
 
     private boolean contentSuppressed() {
-        return contentPolicyRepository.find()
+        return contentPolicyRepository.findFirstBy()
                 .map(NotificationContentPolicy::isContentSuppressed)
                 .orElse(false);
     }

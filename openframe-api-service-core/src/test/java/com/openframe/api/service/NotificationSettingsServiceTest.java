@@ -39,7 +39,7 @@ class NotificationSettingsServiceTest {
     void setUp() {
         repository = mock(NotificationSettingsRepository.class);
         contentPolicyRepository = mock(NotificationContentPolicyRepository.class);
-        when(contentPolicyRepository.find()).thenReturn(Optional.empty());
+        when(contentPolicyRepository.findFirstBy()).thenReturn(Optional.empty());
         service = new NotificationSettingsService(repository, contentPolicyRepository);
     }
 
@@ -55,7 +55,7 @@ class NotificationSettingsServiceTest {
     @DisplayName("Given the tenant enabled suppression, when settings are read, then contentSuppressed is TRUE for every user in the tenant")
     void stored_policy_is_reported() {
         when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
-        when(contentPolicyRepository.find())
+        when(contentPolicyRepository.findFirstBy())
                 .thenReturn(Optional.of(NotificationContentPolicy.builder().contentSuppressed(true).build()));
 
         assertThat(service.get("user-1").isContentSuppressed()).isTrue();
@@ -65,12 +65,14 @@ class NotificationSettingsServiceTest {
     @DisplayName("updateContentSuppression persists tenant-wide; nothing to invalidate, since the policy is read per request")
     void suppression_update_persists() {
         when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
-        when(contentPolicyRepository.find())
+        when(contentPolicyRepository.findFirstBy())
                 .thenReturn(Optional.of(NotificationContentPolicy.builder().contentSuppressed(true).build()));
 
         NotificationSettingsView result = service.updateContentSuppression("user-1", true);
 
-        verify(contentPolicyRepository).setContentSuppressed(true);
+        ArgumentCaptor<NotificationContentPolicy> saved = ArgumentCaptor.forClass(NotificationContentPolicy.class);
+        verify(contentPolicyRepository).save(saved.capture());
+        assertThat(saved.getValue().isContentSuppressed()).isTrue();
         assertThat(result.isContentSuppressed()).isTrue();
     }
 

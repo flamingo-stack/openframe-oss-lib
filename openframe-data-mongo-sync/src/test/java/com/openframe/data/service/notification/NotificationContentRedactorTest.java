@@ -29,7 +29,7 @@ class NotificationContentRedactorTest {
     @Test
     @DisplayName("Given no policy document, when the policy is read, then content is NOT suppressed — absence means the informative default")
     void absent_policy_is_not_suppressed() {
-        when(policyRepository.find()).thenReturn(Optional.empty());
+        when(policyRepository.findFirstBy()).thenReturn(Optional.empty());
 
         assertThat(redactor.contentSuppressed()).isFalse();
     }
@@ -37,7 +37,7 @@ class NotificationContentRedactorTest {
     @Test
     @DisplayName("Given the policy lookup throws, when the policy is read, then content is NOT suppressed — a broken lookup must not blank the tenant")
     void lookup_failure_fails_open() {
-        when(policyRepository.find()).thenThrow(new IllegalStateException("mongo down"));
+        when(policyRepository.findFirstBy()).thenThrow(new IllegalStateException("mongo down"));
 
         assertThat(redactor.contentSuppressed()).isFalse();
     }
@@ -109,7 +109,7 @@ class NotificationContentRedactorTest {
     }
 
     private void stubPolicy(boolean suppressed) {
-        when(policyRepository.find())
+        when(policyRepository.findFirstBy())
                 .thenReturn(Optional.of(NotificationContentPolicy.builder().contentSuppressed(suppressed).build()));
     }
 

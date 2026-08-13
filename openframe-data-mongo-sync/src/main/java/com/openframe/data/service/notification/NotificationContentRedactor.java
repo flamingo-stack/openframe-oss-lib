@@ -36,7 +36,7 @@ public class NotificationContentRedactor {
      */
     public boolean contentSuppressed() {
         try {
-            return policyRepository.find()
+            return policyRepository.findFirstBy()
                     .map(NotificationContentPolicy::isContentSuppressed)
                     .orElse(false);
         } catch (RuntimeException ex) {
