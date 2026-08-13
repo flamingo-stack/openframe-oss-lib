@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -208,9 +209,13 @@ public class TagService {
     public Tag createTag(String key, TagEntityType entityType, String description, String color) {
         log.info("Creating tag '{}' with entityType: {}", key, entityType);
 
-        Tag existing = findByKeyIgnoreCase(key, entityType);
+        Tag existing = tagRepository.findByKeyAndEntityType(key, entityType);
         if (existing != null) {
             return existing;
+        }
+        boolean caseVariantExists = tagRepository.existsByKeyIgnoreCaseAndEntityType(key, entityType);
+        if (caseVariantExists) {
+            throw new ConflictException("Tag with key '" + key + "' already exists");
         }
 
         Tag tag = Tag.builder()
@@ -235,8 +240,7 @@ public class TagService {
             TagEntityType entityType = tag.getEntityType();
             boolean duplicateExists = tagRepository.existsByKeyIgnoreCaseAndEntityTypeAndIdNot(key, entityType, tagId);
             if (duplicateExists) {
-                throw new IllegalArgumentException(
-                        "Tag with key '" + key + "' already exists for " + entityType);
+                throw new ConflictException("Tag with key '" + key + "' already exists");
             }
             tag.setKey(key);
         }
@@ -248,16 +252,6 @@ public class TagService {
         }
 
         return tagRepository.save(tag);
-    }
-
-    private Tag findByKeyIgnoreCase(String key, TagEntityType entityType) {
-        Tag exact = tagRepository.findByKeyAndEntityType(key, entityType);
-        if (exact != null) {
-            return exact;
-        }
-        return tagRepository.findByKeyIgnoreCaseAndEntityType(key, entityType).stream()
-                .findFirst()
-                .orElse(null);
     }
 
     @Transactional

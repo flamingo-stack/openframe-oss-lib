@@ -19,9 +19,9 @@ public interface TagRepository extends MongoRepository<Tag, String> {
 
     boolean existsByKeyAndEntityType(String key, TagEntityType entityType);
 
-    boolean existsByKeyIgnoreCaseAndEntityTypeAndIdNot(String key, TagEntityType entityType, String id);
+    boolean existsByKeyIgnoreCaseAndEntityType(String key, TagEntityType entityType);
 
-    List<Tag> findByKeyIgnoreCaseAndEntityType(String key, TagEntityType entityType);
+    boolean existsByKeyIgnoreCaseAndEntityTypeAndIdNot(String key, TagEntityType entityType, String id);
 
     List<Tag> findByEntityTypeAndKeyContainingIgnoreCase(TagEntityType entityType, String key);
 

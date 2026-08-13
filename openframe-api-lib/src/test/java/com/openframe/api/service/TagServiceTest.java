@@ -1,5 +1,6 @@
 package com.openframe.api.service;
 
+import com.openframe.core.exception.ConflictException;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
@@ -11,7 +12,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.util.List;
 import java.util.Optional;
 
 import static com.openframe.data.document.tag.TagEntityType.KNOWLEDGE_ARTICLE;
@@ -53,20 +53,20 @@ class TagServiceTest {
     }
 
     @Test
-    void createTagReturnsCaseVariantMatchWithoutSaving() {
+    void createTagRejectsCaseVariantDuplicate() {
         when(tagRepository.findByKeyAndEntityType("NEWTAG", KNOWLEDGE_ARTICLE)).thenReturn(null);
-        when(tagRepository.findByKeyIgnoreCaseAndEntityType("NEWTAG", KNOWLEDGE_ARTICLE)).thenReturn(List.of(newTag));
+        when(tagRepository.existsByKeyIgnoreCaseAndEntityType("NEWTAG", KNOWLEDGE_ARTICLE)).thenReturn(true);
 
-        Tag result = tagService.createTag("NEWTAG", KNOWLEDGE_ARTICLE, null, null);
-
-        assertThat(result).isSameAs(newTag);
+        assertThatThrownBy(() -> tagService.createTag("NEWTAG", KNOWLEDGE_ARTICLE, null, null))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("NEWTAG");
         verify(tagRepository, never()).save(any());
     }
 
     @Test
     void createTagSavesWhenNoCaseVariantExists() {
         when(tagRepository.findByKeyAndEntityType("Printers", KNOWLEDGE_ARTICLE)).thenReturn(null);
-        when(tagRepository.findByKeyIgnoreCaseAndEntityType("Printers", KNOWLEDGE_ARTICLE)).thenReturn(List.of());
+        when(tagRepository.existsByKeyIgnoreCaseAndEntityType("Printers", KNOWLEDGE_ARTICLE)).thenReturn(false);
         when(tagRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Tag result = tagService.createTag("Printers", KNOWLEDGE_ARTICLE, "desc", "#FF8800");
@@ -84,7 +84,7 @@ class TagServiceTest {
         Tag result = tagService.createTag("NEWTAG", KNOWLEDGE_ARTICLE, null, null);
 
         assertThat(result).isSameAs(legacyDup);
-        verify(tagRepository, never()).findByKeyIgnoreCaseAndEntityType(any(), any());
+        verify(tagRepository, never()).existsByKeyIgnoreCaseAndEntityType(any(), any());
         verify(tagRepository, never()).save(any());
     }
 
@@ -96,7 +96,7 @@ class TagServiceTest {
                 .thenReturn(true);
 
         assertThatThrownBy(() -> tagService.updateTag("tag-2", "NEWTAG", null, null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("NEWTAG");
         verify(tagRepository, never()).save(any());
     }
