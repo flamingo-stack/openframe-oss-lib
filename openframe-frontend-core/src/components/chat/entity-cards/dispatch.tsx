@@ -350,6 +350,76 @@ function hubspotStatusToVariant(
   return 'grey'
 }
 
+/**
+ * Decode a SELF-DESCRIBING `[card://video:<id>]` marker id into playable
+ * video metadata — the paired decoder for the hub's
+ * `DERIVE_HANDLES_BY_KIND` id minting (keep in lockstep). Embedded
+ * videos have no backing table row, so the marker id IS the payload;
+ * this is what makes video cards transport-independent (no refs frame).
+ *   - bare 11-char id → YouTube (lite-youtube facade takes the bare id)
+ *   - `mux-<playbackId>` → `https://stream.mux.com/<playbackId>.m3u8`
+ *   - `mp4-<base64url(url)>` → decoded https URL
+ * Legacy pre-2026-08 sha1-hash ids (`<kind>-<10 hex>`) and anything
+ * undecodable return null — the caller falls through to the loader,
+ * which renders the marker as plain text (same anti-hallucination
+ * posture as every other card type).
+ */
+function decodeVideoMarkerId(id: string): { videoUrl?: string; youtubeUrl?: string } | null {
+  // Prefix checks FIRST: an id like `mux-1234567` (11 chars) would also
+  // satisfy the bare-YouTube-id pattern below.
+  const mux = id.match(/^mux-([A-Za-z0-9_-]+)$/)
+  if (mux) {
+    // Legacy sha1 ids are exactly 10 lowercase hex — not playback ids.
+    if (/^[0-9a-f]{10}$/.test(mux[1])) return null
+    return { videoUrl: `https://stream.mux.com/${mux[1]}.m3u8` }
+  }
+  const mp4 = id.match(/^mp4-([A-Za-z0-9_-]+)$/)
+  if (mp4) {
+    if (/^[0-9a-f]{10}$/.test(mp4[1])) return null
+    try {
+      const b64 = mp4[1].replace(/-/g, '+').replace(/_/g, '/')
+      const url = atob(b64)
+      // https-only — the id is model-emitted text; never let a marker
+      // smuggle a non-https src into a player.
+      if (!/^https:\/\//.test(url)) return null
+      return { videoUrl: url }
+    } catch {
+      return null
+    }
+  }
+  if (/^[A-Za-z0-9_-]{11}$/.test(id)) return { youtubeUrl: id }
+  return null
+}
+
+/** Read hero-video metadata off a FETCHED item — the API-driven
+ *  replacement for the refs-frame `metadata.videoUrl` check. Two item
+ *  shapes: ChatRef-shaped items (per-object hydration routes) carry the
+ *  SSOT `metadata` keys directly; content rows (public list APIs) carry
+ *  the canonical columns (`custom_video_url` for recordings,
+ *  `main_video_url` elsewhere — see the hub configs' videoUrlColumns).
+ *  Returns null when the item carries no video (compact card only). */
+function itemVideoMetadata(item: any): Record<string, string> | null {
+  const pick = (...vals: unknown[]): string | undefined => {
+    for (const v of vals) if (typeof v === 'string' && v.length > 0) return v
+    return undefined
+  }
+  const m = (item?.metadata ?? {}) as Record<string, unknown>
+  const out: Record<string, string> = {}
+  const videoUrl = pick(m.videoUrl, item?.custom_video_url, item?.main_video_url)
+  const youtubeUrl = pick(m.youtubeUrl, item?.youtube_url)
+  const highlightVideoUrl = pick(m.highlightVideoUrl, item?.highlight_video_url)
+  const videoPoster = pick(
+    m.videoPoster,
+    item?.main_video_thumbnail,
+    item?.highlight_video_thumbnail,
+  )
+  if (videoUrl) out.videoUrl = videoUrl
+  if (youtubeUrl) out.youtubeUrl = youtubeUrl
+  if (highlightVideoUrl) out.highlightVideoUrl = highlightVideoUrl
+  if (videoPoster) out.videoPoster = videoPoster
+  return out.videoUrl || out.youtubeUrl || out.highlightVideoUrl ? out : null
+}
+
 /** Build the display ref for a hydrated card PURELY from the fetched API
  *  item — the item IS a ChatRef (minted server-side by the same SSOTs
  *  that mint the live refs frame), so the API is the single display-data
@@ -1833,6 +1903,25 @@ export function ChatCardLoader({
     }
     return null
   }
+  // Hero-video promotion, API-driven: when the FETCHED item carries a
+  // playable video (ChatRef-shaped items via `metadata.videoUrl` /
+  // `youtubeUrl` / `highlightVideoUrl`; content rows via the canonical
+  // `custom_video_url` / `main_video_url` columns), wrap the compact card
+  // in the same BlockCard + ChatVideoEntityCard shell the refs-frame path
+  // used to produce — but decided from the API item, so it renders on
+  // every transport. No video on the item → compact card only.
+  const videoMeta = itemVideoMetadata(item)
+  if (videoMeta) {
+    const videoRef: ChatRef = {
+      ...finalChatRef,
+      metadata: { ...(finalChatRef.metadata ?? {}), ...videoMeta },
+    }
+    return (
+      <BlockCard inline={finish(entry.render(item, finalChatRef, renderOpts))}>
+        <ChatVideoEntityCard chatRef={videoRef} />
+      </BlockCard>
+    )
+  }
   return finish(entry.render(item, finalChatRef, renderOpts))
 }
 
@@ -1862,11 +1951,6 @@ export function renderChatInlineEntityCard(
   } = {},
 ): React.ReactNode {
   const { onDiscuss, onDisplay, baseRoute, chipBasePlatform, extras } = options
-  const m = chatRef.metadata ?? {}
-  const hasVideo =
-    (typeof m.videoUrl === 'string' && (m.videoUrl as string).length > 0) ||
-    (typeof m.youtubeUrl === 'string' && (m.youtubeUrl as string).length > 0) ||
-    (typeof m.highlightVideoUrl === 'string' && (m.highlightVideoUrl as string).length > 0)
 
   const loader = (
     <ChatCardLoader
@@ -1879,12 +1963,29 @@ export function renderChatInlineEntityCard(
     />
   )
 
-  if (hasVideo) {
-    return (
-      <BlockCard inline={loader}>
-        <ChatVideoEntityCard chatRef={chatRef} />
-      </BlockCard>
-    )
+  // Embedded videos are SELF-DESCRIBING: the marker id alone recovers the
+  // playable URL (`decodeVideoMarkerId`), so the player renders on ANY
+  // transport with zero refs/fetch. Undecodable ids (legacy sha1 hashes,
+  // hallucinations) fall through to the loader → plain-text degrade.
+  // Hero videos on FETCHED entity types (webinars, releases, …) are
+  // handled post-fetch inside ChatCardLoader (`itemVideoMetadata`) — the
+  // marker's ref plays no part in either path.
+  if (chatRef.type === 'video') {
+    const decoded = decodeVideoMarkerId(chatRef.id)
+    if (decoded) {
+      const displayRef: ChatRef = {
+        ...chatRef,
+        title: chatRef.title && chatRef.title !== chatRef.id ? chatRef.title : 'Video',
+        url: chatRef.url ?? (decoded.videoUrl ?? (decoded.youtubeUrl ? `https://www.youtube.com/watch?v=${decoded.youtubeUrl}` : null)),
+        metadata: { ...(chatRef.metadata ?? {}), ...decoded },
+      }
+      return (
+        <BlockCard inline={<ChatInlineVideoPill chatRef={displayRef} />}>
+          <ChatVideoEntityCard chatRef={displayRef} />
+        </BlockCard>
+      )
+    }
+    return loader
   }
 
   return loader
