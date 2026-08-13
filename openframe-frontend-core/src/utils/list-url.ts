@@ -57,10 +57,14 @@ export function canonicalContentRefType(contentRefType: string): string {
  * mapper's `listApi` (raw, unencoded `join(',')`; exact param names) —
  * the byte-parity test (`__tests__/list-url.test.ts`) fails if any drifts.
  *
- * An ABSENT key ⇒ `buildListUrl` returns null (no-fetch). The no-list
- * types (`github_*`, `slack_message`, financials, docs) are intentionally
- * NOT enumerated here — their absence IS the null. `marketing_campaign`
- * is handled as a literal case in `buildListUrl` (see there).
+ * An ABSENT key ⇒ `buildListUrl` returns null (no-fetch). Only two types
+ * are intentionally absent — `deleted_data` (tombstone of a deleted row;
+ * nothing exists to fetch) and `video` (body-embed content-hash ids with
+ * no backing table row). Every other card type resolves here: content
+ * types to their public list APIs, the rest to their per-object
+ * card-hydration routes (see `ENTITY_CARD_ROUTES` below).
+ * `marketing_campaign` is handled as a literal case in `buildListUrl`
+ * (see there).
  */
 const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   roadmap_item: (ids, b) => `${b}/api/roadmap?task_ids=${ids.join(',')}`,
@@ -76,6 +80,32 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   customer_interview: (ids, b) => `${b}/api/customer-interviews?ids=${ids.join(',')}&limit=${ids.length}`,
   investor_update: (ids, b) => `${b}/api/investor-updates?ids=${ids.join(',')}&limit=${ids.length}`,
   faq: (ids, b) => `${b}/api/faqs?ids=${ids.join(',')}&limit=${ids.length}`,
+  // Self-scoped: the endpoint filters by the SESSION user's email server-side
+  // (`selfScopeFilter`), so foreign ids simply return no row — safe to expose
+  // through the same builder path as the public types.
+  hubspot_ticket_self: (ids, b) => `${b}/api/tickets?ids=${ids.join(',')}`,
+  // Per-OBJECT card-hydration routes for the types with no pre-existing
+  // public list API. THIS map is the only place these URL shapes exist —
+  // the hub's mappers/configs delegate here (`listApi: (ids) =>
+  // buildListUrl('<type>', ids)`), same as every entry above. The
+  // internal/public GitHub variants share their object's route; the
+  // route serves whichever variant is bound to the calling source.
+  github_commit: (ids, b) => `${b}/api/github/commits?ids=${ids.join(',')}`,
+  github_commit_public: (ids, b) => `${b}/api/github/commits?ids=${ids.join(',')}`,
+  github_pull_request: (ids, b) => `${b}/api/github/pull-requests?ids=${ids.join(',')}`,
+  github_pull_request_public: (ids, b) => `${b}/api/github/pull-requests?ids=${ids.join(',')}`,
+  github_pr_review: (ids, b) => `${b}/api/github/reviews?ids=${ids.join(',')}`,
+  github_pr_review_public: (ids, b) => `${b}/api/github/reviews?ids=${ids.join(',')}`,
+  slack_message: (ids, b) => `${b}/api/slack-community/messages?ids=${ids.join(',')}`,
+  hubspot_ticket: (ids, b) => `${b}/api/tickets/internal?ids=${ids.join(',')}`,
+  hubspot_ticket_anon: (ids, b) => `${b}/api/tickets/known-issues?ids=${ids.join(',')}`,
+  data_room_doc: (ids, b) => `${b}/api/data-room/documents?ids=${ids.join(',')}`,
+  markdown: (ids, b) => `${b}/api/docs/pages?ids=${ids.join(',')}`,
+  financial_kpi: (ids, b) => `${b}/api/financials/kpis?ids=${ids.join(',')}`,
+  cap_table: (ids, b) => `${b}/api/financials/cap-table?ids=${ids.join(',')}`,
+  profit_loss: (ids, b) => `${b}/api/financials/profit-loss?ids=${ids.join(',')}`,
+  balance_sheet: (ids, b) => `${b}/api/financials/balance-sheet?ids=${ids.join(',')}`,
+  cash_flow: (ids, b) => `${b}/api/financials/cash-flow?ids=${ids.join(',')}`,
 }
 
 /**
