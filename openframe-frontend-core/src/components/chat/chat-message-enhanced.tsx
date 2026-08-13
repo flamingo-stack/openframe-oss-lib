@@ -83,7 +83,7 @@ function groupAskRuns(segments: MessageSegment[]): Map<number, AskSegment[]> {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, approvalVariant, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, onAskSelect, NavLinkAnchor, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, approvalVariant, authorType: authorTypeProp, assistantIcon, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, onAskSelect, NavLinkAnchor, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
@@ -92,16 +92,15 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // (v6.1 §B.2.7 — DRY duplications #2). The OSS-lib stays data-agnostic:
     // it doesn't know about entity types, slash commands, or app routing.
     // The host (multi-platform-hub) returns whatever JSX it wants for each
-    // resolved ChatRef — typically a hover-card pill that composes the
-    // canonical entity card from the host's design system.
+    // marker's descriptor — typically a self-fetching card that hydrates by
+    // id from the host's per-object APIs.
     //
-    // The remark plugin runs whenever the assistant emits a `[card://]`
-    // marker (chatRefs present OR not), so we always strip raw markers
-    // from rendered text (Logic MED-4). When the host's `renderEntityCard`
-    // is unset OR returns null, the override falls back to the ref's
-    // title — or, if even the ref is unknown, the bare cardId. Never
-    // renders the literal `[card://...]` URL.
-    const hasMarkerSupport = !!chatRefs || !!renderEntityCard
+    // The remark plugin runs whenever the host opts in with
+    // `renderEntityCard`, so we always strip raw markers from rendered text
+    // (Logic MED-4). When the host's `renderEntityCard` is unset OR returns
+    // null, the override falls back to the bare cardId. Never renders the
+    // literal `[card://...]` URL.
+    const hasMarkerSupport = !!renderEntityCard
 
     const segments = useMemo(() => normalizeContent(content), [content])
 
@@ -154,9 +153,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // fetch. Caching the produced node by key and returning the SAME element
     // reference lets React bail out of re-rendering that subtree, so the card
     // (and its open menu) survives across chunks. Invalidated per key when the
-    // backing ref or the render fn identity changes.
+    // render fn identity changes.
     const renderedCardNodeCache = useRef(
-      new Map<string, { refMatch: ChatRef | undefined; render: ((ref: ChatRef) => React.ReactNode) | undefined; node: React.ReactNode }>(),
+      new Map<string, { render: ((ref: ChatRef) => React.ReactNode) | undefined; node: React.ReactNode }>(),
     )
 
     /**
@@ -188,7 +187,6 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
      */
     const renderingPlan = useMemo(() => {
       if (!hasMarkerSupport) return null
-      const refs = chatRefs ?? {}
       const render = renderEntityCard
       const inlineByKey = new Map<string, React.ReactNode>()
       type SegmentPart =
@@ -220,39 +218,34 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           const cardId = match[2]
           const key = `${cardType}:${cardId}`
           usedKeys.add(key)
-          // Reuse the cached node when neither the backing ref nor the render
-          // fn changed — returning the SAME element reference across renders is
-          // what stops React from re-mounting the card (and closing its open
-          // menu / re-fetching) on every stream chunk. Also dedups the same key
-          // emitted twice within one message.
-          const refMatch = refs[key]
+          // Reuse the cached node when the render fn didn't change —
+          // returning the SAME element reference across renders is what
+          // stops React from re-mounting the card (and closing its open
+          // menu / re-fetching) on every stream chunk. Also dedups the same
+          // key emitted twice within one message.
           let entry = cache.get(key)
-          if (!entry || entry.refMatch !== refMatch || entry.render !== render) {
-            // Always invoke render() — even when the metadata map has
-            // no entry for this marker. Fetch-mode card types
-            // (delivery_item, roadmap_item, internal_task, etc.) don't
-            // ship metadata in the SSE frame; they self-fetch by `id`
-            // via the host's list-API hook, so a minimal {type,id}
-            // ChatRef is all the renderer needs to mount the loader.
-            // For no-fetch types (hubspot_ticket_self, slack_message,
-            // …) without a refMatch the host's render() returns null
-            // and we fall through to the bare-cardId fallback in the
+          if (!entry || entry.render !== render) {
+            // The marker is the ONLY data on the wire: cards hydrate by id
+            // from the host's per-object APIs, so a minimal {type, id}
+            // descriptor is all the renderer needs to mount the loader.
+            // For types with nothing to fetch the host's render() returns
+            // null and we fall through to the bare-cardId fallback in the
             // `<a card://…>` override below.
             //
-            // SYNTHETIC REF DEFAULTS: `ChatRef.title` and `ChatRef.url`
-            // are non-optional in the type; a bare `{type, id}` cast
-            // would lie to consumers that read those fields. Default
-            // `title` to the cardId (so any host renderer that prints
-            // `ref.title` shows the id rather than `undefined`) and
-            // `url` to null (matches the no-link semantics fetch-mode
-            // cards rely on — they resolve their own URL after fetch).
-            const refForRender: ChatRef = refMatch ?? {
+            // DESCRIPTOR DEFAULTS: `ChatRef.title` and `ChatRef.url` are
+            // non-optional in the type; a bare `{type, id}` cast would lie
+            // to consumers that read those fields. Default `title` to the
+            // cardId (so any host renderer that prints `ref.title` shows
+            // the id rather than `undefined`) and `url` to null (matches
+            // the no-link semantics fetch-mode cards rely on — they
+            // resolve their own URL after fetch).
+            const refForRender: ChatRef = {
               type: cardType,
               id: cardId,
               title: cardId,
               url: null,
             }
-            entry = { refMatch, render, node: render(refForRender) }
+            entry = { render, node: render(refForRender) }
             cache.set(key, entry)
           }
           const rendered = entry.node
@@ -274,7 +267,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               key,
               props.inline != null
                 ? props.inline
-                : <span className="text-ods-text-primary font-medium">{refMatch?.title ?? cardId}</span>,
+                : <span className="text-ods-text-primary font-medium">{cardId}</span>,
             )
           } else if (rendered != null) {
             // Hoist fetch-mode entity cards (roadmap/blog/case-study/release/…)
@@ -313,7 +306,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         }
       })
       return { inlineByKey, partsBySegment, usedKeys }
-    }, [hasMarkerSupport, chatRefs, renderEntityCard, segments])
+    }, [hasMarkerSupport, renderEntityCard, segments])
 
     // Drop cached nodes for markers no longer present so the cache can't grow
     // unbounded as a long message's markers change. Deliberately an EFFECT,
@@ -341,67 +334,6 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // while still reading the current plan at call time.
     const renderingPlanRef = useRef(renderingPlan)
     renderingPlanRef.current = renderingPlan
-    const chatRefsRef = useRef(chatRefs)
-    chatRefsRef.current = chatRefs
-
-    // Ref-SET token. The override reads `chatRefsRef` at CALL time, but the
-    // markdown engine memoizes completed blocks on the override map's
-    // identity — so on a COMPLETED (no longer streaming) message, a ref that
-    // resolves late would never be re-read: nothing else about the renderer's
-    // props changes, the engine's memo bails, and the pill stays stuck on its
-    // fallback (`refMatch.title`, or the raw cardId) forever. Streaming is
-    // covered because `card://` blocks are excluded from the block cache; the
-    // completed path has no other escape.
-    //
-    // The token fingerprints VALUES, not just the key set: a later refs frame
-    // REPLACES the whole map for a send index, and the enrichment case that
-    // matters most — a `title` going from the raw cardId to the resolved
-    // document title — keeps the key set IDENTICAL. A key-only token would be
-    // unchanged, the override map would keep its identity, the engine's
-    // completed-block memo would bail, and the pill would stay on its fallback
-    // forever. Every `ChatRef` field is included because the host's
-    // `renderEntityCard` receives the whole ref and may render any of them.
-    //
-    // Still STABLE per text delta (the refs map doesn't change while tokens
-    // stream), and the cost is one pass over a handful of refs per CHANGED
-    // `chatRefs` identity — the dep list is unchanged.
-    //
-    // Fields are joined by `JSON.stringify`, NOT by a separator character.
-    // `title`, `preview` and `url` are free-form HOST strings, so any
-    // delimiter we pick is one the data may also contain: joined with a plain
-    // space, `title: 'a b'` + empty `url` fingerprints identically to
-    // `title: 'a'` + `url: 'b'`, silently reintroducing the stale-pill memo
-    // bail this token exists to fix. (An earlier revision used a literal NUL
-    // byte as the separator: collision-free in practice, but it made the
-    // source file itself binary to grep and diff tooling.) `JSON.stringify`
-    // escapes every field, so no value can forge a boundary.
-    //
-    // Caveat worth stating: `JSON.stringify` on `metadata` is key-ORDER
-    // dependent: two structurally equal objects built in different insertion
-    // orders fingerprint differently. Acceptable here because every refs map
-    // arrives from ONE decoder with a fixed field order, and the failure mode
-    // is a redundant re-render, never a stale pill.
-    const refsKey = useMemo(
-      () =>
-        Object.entries(chatRefs ?? {})
-          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-          .map(([k, v]) =>
-            JSON.stringify([
-              k,
-              v.type,
-              v.sourceRepo ?? null,
-              v.id,
-              v.title,
-              v.url ?? null,
-              v.targetPlatform ?? null,
-              v.date ?? null,
-              v.preview ?? null,
-              v.metadata ?? null,
-            ]),
-          )
-          .join('|'),
-      [chatRefs],
-    )
 
     const cardComponentOverrides = useMemo(() => {
       if (!hasMarkerSupport && !hasMentionSupport) return undefined
@@ -434,32 +366,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               const key = `${cardType}:${cardId}`
               const inline = renderingPlanRef.current?.inlineByKey.get(key)
               if (inline != null) return inline
-              // Three fallback cases — keep them DISTINCT, never blur them
-              // together. Mixing them up (which the old code did by reaching
-              // for "any same-type ref's title") makes LLM hallucinations
-              // LOOK like real cards, which the user can't tell apart from
-              // genuine references.
-              //
-              //   (1) Exact ref present, renderer returned null:
-              //       The marker is legit (server confirmed the row exists)
-              //       but no compact-card type is registered for `cardType`.
-              //       Render the ref's REAL title as plain text — accurate,
-              //       just no rich UI.
-              //
-              //   (2) Exact ref absent (refs map has no `${cardType}:${cardId}`):
-              //       The LLM emitted a marker for an ID the server did NOT
-              //       surface. Either the LLM hallucinated the id, or the
-              //       refs map and the snapshot drifted (server-side bug
-              //       worth fixing — see `MAX_ROWS_PER_ENTITY_GROUP` in
-              //       `doc-chat-utils.ts:buildSourcesMeta`). Render the raw
-              //       `cardId` so the breakage is VISIBLE; never borrow a
-              //       title from an unrelated ref — that hides the bug and
-              //       deceives the reader into thinking they're looking at
-              //       a real card.
-              const refMatch: ChatRef | undefined = chatRefsRef.current?.[key]
-              if (refMatch) {
-                return <span className="text-ods-text-primary">{refMatch.title}</span>
-              }
+              // No rendered card for this marker (the host's renderer
+              // returned null — no card type registered for `cardType`, or
+              // the id resolved to nothing). Render the raw `cardId` as a
+              // dim span so the marker never LOOKS like a real card: a
+              // hallucinated id must stay visibly broken, never dressed up
+              // with borrowed data.
               return <span className="text-ods-text-secondary opacity-60">{cardId}</span>
             }
           }
@@ -500,11 +412,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       }
       // DEPS ARE DELIBERATELY MINIMAL — every one of them is stable across a
       // streaming turn (booleans + host-stable fn/component identities, both
-      // enforced by this file's `memo` comparator). The rendering plan and the
-      // refs MAP are read through refs above precisely so they do NOT appear
-      // here; `refsKey` is the one ref-derived dep, and it only moves when the
-      // ref set OR any ref VALUE does (see its definition).
-    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor, refsKey])
+      // enforced by this file's `memo` comparator). The rendering plan is
+      // read through a ref above precisely so it does NOT appear here.
+    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor])
 
     /**
      * Body of a markdown-bearing segment (`text` / `guide`).
@@ -801,11 +711,6 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.authorType === nextProps.authorType &&
     prevProps.assistantIcon === nextProps.assistantIcon &&
     prevProps.className === nextProps.className &&
-    // Reference equality on chatRefs is sufficient — the host's hooks should
-    // re-use the same Record instance per turn; mutations create a new map.
-    // Without this check, a parent re-render with a new (but equivalent)
-    // refs object would force a full markdown re-render every keystroke.
-    prevProps.chatRefs === nextProps.chatRefs &&
     // Reference equality — the host re-uses the same array instance per
     // message (it's set once on the optimistic send and never mutated).
     prevProps.contextItems === nextProps.contextItems &&
