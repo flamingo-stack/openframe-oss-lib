@@ -1,6 +1,7 @@
 package com.openframe.client.listener;
 
 import com.openframe.client.event.DeviceCameOnlineEvent;
+import com.openframe.client.event.DeviceWentOfflineEvent;
 import com.openframe.client.service.rmm.DeviceOnlineScheduleTriggerService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -21,11 +22,19 @@ class DeviceOnlineScheduleTriggerListenerTest {
     @InjectMocks private DeviceOnlineScheduleTriggerListener listener;
 
     @Test
-    @DisplayName("offline→online event routes the machine to the trigger service")
-    void cameOnline_triggers() {
+    @DisplayName("online→offline event routes the machine to the trigger service (arm)")
+    void wentOffline_arms() {
+        Machine machine = machine(DeviceStatus.OFFLINE);
+        listener.onDeviceWentOffline(new DeviceWentOfflineEvent(this, machine));
+        verify(triggerService).onDeviceWentOffline(machine);
+    }
+
+    @Test
+    @DisplayName("offline→online event routes the machine to the trigger service (queue reconnect)")
+    void cameOnline_queues() {
         Machine machine = machine(DeviceStatus.ONLINE);
         listener.onDeviceCameOnline(new DeviceCameOnlineEvent(this, machine));
-        verify(triggerService).onDeviceOnline(machine);
+        verify(triggerService).onDeviceCameOnline(machine);
     }
 
     private static Machine machine(DeviceStatus status) {
