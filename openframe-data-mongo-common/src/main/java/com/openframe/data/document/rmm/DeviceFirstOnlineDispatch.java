@@ -17,8 +17,8 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "machine_first_online_dispatch")
 @CompoundIndex(
-        name = "tenant_machineId",
-        def = "{'tenantId': 1, 'machineId': 1}",
+        name = "tenant_machineId_scheduleId",
+        def = "{'tenantId': 1, 'machineId': 1, 'scheduleId': 1}",
         unique = true)
 @CompoundIndex(
         name = "pending_by_first_seen",
@@ -31,6 +31,8 @@ public class DeviceFirstOnlineDispatch implements TenantScoped {
     private String tenantId;
 
     private String machineId;
+
+    private String scheduleId;
 
     private Instant firstSeenAt;
 
