@@ -1,6 +1,7 @@
 package com.openframe.client.listener;
 
 import com.openframe.client.event.DeviceCameOnlineEvent;
+import com.openframe.client.event.DeviceWentOfflineEvent;
 import com.openframe.client.service.rmm.DeviceOnlineScheduleTriggerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +16,12 @@ public class DeviceOnlineScheduleTriggerListener {
     private final DeviceOnlineScheduleTriggerService triggerService;
 
     @EventListener
+    public void onDeviceWentOffline(DeviceWentOfflineEvent event) {
+        triggerService.onDeviceWentOffline(event.getMachine());
+    }
+
+    @EventListener
     public void onDeviceCameOnline(DeviceCameOnlineEvent event) {
-        triggerService.onDeviceOnline(event.getMachine());
+        triggerService.onDeviceCameOnline(event.getMachine());
     }
 }
