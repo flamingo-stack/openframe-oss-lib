@@ -70,7 +70,11 @@ import {
   kindLabel as githubKindLabel,
   reviewStateLabel,
 } from './github-activity-card'
-import { MingoInfoCard, type MingoInfoCardStatus } from '../mingo-info-card'
+import {
+  MingoInfoCard,
+  MingoInfoCardSkeleton,
+  type MingoInfoCardStatus,
+} from '../mingo-info-card'
 import type { ActionsMenuGroup } from '../../ui/actions-menu'
 import { MingoIcon } from '../../icons'
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon'
@@ -343,6 +347,28 @@ function hubspotStatusToVariant(
   if (s === 'CLOSED') return 'success'
   if (s === 'OPEN') return 'warning'
   return 'grey'
+}
+
+/** Merge a fetched `/api/tickets?ids=` row over the marker's ChatRef. The
+ *  endpoint returns ChatRef-shaped items minted by the hub's
+ *  `buildHubspotTicketSelfRef` — the SAME SSOT that mints the live refs
+ *  frame — so this is a field-level overlay, not a translation. Fetched
+ *  fields win (current status/title beat the values frozen into a replayed
+ *  ref); `url`/`targetPlatform` stay the loader's job (`resolveSourceRowCTA`
+ *  + `fallbackHref`). A null/absent item (the `refFallback` render paths)
+ *  passes the ref through untouched. */
+function mergeFetchedTicketRef(item: unknown, chatRef: ChatRef): ChatRef {
+  if (!item || typeof item !== 'object') return chatRef
+  const it = item as Partial<ChatRef>
+  return {
+    ...chatRef,
+    title: typeof it.title === 'string' && it.title ? it.title : chatRef.title,
+    preview: typeof it.preview === 'string' && it.preview ? it.preview : chatRef.preview,
+    metadata: {
+      ...(chatRef.metadata ?? {}),
+      ...(it.metadata && typeof it.metadata === 'object' ? it.metadata : {}),
+    },
+  }
 }
 
 function HubspotTicketChatCard({
@@ -1057,6 +1083,18 @@ type ChatCardRegistryEntry =
        *  from its default branch and hand the user a 404. Types with a real
        *  route (hosted, or covered by a host `override`) leave it unset. */
       noComposedHref?: boolean
+      /** The server-built ChatRef carries a FULL display payload
+       *  (title/preview/metadata/url — e.g. `hubspot_ticket_self`, minted by
+       *  the hub's `buildHubspotTicketSelfRef` SSOT), so the loader renders
+       *  from the ref instead of hiding the card while the fetch is
+       *  UNRESOLVED: in-flight (`isLoading` — no skeleton flash on the live
+       *  path, where the ref arrived seconds ago) and failed (`isError` —
+       *  an auth blip / 5xx is not evidence of deletion). Gated on
+       *  `sourceRepo` so synthetic client-built refs (possible LLM
+       *  hallucinations) never render this way. A SUCCESSFUL fetch that
+       *  misses still goes to the tombstone — a confirmed miss means the
+       *  entity is gone, and the stale ref must not contradict that. */
+      refFallback?: boolean
     }
 
 interface FinancialCardConfig {
@@ -1255,13 +1293,31 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
           discuss={opts.discuss} />
     ),
   },
+  // FETCH-mode (unlike its `hubspot_ticket` / `hubspot_ticket_anon`
+  // siblings above): self-ticket markers must survive transports and
+  // replays that drop the refs frame (NATS-brokered streams, history
+  // rehydration after `filterRefsToAnswer`, the REFS_MAX cap), so the
+  // card self-heals via the session-scoped `GET /api/tickets?ids=`
+  // endpoint like every other fetch card. The live SSE path still
+  // renders instantly from the ref (`refFallback`), and a fetch also
+  // upgrades a replayed ref's frozen status to the CURRENT one.
   hubspot_ticket_self: {
-    mode: 'no-fetch',
+    mode: 'fetch',
     label: 'HubSpot ticket (self)',
+    contentRefType: 'hubspot_ticket_self',
     bareInline: true,
-    render: (chatRef, opts) => (
-      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
-          discuss={opts.discuss} />
+    // Ticket deep-links open the Help-Center drawer (`/tickets?ticket=<id>`),
+    // not a public content page — the composeContentUrl default branch
+    // would synthesize `<origin>/hubspot_ticket_self/<id>` and 404.
+    noComposedHref: true,
+    // The fetched item IS a ChatRef (hub `buildHubspotTicketSelfRef`) —
+    // its `url` carries the canonical deep-link for refs-less replays.
+    fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
+    refFallback: true,
+    skeleton: () => <MingoInfoCardSkeleton />,
+    render: (item, chatRef, opts) => (
+      <HubspotTicketChatCard chatRef={mergeFetchedTicketRef(item, chatRef)}
+          isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
   },
   data_room_doc: {
@@ -1751,13 +1807,22 @@ export function ChatCardLoader({
     if (!finalChatRef.sourceRepo) return null
     return finish(entry.render(finalChatRef, renderOpts))
   }
-  if (isLoading) return <>{entry.skeleton()}</>
+  // `refFallback` types render from the server-built ref while the fetch
+  // is UNRESOLVED (in-flight or failed) — the ref carries a full display
+  // payload, so showing it beats a skeleton on the live path and beats
+  // vanishing on a transient failure. Gated on `sourceRepo` (server-built
+  // refs only); the render fn treats the absent item as "ref-only".
+  const refFallbackNode =
+    fetchEntry?.refFallback && finalChatRef.sourceRepo
+      ? () => finish(fetchEntry.render(undefined, finalChatRef, renderOpts))
+      : null
+  if (isLoading) return refFallbackNode ? refFallbackNode() : <>{entry.skeleton()}</>
   if (!item) {
     // FETCH FAILURE (non-OK response — auth blip, 5xx, rate limit) is
     // NOT evidence of deletion: render nothing rather than a false
     // "deleted" claim. Only a SUCCESSFUL fetch that lacks the id
     // reaches the tombstone below.
-    if (isError) return null
+    if (isError) return refFallbackNode ? refFallbackNode() : null
     // NEVER-FETCHED (query disabled — no list URL registered for this
     // type, or an empty id): no request was made, so absence of `item`
     // proves nothing. Render nothing rather than a false "deleted".

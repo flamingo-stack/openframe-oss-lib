@@ -76,6 +76,11 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   customer_interview: (ids, b) => `${b}/api/customer-interviews?ids=${ids.join(',')}&limit=${ids.length}`,
   investor_update: (ids, b) => `${b}/api/investor-updates?ids=${ids.join(',')}&limit=${ids.length}`,
   faq: (ids, b) => `${b}/api/faqs?ids=${ids.join(',')}&limit=${ids.length}`,
+  // Self-scoped: the endpoint filters by the SESSION user's email server-side
+  // (`selfScopeFilter`), so foreign ids simply return no row — safe to expose
+  // through the same builder path as the public types. `hubspot_ticket` /
+  // `hubspot_ticket_anon` stay intentionally absent (no hydration endpoint).
+  hubspot_ticket_self: (ids, b) => `${b}/api/tickets?ids=${ids.join(',')}`,
 }
 
 /**

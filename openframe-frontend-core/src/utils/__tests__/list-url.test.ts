@@ -26,6 +26,10 @@ const BASELINE: Record<string, string> = {
   product_release: '/api/releases?ids=a,b&limit=2',
   customer_interview: '/api/customer-interviews?ids=a,b&limit=2',
   investor_update: '/api/investor-updates?ids=a,b&limit=2',
+  // Not a migration baseline — added 2026-08 with the ticket-card fetch-mode
+  // flip (hub route `GET /api/tickets?ids=`); frozen here the same way so the
+  // hub's `hubspot-tickets-self` config delegation can't drift.
+  hubspot_ticket_self: '/api/tickets?ids=a,b',
 }
 
 describe('buildListUrl — byte parity with the hub mappers', () => {
@@ -107,6 +111,7 @@ describe('buildListUrl — base-path derivation (covers hub buildListBasePath)',
     customer_interview: '/api/customer-interviews',
     investor_update: '/api/investor-updates',
     marketing_campaign: '/api/admin/marketing/campaigns',
+    hubspot_ticket_self: '/api/tickets',
   }
   it.each(Object.entries(BASE_PATHS))('%s → %s', (type, base) => {
     const url = buildListUrl(type, ['__probe__'])
