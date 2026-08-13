@@ -26,7 +26,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class UserPresenceRepositoryTest {
 
-    // The full key shape is the cross-writer contract — assert it literally, not via the builder.
     private static final String EXPECTED_KEY = "of:{tenant-1}:presence:user:user-1";
 
     @Mock

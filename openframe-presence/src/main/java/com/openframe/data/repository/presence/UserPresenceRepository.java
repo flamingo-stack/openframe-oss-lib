@@ -10,7 +10,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
-// Cross-writer contract: presence:user:{userId} via tenantKey(), value = lastSeen epoch millis, idempotent SET only (never RMW); :ctx:{key} suffix reserved for context presence.
 @Repository
 @RequiredArgsConstructor
 public class UserPresenceRepository {
