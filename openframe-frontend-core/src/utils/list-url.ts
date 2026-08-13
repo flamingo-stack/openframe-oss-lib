@@ -84,37 +84,28 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   // (`selfScopeFilter`), so foreign ids simply return no row — safe to expose
   // through the same builder path as the public types.
   hubspot_ticket_self: (ids, b) => `${b}/api/tickets?ids=${ids.join(',')}`,
-}
-
-/**
- * Per-OBJECT card-hydration routes for the types with no pre-existing
- * public list API (one route per object, matching the repo convention).
- * Each returns ChatRef-shaped items via the same source-binding +
- * row-filter chain passive retrieval uses (a private object is simply
- * not bound on public platforms → 404). The internal/public GitHub
- * variants share ONE route per object — the route serves whichever
- * variant is bound to the calling deployment's source.
- */
-const ENTITY_CARD_ROUTES: Record<string, string> = {
-  github_commit: '/api/github/commits',
-  github_commit_public: '/api/github/commits',
-  github_pull_request: '/api/github/pull-requests',
-  github_pull_request_public: '/api/github/pull-requests',
-  github_pr_review: '/api/github/reviews',
-  github_pr_review_public: '/api/github/reviews',
-  slack_message: '/api/slack-community/messages',
-  hubspot_ticket: '/api/tickets/internal',
-  hubspot_ticket_anon: '/api/tickets/known-issues',
-  data_room_doc: '/api/data-room/documents',
-  markdown: '/api/docs/pages',
-  financial_kpi: '/api/financials/kpis',
-  cap_table: '/api/financials/cap-table',
-  profit_loss: '/api/financials/profit-loss',
-  balance_sheet: '/api/financials/balance-sheet',
-  cash_flow: '/api/financials/cash-flow',
-}
-for (const [t, path] of Object.entries(ENTITY_CARD_ROUTES)) {
-  BUILDERS[t] = (ids, b) => `${b}${path}?ids=${ids.join(',')}`
+  // Per-OBJECT card-hydration routes for the types with no pre-existing
+  // public list API. THIS map is the only place these URL shapes exist —
+  // the hub's mappers/configs delegate here (`listApi: (ids) =>
+  // buildListUrl('<type>', ids)`), same as every entry above. The
+  // internal/public GitHub variants share their object's route; the
+  // route serves whichever variant is bound to the calling source.
+  github_commit: (ids, b) => `${b}/api/github/commits?ids=${ids.join(',')}`,
+  github_commit_public: (ids, b) => `${b}/api/github/commits?ids=${ids.join(',')}`,
+  github_pull_request: (ids, b) => `${b}/api/github/pull-requests?ids=${ids.join(',')}`,
+  github_pull_request_public: (ids, b) => `${b}/api/github/pull-requests?ids=${ids.join(',')}`,
+  github_pr_review: (ids, b) => `${b}/api/github/reviews?ids=${ids.join(',')}`,
+  github_pr_review_public: (ids, b) => `${b}/api/github/reviews?ids=${ids.join(',')}`,
+  slack_message: (ids, b) => `${b}/api/slack-community/messages?ids=${ids.join(',')}`,
+  hubspot_ticket: (ids, b) => `${b}/api/tickets/internal?ids=${ids.join(',')}`,
+  hubspot_ticket_anon: (ids, b) => `${b}/api/tickets/known-issues?ids=${ids.join(',')}`,
+  data_room_doc: (ids, b) => `${b}/api/data-room/documents?ids=${ids.join(',')}`,
+  markdown: (ids, b) => `${b}/api/docs/pages?ids=${ids.join(',')}`,
+  financial_kpi: (ids, b) => `${b}/api/financials/kpis?ids=${ids.join(',')}`,
+  cap_table: (ids, b) => `${b}/api/financials/cap-table?ids=${ids.join(',')}`,
+  profit_loss: (ids, b) => `${b}/api/financials/profit-loss?ids=${ids.join(',')}`,
+  balance_sheet: (ids, b) => `${b}/api/financials/balance-sheet?ids=${ids.join(',')}`,
+  cash_flow: (ids, b) => `${b}/api/financials/cash-flow?ids=${ids.join(',')}`,
 }
 
 /**
