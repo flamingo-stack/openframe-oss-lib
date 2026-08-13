@@ -15,7 +15,6 @@ public class PresenceDataFetcher {
 
     private final UserPresenceService presenceService;
 
-    // Boolean is the GraphQL idiom for a payload-less mutation: true = accepted, failures surface as GraphQL errors, never as false.
     @DgsMutation
     public boolean recordPresence(@AuthenticationPrincipal AuthPrincipal principal) {
         String userId = requireHumanUserId(principal);
