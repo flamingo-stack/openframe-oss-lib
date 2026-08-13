@@ -6,6 +6,7 @@ import com.openframe.client.exception.DuplicateConnectionException;
 import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.core.exception.BaseGlobalExceptionHandler;
 import com.openframe.core.exception.ErrorCode;
+import com.openframe.client.service.AgentUninstallService;
 import com.openframe.client.service.agentregistration.AgentRegistrationService;
 import com.openframe.client.util.TestAuthenticationManager;
 import com.openframe.client.dto.agent.*;
@@ -36,13 +37,16 @@ class AgentControllerTest {
     @Mock
     private AgentRegistrationService agentRegistrationService;
 
+    @Mock
+    private AgentUninstallService agentUninstallService;
+
     private AgentRegistrationRequest registrationRequest;
     private AgentRegistrationResponse registrationResponse;
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setup() {
-        AgentController controller = new AgentController(agentRegistrationService);
+        AgentController controller = new AgentController(agentRegistrationService, agentUninstallService);
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
