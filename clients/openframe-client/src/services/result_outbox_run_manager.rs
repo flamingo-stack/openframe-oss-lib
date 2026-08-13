@@ -4,10 +4,8 @@ use tokio::sync::Notify;
 use tokio::time::{interval, timeout, Duration};
 use tracing::{error, info, warn};
 
-use crate::config::update_config::{
-    FLUSH_PUBLISH_TIMEOUT_SECS, OUTBOX_FLUSH_INTERVAL_SECS, OUTBOX_MAX_PAYLOAD_BYTES,
-};
-use crate::services::result_store::{ResultPublisher, ResultStore};
+use crate::config::update_config::{FLUSH_PUBLISH_TIMEOUT_SECS, OUTBOX_FLUSH_INTERVAL_SECS};
+use crate::services::result_store::{payload_limit, ResultPublisher, ResultStore};
 
 pub struct ResultOutboxRunManager<P: ResultPublisher> {
     store: Arc<ResultStore>,
@@ -53,6 +51,8 @@ impl<P: ResultPublisher + 'static> ResultOutboxRunManager<P> {
                     }
                 };
 
+                let limit = payload_limit(publisher.max_payload().await);
+
                 for (key, subject) in keys {
                     let bytes = match store.load_payload(key.clone()).await {
                         Ok(Some(bytes)) => bytes,
@@ -66,7 +66,7 @@ impl<P: ResultPublisher + 'static> ResultOutboxRunManager<P> {
                         }
                     };
 
-                    if bytes.len() > OUTBOX_MAX_PAYLOAD_BYTES {
+                    if bytes.len() > limit {
                         warn!(
                             key = %key,
                             size = bytes.len(),
