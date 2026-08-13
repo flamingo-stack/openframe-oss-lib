@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -212,6 +213,10 @@ public class TagService {
         if (existing != null) {
             return existing;
         }
+        boolean caseVariantExists = tagRepository.existsByKeyIgnoreCaseAndEntityType(key, entityType);
+        if (caseVariantExists) {
+            throw new ConflictException("Tag with key '" + key + "' already exists");
+        }
 
         Tag tag = Tag.builder()
                 .key(key)
@@ -232,6 +237,11 @@ public class TagService {
                 .orElseThrow(() -> new IllegalArgumentException("Tag not found: " + tagId));
 
         if (key != null) {
+            TagEntityType entityType = tag.getEntityType();
+            boolean duplicateExists = tagRepository.existsByKeyIgnoreCaseAndEntityTypeAndIdNot(key, entityType, tagId);
+            if (duplicateExists) {
+                throw new ConflictException("Tag with key '" + key + "' already exists");
+            }
             tag.setKey(key);
         }
         if (description != null) {
