@@ -6,15 +6,18 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface DeviceOnlineDispatchRepository extends MongoRepository<DeviceFirstOnlineDispatch, String> {
 
-    long deleteByTenantIdAndMachineId(String tenantId, String machineId);
-
     List<DeviceFirstOnlineDispatch> findByStatus(DeviceOnlineDispatchStatus status, Pageable pageable);
 
-    Optional<DeviceFirstOnlineDispatch> findByTenantIdAndMachineId(String tenantId, String machineId);
+    Optional<DeviceFirstOnlineDispatch> findByTenantIdAndMachineIdAndScheduleId(String tenantId, String machineId, String scheduleId);
+
+    long deleteByTenantIdAndScheduleIdAndMachineIdIn(String tenantId, String scheduleId, Collection<String> machineIds);
+
+    long deleteByTenantIdAndMachineId(String tenantId, String machineId);
 }
