@@ -168,7 +168,11 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
         script_id: &str,
     ) {
         let bytes = self.encode_for_publish(result).await;
-        if let Err(e) = self.nats_message_publisher.publish_raw(subject, &bytes).await {
+        if let Err(e) = self
+            .nats_message_publisher
+            .publish_raw(subject, &bytes)
+            .await
+        {
             error!(kind = M::KIND, execution_id = %execution_id, script_id = %script_id, error = %e, "Failed to publish result");
         }
     }

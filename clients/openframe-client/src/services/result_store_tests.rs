@@ -172,7 +172,8 @@ async fn prune_keeps_newest_drops_oldest() {
     for i in 0..5 {
         let mut r = record("ex", &format!("s{}", i));
         r.1.created_at_secs = i as u64;
-        let bytes = ResultStore::encode_result(&result("ex", &format!("s{}", i)), payload_limit(None));
+        let bytes =
+            ResultStore::encode_result(&result("ex", &format!("s{}", i)), payload_limit(None));
         s.complete(r.0, "subj".to_string(), bytes).await.unwrap();
     }
     let dropped = s.prune_oldest(2).await.unwrap();
