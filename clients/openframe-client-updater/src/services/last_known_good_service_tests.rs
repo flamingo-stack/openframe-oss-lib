@@ -76,7 +76,10 @@ fn promote_fails_when_client_binary_is_missing() {
     let s = setup();
     fs::remove_file(&s.client_exe).unwrap();
     assert!(s.svc.promote("1.0.0").is_err());
-    assert!(s.svc.load_anchor().unwrap().is_none(), "anchor must not move");
+    assert!(
+        s.svc.load_anchor().unwrap().is_none(),
+        "anchor must not move"
+    );
 }
 
 #[test]

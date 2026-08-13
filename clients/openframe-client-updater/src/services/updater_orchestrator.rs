@@ -58,7 +58,9 @@ impl UpdaterOrchestrator {
             ServiceManagerService::client_binary_path(),
         );
         state_service.cleanup_legacy_state();
-        let recovery_report = self.recover_from_crash(&state_service, &lkg_service).await?;
+        let recovery_report = self
+            .recover_from_crash(&state_service, &lkg_service)
+            .await?;
 
         let server_host = initial_config_service
             .get_server_url()
@@ -220,8 +222,7 @@ impl UpdaterOrchestrator {
                 let report = RecoveryReport::Failure {
                     phase: UpdaterPhase::Failed,
                     version: version.clone(),
-                    reason: "Updater crashed before stopping service — no changes made"
-                        .to_string(),
+                    reason: "Updater crashed before stopping service — no changes made".to_string(),
                     rolled_back: false,
                 };
                 state_service.clear()?;

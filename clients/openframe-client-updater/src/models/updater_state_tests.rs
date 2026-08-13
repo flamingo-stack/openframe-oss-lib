@@ -81,7 +81,10 @@ fn state_round_trips_through_json() {
     assert_eq!(restored.target_version, state.target_version);
     assert_eq!(restored.phase, state.phase);
     assert_eq!(restored.backup_path, state.backup_path);
-    assert_eq!(restored.downloaded_binary_path, state.downloaded_binary_path);
+    assert_eq!(
+        restored.downloaded_binary_path,
+        state.downloaded_binary_path
+    );
     assert_eq!(restored.failure_reason, state.failure_reason);
     assert_eq!(restored.started_at, state.started_at);
 }

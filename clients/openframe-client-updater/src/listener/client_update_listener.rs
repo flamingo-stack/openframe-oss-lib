@@ -205,6 +205,9 @@ impl ClientUpdateListener {
     }
 
     fn durable_name(machine_id: &str) -> String {
-        format!("machine_{}_client-updater_client-update_consumer", machine_id)
+        format!(
+            "machine_{}_client-updater_client-update_consumer",
+            machine_id
+        )
     }
 }

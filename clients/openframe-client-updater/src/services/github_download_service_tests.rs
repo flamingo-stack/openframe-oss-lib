@@ -58,7 +58,9 @@ fn extracts_target_from_zip_by_suffix() {
         .start_file("release/OpenFrame-Client.exe", FileOptions::default())
         .unwrap();
     writer.write_all(b"exe-bytes").unwrap();
-    writer.start_file("README.md", FileOptions::default()).unwrap();
+    writer
+        .start_file("README.md", FileOptions::default())
+        .unwrap();
     writer.write_all(b"docs").unwrap();
     let archive = Bytes::from(writer.finish().unwrap().into_inner());
 
@@ -75,7 +77,9 @@ fn zip_extraction_errors_when_target_absent() {
     use zip::write::FileOptions;
 
     let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
-    writer.start_file("other.bin", FileOptions::default()).unwrap();
+    writer
+        .start_file("other.bin", FileOptions::default())
+        .unwrap();
     writer.write_all(b"x").unwrap();
     let archive = Bytes::from(writer.finish().unwrap().into_inner());
 
@@ -130,8 +134,12 @@ fn tar_gz_extraction_errors_when_target_absent() {
     let mut header = tar::Header::new_gnu();
     header.set_size(1);
     header.set_cksum();
-    builder.append_data(&mut header, "other", &b"x"[..]).unwrap();
+    builder
+        .append_data(&mut header, "other", &b"x"[..])
+        .unwrap();
     let archive = Bytes::from(builder.into_inner().unwrap().finish().unwrap());
 
-    assert!(service().extract_from_tar_gz(archive, "openframe-client").is_err());
+    assert!(service()
+        .extract_from_tar_gz(archive, "openframe-client")
+        .is_err());
 }

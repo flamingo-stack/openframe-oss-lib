@@ -74,10 +74,14 @@ fn transition_updates_phase_and_persists() {
     let svc = service(dir.path());
 
     let mut state = UpdaterState::new("1.0.0".to_string());
-    svc.transition(&mut state, UpdaterPhase::Downloading).unwrap();
+    svc.transition(&mut state, UpdaterPhase::Downloading)
+        .unwrap();
 
     assert_eq!(state.phase, UpdaterPhase::Downloading);
-    assert_eq!(svc.load().unwrap().unwrap().phase, UpdaterPhase::Downloading);
+    assert_eq!(
+        svc.load().unwrap().unwrap().phase,
+        UpdaterPhase::Downloading
+    );
 }
 
 #[test]

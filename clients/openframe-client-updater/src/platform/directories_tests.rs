@@ -1,11 +1,7 @@
 use super::*;
 
 fn manager(root: &Path) -> DirectoryManager {
-    DirectoryManager::with_custom_dirs(
-        root.join("logs"),
-        root.join("app"),
-        root.join("secured"),
-    )
+    DirectoryManager::with_custom_dirs(root.join("logs"), root.join("app"), root.join("secured"))
 }
 
 #[test]

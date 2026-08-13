@@ -17,7 +17,10 @@ fn versions_match_is_semver_aware() {
 fn versions_match_rejects_different_versions() {
     assert!(!ClientUpdateService::versions_match("1.2.3", "1.2.4"));
     assert!(!ClientUpdateService::versions_match("2.0.0", "1.0.0"));
-    assert!(!ClientUpdateService::versions_match("1.2.3-beta.1", "1.2.3"));
+    assert!(!ClientUpdateService::versions_match(
+        "1.2.3-beta.1",
+        "1.2.3"
+    ));
 }
 
 #[test]

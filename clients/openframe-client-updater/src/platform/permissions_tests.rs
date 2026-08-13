@@ -50,5 +50,7 @@ fn apply_clears_readonly_for_writable_modes() {
 #[test]
 fn apply_on_missing_path_is_a_no_op() {
     let dir = tempfile::tempdir().unwrap();
-    assert!(Permissions::file().apply(&dir.path().join("missing")).is_ok());
+    assert!(Permissions::file()
+        .apply(&dir.path().join("missing"))
+        .is_ok());
 }
