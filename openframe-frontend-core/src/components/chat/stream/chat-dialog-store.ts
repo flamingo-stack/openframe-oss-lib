@@ -213,7 +213,6 @@ const EMPTY_STATE: ChatReducerState = Object.freeze({
   turnMeta: Object.freeze({
     meta: new Map(),
     sources: new Map(),
-    refs: new Map(),
     sendCount: 0,
   }) as ChatReducerState['turnMeta'],
   dialogTokenUsage: null,

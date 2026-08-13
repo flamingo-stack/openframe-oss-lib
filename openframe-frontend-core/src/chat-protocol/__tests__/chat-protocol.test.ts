@@ -66,7 +66,6 @@ describe('createSseFrameDecoder', () => {
       {
         type: 'metadata',
         sources: [{ index: 1 }],
-        refs: undefined,
         provider: 'anthropic',
         modelLabel: 'M',
         modelName: 'm',
@@ -218,7 +217,7 @@ describe('createSseFrameDecoder', () => {
       '{"kind":"text-leading","text":"I\'ll open a ticket."}\0',
       '{"kind":"tool_error","toolName":"create_ticket","message":""}\0',
       '{"kind":"approval_request","proposalId":"prop-1","toolName":"create_ticket","title":"Create ticket","fields":[{"label":"Subject","value":"Printer down"},{"bad":"row"}]}\0',
-      '{"kind":"decision_resolved","proposalId":"prop-1","ok":true,"action":"approved","willAutoContinue":true,"tool_name":"create_ticket","result":{"ticket_id":"T-1"},"card":{"type":"ticket","marker":"[card://ticket:T-1]","ref":{"type":"ticket","id":"T-1","title":"t","url":null}},"receiptText":"Done."}\0',
+      '{"kind":"decision_resolved","proposalId":"prop-1","ok":true,"action":"approved","willAutoContinue":true,"tool_name":"create_ticket","result":{"ticket_id":"T-1"},"receiptText":"Done."}\0',
     ])
     expect(events).toEqual([
       { type: 'text-delta', text: "I'll open a ticket.", leading: true },
@@ -239,9 +238,6 @@ describe('createSseFrameDecoder', () => {
         willAutoContinue: true,
         toolName: 'create_ticket',
         result: { ticket_id: 'T-1' },
-        marker: '[card://ticket:T-1]',
-        cardRef: { type: 'ticket', id: 'T-1', title: 't', url: null },
-        cardType: 'ticket',
         receiptText: 'Done.',
         requestId: 'prop-1',
       },
@@ -380,7 +376,6 @@ describe('encoders', () => {
         expected: {
           type: 'metadata',
           sources: undefined,
-          refs: undefined,
           provider: 'anthropic',
           modelLabel: 'Claude Sonnet',
           modelName: undefined,

@@ -104,14 +104,17 @@ public class ScriptExecutionStatusUpdateHandler
                             if (row.getScheduleId() != null) {
                                 scheduleScriptExecutionAggregator.aggregate(row.getTenantId(), row.getExecutionId());
                             }
-                            markDeviceOnlineDispatchProcessed(row.getTenantId(), machineId);
+                            markDeviceOnlineDispatchProcessed(row.getTenantId(), machineId, row.getScheduleId());
                         },
                         () -> log.warn("No Execution row for executionId={} machineId={} scriptId={} — result arrived before dispatch persisted OR row was never created",
                                 executionId, machineId, scriptId));
     }
 
-    private void markDeviceOnlineDispatchProcessed(String tenantId, String machineId) {
-        deviceOnlineDispatchRepository.findByTenantIdAndMachineId(tenantId, machineId)
+    private void markDeviceOnlineDispatchProcessed(String tenantId, String machineId, String scheduleId) {
+        if (scheduleId == null) {
+            return;
+        }
+        deviceOnlineDispatchRepository.findByTenantIdAndMachineIdAndScheduleId(tenantId, machineId, scheduleId)
                 .filter(row -> row.getStatus() == DeviceOnlineDispatchStatus.DISPATCHED)
                 .ifPresent(row -> {
                     row.setStatus(DeviceOnlineDispatchStatus.PROCESSED);

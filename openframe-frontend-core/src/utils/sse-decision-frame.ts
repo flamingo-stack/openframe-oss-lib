@@ -43,11 +43,6 @@ export interface DecisionResolvedFrame {
     status?: string | null
     mirror_synced?: boolean
   } | null
-  card?: {
-    type?: string
-    marker?: string
-    ref?: unknown
-  } | null
   receiptText?: string
 }
 
@@ -131,7 +126,6 @@ export async function readLeadingDecisionFrame(
 function normalizeDecisionFrame(obj: Record<string, unknown>): DecisionResolvedFrame {
   const action = obj.action === 'rejected' ? 'rejected' : 'approved'
   const result = (obj.result ?? null) as DecisionResolvedFrame['result']
-  const card = (obj.card ?? null) as DecisionResolvedFrame['card']
   return {
     kind: 'decision_resolved',
     ok: obj.ok === true,
@@ -140,7 +134,6 @@ function normalizeDecisionFrame(obj: Record<string, unknown>): DecisionResolvedF
     ...(obj.willAutoContinue === true ? { willAutoContinue: true } : {}),
     ...(typeof obj.proposalId === 'string' ? { proposalId: obj.proposalId } : {}),
     ...(result ? { result } : {}),
-    ...(card ? { card } : {}),
     ...(typeof obj.receiptText === 'string' ? { receiptText: obj.receiptText } : {}),
   }
 }

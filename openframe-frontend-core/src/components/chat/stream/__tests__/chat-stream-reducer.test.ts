@@ -186,7 +186,7 @@ describe('createChatStreamReducer — SSE kernel', () => {
     expect(r.state.streamingPhase).toBe('streaming')
   })
 
-  it('decision_resolved flips the SOURCE card, writes the receipt, and stamps chatRefs', () => {
+  it('decision_resolved flips the SOURCE card and writes the receipt', () => {
     const r = createChatStreamReducer({ transport: 'sse' })
     // Turn 1: approval card.
     r.beginSseSend({ text: 'open a ticket', assistantName: 'Mingo AI' })
@@ -206,8 +206,6 @@ describe('createChatStreamReducer — SSE kernel', () => {
       status: 'approved',
       ok: true,
       receiptText: '✅ Approved — ticket created: [card://ticket:77]',
-      cardRef: { type: 'ticket', id: '77', title: 'Broken printer' },
-      cardType: 'ticket',
     })
     r.endSseTurn()
 
@@ -217,12 +215,11 @@ describe('createChatStreamReducer — SSE kernel', () => {
     const [, sourceMsg, receiptMsg] = r.state.messages
     const card = sourceMsg.segments?.find((s) => s.type === 'approval_request')
     expect((card as { status?: string }).status).toBe('approved')
+    // The receipt's `[card://…]` marker hydrates by id via the card fetch
+    // path — no ref stamping.
     expect(receiptMsg.segments).toEqual([
       { type: 'text', text: '✅ Approved — ticket created: [card://ticket:77]\n\n' },
     ])
-    expect(receiptMsg.chatRefs?.['ticket:77']?.id).toBe('77')
-    // Per-send refs map got the ref too (sendIdx 1 — the hidden send).
-    expect(r.state.turnMeta.refs.get(1)?.['ticket:77']?.id).toBe('77')
     expect(r.state.streamingPhase).toBe('idle')
   })
 
@@ -1199,7 +1196,6 @@ describe('createChatStreamReducer — resetForDialogSwitch boundary', () => {
     expect(r.state.turnMeta.sendCount).toBe(0)
     expect(r.state.turnMeta.meta.size).toBe(0)
     expect(r.state.turnMeta.sources.size).toBe(0)
-    expect(r.state.turnMeta.refs.size).toBe(0)
   })
 
   it('SURVIVOR: approvalStatuses outlive the switch (request ids are global)', () => {

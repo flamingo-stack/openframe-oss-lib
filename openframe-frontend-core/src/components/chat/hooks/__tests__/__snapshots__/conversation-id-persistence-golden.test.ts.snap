@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`server-history hydration (materializes through the reducer) > rebuilds messages + sendIdx-keyed refs + send counter from the transcript 1`] = `
+exports[`server-history hydration (materializes through the reducer) > rebuilds messages + send counter from the transcript 1`] = `
 [
   {
     "content": "open a ticket for the broken printer",
@@ -8,17 +8,6 @@ exports[`server-history hydration (materializes through the reducer) > rebuilds 
     "role": "user",
   },
   {
-    "chatRefs": {
-      "ticket:77": {
-        "id": "77",
-        "metadata": {
-          "status": "OPEN",
-        },
-        "title": "Broken printer",
-        "type": "ticket",
-        "url": null,
-      },
-    },
     "content": "✅ Approved — ticket created: [card://ticket:77]",
     "id": "hydrated-2",
     "role": "assistant",

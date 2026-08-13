@@ -134,15 +134,6 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   onApprove?: ApprovalResolutionHandler
   onReject?: ApprovalResolutionHandler
   /**
-   * Per-row metadata for inline entity-card rendering (v6.1 §B.2.6+§B.2.7).
-   * Keyed by `<documentType>:<primaryKey>`. When present AND
-   * `renderEntityCard` is also provided, text segments are passed through
-   * the `remarkCardLinks` plugin and `[card://<type>:<id>]` markers
-   * expand into the host's chosen inline component. When unset (or
-   * `renderEntityCard` unset), messages render as plain markdown.
-   */
-  chatRefs?: Record<string, ChatRef>
-  /**
    * Entity-context items attached to this (user) message. When present the
    * bubble renders a read-only chip strip beneath its text (Figma node
    * 31:28709). Resolved from `UnifiedChatMessage.contextItems` by the host.
