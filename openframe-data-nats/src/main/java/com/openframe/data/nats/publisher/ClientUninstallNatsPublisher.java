@@ -1,11 +1,12 @@
 package com.openframe.data.nats.publisher;
 
+import com.openframe.data.nats.model.ClientUninstallMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
+import java.time.Instant;
 
 import static java.lang.String.format;
 
@@ -21,9 +22,15 @@ public class ClientUninstallNatsPublisher {
 
     public void publish(String machineId) {
         String topicName = format(TOPIC_NAME_TEMPLATE, machineId);
-        // the message itself is the command — no payload contract, empty JSON body
-        natsMessagePublisher.publishPersistent(topicName, Map.of());
+        ClientUninstallMessage message = buildMessage();
+        natsMessagePublisher.publishPersistent(topicName, message);
 
         log.info("Published client uninstall command for machine {}", machineId);
+    }
+
+    private ClientUninstallMessage buildMessage() {
+        ClientUninstallMessage message = new ClientUninstallMessage();
+        message.setIssuedAt(Instant.now().toString());
+        return message;
     }
 }
