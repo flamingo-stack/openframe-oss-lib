@@ -79,6 +79,7 @@ import {
 import type { ActionsMenuGroup } from '../../ui/actions-menu'
 import { MingoIcon } from '../../icons'
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon'
+import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-triangle-icon'
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon'
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon'
 import { QuestionCircleIcon } from '../../icons-v2-generated/signs-and-symbols/question-circle-icon'
@@ -355,7 +356,8 @@ function hubspotStatusToVariant(
  * video metadata — the paired decoder for the hub's
  * `DERIVE_HANDLES_BY_KIND` id minting (keep in lockstep). Embedded
  * videos have no backing table row, so the marker id IS the payload;
- * this is what makes video cards transport-independent (no refs frame).
+ * this is what makes video cards transport-independent (no fetch, no
+ * server-shipped metadata).
  *   - bare 11-char id → YouTube (lite-youtube facade takes the bare id)
  *   - `mux-<playbackId>` → `https://stream.mux.com/<playbackId>.m3u8`
  *   - `mp4-<base64url(url)>` → decoded https URL
@@ -392,7 +394,7 @@ function decodeVideoMarkerId(id: string): { videoUrl?: string; youtubeUrl?: stri
 }
 
 /** Read hero-video metadata off a FETCHED item — the API-driven
- *  replacement for the refs-frame `metadata.videoUrl` check. Two item
+ *  replacement for the retired refs-frame `metadata.videoUrl` check. Two item
  *  shapes: ChatRef-shaped items (per-object hydration routes) carry the
  *  SSOT `metadata` keys directly; content rows (public list APIs) carry
  *  the canonical columns (`custom_video_url` for recordings,
@@ -420,9 +422,33 @@ function itemVideoMetadata(item: any): Record<string, string> | null {
   return out.videoUrl || out.youtubeUrl || out.highlightVideoUrl ? out : null
 }
 
+/** LOUD hydration-failure card — a card that fails to load renders a
+ *  VISIBLE error state instead of silently disappearing (explicit
+ *  product decision 2026-08-13: broken must look broken, both for
+ *  transient fetch failures and for ids the API doesn't recognize). */
+function CardLoadFailure({
+  label,
+  id,
+  detail,
+}: {
+  label: string
+  id: string
+  detail: string
+}) {
+  return (
+    <MingoInfoCard
+      title={label}
+      description={`${detail} · id: ${id}`}
+      icon={<AlertTriangleIcon size={24} />}
+      status={{ label: 'FAILED', variant: 'error' }}
+      menuAriaLabel="Card failed to load"
+    />
+  )
+}
+
 /** Build the display ref for a hydrated card PURELY from the fetched API
- *  item — the item IS a ChatRef (minted server-side by the same SSOTs
- *  that mint the live refs frame), so the API is the single display-data
+ *  item — the item IS a ChatRef (minted server-side by the per-object
+ *  ref-building SSOTs), so the API is the single display-data
  *  layer. The marker's ref contributes ONLY the loader-resolved
  *  `url`/`targetPlatform` (embed-origin prefixing of the item's own url
  *  via `fallbackHref`) — never titles/previews/metadata. */
@@ -1345,9 +1371,14 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   deleted_data: {
     label: 'Deleted',
     bareInline: true,
+    // The marker descriptor carries no metadata (cards hydrate by id, and a
+    // deleted entity has nothing to hydrate from), so every prop degrades to
+    // null and the card renders its generic "Deleted item" tombstone. The
+    // descriptor's `title` defaults to the raw cardId — suppress it so the
+    // strikethrough line never shows an opaque id.
     render: (_item, chatRef) => (
       <DeletedDataCard
-        title={chatRef.title ?? null}
+        title={chatRef.title && chatRef.title !== chatRef.id ? chatRef.title : null}
         entityLabel={(chatRef.metadata?.entity_label as string | undefined) ?? null}
         recoveryNote={(chatRef.metadata?.recovery_note as string | undefined) ?? null}
       />
@@ -1733,9 +1764,9 @@ export function ChatCardLoader({
   //   1. the registry's per-type `fallbackHref` — an explicit non-content
   //      destination (marketing campaign → `/admin/...`);
   //   2. the host's `composeContentUrl` seam via `resolveFetchedCardHref` —
-  //      the SAME resolver page cards and SSE chat cards go through. This is
-  //      what makes Mingo/NATS cards clickable: that transport ships bare
-  //      `[card://type:id]` markers with no refs metadata, so the ref reaches
+  //      the SAME resolver page cards go through. This is what makes cards
+  //      clickable on every transport: the wire ships bare
+  //      `[card://type:id]` markers with no metadata, so the ref reaches
   //      us with `url: null` and `resolveSourceRowCTA` has nothing to route.
   const composedHref =
     fetchEntry?.contentRefType && !resolvedChatRef.url && item && !fetchEntry.fallbackHref && !fetchEntry.noComposedHref
@@ -1846,70 +1877,35 @@ export function ChatCardLoader({
     )
   if (!fetchEntry) {
     // Ref-only types (`deleted_data`, `video` — nothing exists server-side
-    // to fetch). Synthetic-ref gate: `chat-message-enhanced.tsx` builds a
-    // minimal `{ type, id, title: cardId, url: null }` ChatRef when the LLM
-    // emits `[card://<type>:<id>]` for an id the server did NOT
-    // surface (refs map miss) — typically an LLM hallucination of a
-    // composite/invented UUID. EVERY real ref carries `sourceRepo`
-    // (set by `buildChatRefFromRow` via `config.id` AND by
-    // `synthesizeVideoRefs` via `EMBEDDED_VIDEO_SOURCE_REPO`), so a
-    // missing `sourceRepo` is a reliable synthetic-ref signal.
-    //
-    // Returning null here triggers the bare-cardId fallback span in
-    // chat-message-enhanced's `<a card://...>` override — the
-    // documented "VISIBLE breakage" behavior (a hallucinated marker must
-    // not render a real-looking card).
-    //
-    // Fetching types handle this gracefully instead: a synthetic id leads
-    // to a fetch miss → `!item` → null below.
-    if (!finalChatRef.sourceRepo) return null
+    // to fetch): render straight from the marker's descriptor.
     return finish(entry.render(undefined, finalChatRef, renderOpts))
   }
   if (isLoading) return <>{fetchEntry.skeleton?.() ?? null}</>
   if (!item) {
-    // FETCH FAILURE (non-OK response — auth blip, 5xx, rate limit) is
-    // NOT evidence of deletion: render nothing rather than a false
-    // "deleted" claim. Only a SUCCESSFUL fetch that lacks the id
-    // reaches the tombstone below.
-    if (isError) return null
-    // NEVER-FETCHED (query disabled — no list URL registered for this
-    // type, or an empty id): no request was made, so absence of `item`
-    // proves nothing. Render nothing rather than a false "deleted".
-    if (!isFetched) return null
-    // FETCH MISS. Two distinct cases, split by ref provenance:
-    //
-    //   - SERVER-BUILT ref (`sourceRepo` present — the entity provably
-    //     existed when the answer was written, its ref was persisted
-    //     with the message): the entity is GONE now (deleted /
-    //     tombstoned). Render the generic deleted-data TOMBSTONE so the
-    //     thread keeps its integrity instead of a silent gap — works
-    //     for ANY fetch-mode entity type, no per-type wiring.
-    //
-    //   - SYNTHETIC client-built ref (bare marker with no refs entry —
-    //     possibly a hallucinated id): keep the existing hide-it
-    //     behavior; a "deleted" placeholder would assert an existence
-    //     we can't vouch for.
-    if (finalChatRef.sourceRepo) {
-      return (
-        <DeletedDataCard
-          title={finalChatRef.title ?? null}
-          entityLabel={entry.label}
-          recoveryNote={
-            (finalChatRef.metadata as Record<string, unknown> | null | undefined)
-              ?.recovery_note as string | undefined ?? null
-          }
-        />
-      )
+    // FAIL LOUD (explicit product decision 2026-08-13): a card that
+    // cannot hydrate renders a VISIBLE error card — silent removal made
+    // broken answers look fine. Three distinguishable states:
+    if (isError) {
+      // Transient fetch failure (auth blip, 5xx, rate limit).
+      return <CardLoadFailure label={entry.label} id={finalChatRef.id} detail="Failed to load" />
     }
-    return null
+    if (!isFetched) {
+      // Query never ran — no list URL registered for this type / empty id.
+      return <CardLoadFailure label={entry.label} id={finalChatRef.id} detail="Not loadable" />
+    }
+    // Successful fetch, id absent — entity gone or the LLM invented the id.
+    return <CardLoadFailure label={entry.label} id={finalChatRef.id} detail="Not found" />
   }
   // Hero-video promotion, API-driven: when the FETCHED item carries a
   // playable video (ChatRef-shaped items via `metadata.videoUrl` /
   // `youtubeUrl` / `highlightVideoUrl`; content rows via the canonical
-  // `custom_video_url` / `main_video_url` columns), wrap the compact card
-  // in the same BlockCard + ChatVideoEntityCard shell the refs-frame path
-  // used to produce — but decided from the API item, so it renders on
-  // every transport. No video on the item → compact card only.
+  // `custom_video_url` / `main_video_url` columns), render the video
+  // section as a SIBLING below the compact card. NOT `<BlockCard>` —
+  // that is a render-null sentinel only chat-message-enhanced's SYNC
+  // pre-scan understands; returned from inside this loader (post-fetch,
+  // async) it renders nothing (the missing-videos regression,
+  // 2026-08-13). The loader's output already lives in a hoisted
+  // block-level sibling (`b-<key>`), so block content is legal here.
   const videoMeta = itemVideoMetadata(item)
   if (videoMeta) {
     const videoRef: ChatRef = {
@@ -1917,9 +1913,10 @@ export function ChatCardLoader({
       metadata: { ...(finalChatRef.metadata ?? {}), ...videoMeta },
     }
     return (
-      <BlockCard inline={finish(entry.render(item, finalChatRef, renderOpts))}>
+      <>
+        {finish(entry.render(item, finalChatRef, renderOpts))}
         <ChatVideoEntityCard chatRef={videoRef} />
-      </BlockCard>
+      </>
     )
   }
   return finish(entry.render(item, finalChatRef, renderOpts))

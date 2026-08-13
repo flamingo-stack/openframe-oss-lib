@@ -206,7 +206,10 @@ describe('SSE wire decode — golden fixtures (full hook path)', () => {
     expect(snapshotState(result)).toMatchSnapshot()
   })
 
-  it('(e) [card://blog:x] marker in the answer with refs metadata frame', async () => {
+  it('(e) [card://blog:x] marker in the answer; a legacy refs frame is ignored', async () => {
+    // The refs data channel is GONE — cards hydrate by id from the marker.
+    // An old server still emitting a refs-bearing metadata frame must be
+    // harmless: the frame decodes as metadata-ish and contributes nothing.
     const refsFrame =
       '{"refs":{"blog:x":{"type":"blog","id":"x","title":"Post X","url":"/blog/x","metadata":{"slug":"post-x"}}}}\0'
     mockFetchStream([
