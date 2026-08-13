@@ -5,10 +5,10 @@ use crate::config::update_config::{
 };
 use crate::listener::client_update_gate::park_or_dispatch;
 use crate::models::ToolRestartMessage;
+use crate::platform::{in_flight_client_update_phase, UPDATER_TOOL_AGENT_ID};
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::tool_restart_service::RestartOutcome;
 use crate::services::tool_restart_service::ToolRestartService;
-use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::AgentConfigurationService;
 use anyhow::Result;
 use async_nats::jetstream;
@@ -24,7 +24,6 @@ pub struct ToolRestartMessageListener {
     nats_connection_manager: NatsConnectionManager,
     tool_restart_service: ToolRestartService,
     config_service: AgentConfigurationService,
-    tool_run_manager: ToolRunManager,
 }
 
 impl ToolRestartMessageListener {
@@ -34,13 +33,11 @@ impl ToolRestartMessageListener {
         nats_connection_manager: NatsConnectionManager,
         tool_restart_service: ToolRestartService,
         config_service: AgentConfigurationService,
-        tool_run_manager: ToolRunManager,
     ) -> Self {
         Self {
             nats_connection_manager,
             tool_restart_service,
             config_service,
-            tool_run_manager,
         }
     }
 
@@ -129,20 +126,22 @@ impl ToolRestartMessageListener {
 
         let listener = self.clone();
         let label = format!("tool-restart:{}", tool_agent_id);
-        park_or_dispatch(
-            self.tool_run_manager.clone(),
-            message,
-            label,
-            move |msg| async move {
-                listener.dispatch(msg, tool_agent_id).await;
-            },
-        )
+        park_or_dispatch(message, label, move |msg| async move {
+            listener.dispatch(msg, tool_agent_id).await;
+        })
         .await;
 
         Ok(())
     }
 
     async fn dispatch(&self, message: Message, tool_agent_id: String) {
+        if tool_agent_id == UPDATER_TOOL_AGENT_ID {
+            if let Some(phase) = in_flight_client_update_phase() {
+                info!("Client update in flight (updater phase: {phase}), deferring updater restart for redelivery");
+                return;
+            }
+        }
+
         let ack_message = match self
             .tool_restart_service
             .restart_guarded(&tool_agent_id)

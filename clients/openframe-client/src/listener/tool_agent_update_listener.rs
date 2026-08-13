@@ -127,17 +127,11 @@ impl ToolAgentUpdateListener {
             }
         };
 
-        let tool_agent_id = tool_agent_update_message.tool_agent_id.clone();
-
         let listener = self.clone();
-        park_or_dispatch(
-            self.tool_run_manager.clone(),
-            message,
-            format!("tool-update:{}", tool_agent_id),
-            move |msg| async move {
-                listener.dispatch(msg, tool_agent_update_message).await;
-            },
-        )
+        let label = format!("tool-update:{}", tool_agent_update_message.tool_agent_id);
+        park_or_dispatch(message, label, move |msg| async move {
+            listener.dispatch(msg, tool_agent_update_message).await;
+        })
         .await;
 
         Ok(())

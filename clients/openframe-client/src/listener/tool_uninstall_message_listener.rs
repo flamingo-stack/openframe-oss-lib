@@ -5,6 +5,7 @@ use crate::config::update_config::{
 };
 use crate::listener::client_update_gate::park_or_dispatch;
 use crate::models::ToolUninstallMessage;
+use crate::platform::{in_flight_client_update_phase, UPDATER_TOOL_AGENT_ID};
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::tool_uninstall_service::ToolUninstallService;
@@ -125,17 +126,11 @@ impl ToolUninstallMessageListener {
             }
         };
 
-        let tool_agent_id = uninstall_message.tool_agent_id.clone();
-
         let listener = self.clone();
-        park_or_dispatch(
-            self.tool_run_manager.clone(),
-            message,
-            format!("tool-uninstall:{}", tool_agent_id),
-            move |msg| async move {
-                listener.dispatch(msg, uninstall_message).await;
-            },
-        )
+        let label = format!("tool-uninstall:{}", uninstall_message.tool_agent_id);
+        park_or_dispatch(message, label, move |msg| async move {
+            listener.dispatch(msg, uninstall_message).await;
+        })
         .await;
 
         Ok(())
@@ -143,6 +138,13 @@ impl ToolUninstallMessageListener {
 
     async fn dispatch(&self, message: Message, uninstall_message: ToolUninstallMessage) {
         let tool_agent_id = uninstall_message.tool_agent_id.clone();
+
+        if tool_agent_id == UPDATER_TOOL_AGENT_ID {
+            if let Some(phase) = in_flight_client_update_phase() {
+                info!("Client update in flight (updater phase: {phase}), deferring updater uninstall for redelivery");
+                return;
+            }
+        }
 
         let tool_lock = self.tool_run_manager.tool_lock(&tool_agent_id).await;
         let _guard = match tool_lock.try_lock() {
