@@ -43,6 +43,7 @@ import {
   buildAnchorProps,
 } from '../utils/nav-anchor-props'
 import { safeHref } from '../utils/compact-card-classes'
+import { faqItemAnchor } from '../../../utils/faq-anchor'
 import { useChatPanel } from '../chat-panel-context'
 import { getSourceLabel } from '../utils/source-icons'
 import { SourceActionButton } from '../source-action-button'
@@ -349,21 +350,42 @@ function hubspotStatusToVariant(
   return 'grey'
 }
 
-/** Merge a fetched `/api/tickets?ids=` row over the marker's ChatRef. The
- *  endpoint returns ChatRef-shaped items minted by the hub's
- *  `buildHubspotTicketSelfRef` — the SAME SSOT that mints the live refs
- *  frame — so this is a field-level overlay, not a translation. Fetched
- *  fields win (current status/title beat the values frozen into a replayed
- *  ref); `url`/`targetPlatform` stay the loader's job (`resolveSourceRowCTA`
- *  + `fallbackHref`). A null/absent item (the `refFallback` render paths)
- *  passes the ref through untouched. */
-function mergeFetchedTicketRef(item: unknown, chatRef: ChatRef): ChatRef {
+/** Merge a fetched ChatRef-shaped item over the marker's ChatRef. The
+ *  hydration endpoints (`/api/chat/entity-refs`, `/api/tickets`) return
+ *  items minted by the SAME hub SSOTs that mint the live refs frame
+ *  (`buildChatRefFromRow` / `buildHubspotTicketSelfRef`) — so this is a
+ *  field-level overlay, not a translation. Fetched fields win (current
+ *  status/title beat the values frozen into a replayed ref);
+ *  `url`/`targetPlatform` stay the loader's job (`resolveSourceRowCTA`
+ *  + `fallbackHref`). A null/absent item (the ref-only and `refFallback`
+ *  render paths) passes the ref through untouched. */
+/** FAQ variant of the overlay — `/api/faqs?ids=` returns faq-shaped rows
+ *  (`question`/`answer`/`section`), not ChatRefs. Same precedence rule:
+ *  fetched fields win, the marker's ref fills the gaps. */
+function mergeFetchedFaqRef(item: unknown, chatRef: ChatRef): ChatRef {
+  if (!item || typeof item !== 'object') return chatRef
+  const it = item as { question?: unknown; answer?: unknown; section?: unknown }
+  const answer =
+    typeof it.answer === 'string' && it.answer.trim().length > 0 ? it.answer.trim() : null
+  return {
+    ...chatRef,
+    title: typeof it.question === 'string' && it.question ? it.question : chatRef.title,
+    preview: answer ? (answer.length > 400 ? `${answer.slice(0, 397)}…` : answer) : chatRef.preview,
+    metadata: {
+      ...(chatRef.metadata ?? {}),
+      ...(typeof it.section === 'string' && it.section ? { section: it.section } : {}),
+    },
+  }
+}
+
+function mergeFetchedRefOverlay(item: unknown, chatRef: ChatRef): ChatRef {
   if (!item || typeof item !== 'object') return chatRef
   const it = item as Partial<ChatRef>
   return {
     ...chatRef,
     title: typeof it.title === 'string' && it.title ? it.title : chatRef.title,
     preview: typeof it.preview === 'string' && it.preview ? it.preview : chatRef.preview,
+    date: typeof it.date === 'string' && it.date ? it.date : chatRef.date,
     metadata: {
       ...(chatRef.metadata ?? {}),
       ...(it.metadata && typeof it.metadata === 'object' ? it.metadata : {}),
@@ -1048,54 +1070,87 @@ function RoadmapChatCard({
 // CHAT_CARD_REGISTRY — single source of truth.
 // =============================================================================
 
-type ChatCardRegistryEntry =
-  | {
-      mode: 'no-fetch'
-      label: string
-      bareInline?: boolean
-      displayAction?: boolean
-      render: (chatRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode
-    }
-  | {
-      mode: 'fetch'
-      label: string
-      contentRefType: string
-      displayAction?: boolean
-      /** Render the card alone — skip the `ChatCardWithDiscuss` "Ask" +
-       *  provenance source row (mirrors the no-fetch `bareInline`). */
-      bareInline?: boolean
-      skeleton: () => React.ReactNode
-      render: (item: any, chatRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode
-      /** Optional post-fetch URL synthesizer. When `chatRef.url` is null
-       *  AFTER `resolveSourceRowCTA`, the loader runs this against the
-       *  hydrated item to produce a fallback hub-internal URL (e.g.
-       *  `/admin/campaigns/${item.id}` for marketing campaigns). Result
-       *  is validated via `safeHref` before being attached to the
-       *  resolved ref — so the wrapper sees a non-null `href`, the
-       *  pre-computed `isNewTab` reflects the actual destination, and
-       *  the click goes through `handleChatNavClick` (no silent
-       *  bypass of embed-mode / close-on-nav). Takes precedence over the
-       *  `composeContentUrl` fallback below. */
-      fallbackHref?: (item: any) => string | null
-      /** Opt OUT of the post-fetch `composeContentUrl` fallback (see
-       *  `resolveFetchedCardHref`). Set for types with NO public destination
-       *  — the seam would otherwise synthesize `<contentOrigin>/<type>/<id>`
-       *  from its default branch and hand the user a 404. Types with a real
-       *  route (hosted, or covered by a host `override`) leave it unset. */
-      noComposedHref?: boolean
-      /** The server-built ChatRef carries a FULL display payload
-       *  (title/preview/metadata/url — e.g. `hubspot_ticket_self`, minted by
-       *  the hub's `buildHubspotTicketSelfRef` SSOT), so the loader renders
-       *  from the ref instead of hiding the card while the fetch is
-       *  UNRESOLVED: in-flight (`isLoading` — no skeleton flash on the live
-       *  path, where the ref arrived seconds ago) and failed (`isError` —
-       *  an auth blip / 5xx is not evidence of deletion). Gated on
-       *  `sourceRepo` so synthetic client-built refs (possible LLM
-       *  hallucinations) never render this way. A SUCCESSFUL fetch that
-       *  misses still goes to the tombstone — a confirmed miss means the
-       *  entity is gone, and the stale ref must not contradict that. */
-      refFallback?: boolean
-    }
+/**
+ * ONE entry shape — no fetch/no-fetch mode split. Every card type fetches
+ * its data by id ("send ids → get full objects"); the ONLY entries without
+ * a `contentRefType` are the two types that have nothing server-side to
+ * fetch: `deleted_data` (a tombstone for a row that no longer exists) and
+ * `video` (body-embed content-hash ids with no backing table row) — those
+ * render straight from the server-built ref.
+ */
+interface ChatCardRegistryEntry {
+  label: string
+  /** Render the card alone — skip the `ChatCardWithDiscuss` "Ask" +
+   *  provenance source row. */
+  bareInline?: boolean
+  displayAction?: boolean
+  /** Hydration type for `useChatCardItem` → `buildListUrl`. Content types
+   *  resolve to their public list APIs; ref-shaped types resolve to the
+   *  hub's generic `/api/chat/entity-refs?type=&ids=`. ABSENT only for
+   *  `deleted_data` + `video` (see above). */
+  contentRefType?: string
+  /** Required whenever `contentRefType` is set. */
+  skeleton?: () => React.ReactNode
+  /** `item` is the fetched row (`undefined` on the ref-only and
+   *  `refFallback` render paths). */
+  render: (item: any, chatRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode
+  /** Optional post-fetch URL synthesizer. When `chatRef.url` is null
+   *  AFTER `resolveSourceRowCTA`, the loader runs this against the
+   *  hydrated item to produce a fallback URL (e.g.
+   *  `/admin/campaigns/${item.id}` for marketing campaigns; `item.url`
+   *  for ChatRef-shaped items). Result is validated via `safeHref`
+   *  before being attached to the resolved ref — so the wrapper sees a
+   *  non-null `href`, the pre-computed `isNewTab` reflects the actual
+   *  destination, and the click goes through `handleChatNavClick` (no
+   *  silent bypass of embed-mode / close-on-nav). Takes precedence over
+   *  the `composeContentUrl` fallback below. */
+  fallbackHref?: (item: any) => string | null
+  /** Opt OUT of the post-fetch `composeContentUrl` fallback (see
+   *  `resolveFetchedCardHref`). Set for types with NO public destination
+   *  — the seam would otherwise synthesize `<contentOrigin>/<type>/<id>`
+   *  from its default branch and hand the user a 404. Types with a real
+   *  route (hosted, or covered by a host `override`) leave it unset. */
+  noComposedHref?: boolean
+  /** The server-built ChatRef carries a FULL display payload
+   *  (title/preview/metadata/url — every type minted by the hub's
+   *  `buildChatRefFromRow` / `buildHubspotTicketSelfRef` SSOTs), so the
+   *  loader renders from the ref instead of hiding the card while the
+   *  fetch is UNRESOLVED: in-flight (`isLoading` — no skeleton flash on
+   *  the live path, where the ref arrived seconds ago) and failed
+   *  (`isError` — an auth blip / 5xx is not evidence of deletion). Gated
+   *  on `sourceRepo` so synthetic client-built refs (possible LLM
+   *  hallucinations) never render this way. A SUCCESSFUL fetch that
+   *  misses still goes to the tombstone — a confirmed miss means the
+   *  entity is gone, and the stale ref must not contradict that. */
+  refFallback?: boolean
+}
+
+/**
+ * Entry preset for types hydrated by the hub's generic
+ * `/api/chat/entity-refs` endpoint (and `hubspot_ticket_self` via
+ * `/api/tickets`) — the fetched item IS a `ChatRef`, so the render
+ * overlays it on the marker's ref (`mergeFetchedRefOverlay`) and the
+ * shared flags apply: `item.url` is the canonical destination
+ * (`fallbackHref`), no `<origin>/<type>/<id>` synthesis
+ * (`noComposedHref`), and the ref renders while the fetch is unresolved
+ * (`refFallback`).
+ */
+function refHydratedEntry(
+  docType: string,
+  label: string,
+  renderRef: (displayRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode,
+): ChatCardRegistryEntry {
+  return {
+    label,
+    bareInline: true,
+    contentRefType: docType,
+    noComposedHref: true,
+    fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
+    refFallback: true,
+    skeleton: () => <MingoInfoCardSkeleton />,
+    render: (item, chatRef, opts) => renderRef(mergeFetchedRefOverlay(item, chatRef), opts),
+  }
+}
 
 interface FinancialCardConfig {
   label: string
@@ -1115,27 +1170,24 @@ const FINANCIAL_CARD_CONFIGS: Record<string, FinancialCardConfig> = {
  *  family is a config map + one `registryEntries(...)` call. */
 function registryEntries<C>(
   configs: Record<string, C>,
-  build: (cfg: C) => ChatCardRegistryEntry,
+  build: (cfg: C, docType: string) => ChatCardRegistryEntry,
 ): Record<string, ChatCardRegistryEntry> {
   const out: Record<string, ChatCardRegistryEntry> = {}
-  for (const [docType, cfg] of Object.entries(configs)) out[docType] = build(cfg)
+  for (const [docType, cfg] of Object.entries(configs)) out[docType] = build(cfg, docType)
   return out
 }
 
 function financialRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  return registryEntries(FINANCIAL_CARD_CONFIGS, (cfg) => ({
-    mode: 'no-fetch',
-    label: cfg.label,
-    bareInline: true,
-    render: (chatRef, opts) => (
+  return registryEntries(FINANCIAL_CARD_CONFIGS, (cfg, docType) =>
+    refHydratedEntry(docType, cfg.label, (displayRef, opts) => (
       <GenericFinancialChatCard
-        chatRef={chatRef}
+        chatRef={displayRef}
         icon={cfg.icon()}
         isNewTab={opts.isNewTab}
         discuss={opts.discuss}
       />
-    ),
-  }))
+    )),
+  )
 }
 
 interface GitHubCardConfig {
@@ -1151,15 +1203,12 @@ const GITHUB_CARD_CONFIGS: Record<string, GitHubCardConfig> = {
   github_pr_review_public: { label: 'GitHub review (public)', kind: 'pr_review' },
 }
 function githubRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  return registryEntries(GITHUB_CARD_CONFIGS, (cfg) => ({
-    mode: 'no-fetch',
-    label: cfg.label,
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <GitHubChatCard chatRef={chatRef} kind={cfg.kind} isNewTab={opts.isNewTab}
+  return registryEntries(GITHUB_CARD_CONFIGS, (cfg, docType) =>
+    refHydratedEntry(docType, cfg.label, (displayRef, opts) => (
+      <GitHubChatCard chatRef={displayRef} kind={cfg.kind} isNewTab={opts.isNewTab}
         discuss={opts.discuss} />
-    ),
-  }))
+    )),
+  )
 }
 
 type ProgramConfigKey = 'podcast' | 'webinar' | 'event'
@@ -1175,7 +1224,6 @@ const PROGRAM_CARD_CONFIGS: Record<string, ProgramCardConfig> = {
 }
 function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(PROGRAM_CARD_CONFIGS, (cfg) => ({
-    mode: 'fetch',
     label: cfg.label,
     contentRefType: cfg.contentRefType,
     bareInline: true,
@@ -1220,7 +1268,6 @@ const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
 }
 function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(ROADMAP_CARD_CONFIGS, (cfg) => ({
-    mode: 'fetch',
     label: cfg.label,
     contentRefType: cfg.contentRefType,
     bareInline: true,
@@ -1239,17 +1286,16 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
 }
 
 const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
-  // ───────── no-fetch: ChatRef carries everything ─────────
+  // ───────── ref-shaped types: hydrated via /api/chat/entity-refs ─────────
   ...githubRegistryEntries(),
   // Generic TOMBSTONE for entities a chat action deleted (ClickUp task
-  // today; any deletable entity tomorrow). No fetch, no navigation —
-  // the entity no longer resolves anywhere; the placeholder keeps the
+  // today; any deletable entity tomorrow). No fetch (nothing exists
+  // server-side anymore), no navigation — the placeholder keeps the
   // thread's integrity (Teams/Slack "This message was deleted" pattern).
   deleted_data: {
-    mode: 'no-fetch',
     label: 'Deleted',
     bareInline: true,
-    render: (chatRef) => (
+    render: (_item, chatRef) => (
       <DeletedDataCard
         title={chatRef.title ?? null}
         entityLabel={(chatRef.metadata?.entity_label as string | undefined) ?? null}
@@ -1257,98 +1303,70 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
       />
     ),
   },
-  slack_message: {
-    mode: 'no-fetch',
-    label: 'Slack message',
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <SlackChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
-          discuss={opts.discuss} />
-    ),
-  },
+  slack_message: refHydratedEntry('slack_message', 'Slack message', (displayRef, opts) => (
+    <SlackChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+  )),
+  // FAQ hydrates from its EXISTING public list API (`/api/faqs?ids=` —
+  // also feeding related-content rails, so its base path must not move
+  // to the generic endpoint). Rows are faq-shaped, not ChatRef-shaped,
+  // hence the bespoke overlay instead of `refHydratedEntry`.
   faq: {
-    mode: 'no-fetch',
     label: 'FAQ',
     bareInline: true,
-    render: (chatRef, opts) => (
-      <FaqChatCard chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
-    ),
-  },
-  hubspot_ticket: {
-    mode: 'no-fetch',
-    label: 'HubSpot ticket',
-    // `MingoInfoCard` is the whole card — no "Ask"/provenance source row.
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
-          discuss={opts.discuss} />
-    ),
-  },
-  hubspot_ticket_anon: {
-    mode: 'no-fetch',
-    label: 'HubSpot ticket (anon)',
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
-          discuss={opts.discuss} />
-    ),
-  },
-  // FETCH-mode (unlike its `hubspot_ticket` / `hubspot_ticket_anon`
-  // siblings above): self-ticket markers must survive transports and
-  // replays that drop the refs frame (NATS-brokered streams, history
-  // rehydration after `filterRefsToAnswer`, the REFS_MAX cap), so the
-  // card self-heals via the session-scoped `GET /api/tickets?ids=`
-  // endpoint like every other fetch card. The live SSE path still
-  // renders instantly from the ref (`refFallback`), and a fetch also
-  // upgrades a replayed ref's frozen status to the CURRENT one.
-  hubspot_ticket_self: {
-    mode: 'fetch',
-    label: 'HubSpot ticket (self)',
-    contentRefType: 'hubspot_ticket_self',
-    bareInline: true,
-    // Ticket deep-links open the Help-Center drawer (`/tickets?ticket=<id>`),
-    // not a public content page — the composeContentUrl default branch
-    // would synthesize `<origin>/hubspot_ticket_self/<id>` and 404.
+    contentRefType: 'faq',
     noComposedHref: true,
-    // The fetched item IS a ChatRef (hub `buildHubspotTicketSelfRef`) —
-    // its `url` carries the canonical deep-link for refs-less replays.
-    fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
+    fallbackHref: (item: { id?: number | string }) =>
+      item?.id != null ? `/faqs#${faqItemAnchor(item.id)}` : null,
     refFallback: true,
     skeleton: () => <MingoInfoCardSkeleton />,
     render: (item, chatRef, opts) => (
-      <HubspotTicketChatCard chatRef={mergeFetchedTicketRef(item, chatRef)}
-          isNewTab={opts.isNewTab} discuss={opts.discuss} />
-    ),
-  },
-  data_room_doc: {
-    mode: 'no-fetch',
-    label: 'Data-room doc',
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <DataRoomDocChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
+      <FaqChatCard chatRef={mergeFetchedFaqRef(item, chatRef)} isNewTab={opts.isNewTab}
           discuss={opts.discuss} />
     ),
   },
-  markdown: {
-    mode: 'no-fetch',
-    label: 'Doc page (markdown)',
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <DataRoomDocChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
+  hubspot_ticket: refHydratedEntry('hubspot_ticket', 'HubSpot ticket', (displayRef, opts) => (
+    <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab}
+        discuss={opts.discuss} />
+  )),
+  hubspot_ticket_anon: refHydratedEntry(
+    'hubspot_ticket_anon',
+    'HubSpot ticket (anon)',
+    (displayRef, opts) => (
+      <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab}
           discuss={opts.discuss} />
     ),
-  },
+  ),
+  // Self tickets hydrate via the session-scoped `GET /api/tickets?ids=`
+  // (`selfScopeFilter` ACL) instead of the generic endpoint — the self
+  // config's searchFilter is deliberately fail-closed there. Same
+  // ChatRef item shape (`buildHubspotTicketSelfRef` SSOT), same preset.
+  hubspot_ticket_self: refHydratedEntry(
+    'hubspot_ticket_self',
+    'HubSpot ticket (self)',
+    (displayRef, opts) => (
+      <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab}
+          discuss={opts.discuss} />
+    ),
+  ),
+  data_room_doc: refHydratedEntry('data_room_doc', 'Data-room doc', (displayRef, opts) => (
+    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab}
+        discuss={opts.discuss} />
+  )),
+  markdown: refHydratedEntry('markdown', 'Doc page (markdown)', (displayRef, opts) => (
+    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab}
+        discuss={opts.discuss} />
+  )),
+  // Body-synthesized video ids (`shortVideoId` content hashes / YouTube
+  // ids) have no backing table row to fetch — ref-only by nature.
   video: {
-    mode: 'no-fetch',
     label: 'Video',
     bareInline: true,
-    render: (chatRef) => <ChatInlineVideoPill chatRef={chatRef} />,
+    render: (_item, chatRef) => <ChatInlineVideoPill chatRef={chatRef} />,
   },
   ...financialRegistryEntries(),
 
-  // ───────── fetch: needs full row from list API ─────────
+  // ───────── content types: full rows from their public list APIs ─────────
   blog_post: {
-    mode: 'fetch',
     label: 'Blog post',
     contentRefType: 'blog_post_existing',
     bareInline: true,
@@ -1365,7 +1383,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   case_study: {
-    mode: 'fetch',
     label: 'Case study',
     contentRefType: 'case_study',
     bareInline: true,
@@ -1381,7 +1398,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   customer_interview: {
-    mode: 'fetch',
     label: 'Customer interview',
     contentRefType: 'customer_interview',
     bareInline: true,
@@ -1397,7 +1413,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   product_release: {
-    mode: 'fetch',
     label: 'Product release',
     contentRefType: 'product_release',
     bareInline: true,
@@ -1424,7 +1439,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   },
   ...programRegistryEntries(),
   investor_update: {
-    mode: 'fetch',
     label: 'Investor update',
     contentRefType: 'investor_update',
     bareInline: true,
@@ -1440,7 +1454,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   onboarding_guide: {
-    mode: 'fetch',
     label: 'Onboarding guide',
     contentRefType: 'onboarding_guide',
     bareInline: true,
@@ -1458,7 +1471,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   marketing_campaign: {
-    mode: 'fetch',
     label: 'Marketing campaign',
     contentRefType: 'marketing_campaign',
     bareInline: true,
@@ -1655,7 +1667,7 @@ export function ChatCardLoader({
   // unconditionally regardless of entry mode. For non-fetch types the
   // `contentRefType` is empty so the hook returns `isLoading=false` and
   // `item=undefined`, which we ignore.
-  const fetchEntry = entry && entry.mode === 'fetch' ? entry : null
+  const fetchEntry = entry && entry.contentRefType ? entry : null
   const { item, isLoading, isError, isFetched } = useChatCardItem<any>(
     fetchEntry?.contentRefType ?? '',
     fetchEntry ? resolvedChatRef.id : '',
@@ -1677,7 +1689,7 @@ export function ChatCardLoader({
   //      `[card://type:id]` markers with no refs metadata, so the ref reaches
   //      us with `url: null` and `resolveSourceRowCTA` has nothing to route.
   const composedHref =
-    fetchEntry && !resolvedChatRef.url && item && !fetchEntry.fallbackHref && !fetchEntry.noComposedHref
+    fetchEntry?.contentRefType && !resolvedChatRef.url && item && !fetchEntry.fallbackHref && !fetchEntry.noComposedHref
       ? resolveFetchedCardHref({
           contentRefType: fetchEntry.contentRefType,
           id: resolvedChatRef.id,
@@ -1783,9 +1795,10 @@ export function ChatCardLoader({
         {navWrap(node)}
       </ChatCardWithDiscuss>
     )
-  if (entry.mode === 'no-fetch') {
-    // Synthetic-ref gate. `chat-message-enhanced.tsx` builds a minimal
-    // `{ type, id, title: cardId, url: null }` ChatRef when the LLM
+  if (!fetchEntry) {
+    // Ref-only types (`deleted_data`, `video` — nothing exists server-side
+    // to fetch). Synthetic-ref gate: `chat-message-enhanced.tsx` builds a
+    // minimal `{ type, id, title: cardId, url: null }` ChatRef when the LLM
     // emits `[card://<type>:<id>]` for an id the server did NOT
     // surface (refs map miss) — typically an LLM hallucination of a
     // composite/invented UUID. EVERY real ref carries `sourceRepo`
@@ -1795,17 +1808,13 @@ export function ChatCardLoader({
     //
     // Returning null here triggers the bare-cardId fallback span in
     // chat-message-enhanced's `<a card://...>` override — the
-    // documented "VISIBLE breakage" behavior. Without this gate, a
-    // hallucinated marker like `[card://markdown:f18945f8-<real-uuid>]`
-    // renders a `DataRoomDocChatCard` with the generic "Document"
-    // badge AND the fake id as the title — which the user can't tell
-    // apart from a real card (the entire point of the fallback
-    // comment block in chat-message-enhanced.tsx).
+    // documented "VISIBLE breakage" behavior (a hallucinated marker must
+    // not render a real-looking card).
     //
-    // Fetch-mode types already handle this gracefully: a synthetic
-    // id leads to a fetch miss → `!item` → null at line ~1034.
+    // Fetching types handle this gracefully instead: a synthetic id leads
+    // to a fetch miss → `!item` → null below.
     if (!finalChatRef.sourceRepo) return null
-    return finish(entry.render(finalChatRef, renderOpts))
+    return finish(entry.render(undefined, finalChatRef, renderOpts))
   }
   // `refFallback` types render from the server-built ref while the fetch
   // is UNRESOLVED (in-flight or failed) — the ref carries a full display
@@ -1813,10 +1822,10 @@ export function ChatCardLoader({
   // vanishing on a transient failure. Gated on `sourceRepo` (server-built
   // refs only); the render fn treats the absent item as "ref-only".
   const refFallbackNode =
-    fetchEntry?.refFallback && finalChatRef.sourceRepo
+    fetchEntry.refFallback && finalChatRef.sourceRepo
       ? () => finish(fetchEntry.render(undefined, finalChatRef, renderOpts))
       : null
-  if (isLoading) return refFallbackNode ? refFallbackNode() : <>{entry.skeleton()}</>
+  if (isLoading) return refFallbackNode ? refFallbackNode() : <>{fetchEntry.skeleton?.() ?? null}</>
   if (!item) {
     // FETCH FAILURE (non-OK response — auth blip, 5xx, rate limit) is
     // NOT evidence of deletion: render nothing rather than a false

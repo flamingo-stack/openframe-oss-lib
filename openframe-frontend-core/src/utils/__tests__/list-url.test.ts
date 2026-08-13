@@ -26,10 +26,27 @@ const BASELINE: Record<string, string> = {
   product_release: '/api/releases?ids=a,b&limit=2',
   customer_interview: '/api/customer-interviews?ids=a,b&limit=2',
   investor_update: '/api/investor-updates?ids=a,b&limit=2',
-  // Not a migration baseline — added 2026-08 with the ticket-card fetch-mode
-  // flip (hub route `GET /api/tickets?ids=`); frozen here the same way so the
-  // hub's `hubspot-tickets-self` config delegation can't drift.
+  // Not migration baselines — added 2026-08 with the everything-fetches card
+  // unification; frozen here the same way so the hub config delegations
+  // can't drift. Self tickets ride the session-scoped `/api/tickets`; the
+  // rest ride the generic `/api/chat/entity-refs` hydration endpoint.
   hubspot_ticket_self: '/api/tickets?ids=a,b',
+  github_commit: '/api/chat/entity-refs?type=github_commit&ids=a,b',
+  github_commit_public: '/api/chat/entity-refs?type=github_commit_public&ids=a,b',
+  github_pull_request: '/api/chat/entity-refs?type=github_pull_request&ids=a,b',
+  github_pull_request_public: '/api/chat/entity-refs?type=github_pull_request_public&ids=a,b',
+  github_pr_review: '/api/chat/entity-refs?type=github_pr_review&ids=a,b',
+  github_pr_review_public: '/api/chat/entity-refs?type=github_pr_review_public&ids=a,b',
+  slack_message: '/api/chat/entity-refs?type=slack_message&ids=a,b',
+  hubspot_ticket: '/api/chat/entity-refs?type=hubspot_ticket&ids=a,b',
+  hubspot_ticket_anon: '/api/chat/entity-refs?type=hubspot_ticket_anon&ids=a,b',
+  data_room_doc: '/api/chat/entity-refs?type=data_room_doc&ids=a,b',
+  markdown: '/api/chat/entity-refs?type=markdown&ids=a,b',
+  financial_kpi: '/api/chat/entity-refs?type=financial_kpi&ids=a,b',
+  cap_table: '/api/chat/entity-refs?type=cap_table&ids=a,b',
+  profit_loss: '/api/chat/entity-refs?type=profit_loss&ids=a,b',
+  balance_sheet: '/api/chat/entity-refs?type=balance_sheet&ids=a,b',
+  cash_flow: '/api/chat/entity-refs?type=cash_flow&ids=a,b',
 }
 
 describe('buildListUrl — byte parity with the hub mappers', () => {
@@ -127,17 +144,13 @@ describe('buildListUrl — null (no list endpoint)', () => {
     expect(buildListUrl('marketing_campaign', [])).toBeNull()
   })
 
-  // No-fetch types are ABSENT keys (not enumerated as null) — their absence
-  // IS the null. Guards against accidentally adding a builder for one.
+  // Only the two genuinely un-fetchable types are ABSENT keys — their
+  // absence IS the null. `deleted_data` is a tombstone for a row that no
+  // longer exists; `video` ids are body-embed content hashes with no
+  // backing table row. Guards against accidentally adding a builder.
   it.each([
-    'github_commit',
-    'github_pr',
-    'github_review',
-    'slack_message',
-    'financial_kpi',
-    'markdown',
-    'data_room_doc',
-    'hubspot_ticket',
+    'deleted_data',
+    'video',
     'unknown_type',
   ])('%s → null', (type) => {
     expect(buildListUrl(type, ['a', 'b'])).toBeNull()

@@ -57,10 +57,14 @@ export function canonicalContentRefType(contentRefType: string): string {
  * mapper's `listApi` (raw, unencoded `join(',')`; exact param names) —
  * the byte-parity test (`__tests__/list-url.test.ts`) fails if any drifts.
  *
- * An ABSENT key ⇒ `buildListUrl` returns null (no-fetch). The no-list
- * types (`github_*`, `slack_message`, financials, docs) are intentionally
- * NOT enumerated here — their absence IS the null. `marketing_campaign`
- * is handled as a literal case in `buildListUrl` (see there).
+ * An ABSENT key ⇒ `buildListUrl` returns null (no-fetch). Only two types
+ * are intentionally absent — `deleted_data` (tombstone of a deleted row;
+ * nothing exists to fetch) and `video` (body-embed content-hash ids with
+ * no backing table row). Every other card type resolves here: content
+ * types to their public list APIs, the rest to the hub's generic
+ * `/api/chat/entity-refs` hydration endpoint (see `ENTITY_REF_TYPES`
+ * below). `marketing_campaign` is handled as a literal case in
+ * `buildListUrl` (see there).
  */
 const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   roadmap_item: (ids, b) => `${b}/api/roadmap?task_ids=${ids.join(',')}`,
@@ -78,9 +82,38 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   faq: (ids, b) => `${b}/api/faqs?ids=${ids.join(',')}&limit=${ids.length}`,
   // Self-scoped: the endpoint filters by the SESSION user's email server-side
   // (`selfScopeFilter`), so foreign ids simply return no row — safe to expose
-  // through the same builder path as the public types. `hubspot_ticket` /
-  // `hubspot_ticket_anon` stay intentionally absent (no hydration endpoint).
+  // through the same builder path as the public types.
   hubspot_ticket_self: (ids, b) => `${b}/api/tickets?ids=${ids.join(',')}`,
+}
+
+/**
+ * Types with NO public list API of their own — hydrated by the hub's
+ * generic `GET /api/chat/entity-refs?type=&ids=` endpoint, which returns
+ * ChatRef-shaped items via the same source-binding + row-filter chain
+ * passive retrieval uses (a private type is simply not bound on public
+ * platforms → 404). Registered into the SAME `BUILDERS` map so every
+ * card type resolves through the one `buildListUrl` path.
+ */
+const ENTITY_REF_TYPES = [
+  'github_commit',
+  'github_commit_public',
+  'github_pull_request',
+  'github_pull_request_public',
+  'github_pr_review',
+  'github_pr_review_public',
+  'slack_message',
+  'hubspot_ticket',
+  'hubspot_ticket_anon',
+  'data_room_doc',
+  'markdown',
+  'financial_kpi',
+  'cap_table',
+  'profit_loss',
+  'balance_sheet',
+  'cash_flow',
+] as const
+for (const t of ENTITY_REF_TYPES) {
+  BUILDERS[t] = (ids, b) => `${b}/api/chat/entity-refs?type=${t}&ids=${ids.join(',')}`
 }
 
 /**
