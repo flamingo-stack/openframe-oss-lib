@@ -28,25 +28,26 @@ const BASELINE: Record<string, string> = {
   investor_update: '/api/investor-updates?ids=a,b&limit=2',
   // Not migration baselines — added 2026-08 with the everything-fetches card
   // unification; frozen here the same way so the hub config delegations
-  // can't drift. Self tickets ride the session-scoped `/api/tickets`; the
-  // rest ride the generic `/api/chat/entity-refs` hydration endpoint.
+  // can't drift. One route per OBJECT: self tickets ride the
+  // session-scoped `/api/tickets`; internal/public github variants share
+  // their object's route (the route resolves the bound variant).
   hubspot_ticket_self: '/api/tickets?ids=a,b',
-  github_commit: '/api/chat/entity-refs?type=github_commit&ids=a,b',
-  github_commit_public: '/api/chat/entity-refs?type=github_commit_public&ids=a,b',
-  github_pull_request: '/api/chat/entity-refs?type=github_pull_request&ids=a,b',
-  github_pull_request_public: '/api/chat/entity-refs?type=github_pull_request_public&ids=a,b',
-  github_pr_review: '/api/chat/entity-refs?type=github_pr_review&ids=a,b',
-  github_pr_review_public: '/api/chat/entity-refs?type=github_pr_review_public&ids=a,b',
-  slack_message: '/api/chat/entity-refs?type=slack_message&ids=a,b',
-  hubspot_ticket: '/api/chat/entity-refs?type=hubspot_ticket&ids=a,b',
-  hubspot_ticket_anon: '/api/chat/entity-refs?type=hubspot_ticket_anon&ids=a,b',
-  data_room_doc: '/api/chat/entity-refs?type=data_room_doc&ids=a,b',
-  markdown: '/api/chat/entity-refs?type=markdown&ids=a,b',
-  financial_kpi: '/api/chat/entity-refs?type=financial_kpi&ids=a,b',
-  cap_table: '/api/chat/entity-refs?type=cap_table&ids=a,b',
-  profit_loss: '/api/chat/entity-refs?type=profit_loss&ids=a,b',
-  balance_sheet: '/api/chat/entity-refs?type=balance_sheet&ids=a,b',
-  cash_flow: '/api/chat/entity-refs?type=cash_flow&ids=a,b',
+  github_commit: '/api/github/commits?ids=a,b',
+  github_commit_public: '/api/github/commits?ids=a,b',
+  github_pull_request: '/api/github/pull-requests?ids=a,b',
+  github_pull_request_public: '/api/github/pull-requests?ids=a,b',
+  github_pr_review: '/api/github/reviews?ids=a,b',
+  github_pr_review_public: '/api/github/reviews?ids=a,b',
+  slack_message: '/api/slack-community/messages?ids=a,b',
+  hubspot_ticket: '/api/tickets/internal?ids=a,b',
+  hubspot_ticket_anon: '/api/tickets/known-issues?ids=a,b',
+  data_room_doc: '/api/data-room/documents?ids=a,b',
+  markdown: '/api/docs/pages?ids=a,b',
+  financial_kpi: '/api/financials/kpis?ids=a,b',
+  cap_table: '/api/financials/cap-table?ids=a,b',
+  profit_loss: '/api/financials/profit-loss?ids=a,b',
+  balance_sheet: '/api/financials/balance-sheet?ids=a,b',
+  cash_flow: '/api/financials/cash-flow?ids=a,b',
 }
 
 describe('buildListUrl — byte parity with the hub mappers', () => {

@@ -61,10 +61,10 @@ export function canonicalContentRefType(contentRefType: string): string {
  * are intentionally absent — `deleted_data` (tombstone of a deleted row;
  * nothing exists to fetch) and `video` (body-embed content-hash ids with
  * no backing table row). Every other card type resolves here: content
- * types to their public list APIs, the rest to the hub's generic
- * `/api/chat/entity-refs` hydration endpoint (see `ENTITY_REF_TYPES`
- * below). `marketing_campaign` is handled as a literal case in
- * `buildListUrl` (see there).
+ * types to their public list APIs, the rest to their per-object
+ * card-hydration routes (see `ENTITY_CARD_ROUTES` below).
+ * `marketing_campaign` is handled as a literal case in `buildListUrl`
+ * (see there).
  */
 const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   roadmap_item: (ids, b) => `${b}/api/roadmap?task_ids=${ids.join(',')}`,
@@ -87,33 +87,34 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
 }
 
 /**
- * Types with NO public list API of their own — hydrated by the hub's
- * generic `GET /api/chat/entity-refs?type=&ids=` endpoint, which returns
- * ChatRef-shaped items via the same source-binding + row-filter chain
- * passive retrieval uses (a private type is simply not bound on public
- * platforms → 404). Registered into the SAME `BUILDERS` map so every
- * card type resolves through the one `buildListUrl` path.
+ * Per-OBJECT card-hydration routes for the types with no pre-existing
+ * public list API (one route per object, matching the repo convention).
+ * Each returns ChatRef-shaped items via the same source-binding +
+ * row-filter chain passive retrieval uses (a private object is simply
+ * not bound on public platforms → 404). The internal/public GitHub
+ * variants share ONE route per object — the route serves whichever
+ * variant is bound to the calling deployment's source.
  */
-const ENTITY_REF_TYPES = [
-  'github_commit',
-  'github_commit_public',
-  'github_pull_request',
-  'github_pull_request_public',
-  'github_pr_review',
-  'github_pr_review_public',
-  'slack_message',
-  'hubspot_ticket',
-  'hubspot_ticket_anon',
-  'data_room_doc',
-  'markdown',
-  'financial_kpi',
-  'cap_table',
-  'profit_loss',
-  'balance_sheet',
-  'cash_flow',
-] as const
-for (const t of ENTITY_REF_TYPES) {
-  BUILDERS[t] = (ids, b) => `${b}/api/chat/entity-refs?type=${t}&ids=${ids.join(',')}`
+const ENTITY_CARD_ROUTES: Record<string, string> = {
+  github_commit: '/api/github/commits',
+  github_commit_public: '/api/github/commits',
+  github_pull_request: '/api/github/pull-requests',
+  github_pull_request_public: '/api/github/pull-requests',
+  github_pr_review: '/api/github/reviews',
+  github_pr_review_public: '/api/github/reviews',
+  slack_message: '/api/slack-community/messages',
+  hubspot_ticket: '/api/tickets/internal',
+  hubspot_ticket_anon: '/api/tickets/known-issues',
+  data_room_doc: '/api/data-room/documents',
+  markdown: '/api/docs/pages',
+  financial_kpi: '/api/financials/kpis',
+  cap_table: '/api/financials/cap-table',
+  profit_loss: '/api/financials/profit-loss',
+  balance_sheet: '/api/financials/balance-sheet',
+  cash_flow: '/api/financials/cash-flow',
+}
+for (const [t, path] of Object.entries(ENTITY_CARD_ROUTES)) {
+  BUILDERS[t] = (ids, b) => `${b}${path}?ids=${ids.join(',')}`
 }
 
 /**
