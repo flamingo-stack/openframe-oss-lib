@@ -20,7 +20,9 @@ pub const RECONNECTION_DELAY_MS: u64 = 5000; // 5 seconds
 pub const OUTBOX_MAX_ENTRIES: usize = 500;
 pub const OUTBOX_FLUSH_INTERVAL_SECS: u64 = 30;
 pub const FLUSH_PUBLISH_TIMEOUT_SECS: u64 = 30;
-pub const OUTBOX_MAX_PAYLOAD_BYTES: usize = 1024 * 1024 - 64 * 1024;
+
+pub const NATS_PAYLOAD_FALLBACK_BYTES: usize = 5 * 1024 * 1024;
+pub const NATS_PAYLOAD_HEADROOM_BYTES: usize = 64 * 1024;
 
 // Last-known-good update ratchet
 /// How long the updater waits for the new binary's boot marker.

@@ -2,6 +2,7 @@ package com.openframe.client.controller;
 
 
 import com.openframe.client.dto.agent.*;
+import com.openframe.client.service.AgentUninstallService;
 import com.openframe.client.service.agentregistration.AgentRegistrationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ public class AgentController {
     private static final String CLIENT_SECRET_HEADER = "X-Client-Secret";
 
     private final AgentRegistrationService agentRegistrationService;
+    private final AgentUninstallService agentUninstallService;
 
     @PostMapping("/register")
     public AgentRegistrationResponse register(
@@ -35,6 +37,15 @@ public class AgentController {
             @Valid @RequestBody AgentRegistrationRequest request
     ) {
         return agentRegistrationService.reinstall(initialKey, machineId, clientSecret, request);
+    }
+
+    @PostMapping("/uninstall")
+    public ResponseEntity<Void> uninstall(
+            @RequestHeader(MACHINE_ID_HEADER) String machineId,
+            @RequestHeader(CLIENT_SECRET_HEADER) String clientSecret
+    ) {
+        agentUninstallService.uninstall(machineId, clientSecret);
+        return ResponseEntity.noContent().build();
     }
 
 }
