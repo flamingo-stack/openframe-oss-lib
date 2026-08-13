@@ -12,8 +12,6 @@ import java.util.Optional;
 @Repository
 public interface DeviceOnlineDispatchRepository extends MongoRepository<DeviceFirstOnlineDispatch, String> {
 
-    boolean existsByTenantIdAndMachineId(String tenantId, String machineId);
-
     long deleteByTenantIdAndMachineId(String tenantId, String machineId);
 
     List<DeviceFirstOnlineDispatch> findByStatus(DeviceOnlineDispatchStatus status, Pageable pageable);

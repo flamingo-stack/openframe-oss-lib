@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.ExecutionSource;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.model.enums.Destination;
@@ -133,6 +134,23 @@ class ScriptExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
 
         verify(deviceOnlineDispatchRepository, never()).save(any(DeviceFirstOnlineDispatch.class));
+    }
+
+    @Test
+    @DisplayName("handle: SCHEDULED source survives the RUNNING→SUCCESS transition (regression: source must not be dropped on completion)")
+    void handle_success_preservesScheduledSource() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setSource(ExecutionSource.SCHEDULED);
+        row.setScheduleId("sched-99");
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
+
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+        assertThat(captor.getValue().getSource()).isEqualTo(ExecutionSource.SCHEDULED);
     }
 
     @Test
