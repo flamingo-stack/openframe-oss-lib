@@ -50,7 +50,7 @@ async fn invariant_journal_xor_outbox() {
     assert!(s.has_batch("ex").await.unwrap());
     assert!(s.pending_keys().await.unwrap().is_empty());
 
-    let bytes = ResultStore::encode_result(&result("ex", "a"));
+    let bytes = ResultStore::encode_result(&result("ex", "a"), payload_limit(None));
     s.complete(key.clone(), "subj".to_string(), bytes)
         .await
         .unwrap();
@@ -86,7 +86,7 @@ async fn write_ahead_survives_reopen() {
     let key = entry_key("ex", Some("a"));
     {
         let s = ResultStore::open_or_degrade(path.clone());
-        let bytes = ResultStore::encode_result(&result("ex", "a"));
+        let bytes = ResultStore::encode_result(&result("ex", "a"), payload_limit(None));
         s.complete(key.clone(), "subj".to_string(), bytes)
             .await
             .unwrap();
@@ -139,8 +139,8 @@ async fn recover_is_idempotent() {
 #[tokio::test]
 async fn same_batch_two_scripts_coexist() {
     let (s, _d) = store();
-    let a = ResultStore::encode_result(&result("ex", "a"));
-    let b = ResultStore::encode_result(&result("ex", "b"));
+    let a = ResultStore::encode_result(&result("ex", "a"), payload_limit(None));
+    let b = ResultStore::encode_result(&result("ex", "b"), payload_limit(None));
     s.complete(entry_key("ex", Some("a")), "subj".to_string(), a)
         .await
         .unwrap();
@@ -152,11 +152,12 @@ async fn same_batch_two_scripts_coexist() {
 
 #[tokio::test]
 async fn oversize_result_is_truncated_under_limit() {
+    let limit = payload_limit(None);
     let mut r = result("ex", "a");
-    r.stdout = "x".repeat(OUTBOX_MAX_PAYLOAD_BYTES + 1024);
+    r.stdout = "x".repeat(limit + 1024);
     r.stderr = "diagnostic".to_string();
-    let bytes = ResultStore::encode_result(&r);
-    assert!(bytes.len() <= OUTBOX_MAX_PAYLOAD_BYTES);
+    let bytes = ResultStore::encode_result(&r, limit);
+    assert!(bytes.len() <= limit);
     let decoded: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(decoded["error"], TRUNCATION_MARKER);
     assert_eq!(
@@ -171,10 +172,29 @@ async fn prune_keeps_newest_drops_oldest() {
     for i in 0..5 {
         let mut r = record("ex", &format!("s{}", i));
         r.1.created_at_secs = i as u64;
-        let bytes = ResultStore::encode_result(&result("ex", &format!("s{}", i)));
+        let bytes = ResultStore::encode_result(&result("ex", &format!("s{}", i)), payload_limit(None));
         s.complete(r.0, "subj".to_string(), bytes).await.unwrap();
     }
     let dropped = s.prune_oldest(2).await.unwrap();
     assert_eq!(dropped, 3);
     assert_eq!(s.len().await.unwrap(), 2);
+}
+
+#[test]
+fn payload_limit_follows_live_max_payload() {
+    use crate::config::update_config::{NATS_PAYLOAD_FALLBACK_BYTES, NATS_PAYLOAD_HEADROOM_BYTES};
+
+    // Unknown live value → fallback minus headroom.
+    assert_eq!(
+        payload_limit(None),
+        NATS_PAYLOAD_FALLBACK_BYTES - NATS_PAYLOAD_HEADROOM_BYTES
+    );
+    // A raised server limit is honored automatically.
+    let raised = 8 * 1024 * 1024;
+    assert_eq!(
+        payload_limit(Some(raised)),
+        raised - NATS_PAYLOAD_HEADROOM_BYTES
+    );
+    // A pathologically small limit saturates to 0 rather than underflowing.
+    assert_eq!(payload_limit(Some(1024)), 0);
 }
