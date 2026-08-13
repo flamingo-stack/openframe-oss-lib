@@ -4,14 +4,15 @@ import com.openframe.client.service.rmm.DeviceOnlineDispatchService;
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.device.MachineFirstOnlineDispatch;
+import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
+import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
-import com.openframe.data.repository.device.MachineFirstOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
@@ -28,12 +29,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -50,7 +51,7 @@ class DeviceOnlineDispatchServiceTest {
     private static final String MACHINE = "m-1";
     private static final String ROW_ID = "row-1";
 
-    @Mock private MachineFirstOnlineDispatchRepository dispatchRepository;
+    @Mock private DeviceOnlineDispatchRepository dispatchRepository;
     @Mock private MachineRepository machineRepository;
     @Mock private ScriptScheduleMachineAssignedRepository assignedRepository;
     @Mock private ScriptScheduleRepository scheduleRepository;
@@ -63,88 +64,95 @@ class DeviceOnlineDispatchServiceTest {
     void setUp() {
         // @Value fields don't get populated by @InjectMocks — set explicitly.
         ReflectionTestUtils.setField(service, "batchSize", 500);
-        // Default: bulk update reports "everything you sent got modified" — the healthy case.
-        lenient().when(dispatchRepository.markDispatchedIn(anyCollection(), any(Instant.class)))
-                .thenAnswer(inv -> (long) ((Collection<?>) inv.getArgument(0)).size());
+    }
+
+    private List<String> savedDispatchedIds() {
+        ArgumentCaptor<Iterable<DeviceFirstOnlineDispatch>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(dispatchRepository).saveAll(captor.capture());
+        List<DeviceFirstOnlineDispatch> saved = new ArrayList<>();
+        captor.getValue().forEach(saved::add);
+        assertThat(saved).allMatch(r -> r.getStatus() == DeviceOnlineDispatchStatus.DISPATCHED);
+        assertThat(saved).allMatch(r -> r.getDispatchedAt() != null);
+        return saved.stream().map(DeviceFirstOnlineDispatch::getId).toList();
     }
 
     @Test
     @DisplayName("pending row + online machine + assigned DEVICE_ONLINE schedule → dispatched, bulk-marked")
     void firesActiveDeviceOnlineOnly() {
-        MachineFirstOnlineDispatch row = pendingRow();
+        DeviceFirstOnlineDispatch row = pendingRow();
         ScriptSchedule s = schedule("s1");
-        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(row));
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
         stubTenantReads(TENANT, List.of(onlineMachine()), List.of(assignment(MACHINE, "s1")), List.of(s));
 
-        service.processPending();
+        service.processDevicesBecameOnline();
 
         verify(fireDispatcher).dispatch(eq(s), eq(List.of(MACHINE)), any(Instant.class));
-        verify(dispatchRepository).markDispatchedIn(eq(List.of(ROW_ID)), any(Instant.class));
+        assertThat(savedDispatchedIds()).containsExactly(ROW_ID);
     }
 
     @Test
     @DisplayName("machine offline at tick → skipped, row stays pending")
     void offlineMachine_leavesRowPending() {
-        MachineFirstOnlineDispatch row = pendingRow();
+        DeviceFirstOnlineDispatch row = pendingRow();
         Machine offline = onlineMachine();
         offline.setStatus(DeviceStatus.OFFLINE);
-        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(row));
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
         stubTenantReads(TENANT, List.of(offline), List.of(), List.of());
 
-        service.processPending();
+        service.processDevicesBecameOnline();
 
         verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
-        verify(dispatchRepository, never()).markDispatchedIn(any(), any(Instant.class));
+        verify(dispatchRepository, never()).saveAll(any());
     }
 
     @Test
     @DisplayName("machine missing → skipped, row stays pending")
     void missingMachine_leavesRowPending() {
-        MachineFirstOnlineDispatch row = pendingRow();
-        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(row));
+        DeviceFirstOnlineDispatch row = pendingRow();
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
         stubTenantReads(TENANT, List.of(), List.of(), List.of());
 
-        service.processPending();
+        service.processDevicesBecameOnline();
 
         verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
-        verify(dispatchRepository, never()).markDispatchedIn(any(), any(Instant.class));
+        verify(dispatchRepository, never()).saveAll(any());
     }
 
     @Test
     @DisplayName("no schedules due → row STILL bulk-marked (drains pending set)")
     void noSchedulesDue_stillMarksDispatched() {
-        MachineFirstOnlineDispatch row = pendingRow();
-        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(row));
+        DeviceFirstOnlineDispatch row = pendingRow();
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
         stubTenantReads(TENANT, List.of(onlineMachine()), List.of(), List.of());
 
-        service.processPending();
+        service.processDevicesBecameOnline();
 
         verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
-        verify(dispatchRepository).markDispatchedIn(eq(List.of(ROW_ID)), any(Instant.class));
+        assertThat(savedDispatchedIds()).containsExactly(ROW_ID);
     }
 
     @Test
     @DisplayName("matching CRITERIA schedule fires without explicit assignment")
     void criteriaScheduleFiresWithoutAssignment() {
-        MachineFirstOnlineDispatch row = pendingRow();
+        DeviceFirstOnlineDispatch row = pendingRow();
         ScriptSchedule criteria = criteriaSchedule("c1");
-        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(row));
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
         stubTenantReads(TENANT, List.of(onlineMachine()), List.of(), List.of(criteria));
         when(targetResolver.matchesCriteria(eq(criteria), any(Machine.class))).thenReturn(true);
 
-        service.processPending();
+        service.processDevicesBecameOnline();
 
         verify(fireDispatcher).dispatch(eq(criteria), eq(List.of(MACHINE)), any(Instant.class));
-        verify(dispatchRepository).markDispatchedIn(eq(List.of(ROW_ID)), any(Instant.class));
+        assertThat(savedDispatchedIds()).containsExactly(ROW_ID);
     }
 
     @Test
     @DisplayName("per-row dispatch throws → failing row NOT in bulk-mark; siblings flushed")
     void dispatchFailure_leavesRowPendingAndKeepsProcessingOthers() {
-        MachineFirstOnlineDispatch bad = row("row-bad", "m-bad");
-        MachineFirstOnlineDispatch ok = row("row-ok", "m-ok");
+        DeviceFirstOnlineDispatch bad = row("row-bad", "m-bad");
+        DeviceFirstOnlineDispatch ok = row("row-ok", "m-ok");
         ScriptSchedule s = schedule("s1");
-        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(bad, ok));
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(bad, ok));
         stubTenantReads(TENANT,
                 List.of(onlineMachine("m-bad"), onlineMachine("m-ok")),
                 List.of(assignment("m-bad", "s1"), assignment("m-ok", "s1")),
@@ -152,38 +160,36 @@ class DeviceOnlineDispatchServiceTest {
         doThrow(new RuntimeException("nats down"))
                 .when(fireDispatcher).dispatch(eq(s), eq(List.of("m-bad")), any(Instant.class));
 
-        service.processPending();
+        service.processDevicesBecameOnline();
 
         verify(fireDispatcher).dispatch(eq(s), eq(List.of("m-ok")), any(Instant.class));
-        ArgumentCaptor<Collection<String>> ids = ArgumentCaptor.forClass(Collection.class);
-        verify(dispatchRepository).markDispatchedIn(ids.capture(), any(Instant.class));
-        assertThat(ids.getValue()).containsExactly("row-ok");
+        assertThat(savedDispatchedIds()).containsExactly("row-ok");
     }
 
     @Test
     @DisplayName("empty pending set → no work")
     void nothingPending_noWork() {
-        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of());
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of());
 
-        service.processPending();
+        service.processDevicesBecameOnline();
 
         verify(machineRepository, never()).findByTenantIdAndMachineIdIn(any(), any());
-        verify(dispatchRepository, never()).markDispatchedIn(any(), any(Instant.class));
+        verify(dispatchRepository, never()).saveAll(any());
     }
 
     @Test
     @DisplayName("batch cap: the pending query is bounded at the DB by batchSize, ordered oldest-first")
     void batchSizeCapsPerTick_boundedAtDb() {
         ReflectionTestUtils.setField(service, "batchSize", 2);
-        MachineFirstOnlineDispatch a = row("row-a", "m-a");
-        MachineFirstOnlineDispatch b = row("row-b", "m-b");
-        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(a, b));
+        DeviceFirstOnlineDispatch a = row("row-a", "m-a");
+        DeviceFirstOnlineDispatch b = row("row-b", "m-b");
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(a, b));
         stubTenantReads(TENANT, List.of(), List.of(), List.of());
 
-        service.processPending();
+        service.processDevicesBecameOnline();
 
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(dispatchRepository).findByDispatchedAtIsNull(pageable.capture());
+        verify(dispatchRepository).findByStatus(eq(DeviceOnlineDispatchStatus.NEW), pageable.capture());
         assertThat(pageable.getValue().getPageSize()).isEqualTo(2);
         assertThat(pageable.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.ASC, "firstSeenAt"));
 
@@ -195,41 +201,37 @@ class DeviceOnlineDispatchServiceTest {
     @Test
     @DisplayName("no N+1: 3 rows same tenant → ONE bulk read per collection, ONE bulk mark")
     void oneRoundTripPerCollectionPerTenant() {
-        MachineFirstOnlineDispatch a = row("row-a", "m-a");
-        MachineFirstOnlineDispatch b = row("row-b", "m-b");
-        MachineFirstOnlineDispatch c = row("row-c", "m-c");
-        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(a, b, c));
+        DeviceFirstOnlineDispatch a = row("row-a", "m-a");
+        DeviceFirstOnlineDispatch b = row("row-b", "m-b");
+        DeviceFirstOnlineDispatch c = row("row-c", "m-c");
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(a, b, c));
         stubTenantReads(TENANT,
                 List.of(onlineMachine("m-a"), onlineMachine("m-b"), onlineMachine("m-c")),
                 List.of(), List.of());
 
-        service.processPending();
+        service.processDevicesBecameOnline();
 
         verify(machineRepository, times(1)).findByTenantIdAndMachineIdIn(eq(TENANT), any());
         verify(assignedRepository, times(1)).findByTenantIdAndMachineIdIn(eq(TENANT), any());
         verify(scheduleRepository, times(1))
                 .findByTenantIdAndTriggerAndStatus(TENANT, ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
-        ArgumentCaptor<Collection<String>> ids = ArgumentCaptor.forClass(Collection.class);
-        verify(dispatchRepository, times(1)).markDispatchedIn(ids.capture(), any(Instant.class));
-        assertThat(ids.getValue()).containsExactlyInAnyOrder("row-a", "row-b", "row-c");
+        assertThat(savedDispatchedIds()).containsExactlyInAnyOrder("row-a", "row-b", "row-c");
     }
 
     @Test
     @DisplayName("cross-tenant: 2 tenants → bulk reads per tenant, ONE global bulk-mark")
     void multiTenantIsolation() {
-        MachineFirstOnlineDispatch a = row("row-a", "m-a", TENANT);
-        MachineFirstOnlineDispatch b = row("row-b", "m-b", OTHER_TENANT);
-        when(dispatchRepository.findByDispatchedAtIsNull(any(Pageable.class))).thenReturn(List.of(a, b));
+        DeviceFirstOnlineDispatch a = row("row-a", "m-a", TENANT);
+        DeviceFirstOnlineDispatch b = row("row-b", "m-b", OTHER_TENANT);
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(a, b));
         stubTenantReads(TENANT, List.of(onlineMachine("m-a", TENANT)), List.of(), List.of());
         stubTenantReads(OTHER_TENANT, List.of(onlineMachine("m-b", OTHER_TENANT)), List.of(), List.of());
 
-        service.processPending();
+        service.processDevicesBecameOnline();
 
         verify(machineRepository).findByTenantIdAndMachineIdIn(eq(TENANT), any());
         verify(machineRepository).findByTenantIdAndMachineIdIn(eq(OTHER_TENANT), any());
-        ArgumentCaptor<Collection<String>> ids = ArgumentCaptor.forClass(Collection.class);
-        verify(dispatchRepository, times(1)).markDispatchedIn(ids.capture(), any(Instant.class));
-        assertThat(ids.getValue()).containsExactlyInAnyOrder("row-a", "row-b");
+        assertThat(savedDispatchedIds()).containsExactlyInAnyOrder("row-a", "row-b");
     }
 
     // --- fixtures --------------------------------------------------------------------------------
@@ -247,16 +249,16 @@ class DeviceOnlineDispatchServiceTest {
                 .thenReturn(tenantSchedules);
     }
 
-    private static MachineFirstOnlineDispatch pendingRow() {
+    private static DeviceFirstOnlineDispatch pendingRow() {
         return row(ROW_ID, MACHINE, TENANT);
     }
 
-    private static MachineFirstOnlineDispatch row(String id, String machineId) {
+    private static DeviceFirstOnlineDispatch row(String id, String machineId) {
         return row(id, machineId, TENANT);
     }
 
-    private static MachineFirstOnlineDispatch row(String id, String machineId, String tenantId) {
-        return MachineFirstOnlineDispatch.builder()
+    private static DeviceFirstOnlineDispatch row(String id, String machineId, String tenantId) {
+        return DeviceFirstOnlineDispatch.builder()
                 .id(id).tenantId(tenantId).machineId(machineId).firstSeenAt(Instant.now()).build();
     }
 

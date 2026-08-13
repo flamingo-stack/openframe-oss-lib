@@ -42,8 +42,8 @@ export const remarkCardLinks: Plugin<[], Root> = () => {
       if (!text || !text.includes("[card://")) return
 
       // Walk the regex and split the text into a sequence of text + link nodes.
-      // The link's `children` carry the original literal so unknown-ref
-      // fallbacks (no matching key in the refs map) render the literal text
+      // The link's `children` carry the original literal so unresolved-marker
+      // fallbacks (host renderer produced nothing) render the literal text
       // instead of a broken anchor.
       const parts: Array<Text | Link> = []
       let lastIndex = 0

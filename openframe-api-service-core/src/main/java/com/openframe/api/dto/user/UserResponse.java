@@ -10,10 +10,6 @@ import java.util.List;
 @Data
 @Builder
 public class UserResponse {
-
-    public static final String SYSTEM_ID = "SYSTEM";
-    public static final String EMPTY = "";
-
     private String id;
     private String email;
     private boolean emailVerified;
@@ -24,14 +20,6 @@ public class UserResponse {
     private ImageDto image;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
-    public static UserResponse system() {
-        return UserResponse.builder()
-                .id(SYSTEM_ID)
-                .firstName(SYSTEM_ID)
-                .lastName(EMPTY)
-                .build();
-    }
 }
 
 

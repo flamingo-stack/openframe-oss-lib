@@ -13,7 +13,7 @@
  *
  * Fields that only one transport can populate are typed as nullable (per-turn
  * LLM metadata is SSE-only) or optional (Guide-only message sub-fields like
- * `sources` and `chatRefs`). In the off-mode they're null/undefined.
+ * `sources`). In the off-mode they're null/undefined.
  */
 
 import type { MessageSegment } from './message.types'
@@ -101,10 +101,9 @@ export interface UnifiedUsageBreakdown {
 /**
  * Generic chat message shape — unified between Guide (SSE) and Mingo (NATS).
  *
- * Guide-mode messages populate `sources` (RAG document citations) and
- * `chatRefs` (inline entity-card references). Mingo-mode messages leave
- * those undefined. Tool-execution and approval events ride inside
- * `segments` and are common to both modes.
+ * Guide-mode messages populate `sources` (RAG document citations);
+ * Mingo-mode messages leave it undefined. Tool-execution and approval
+ * events ride inside `segments` and are common to both modes.
  */
 export interface UnifiedChatMessage {
   id: string
@@ -173,12 +172,6 @@ export interface UnifiedChatMessage {
 
   /** Guide/SSE-only: document citations. Undefined in Mingo mode. */
   sources?: ChatSource[]
-
-  /**
-   * Guide/SSE-only: per-row refs for inline entity-card rendering.
-   * Keyed by `<documentType>:<primaryKey>`. Undefined in Mingo mode.
-   */
-  chatRefs?: Record<string, ChatRef>
 
   /**
    * Per-message viewport-positioning hint. Common to both modes; the

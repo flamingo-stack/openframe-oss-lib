@@ -90,6 +90,7 @@ public class GatewaySecurityConfig {
                                 CLIENTS_PREFIX + "/metrics/**",
                                 CLIENTS_PREFIX + "/api/agents/register",
                                 CLIENTS_PREFIX + "/api/agents/reinstall",
+                                CLIENTS_PREFIX + "/api/agents/uninstall",
                                 CLIENTS_PREFIX + "/api/release-version",
                                 CLIENTS_PREFIX + "/oauth/token",
                                 // TODO: removxxe after migration artifacts to GitHub
