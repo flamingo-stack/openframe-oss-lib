@@ -112,25 +112,6 @@ export interface MessageOwner {
   }
 }
 
-// ========== ChatRef-key construction ==========
-
-/**
- * Canonical key shape for the `chatRefs` map carried on every Message —
- * `${docType}:${externalId}`. The chat-message renderer looks up inline
- * `[card://<type>:<id>]` markers via this same key shape, so keeping the
- * construction in one place avoids divergence between the writer
- * (server-driven attach in decision_resolved handler) and the readers
- * (renderingPlan in chat-message-enhanced).
- *
- * Pure function — no runtime cost vs. inline template literal — but the
- * call-site reads as "the chat-ref key for this ref" rather than as a
- * generic string-concat, which is what the eye is hunting for when
- * scanning the file for ref-keyed logic.
- */
-export function buildChatRefKey(docType: string, externalId: string): string {
-  return `${docType}:${externalId}`
-}
-
 // ========== Content-shape helpers ==========
 
 import type { MessageContent, MessageSegment } from './message.types'

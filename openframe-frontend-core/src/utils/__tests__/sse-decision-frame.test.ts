@@ -118,14 +118,12 @@ describe('readLeadingDecisionFrame', () => {
       willAutoContinue: false,
       proposalId: 'prop-123',
       result: { ticket_id: 'tkt-7', status: 'CLOSED' },
-      card: { type: 'ticket', marker: 'm1', ref: { id: 'tkt-7' } },
       receiptText: 'Ticket closed.',
     }
     const wire = bytes(JSON.stringify(frame) + '\0')
     const result = await readLeadingDecisionFrame(streamingResponse([wire]))
     expect(result.toolName).toBe('update_ticket')
     expect(result.proposalId).toBe('prop-123')
-    expect(result.card?.marker).toBe('m1')
     expect(result.receiptText).toBe('Ticket closed.')
   })
 })

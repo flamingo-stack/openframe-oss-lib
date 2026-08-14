@@ -205,8 +205,8 @@ export {
   resolveSourceIcon,
 } from './source-row-cta'
 
-// Post-fetch enrichment for the synthetic ChatRef a `[card://type:id]` marker
-// produces when the transport ships no refs metadata (Mingo/NATS).
+// Post-fetch enrichment for the minimal ChatRef descriptor a
+// `[card://type:id]` marker produces (the wire ships no card metadata).
 export {
   resolveFetchedCardHref,
   readFetchedCardTitle,
