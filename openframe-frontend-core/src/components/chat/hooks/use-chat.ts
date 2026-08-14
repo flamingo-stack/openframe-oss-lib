@@ -15,8 +15,6 @@ import type {
   MessageSegment,
   ToolExecutionData,
 } from '../types/message.types'
-import { buildChatRefKey } from '../types/chat.types'
-import type { ChatRef } from '../chat-ref.types'
 
 export type { Message } from '../types/message.types'
 export type { StreamFnExtraOptions } from './use-sse'
@@ -285,18 +283,6 @@ export function useChat({
               ok: boolean
               toolName?: string
               result?: { ticket_id?: string; status?: string | null }
-              marker?: string
-              /** Full ChatRef payload from the server's `decision_resolved`
-               *  frame — `card.ref` in the wire format. Carries enough
-               *  metadata for inline card render. */
-              cardRef?: {
-                type?: string
-                id?: string
-                title?: string
-                url?: string | null
-                metadata?: Record<string, string | null | undefined>
-                [key: string]: unknown
-              }
               /** Server-rendered receipt copy. Computed by the per-source
                *  `strategy.tools.receiptRenderer(...)`. */
               receiptText?: string
@@ -354,39 +340,9 @@ export function useChat({
               updatedSegments.push({ type: 'text', text: currentTextSegment })
             }
             currentAssistantSegmentsRef.current = updatedSegments
-            // SERVER-DRIVEN CARDREF ATTACHMENT — stamp the ref onto THIS
-            // assistant message so the `[card://<type>:<id>]` marker
-            // resolves via `message.chatRefs` independent of per-turn
-            // refsMap indexing.
-            const refForMessage =
-              decision.cardRef &&
-              typeof decision.cardRef.type === 'string' &&
-              typeof decision.cardRef.id === 'string'
-                ? decision.cardRef
-                : null
-            if (refForMessage) {
-              const refKey = buildChatRefKey(
-                refForMessage.type as string,
-                refForMessage.id as string,
-              )
-              setMessages((prev) => {
-                const next = [...prev]
-                const lastIdx = next.length - 1
-                const lastMsg = next[lastIdx]
-                if (!lastMsg || lastMsg.role !== 'assistant') return prev
-                next[lastIdx] = {
-                  ...lastMsg,
-                  content: updatedSegments.length > 0 ? updatedSegments : '',
-                  chatRefs: {
-                    ...(lastMsg.chatRefs ?? {}),
-                    [refKey]: refForMessage as unknown as ChatRef,
-                  },
-                }
-                return next
-              })
-            } else {
-              updateLastAssistantMessage(updatedSegments)
-            }
+            // The receipt's `[card://<type>:<id>]` marker resolves via the
+            // card fetch path (hydrate-by-id) — no ref stamping needed.
+            updateLastAssistantMessage(updatedSegments)
           } else if (segment.type === 'tool_execution') {
             if (currentTextSegment) {
               const updatedSegments = [...currentAssistantSegmentsRef.current]

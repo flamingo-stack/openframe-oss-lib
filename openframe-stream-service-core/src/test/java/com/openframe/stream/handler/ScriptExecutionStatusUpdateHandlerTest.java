@@ -42,6 +42,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     private static final String EXECUTION_ID = "exec-1";
     private static final String MACHINE_ID = "machine-42";
     private static final String SCRIPT_ID = "script-1";
+    private static final String SCHEDULE_ID = "sched-1";
 
     @Mock
     private ScriptExecutionRepository scriptExecutionRepository;
@@ -89,14 +90,16 @@ class ScriptExecutionStatusUpdateHandlerTest {
     }
 
     @Test
-    @DisplayName("handle: a result for the machine flips its DISPATCHED first-online sentinel to PROCESSED (find + guarded save)")
+    @DisplayName("handle: a schedule result flips that (machine, schedule) DISPATCHED sentinel to PROCESSED (find + guarded save)")
     void handle_marksDeviceOnlineDispatchProcessed() {
         ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId(SCHEDULE_ID);
         when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
         DeviceFirstOnlineDispatch sentinel = DeviceFirstOnlineDispatch.builder()
-                .tenantId(TENANT_ID).machineId(MACHINE_ID).status(DeviceOnlineDispatchStatus.DISPATCHED).build();
-        when(deviceOnlineDispatchRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
+                .tenantId(TENANT_ID).machineId(MACHINE_ID).scheduleId(SCHEDULE_ID)
+                .status(DeviceOnlineDispatchStatus.DISPATCHED).build();
+        when(deviceOnlineDispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT_ID, MACHINE_ID, SCHEDULE_ID))
                 .thenReturn(Optional.of(sentinel));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
@@ -107,12 +110,26 @@ class ScriptExecutionStatusUpdateHandlerTest {
     }
 
     @Test
-    @DisplayName("handle: no first-online sentinel for the machine → nothing to flip, no save")
-    void handle_noSentinel_doesNotSave() {
-        ScriptExecution row = runningRow(EXECUTION_ID);
+    @DisplayName("handle: ad-hoc result (no scheduleId) → no DEVICE_ONLINE sentinel is touched")
+    void handle_noScheduleId_doesNotTouchSentinel() {
+        ScriptExecution row = runningRow(EXECUTION_ID);   // scheduleId null
         when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
-        when(deviceOnlineDispatchRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
+
+        verify(deviceOnlineDispatchRepository, never()).findByTenantIdAndMachineIdAndScheduleId(any(), any(), any());
+        verify(deviceOnlineDispatchRepository, never()).save(any(DeviceFirstOnlineDispatch.class));
+    }
+
+    @Test
+    @DisplayName("handle: no sentinel for (machine, schedule) → nothing to flip, no save")
+    void handle_noSentinel_doesNotSave() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId(SCHEDULE_ID);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+        when(deviceOnlineDispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT_ID, MACHINE_ID, SCHEDULE_ID))
                 .thenReturn(Optional.empty());
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
@@ -121,14 +138,16 @@ class ScriptExecutionStatusUpdateHandlerTest {
     }
 
     @Test
-    @DisplayName("handle: sentinel already PROCESSED (or absent DISPATCHED) → guarded, no save")
+    @DisplayName("handle: sentinel already PROCESSED (or not DISPATCHED) → guarded, no save")
     void handle_sentinelNotDispatched_doesNotSave() {
         ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId(SCHEDULE_ID);
         when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
         DeviceFirstOnlineDispatch sentinel = DeviceFirstOnlineDispatch.builder()
-                .tenantId(TENANT_ID).machineId(MACHINE_ID).status(DeviceOnlineDispatchStatus.PROCESSED).build();
-        when(deviceOnlineDispatchRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
+                .tenantId(TENANT_ID).machineId(MACHINE_ID).scheduleId(SCHEDULE_ID)
+                .status(DeviceOnlineDispatchStatus.PROCESSED).build();
+        when(deviceOnlineDispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT_ID, MACHINE_ID, SCHEDULE_ID))
                 .thenReturn(Optional.of(sentinel));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());

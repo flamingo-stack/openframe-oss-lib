@@ -236,6 +236,11 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
             </div>
           )}
 
+          {/* Host-owned action above the nav — the same slot the sidebar
+              renders, so a host passes `topSlot` once and both surfaces get it.
+              Never minimized: this panel is always the full width of the phone. */}
+          {config.topSlot?.({ minimized: false })}
+
           {/* Primary Navigation Items - Grid Layout */}
           <nav aria-label="Primary navigation">
             {renderNavigationGrid(primaryItems)}
