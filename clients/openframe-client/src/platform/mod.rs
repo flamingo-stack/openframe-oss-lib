@@ -39,6 +39,7 @@ pub use installation_detector::detect_actual_installation;
 pub use permissions::{Capability, PermissionError, PermissionUtils, Permissions};
 #[cfg(target_os = "windows")]
 pub use powershell::get_powershell_path;
+pub(crate) use tool_updater::clear_aside_binary;
 pub use tool_updater::{
     create_migrator, create_updater, needs_migration, run_migration, run_update, ToolUpdater,
     ToolUpdaterDeps, UpdateContext,

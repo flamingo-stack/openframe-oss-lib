@@ -194,8 +194,7 @@ public class ScriptScheduleDataFetcher {
         String rawScheduleId = decodeId(scheduleId);
         ScriptScheduleResponse schedule = scheduleService.get(rawScheduleId);
         DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
-        List<String> ids = deviceService.findDeviceIdsForPlatforms(
-                schedule.getSupportedPlatforms(), filterOptions, search);
+        List<String> ids = deviceService.findDeviceIdsForPlatforms(schedule.getSupportedPlatforms(), filterOptions, search);
         scheduleDeviceService.addDevices(rawScheduleId, ids, principal.getId());
         return scheduleService.get(rawScheduleId);
     }

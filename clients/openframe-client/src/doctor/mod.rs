@@ -1,4 +1,5 @@
 pub mod checks;
+pub mod healing;
 
 use crate::installation_initial_config_service::InstallConfigParams;
 use crate::platform::DirectoryManager;
@@ -9,6 +10,7 @@ use checks::*;
 pub enum CheckCategory {
     Command,
     Admin,
+    Runtime,
     Disk,
     Network,
 }
@@ -21,12 +23,19 @@ pub enum CheckStatus {
     Info,
 }
 
+/// Automatic fix the healing submodule can run when a check flags it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Remediation {
+    InstallWebview2,
+}
+
 #[derive(Debug)]
 pub struct CheckResult {
     pub category: CheckCategory,
     pub status: CheckStatus,
     pub name: String,
     pub hint: Option<String>,
+    pub remediation: Option<Remediation>,
 }
 
 impl CheckResult {
@@ -36,6 +45,7 @@ impl CheckResult {
             status: CheckStatus::Pass,
             name: name.to_string(),
             hint: None,
+            remediation: None,
         }
     }
 
@@ -45,6 +55,7 @@ impl CheckResult {
             status: CheckStatus::Fail,
             name: name.to_string(),
             hint: Some(hint.into()),
+            remediation: None,
         }
     }
 
@@ -54,6 +65,7 @@ impl CheckResult {
             status: CheckStatus::Warn,
             name: name.to_string(),
             hint: Some(hint.into()),
+            remediation: None,
         }
     }
 
@@ -63,7 +75,13 @@ impl CheckResult {
             status: CheckStatus::Info,
             name: name.to_string(),
             hint: None,
+            remediation: None,
         }
+    }
+
+    pub fn with_remediation(mut self, remediation: Remediation) -> Self {
+        self.remediation = Some(remediation);
+        self
     }
 }
 
@@ -128,6 +146,10 @@ pub async fn run_preinstall(params: &InstallConfigParams) -> DoctorReport {
         };
     }
 
+    if let Some(webview2) = check_webview2_runtime() {
+        results.push(webview2);
+    }
+
     let dir_manager = DirectoryManager::new();
     let disk_targets: Vec<(&std::path::Path, &str)> = vec![
         (
@@ -177,6 +199,10 @@ pub async fn run_healthcheck() -> DoctorReport {
             results,
             title: "health check",
         };
+    }
+
+    if let Some(webview2) = check_webview2_runtime() {
+        results.push(webview2);
     }
 
     let dir_manager = DirectoryManager::new();

@@ -3,7 +3,12 @@
  * Contains types for message parsing, accumulation, and processing
  */
 
-import type { MessageSegment, PendingToolCallData, ExecutingToolState } from './message.types'
+import type {
+  ApprovalRequestField,
+  MessageSegment,
+  PendingToolCallData,
+  ExecutingToolState,
+} from './message.types'
 import type { ChatApprovalStatus, AssistantType } from './chat.types'
 import type { ChunkData } from './network.types'
 
@@ -18,6 +23,12 @@ export interface PendingApproval {
   command: string
   explanation?: string
   approvalType: string
+  /** Structured label/value rows — a Product Guide card is almost entirely
+   *  these, so a path that forgets them renders a bare title. */
+  fields?: ApprovalRequestField[]
+  /** Where the card came from; `'guide'` keeps it inline and routes its
+   *  buttons to the hub (see `ApprovalRequestData.origin`). */
+  origin?: 'guide'
 }
 
 export interface AccumulatorState {

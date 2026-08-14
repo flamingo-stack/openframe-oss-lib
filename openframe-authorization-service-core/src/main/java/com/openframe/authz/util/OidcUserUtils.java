@@ -29,7 +29,12 @@ public final class OidcUserUtils {
      * {@code false} (boolean or string) never does.
      */
     public static boolean emailVerifiedClaimAllows(OidcUser user) {
-        Object claim = user.getClaims().get("email_verified");
+        return emailVerifiedClaimAllows(user.getClaims());
+    }
+
+    /** Claims-map variant for callers outside the OIDC-login flow (e.g. the native Apple exchange). */
+    public static boolean emailVerifiedClaimAllows(java.util.Map<String, Object> claims) {
+        Object claim = claims.get("email_verified");
         if (claim instanceof Boolean b) {
             return b;
         }

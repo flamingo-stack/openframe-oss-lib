@@ -15,6 +15,6 @@ public class CreateTicketInput {
     private String organizationId;
     private String deviceId;
     private String assigneeId;
-    private List<String> labelIds;
+    private List<String> tagIds;
     private List<String> tempAttachmentIds;
 }

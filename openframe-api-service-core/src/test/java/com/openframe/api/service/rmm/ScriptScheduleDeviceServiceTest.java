@@ -10,6 +10,7 @@ import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.openframe.data.document.rmm.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,6 +45,7 @@ class ScriptScheduleDeviceServiceTest {
     private ScriptScheduleRepository scheduleRepository;
     private MachineRepository machineRepository;
     private ScheduleDeviceTargetResolver targetResolver;
+    private DeviceOnlineDispatchRepository dispatchRepository;
     private ScriptScheduleDeviceService service;
 
     @BeforeEach
@@ -52,13 +55,14 @@ class ScriptScheduleDeviceServiceTest {
         machineRepository = mock(MachineRepository.class);
         targetResolver = mock(ScheduleDeviceTargetResolver.class);
         TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
-        service = new ScriptScheduleDeviceService(assignedRepository, scheduleRepository, machineRepository, targetResolver, tenantIdProvider);
+        dispatchRepository = mock(DeviceOnlineDispatchRepository.class);
+        service = new ScriptScheduleDeviceService(assignedRepository, scheduleRepository, machineRepository, targetResolver, tenantIdProvider, dispatchRepository);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // By default every requested machineId resolves to an in-tenant device (osType "windows");
         // platform/existence tests override this stub with their own machines.
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenAnswer(inv -> {
             java.util.Collection<String> ids = inv.getArgument(1);
-            return ids.stream().map(id -> machine(id, id, OsType.WINDOWS)).toList();
+            return ids.stream().map(id -> machine(id, id, WINDOWS)).toList();
         });
     }
 
@@ -70,6 +74,53 @@ class ScriptScheduleDeviceServiceTest {
     private void scheduleExistsWithPlatforms(ScriptStatus status, List<OsType> platforms) {
         ScriptSchedule schedule = ScriptSchedule.builder().id(SCHEDULE_ID).status(status).supportedPlatforms(platforms).build();
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
+    }
+
+    private void scheduleExistsWithTrigger(ScriptStatus status, com.openframe.data.document.rmm.ScriptScheduleTrigger trigger) {
+        ScriptSchedule schedule = ScriptSchedule.builder().id(SCHEDULE_ID).status(status).trigger(trigger).build();
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
+    }
+
+    @Test
+    @DisplayName("setDevices on a DEVICE_ONLINE schedule → arms a NEW dispatch sentinel per (machine, schedule)")
+    void setDevices_deviceOnlineSchedule_armsSentinels() {
+        scheduleExistsWithTrigger(ScriptStatus.ACTIVE, com.openframe.data.document.rmm.ScriptScheduleTrigger.DEVICE_ONLINE);
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.setDevices(SCHEDULE_ID, List.of("m-1", "m-2"), "user-1");
+
+        // stale sentinels for the newly-added devices are cleared first, then fresh NEW rows written
+        verify(dispatchRepository).deleteByTenantIdAndScheduleIdAndMachineIdIn(eq(TENANT_ID), eq(SCHEDULE_ID), any());
+        ArgumentCaptor<List<com.openframe.data.document.rmm.DeviceFirstOnlineDispatch>> captor = ArgumentCaptor.forClass(List.class);
+        verify(dispatchRepository).saveAll(captor.capture());
+        List<com.openframe.data.document.rmm.DeviceFirstOnlineDispatch> rows = captor.getValue();
+        assertThat(rows).extracting(com.openframe.data.document.rmm.DeviceFirstOnlineDispatch::getMachineId)
+                .containsExactlyInAnyOrder("m-1", "m-2");
+        assertThat(rows).allSatisfy(r -> {
+            assertThat(r.getScheduleId()).isEqualTo(SCHEDULE_ID);
+            assertThat(r.getStatus()).isEqualTo(com.openframe.data.document.rmm.DeviceOnlineDispatchStatus.NEW);
+        });
+    }
+
+    @Test
+    @DisplayName("setDevices on a DATE_TIME schedule → does NOT touch the DEVICE_ONLINE dispatch collection")
+    void setDevices_dateTimeSchedule_doesNotArm() {
+        scheduleExistsWithTrigger(ScriptStatus.ACTIVE, com.openframe.data.document.rmm.ScriptScheduleTrigger.DATE_TIME);
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.setDevices(SCHEDULE_ID, List.of("m-1"), "user-1");
+
+        verify(dispatchRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("removeDevices → disarms (drops the DEVICE_ONLINE sentinels for those machines)")
+    void removeDevices_disarmsSentinels() {
+        scheduleExists(ScriptStatus.ACTIVE);
+
+        service.removeDevices(SCHEDULE_ID, List.of("m-1", "m-2"), "user-1");
+
+        verify(dispatchRepository).deleteByTenantIdAndScheduleIdAndMachineIdIn(eq(TENANT_ID), eq(SCHEDULE_ID), any());
     }
 
     private static Machine machine(String machineId, String hostname, OsType osType) {
@@ -118,7 +169,7 @@ class ScriptScheduleDeviceServiceTest {
     void setDevices_deviceOsMismatch_rejected() {
         scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-win", "win-box", OsType.WINDOWS)));
+                .thenReturn(List.of(machine("m-win", "win-box", WINDOWS)));
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
                 .isInstanceOf(BadRequestException.class)
@@ -280,7 +331,7 @@ class ScriptScheduleDeviceServiceTest {
     void addDevices_platformMismatch_rejected() {
         scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(OsType.MAC_OS));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-win", "win-box", OsType.WINDOWS)));
+                .thenReturn(List.of(machine("m-win", "win-box", WINDOWS)));
 
         assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
                 .isInstanceOf(BadRequestException.class);
@@ -293,7 +344,7 @@ class ScriptScheduleDeviceServiceTest {
         scheduleExists(ScriptStatus.ACTIVE);
         // only m-known resolves in this tenant; m-ghost is absent (unknown or belongs to another tenant)
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-known", "known-box", OsType.WINDOWS)));
+                .thenReturn(List.of(machine("m-known", "known-box", WINDOWS)));
 
         assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-known", "m-ghost"), "user-1"))
                 .isInstanceOf(BadRequestException.class)
@@ -306,7 +357,7 @@ class ScriptScheduleDeviceServiceTest {
     void setDevices_unknownMachineId_rejected() {
         scheduleExists(ScriptStatus.ACTIVE);
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-known", "known-box", OsType.WINDOWS)));
+                .thenReturn(List.of(machine("m-known", "known-box", WINDOWS)));
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-known", "m-ghost"), "user-1"))
                 .isInstanceOf(BadRequestException.class)
@@ -331,7 +382,7 @@ class ScriptScheduleDeviceServiceTest {
     void applyCriteria_setsModeAndPersists() {
         scheduleExists(ScriptStatus.ACTIVE);
         ScheduleDeviceCriteria criteria = ScheduleDeviceCriteria.builder()
-                .organizationIds(List.of("org-1")).osTypes(List.of("WINDOWS")).build();
+                .organizationIds(List.of("org-1")).osTypes(List.of(WINDOWS)).build();
 
         service.applyCriteria(SCHEDULE_ID, criteria, "user-1");
 

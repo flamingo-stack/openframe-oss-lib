@@ -23,7 +23,8 @@ pub mod update_state;
 
 pub use execution::{
     CommandMessage, ExecutionMessage, ExecutionRequest, PrivilegeLevel, RmmResult, ScriptEnvVar,
-    ScriptMessage, ScriptShell,
+    ScriptMessage, ScriptScheduleExecutionItem, ScriptScheduleExecutionMessage, ScriptShell,
+    ScriptSpec,
 };
 
 pub use agent_configuration::AgentConfiguration;

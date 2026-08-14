@@ -2,9 +2,9 @@ package com.openframe.test.api.graphql;
 
 public class TicketQueries {
 
-    public static final String TICKET_LABELS = """
-            query TicketLabels {
-                ticketLabels {
+    public static final String TICKET_TAGS = """
+            query TicketTags {
+                ticketTags {
                     id
                     key
                     description
@@ -45,7 +45,7 @@ public class TicketQueries {
                             assignedTo
                             assignedName
                             assigneeImage { imageUrl }
-                            labels { id key color }
+                            tags { id key color }
                             createdAt
                             updatedAt
                             resolvedAt
@@ -93,7 +93,7 @@ public class TicketQueries {
                     assignedTo
                     assignedName
                     assigneeImage { imageUrl }
-                    labels { id key color }
+                    tags { id key color }
                     dialog {
                         id
                         currentMode
@@ -203,7 +203,7 @@ public class TicketQueries {
                         organizationName
                         assignedTo
                         assignedName
-                        labels { id key color }
+                        tags { id key color }
                         attachments {
                             id
                             ticketId
