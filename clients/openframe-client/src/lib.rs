@@ -39,6 +39,7 @@ pub mod executor;
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
 use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
+use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
@@ -158,6 +159,7 @@ pub struct Client {
     tool_restart_message_listener: ToolRestartMessageListener,
     openframe_client_update_listener: OpenFrameClientUpdateListener,
     tool_agent_update_listener: ToolAgentUpdateListener,
+    client_uninstall_message_listener: ClientUninstallMessageListener,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
     script_schedule_execution_listener: ExecutionListener<ScriptScheduleExecutionMessage>,
@@ -483,6 +485,13 @@ impl Client {
             tool_run_manager.clone(),
         );
 
+        // Initialize client uninstall listener (dashboard-triggered device uninstall)
+        let client_uninstall_message_listener = ClientUninstallMessageListener::new(
+            nats_connection_manager.clone(),
+            deactivation_service.clone(),
+            config_service.clone(),
+        );
+
         let execution_service = ExecutionService::new();
 
         let result_store = Arc::new(ResultStore::open_or_degrade(
@@ -551,6 +560,7 @@ impl Client {
             tool_restart_message_listener,
             openframe_client_update_listener,
             tool_agent_update_listener,
+            client_uninstall_message_listener,
             command_execution_listener,
             script_execution_listener,
             script_schedule_execution_listener,
@@ -643,6 +653,9 @@ impl Client {
 
         // Start tool agent update listener in background
         self.tool_agent_update_listener.start().await?;
+
+        // Start client uninstall listener in background
+        self.client_uninstall_message_listener.start().await?;
 
         // Recover interrupted scheduled scripts, then start the outbox flusher,
         // both strictly before any execution listener can accept new batches
