@@ -31,3 +31,28 @@ fn handles_non_json_body() {
         "gateway timeout"
     ));
 }
+
+#[test]
+fn terminal_statuses_are_already_gone() {
+    for status in [
+        StatusCode::UNAUTHORIZED,
+        StatusCode::FORBIDDEN,
+        StatusCode::NOT_FOUND,
+        StatusCode::GONE,
+    ] {
+        assert!(is_already_gone(status), "{status} should be terminal");
+    }
+}
+
+#[test]
+fn transient_statuses_are_not_already_gone() {
+    for status in [
+        StatusCode::BAD_REQUEST,
+        StatusCode::TOO_MANY_REQUESTS,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        StatusCode::BAD_GATEWAY,
+        StatusCode::SERVICE_UNAVAILABLE,
+    ] {
+        assert!(!is_already_gone(status), "{status} should be retried");
+    }
+}

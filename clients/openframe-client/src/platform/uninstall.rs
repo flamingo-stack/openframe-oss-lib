@@ -5,8 +5,8 @@ use tracing::{info, warn};
 use crate::platform::DirectoryManager;
 use crate::service_adapter::{CrossPlatformServiceManager, ServiceConfig};
 use crate::services::{
-    AgentConfigurationService, InitialConfigurationService, InstalledToolsService,
-    ToolCommandParamsResolver, ToolKillService, ToolUninstallService,
+    AgentConfigurationService, DeregistrationService, InitialConfigurationService,
+    InstalledToolsService, ToolCommandParamsResolver, ToolKillService, ToolUninstallService,
 };
 
 const SERVICE_NAME: &str = "client";
@@ -344,7 +344,11 @@ pub async fn uninstall_integrated_tools(dir_manager: &DirectoryManager) -> Resul
 
 /// Windows-specific uninstall implementation
 #[cfg(target_os = "windows")]
-pub async fn uninstall_windows(dir_manager: &DirectoryManager, install_path: &Path) -> Result<()> {
+pub async fn uninstall_windows(
+    dir_manager: &DirectoryManager,
+    install_path: &Path,
+    deregistration_service: Option<DeregistrationService>,
+) -> Result<()> {
     info!("========================================");
     info!("OpenFrame Uninstallation");
     info!("========================================");
@@ -364,6 +368,11 @@ pub async fn uninstall_windows(dir_manager: &DirectoryManager, install_path: &Pa
     match service.uninstall() {
         Ok(_) => info!("Service uninstalled successfully"),
         Err(e) => warn!("Service uninstall warning: {} (may not be installed)", e),
+    }
+
+    // After the service stop so a heartbeat can't resurrect the deleted machine record.
+    if let Some(deregistration_service) = &deregistration_service {
+        deregistration_service.deregister_best_effort().await;
     }
 
     info!("Step 2: Gracefully uninstalling integrated tools...");
@@ -402,6 +411,11 @@ pub async fn uninstall_windows(dir_manager: &DirectoryManager, install_path: &Pa
         }
     }
 
+    // Final chance to report the uninstall, before the cleanup script starts waiting on our exit.
+    if let Some(deregistration_service) = &deregistration_service {
+        deregistration_service.retry_if_unreported().await;
+    }
+
     // Launch cleanup script to remove binary after process exit
     if install_path.exists() {
         info!("Launching binary cleanup script...");
@@ -427,7 +441,11 @@ pub async fn uninstall_windows(dir_manager: &DirectoryManager, install_path: &Pa
 
 /// macOS-specific uninstall implementation
 #[cfg(target_os = "macos")]
-pub async fn uninstall_macos(dir_manager: &DirectoryManager, install_path: &Path) -> Result<()> {
+pub async fn uninstall_macos(
+    dir_manager: &DirectoryManager,
+    install_path: &Path,
+    deregistration_service: Option<DeregistrationService>,
+) -> Result<()> {
     info!("========================================");
     info!("OpenFrame Uninstallation");
     info!("========================================");
@@ -447,6 +465,11 @@ pub async fn uninstall_macos(dir_manager: &DirectoryManager, install_path: &Path
     match service.uninstall() {
         Ok(_) => info!("Service uninstalled successfully"),
         Err(e) => warn!("Service uninstall warning: {} (may not be installed)", e),
+    }
+
+    // After the service stop so a heartbeat can't resurrect the deleted machine record.
+    if let Some(deregistration_service) = &deregistration_service {
+        deregistration_service.deregister_best_effort().await;
     }
 
     info!("Step 2: Gracefully uninstalling integrated tools...");
@@ -506,6 +529,11 @@ pub async fn uninstall_macos(dir_manager: &DirectoryManager, install_path: &Path
         if !removed {
             warn!("Binary could not be removed, may require manual cleanup");
         }
+    }
+
+    // Final chance to report the uninstall now that the wipe is done.
+    if let Some(deregistration_service) = &deregistration_service {
+        deregistration_service.retry_if_unreported().await;
     }
 
     info!("");
