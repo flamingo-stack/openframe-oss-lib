@@ -996,7 +996,6 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     approvalVariant={approvalVariant}
                     authorType={message.authorType}
                     assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
-                    chatRefs={message.chatRefs}
                     contextItems={message.contextItems}
                     resolveContextIcon={resolveContextIcon}
                     renderContextItem={renderContextItem}

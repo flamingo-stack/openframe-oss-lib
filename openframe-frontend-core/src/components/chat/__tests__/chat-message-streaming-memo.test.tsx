@@ -21,7 +21,6 @@ import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import type { MessageSegment } from '../types'
-import type { ChatRef } from '../chat-ref.types'
 
 /** Every `componentOverrides` / `additionalRemarkPlugins` identity the
  *  component handed the markdown renderer, in render order. */
@@ -49,7 +48,6 @@ import { ChatMessageEnhanced } from '../chat-message-enhanced'
 function NavLinkAnchor({ href, children }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   return <a href={href}>{children}</a>
 }
-const CHAT_REFS: Record<string, ChatRef> = {}
 const renderMention = () => null
 
 /** Fresh array per call — the reducer replaces `segments` on every delta. */
@@ -65,7 +63,6 @@ describe('ChatMessageEnhanced — override identity across a streamed turn', () 
     const props = {
       role: 'assistant' as const,
       isTyping: true,
-      chatRefs: CHAT_REFS,
       renderMention,
       NavLinkAnchor,
     }
@@ -93,115 +90,43 @@ describe('ChatMessageEnhanced — override identity across a streamed turn', () 
     expect(view.container.textContent).toContain('token9')
   })
 
-  it('still resolves card markers through the CURRENT plan (ref-read, not closure)', () => {
+  it('surfaces the raw card id when the host renderer resolves nothing', () => {
+    // The marker is the ONLY data channel now: with the host's
+    // `renderEntityCard` returning null (no card type registered / nothing
+    // to hydrate), the `<a card://…>` override must render the dim raw-id
+    // fallback — never a real-looking card, never the literal marker URL.
     seenOverrides.length = 0
-    const refs: Record<string, ChatRef> = {
-      'blog:abc': { type: 'blog', id: 'abc', title: 'Resolved Title', url: null },
-    }
     render(
       <ChatMessageEnhanced
         role="assistant"
         content={[{ type: 'text', text: 'See [card://blog:abc] for more.' }]}
-        chatRefs={refs}
+        renderEntityCard={() => null}
         NavLinkAnchor={NavLinkAnchor}
       />,
     )
     const overrides = seenOverrides[0] as { a: React.FC<{ href: string; children?: React.ReactNode }> }
     const out = render(<>{overrides.a({ href: 'card://blog:abc', children: 'x' })}</>)
-    expect(out.container.textContent).toBe('Resolved Title')
+    expect(out.container.textContent).toBe('abc')
   })
 
-  /**
-   * REGRESSION (round 3): a ref that resolves AFTER the message finished
-   * streaming must still reach the pill. The override reads `chatRefs`
-   * through a ref, so its own closure is fine — but the markdown engine
-   * memoizes completed blocks on the override map's IDENTITY. With
-   * `chatRefs` excluded from the override memo's deps entirely, the map kept
-   * its old identity, the engine bailed, and the marker rendered its raw-id
-   * fallback permanently.
-   */
-  it('gives componentOverrides a NEW identity when the ref set grows (completed message)', () => {
-    seenOverrides.length = 0
-    const content: MessageSegment[] = [{ type: 'text', text: 'See [card://blog:late] for more.' }]
-    const emptyRefs: Record<string, ChatRef> = {}
-    const props = {
-      role: 'assistant' as const,
-      isTyping: false,
-      content,
-      NavLinkAnchor,
-    }
-
-    const view = render(<ChatMessageEnhanced {...props} chatRefs={emptyRefs} />)
-    const before = seenOverrides[seenOverrides.length - 1] as {
-      a: React.FC<{ href: string; children?: React.ReactNode }>
-    }
-    // Unresolved: the raw card id is surfaced so the breakage is visible.
-    expect(render(<>{before.a({ href: 'card://blog:late', children: 'x' })}</>).container.textContent)
-      .toBe('late')
-
-    // Same content, same everything — only the refs map gains the entry.
-    const resolvedRefs: Record<string, ChatRef> = {
-      'blog:late': { type: 'blog', id: 'late', title: 'Late Title', url: null },
-    }
-    view.rerender(<ChatMessageEnhanced {...props} chatRefs={resolvedRefs} />)
-
-    const after = seenOverrides[seenOverrides.length - 1] as {
-      a: React.FC<{ href: string; children?: React.ReactNode }>
-    }
-    expect(after).not.toBe(before)
-    expect(render(<>{after.a({ href: 'card://blog:late', children: 'x' })}</>).container.textContent)
-      .toBe('Late Title')
-  })
-
-  /**
-   * REGRESSION (round 5): a later refs frame REPLACES the map for a send index
-   * with the SAME key set but richer values — the `title` going from the raw
-   * cardId to the resolved document title is the exact production case. A
-   * key-set-only token produced an identical string, so the override map kept
-   * its identity, the engine's completed-block memo bailed, and the pill stayed
-   * on its fallback forever. The token fingerprints VALUES now.
-   */
-  it('gives componentOverrides a NEW identity when a ref VALUE is enriched (same key set)', () => {
-    seenOverrides.length = 0
-    const content: MessageSegment[] = [{ type: 'text', text: 'See [card://blog:abc].' }]
-    const props = { role: 'assistant' as const, isTyping: false, content, NavLinkAnchor }
-
-    // First frame: the ref exists but its title is still the raw card id.
-    const stub: Record<string, ChatRef> = {
-      'blog:abc': { type: 'blog', id: 'abc', title: 'abc', url: null },
-    }
-    const view = render(<ChatMessageEnhanced {...props} chatRefs={stub} />)
-    const before = seenOverrides[seenOverrides.length - 1] as {
-      a: React.FC<{ href: string; children?: React.ReactNode }>
-    }
-    expect(render(<>{before.a({ href: 'card://blog:abc', children: 'x' })}</>).container.textContent)
-      .toBe('abc')
-
-    // Second frame: SAME key set, enriched value.
-    const enriched: Record<string, ChatRef> = {
-      'blog:abc': { type: 'blog', id: 'abc', title: 'Resolved Document Title', url: null },
-    }
-    view.rerender(<ChatMessageEnhanced {...props} chatRefs={enriched} />)
-
-    const after = seenOverrides[seenOverrides.length - 1] as {
-      a: React.FC<{ href: string; children?: React.ReactNode }>
-    }
-    expect(after).not.toBe(before)
-    expect(render(<>{after.a({ href: 'card://blog:abc', children: 'x' })}</>).container.textContent)
-      .toBe('Resolved Document Title')
-  })
-
-  /** …but a same-KEY refs object (new identity, same entries) must NOT churn
-   *  the override map — that is the streaming-stability guarantee above. */
-  it('keeps the override identity when only the refs object identity changes', () => {
-    seenOverrides.length = 0
-    const content: MessageSegment[] = [{ type: 'text', text: 'See [card://blog:abc].' }]
-    const ref: ChatRef = { type: 'blog', id: 'abc', title: 'T', url: null }
-    const props = { role: 'assistant' as const, content, NavLinkAnchor }
-
-    const view = render(<ChatMessageEnhanced {...props} chatRefs={{ 'blog:abc': ref }} />)
-    view.rerender(<ChatMessageEnhanced {...props} chatRefs={{ 'blog:abc': ref }} />)
-
-    expect(new Set(seenOverrides).size).toBe(1)
+  it('mounts the host card from the marker descriptor alone (hydrate-by-id)', () => {
+    // No refs frame exists: the renderer receives the minimal
+    // `{type, id, title: id, url: null}` descriptor built from the marker
+    // and is expected to self-fetch. The rendered node is hoisted as a
+    // block sibling of the text.
+    const seenRefs: Array<{ type: string; id: string }> = []
+    const view = render(
+      <ChatMessageEnhanced
+        role="assistant"
+        content={[{ type: 'text', text: 'See [card://blog:abc] for more.' }]}
+        renderEntityCard={(ref) => {
+          seenRefs.push({ type: ref.type, id: ref.id })
+          return <div data-testid="card">card:{ref.id}</div>
+        }}
+        NavLinkAnchor={NavLinkAnchor}
+      />,
+    )
+    expect(seenRefs).toEqual([{ type: 'blog', id: 'abc' }])
+    expect(view.container.textContent).toContain('card:abc')
   })
 })

@@ -18,6 +18,7 @@ export const MESSAGE_TYPE = {
   APPROVAL_RESULT: 'APPROVAL_RESULT',
   ESCALATION_OFFER: 'ESCALATION_OFFER',
   TICKET_ESCALATED: 'TICKET_ESCALATED',
+  TICKET_EVENT: 'TICKET_EVENT',
   ERROR: 'ERROR',
   MESSAGE_START: 'MESSAGE_START',
   MESSAGE_END: 'MESSAGE_END',
@@ -156,6 +157,34 @@ export interface TicketEscalatedData {
   /** Backend-authored explanation; the card falls back to generic copy when
    *  the wire omits it (the field is nullable). */
   text?: string
+}
+
+// ========== Ticket Event Types ==========
+
+/** Known `TicketEventData.kind` values. The vocabulary is OPEN on the wire:
+ *  an unknown kind still renders (as a neutral info line) rather than being
+ *  dropped, so the backend can add lifecycle kinds without a client release. */
+export const TICKET_EVENT_KIND = {
+  RESOLVED: 'RESOLVED',
+  REOPENED: 'REOPENED',
+} as const
+
+export type TicketEventKind =
+  | typeof TICKET_EVENT_KIND[keyof typeof TICKET_EVENT_KIND]
+  | (string & {})
+
+/** Ticket lifecycle receipt (`TICKET_EVENT`) — the ticket was resolved,
+ *  reopened, etc. Same field names live (NATS chunk) and persisted
+ *  (GraphQL `TicketEventData` inside `messageData`), so ONE mapper covers
+ *  both paths. All actor fields are optional: the event stays renderable
+ *  when the backend can't attribute it. */
+export interface TicketEventData {
+  kind: TicketEventKind
+  actorId?: string
+  actorName?: string
+  /** Who acted — e.g. an AI agent vs a human. Open string like `kind`. */
+  actorType?: string
+  reason?: string
 }
 
 /**
@@ -310,6 +339,23 @@ export type TicketEscalatedSegment = {
   data: TicketEscalatedData
 }
 
+/**
+ * Ticket lifecycle receipt (resolved / reopened / an unknown future kind).
+ * Arrives as a standalone `TICKET_EVENT` chunk outside MESSAGE_START/END —
+ * same delivery shape as `ticket_escalated`.
+ *
+ * `streamSeq` is the chunk's JetStream sequence, kept ON the segment because
+ * it is the event's only stable identity: the accumulator upserts on it so a
+ * redelivered chunk (catch-up over hydrated history) replaces rather than
+ * stacks a second card, while two genuinely distinct events of the same kind
+ * (resolve → reopen → resolve) keep distinct sequences and both render.
+ */
+export type TicketEventSegment = {
+  type: 'ticket_event'
+  data: TicketEventData
+  streamSeq?: number
+}
+
 export type ErrorSegment = {
   type: 'error'
   title: string
@@ -322,7 +368,7 @@ export type ContextCompactionSegment = {
   summary?: string
 }
 
-export type MessageSegment = TextSegment | ThinkingSegment | GuideSegment | AskSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | EscalationOfferSegment | TicketEscalatedSegment | ErrorSegment | ContextCompactionSegment
+export type MessageSegment = TextSegment | ThinkingSegment | GuideSegment | AskSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | EscalationOfferSegment | TicketEscalatedSegment | TicketEventSegment | ErrorSegment | ContextCompactionSegment
 
 export type MessageContent = string | MessageSegment[]
 
@@ -427,6 +473,18 @@ export interface TicketEscalatedMessageData extends MessageDataBase {
   text?: string
 }
 
+/** Persisted ticket lifecycle row — same field names as the live chunk
+ *  (see `TicketEventData`), decoded by the SAME mapper on replay. Fields are
+ *  wire-shaped (`| null`): every one is a nullable GraphQL scalar. */
+export interface TicketEventMessageData extends MessageDataBase {
+  type: 'TICKET_EVENT'
+  kind?: string | null
+  actorId?: string | null
+  actorName?: string | null
+  actorType?: string | null
+  reason?: string | null
+}
+
 export interface ErrorMessageData extends MessageDataBase {
   type: 'ERROR'
   error?: string
@@ -473,6 +531,7 @@ export type MessageData =
   | ApprovalResultMessageData
   | EscalationOfferMessageData
   | TicketEscalatedMessageData
+  | TicketEventMessageData
   | ErrorMessageData
   | AIMetadataMessageData
   | SystemMessageData
@@ -518,7 +577,6 @@ export interface ProcessedMessage {
 
 // ========== Base Message Interface ==========
 
-import type { ChatRef as MessageChatRef } from '../chat-ref.types'
 import type { ChatContextItem } from './context-item.types'
 
 export interface Message {
@@ -534,11 +592,6 @@ export interface Message {
    *  realtime synthetics so `mergeHistoryWithRealtime` can decide history
    *  coverage per-message (see `MergeableChatMessage.streamSeq`). */
   streamSeq?: number
-  /** Per-row metadata for inline entity-card rendering on this message
-   *  (v6.1 §B.2.6). Keyed by `<documentType>:<primaryKey>`. Optional —
-   *  user messages and legacy turns omit this field. The host's
-   *  `renderEntityCard` callback resolves keys to inline components. */
-  chatRefs?: Record<string, MessageChatRef>
   /** Entity-context items attached to this (user) message via the composer's
    *  context picker. When present the message bubble renders the context
    *  chips beneath its text (Figma node 31:28709). Optional — omitted for

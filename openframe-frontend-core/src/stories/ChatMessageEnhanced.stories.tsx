@@ -188,31 +188,26 @@ export const PendingApprovalSegment: Story = {
  * text segment — the host's `renderEntityCard` node is hoisted out of the
  * markdown as a sibling block, and an unknown id degrades to the bare id.
  * Regression guard: the guide body used to skip the marker plan entirely.
+ *
+ * The marker is the ONLY data channel: `renderEntityCard` receives a minimal
+ * `{type, id}` descriptor and hydrates by id (here from a story-local map;
+ * in production from the host's per-object APIs).
  */
+const GUIDE_TITLES_BY_ID: Record<string, string> = {
+	"first-check": "Create Your First Monitoring Check",
+	"add-devices": "Add Devices to a Policy",
+};
+
 export const GuideWithEntityCards: Story = {
 	args: {
 		role: "assistant",
 		name: "Mingo",
 		assistantType: "mingo",
 		timestamp: at247(),
-		chatRefs: {
-			"onboarding_guide:first-check": {
-				type: "onboarding_guide",
-				id: "first-check",
-				title: "Create Your First Monitoring Check",
-				url: "/help-center/onboarding-guides/first-check",
-			},
-			"onboarding_guide:add-devices": {
-				type: "onboarding_guide",
-				id: "add-devices",
-				title: "Add Devices to a Policy",
-				url: "/help-center/onboarding-guides/add-devices",
-			},
-		},
 		renderEntityCard: (ref) =>
 			ref.type === "onboarding_guide" ? (
 				<div className="flex items-center gap-[var(--spacing-system-s)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-s)]">
-					<span className="flex-1 text-h4 text-ods-text-primary">{ref.title}</span>
+					<span className="flex-1 text-h4 text-ods-text-primary">{GUIDE_TITLES_BY_ID[ref.id] ?? ref.id}</span>
 					<span className="text-h5 text-ods-text-secondary">Guide</span>
 				</div>
 			) : null,
