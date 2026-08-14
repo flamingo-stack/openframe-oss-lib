@@ -39,6 +39,11 @@ public class MachineStatusService {
         Machine machine = machineRepository.findByMachineId(machineId)
                 .orElseThrow(() -> new MachineNotFoundException(machineId));
 
+        if (isDeletionInProgress(machine)) {
+            log.debug("Ignoring {} event for machineId={} in status {}", newStatus, machineId, machine.getStatus());
+            return;
+        }
+
         if (isEventNewer(eventTimestamp, machine.getLastSeen())) {
             applyStatusUpdate(machine, newStatus, eventTimestamp);
         } else {
@@ -48,6 +53,11 @@ public class MachineStatusService {
 
     private boolean isEventNewer(Instant eventTimestamp, Instant lastSeen) {
         return lastSeen == null || eventTimestamp.isAfter(lastSeen);
+    }
+
+    private boolean isDeletionInProgress(Machine machine) {
+        DeviceStatus status = machine.getStatus();
+        return status == DeviceStatus.PENDING_DELETION || status == DeviceStatus.DELETED;
     }
 
     private void applyStatusUpdate(Machine machine, DeviceStatus newStatus, Instant eventTimestamp) {
