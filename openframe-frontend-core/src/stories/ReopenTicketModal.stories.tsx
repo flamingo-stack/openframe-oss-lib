@@ -17,10 +17,10 @@ const meta = {
       description: {
         component:
           'Reopen Ticket dialog (Figma openframe---tickets 8456-17581): shown when a technician reopens a ' +
-          'Resolved/Archived ticket. Same Status + Assigned pair as TakeOverTicketModal plus an optional free-text ' +
-          'reason. Unlike Take Over, the assignee is optional - a reopened ticket may stay unassigned. ' +
-          'Presentational - the consumer supplies option lists (design default pre-selects Tech Required), ' +
-          'default selections, and performs the actual reopen in onConfirm.',
+          'Resolved/Archived ticket. Same Status + Assigned pair as TakeOverTicketModal - both required before ' +
+          'the CTA unlocks - plus an optional free-text reason. Presentational - the consumer supplies option ' +
+          'lists (design default pre-selects Tech Required), default selections, and performs the actual reopen ' +
+          'in onConfirm.',
       },
     },
   },
@@ -98,11 +98,11 @@ export const Default: Story = {
 };
 
 /**
- * No assignee - the reopen still confirms and the ticket stays unassigned
- * (flagged for triage). This is the deliberate difference from Take Over,
- * where the CTA locks until a technician is picked.
+ * No assignee pre-selected (e.g. the ticket was unassigned): the CTA stays
+ * locked until a technician is chosen - both fields are required, matching
+ * Take Over.
  */
-export const NoAssignee: Story = {
+export const NoDefaultAssignee: Story = {
   args: { ...Default.args, initialAssigneeId: null },
   render: args => <ControlledModal {...args} />,
 };

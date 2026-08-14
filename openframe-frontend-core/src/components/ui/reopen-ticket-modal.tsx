@@ -19,8 +19,7 @@ const REASON_MAX_LENGTH = 1000;
 
 export interface ReopenTicketSelection {
   statusId: string;
-  /** `null` — reopen without an assignee (the ticket stays unassigned). */
-  assigneeId: string | null;
+  assigneeId: string;
   /** Trimmed; `null` when the field was left blank. */
   reason: string | null;
 }
@@ -39,8 +38,9 @@ export interface ReopenTicketModalProps {
   assigneesLoading?: boolean;
   /** Pre-selected status; falls back to the first status option. */
   initialStatusId?: string | null;
-  /** Pre-selected assignee. Unlike Take Over, the assignee is OPTIONAL —
-   *  a reopened ticket may stay unassigned (it is flagged for triage). */
+  /** Pre-selected assignee (the design default restores the ticket's previous
+   *  assignee). No fallback — with none selected the CTA stays locked, same
+   *  as Take Over: both Status and Assigned are required to confirm. */
   initialAssigneeId?: string | null;
   /** Confirm in-flight: buttons lock and the modal refuses to close. */
   isPending?: boolean;
@@ -50,7 +50,8 @@ export interface ReopenTicketModalProps {
 /**
  * Reopen Ticket dialog (Figma openframe---tickets 8456-17581): shown when a
  * technician reopens a Resolved/Archived ticket. Same Status + Assigned pair
- * as {@link TakeOverTicketModal} plus an optional free-text reason.
+ * as {@link TakeOverTicketModal} — both REQUIRED before the CTA unlocks —
+ * plus an optional free-text reason.
  * Presentational — the consumer supplies the option lists, their ordering and
  * default selections, and performs the actual reopen in `onConfirm`.
  *
@@ -86,11 +87,11 @@ export function ReopenTicketModal({
   const selectedAssignee = assigneeOptions.find(o => o.value === assigneeId);
 
   const handleConfirm = () => {
-    if (!selectedStatusId || isPending) return;
+    if (!selectedStatusId || !assigneeId || isPending) return;
     const trimmedReason = reason.trim();
     onConfirm({
       statusId: selectedStatusId,
-      assigneeId: assigneeId ?? null,
+      assigneeId,
       reason: trimmedReason ? trimmedReason.slice(0, REASON_MAX_LENGTH) : null,
     });
   };
@@ -163,7 +164,7 @@ export function ReopenTicketModal({
           variant="accent"
           onClick={handleConfirm}
           loading={isPending}
-          disabled={!selectedStatusId}
+          disabled={!selectedStatusId || !assigneeId}
           className="flex-1"
         >
           Reopen Ticket
