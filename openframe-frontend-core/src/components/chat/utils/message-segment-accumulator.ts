@@ -20,6 +20,8 @@ import type {
   EscalationOfferSegment,
   TicketEscalatedData,
   TicketEscalatedSegment,
+  TicketEventData,
+  TicketEventSegment,
   ContextCompactionSegment,
   ErrorSegment,
   PendingApproval,
@@ -536,6 +538,42 @@ export class MessageSegmentAccumulator {
   }
 
   /**
+   * Add a ticket lifecycle receipt (resolved / reopened / unknown kind).
+   *
+   * Upsert identity is the chunk's stream sequence when BOTH sides know it;
+   * otherwise full payload equality. History-hydrated segments come back
+   * seq-less (the persisted row's seq lives on the message, not the
+   * `messageData`), so a JetStream catch-up redelivery of the same event must
+   * still match its hydrated twin — payload equality is what catches that.
+   * Two genuinely distinct events (resolve → reopen → resolve) differ in seq
+   * or payload and both render.
+   */
+  addTicketEvent(data: TicketEventData, streamSeq?: number): MessageSegment[] {
+    const segment: TicketEventSegment = {
+      type: 'ticket_event',
+      data,
+      ...(streamSeq !== undefined ? { streamSeq } : {}),
+    }
+    const existingIndex = this.segments.findIndex((s) => {
+      if (s.type !== 'ticket_event') return false
+      if (s.streamSeq !== undefined && streamSeq !== undefined) return s.streamSeq === streamSeq
+      return (
+        s.data.kind === data.kind &&
+        s.data.actorId === data.actorId &&
+        s.data.actorName === data.actorName &&
+        s.data.actorType === data.actorType &&
+        s.data.reason === data.reason
+      )
+    })
+    if (existingIndex !== -1) {
+      this.segments[existingIndex] = segment
+      return this.getSegments()
+    }
+    this.segments.push(segment)
+    return this.getSegments()
+  }
+
+  /**
    * Update status of an existing approval segment (single, batch, or
    * escalation offer).
    * `resolvedByName` (when provided) is stamped onto the matching batch segment so the
@@ -679,6 +717,9 @@ export class MessageSegmentAccumulator {
         }
         case 'ticket_escalated':
           this.addTicketEscalated(segment.data)
+          break
+        case 'ticket_event':
+          this.addTicketEvent(segment.data, segment.streamSeq)
           break
         case 'error':
           this.addError(segment.title, segment.details)

@@ -1364,6 +1364,25 @@ export function createChatStreamReducer(
         break
       }
 
+      case 'ticket-event': {
+        // Standalone chunk outside MESSAGE_START/END — same routing as
+        // `ticket-escalated`. `seq` rides onto the segment: it is the event's
+        // dedupe identity (see `addTicketEvent`).
+        const before = accumulator.getSegments().length
+        const segments = accumulator.addTicketEvent(
+          {
+            kind: event.kind,
+            actorId: event.actorId,
+            actorName: event.actorName,
+            actorType: event.actorType,
+            reason: event.reason,
+          },
+          seq,
+        )
+        applyAccumulated(before, segments)
+        break
+      }
+
       case 'error': {
         let message: string | undefined
         if (event.details) {

@@ -257,6 +257,38 @@ const CORPUS: Record<string, unknown> = {
   ticket_escalated_missing_reason: { type: 'TICKET_ESCALATED', ticketId: 'ticket-1' },
   ticket_escalated_missing_ticket_id: { type: 'TICKET_ESCALATED', reason: 'INACTIVITY' },
 
+  // TICKET_EVENT — standalone lifecycle receipt. `kind` is an OPEN string:
+  // unknown kinds must decode (neutral render), only a missing/blank kind is
+  // malformed. The chunk names its JetStream sequence `sequenceId` in the
+  // payload; it backfills `seq` when the transport didn't stamp `streamSeq`.
+  ticket_event_resolved: {
+    type: 'TICKET_EVENT',
+    kind: 'RESOLVED',
+    actorId: 'fae',
+    actorName: 'Fae',
+    actorType: 'AI',
+    sequenceId: 412,
+  },
+  ticket_event_reopened_with_reason: {
+    type: 'TICKET_EVENT',
+    kind: 'REOPENED',
+    actorId: 'user-42',
+    actorName: 'John Smith',
+    actorType: 'CLIENT',
+    reason: 'The printer stopped working again',
+    sequenceId: 413,
+  },
+  ticket_event_unknown_kind: { type: 'TICKET_EVENT', kind: 'ON_HOLD', actorName: 'Roman Smith' },
+  ticket_event_missing_kind: { type: 'TICKET_EVENT', actorName: 'Fae' },
+  ticket_event_blank_reason_dropped: { type: 'TICKET_EVENT', kind: 'RESOLVED', reason: '   ' },
+  // Transport-stamped streamSeq wins over the payload's sequenceId copy.
+  ticket_event_stream_seq_wins: {
+    type: 'TICKET_EVENT',
+    kind: 'RESOLVED',
+    streamSeq: 500,
+    sequenceId: 499,
+  },
+
   approval_result_approved: {
     type: 'APPROVAL_RESULT',
     approvalRequestId: 'req-1',
