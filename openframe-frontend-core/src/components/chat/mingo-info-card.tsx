@@ -120,6 +120,27 @@ function CardMedia({
   return null
 }
 
+/** Loading placeholder matching `MingoInfoCard` geometry (40px media box,
+ *  title + description lines, trailing pill slot). Span-only for the same
+ *  inside-`<p>` validity reason as the card itself. */
+export function MingoInfoCardSkeleton({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        'flex w-full animate-pulse items-center gap-[var(--spacing-system-s)] overflow-hidden rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-s)]',
+        className,
+      )}
+    >
+      <span className="block size-10 shrink-0 rounded-md border border-ods-border bg-ods-bg" />
+      <span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
+        <span className="block h-4 w-1/2 rounded bg-ods-bg" />
+        <span className="block h-3 w-3/4 rounded bg-ods-bg/60" />
+      </span>
+      <span className="block h-5 w-16 shrink-0 rounded bg-ods-bg/60" />
+    </span>
+  )
+}
+
 export function MingoInfoCard({
   title,
   description,

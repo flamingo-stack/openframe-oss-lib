@@ -21,7 +21,7 @@ public class DeviceOnlineDispatchScheduler {
     )
     public void run() {
         try {
-            dispatchService.processPending();
+            dispatchService.processDevicesBecameOnline();
         } catch (Exception e) {
             log.error("DEVICE_ONLINE dispatch sweep failed", e);
         }

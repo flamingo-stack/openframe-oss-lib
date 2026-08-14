@@ -14,7 +14,7 @@
  *
  * The reducer absorbed `useChat`'s trailing-assistant merge, the
  * `decision_resolved` receipt path, and the sendIdx-keyed
- * sources/refs/meta maps; this file keeps only the transport wiring
+ * sources/meta maps; this file keeps only the transport wiring
  * (fetch/abort, request-body building), the server-issued conversation-id
  * persistence (id ONLY — see below), the mount-time server-history
  * hydration seam, and the public `UnifiedChatState` mapping.
@@ -133,9 +133,6 @@ export interface DocChatMessage {
   /** Structured segments. When set, callers should prefer this over `content`. */
   segments?: MessageSegment[]
   sources?: ChatSource[]
-  /** Per-row refs for inline object-card rendering. Keyed by
-   *  `<documentType>:<primaryKey>`. Populated for assistant messages only. */
-  chatRefs?: Record<string, ChatRef>
   /** Per-message viewport-positioning hint emitted by the server. */
   scrollAnchor?: ScrollAnchor
   /** When true the message is part of the conversation history but is
@@ -186,7 +183,7 @@ export interface UseSseChatAdapterRuntimeOptions {
 // The client never generates ids. Message history lives server-side in
 // `chat_conversations` / `chat_messages` (recorded turn-by-turn by the chat
 // route) and is rehydrated on mount via `GET <chatStreamUrl>/history`.
-// localStorage never stores messages, sources, refs, or send counts —
+// localStorage never stores messages, sources, or send counts —
 // the server transcript is the single source of truth for history.
 // (The retired PersistedChatState v1 full-history blobs are swept on mount
 // by `pruneStaleChatConversationStorage` — never read, never migrated.)
@@ -214,7 +211,6 @@ function historyMessageToReducerMessage(m: Message): UnifiedChatMessage {
     ...(m.avatar != null ? { avatar: m.avatar } : {}),
     ...(m.timestamp !== undefined ? { timestamp: m.timestamp } : {}),
     ...(m.hidden ? { hidden: true } : {}),
-    ...(m.chatRefs ? { chatRefs: m.chatRefs } : {}),
   } as UnifiedChatMessage
 }
 
@@ -343,20 +339,18 @@ export function useSseChatAdapter(
   // `use-chat-history-hydration.ts` (see there for the full contract +
   // failure semantics: a miss starts the UI empty, never loses server
   // context). THIS adapter owns the materialization seam: the hook hands
-  // back plain `Message[]` rows plus per-send refs + the user-turn count
-  // (via the two shim refs below), and `hydrateMessages` feeds ALL of it
-  // through the REDUCER — `initializeWithState` on an empty thread,
-  // `prependMessages` when the user already sent before hydration landed
-  // (nothing typed is lost; the server resolves LLM history from its own
-  // store either way), and `seedSseMaps` for the sendIdx-keyed refs + the
-  // send counter. No parallel merge path.
+  // back plain `Message[]` rows plus the user-turn count (via the shim ref
+  // below), and `hydrateMessages` feeds ALL of it through the REDUCER —
+  // `initializeWithState` on an empty thread, `prependMessages` when the
+  // user already sent before hydration landed (nothing typed is lost; the
+  // server resolves LLM history from its own store either way), and
+  // `seedSseMaps` for the send counter. No parallel merge path.
   const historyUrl =
     runtime.endpoints.chatHistoryUrl ??
     `${runtime.endpoints.chatStreamUrl.replace(/\/+$/, '')}/history`
-  const hydrationRefsMapRef = useRef<Map<number, Record<string, ChatRef>>>(new Map())
   const hydrationSendCountRef = useRef(0)
   const hydrateMessages = useCallback(
-    (history: Message[]) => {
+    (history: Message[], sourcesSeed?: Array<[number, unknown[]]>) => {
       mutate((r) => {
         const mapped = history.map(historyMessageToReducerMessage)
         const liveSendCount = r.state.turnMeta.sendCount
@@ -366,7 +360,10 @@ export function useSseChatAdapter(
           r.prependMessages(mapped)
         }
         r.seedSseMaps({
-          refs: Array.from(hydrationRefsMapRef.current.entries()),
+          // Restore the hydrated turns' "Sources used" chips (persisted
+          // audit copy, projected by the history route) alongside the
+          // send counter.
+          ...(sourcesSeed && sourcesSeed.length > 0 ? { sources: sourcesSeed } : {}),
           sendCount: hydrationSendCountRef.current + liveSendCount,
         })
       })
@@ -378,7 +375,6 @@ export function useSseChatAdapter(
     source,
     historyUrl,
     conversationIdRef,
-    refsMapRef: hydrationRefsMapRef,
     sendCountRef: hydrationSendCountRef,
     hydrateMessages,
     // Meta invalidation is a reducer concern here: `seedSseMaps` (inside
@@ -553,21 +549,20 @@ export function useSseChatAdapter(
     // hydration guard means a re-captured id can hydrate again if needed.
     conversationIdRef.current = null
     conversationStorage.clear()
-    hydrationRefsMapRef.current = new Map()
     hydrationSendCountRef.current = 0
     hydratedKeyRef.current = null
   }, [mutate, conversationStorage, hydratedKeyRef])
 
   // ─── Public message mapping (sendIdx fan-out lookup) ──────────────────────
-  // Index sources/refs/scrollAnchor by USER-SEND count (`sendIdx`), not by
-  // assistant-message count. Each user send produces exactly ONE refs entry
-  // server-side, but it can produce MULTIPLE assistant messages on the
+  // Index sources/scrollAnchor by USER-SEND count (`sendIdx`), not by
+  // assistant-message count. Each user send produces exactly ONE sources
+  // entry server-side, but it can produce MULTIPLE assistant messages on the
   // client (main RAG reply + post-approve card + auto-continuation prose).
   // Counting VISIBLE user sends and mapping every following assistant
   // message to that index keeps the lookup stable — server hydration seeds
   // the same maps (via `seedSseMaps`) so hydrated turns resolve identically.
   const docMessages: DocChatMessage[] = useMemo(() => {
-    const { meta, sources: sourcesMap, refs: refsMap } = state.turnMeta
+    const { meta, sources: sourcesMap } = state.turnMeta
     let sendIdx = -1
     return state.messages.map((m) => {
       const segments = m.segments
@@ -580,7 +575,6 @@ export function useSseChatAdapter(
               .join('') ?? ''
 
       let sources: ChatSource[] | undefined
-      let chatRefs: Record<string, ChatRef> | undefined
       let scrollAnchor: ScrollAnchor | undefined
       if (m.role === 'user' && !m.hidden) {
         sendIdx++
@@ -588,10 +582,6 @@ export function useSseChatAdapter(
       if (m.role === 'assistant') {
         const lookupIdx = sendIdx >= 0 ? sendIdx : 0
         sources = sourcesMap.get(lookupIdx) as ChatSource[] | undefined
-        // The receipt path stamps `chatRefs` directly onto the assistant
-        // message; prefer that message-bound copy when present, fall back
-        // to the per-turn refs map.
-        chatRefs = m.chatRefs ?? refsMap.get(lookupIdx)
         scrollAnchor = (meta.get(lookupIdx)?.scrollAnchor as ScrollAnchor | null) ?? undefined
       }
 
@@ -601,7 +591,6 @@ export function useSseChatAdapter(
         content,
         ...(segments ? { segments } : {}),
         ...(sources ? { sources } : {}),
-        ...(chatRefs ? { chatRefs } : {}),
         ...(scrollAnchor ? { scrollAnchor } : {}),
         ...(m.hidden ? { hidden: true } : {}),
       }

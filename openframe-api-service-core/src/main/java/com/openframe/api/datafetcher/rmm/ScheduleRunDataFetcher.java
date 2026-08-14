@@ -88,7 +88,7 @@ public class ScheduleRunDataFetcher {
     public CompletableFuture<UserResponse> initiator(DgsDataFetchingEnvironment dfe) {
         ScheduleRunResponse run = dfe.getSource();
         if (run.getInitiatedBy() == null) {
-            return CompletableFuture.completedFuture(UserResponse.system());
+            return CompletableFuture.completedFuture(null);
         }
         DataLoader<String, UserResponse> loader = dfe.getDataLoader("userDataLoader");
         return loader.load(run.getInitiatedBy());

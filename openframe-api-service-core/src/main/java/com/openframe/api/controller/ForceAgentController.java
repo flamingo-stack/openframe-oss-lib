@@ -1,14 +1,17 @@
 package com.openframe.api.controller;
 
+import com.openframe.api.dto.force.request.ForceClientUninstallRequest;
 import com.openframe.api.dto.force.request.ForceToolInstallationAllRequest;
 import com.openframe.api.dto.force.request.ForceToolInstallationRequest;
 import com.openframe.api.dto.force.request.ForceToolReinstallationRequest;
+import com.openframe.api.dto.force.response.ForceClientUninstallResponse;
 import com.openframe.api.dto.force.response.ForceClientUpdateResponse;
 import com.openframe.api.dto.force.response.ForceToolAgentInstallationResponse;
 import com.openframe.api.dto.update.ForceClientUpdateRequest;
 import com.openframe.api.dto.update.ForceToolAgentUpdateAllRequest;
 import com.openframe.api.dto.update.ForceToolAgentUpdateRequest;
 import com.openframe.api.dto.update.ForceToolAgentUpdateResponse;
+import com.openframe.api.service.ForceClientUninstallService;
 import com.openframe.api.service.ForceClientUpdateService;
 import com.openframe.api.service.ForceToolAgentUpdateService;
 import com.openframe.api.service.ForceToolInstallationService;
@@ -23,6 +26,7 @@ public class ForceAgentController {
     private final ForceToolInstallationService toolInstallationService;
     private final ForceClientUpdateService clientUpdateService;
     private final ForceToolAgentUpdateService toolAgentUpdateService;
+    private final ForceClientUninstallService clientUninstallService;
 
     @PostMapping("tool-agent/install")
     public ForceToolAgentInstallationResponse forceToolInstallation(@RequestBody ForceToolInstallationRequest request) {
@@ -37,6 +41,11 @@ public class ForceAgentController {
     @PostMapping("tool-agent/update")
     public ForceToolAgentUpdateResponse forceToolAgentUpdate(@RequestBody ForceToolAgentUpdateRequest request) {
         return toolAgentUpdateService.process(request);
+    }
+
+    @PostMapping("client/uninstall")
+    public ForceClientUninstallResponse forceClientUninstall(@RequestBody ForceClientUninstallRequest request) {
+        return clientUninstallService.process(request);
     }
 
     @PostMapping("client/update/all")

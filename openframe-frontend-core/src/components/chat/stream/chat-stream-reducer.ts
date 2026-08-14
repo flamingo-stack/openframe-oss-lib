@@ -21,7 +21,7 @@
  *     `./message-mutations`;
  *   - `useSseChatAdapter`/`useChat`'s SSE turn kernel (cumulative text
  *     replace, front-inserted thinking, approval card, `decision_resolved`
- *     receipt + cardRef stamping, sendIdx-keyed sources/refs/meta maps).
+ *     receipt, sendIdx-keyed sources/meta maps).
  *
  * Idempotency:
  *   - events whose `seq` ≤ the last applied seq are dropped (per instance);
@@ -60,7 +60,6 @@ import { parseScrollAnchor, type ScrollAnchor } from '../utils/scroll-anchor'
 import { escapeThinkingTags } from '../../../chat-protocol/decode'
 import { isGuideOrigin } from '../../../chat-protocol/events'
 import { approvalDisplaysInline, guideApprovalOrigin } from '../utils/approval-display'
-import { buildChatRefKey } from '../types/chat.types'
 import type {
   ApprovalBatchSegment,
   ApprovalRequestSegment,
@@ -86,7 +85,6 @@ import {
   type ParticipantEvent,
   type UsageEvent,
 } from '../../../chat-protocol/events'
-import type { ChatRef } from '../chat-ref.types'
 import {
   CONTENT_DEDUP_WINDOW,
   SYSTEM_DEDUP_WINDOW,
@@ -143,13 +141,12 @@ export function createEmptyTurnMeta(): ChatTurnMeta {
 }
 
 /** SSE per-send maps, keyed by the send counter (`sendIdx`). Each user send
- *  produces ONE server-side refs/sources entry but can fan out to MULTIPLE
+ *  produces ONE server-side sources entry but can fan out to MULTIPLE
  *  assistant messages client-side — the adapter maps every following
  *  assistant message back to its send's entry. */
 export interface ChatTurnMetaState {
   meta: Map<number, ChatTurnMeta>
   sources: Map<number, unknown[]>
-  refs: Map<number, Record<string, ChatRef>>
   sendCount: number
 }
 
@@ -436,7 +433,6 @@ export interface ChatStreamReducer {
   failSseTurn(errorMessage: string): void
   seedSseMaps(seed: {
     sources?: Array<[number, unknown[]]>
-    refs?: Array<[number, Record<string, ChatRef>]>
     sendCount?: number
   }): void
 
@@ -675,7 +671,6 @@ export function createChatStreamReducer(
   // SSE per-send maps + per-turn kernel.
   const metaMap = new Map<number, ChatTurnMeta>()
   const sourcesMap = new Map<number, unknown[]>()
-  const refsMap = new Map<number, Record<string, ChatRef>>()
   let sendCount = 0
   let sseCurrentText = ''
 
@@ -690,7 +685,7 @@ export function createChatStreamReducer(
       stateCache = {
         messages,
         streamingPhase,
-        turnMeta: { meta: metaMap, sources: sourcesMap, refs: refsMap, sendCount },
+        turnMeta: { meta: metaMap, sources: sourcesMap, sendCount },
         dialogTokenUsage,
         liveModel,
         approvalStatuses,
@@ -1518,16 +1513,7 @@ export function createChatStreamReducer(
     invalidate()
   }
 
-  function applySseApprovalResolved(event: ApprovalResolvedEvent, sendIdx: number): void {
-    // Inline post-approve card ref → per-send refs map (the marker in the
-    // receipt resolves through it on rehydration).
-    const cardRef = event.cardRef as ChatRef | undefined
-    if (cardRef?.id && event.cardType) {
-      const existing = refsMap.get(sendIdx) ?? {}
-      const key = buildChatRefKey(event.cardType, cardRef.id)
-      refsMap.set(sendIdx, { ...existing, [key]: cardRef })
-      invalidate()
-    }
+  function applySseApprovalResolved(event: ApprovalResolvedEvent): void {
     const proposalId = event.requestId
     if (!proposalId) return
 
@@ -1538,29 +1524,13 @@ export function createChatStreamReducer(
     )
 
     // Step 2 — server-rendered receipt into the CURRENT message. No
-    // server-provided copy → don't fabricate a fallback.
+    // server-provided copy → don't fabricate a fallback. The receipt's
+    // `[card://…]` marker hydrates via the card fetch path on its own —
+    // no ref stamping needed.
     const receipt = typeof event.receiptText === 'string' ? event.receiptText : null
     if (receipt === null) return
     sseCurrentText = receipt + '\n\n'
     sseWriteTrailingText(sseCurrentText)
-
-    // Step 3 — stamp the ref onto THIS assistant message so the
-    // `[card://<type>:<id>]` marker resolves via `message.chatRefs`
-    // independent of per-turn refsMap indexing.
-    const refForMessage =
-      cardRef && typeof (cardRef as { type?: unknown }).type === 'string' && typeof cardRef.id === 'string'
-        ? cardRef
-        : null
-    if (refForMessage) {
-      const last = messages[messages.length - 1]
-      if (last && last.role === 'assistant') {
-        const refKey = buildChatRefKey((refForMessage as { type: string }).type, refForMessage.id)
-        setMessagesInternal([
-          ...messages.slice(0, -1),
-          { ...last, chatRefs: { ...(last.chatRefs ?? {}), [refKey]: refForMessage } },
-        ])
-      }
-    }
   }
 
   function applySseMetadata(event: ChatMetadataEvent, sendIdx: number): void {
@@ -1573,10 +1543,6 @@ export function createChatStreamReducer(
     }
     if (event.sources) {
       sourcesMap.set(sendIdx, event.sources as unknown[])
-      invalidate()
-    }
-    if (event.refs && typeof event.refs === 'object') {
-      refsMap.set(sendIdx, event.refs as Record<string, ChatRef>)
       invalidate()
     }
     if (event.modelLabel || event.contextWindowMaxTokens || event.provider || event.modelName) {
@@ -1734,7 +1700,7 @@ export function createChatStreamReducer(
         break
       }
       case 'approval-resolved':
-        applySseApprovalResolved(event, sendIdx)
+        applySseApprovalResolved(event)
         break
       case 'metadata':
         applySseMetadata(event, sendIdx)
@@ -1784,7 +1750,6 @@ export function createChatStreamReducer(
     adoptTrailingAssistant = false
     metaMap.clear()
     sourcesMap.clear()
-    refsMap.clear()
     sendCount = 0
     sseCurrentText = ''
     invalidate()
@@ -1840,7 +1805,6 @@ export function createChatStreamReducer(
     sseCurrentText = ''
     metaMap.clear()
     sourcesMap.clear()
-    refsMap.clear()
     sendCount = 0
     invalidate()
   }
@@ -2052,9 +2016,8 @@ export function createChatStreamReducer(
       streamingPhase = 'idle'
       invalidate()
     },
-    seedSseMaps({ sources, refs, sendCount: seedSendCount }) {
+    seedSseMaps({ sources, sendCount: seedSendCount }) {
       if (sources) for (const [k, v] of sources) sourcesMap.set(k, v)
-      if (refs) for (const [k, v] of refs) refsMap.set(k, v)
       if (typeof seedSendCount === 'number') sendCount = seedSendCount
       invalidate()
     },

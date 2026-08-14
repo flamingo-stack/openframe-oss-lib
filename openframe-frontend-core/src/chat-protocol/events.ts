@@ -182,11 +182,6 @@ export interface ApprovalResolvedEvent extends ChatStreamEventBase {
   approvalType?: string
   resolvedByName?: string | null
   receiptText?: string
-  /** Inline post-approve card: the ref payload + its documentType +
-   *  the `[card://…]` marker (SSE only). */
-  cardRef?: unknown
-  cardType?: string
-  marker?: string
   result?: DecisionResolvedFrame['result']
   willAutoContinue?: boolean
   /** Set when the resolution came from a Product Guide frame — see {@link GuideOrigin}. */
@@ -282,7 +277,6 @@ export interface ChatMetadataEvent extends ChatStreamEventBase {
   modelName?: string | null
   contextWindowMaxTokens?: number | null
   sources?: unknown
-  refs?: unknown
   scrollAnchor?: unknown
   /** Server-minted conversation id (`ChatMetadataFrame.conversationId`),
    *  passed through raw like every other catch-all field — the consumer

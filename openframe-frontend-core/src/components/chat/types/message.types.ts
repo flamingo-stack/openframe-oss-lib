@@ -577,7 +577,6 @@ export interface ProcessedMessage {
 
 // ========== Base Message Interface ==========
 
-import type { ChatRef as MessageChatRef } from '../chat-ref.types'
 import type { ChatContextItem } from './context-item.types'
 
 export interface Message {
@@ -593,11 +592,6 @@ export interface Message {
    *  realtime synthetics so `mergeHistoryWithRealtime` can decide history
    *  coverage per-message (see `MergeableChatMessage.streamSeq`). */
   streamSeq?: number
-  /** Per-row metadata for inline entity-card rendering on this message
-   *  (v6.1 §B.2.6). Keyed by `<documentType>:<primaryKey>`. Optional —
-   *  user messages and legacy turns omit this field. The host's
-   *  `renderEntityCard` callback resolves keys to inline components. */
-  chatRefs?: Record<string, MessageChatRef>
   /** Entity-context items attached to this (user) message via the composer's
    *  context picker. When present the message bubble renders the context
    *  chips beneath its text (Figma node 31:28709). Optional — omitted for
