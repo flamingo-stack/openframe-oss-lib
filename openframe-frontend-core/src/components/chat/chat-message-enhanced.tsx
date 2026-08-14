@@ -10,6 +10,7 @@ import { ApprovalRequestMessage } from "./approval-request-message"
 import { ApprovalBatchMessage } from "./approval-batch-message"
 import { EscalationOfferMessage } from "./escalation-offer-message"
 import { TicketEscalatedMessage } from "./ticket-escalated-message"
+import { TicketEventMessage } from "./ticket-event-message"
 import { ErrorMessageDisplay } from "./error-message-display"
 import { ContextCompactionDisplay } from "./context-compaction-display"
 import { ThinkingDisplay } from "./thinking-display"
@@ -650,6 +651,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                   )
                 } else if (segment.type === 'ticket_escalated') {
                   return <TicketEscalatedMessage key={index} data={segment.data} timestamp={timestamp} />
+                } else if (segment.type === 'ticket_event') {
+                  return <TicketEventMessage key={index} data={segment.data} timestamp={timestamp} />
                 } else if (segment.type === 'error') {
                   return (
                     <ErrorMessageDisplay

@@ -243,6 +243,23 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
       }
       return null
 
+    // Same completeness gate as the live decoder: `kind` (an OPEN string —
+    // unknown kinds render as a neutral line) is the only required field.
+    // Field names match the chunk, so ONE mapping covers both paths; the
+    // typeof gates also fold the row's GraphQL nulls to undefined.
+    case MESSAGE_TYPE.TICKET_EVENT: {
+      const kind = 'kind' in data && typeof data.kind === 'string' ? data.kind.trim() : ''
+      if (!kind) return null
+      return {
+        type: 'ticket-event',
+        kind,
+        actorId: typeof data.actorId === 'string' ? data.actorId : undefined,
+        actorName: typeof data.actorName === 'string' ? data.actorName : undefined,
+        actorType: typeof data.actorType === 'string' ? data.actorType : undefined,
+        reason: typeof data.reason === 'string' && data.reason.trim() ? data.reason : undefined,
+      }
+    }
+
     case MESSAGE_TYPE.ERROR:
       if ('error' in data) {
         return {
@@ -333,6 +350,20 @@ function applyHistoryEvent(
         ticketNumber: event.ticketNumber,
         reason: event.reason,
         text: event.text,
+      })
+      break
+
+    // Seq-less on purpose: the persisted row's sequence lives on the message
+    // (`lastChunkStreamSeq`), not in `messageData`. A live redelivery of the
+    // same event matches this segment by payload equality (see
+    // `addTicketEvent`).
+    case 'ticket-event':
+      accumulator.addTicketEvent({
+        kind: event.kind,
+        actorId: event.actorId,
+        actorName: event.actorName,
+        actorType: event.actorType,
+        reason: event.reason,
       })
       break
 
