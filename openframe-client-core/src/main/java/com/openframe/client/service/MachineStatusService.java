@@ -13,6 +13,12 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 
+import static com.openframe.data.document.device.DeviceStatus.DELETED;
+import static com.openframe.data.document.device.DeviceStatus.OFFLINE;
+import static com.openframe.data.document.device.DeviceStatus.ONLINE;
+import static com.openframe.data.document.device.DeviceStatus.PENDING;
+import static com.openframe.data.document.device.DeviceStatus.PENDING_DELETION;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -22,15 +28,15 @@ public class MachineStatusService {
     private final ApplicationEventPublisher eventPublisher;
 
     public void updateToOnline(String machineId, Instant eventTimestamp) {
-        update(machineId, DeviceStatus.ONLINE, eventTimestamp);
+        update(machineId, ONLINE, eventTimestamp);
     }
 
     public void updateToOffline(String machineId, Instant eventTimestamp) {
-        update(machineId, DeviceStatus.OFFLINE, eventTimestamp);
+        update(machineId, OFFLINE, eventTimestamp);
     }
 
     public void processHeartbeat(String machineId, Instant eventTimestamp) {
-        update(machineId, DeviceStatus.ONLINE, eventTimestamp);
+        update(machineId, ONLINE, eventTimestamp);
     }
 
     private void update(String machineId, DeviceStatus newStatus, Instant eventTimestamp) {
@@ -57,7 +63,7 @@ public class MachineStatusService {
 
     private boolean isDeletionInProgress(Machine machine) {
         DeviceStatus status = machine.getStatus();
-        return status == DeviceStatus.PENDING_DELETION || status == DeviceStatus.DELETED;
+        return status == PENDING_DELETION || status == DELETED;
     }
 
     private void applyStatusUpdate(Machine machine, DeviceStatus newStatus, Instant eventTimestamp) {
@@ -67,12 +73,12 @@ public class MachineStatusService {
         machineRepository.save(machine);
         log.debug("Updated machineId={} to status={} at {}", machine.getMachineId(), newStatus, eventTimestamp);
 
-        if (previousStatus == DeviceStatus.PENDING && (newStatus == DeviceStatus.ONLINE || newStatus == DeviceStatus.OFFLINE)) {
+        if (previousStatus == PENDING && (newStatus == ONLINE || newStatus == OFFLINE)) {
             log.info("Device first connected: machineId={}, transition {} -> {}", machine.getMachineId(), previousStatus, newStatus);
             eventPublisher.publishEvent(new DeviceFirstConnectedEvent(this, machine));
         }
 
-        if (previousStatus == DeviceStatus.OFFLINE && newStatus == DeviceStatus.ONLINE) {
+        if (previousStatus == OFFLINE && newStatus == ONLINE) {
             log.info("Device came online (offline->online): machineId={}", machine.getMachineId());
             eventPublisher.publishEvent(new DeviceCameOnlineEvent(this, machine));
         }
