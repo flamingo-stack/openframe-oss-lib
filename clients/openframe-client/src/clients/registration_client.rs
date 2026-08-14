@@ -140,10 +140,17 @@ impl RegistrationClient {
                 .context("Failed to parse client secret header")?,
         );
 
+        // A body is required: the GCP LB rejects body-less POSTs with 411.
+        // Backend contract does not require this body.
+        let body = serde_json::json!({
+            "deletedAt": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true)
+        });
+
         let response = self
             .http_client
             .post(&url)
             .headers(headers)
+            .json(&body)
             .send()
             .await
             .context("Failed to send deregistration request")?;
