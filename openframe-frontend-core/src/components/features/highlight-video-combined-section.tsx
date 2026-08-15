@@ -16,10 +16,6 @@ export interface HighlightVideoCombinedSectionProps {
   targetDurationSeconds: number;
   /** Handler for duration changes */
   onTargetDurationChange: (seconds: number) => void;
-  /** Whether to skip subtitle burning */
-  skipSubtitleBurning: boolean;
-  /** Handler for subtitle burning toggle */
-  onSkipSubtitleBurningChange: (skip: boolean) => void;
   /** Whether config section is disabled */
   configDisabled?: boolean;
 
@@ -102,8 +98,6 @@ export function HighlightVideoCombinedSection({
   // Config props
   targetDurationSeconds,
   onTargetDurationChange,
-  skipSubtitleBurning,
-  onSkipSubtitleBurningChange,
   configDisabled = false,
   // Generation props
   onGenerateHighlight,
@@ -164,8 +158,6 @@ export function HighlightVideoCombinedSection({
       <HighlightConfigSection
         targetDurationSeconds={targetDurationSeconds}
         onTargetDurationChange={onTargetDurationChange}
-        skipSubtitleBurning={skipSubtitleBurning}
-        onSkipSubtitleBurningChange={onSkipSubtitleBurningChange}
         disabled={configDisabled}
       />
 

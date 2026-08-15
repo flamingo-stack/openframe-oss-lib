@@ -14,8 +14,6 @@ import type { VideoTeaser, Speaker, VideoClip, TranscriptWord, SpeakerMapping, E
 export interface CustomerInterviewConfig {
   /** Target duration in seconds for AI-generated highlight video (default: 180) */
   highlight_target_duration_seconds?: number
-  /** Skip subtitle burning during highlight video generation */
-  skipSubtitleBurning?: boolean
 }
 
 export interface CustomerInterview {

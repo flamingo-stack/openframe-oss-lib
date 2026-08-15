@@ -138,6 +138,7 @@ export function OnboardingGuideDetailView({
   }
 
   const captionsUrl = getCaptionsUrl('onboarding_guide', guide.id, guide.srt_content)
+  const highlightCaptionsUrl = getCaptionsUrl('onboarding_guide', guide.id, guide.highlight_srt_content, { variant: 'highlight' })
 
   const videoPoster =
     guide.main_video_thumbnail ||
@@ -197,6 +198,7 @@ export function OnboardingGuideDetailView({
               title={guide.title}
               srtContent={guide.srt_content}
               captionsUrl={captionsUrl}
+              highlightCaptionsUrl={highlightCaptionsUrl}
               MarkdownRenderer={MarkdownRenderer}
             />
           </div>
