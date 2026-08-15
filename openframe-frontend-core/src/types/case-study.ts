@@ -40,6 +40,7 @@ export interface CaseStudy {
   // NOTE: transcript_words_data is server-only and intentionally NOT typed here.
   transcript?: string | null
   srt_content?: string | null
+  highlight_srt_content?: string | null
   video_summary?: string | null
   custom_instructions?: string | null
   config?: Record<string, unknown> | null // clip/highlight processing config
@@ -98,6 +99,7 @@ export interface CreateCaseStudyData {
   // Video processing pipeline (parity with customer_interviews)
   transcript?: string | null
   srt_content?: string | null
+  highlight_srt_content?: string | null
   video_summary?: string | null
   custom_instructions?: string | null
   config?: Record<string, unknown> | null

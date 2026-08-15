@@ -9,10 +9,6 @@ export interface HighlightConfigSectionProps {
   targetDurationSeconds: number;
   /** Callback when target duration changes */
   onTargetDurationChange: (seconds: number) => void;
-  /** Whether to skip subtitle burning */
-  skipSubtitleBurning: boolean;
-  /** Callback when skip subtitle option changes */
-  onSkipSubtitleBurningChange: (skip: boolean) => void;
   /** Whether the section is disabled */
   disabled?: boolean;
   /** Additional class name */
@@ -23,13 +19,13 @@ export interface HighlightConfigSectionProps {
  * HighlightConfigSection - Unified component for highlight video configuration
  *
  * This component provides a consistent UI for both CustomerInterview and ProductRelease entities,
- * including duration selection and subtitle burning options in a styled horizontal layout.
+ * including duration selection in a styled horizontal layout. Highlight captions
+ * are generated automatically as a selectable text track (same pattern as the
+ * main video) — there is no subtitle-burning option anymore.
  */
 export function HighlightConfigSection({
   targetDurationSeconds,
   onTargetDurationChange,
-  skipSubtitleBurning,
-  onSkipSubtitleBurningChange,
   disabled = false,
   className = '',
 }: HighlightConfigSectionProps) {
@@ -54,19 +50,6 @@ export function HighlightConfigSection({
               <SelectItem value="300">5 minutes</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="flex items-center gap-2 pt-5">
-          <input
-            type="checkbox"
-            id="skipSubtitleBurning"
-            checked={skipSubtitleBurning}
-            onChange={(e) => onSkipSubtitleBurningChange(e.target.checked)}
-            disabled={disabled}
-            className="h-4 w-4 rounded border-ods-border bg-ods-bg text-ods-accent focus:ring-ods-accent"
-          />
-          <Label htmlFor="skipSubtitleBurning" className="text-h6 cursor-pointer">
-            Skip subtitle burning
-          </Label>
         </div>
       </div>
     </div>
