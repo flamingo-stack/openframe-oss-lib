@@ -46,8 +46,10 @@ impl MachineHeartbeatPublisher {
         if count >= HEARTBEAT_LOG_INTERVAL {
             self.heartbeat_count.store(0, Ordering::Relaxed);
             info!(
-                "Heartbeat healthy for machine: {} ({} sent since last check)",
-                machine_id, count
+                "Heartbeat healthy for machine: {} ({} sent since last check, running version: {})",
+                machine_id,
+                count,
+                env!("OPENFRAME_VERSION")
             );
         } else {
             debug!("Sent heartbeat for machine: {}", machine_id);
