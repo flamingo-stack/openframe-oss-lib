@@ -12,11 +12,28 @@ const ANIMATION_DURATION = 200
 
 const ModalContext = React.createContext<{ onClose?: () => void }>({})
 
+/**
+ * Panel width, as a named variant rather than a per-call-site `max-w-*`.
+ * `medium` is the single-column form width; `wide` is the two-column editor
+ * width and pairs with `ModalV2TwoColumn`.
+ *
+ * Every arm keeps the `calc(100vw-2rem)` arm so content can never stretch the
+ * panel past the viewport (minus the `mx-4` margins) on narrow screens.
+ */
+export type ModalV2Size = "default" | "medium" | "wide"
+
+const MODAL_V2_SIZE_CLASSES: Record<ModalV2Size, string> = {
+  default: "max-w-[min(28rem,calc(100vw-2rem))]",
+  medium: "max-w-[min(42rem,calc(100vw-2rem))]",
+  wide: "max-w-[min(1400px,calc(100vw-2rem))]",
+}
+
 interface ModalProps {
   isOpen: boolean
   onClose: () => void
   children: React.ReactNode
   className?: string
+  size?: ModalV2Size
 }
 
 interface ModalContentProps {
@@ -39,6 +56,12 @@ interface ModalFooterProps {
   className?: string
 }
 
+interface ModalTwoColumnProps {
+  left: React.ReactNode
+  right: React.ReactNode
+  className?: string
+}
+
 // Topmost-modal stack: with stacked modals (confirm above a form) only the
 // TOP one may contain focus, or they fight each other.
 const modalStack: symbol[] = []
@@ -58,7 +81,7 @@ const isInPortaledLayer = (node: Node | null): boolean =>
   ) !== null
 
 const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
-  ({ isOpen, onClose, children, className }, ref) => {
+  ({ isOpen, onClose, children, className, size = "default" }, ref) => {
     // Keep the modal mounted while the exit animation plays.
     const [isMounted, setIsMounted] = useState(isOpen)
     const panelRef = React.useRef<HTMLDivElement | null>(null)
@@ -247,11 +270,10 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           tabIndex={-1}
           data-state={state}
           className={cn(
-            // min() keeps the desktop cap at 28rem while never letting content
-            // stretch the panel past the viewport (minus the mx-4 margins) on
-            // narrow screens. A single base utility (not md:max-w-md) so consumer
+            // A single base utility per size (not md:max-w-*) so consumer
             // max-w-* overrides via className still win at every breakpoint.
-            "relative z-10 w-full min-w-0 max-w-[min(28rem,calc(100vw-2rem))] flex flex-col",
+            "relative z-10 w-full min-w-0 flex flex-col",
+            MODAL_V2_SIZE_CLASSES[size],
             "mx-4 mb-4 md:mb-0",
             // dvh, not vh: vh ignores a mobile browser's retracting URL bar, so
             // 90vh already overflowed behind Safari's toolbar. The `100%-2rem`
@@ -261,6 +283,11 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
             // stay pinned, ModalV2Content scrolls. min() picks 90dvh on any
             // viewport over 320px tall, so desktop is untouched.
             "max-h-[min(90dvh,100%-2rem)]",
+            // `wide` also FIXES the desktop height rather than only capping it:
+            // its columns scroll independently, and a height that tracks
+            // content makes the panel jump as an entity hydrates in. Mobile
+            // keeps the bottom-sheet's content-sized height.
+            size === "wide" && "md:h-[min(90dvh,100%-2rem)]",
             "bg-ods-bg md:bg-ods-card",
             "border border-ods-border rounded-md shadow-xl",
             "p-[var(--spacing-system-xl)] gap-[var(--spacing-system-l)]",
@@ -296,6 +323,35 @@ const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
   )
 )
 ModalContent.displayName = "ModalV2Content"
+
+/**
+ * The two-column editor body. Use INSTEAD OF `ModalV2Content` (not inside it)
+ * on a `size="wide"` modal — it owns the same `flex-1 min-h-0` slot.
+ *
+ * Scroll model, which is the whole reason this is a component and not a pair
+ * of copy-pasted class strings: below `lg` there is ONE column and the outer
+ * region scrolls, so a phone behaves exactly like every single-column modal.
+ * From `lg` up the outer region is `overflow-hidden` and each column scrolls
+ * independently, so a long left column never drags the right one out of view.
+ */
+const ModalTwoColumn = React.forwardRef<HTMLDivElement, ModalTwoColumnProps>(
+  ({ left, right, className }, ref) => (
+    <div
+      ref={ref}
+      className={cn("flex-1 min-h-0 overflow-y-auto lg:overflow-hidden", className)}
+    >
+      <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2 gap-[var(--spacing-system-xl)]">
+        <div className="min-h-0 space-y-[var(--spacing-system-lf)] lg:overflow-y-auto lg:pr-[var(--spacing-system-sf)]">
+          {left}
+        </div>
+        <div className="min-h-0 space-y-[var(--spacing-system-lf)] lg:overflow-y-auto lg:pr-[var(--spacing-system-sf)]">
+          {right}
+        </div>
+      </div>
+    </div>
+  )
+)
+ModalTwoColumn.displayName = "ModalV2TwoColumn"
 
 const ModalHeader = React.forwardRef<HTMLDivElement, ModalHeaderProps>(
   ({ children, className }, ref) => {
@@ -352,5 +408,6 @@ export {
   ModalContent as ModalV2Content,
   ModalFooter as ModalV2Footer,
   ModalHeader as ModalV2Header,
-  ModalTitle as ModalV2Title
+  ModalTitle as ModalV2Title,
+  ModalTwoColumn as ModalV2TwoColumn
 }
