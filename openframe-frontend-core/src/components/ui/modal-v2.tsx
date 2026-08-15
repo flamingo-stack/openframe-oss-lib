@@ -273,6 +273,13 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
             // A single base utility per size (not md:max-w-*) so consumer
             // max-w-* overrides via className still win at every breakpoint.
             "relative z-10 w-full min-w-0 flex flex-col",
+            // The panel is a focus TARGET (tabIndex -1), not a control: focus
+            // moves here on open so the dialog owns the keyboard, and the UA
+            // then paints its default ring around the whole modal. Opening by
+            // click hides it via :focus-visible heuristics, but a modal opened
+            // from a URL on page load has no preceding pointer event, so the
+            // ring showed on every refresh. Fields inside keep their own rings.
+            "outline-none",
             MODAL_V2_SIZE_CLASSES[size],
             "mx-4 mb-4 md:mb-0",
             // dvh, not vh: vh ignores a mobile browser's retracting URL bar, so
