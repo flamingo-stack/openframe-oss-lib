@@ -340,7 +340,13 @@ const ModalTwoColumn = React.forwardRef<HTMLDivElement, ModalTwoColumnProps>(
       ref={ref}
       className={cn("flex-1 min-h-0 overflow-y-auto lg:overflow-hidden", className)}
     >
-      <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2 gap-[var(--spacing-system-xl)]">
+      {/* `lg:grid-rows-[minmax(0,1fr)]` is what makes the columns scroll: an
+          implicit `auto` row sizes to the TALLER column, so the columns had no
+          bounded height to scroll inside and the outer `overflow-hidden`
+          silently clipped them instead. minmax(0,…) also beats the default
+          `min-height:auto` on the row, which would otherwise refuse to shrink
+          below content height. */}
+      <div className="grid grid-cols-1 gap-[var(--spacing-system-xl)] lg:h-full lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)]">
         <div className="min-h-0 space-y-[var(--spacing-system-lf)] lg:overflow-y-auto lg:pr-[var(--spacing-system-sf)]">
           {left}
         </div>

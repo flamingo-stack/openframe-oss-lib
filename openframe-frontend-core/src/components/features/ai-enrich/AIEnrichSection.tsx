@@ -283,6 +283,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
           {/* Clear button */}
           {showClearButton && onClear && (
             <Button
+              type="button"
               variant="outline"
               size="small-legacy"
               onClick={onClear}
