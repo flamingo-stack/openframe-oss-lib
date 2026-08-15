@@ -5,6 +5,7 @@ import { Sparkles, Upload } from 'lucide-react';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { AIEnrichSection } from './ai-enrich';
 import { HighlightConfigSection } from './highlight-config-section';
+import { SubtitlesEditor } from './subtitles-editor';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -72,6 +73,14 @@ export interface HighlightVideoCombinedSectionProps {
   emptyMessage?: string;
   /** Upload progress component (optional) */
   uploadProgressComponent?: ReactNode;
+
+  // ===== Highlight Subtitles (SRT) Props =====
+  /** Highlight captions SRT content (highlight_srt_content) */
+  subtitles?: string;
+  /** Callback when highlight subtitles change */
+  onSubtitlesChange?: (value: string) => void;
+  /** Whether the highlight subtitles were AI generated */
+  isSubtitlesAIGenerated?: boolean;
   /** Video preview component - receives video data, should render the preview */
   renderVideoPreview: (props: {
     videoUrl: string;
@@ -126,6 +135,10 @@ export function HighlightVideoCombinedSection({
   previewLabel = "Highlight Video",
   emptyMessage = "No highlight video yet. Use AI generation above or upload manually.",
   uploadProgressComponent,
+  // Highlight subtitles props
+  subtitles,
+  onSubtitlesChange,
+  isSubtitlesAIGenerated = false,
   renderVideoPreview,
   // Common
   className = '',
@@ -221,6 +234,18 @@ export function HighlightVideoCombinedSection({
           </p>
         )}
       </div>
+
+      {/* 4. Highlight Subtitles (SRT) — the SAME SubtitlesEditor the main
+          video's TranscriptSummaryEditor renders, bound to
+          highlight_srt_content instead of srt_content. */}
+      <SubtitlesEditor
+        id="highlight-subtitles"
+        subtitles={subtitles}
+        onSubtitlesChange={onSubtitlesChange}
+        label="Highlight Subtitles (SRT)"
+        helperText="SRT captions transcribed from the highlight reel (AssemblyAI). Served as a selectable text track on the highlight player. Editable for fine-tuning."
+        isAIGenerated={isSubtitlesAIGenerated}
+      />
     </div>
   );
 }
