@@ -67,7 +67,7 @@ export function Field({ label, hint, required, children, error, labelExtras, lab
   return (
     <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
       <div className="flex items-center gap-1.5">
-        <Label htmlFor={controlId} variant="small" className="text-ods-text-primary">
+        <Label htmlFor={controlId}>
           {label}
           {required && ' *'}
         </Label>

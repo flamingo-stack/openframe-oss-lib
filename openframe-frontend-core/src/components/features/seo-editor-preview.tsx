@@ -227,7 +227,7 @@ export function SEOEditorPreview({
         <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
           {/* Group label for the upload widget — Field's exact label treatment,
               so the OG column's label row aligns with the Description Field. */}
-          <Label variant="small" className="text-ods-text-primary">
+          <Label>
             OG Image
           </Label>
 
