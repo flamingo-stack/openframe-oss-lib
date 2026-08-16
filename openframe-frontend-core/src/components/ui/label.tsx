@@ -11,7 +11,11 @@ const labelVariants = cva(
   {
     variants: {
       variant: {
-        default: "text-h4",
+        // default is text-h6, matching `Field`'s label (Label variant="small")
+        // and FieldWrapper — every bare <Label> is a form label, and the three
+        // primitives must agree on ONE label scale. Use variant="large" for an
+        // intentionally bigger label.
+        default: "text-h6",
         small: "text-h6",
         medium: "text-h6",
         large: "text-h4"
