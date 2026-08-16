@@ -12,6 +12,11 @@ import Image from '../../embed-shims/next-image';
 import { SEO_TITLE_MAX_LENGTH } from '../../utils/seo-title';
 import { SEO_DESCRIPTION_MAX_LENGTH } from '../../utils/seo-description';
 
+/** SEO Description textarea and the OG upload box sit side by side on desktop —
+ *  ONE height constant for both, so the pair stays flush instead of each
+ *  picking its own (`rows` on one, `min-h` on the other, drifting apart). */
+const SEO_MEDIA_BOX_HEIGHT = 'h-[280px]'
+
 export interface SEOEditorPreviewProps {
   // SEO fields - must be strings (not undefined)
   seoTitle: string;
@@ -208,8 +213,7 @@ export function SEOEditorPreview({
                 maxLength={SEO_DESCRIPTION_MAX_LENGTH}
                 invalid={seoDescriptionTooLong}
                 placeholder="Enter SEO meta description..."
-                className="bg-ods-bg border-ods-border text-ods-text-primary resize-none"
-                rows={10}
+                className={cn('bg-ods-bg border-ods-border text-ods-text-primary resize-none', SEO_MEDIA_BOX_HEIGHT)}
               />
             )}
           </Field>
@@ -231,7 +235,7 @@ export function SEOEditorPreview({
               so this box's top aligns with the Description textarea's top. */}
           <div className="relative pt-[var(--spacing-system-xxs)]">
             {displayImage && !imageError ? (
-              <div className="relative group h-full min-h-[280px]">
+              <div className={cn("relative group", SEO_MEDIA_BOX_HEIGHT)}>
                 <Image
                   src={displayImage}
                   alt="OG Image"
@@ -266,7 +270,7 @@ export function SEOEditorPreview({
               </div>
             ) : (
               <div
-                className="h-full min-h-[280px] border-2 border-dashed border-ods-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-ods-accent transition-colors bg-ods-bg-hover"
+                className={cn(SEO_MEDIA_BOX_HEIGHT, "border-2 border-dashed border-ods-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-ods-accent transition-colors bg-ods-bg-hover")}
                 onClick={() => onOgImageUpload && fileInputRef?.click()}
               >
                 {isUploading ? (
