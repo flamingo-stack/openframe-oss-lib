@@ -72,3 +72,23 @@ export const DisabledValues: Story = {
     disabledValues: ['all', 'draft', 'archived'],
   },
 }
+
+/** View-toggle mode: `showAll={false}` for facets with no all-of-them state —
+ *  one option is always selected (Everyone / My Sessions). */
+export const ViewToggleNoAll: Story = {
+  render: function ViewStory() {
+    const [view, setView] = useState('everyone')
+    return (
+      <StatusFilterComponent
+        label="View"
+        showAll={false}
+        selectedStatus={view}
+        onStatusChange={setView}
+        statusOptions={[
+          { value: 'everyone', label: 'Everyone' },
+          { value: 'mine', label: 'My Sessions' },
+        ]}
+      />
+    )
+  },
+}

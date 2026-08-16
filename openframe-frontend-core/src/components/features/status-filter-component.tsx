@@ -30,6 +30,14 @@ export interface StatusFilterComponentProps {
    * component during hydration and reports a mismatch on the label text.
    */
   label?: string;
+  /**
+   * Render the built-in "All" clear-selection button (default true). Turn it
+   * off for facets with no all-of-them state — e.g. a View toggle
+   * (Everyone / My Sessions), where one option is always selected. Added so
+   * those rows reuse THIS component instead of hand-rolling identical markup
+   * (which React then pairs against this component during hydration).
+   */
+  showAll?: boolean;
 }
 
 /**
@@ -45,7 +53,8 @@ export function StatusFilterComponent({
   count = 0,
   className = '',
   disabledValues = [],
-  label = 'Status'
+  label = 'Status',
+  showAll = true
 }: StatusFilterComponentProps) {
   // Filter out 'all' from options since we render it separately
   const filteredOptions = statusOptions.filter(option => option.value !== 'all');
@@ -60,6 +69,7 @@ export function StatusFilterComponent({
       </div>
 
       {/* All button */}
+      {showAll && (
       <Button
         type="button"
         variant={selectedStatus === 'all' ? "accent" : "outline"}
@@ -70,6 +80,7 @@ export function StatusFilterComponent({
       >
         All
       </Button>
+      )}
 
       {/* Status option buttons */}
       {filteredOptions.map((option) => (
