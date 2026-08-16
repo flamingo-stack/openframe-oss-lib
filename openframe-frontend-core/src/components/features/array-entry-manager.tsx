@@ -124,7 +124,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
   return (
     <div className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between">
-        <Label className="text-h6 text-ods-text-primary">{title}</Label>
+        <Label>{title}</Label>
         <div className="flex items-center gap-2">
           {requireSave && isDirty && (
             <Button

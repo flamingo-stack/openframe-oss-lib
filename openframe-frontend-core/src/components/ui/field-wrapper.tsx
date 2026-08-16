@@ -1,5 +1,6 @@
 "use client"
 
+import { Label } from './label'
 import * as React from "react"
 import { cn } from "../../utils/cn"
 
@@ -43,9 +44,9 @@ const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
           // Field-wrapped controls with `label=`-prop controls showed two label
           // sizes side by side — the exact inconsistency the admin editors kept
           // reporting. One label scale, owned here and in Field together.
-          <label className="text-h6 text-ods-text-primary mb-1">
+          <Label className="mb-1">
             {label}
-          </label>
+          </Label>
         )}
         {children}
         {error && (
