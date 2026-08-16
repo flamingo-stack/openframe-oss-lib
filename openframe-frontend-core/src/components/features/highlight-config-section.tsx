@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Label } from '../ui/label';
+import { Field } from '../ui/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 export interface HighlightConfigSectionProps {
@@ -33,13 +33,16 @@ export function HighlightConfigSection({
     <div className={`space-y-3 p-4 bg-ods-card rounded-lg border border-ods-border ${className}`}>
       <div className="flex items-center gap-4">
         <div className="flex-1">
-          <Label className="text-h6">Target Duration</Label>
+          {/* Field, not a raw Label + margin hack — same label system as every
+              other form field so adjacent columns stay on one baseline. */}
+          <Field label="Target Duration">
+            {(f) => (
           <Select
             value={targetDurationSeconds.toString()}
             onValueChange={(value) => onTargetDurationChange(parseInt(value))}
             disabled={disabled}
           >
-            <SelectTrigger className="bg-ods-bg mt-1">
+            <SelectTrigger id={f.id} className="bg-ods-bg">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-ods-card">
@@ -50,6 +53,8 @@ export function HighlightConfigSection({
               <SelectItem value="300">5 minutes</SelectItem>
             </SelectContent>
           </Select>
+            )}
+          </Field>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Input, Textarea, Label, Button, Badge } from '../ui';
+import { Input, Textarea, Label, Button, Badge, Field } from '../ui';
 import { ConfidenceBadge } from '../features';
 import { Globe, ExternalLink, Upload, X, Loader2, Sparkles } from 'lucide-react';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
@@ -112,49 +112,42 @@ export function SEOEditorPreview({
         SEO & Open Graph
       </h3>
 
-      {/* SEO Title & Keywords - Same Row */}
+      {/* SEO Title & Keywords - Same Row. EVERY field goes through `Field`, so
+          both columns share one label-row geometry; badges + the char counter
+          ride the label row (labelExtras / labelEnd) instead of adding stray
+          rows that misalign siblings. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Label className="text-h6 text-ods-text-primary">
-              SEO Title
-            </Label>
-            {aiConfidenceSeoTitle !== undefined && (
-              <>
-                <AIGeneratedBadge />
-                <ConfidenceBadge
-                  confidence={aiConfidenceSeoTitle}
-                  showLabel={true}
-                  showPercentage={true}
-                  size="sm"
-                />
-              </>
+          <Field
+            label="SEO Title"
+            error={seoTitleTooLong ? `Too long: search engines may truncate this title (keep it under ${SEO_TITLE_MAX_LENGTH})` : null}
+            labelExtras={
+              aiConfidenceSeoTitle !== undefined ? (
+                <>
+                  <AIGeneratedBadge />
+                  <ConfidenceBadge confidence={aiConfidenceSeoTitle} showLabel={true} showPercentage={true} size="sm" />
+                </>
+              ) : undefined
+            }
+            labelEnd={
+              <span className={cn('text-h6 tabular-nums', seoTitleTooLong ? 'text-ods-error font-semibold' : 'text-ods-text-secondary')}>
+                {seoTitleLength}/{SEO_TITLE_MAX_LENGTH}
+              </span>
+            }
+          >
+            {(f) => (
+              <Input
+                {...f}
+                value={seoTitle || ''}
+                onChange={(e) => onSeoTitleChange(e.target.value)}
+                disabled={disabled}
+                maxLength={SEO_TITLE_MAX_LENGTH}
+                invalid={seoTitleTooLong}
+                placeholder="Enter SEO meta title..."
+                className="bg-ods-bg border-ods-border text-ods-text-primary"
+              />
             )}
-          </div>
-          <Input
-            value={seoTitle || ''}
-            onChange={(e) => onSeoTitleChange(e.target.value)}
-            disabled={disabled}
-            maxLength={SEO_TITLE_MAX_LENGTH}
-            invalid={seoTitleTooLong}
-            placeholder="Enter SEO meta title..."
-            className="bg-ods-bg border-ods-border text-ods-text-primary"
-          />
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-h6 text-ods-error">
-              {seoTitleTooLong
-                ? `Too long: search engines may truncate this title (keep it under ${SEO_TITLE_MAX_LENGTH})`
-                : ''}
-            </span>
-            <span
-              className={cn(
-                "text-h6 tabular-nums shrink-0",
-                seoTitleTooLong ? 'text-ods-error font-semibold' : 'text-ods-text-secondary'
-              )}
-            >
-              {seoTitleLength}/{SEO_TITLE_MAX_LENGTH}
-            </span>
-          </div>
+          </Field>
           {!seoTitle && title && (
             <p className="text-h6 text-ods-accent">
               Auto-populated from title
@@ -162,77 +155,64 @@ export function SEOEditorPreview({
           )}
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Label className="text-h6 text-ods-text-primary">
-              SEO Keywords
-            </Label>
-            {aiConfidenceSeoKeywords !== undefined && (
+        <Field
+          label="SEO Keywords"
+          labelExtras={
+            aiConfidenceSeoKeywords !== undefined ? (
               <>
                 <AIGeneratedBadge />
-                <ConfidenceBadge
-                  confidence={aiConfidenceSeoKeywords}
-                  showLabel={true}
-                  showPercentage={true}
-                  size="sm"
-                />
+                <ConfidenceBadge confidence={aiConfidenceSeoKeywords} showLabel={true} showPercentage={true} size="sm" />
               </>
-            )}
-          </div>
-          <Input
-            value={seoKeywords || ''}
-            onChange={(e) => onSeoKeywordsChange(e.target.value)}
-            disabled={disabled}
-            placeholder="Enter SEO keywords..."
-            className="bg-ods-bg border-ods-border text-ods-text-primary"
-          />
-        </div>
+            ) : undefined
+          }
+        >
+          {(f) => (
+            <Input
+              {...f}
+              value={seoKeywords || ''}
+              onChange={(e) => onSeoKeywordsChange(e.target.value)}
+              disabled={disabled}
+              placeholder="Enter SEO keywords..."
+              className="bg-ods-bg border-ods-border text-ods-text-primary"
+            />
+          )}
+        </Field>
       </div>
 
       {/* SEO Description & OG Image - Same Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="space-y-2 flex flex-col h-full">
-          <div className="flex items-center gap-2">
-            <Label className="text-h6 text-ods-text-primary">
-              SEO Description
-            </Label>
-            {aiConfidenceSeoDescription !== undefined && (
-              <>
-                <AIGeneratedBadge />
-                <ConfidenceBadge
-                  confidence={aiConfidenceSeoDescription}
-                  showLabel={true}
-                  showPercentage={true}
-                  size="sm"
-                />
-              </>
+        <div className="space-y-2">
+          <Field
+            label="SEO Description"
+            error={seoDescriptionTooLong ? `Too long: search engines may truncate this description (keep it under ${SEO_DESCRIPTION_MAX_LENGTH})` : null}
+            labelExtras={
+              aiConfidenceSeoDescription !== undefined ? (
+                <>
+                  <AIGeneratedBadge />
+                  <ConfidenceBadge confidence={aiConfidenceSeoDescription} showLabel={true} showPercentage={true} size="sm" />
+                </>
+              ) : undefined
+            }
+            labelEnd={
+              <span className={cn('text-h6 tabular-nums', seoDescriptionTooLong ? 'text-ods-error font-semibold' : 'text-ods-text-secondary')}>
+                {seoDescriptionLength}/{SEO_DESCRIPTION_MAX_LENGTH}
+              </span>
+            }
+          >
+            {(f) => (
+              <Textarea
+                {...f}
+                value={seoDescription || ''}
+                onChange={(e) => onSeoDescriptionChange(e.target.value)}
+                disabled={disabled}
+                maxLength={SEO_DESCRIPTION_MAX_LENGTH}
+                invalid={seoDescriptionTooLong}
+                placeholder="Enter SEO meta description..."
+                className="bg-ods-bg border-ods-border text-ods-text-primary resize-none"
+                rows={10}
+              />
             )}
-          </div>
-          <Textarea
-            value={seoDescription || ''}
-            onChange={(e) => onSeoDescriptionChange(e.target.value)}
-            disabled={disabled}
-            maxLength={SEO_DESCRIPTION_MAX_LENGTH}
-            invalid={seoDescriptionTooLong}
-            placeholder="Enter SEO meta description..."
-            className="bg-ods-bg border-ods-border text-ods-text-primary flex-1 resize-none"
-            rows={6}
-          />
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-h6 text-ods-error">
-              {seoDescriptionTooLong
-                ? `Too long: search engines may truncate this description (keep it under ${SEO_DESCRIPTION_MAX_LENGTH})`
-                : ''}
-            </span>
-            <span
-              className={cn(
-                "text-h6 tabular-nums shrink-0",
-                seoDescriptionTooLong ? 'text-ods-error font-semibold' : 'text-ods-text-secondary'
-              )}
-            >
-              {seoDescriptionLength}/{SEO_DESCRIPTION_MAX_LENGTH}
-            </span>
-          </div>
+          </Field>
           {!seoDescription && summary && (
             <p className="text-h6 text-ods-accent">
               Auto-populated from summary
@@ -240,13 +220,16 @@ export function SEOEditorPreview({
           )}
         </div>
 
-        <div className="space-y-2 flex flex-col h-full">
-          <Label className="text-h6 text-ods-text-primary">
+        <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
+          {/* Group label for the upload widget — Field's exact label treatment,
+              so the OG column's label row aligns with the Description Field. */}
+          <Label variant="small" className="text-ods-text-primary">
             OG Image
           </Label>
 
-          {/* OG Image Upload/Display */}
-          <div className="flex-1 relative">
+          {/* OG Image Upload/Display — pt matches Field's label→control offset
+              so this box's top aligns with the Description textarea's top. */}
+          <div className="relative pt-[var(--spacing-system-xxs)]">
             {displayImage && !imageError ? (
               <div className="relative group h-full min-h-[280px]">
                 <Image

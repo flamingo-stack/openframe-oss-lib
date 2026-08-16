@@ -23,6 +23,19 @@ export interface FieldProps {
   required?: boolean
   children: (props: FieldRenderProps) => React.ReactNode
   error?: string | null
+  /**
+   * Inline content after the label text — AI badges, confidence chips. Lives in
+   * the LABEL ROW so fields that carry badges keep the same geometry as fields
+   * that don't; a hand-rolled label row next to a `Field` is what makes two
+   * columns' controls land at different heights.
+   */
+  labelExtras?: React.ReactNode
+  /**
+   * Right-aligned content at the end of the label row — character counters,
+   * shortcuts. Same rationale: a counter rendered as its own row under the
+   * control gives that column an extra line and misaligns every sibling.
+   */
+  labelEnd?: React.ReactNode
 }
 
 /**
@@ -42,7 +55,7 @@ export interface FieldProps {
  * association at all (the label looks wired up and announces nothing), so the
  * type doesn't offer one.
  */
-export function Field({ label, hint, required, children, error }: FieldProps) {
+export function Field({ label, hint, required, children, error, labelExtras, labelEnd }: FieldProps) {
   const controlId = React.useId()
   const errorId = `${controlId}-error`
   const renderProps: FieldRenderProps = {
@@ -59,6 +72,8 @@ export function Field({ label, hint, required, children, error }: FieldProps) {
           {required && ' *'}
         </Label>
         {hint && <InfoHint label={label}>{hint}</InfoHint>}
+        {labelExtras}
+        {labelEnd && <span className="ml-auto shrink-0">{labelEnd}</span>}
       </div>
       <div className="pt-[var(--spacing-system-xxs)]">
         {children(renderProps)}
