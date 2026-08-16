@@ -38,7 +38,12 @@ const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
     return (
       <div ref={ref} className={cn(hasChrome ? "relative flex w-full flex-col" : "contents", className)}>
         {label && (
-          <label className="text-h4 text-ods-text-primary mb-1">
+          // text-h6, NOT text-h4: `Field` (ui/field.tsx) renders its label via
+          // `Label variant="small"` = text-h6, and every form that mixes
+          // Field-wrapped controls with `label=`-prop controls showed two label
+          // sizes side by side — the exact inconsistency the admin editors kept
+          // reporting. One label scale, owned here and in Field together.
+          <label className="text-h6 text-ods-text-primary mb-1">
             {label}
           </label>
         )}
