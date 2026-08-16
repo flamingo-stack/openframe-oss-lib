@@ -27,8 +27,12 @@ export {
   type CoverImageFallback,
 } from './use-cover-image-fallback'
 export { AdminContentCard } from './admin-content-card'
+export { EmployeeEntryCard, EmployeeEntryCardSkeleton, EmployeeEntryBadge } from './employee-entry-card'
+export type { EmployeeEntryCardData, EmployeeEntryCardProps } from './employee-entry-card'
 export { WhatIShippedCard, WhatIShippedCardSkeleton } from './what-i-shipped-card'
 export type { WhatIShippedCardData, WhatIShippedCardProps } from './what-i-shipped-card'
+export { HowIWorkCard, HowIWorkCardSkeleton } from './how-i-work-card'
+export type { HowIWorkCardData, HowIWorkCardProps } from './how-i-work-card'
 
 // Moved-into-subdir flat cards
 export { BlockCard, type BlockCardProps } from './block-card'
