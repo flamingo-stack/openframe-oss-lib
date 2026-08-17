@@ -17,6 +17,11 @@ public class RmmExecutionMetrics {
 
     private static final String COMPLETED_COUNTER = "openframe.rmm.execution.completed";
     private static final String LATENCY_TIMER = "openframe.rmm.execution.latency";
+    private static final String LATENCY_DESCRIPTION = "Time from dispatch to result write-back for an RMM execution";
+
+    private static final String TAG_KIND = "kind";
+    private static final String TAG_STATUS = "status";
+    private static final String STATUS_UNKNOWN = "UNKNOWN";
 
     @Nullable
     private final MeterRegistry registry;
@@ -29,14 +34,14 @@ public class RmmExecutionMetrics {
         if (registry == null) {
             return;
         }
-        String statusTag = status != null ? status.name() : "UNKNOWN";
-        registry.counter(COMPLETED_COUNTER, "kind", kind, "status", statusTag).increment();
+        String statusTag = status != null ? status.name() : STATUS_UNKNOWN;
+        registry.counter(COMPLETED_COUNTER, TAG_KIND, kind, TAG_STATUS, statusTag).increment();
 
         if (dispatchedAt != null && finishedAt != null) {
             Timer.builder(LATENCY_TIMER)
-                    .description("Time from dispatch to result write-back for an RMM execution")
-                    .tag("kind", kind)
-                    .tag("status", statusTag)
+                    .description(LATENCY_DESCRIPTION)
+                    .tag(TAG_KIND, kind)
+                    .tag(TAG_STATUS, statusTag)
                     .publishPercentileHistogram()
                     .register(registry)
                     .record(Duration.between(dispatchedAt, finishedAt));

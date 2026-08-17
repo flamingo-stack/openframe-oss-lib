@@ -22,6 +22,8 @@ public class ScriptExecutionWatchdogService {
     private static final String STUCK_ERROR_MESSAGE_FORMAT = "No result received within %d seconds; watchdog marked execution as failed";
 
     private static final String REAPED_COUNTER = "openframe.rmm.execution.watchdog.reaped";
+    private static final String TAG_KIND = "kind";
+    private static final String KIND_SCRIPT = "script";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleJobExecutionWatchdogService headerWatchdogService;
@@ -55,7 +57,7 @@ public class ScriptExecutionWatchdogService {
         stuck.forEach(row -> markFailing(row, now));
         scriptExecutionRepository.saveAll(stuck);
         if (meterRegistry != null) {
-            meterRegistry.counter(REAPED_COUNTER, "kind", "script").increment(stuck.size());
+            meterRegistry.counter(REAPED_COUNTER, TAG_KIND, KIND_SCRIPT).increment(stuck.size());
         }
 
         log.info("Marked {} Execution row(s) as FAILED", stuck.size());
