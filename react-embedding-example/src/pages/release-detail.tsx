@@ -7,14 +7,23 @@ import {
   type VideoDisplaySectionProps,
   type DeliveryResponse,
 } from '@flamingo-stack/openframe-frontend-core/components'
-import { EntityVideoSection } from '@flamingo-stack/openframe-frontend-core/components/features'
+import { EntityVideoSection, getCaptionsUrl } from '@flamingo-stack/openframe-frontend-core/components/features'
 import type { RoadmapItem } from '@flamingo-stack/openframe-frontend-core/components/chat'
 import { EP } from '../config/endpoints'
+import { CONTENT_PREFIX } from '../config/content'
 
 /**
  * Host-supplied data hook — ReleaseDetailPage REQUIRES this so it fetches through the
  * app's QueryClient. Points at the hub's public single-release route
  * (`/content/api/releases/<slug>`); a miss surfaces the lib's error state (no crash).
+ *
+ * Captions: the lib's `ReleaseDetailPage` reads `captionsUrl` /
+ * `highlightCaptionsUrl` off the release the host hook returns (the hub's own
+ * wrapper derives them the same way). Since 0.0.543 captions are NOT burned
+ * into the video — they're served as a native `<track>` from the hub's
+ * `/api/captions/...` endpoint, and `getCaptionsUrl` builds that path
+ * RELATIVE. An embedder must reroute it through the /content proxy or the
+ * browser resolves it against the embedder's origin and the track 404s.
  */
 function useRelease(slug: string | undefined) {
   const query = useQuery({
@@ -22,7 +31,15 @@ function useRelease(slug: string | undefined) {
     queryFn: async () => {
       const res = await fetch(EP.productReleaseBySlug(slug!))
       if (!res.ok) throw new Error(`Request failed (${res.status})`)
-      return res.json()
+      const release = await res.json()
+      const proxied = (rel: string | undefined) => (rel ? `${CONTENT_PREFIX}${rel}` : undefined)
+      return {
+        ...release,
+        captionsUrl: proxied(getCaptionsUrl('product_release', release.id, release.srt_content)),
+        highlightCaptionsUrl: proxied(
+          getCaptionsUrl('product_release', release.id, release.highlight_srt_content, { variant: 'highlight' }),
+        ),
+      }
     },
     enabled: !!slug,
   })

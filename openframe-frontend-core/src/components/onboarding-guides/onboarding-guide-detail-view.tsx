@@ -83,6 +83,12 @@ export interface OnboardingGuideDetailViewProps {
    *  layout already provides the page container — only the padding box renders,
    *  avoiding a nested `<main>`. */
   shell?: boolean
+  /** Rewrite the RELATIVE `/api/captions/...` track URLs the view builds from
+   *  the guide's SRT columns (e.g. prefix a `/content` proxy base). Same
+   *  contract as `useWalkthroughVideo`'s option of the same name — omit it for
+   *  same-origin hosts; cross-origin embedders MUST pass it or captions 404
+   *  against the embedder's origin. */
+  transformCaptionsUrl?: (relativeUrl: string) => string
 }
 
 export function OnboardingGuideDetailView({
@@ -100,6 +106,7 @@ export function OnboardingGuideDetailView({
   basePath = '/onboarding-guides',
   relatedContent,
   shell = true,
+  transformCaptionsUrl,
 }: OnboardingGuideDetailViewProps) {
   const resolvedBackHref = backHref ?? basePath
   const runtime = useChatRuntime()
@@ -137,8 +144,14 @@ export function OnboardingGuideDetailView({
     )
   }
 
-  const captionsUrl = getCaptionsUrl('onboarding_guide', guide.id, guide.srt_content)
-  const highlightCaptionsUrl = getCaptionsUrl('onboarding_guide', guide.id, guide.highlight_srt_content, { variant: 'highlight' })
+  // getCaptionsUrl returns a RELATIVE `/api/captions/...` path; cross-origin
+  // embedders reroute it through their content proxy via transformCaptionsUrl.
+  const proxied = (rel: string | undefined) =>
+    rel && transformCaptionsUrl ? transformCaptionsUrl(rel) : rel
+  const captionsUrl = proxied(getCaptionsUrl('onboarding_guide', guide.id, guide.srt_content))
+  const highlightCaptionsUrl = proxied(
+    getCaptionsUrl('onboarding_guide', guide.id, guide.highlight_srt_content, { variant: 'highlight' }),
+  )
 
   const videoPoster =
     guide.main_video_thumbnail ||

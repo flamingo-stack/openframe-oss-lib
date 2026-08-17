@@ -116,6 +116,32 @@ itself) use the other mode instead: resolve the announcement plus the dismissal
 cookie server-side and pass `initialAnnouncement` so the bar renders in the first
 HTML byte with zero layout shift.
 
+### Video captions — relative `/api/captions/...` track URLs (MUST be proxied)
+
+Since lib **0.0.543** captions are no longer burned into video pixels (the Shotstack
+subtitle-burning stage was removed hub-side). Every caption — main video AND highlight
+reel — is a native `<track>` whose URL `getCaptionsUrl()` builds **relative**:
+`/api/captions/<entityType>/<entityId>?v=<hash>[&variant=highlight]`. Same-origin hosts
+(the hub) resolve it fine; in an embedder the browser resolves it against **this SPA's
+origin**, the track 404s, and captions silently disappear. Every video surface must
+reroute the URL through `/content`:
+
+- **Walkthrough widget** — pass `transformCaptionsUrl` to `useWalkthroughVideo`
+  (`src/components/walkthrough-video.tsx`).
+- **Onboarding guide detail** — pass `transformCaptionsUrl` to
+  `<OnboardingGuideDetailView>` (`src/pages/onboarding-detail.tsx`); the view builds the
+  URLs internally from the guide's SRT columns.
+- **Release detail** — the lib's `ReleaseDetailPage` reads `captionsUrl` /
+  `highlightCaptionsUrl` off the release YOUR `useRelease` hook returns; derive both with
+  `getCaptionsUrl('product_release', id, srt_content /* | highlight_srt_content */)` and
+  prefix `CONTENT_PREFIX` (`src/pages/release-detail.tsx`).
+
+The transform is always the same one-liner: `(rel) => \`${CONTENT_PREFIX}${rel}\``. No
+extra proxy rule is needed — the captions endpoint rides the standard `/content/api/*`
+mapping. Don't point the track at the hub origin directly instead: cross-origin `<track>`
+also requires `crossOrigin` on the `<video>` element, which the lib's `<Video>` doesn't
+set — the proxy route is the supported path.
+
 ### Two documented `/api` exceptions (dev only)
 
 Two lib surfaces still hardcode bare `/api` with no override prop today:
