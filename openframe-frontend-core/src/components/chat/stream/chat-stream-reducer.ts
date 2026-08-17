@@ -1376,6 +1376,7 @@ export function createChatStreamReducer(
             actorName: event.actorName,
             actorType: event.actorType,
             reason: event.reason,
+            targetStatusKind: event.targetStatusKind,
           },
           seq,
         )

@@ -18,8 +18,17 @@ export function getCaptionsUrl(
   entityType: string,
   entityId: string | number,
   srtContent?: string | null,
+  options?: {
+    /**
+     * Which SRT column the endpoint should serve. `'highlight'` targets the
+     * entity's highlight_srt_content (AI highlight reel captions); omitted
+     * means the main video's srt_content.
+     */
+    variant?: 'highlight'
+  },
 ): string | undefined {
   if (!srtContent) return undefined
   const hash = `${srtContent.length}-${srtContent.slice(0, 8).replace(/\s/g, '')}`
-  return `/api/captions/${entityType}/${entityId}?v=${hash}`
+  const variant = options?.variant ? `&variant=${options.variant}` : ''
+  return `/api/captions/${entityType}/${entityId}?v=${hash}${variant}`
 }

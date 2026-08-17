@@ -30,6 +30,8 @@ import type {
   CampaignCardItem,
   GenericEntityCardItem,
 } from '../../components/chat/entity-cards'
+import type { WhatIShippedCardData } from '../../components/chat/entity-cards/what-i-shipped-card'
+import type { HowIWorkCardData } from '../../components/chat/entity-cards/how-i-work-card'
 
 // =============================================================================
 // Common
@@ -598,4 +600,42 @@ export const campaignItem: CampaignCardItem = {
     { id: 'g1', label: 'Drive 800 signups' },
     { id: 'g2', label: '12 podcast plays' },
   ],
+}
+
+// =============================================================================
+// Employee entries (people-hub) — What I Shipped / How I Work
+// =============================================================================
+
+
+export const whatIShippedEntry: WhatIShippedCardData = {
+  title: 'Shipped the new billing flow + cut sync latency 40%',
+  summary:
+    'Rebuilt the checkout path around the unified billing service, moved webhook fan-out to the outbox drainer, and deleted the legacy cron.',
+  status: 'published',
+  entry_month: '2026-07-01',
+  featured_image:
+    'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&h=675&fit=crop',
+  main_video_thumbnail: null,
+  author: {
+    full_name: 'Yevhenii Petrenko',
+    avatar_url:
+      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop',
+  },
+}
+
+export const howIWorkEntry: HowIWorkCardData = {
+  title: 'Competitive research in 40 minutes with a standing Claude prompt',
+  summary:
+    'Three separate single-purpose conversations (pricing, docs gaps, changelog velocity), exported as JSON into Notion through a Zapier automation.',
+  status: 'published',
+  session_date: '2026-08-16',
+  discipline: 'marketing',
+  featured_image:
+    'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&h=675&fit=crop',
+  main_video_thumbnail: null,
+  author: {
+    full_name: 'Semen Kovalenko',
+    avatar_url:
+      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop',
+  },
 }

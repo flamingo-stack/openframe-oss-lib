@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Label } from '../ui/label';
+import { Field } from '../ui/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 export interface HighlightConfigSectionProps {
@@ -9,10 +9,6 @@ export interface HighlightConfigSectionProps {
   targetDurationSeconds: number;
   /** Callback when target duration changes */
   onTargetDurationChange: (seconds: number) => void;
-  /** Whether to skip subtitle burning */
-  skipSubtitleBurning: boolean;
-  /** Callback when skip subtitle option changes */
-  onSkipSubtitleBurningChange: (skip: boolean) => void;
   /** Whether the section is disabled */
   disabled?: boolean;
   /** Additional class name */
@@ -23,13 +19,13 @@ export interface HighlightConfigSectionProps {
  * HighlightConfigSection - Unified component for highlight video configuration
  *
  * This component provides a consistent UI for both CustomerInterview and ProductRelease entities,
- * including duration selection and subtitle burning options in a styled horizontal layout.
+ * including duration selection in a styled horizontal layout. Highlight captions
+ * are generated automatically as a selectable text track (same pattern as the
+ * main video) — there is no subtitle-burning option anymore.
  */
 export function HighlightConfigSection({
   targetDurationSeconds,
   onTargetDurationChange,
-  skipSubtitleBurning,
-  onSkipSubtitleBurningChange,
   disabled = false,
   className = '',
 }: HighlightConfigSectionProps) {
@@ -37,13 +33,16 @@ export function HighlightConfigSection({
     <div className={`space-y-3 p-4 bg-ods-card rounded-lg border border-ods-border ${className}`}>
       <div className="flex items-center gap-4">
         <div className="flex-1">
-          <Label className="text-h6">Target Duration</Label>
+          {/* Field, not a raw Label + margin hack — same label system as every
+              other form field so adjacent columns stay on one baseline. */}
+          <Field label="Target Duration">
+            {(f) => (
           <Select
             value={targetDurationSeconds.toString()}
             onValueChange={(value) => onTargetDurationChange(parseInt(value))}
             disabled={disabled}
           >
-            <SelectTrigger className="bg-ods-bg mt-1">
+            <SelectTrigger id={f.id} className="bg-ods-bg">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-ods-card">
@@ -54,19 +53,8 @@ export function HighlightConfigSection({
               <SelectItem value="300">5 minutes</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="flex items-center gap-2 pt-5">
-          <input
-            type="checkbox"
-            id="skipSubtitleBurning"
-            checked={skipSubtitleBurning}
-            onChange={(e) => onSkipSubtitleBurningChange(e.target.checked)}
-            disabled={disabled}
-            className="h-4 w-4 rounded border-ods-border bg-ods-bg text-ods-accent focus:ring-ods-accent"
-          />
-          <Label htmlFor="skipSubtitleBurning" className="text-h6 cursor-pointer">
-            Skip subtitle burning
-          </Label>
+            )}
+          </Field>
         </div>
       </div>
     </div>

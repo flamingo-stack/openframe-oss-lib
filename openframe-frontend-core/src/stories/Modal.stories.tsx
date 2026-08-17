@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { fn } from 'storybook/test'
 import { Autocomplete, type AutocompleteOption } from '../components/ui/autocomplete'
 import { Button } from '../components/ui/button'
@@ -12,6 +12,12 @@ const meta: ModalStoryMeta = {
   component: Modal,
   parameters: {
     layout: 'centered',
+    docs: {
+      description: {
+        component:
+          'Deprecated. The compact legacy dialog kept for the confirm modals that have not moved yet — new work uses `ModalV2` (UI/ModalV2), which owns the focus trap, Escape stacking, keyboard-inset handling, the `size` variants and the two-column body. Sizing and two-column layout are NOT available here: the `size` prop and the `TWO_COLUMN_MODAL_*` class-string constants this component used to export were removed once `ModalV2` gained `size` + `ModalV2TwoColumn`. Width is a plain `className` override.',
+      },
+    },
   },
   argTypes: {
     isOpen: {
@@ -82,8 +88,9 @@ const autocompleteOptions: AutocompleteOption<string>[] = [
 ]
 
 /**
- * Modal with Autocomplete inside. Uses `portalContainer` to render the dropdown
- * within the modal's DOM tree, avoiding z-index conflicts.
+ * Modal with Autocomplete inside. The Autocomplete dropdown renders inline in
+ * the modal's own DOM tree (no portal), so the panel needs `overflow-visible`
+ * for the list to escape the dialog box.
  */
 export const WithAutocomplete: Story = {
   args: {
@@ -94,11 +101,6 @@ export const WithAutocomplete: Story = {
   render: function Render(args) {
     const [isOpen, setIsOpen] = useState(args.isOpen)
     const [selected, setSelected] = useState<string[]>(['enterprise'])
-    const [modalElement, setModalElement] = useState<HTMLDivElement | null>(null)
-
-    const modalRef = useCallback((node: HTMLDivElement | null) => {
-      setModalElement(node)
-    }, [])
 
     return (
       <>
@@ -106,7 +108,6 @@ export const WithAutocomplete: Story = {
           Open Modal with Autocomplete
         </Button>
         <Modal
-          ref={modalRef}
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
           className="max-w-lg overflow-visible"

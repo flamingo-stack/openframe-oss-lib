@@ -89,7 +89,7 @@ export function ChangelogManager({
   return (
     <div className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between">
-        <Label className="text-h6 text-ods-text-primary">
+        <Label>
           {title}
         </Label>
         <Button
@@ -171,7 +171,7 @@ export function ChangelogManager({
               <div className="px-3 pb-3 space-y-3 border-t border-ods-border pt-3">
                 {/* Title */}
                 <div className="space-y-1">
-                  <Label className="text-h6 text-ods-text-secondary">Title *</Label>
+                  <Label className="text-ods-text-secondary">Title *</Label>
                   <Input
                     placeholder="e.g., New dark mode theme support"
                     value={entry.title}
@@ -183,7 +183,7 @@ export function ChangelogManager({
 
                 {/* Description */}
                 <div className="space-y-1">
-                  <Label className="text-h6 text-ods-text-secondary">Description</Label>
+                  <Label className="text-ods-text-secondary">Description</Label>
                   <Textarea
                     placeholder="Detailed explanation of the change..."
                     value={entry.description || ''}

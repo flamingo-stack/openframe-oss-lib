@@ -71,18 +71,26 @@ export const ReopenedWithReason: Story = {
 	},
 };
 
-/** Reopened, no reason, AI keeps assisting — Figma type=reopened-fae. */
+/** Reopened into AI Assistance (targetStatusKind decides) — Figma type=reopened-fae. */
 export const ReopenedFaeContinues: Story = {
 	args: {
-		data: { kind: "REOPENED", actorId: "fae", actorName: "Fae", actorType: "AI" },
+		data: { kind: "REOPENED", actorId: "u-7", actorName: "John Smith", actorType: "CLIENT", targetStatusKind: "AI_ASSISTANCE" },
 		timestamp: TIMESTAMP,
 	},
 };
 
-/** Reopened, no reason, routed to a human — Figma type=reopened-tech. */
+/** Reopened into Tech Required (targetStatusKind decides) — Figma type=reopened-tech. */
 export const ReopenedTechnicianReplies: Story = {
 	args: {
-		data: { kind: "REOPENED", actorId: "u-42", actorName: "Roman Smith", actorType: "TECHNICIAN" },
+		data: { kind: "REOPENED", actorId: "u-7", actorName: "John Smith", actorType: "CLIENT", targetStatusKind: "TECH_REQUIRED" },
+		timestamp: TIMESTAMP,
+	},
+};
+
+/** Older backend without targetStatusKind — the actorType heuristic still decides. */
+export const ReopenedLegacyActorFallback: Story = {
+	args: {
+		data: { kind: "REOPENED", actorId: "fae", actorName: "Fae", actorType: "AI" },
 		timestamp: TIMESTAMP,
 	},
 };

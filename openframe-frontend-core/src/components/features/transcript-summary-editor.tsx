@@ -5,9 +5,8 @@ import { Sparkles } from 'lucide-react';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import { Badge } from '../ui/badge';
-import { StandardCcIcon } from '../icons-v2-generated';
 import { ConfidenceBadge } from './ai-enrich/ConfidenceBadge';
+import { SubtitlesEditor } from './subtitles-editor';
 
 export interface TranscriptSummaryEditorProps {
   /** Video summary text value - AI-generated from video transcription (defaults to empty string if undefined) */
@@ -161,37 +160,19 @@ export function TranscriptSummaryEditor({
         </div>
       </div>
 
-      {/* Subtitles Editor — only shown when subtitles content exists or handler provided */}
-      {(subtitles || onSubtitlesChange) && (
-        <div>
-          <div className="mb-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="subtitles">{subtitlesLabel}</Label>
-              {isAIGenerated && subtitles && (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  <StandardCcIcon size={12} />
-                  AI Generated
-                </Badge>
-              )}
-            </div>
-            <p className="text-h6 text-ods-text-secondary mt-1">{subtitlesHelperText}</p>
-          </div>
-          <div
-            className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
-            style={{ minHeight: `${subtitlesMinHeight}px` }}
-          >
-            <Textarea
-              id="subtitles"
-              value={subtitles || ''}
-              onChange={(e) => onSubtitlesChange?.(e.target.value)}
-              placeholder={subtitlesPlaceholder}
-              disabled={disabled || !onSubtitlesChange}
-              className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
-              style={{ minHeight: `${subtitlesMinHeight}px`, lineHeight: '1.6' }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Subtitles Editor — the shared SubtitlesEditor SSOT (same component
+          the highlight section uses for highlight_srt_content). */}
+      <SubtitlesEditor
+        id="subtitles"
+        subtitles={subtitles}
+        onSubtitlesChange={onSubtitlesChange}
+        label={subtitlesLabel}
+        helperText={subtitlesHelperText}
+        placeholder={subtitlesPlaceholder}
+        minHeight={subtitlesMinHeight}
+        isAIGenerated={isAIGenerated}
+        disabled={disabled}
+      />
     </div>
   );
 }

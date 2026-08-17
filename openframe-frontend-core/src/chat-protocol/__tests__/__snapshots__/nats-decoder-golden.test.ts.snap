@@ -412,9 +412,30 @@ exports[`decodeNatsChunk — golden corpus > maps the full recorded corpus to no
     "actorType": undefined,
     "kind": "RESOLVED",
     "reason": undefined,
+    "targetStatusKind": undefined,
+    "type": "ticket-event",
+  },
+  "ticket_event_blank_target_kind_dropped": {
+    "actorId": undefined,
+    "actorName": undefined,
+    "actorType": undefined,
+    "kind": "REOPENED",
+    "reason": undefined,
+    "seq": 415,
+    "targetStatusKind": undefined,
     "type": "ticket-event",
   },
   "ticket_event_missing_kind": null,
+  "ticket_event_reopened_target_kind": {
+    "actorId": "user-42",
+    "actorName": "John Smith",
+    "actorType": "CLIENT",
+    "kind": "REOPENED",
+    "reason": undefined,
+    "seq": 414,
+    "targetStatusKind": "AI_ASSISTANCE",
+    "type": "ticket-event",
+  },
   "ticket_event_reopened_with_reason": {
     "actorId": "user-42",
     "actorName": "John Smith",
@@ -422,6 +443,7 @@ exports[`decodeNatsChunk — golden corpus > maps the full recorded corpus to no
     "kind": "REOPENED",
     "reason": "The printer stopped working again",
     "seq": 413,
+    "targetStatusKind": undefined,
     "type": "ticket-event",
   },
   "ticket_event_resolved": {
@@ -431,6 +453,7 @@ exports[`decodeNatsChunk — golden corpus > maps the full recorded corpus to no
     "kind": "RESOLVED",
     "reason": undefined,
     "seq": 412,
+    "targetStatusKind": undefined,
     "type": "ticket-event",
   },
   "ticket_event_stream_seq_wins": {
@@ -440,6 +463,7 @@ exports[`decodeNatsChunk — golden corpus > maps the full recorded corpus to no
     "kind": "RESOLVED",
     "reason": undefined,
     "seq": 500,
+    "targetStatusKind": undefined,
     "type": "ticket-event",
   },
   "ticket_event_unknown_kind": {
@@ -448,6 +472,7 @@ exports[`decodeNatsChunk — golden corpus > maps the full recorded corpus to no
     "actorType": undefined,
     "kind": "ON_HOLD",
     "reason": undefined,
+    "targetStatusKind": undefined,
     "type": "ticket-event",
   },
   "token_usage": {

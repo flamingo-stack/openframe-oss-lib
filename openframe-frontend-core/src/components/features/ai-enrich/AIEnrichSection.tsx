@@ -52,6 +52,14 @@ export interface AIEnrichSectionProps {
 
   // Custom content (like created tags info)
   children?: React.ReactNode
+  /**
+   * Settings panel rendered INSIDE the card, between the header and the action
+   * button (same slot the custom-instructions block occupies). Combined
+   * sections (clips, highlight) pass their config here so it sits under the
+   * title that names it — rendered ABOVE the card, a config panel reads as
+   * belonging to whatever section happens to precede it.
+   */
+  configSlot?: React.ReactNode
 
   // Actions
   onClear?: () => void
@@ -98,6 +106,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
   confidenceFields,
   requiredFields,
   children,
+  configSlot,
   onClear,
   showClearButton = true,
   onCancel,
@@ -147,6 +156,9 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
           )}
         </div>
       </div>
+
+      {/* Editor-provided settings (opt-in) — e.g. clip aspect ratio, highlight duration */}
+      {configSlot}
 
       {/* Editor-provided custom instructions (opt-in) */}
       {showCustomInstructions && (
@@ -283,6 +295,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
           {/* Clear button */}
           {showClearButton && onClear && (
             <Button
+              type="button"
               variant="outline"
               size="small-legacy"
               onClick={onClear}
