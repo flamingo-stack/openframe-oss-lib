@@ -167,15 +167,15 @@ export function HighlightVideoCombinedSection({
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* 1. Configuration Section */}
-      <HighlightConfigSection
-        targetDurationSeconds={targetDurationSeconds}
-        onTargetDurationChange={onTargetDurationChange}
-        disabled={configDisabled}
-      />
-
       {/* 2. AI Enrich Button Section */}
       <AIEnrichSection
+        configSlot={
+          <HighlightConfigSection
+            targetDurationSeconds={targetDurationSeconds}
+            onTargetDurationChange={onTargetDurationChange}
+            disabled={configDisabled}
+          />
+        }
         title={title}
         description={description || defaultDescription}
         icon={<Sparkles className="h-5 w-5" />}

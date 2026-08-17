@@ -128,7 +128,7 @@ export function HighlightVideoSection({
       <div className="space-y-3 p-4 bg-ods-card rounded-lg border border-ods-border">
         <div className="flex items-center gap-4">
           <div className="flex-1">
-            <Label className="text-h6">Target Duration</Label>
+            <Label>Target Duration</Label>
             <Select
               value={targetDurationSeconds.toString()}
               onValueChange={(value) => onTargetDurationChange(parseInt(value))}

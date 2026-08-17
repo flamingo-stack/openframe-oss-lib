@@ -279,6 +279,23 @@ const CORPUS: Record<string, unknown> = {
     sequenceId: 413,
   },
   ticket_event_unknown_kind: { type: 'TICKET_EVENT', kind: 'ON_HOLD', actorName: 'Roman Smith' },
+  // Where the ticket reopened INTO - decides the card's subtitle without
+  // guessing from the actor. Blank strings are folded to undefined.
+  ticket_event_reopened_target_kind: {
+    type: 'TICKET_EVENT',
+    kind: 'REOPENED',
+    actorId: 'user-42',
+    actorName: 'John Smith',
+    actorType: 'CLIENT',
+    targetStatusKind: 'AI_ASSISTANCE',
+    streamSeq: 414,
+  },
+  ticket_event_blank_target_kind_dropped: {
+    type: 'TICKET_EVENT',
+    kind: 'REOPENED',
+    targetStatusKind: '  ',
+    streamSeq: 415,
+  },
   ticket_event_missing_kind: { type: 'TICKET_EVENT', actorName: 'Fae' },
   ticket_event_blank_reason_dropped: { type: 'TICKET_EVENT', kind: 'RESOLVED', reason: '   ' },
   // Transport-stamped streamSeq wins over the payload's sequenceId copy.

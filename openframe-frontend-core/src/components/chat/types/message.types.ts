@@ -185,6 +185,11 @@ export interface TicketEventData {
   /** Who acted — e.g. an AI agent vs a human. Open string like `kind`. */
   actorType?: string
   reason?: string
+  /** Kind-token of the status the ticket reopened INTO (AI_ASSISTANCE /
+   *  TECH_REQUIRED / CUSTOM / ...) — same open vocabulary the lifecycle
+   *  statuses use. Picks the REOPENED card's subtitle deterministically;
+   *  absent on RESOLVED events and older backends. */
+  targetStatusKind?: string
 }
 
 /**
@@ -483,6 +488,7 @@ export interface TicketEventMessageData extends MessageDataBase {
   actorName?: string | null
   actorType?: string | null
   reason?: string | null
+  targetStatusKind?: string | null
 }
 
 export interface ErrorMessageData extends MessageDataBase {
