@@ -21,6 +21,7 @@ import { SearchInput } from '../../ui';
 import { StatusFilterComponent } from '../../features';
 import {
   OPENFRAME_DEV_SECTIONS,
+  type OpenframeDevSection,
   type OpenframeDevSectionKey,
 } from '../../../utils/dev-sections/openframe-dev-sections';
 
@@ -65,7 +66,11 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const search = section.search;
+  // Widen from the registry's per-section literal types to the interface —
+  // optional fields (`clearParamKeys`) exist on the interface but not on
+  // every section's inferred literal. Sound: the registry `satisfies`
+  // `Record<string, OpenframeDevSection>`.
+  const search: OpenframeDevSection['search'] = section.search;
   const filter = section.filter;
 
   const currentSearch = search ? searchParams.get(search.paramKey) || '' : '';
@@ -73,8 +78,11 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
     ? searchParams.get(filter.paramKey) || filter.defaultValue
     : '';
 
-  // Controlled search-input state — input commits to the URL only on
-  // Enter (not on every keystroke), preserving the legacy behavior.
+  // Controlled search-input state — TYPING commits to the URL only on
+  // Enter (not on every keystroke), but CLEARING commits immediately:
+  // an emptied input must not keep filtering the list (the URL param —
+  // and any linked `clearParamKeys` companion like the tickets
+  // `?ticket=` drawer param — previously survived until Enter).
   // Lazy init from URL avoids a brief flash of stale value on first
   // paint after URL-driven re-render (e.g. tab switch).
   const [searchValue, setSearchValue] = useState(() => currentSearch);
@@ -85,9 +93,21 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
   const handleSearchSubmit = (value: string) => {
     if (!search) return;
     const params = new URLSearchParams(searchParams.toString());
-    if (value.trim()) params.set(search.paramKey, value.trim());
-    else params.delete(search.paramKey);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    if (value.trim()) {
+      params.set(search.paramKey, value.trim());
+    } else {
+      params.delete(search.paramKey);
+      // Empty commit tears down the search's linked companion params too
+      // (deep links set them TOGETHER — see the config field docs).
+      for (const key of search.clearParamKeys ?? []) params.delete(key);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchValue(value);
+    if (value === '' && currentSearch !== '') handleSearchSubmit('');
   };
 
   const handleFilterChange = (value: string) => {
@@ -129,7 +149,7 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
               showDropdown={false}
               placeholder={search.placeholder}
               value={searchValue}
-              onChange={setSearchValue}
+              onChange={handleSearchChange}
               onSubmit={handleSearchSubmit}
             />
           )}

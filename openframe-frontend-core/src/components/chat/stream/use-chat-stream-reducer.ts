@@ -16,7 +16,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
-import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import type { ChatStreamEvent } from '../../../chat-protocol/events'
 import {
   DEFAULT_DIALOG_SIDE,
@@ -33,35 +32,6 @@ import type {
 interface DialogKey {
   dialogId: string
   side: ChatDialogSide
-}
-
-/** QueryClient when a provider is mounted, null otherwise. The chat shell
- *  does not REQUIRE react-query (a provider-less embedder can still chat) —
- *  but when cards are in play a provider is always present (their
- *  `useChatCardItem` hard-depends on it), so mutation invalidation works
- *  exactly where it matters. Unconditional hook call → order-stable. */
-function useOptionalQueryClient(): QueryClient | null {
-  try {
-    return useQueryClient()
-  } catch {
-    return null
-  }
-}
-
-/** A confirmed tool action mutated this entity — mark every cached card
- *  row for that id stale so receipt cards (and any earlier card of the
- *  same entity in the transcript) refetch the post-mutation state.
- *  Without this, `useChatCardItem`'s 5-min staleTime serves the
- *  PRE-mutation row: observed live 2026-08-18 as a "NEW" badge on a
- *  ticket the receipt itself said was just CLOSED. */
-function invalidateMutatedEntityCards(queryClient: QueryClient | null, event: ChatStreamEvent): void {
-  if (!queryClient) return
-  if (event.type !== 'approval-resolved' || event.status !== 'approved') return
-  const mutatedId = (event.result as { ticket_id?: string } | undefined)?.ticket_id
-  if (!mutatedId) return
-  void queryClient.invalidateQueries({
-    predicate: (q) => q.queryKey[0] === 'chat-card-item' && q.queryKey[2] === mutatedId,
-  })
 }
 
 export interface UseChatStreamReducerOptions {
@@ -129,7 +99,6 @@ export function useChatStreamReducer({
 
   const flushDeltas = useCallback(() => batcher.flush(), [batcher])
 
-  const queryClient = useOptionalQueryClient()
   const applyEvent = useCallback(
     (event: ChatStreamEvent) => {
       // `push` flushes on key change and returns false for non-delta events;
@@ -138,12 +107,8 @@ export function useChatStreamReducer({
       if (batcher.push(event, keyRef.current)) return
       batcher.flush()
       store.apply(dialogId, side, event)
-      // Post-apply side effect: an approved tool action invalidates the
-      // mutated entity's cached card rows (see helper above). Runs at the
-      // applyEvent boundary so BOTH transports (SSE + NATS) get it.
-      invalidateMutatedEntityCards(queryClient, event)
     },
-    [batcher, store, dialogId, side, queryClient],
+    [batcher, store, dialogId, side],
   )
 
   // Flush on unmount so a torn-down panel doesn't drop its tail deltas.
