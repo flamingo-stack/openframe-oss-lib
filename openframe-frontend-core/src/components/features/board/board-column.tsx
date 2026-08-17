@@ -2,7 +2,7 @@
 
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { memo, useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon'
 import { cn } from '../../../utils/cn'
 import { BoardColumnHeader } from './board-column-header'
@@ -15,7 +15,8 @@ import type { BoardColumnDef, BoardTicket } from './types'
 export interface BoardColumnProps {
   column: BoardColumnDef
   collapsed?: boolean
-  onToggleCollapse: () => void
+  /** Takes the id so the board can pass one stable handler to every lane. */
+  onToggleCollapse: (columnId: string) => void
   onAddTicket?: (columnId: string) => void
   onArchive?: (columnId: string) => void
   getTicketHref?: (ticketId: string) => string
@@ -58,6 +59,10 @@ export const BoardColumn = memo(function BoardColumn({
     disabled: column.dropDisabled || collapsed,
   })
 
+  // The header's own prop stays zero-arg; the id is bound here, where it is
+  // already known, rather than by the board building one closure per lane.
+  const handleToggleCollapse = useCallback(() => onToggleCollapse(column.id), [onToggleCollapse, column.id])
+
   return (
     <div
       ref={setLaneRef}
@@ -75,7 +80,7 @@ export const BoardColumn = memo(function BoardColumn({
       <BoardColumnHeader
         column={column}
         collapsed={collapsed}
-        onToggleCollapse={onToggleCollapse}
+        onToggleCollapse={handleToggleCollapse}
         onAddTicket={!collapsed && onAddTicket ? () => onAddTicket(column.id) : undefined}
         onArchive={!collapsed && column.archivable && onArchive ? () => onArchive(column.id) : undefined}
       />

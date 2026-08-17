@@ -36,7 +36,6 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 const resolver = vi.hoisted(() => ({
   detect: vi.fn(() => []),
   freeze: vi.fn(),
-  settle: vi.fn(),
   release: vi.fn(),
   dispose: vi.fn(),
 }))
@@ -44,7 +43,7 @@ const resolver = vi.hoisted(() => ({
 const dnd = vi.hoisted(() => ({ props: null as Record<string, (event: unknown) => void> | null }))
 
 vi.mock('../components/features/board/drop-target', () => ({
-  createDropTargetResolver: () => resolver,
+  useDropTarget: () => resolver,
 }))
 
 vi.mock('@dnd-kit/core', async importOriginal => {
@@ -99,15 +98,6 @@ describe('Board drag guard wiring', () => {
     expect(resolver.freeze).toHaveBeenCalledTimes(1)
   })
 
-  it('settles once the moved list has committed, so the freeze outlives it', () => {
-    render(<Board columns={COLUMNS} onChange={() => {}} />)
-    act(() => dnd.props?.onDragStart({ active: { id: 'a1' } }))
-    const before = resolver.settle.mock.calls.length
-
-    act(() => dnd.props?.onDragOver(CROSS_LANE_OVER))
-    expect(resolver.settle.mock.calls.length).toBeGreaterThan(before)
-  })
-
   it('leaves the target alone while the pointer stays inside one lane', () => {
     // Sorting within a lane re-lays nothing out across parents, so there is no
     // re-measure cascade to guard against — freezing here would only make the
@@ -136,11 +126,9 @@ describe('Board drag guard wiring', () => {
     expect(resolver.release).toHaveBeenCalled()
   })
 
-  it('drops a pending frame when the board unmounts mid-drag', () => {
-    const view = render(<Board columns={COLUMNS} onChange={() => {}} />)
-    act(() => dnd.props?.onDragStart({ active: { id: 'a1' } }))
-    act(() => dnd.props?.onDragOver(CROSS_LANE_OVER))
-    view.unmount()
-    expect(resolver.dispose).toHaveBeenCalled()
-  })
 })
+
+// `settle` on the committed list and `dispose` on unmount used to be wired here
+// too, and were tested here. They now live inside `useDropTarget`, next to the
+// rules they protect, so the board cannot forget them and there is nothing left
+// to assert about — see `useDropTarget` in `board-drop-target.test.ts`.

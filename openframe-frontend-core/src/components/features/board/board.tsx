@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -16,7 +16,7 @@ import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useHorizontalScrollbar } from '../../../hooks/ui/use-horizontal-scrollbar'
 import { cn } from '../../../utils/cn'
 import { BoardColumn } from './board-column'
-import { createDropTargetResolver } from './drop-target'
+import { useDropTarget } from './drop-target'
 import { TicketCard } from './ticket-card'
 import type { BoardChange, BoardColumnDef, BoardTicket } from './types'
 import { useBoardCollapse } from './use-board-collapse'
@@ -81,32 +81,8 @@ export function Board({
   )
 
   // Same collision policy as before, plus the two rules that stop a cross-column
-  // move from triggering the next one — see `drop-target.ts`. Kept out of React
-  // so both rules are unit-testable frame by frame.
-  const dropTarget = useMemo(() => createDropTargetResolver(), [])
-  useEffect(() => dropTarget.dispose, [dropTarget])
-
-  // Keep a freeze alive across the commit that caused it — see `settle`. Keyed
-  // on `items` because that is the state whose change re-measures the lanes.
-  useEffect(() => {
-    dropTarget.settle()
-  }, [items, dropTarget])
-
-  // One stable handler per column id. `onToggleCollapse` keeps its zero-arg
-  // shape (public prop), but an inline arrow would hand every lane a new
-  // function on every drag frame and defeat `BoardColumn`'s memo — which is the
-  // whole point of only rebuilding the lanes a move touches.
-  const toggleRef = useRef(toggle)
-  toggleRef.current = toggle
-  const collapseHandlers = useRef(new Map<string, () => void>())
-  const collapseHandlerFor = useCallback((columnId: string) => {
-    let handler = collapseHandlers.current.get(columnId)
-    if (!handler) {
-      handler = () => toggleRef.current(columnId)
-      collapseHandlers.current.set(columnId, handler)
-    }
-    return handler
-  }, [])
+  // move from triggering the next one — see `drop-target.ts`.
+  const dropTarget = useDropTarget()
 
   const handleDragStart = (e: DragStartEvent) => {
     const id = String(e.active.id)
@@ -278,7 +254,7 @@ export function Board({
                 <BoardColumn
                   column={column}
                   collapsed={!!collapsed[column.id]}
-                  onToggleCollapse={collapseHandlerFor(column.id)}
+                  onToggleCollapse={toggle}
                   onAddTicket={onAddTicket}
                   onArchive={onArchiveColumn}
                   getTicketHref={getTicketHref}
