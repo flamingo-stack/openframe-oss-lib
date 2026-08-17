@@ -109,6 +109,7 @@ export interface VideoProcessingFields {
  * - case_study: Case study generation from customer interviews
  * - onboarding_guide: Step-by-step onboarding guides with optional video walkthrough
  * - what_i_shipped: Monthly employee "What I Shipped" entries (people-hub) with transcription/bites/highlight
+ * - how_i_work: Recorded employee AI-workflow sessions (people-hub) with transcription/bites/highlight
  */
 export type VideoProcessingEntityType =
   | 'customer_interview'
@@ -120,5 +121,6 @@ export type VideoProcessingEntityType =
   | 'investor_update'
   | 'onboarding_guide'
   | 'what_i_shipped'
+  | 'how_i_work'
   | 'walkthrough_video'
 // Fri May 15 14:58:59 EDT 2026

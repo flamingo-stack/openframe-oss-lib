@@ -562,7 +562,8 @@ export class MessageSegmentAccumulator {
         s.data.actorId === data.actorId &&
         s.data.actorName === data.actorName &&
         s.data.actorType === data.actorType &&
-        s.data.reason === data.reason
+        s.data.reason === data.reason &&
+        s.data.targetStatusKind === data.targetStatusKind
       )
     })
     if (existingIndex !== -1) {

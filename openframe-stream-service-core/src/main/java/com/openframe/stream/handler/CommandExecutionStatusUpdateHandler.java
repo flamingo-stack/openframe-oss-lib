@@ -68,6 +68,8 @@ public class CommandExecutionStatusUpdateHandler
             return;
         }
 
+        log.info("Handling COMMAND result event: executionId={} machineId={}", executionId, machineId);
+
         commandExecutionRepository.findByMachineIdAndExecutionId(machineId, executionId)
                 .ifPresentOrElse(
                         row -> applyResult(row, after),

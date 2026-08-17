@@ -393,6 +393,10 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         actorType: typeof data.actorType === 'string' ? data.actorType : undefined,
         reason:
           typeof data.reason === 'string' && data.reason.trim() ? data.reason : undefined,
+        targetStatusKind:
+          typeof data.targetStatusKind === 'string' && data.targetStatusKind.trim()
+            ? data.targetStatusKind
+            : undefined,
         ...eventSeq,
       }
     }
