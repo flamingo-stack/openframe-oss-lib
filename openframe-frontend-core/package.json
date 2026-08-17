@@ -321,6 +321,10 @@
     }
   },
   "dependencies": {
+    "@atlaskit/pragmatic-drag-and-drop": "^3.0.0",
+    "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "^3.0.1",
+    "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.1.0",
+    "@atlaskit/pragmatic-drag-and-drop-react-drop-indicator": "^4.1.2",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -379,6 +383,7 @@
     "react-easy-crop": "^5.5.0",
     "react-hook-form": "^7.62.0",
     "react-markdown": "^10.1.0",
+    "react-remove-scroll": "^2.7.1",
     "react-resizable-panels": "^3.0.4",
     "react-scroll": "^1.9.0",
     "recharts": "^3.1.0",
@@ -393,8 +398,7 @@
     "tailwindcss-animate": "^1.0.7",
     "unist-util-visit": "^5.0.0",
     "use-stick-to-bottom": "^1.1.4",
-    "vaul": "^1.1.2",
-    "react-remove-scroll": "^2.7.1"
+    "vaul": "^1.1.2"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.4",
