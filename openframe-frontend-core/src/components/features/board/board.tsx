@@ -1,17 +1,13 @@
 'use client'
 
-import * as React from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  closestCorners,
-  pointerWithin,
-  rectIntersection,
   useSensor,
   useSensors,
-  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -20,6 +16,7 @@ import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useHorizontalScrollbar } from '../../../hooks/ui/use-horizontal-scrollbar'
 import { cn } from '../../../utils/cn'
 import { BoardColumn } from './board-column'
+import { createDropTargetResolver } from './drop-target'
 import { TicketCard } from './ticket-card'
 import type { BoardChange, BoardColumnDef, BoardTicket } from './types'
 import { useBoardCollapse } from './use-board-collapse'
@@ -31,7 +28,7 @@ export interface BoardProps {
   onAddTicket?: (columnId: string) => void
   onArchiveColumn?: (columnId: string) => void
   getTicketHref?: (ticketId: string) => string
-  renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
+  renderAssignSlot?: (ticket: BoardTicket) => ReactNode
   onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
   onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
   collapseStorageKey?: string
@@ -68,53 +65,48 @@ export function Board({
     onThumbPointerUp,
   } = useHorizontalScrollbar()
 
-  const [items, setItems] = React.useState<BoardColumnDef[]>(columns)
-  const isDraggingRef = React.useRef(false)
+  const [items, setItems] = useState<BoardColumnDef[]>(columns)
+  const isDraggingRef = useRef(false)
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isDraggingRef.current) setItems(columns)
   }, [columns])
 
-  const dragOriginRef = React.useRef<{ ticketId: string; fromColumnId: string } | null>(null)
-  const [activeTicket, setActiveTicket] = React.useState<{ ticket: BoardTicket; columnId: string } | null>(null)
+  const dragOriginRef = useRef<{ ticketId: string; fromColumnId: string } | null>(null)
+  const [activeTicket, setActiveTicket] = useState<{ ticket: BoardTicket; columnId: string } | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  const collisionDetection = React.useCallback<CollisionDetection>((args) => {
-    const pointer = pointerWithin(args)
-    const intersections = pointer.length > 0 ? pointer : rectIntersection(args)
+  // Same collision policy as before, plus the two rules that stop a cross-column
+  // move from triggering the next one — see `drop-target.ts`. Kept out of React
+  // so both rules are unit-testable frame by frame.
+  const dropTarget = useMemo(() => createDropTargetResolver(), [])
+  useEffect(() => dropTarget.dispose, [dropTarget])
 
-    const ticketHit = intersections.find(
-      c => c.data?.droppableContainer?.data?.current?.type === 'ticket',
-    )
-    if (ticketHit) return [ticketHit]
-
-    const columnHit = intersections.find(
-      c => c.data?.droppableContainer?.data?.current?.type === 'column',
-    )
-    if (columnHit) {
-      const columnId = columnHit.data?.droppableContainer?.data?.current?.columnId
-      const ticketsInColumn = args.droppableContainers.filter(c => {
-        const d = c.data.current as { type?: string; columnId?: string } | undefined
-        return d?.type === 'ticket' && d.columnId === columnId
-      })
-      if (ticketsInColumn.length > 0) {
-        const closest = closestCorners({ ...args, droppableContainers: ticketsInColumn })
-        if (closest.length > 0) return closest
-      }
-      return [columnHit]
+  // One stable handler per column id. `onToggleCollapse` keeps its zero-arg
+  // shape (public prop), but an inline arrow would hand every lane a new
+  // function on every drag frame and defeat `BoardColumn`'s memo — which is the
+  // whole point of only rebuilding the lanes a move touches.
+  const toggleRef = useRef(toggle)
+  toggleRef.current = toggle
+  const collapseHandlers = useRef(new Map<string, () => void>())
+  const collapseHandlerFor = useCallback((columnId: string) => {
+    let handler = collapseHandlers.current.get(columnId)
+    if (!handler) {
+      handler = () => toggleRef.current(columnId)
+      collapseHandlers.current.set(columnId, handler)
     }
-
-    return closestCorners(args)
+    return handler
   }, [])
 
   const handleDragStart = (e: DragStartEvent) => {
     const id = String(e.active.id)
     const located = locate(items, id)
     if (!located) return
+    dropTarget.release()
     isDraggingRef.current = true
     dragOriginRef.current = { ticketId: id, fromColumnId: located.columnId }
     setActiveTicket({ ticket: located.ticket, columnId: located.columnId })
@@ -142,6 +134,14 @@ export function Board({
       !!origin &&
       !targetCol.allowedFromColumns.includes(origin.fromColumnId)
     if ((targetCol?.dropDisabled && !isReturnToOrigin) || blockedBySource) return
+
+    // The move below re-mounts the card under another parent, so dnd-kit
+    // unregisters + re-registers its droppable and re-measures every rect, then
+    // dispatches `onDragOver` again from the effect keyed on the over id. Hold
+    // the target for one frame so that cascade cannot schedule the next move —
+    // otherwise the two columns pass the card back and forth inside a single
+    // commit until React aborts the tree with "Maximum update depth exceeded".
+    dropTarget.freeze()
 
     setItems(prev => {
       const fromIndex = findIndexInColumn(prev, fromColumnId, activeId)
@@ -180,6 +180,7 @@ export function Board({
     dragOriginRef.current = null
     setActiveTicket(null)
     isDraggingRef.current = false
+    dropTarget.release()
 
     const { over } = e
     if (!over || !origin) {
@@ -240,13 +241,14 @@ export function Board({
     dragOriginRef.current = null
     setActiveTicket(null)
     isDraggingRef.current = false
+    dropTarget.release()
     setItems(columns)
   }
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={collisionDetection}
+      collisionDetection={dropTarget.detect}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
@@ -265,12 +267,12 @@ export function Board({
             const joinRight = !!(column.system && next?.system)
             const showGap = i > 0 && !joinLeft
             return (
-              <React.Fragment key={column.id}>
+              <Fragment key={column.id}>
                 {showGap && <div aria-hidden className="w-[var(--spacing-system-mf)] shrink-0" />}
                 <BoardColumn
                   column={column}
                   collapsed={!!collapsed[column.id]}
-                  onToggleCollapse={() => toggle(column.id)}
+                  onToggleCollapse={collapseHandlerFor(column.id)}
                   onAddTicket={onAddTicket}
                   onArchive={onArchiveColumn}
                   getTicketHref={getTicketHref}
@@ -282,7 +284,7 @@ export function Board({
                   joinLeft={joinLeft}
                   joinRight={joinRight}
                 />
-              </React.Fragment>
+              </Fragment>
             )
           })}
         </div>

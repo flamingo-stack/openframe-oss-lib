@@ -3,7 +3,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import Link from '../../../embed-shims/next-link'
-import * as React from 'react'
+import { memo, useMemo, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import { ClockIcon, DotsLoaderIcon, LaptopIcon, Flag02Icon, MessagesIcon, UserCheckIcon } from '../../icons-v2-generated'
 import { DeletedUserAvatar } from '../../ui/deleted-user-avatar'
 import { SquareAvatar } from '../../ui/square-avatar'
@@ -13,6 +13,7 @@ import { cn } from '../../../utils/cn'
 import { getReadableTextColor } from '../../../utils/ods-color-utils'
 import { formatTicketRelativeTime, formatTicketFullTimestamp } from '../../../utils/date-utils'
 import { BoardTicketApproval } from './board-ticket-approval'
+import { TICKET_ID_ATTRIBUTE } from './use-lane-scroll-anchor'
 import type { BoardPriority, BoardTicket, BoardTicketActivityKind } from './types'
 
 const PRIORITY_COLOR_CLASS: Record<BoardPriority, string> = {
@@ -45,7 +46,7 @@ const TICKET_CARD_SHELL =
 export interface TicketCardBodyProps {
   ticket: BoardTicket
   columnColor?: string
-  renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
+  renderAssignSlot?: (ticket: BoardTicket) => ReactNode
   /** Approval callbacks receive the request id directly (the draggable
    *  `TicketCard` adapts its own `(ticketId, requestId)` signature onto these). */
   onApprove?: (requestId?: string) => void | Promise<void>
@@ -202,12 +203,17 @@ export interface TicketCardProps {
   href?: string
   isOverlay?: boolean
   dragDisabled?: boolean
-  renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
+  renderAssignSlot?: (ticket: BoardTicket) => ReactNode
   onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
   onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
 }
 
-export function TicketCard({
+/** Memoized: a drag moves one card, but it re-renders the column lists around
+ *  it, and a board carries dozens of cards whose props did not change. Hosts
+ *  must pass stable `renderAssignSlot` / `onApprove` / `onReject` (useCallback)
+ *  for this to bite — an inline arrow re-renders every card on every keystroke
+ *  anywhere in the page. dnd-kit recommends memoizing sortable items. */
+export const TicketCard = memo(function TicketCard({
   ticket,
   columnId,
   columnColor,
@@ -218,12 +224,12 @@ export function TicketCard({
   onApprove,
   onReject,
 }: TicketCardProps) {
-  const sortableData = React.useMemo(() => ({ columnId, type: 'ticket' as const }), [columnId])
+  const sortableData = useMemo(() => ({ columnId, type: 'ticket' as const }), [columnId])
   const sortable = useSortable({ id: ticket.id, data: sortableData, disabled: dragDisabled })
 
   const showNewMessage = !!ticket.hasNewMessage && !!columnColor
 
-  const style: React.CSSProperties = isOverlay
+  const style: CSSProperties = isOverlay
     ? {}
     : {
         transform: CSS.Transform.toString(sortable.transform),
@@ -231,18 +237,29 @@ export function TicketCard({
       }
   if (showNewMessage) style.borderColor = columnColor
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (e: MouseEvent) => {
     if (sortable.isDragging) e.preventDefault()
   }
 
-  const body = (
-    <TicketCardBody
-      ticket={ticket}
-      columnColor={columnColor}
-      renderAssignSlot={renderAssignSlot}
-      onApprove={onApprove ? requestId => onApprove(ticket.id, requestId) : undefined}
-      onReject={onReject ? requestId => onReject(ticket.id, requestId) : undefined}
-    />
+  // Held as one memoized element, not re-created per render. `useSortable`
+  // subscribes to dnd-kit's context, and that context changes whenever a drag
+  // starts, ends or moves a card between columns — memo cannot stop a
+  // context update, so every card on the board re-renders at those moments. By
+  // keeping the same element object, React bails out of the whole subtree and
+  // only this thin wrapper (transform + drag classes) re-renders. That is what
+  // keeps a heavy card body — avatars, tags, tooltips, a host's assignee
+  // picker with its own queries — out of the drag's hot path.
+  const body = useMemo(
+    () => (
+      <TicketCardBody
+        ticket={ticket}
+        columnColor={columnColor}
+        renderAssignSlot={renderAssignSlot}
+        onApprove={onApprove ? requestId => onApprove(ticket.id, requestId) : undefined}
+        onReject={onReject ? requestId => onReject(ticket.id, requestId) : undefined}
+      />
+    ),
+    [ticket, columnColor, renderAssignSlot, onApprove, onReject],
   )
 
   const cardClasses = cn(
@@ -256,6 +273,9 @@ export function TicketCard({
     ref: isOverlay ? undefined : sortable.setNodeRef,
     style,
     className: cardClasses,
+    // Read by the lane's scroll anchor to keep the list still when tickets are
+    // inserted above the viewport — see `use-lane-scroll-anchor.ts`.
+    ...(isOverlay ? {} : { [TICKET_ID_ATTRIBUTE]: ticket.id }),
     ...(isOverlay ? {} : sortable.attributes),
     ...(isOverlay ? {} : sortable.listeners),
   }
@@ -297,7 +317,7 @@ export function TicketCard({
       <div className={cn('pointer-events-none', innerWrapperClass)}>{body}</div>
     </div>
   )
-}
+})
 
 function TicketTagRow({ tags }: { tags: string[] }) {
   const visible = tags.slice(0, MAX_VISIBLE_TAGS)

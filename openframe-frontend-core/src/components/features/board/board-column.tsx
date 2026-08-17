@@ -2,13 +2,14 @@
 
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import * as React from 'react'
+import { memo, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon'
 import { cn } from '../../../utils/cn'
 import { BoardColumnHeader } from './board-column-header'
 import { tintOnDark } from './color-utils'
 import { TicketCard } from './ticket-card'
 import { TicketCardSkeleton } from './ticket-card-skeleton'
+import { useLaneScrollAnchor } from './use-lane-scroll-anchor'
 import type { BoardColumnDef, BoardTicket } from './types'
 
 export interface BoardColumnProps {
@@ -18,7 +19,7 @@ export interface BoardColumnProps {
   onAddTicket?: (columnId: string) => void
   onArchive?: (columnId: string) => void
   getTicketHref?: (ticketId: string) => string
-  renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
+  renderAssignSlot?: (ticket: BoardTicket) => ReactNode
   onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
   onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
   onLoadMore?: (columnId: string) => void
@@ -27,7 +28,10 @@ export interface BoardColumnProps {
   joinRight?: boolean
 }
 
-export function BoardColumn({
+/** Memoized: `Board` rebuilds only the two columns a drag touches, so the
+ *  untouched ones keep their object identity and can skip the render entirely.
+ *  Without this, every pointer move that shifts a card re-renders all lanes. */
+export const BoardColumn = memo(function BoardColumn({
   column,
   collapsed = false,
   onToggleCollapse,
@@ -42,8 +46,21 @@ export function BoardColumn({
   joinLeft = false,
   joinRight = false,
 }: BoardColumnProps) {
+  // The drop zone is the WHOLE lane, header included — not just the list. A
+  // droppable that stops at the list leaves dead strips (the header, the
+  // padding) where the pointer is over a column yet hits nothing, and there the
+  // drop target has to be guessed from rect overlap, which is both wrong-looking
+  // and unstable. Collapsed lanes stay out: they render no list to drop into.
+  const droppableData = useMemo(() => ({ columnId: column.id, type: 'column' as const }), [column.id])
+  const { setNodeRef: setLaneRef, isOver } = useDroppable({
+    id: `column:${column.id}`,
+    data: droppableData,
+    disabled: column.dropDisabled || collapsed,
+  })
+
   return (
     <div
+      ref={setLaneRef}
       className={cn(
         'flex h-full shrink-0 flex-col gap-[var(--spacing-system-sf)] overflow-hidden rounded-md border border-ods-border p-[var(--spacing-system-sf)]',
         'transition-[width] duration-300 ease-out',
@@ -51,6 +68,7 @@ export function BoardColumn({
         column.system && 'bg-ods-card',
         joinLeft && 'rounded-l-none border-l-0',
         joinRight && 'rounded-r-none',
+        isOver && 'outline outline-2 -outline-offset-2 outline-ods-focus',
       )}
       style={column.system ? undefined : { backgroundColor: tintOnDark(column.color) }}
     >
@@ -77,40 +95,40 @@ export function BoardColumn({
       )}
     </div>
   )
-}
+})
 
 interface ColumnBodyProps {
   column: BoardColumnDef
   getTicketHref?: (ticketId: string) => string
-  renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
+  renderAssignSlot?: (ticket: BoardTicket) => ReactNode
   onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
   onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
   onLoadMore?: (columnId: string) => void
   loadMoreRootMargin: string
 }
 
-function ColumnBody({ column, getTicketHref, renderAssignSlot, onApprove, onReject, onLoadMore, loadMoreRootMargin }: ColumnBodyProps) {
-  const ticketIds = React.useMemo(() => column.tickets.map(t => t.id), [column.tickets])
+function ColumnBody({
+  column,
+  getTicketHref,
+  renderAssignSlot,
+  onApprove,
+  onReject,
+  onLoadMore,
+  loadMoreRootMargin,
+}: ColumnBodyProps) {
+  const ticketIds = useMemo(() => column.tickets.map(t => t.id), [column.tickets])
 
-  const droppableData = React.useMemo(
-    () => ({ columnId: column.id, type: 'column' as const }),
-    [column.id],
-  )
-  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
-    id: `column:${column.id}`,
-    data: droppableData,
-    disabled: column.dropDisabled,
-  })
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-  const scrollRef = React.useRef<HTMLDivElement | null>(null)
-  const sentinelRef = React.useRef<HTMLDivElement | null>(null)
+  useLaneScrollAnchor(scrollRef, column.tickets)
 
-  const loadMoreRef = React.useRef(onLoadMore)
+  const loadMoreRef = useRef(onLoadMore)
   loadMoreRef.current = onLoadMore
-  const columnIdRef = React.useRef(column.id)
+  const columnIdRef = useRef(column.id)
   columnIdRef.current = column.id
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!column.hasMore || column.isLoadingMore) return
     const sentinel = sentinelRef.current
     const root = scrollRef.current
@@ -128,21 +146,14 @@ function ColumnBody({ column, getTicketHref, renderAssignSlot, onApprove, onReje
     return () => observer.disconnect()
   }, [column.hasMore, column.isLoadingMore, loadMoreRootMargin])
 
-  const setBodyRef = React.useCallback(
-    (el: HTMLDivElement | null) => {
-      scrollRef.current = el
-      setDroppableRef(el)
-    },
-    [setDroppableRef],
-  )
-
   return (
+    // `overflow-anchor:none` hands scroll anchoring to `useLaneScrollAnchor`
+    // wholesale. The browser's own anchoring is unusable here — it silently
+    // skips transformed elements, so it works between drags and does nothing
+    // during one — and leaving both on double-corrects every insertion.
     <div
-      ref={setBodyRef}
-      className={cn(
-        'flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-xs)] overflow-y-auto',
-        isOver && 'rounded-md outline outline-2 outline-offset-2 outline-ods-focus',
-      )}
+      ref={scrollRef}
+      className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-xs)] overflow-y-auto [overflow-anchor:none]"
     >
       <SortableContext items={ticketIds} strategy={verticalListSortingStrategy}>
         {column.isLoading ? (
@@ -172,14 +183,13 @@ function ColumnBody({ column, getTicketHref, renderAssignSlot, onApprove, onReje
 }
 
 function SkeletonStack({ count = 4 }: { count?: number }) {
-  const keys = React.useMemo(
-    () => Array.from({ length: count }, () => Math.random().toString(36).slice(2)),
-    [count],
-  )
+  // Position IS the identity here: the rows are interchangeable placeholders in
+  // a fixed-length list, so the index is the correct key. Random keys remounted
+  // every row whenever this re-rendered with a different `count`.
   return (
     <>
-      {keys.map(k => (
-        <TicketCardSkeleton key={k} />
+      {Array.from({ length: count }, (_, i) => (
+        <TicketCardSkeleton key={`skeleton-${i}`} />
       ))}
     </>
   )
