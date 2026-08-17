@@ -73,13 +73,19 @@ export function useChatCardItem<T = unknown>(
     // user toggles back to the tab is wasteful (the row's id-keyed
     // payload is effectively immutable).
     refetchOnWindowFocus: false,
-    // The id-keyed payload is effectively immutable, and a fetch-mode card
-    // inside a STREAMING assistant message re-mounts on every chunk as the
-    // surrounding markdown re-parses. Without a staleTime that meant a fresh
-    // network fetch + loading-skeleton flash on every single chunk. Treat the
-    // row as fresh for 5 min (matches the public pages) and keep it cached
-    // long after unmount so remounts resolve synchronously from cache — no
-    // refetch, no skeleton flash.
+    // A fetch-mode card inside a STREAMING assistant message re-mounts on
+    // every chunk as the surrounding markdown re-parses. Without a staleTime
+    // that meant a fresh network fetch + loading-skeleton flash on every
+    // single chunk. Treat the row as fresh for 5 min (matches the public
+    // pages) and keep it cached long after unmount so remounts resolve
+    // synchronously from cache — no refetch, no skeleton flash.
+    //
+    // MUTABLE ENTITIES (tickets, tasks): the 5-min freshness is NOT an
+    // immutability claim. When a confirmed tool action mutates an entity,
+    // `use-chat-stream-reducer` invalidates every ['chat-card-item', *, id]
+    // entry for it on the `approval-resolved` event — the receipt card (and
+    // any earlier card of the same entity) refetches the post-mutation row.
+    // Keep that invalidation in sync with this queryKey shape.
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   })
