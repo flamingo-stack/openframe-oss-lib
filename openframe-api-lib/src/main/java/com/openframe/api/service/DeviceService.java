@@ -88,7 +88,7 @@ public class DeviceService {
                                                   String search,
                                                   SortInput sort) {
         Collection<String> scope = machineIds == null ? List.of() : machineIds;
-        return paginate(machineFilter(filterOptions, null, scope), search, paginationCriteria, sort);
+        return paginate(scheduleDeviceFilter(filterOptions, null, scope), search, paginationCriteria, sort);
     }
 
     public CountedGenericQueryResult<Machine> queryDevicesForPlatforms(Collection<OsType> osTypes,
@@ -105,7 +105,7 @@ public class DeviceService {
                                                   CursorPaginationCriteria paginationCriteria,
                                                   String search) {
         String tenantId = tenantIdProvider.getTenantId();
-        MachineQueryFilter filter = machineFilter(filterOptions, platformNames, null);
+        MachineQueryFilter filter = scheduleDeviceFilter(filterOptions, platformNames, null);
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
 
         long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
@@ -130,12 +130,12 @@ public class DeviceService {
     public DeviceFilters getAssignedDeviceFilters(Collection<String> machineIds,
                                                   DeviceFilterCriteria filterOptions, String search) {
         Collection<String> scope = machineIds == null ? List.of() : machineIds;
-        return deviceFilters(machineFilter(filterOptions, null, scope), search);
+        return deviceFilters(scheduleDeviceFilter(filterOptions, null, scope), search);
     }
 
     public DeviceFilters getAvailableDeviceFilters(Collection<OsType> platformNames,
                                                    DeviceFilterCriteria filterOptions, String search) {
-        return deviceFilters(machineFilter(filterOptions, platformNames, null), search);
+        return deviceFilters(scheduleDeviceFilter(filterOptions, platformNames, null), search);
     }
 
     private DeviceFilters deviceFilters(MachineQueryFilter filter, String search) {
@@ -157,7 +157,7 @@ public class DeviceService {
     public List<String> findDeviceIdsForPlatforms(Collection<OsType> platformNames,
                                                   DeviceFilterCriteria filterOptions, String search) {
         return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
-                machineFilter(filterOptions, platformNames, null), search);
+                scheduleDeviceFilter(filterOptions, platformNames, null), search);
     }
 
     /**
@@ -173,7 +173,7 @@ public class DeviceService {
             return List.copyOf(machineIds);
         }
         return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
-                machineFilter(filterOptions, null, machineIds), search);
+                scheduleDeviceFilter(filterOptions, null, machineIds), search);
     }
 
     private CountedGenericQueryResult<Machine> paginate(MachineQueryFilter filter, String search,
@@ -213,6 +213,14 @@ public class DeviceService {
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
+    }
+
+    private MachineQueryFilter scheduleDeviceFilter(DeviceFilterCriteria filter,
+                                                    Collection<OsType> osTypeScope,
+                                                    Collection<String> restrictToMachineIds) {
+        MachineQueryFilter out = machineFilter(filter, osTypeScope, restrictToMachineIds);
+        out.setExcludeStatuses(List.of(DeviceStatus.DELETED.name(), DeviceStatus.ARCHIVED.name(), DeviceStatus.PENDING.name()));
+        return out;
     }
 
     private MachineQueryFilter machineFilter(DeviceFilterCriteria filter,
