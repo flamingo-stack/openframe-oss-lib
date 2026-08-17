@@ -3,29 +3,26 @@ package com.openframe.core.util;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
-public final class PlainTextExcerpt {
+public final class PlainText {
 
     public static final String ELLIPSIS = "…";
 
-    private static final Pattern FENCED_CODE = Pattern.compile("(?s)```.*?```|~~~.*?~~~");
-    private static final Pattern HTML_TAG = Pattern.compile("(?s)<[^>]*>");
+    // Rules 1-9 below mirror the web client's stripNotificationMarkup(), pattern for pattern and in
+    // the same order, so a notification reads identically in the app and in a push. Any change here
+    // has to be made there too, or the two surfaces drift apart.
+    private static final Pattern HTML_TAG = Pattern.compile("<[^>]+>");
     private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[([^\\]]*)]\\([^)]*\\)");
-    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[([^\\]]*)]\\([^)]*\\)");
-    private static final Pattern AUTOLINK = Pattern.compile("<((?:https?|mailto):[^>]+)>");
-    private static final Pattern REFERENCE_LINK = Pattern.compile("\\[([^\\]]*)]\\[[^\\]]*]");
-    private static final Pattern INLINE_CODE = Pattern.compile("`+([^`]*)`+");
-    private static final Pattern HEADING = Pattern.compile("(?m)^\\s{0,3}#{1,6}\\s*|(?<=\\s)#{1,6}\\s+");
-    private static final Pattern SETEXT_UNDERLINE = Pattern.compile("(?m)^\\s{0,3}[=-]{2,}\\s*$");
-    private static final Pattern BLOCKQUOTE = Pattern.compile("(?m)^\\s*>+\\s?");
-    private static final Pattern LIST_MARKER = Pattern.compile("(?m)^\\s*(?:[-*+]|\\d{1,9}[.)])\\s+");
-    private static final Pattern THEMATIC_BREAK = Pattern.compile("(?m)^\\s{0,3}(?:[-*_]\\s*){3,}$");
-    private static final Pattern ASTERISK_EMPHASIS = Pattern.compile("(\\*{1,3})(?=\\S)(.*?)(?<=\\S)\\1");
-    private static final Pattern STRIKETHROUGH = Pattern.compile("(~{1,2})(?=\\S)(.*?)(?<=\\S)\\1");
-    private static final Pattern UNDERSCORE_EMPHASIS =
-            Pattern.compile("(?<![\\w_])(_{1,3})(?=\\S)(.*?)(?<=\\S)\\1(?![\\w_])");
+    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[([^\\]]+)]\\([^)]*\\)");
+    private static final Pattern EMPHASIS = Pattern.compile("(\\*{1,3}|_{1,3}|~~)(\\S(?:.*?\\S)?)\\1");
+    private static final Pattern CODE = Pattern.compile("`{1,3}([^`]*)`{1,3}");
+    private static final Pattern HEADING = Pattern.compile("(?m)^[^\\S\\n]{0,3}#{1,6}[^\\S\\n]+");
+    private static final Pattern MID_LINE_HEADING = Pattern.compile("[^\\S\\n]#{2,6}[^\\S\\n]+");
+    private static final Pattern BLOCKQUOTE = Pattern.compile("(?m)^[^\\S\\n]{0,3}>[^\\S\\n]?");
+    private static final Pattern LIST_MARKER = Pattern.compile("(?m)^[^\\S\\n]{0,3}(?:[-*+]|\\d+\\.)[^\\S\\n]+");
+
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
-    private PlainTextExcerpt() {
+    private PlainText() {
     }
 
     public static String sanitize(String value) {
@@ -33,28 +30,17 @@ public final class PlainTextExcerpt {
             return null;
         }
         String text = value;
-        text = FENCED_CODE.matcher(text).replaceAll(" ");
-        text = THEMATIC_BREAK.matcher(text).replaceAll(" ");
-        text = SETEXT_UNDERLINE.matcher(text).replaceAll(" ");
-        text = AUTOLINK.matcher(text).replaceAll("$1");
-        text = HTML_TAG.matcher(text).replaceAll(" ");
+        text = HTML_TAG.matcher(text).replaceAll("");
         text = MARKDOWN_IMAGE.matcher(text).replaceAll("$1");
         text = MARKDOWN_LINK.matcher(text).replaceAll("$1");
-        text = REFERENCE_LINK.matcher(text).replaceAll("$1");
-        text = INLINE_CODE.matcher(text).replaceAll("$1");
+        text = EMPHASIS.matcher(text).replaceAll("$2");
+        text = CODE.matcher(text).replaceAll("$1");
         text = HEADING.matcher(text).replaceAll("");
+        text = MID_LINE_HEADING.matcher(text).replaceAll(" ");
         text = BLOCKQUOTE.matcher(text).replaceAll("");
         text = LIST_MARKER.matcher(text).replaceAll("");
-        // Twice: `**_bold italic_**` needs the outer pair removed before the inner one matches.
-        text = stripEmphasis(stripEmphasis(text));
         text = WHITESPACE.matcher(text).replaceAll(" ").trim();
         return text.isEmpty() ? null : text;
-    }
-
-    private static String stripEmphasis(String text) {
-        String stripped = ASTERISK_EMPHASIS.matcher(text).replaceAll("$2");
-        stripped = UNDERSCORE_EMPHASIS.matcher(stripped).replaceAll("$2");
-        return STRIKETHROUGH.matcher(stripped).replaceAll("$2");
     }
 
     public static String sanitizeAndExcerpt(String value, int maxChars) {
