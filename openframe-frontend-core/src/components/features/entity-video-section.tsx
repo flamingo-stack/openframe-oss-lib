@@ -9,6 +9,8 @@ import {
 } from '../ui/tabs';
 import type { VideoTeaser } from '../../types/video-processing';
 import { Video } from './video';
+import { getEntityCaptionUrlsById } from './captions-url';
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import { VideoBitesStrip, type VideoBiteStripItem } from './video-bites-strip';
 import { DEFAULT_VIDEO_BITES_TITLE, type VideoBiteStripProfile } from './video-bites-shared';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
@@ -77,6 +79,14 @@ export interface EntityVideoSectionProps {
    * player (`getCaptionsUrl(type, id, highlightSrt, { variant: 'highlight' })`).
    */
   highlightCaptionsUrl?: string | null;
+  /**
+   * Entity identity for caption derivation — the alternative to the explicit
+   * URL props above for hosts that don't hold the entity's SRT columns (chat
+   * cards). The section derives both `<track>` URLs itself from the runtime's
+   * captions base (`getEntityCaptionUrlsById`); explicit `captionsUrl` /
+   * `highlightCaptionsUrl` win when also provided.
+   */
+  captionsEntity?: { type: string; id: string | number } | null;
   /** LCP hint — when true, the full-video tab's poster eager-loads. */
   priority?: boolean;
 }
@@ -99,13 +109,24 @@ export function EntityVideoSection({
   bitesAutoScroll = true,
   MarkdownRenderer,
   srtContent,
-  captionsUrl,
-  highlightCaptionsUrl,
+  captionsUrl: captionsUrlProp,
+  highlightCaptionsUrl: highlightCaptionsUrlProp,
+  captionsEntity,
   priority = false,
 }: EntityVideoSectionProps) {
+  const runtime = useChatRuntime();
   const hasFullVideo = !!(youtubeUrl || mainVideoUrl);
   const hasHighlight = !!highlightVideoUrl;
   const hasVideo = hasFullVideo || hasHighlight;
+
+  // Caption resolution: explicit URL props win (detail pages gate on their
+  // entity's SRT columns); otherwise derive from `captionsEntity` identity via
+  // the runtime's captions base — the zero-knowledge path for chat cards.
+  const derivedCaptions = captionsEntity
+    ? getEntityCaptionUrlsById(runtime?.endpoints, captionsEntity.type, captionsEntity.id)
+    : null;
+  const captionsUrl = captionsUrlProp ?? derivedCaptions?.captionsUrl;
+  const highlightCaptionsUrl = highlightCaptionsUrlProp ?? derivedCaptions?.highlightCaptionsUrl;
 
   if (!hasVideo && !videoSummary && (!videoBites || videoBites.length === 0)) {
     return null;

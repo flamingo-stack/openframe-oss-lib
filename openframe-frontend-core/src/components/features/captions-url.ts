@@ -115,3 +115,34 @@ export function getEntityCaptionUrls(
     }),
   }
 }
+
+/**
+ * Identity-only variant of `getEntityCaptionUrls` — for surfaces that know the
+ * entity's type + id but NOT its SRT columns (chat cards, whose hydration rows
+ * deliberately exclude the heavy SRT content). The `/api/captions` route is
+ * addressed purely by `<entityType>/<entityId>`, so the URLs derive from
+ * identity alone; a video without subtitles costs one silent 404 `<track>`
+ * fetch. No `?v=` cache-buster (no content to hash) — the route's own
+ * Cache-Control governs freshness.
+ */
+export function getEntityCaptionUrlsById(
+  endpoints: CaptionsEndpoints | null | undefined,
+  entityType: string,
+  entityId: string | number,
+): Required<EntityCaptionUrls> {
+  const base = resolveCaptionsBase(endpoints)
+  return {
+    captionsUrl: `${base}/${entityType}/${entityId}`,
+    highlightCaptionsUrl: `${base}/${entityType}/${entityId}?variant=highlight`,
+  }
+}
+
+/**
+ * Chat docType → captions-route entity type. Chat documentTypes equal the
+ * captions entity types for every video-bearing type except podcast
+ * (`podcast` vs `podcast_episode`). Kept here (not per-card) so the alias
+ * exists exactly once.
+ */
+export function captionsEntityTypeForDocType(docType: string): string {
+  return docType === 'podcast' ? 'podcast_episode' : docType
+}
