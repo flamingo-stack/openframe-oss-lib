@@ -14,7 +14,6 @@ import com.openframe.data.document.notification.NotificationSettings;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.NotificationSettingsRepository;
-import com.openframe.data.service.notification.NotificationContentRedactor;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,7 +29,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -49,7 +47,6 @@ class NotificationBroadcasterTest {
     private NotificationNatsPublisher natsPublisher;
     private NotificationChannelDispatcher channelDispatcher;
     private NotificationSettingsRepository settingsRepository;
-    private NotificationContentRedactor contentRedactor;
     private NotificationBroadcaster broadcaster;
 
     @BeforeEach
@@ -60,7 +57,6 @@ class NotificationBroadcasterTest {
         natsPublisher = mock(NotificationNatsPublisher.class);
         channelDispatcher = mock(NotificationChannelDispatcher.class);
         settingsRepository = mock(NotificationSettingsRepository.class);
-        contentRedactor = mock(NotificationContentRedactor.class);
         broadcaster = newBroadcaster(Optional.of(natsPublisher), true);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
             Notification arg = inv.getArgument(0);
@@ -86,9 +82,9 @@ class NotificationBroadcasterTest {
                 eq("notif-id-1"), eq(NotificationCategory.MINGO), anyString(), eq(RecipientType.USER), eq(Set.of("admin-1", "admin-2")));
         verify(readStateService, never()).createForAudience(
                 anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.MACHINE), any());
-        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.MINGO), anyBoolean());
-        verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class), eq(NotificationCategory.MINGO), anyBoolean());
-        verify(natsPublisher, never()).publishToMachine(anyString(), any(Notification.class), any(NotificationCategory.class), anyBoolean());
+        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.MINGO));
+        verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class), eq(NotificationCategory.MINGO));
+        verify(natsPublisher, never()).publishToMachine(anyString(), any(Notification.class), any(NotificationCategory.class));
     }
 
     @Test
@@ -108,9 +104,9 @@ class NotificationBroadcasterTest {
                 eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), eq(RecipientType.MACHINE), eq(Set.of("m-1", "m-2")));
         verify(readStateService, never()).createForAudience(
                 anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
-        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS), anyBoolean());
-        verify(natsPublisher).publishToMachine(eq("m-2"), any(Notification.class), eq(NotificationCategory.TICKETS), anyBoolean());
-        verify(natsPublisher, never()).publishToUser(anyString(), any(Notification.class), any(NotificationCategory.class), anyBoolean());
+        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
+        verify(natsPublisher).publishToMachine(eq("m-2"), any(Notification.class), eq(NotificationCategory.TICKETS));
+        verify(natsPublisher, never()).publishToUser(anyString(), any(Notification.class), any(NotificationCategory.class));
         verify(channelDispatcher, never()).dispatch(any(), any(Notification.class), any(NotificationCategory.class));
     }
 
@@ -132,8 +128,8 @@ class NotificationBroadcasterTest {
                 eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), eq(RecipientType.USER), eq(Set.of("admin-1")));
         verify(readStateService).createForAudience(
                 eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), eq(RecipientType.MACHINE), eq(Set.of("m-1")));
-        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.TICKETS), anyBoolean());
-        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS), anyBoolean());
+        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
+        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
     }
 
     @Test
@@ -233,7 +229,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given the NATS publisher throws RuntimeException for one recipient, when broadcast is called, then subsequent recipients still receive publishToUser/publishToMachine — one bad send does not poison the loop")
     void nats_publish_failure_for_one_recipient_does_not_skip_others() {
-        doThrow(new RuntimeException("nats reject")).when(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class), anyBoolean());
+        doThrow(new RuntimeException("nats reject")).when(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Approval")
                 .severity(NotificationSeverity.INFO)
@@ -244,10 +240,10 @@ class NotificationBroadcasterTest {
 
         broadcaster.broadcast(cmd);
 
-        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class), anyBoolean());
-        verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class), any(NotificationCategory.class), anyBoolean());
-        verify(natsPublisher).publishToUser(eq("admin-3"), any(Notification.class), any(NotificationCategory.class), anyBoolean());
-        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), any(NotificationCategory.class), anyBoolean());
+        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
+        verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class), any(NotificationCategory.class));
+        verify(natsPublisher).publishToUser(eq("admin-3"), any(Notification.class), any(NotificationCategory.class));
+        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), any(NotificationCategory.class));
     }
 
     @Test
@@ -311,8 +307,8 @@ class NotificationBroadcasterTest {
         broadcaster.update(updated);
 
         verify(notificationRepository).save(updated);
-        verify(natsPublisher).publishUpdateToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.TICKETS), anyBoolean());
-        verify(natsPublisher).publishUpdateToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS), anyBoolean());
+        verify(natsPublisher).publishUpdateToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
+        verify(natsPublisher).publishUpdateToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
     }
 
     @Test
@@ -325,8 +321,8 @@ class NotificationBroadcasterTest {
 
         broadcaster.update(updated);
 
-        verify(natsPublisher, never()).publishUpdateToUser(eq("deleter"), any(Notification.class), any(NotificationCategory.class), anyBoolean());
-        verify(natsPublisher).publishUpdateToUser(eq("reader"), any(Notification.class), any(NotificationCategory.class), anyBoolean());
+        verify(natsPublisher, never()).publishUpdateToUser(eq("deleter"), any(Notification.class), any(NotificationCategory.class));
+        verify(natsPublisher).publishUpdateToUser(eq("reader"), any(Notification.class), any(NotificationCategory.class));
     }
 
     @Test
@@ -334,14 +330,14 @@ class NotificationBroadcasterTest {
     void update_publish_failure_for_one_recipient_does_not_skip_others() {
         Notification updated = updatedNotification();
         doThrow(new RuntimeException("nats reject")).when(natsPublisher)
-                .publishUpdateToUser(eq("a"), any(Notification.class), any(NotificationCategory.class), anyBoolean());
+                .publishUpdateToUser(eq("a"), any(Notification.class), any(NotificationCategory.class));
         when(readStateService.findRecipients("notif-id-1")).thenReturn(java.util.List.of(
                 recipient("a", RecipientType.USER, ReadStatus.UNREAD),
                 recipient("b", RecipientType.USER, ReadStatus.UNREAD)));
 
         broadcaster.update(updated);
 
-        verify(natsPublisher).publishUpdateToUser(eq("b"), any(Notification.class), any(NotificationCategory.class), anyBoolean());
+        verify(natsPublisher).publishUpdateToUser(eq("b"), any(Notification.class), any(NotificationCategory.class));
     }
 
     @Test
@@ -372,7 +368,7 @@ class NotificationBroadcasterTest {
 
         verify(readStateService).createForAudience(
                 anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), eq(Set.of("keeper")));
-        verify(natsPublisher, never()).publishToUser(eq("muter"), any(Notification.class), any(NotificationCategory.class), anyBoolean());
+        verify(natsPublisher, never()).publishToUser(eq("muter"), any(Notification.class), any(NotificationCategory.class));
         verify(channelDispatcher).dispatch(eq(Set.of("keeper")), any(Notification.class), any(NotificationCategory.class));
     }
 
@@ -497,7 +493,7 @@ class NotificationBroadcasterTest {
     private NotificationBroadcaster newBroadcaster(Optional<NotificationNatsPublisher> publisher, boolean notificationsEnabled) {
         NotificationBroadcaster bc = new NotificationBroadcaster(
                 notificationRepository, readStateService, descriptorRegistry, publisher, channelDispatcher,
-                contentRedactor, settingsRepository);
+                settingsRepository);
         ReflectionTestUtils.setField(bc, "notificationsEnabled", notificationsEnabled);
         return bc;
     }

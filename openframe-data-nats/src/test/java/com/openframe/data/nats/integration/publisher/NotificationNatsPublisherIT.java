@@ -60,7 +60,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
                 .createdAt(Instant.now())
                 .context(GenericContext.builder().type("welcome").payload("{\"k\":\"v\"}").build()));
 
-        publisher.publishToUser("alice", saved, NotificationCategory.TICKETS, false);
+        publisher.publishToUser("alice", saved, NotificationCategory.TICKETS);
 
         Message received = sub.nextMessage(Duration.ofSeconds(5));
         assertThat(received).isNotNull();
@@ -84,7 +84,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
                 .title("for bob")
                 .context(GenericContext.builder().type("evt").payload("{}").build()));
 
-        publisher.publishToUser("bob", savedForBob, NotificationCategory.GENERIC, false);
+        publisher.publishToUser("bob", savedForBob, NotificationCategory.GENERIC);
 
         assertThat(aliceSub.nextMessage(Duration.ofSeconds(1))).isNull();
     }
@@ -100,7 +100,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
                 .title("Machine event")
                 .context(GenericContext.builder().type("event").payload("{}").build()));
 
-        publisher.publishToMachine("m1", saved, NotificationCategory.DEVICES, false);
+        publisher.publishToMachine("m1", saved, NotificationCategory.DEVICES);
 
         assertThat(machineSub.nextMessage(Duration.ofSeconds(5))).isNotNull();
         assertThat(otherSub.nextMessage(Duration.ofSeconds(1))).isNull();
@@ -113,7 +113,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
                 .title("not yet persisted")
                 .context(GenericContext.builder().type("evt").payload("{}").build())
                 .build();
-        assertThatThrownBy(() -> publisher.publishToUser("alice", noId, NotificationCategory.GENERIC, false))
+        assertThatThrownBy(() -> publisher.publishToUser("alice", noId, NotificationCategory.GENERIC))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

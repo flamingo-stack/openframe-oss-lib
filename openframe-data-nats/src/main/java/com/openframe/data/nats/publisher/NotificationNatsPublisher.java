@@ -5,7 +5,6 @@ import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.nats.model.NotificationEventType;
 import com.openframe.data.nats.model.NotificationMessage;
-import com.openframe.data.service.notification.NotificationContentRedactor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -26,44 +25,39 @@ public class NotificationNatsPublisher {
     private static final String MACHINE_TOPIC_TEMPLATE = "machine.%s.notification";
 
     private final NatsMessagePublisher natsMessagePublisher;
-    private final NotificationContentRedactor contentRedactor;
 
-    public void publishToUser(String userId, Notification notification, NotificationCategory category,
-                              boolean contentSuppressed) {
-        publishToUser(userId, notification, category, NotificationEventType.CREATED, contentSuppressed);
+    public void publishToUser(String userId, Notification notification, NotificationCategory category) {
+        publishToUser(userId, notification, category, NotificationEventType.CREATED);
     }
 
-    public void publishToMachine(String machineId, Notification notification, NotificationCategory category,
-                                 boolean contentSuppressed) {
-        publishToMachine(machineId, notification, category, NotificationEventType.CREATED, contentSuppressed);
+    public void publishToMachine(String machineId, Notification notification, NotificationCategory category) {
+        publishToMachine(machineId, notification, category, NotificationEventType.CREATED);
     }
 
-    public void publishUpdateToUser(String userId, Notification notification, NotificationCategory category,
-                                    boolean contentSuppressed) {
-        publishToUser(userId, notification, category, NotificationEventType.UPDATED, contentSuppressed);
+    public void publishUpdateToUser(String userId, Notification notification, NotificationCategory category) {
+        publishToUser(userId, notification, category, NotificationEventType.UPDATED);
     }
 
-    public void publishUpdateToMachine(String machineId, Notification notification, NotificationCategory category,
-                                       boolean contentSuppressed) {
-        publishToMachine(machineId, notification, category, NotificationEventType.UPDATED, contentSuppressed);
+    public void publishUpdateToMachine(String machineId, Notification notification, NotificationCategory category) {
+        publishToMachine(machineId, notification, category, NotificationEventType.UPDATED);
     }
 
     private void publishToUser(String userId, Notification notification, NotificationCategory category,
-                               NotificationEventType eventType, boolean contentSuppressed) {
+                               NotificationEventType eventType) {
         if (isBlank(userId)) {
             throw new IllegalArgumentException("userId must not be blank when publishing to user subject");
         }
         String topic = format(USER_TOPIC_TEMPLATE, userId);
-        publish(topic, notification, category, eventType, contentSuppressed);
+        publish(topic, notification, category, eventType);
     }
 
     private void publishToMachine(String machineId, Notification notification, NotificationCategory category,
-                                  NotificationEventType eventType, boolean contentSuppressed) {
+                                  NotificationEventType eventType) {
         if (isBlank(machineId)) {
             throw new IllegalArgumentException("machineId must not be blank when publishing to machine subject");
         }
         String topic = format(MACHINE_TOPIC_TEMPLATE, machineId);
-        publish(topic, notification, category, eventType, contentSuppressed);
+        publish(topic, notification, category, eventType);
     }
 
     /**
@@ -88,12 +82,12 @@ public class NotificationNatsPublisher {
     }
 
     private void publish(String topic, Notification notification, NotificationCategory category,
-                         NotificationEventType eventType, boolean contentSuppressed) {
+                         NotificationEventType eventType) {
         if (notification == null || notification.getId() == null) {
             throw new IllegalArgumentException("Notification must be persisted before publishing");
         }
         try {
-            NotificationMessage message = buildMessage(notification, category, eventType, contentSuppressed);
+            NotificationMessage message = buildMessage(notification, category, eventType);
             natsMessagePublisher.publish(topic, message);
         } catch (NatsException ex) {
             log.warn("NATS publish failed for notification {} on {}: {}",
@@ -102,12 +96,12 @@ public class NotificationNatsPublisher {
     }
 
     private NotificationMessage buildMessage(Notification notification, NotificationCategory category,
-                                             NotificationEventType eventType, boolean contentSuppressed) {
+                                             NotificationEventType eventType) {
         return NotificationMessage.builder()
                 .id(notification.getId())
                 .severity(notification.getSeverity())
                 .title(notification.getTitle())
-                .description(contentRedactor.descriptionFor(notification, category, contentSuppressed))
+                .description(notification.getDescription())
                 .createdAt(notification.getCreatedAt())
                 .category(category)
                 .context(notification.getContext())

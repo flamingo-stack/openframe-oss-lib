@@ -13,7 +13,6 @@ import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.NotificationPage;
 import com.openframe.data.repository.notification.NotificationRepository;
-import com.openframe.data.service.notification.NotificationContentRedactor;
 import com.openframe.data.repository.notification.NotificationWithStatus;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +37,6 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final GraphQLNotificationMapper notificationMapper;
-    private final NotificationContentRedactor contentRedactor;
 
     public GenericQueryResult<NotificationView> list(String recipientId,
                                                      RecipientType recipientType,
@@ -68,10 +66,8 @@ public class NotificationService {
             items = items.reversed();
         }
 
-        boolean contentSuppressed = contentRedactor.contentSuppressed();
         List<NotificationView> views = items.stream()
-                .map(item -> notificationMapper.toView(
-                        item.notification(), item.status() == ReadStatus.READ, contentSuppressed))
+                .map(item -> notificationMapper.toView(item.notification(), item.status() == ReadStatus.READ))
                 .toList();
 
         return GenericQueryResult.<NotificationView>builder()

@@ -5,11 +5,6 @@ extend type Query {
 extend type Mutation {
     "The modal saves full state; omitting typeSettings keeps the stored group overrides."
     updateNotificationSettings(enabled: Boolean!, typeSettings: [NotificationTypeSettingInput!]): NotificationSettings!
-    """
-    Tenant-wide privacy switch, restricted to ADMIN/OWNER. Every recipient in the tenant reads the
-    result, unlike updateNotificationSettings, which is the caller's own preference.
-    """
-    updateNotificationContentSuppression(suppressed: Boolean!): NotificationSettings!
 }
 
 "The 'Notify about' checkboxes. A notification type outside every group cannot be muted."
@@ -38,9 +33,4 @@ type NotificationSettings {
     enabled: Boolean!
     "Every group exactly once, defaults already resolved."
     typeSettings: [NotificationTypeSetting!]!
-    """
-    Tenant-wide privacy policy, not a per-user preference. When true, descriptions are replaced by a
-    neutral line in-app, on the live socket and in push bodies; titles keep entity attribution.
-    """
-    contentSuppressed: Boolean!
 }

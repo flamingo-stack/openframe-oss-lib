@@ -5,8 +5,6 @@ import com.openframe.api.dto.NotificationTypeSetting;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSettings;
-import com.openframe.data.document.notification.NotificationContentPolicy;
-import com.openframe.data.repository.notification.NotificationContentPolicyRepository;
 import com.openframe.data.repository.notification.NotificationSettingsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,55 +30,12 @@ import static org.mockito.Mockito.when;
 class NotificationSettingsServiceTest {
 
     private NotificationSettingsRepository repository;
-    private NotificationContentPolicyRepository contentPolicyRepository;
     private NotificationSettingsService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(NotificationSettingsRepository.class);
-        contentPolicyRepository = mock(NotificationContentPolicyRepository.class);
-        when(contentPolicyRepository.findFirstBy()).thenReturn(Optional.empty());
-        service = new NotificationSettingsService(repository, contentPolicyRepository);
-    }
-
-    @Test
-    @DisplayName("Given no content policy, when settings are read, then contentSuppressed is FALSE — absence means the informative default")
-    void absent_policy_answers_the_informative_default() {
-        when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
-
-        assertThat(service.get("user-1").isContentSuppressed()).isFalse();
-    }
-
-    @Test
-    @DisplayName("Given the tenant enabled suppression, when settings are read, then contentSuppressed is TRUE for every user in the tenant")
-    void stored_policy_is_reported() {
-        when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
-        when(contentPolicyRepository.findFirstBy())
-                .thenReturn(Optional.of(NotificationContentPolicy.builder().contentSuppressed(true).build()));
-
-        assertThat(service.get("user-1").isContentSuppressed()).isTrue();
-    }
-
-    @Test
-    @DisplayName("updateContentSuppression persists tenant-wide; nothing to invalidate, since the policy is read per request")
-    void suppression_update_persists() {
-        when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
-        when(contentPolicyRepository.findFirstBy())
-                .thenReturn(Optional.of(NotificationContentPolicy.builder().contentSuppressed(true).build()));
-
-        NotificationSettingsView result = service.updateContentSuppression("user-1", true);
-
-        ArgumentCaptor<NotificationContentPolicy> saved = ArgumentCaptor.forClass(NotificationContentPolicy.class);
-        verify(contentPolicyRepository).save(saved.capture());
-        assertThat(saved.getValue().isContentSuppressed()).isTrue();
-        assertThat(result.isContentSuppressed()).isTrue();
-    }
-
-    @Test
-    @DisplayName("Given a null suppressed flag, when updating, then BadRequestException — a null switch has no meaning")
-    void null_suppression_is_rejected() {
-        assertThatThrownBy(() -> service.updateContentSuppression("user-1", null))
-                .isInstanceOf(BadRequestException.class);
+        service = new NotificationSettingsService(repository);
     }
 
     @Test

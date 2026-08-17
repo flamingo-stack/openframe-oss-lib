@@ -10,7 +10,6 @@ import com.openframe.api.service.NotificationSettingsService;
 import com.openframe.api.support.CurrentPrincipalSupport;
 import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import java.util.List;
@@ -35,14 +34,5 @@ public class NotificationSettingsDataFetcher {
             @AuthenticationPrincipal AuthPrincipal principal) {
         String userId = CurrentPrincipalSupport.requireHumanUserId(principal);
         return notificationSettingsService.update(userId, enabled, typeSettings);
-    }
-
-    @DgsMutation
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'OWNER')")
-    public NotificationSettingsView updateNotificationContentSuppression(
-            @InputArgument Boolean suppressed,
-            @AuthenticationPrincipal AuthPrincipal principal) {
-        String userId = CurrentPrincipalSupport.requireHumanUserId(principal);
-        return notificationSettingsService.updateContentSuppression(userId, suppressed);
     }
 }

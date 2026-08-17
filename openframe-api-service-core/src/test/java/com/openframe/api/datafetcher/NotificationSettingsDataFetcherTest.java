@@ -61,24 +61,11 @@ class NotificationSettingsDataFetcherTest {
         assertThatThrownBy(() -> fetcher.notificationSettings(agent)).isInstanceOf(UnauthorizedException.class);
         assertThatThrownBy(() -> fetcher.updateNotificationSettings(false, null, agent))
                 .isInstanceOf(UnauthorizedException.class);
-        assertThatThrownBy(() -> fetcher.updateNotificationContentSuppression(true, agent))
-                .isInstanceOf(UnauthorizedException.class);
         verifyNoInteractions(service);
     }
 
-    @Test
-    @DisplayName("updateNotificationContentSuppression delegates the tenant-wide flag")
-    void suppression_update_delegates() {
-        when(service.updateContentSuppression("user-1", true))
-                .thenReturn(new NotificationSettingsView(true, List.of(), true));
-
-        assertThat(fetcher.updateNotificationContentSuppression(true, principal("user-1")).isContentSuppressed())
-                .isTrue();
-        verify(service).updateContentSuppression("user-1", true);
-    }
-
     private static NotificationSettingsView view(boolean enabled) {
-        return new NotificationSettingsView(enabled, List.of(), false);
+        return new NotificationSettingsView(enabled, List.of());
     }
 
     private static AuthPrincipal principal(String userId) {
