@@ -15,6 +15,7 @@ import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -82,6 +83,23 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
             ExecutionFacetField.MACHINE, FIELD_MACHINE_ID));
 
     private final MongoTemplate mongoTemplate;
+
+    @Override
+    public void applyResult(ScriptExecution row) {
+        Update update = new Update()
+                .set(FIELD_STATUS, row.getStatus())
+                .set(FIELD_STATUS_CHANGED_AT, row.getStatusChangedAt())
+                .set(FIELD_FINISHED_AT, row.getFinishedAt())
+                .set("exitCode", row.getExitCode())
+                .set("executionTimeMs", row.getExecutionTimeMs())
+                .set("timedOut", row.getTimedOut())
+                .set(FIELD_STDOUT, row.getStdout())
+                .set("stdoutTruncated", row.getStdoutTruncated())
+                .set(FIELD_STDERR, row.getStderr())
+                .set("stderrTruncated", row.getStderrTruncated())
+                .set("error", row.getError());
+        mongoTemplate.updateFirst(new Query(Criteria.where(FIELD_ID).is(row.getId())), update, ScriptExecution.class);
+    }
 
     @Override
     public List<ScriptExecution> findPage(String tenantId, ExecutionOwnerScope owner,

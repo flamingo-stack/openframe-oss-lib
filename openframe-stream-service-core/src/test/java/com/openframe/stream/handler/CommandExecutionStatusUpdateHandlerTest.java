@@ -65,7 +65,7 @@ class CommandExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<CommandExecution> captor = ArgumentCaptor.forClass(CommandExecution.class);
-        verify(commandExecutionRepository).save(captor.capture());
+        verify(commandExecutionRepository).applyResult(captor.capture());
         CommandExecution saved = captor.getValue();
         assertThat(saved.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
         assertThat(saved.getExitCode()).isZero();
@@ -87,7 +87,7 @@ class CommandExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(1, false, null, null, null, null), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<CommandExecution> captor = ArgumentCaptor.forClass(CommandExecution.class);
-        verify(commandExecutionRepository).save(captor.capture());
+        verify(commandExecutionRepository).applyResult(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
     }
 
@@ -101,7 +101,7 @@ class CommandExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(null, true, null, null, null, null), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<CommandExecution> captor = ArgumentCaptor.forClass(CommandExecution.class);
-        verify(commandExecutionRepository).save(captor.capture());
+        verify(commandExecutionRepository).applyResult(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(captor.getValue().getTimedOut()).isTrue();
     }
@@ -116,7 +116,7 @@ class CommandExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(0, false, "SHELL_UNAVAILABLE", null, null, null), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<CommandExecution> captor = ArgumentCaptor.forClass(CommandExecution.class);
-        verify(commandExecutionRepository).save(captor.capture());
+        verify(commandExecutionRepository).applyResult(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(captor.getValue().getError()).isEqualTo("SHELL_UNAVAILABLE");
     }
@@ -131,7 +131,7 @@ class CommandExecutionStatusUpdateHandlerTest {
 
         handler.handle(messageWith(0, false, null, null, null, null), new IntegratedToolEnrichedData());
 
-        verify(commandExecutionRepository, never()).save(any());
+        verify(commandExecutionRepository, never()).applyResult(any());
     }
 
     @Test
@@ -142,7 +142,7 @@ class CommandExecutionStatusUpdateHandlerTest {
 
         handler.handle(messageWith(0, false, null, null, null, null), new IntegratedToolEnrichedData());
 
-        verify(commandExecutionRepository, never()).save(any());
+        verify(commandExecutionRepository, never()).applyResult(any());
     }
 
     @Test
@@ -156,7 +156,7 @@ class CommandExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(0, false, null, null, huge, huge), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<CommandExecution> captor = ArgumentCaptor.forClass(CommandExecution.class);
-        verify(commandExecutionRepository).save(captor.capture());
+        verify(commandExecutionRepository).applyResult(captor.capture());
         CommandExecution saved = captor.getValue();
         assertThat(saved.getStdout().getBytes(StandardCharsets.UTF_8).length)
                 .isLessThanOrEqualTo(CommandExecution.MAX_OUTPUT_BYTES);

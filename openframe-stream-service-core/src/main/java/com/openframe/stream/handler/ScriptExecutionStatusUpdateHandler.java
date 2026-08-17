@@ -168,7 +168,7 @@ public class ScriptExecutionStatusUpdateHandler
         row.setStderr(truncStderr.value);
         row.setStderrTruncated(truncStderr.truncated);
 
-        scriptExecutionRepository.save(row);
+        scriptExecutionRepository.applyResult(row);
         log.info("Transitioned Execution row: executionId={} status=RUNNING→{} exitCode={} timedOut={}",
                 row.getExecutionId(), newStatus, exitCode, timedOut);
     }
