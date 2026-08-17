@@ -126,6 +126,29 @@ export interface NavigationSidebarConfig {
    * expects so the placeholder and the loaded nav are the same height.
    */
   loadingRows?: { primary?: number; secondary?: number }
+  /**
+   * Host-owned content rendered above the primary navigation — an action that
+   * belongs in the nav's position but is not a nav entry, such as the desktop
+   * shell's "an update is ready" button.
+   *
+   * Kept out of `items` deliberately: an entry there is a row in the primary
+   * `<nav>` landmark, styled as one and announced as one, and none of that is
+   * true of an action that navigates nowhere. It also renders in every surface
+   * that takes this config — the sidebar AND the mobile burger menu — so a host
+   * passes it once and gets both.
+   *
+   * A render prop rather than a node because the two surfaces are different
+   * widths and only this component knows which: the 56px rail has room for a
+   * glyph and nothing else, while the burger menu is always full width. A host
+   * cannot derive `minimized` itself — it is the sidebar's own state, resolved
+   * from a persisted preference, the tablet breakpoint and any open overlay —
+   * and a container query would have to be authored in the HOST's Tailwind
+   * scan to emit anything.
+   *
+   * Rendered regardless of `loading`: it comes from host state that has nothing
+   * to do with whether the nav entries have resolved.
+   */
+  topSlot?: (state: { minimized: boolean }) => React.ReactNode
   minimized?: boolean
   onNavigate?: (path: string) => void
   onToggleMinimized?: () => void

@@ -88,6 +88,8 @@ export interface VideoDisplaySectionProps {
   bitesHref?: string;
   srtContent?: string | null;
   captionsUrl?: string | null;
+  /** VTT captions URL for the highlight reel (variant=highlight). */
+  highlightCaptionsUrl?: string | null;
 }
 
 export interface ReleaseDetailPageProps {
@@ -342,6 +344,7 @@ export function ReleaseDetailPage({
             bitesHref={typeof release.slug === 'string' ? `/releases/${release.slug}` : undefined}
             srtContent={release?.srt_content as string | null | undefined}
             captionsUrl={release?.captionsUrl as string | undefined}
+            highlightCaptionsUrl={release?.highlightCaptionsUrl as string | undefined}
           />
         ) : (
           <>
@@ -370,6 +373,7 @@ export function ReleaseDetailPage({
               <Video
                 url={highlightVideoUrl}
                 poster={highlightVideoThumbnail}
+                captionsUrl={release?.highlightCaptionsUrl as string | undefined}
                 layout="centered"
               />
             )}

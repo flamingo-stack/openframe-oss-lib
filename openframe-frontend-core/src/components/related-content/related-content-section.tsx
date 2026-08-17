@@ -65,6 +65,7 @@ import { decideNewTab } from '../chat/utils/decide-new-tab';
 // instantiates a QueryClient, so embedders need NO QueryClientProvider.
 import { BlogCard, BlogCardSkeleton } from '../chat/entity-cards/blog-card';
 import { WhatIShippedCard, WhatIShippedCardSkeleton } from '../chat/entity-cards/what-i-shipped-card';
+import { HowIWorkCard, HowIWorkCardSkeleton } from '../chat/entity-cards/how-i-work-card';
 import { CaseStudyCard, CaseStudyCardSkeleton } from '../chat/entity-cards/case-study-card';
 import { CustomerInterviewCard, CustomerInterviewCardSkeleton } from '../chat/entity-cards/customer-interview-card';
 import { ProductReleaseCard, ProductReleaseCardSkeleton } from '../chat/entity-cards/product-release-card';
@@ -167,6 +168,9 @@ function renderSkeletonForType(
     case 'what_i_shipped':
       // Matches the WhatIShippedCard (AdminContentCard 3:2) shape.
       return <WhatIShippedCardSkeleton />;
+    case 'how_i_work':
+      // Same shared employee-entry shape as What I Shipped.
+      return <HowIWorkCardSkeleton />;
     case 'marketing_campaign':
       return adminCampaignCard ? <adminCampaignCard.Skeleton size={legacySize} /> : null;
     case 'roadmap_item':
@@ -290,6 +294,20 @@ function CardForType({
           // with `href: undefined` is still truthy and would make WhatIShippedCard
           // wrap the card in a dead <a> (no URL). Mirrors the ProductReleaseCard
           // `linkProps ?? undefined` pattern above.
+          anchorProps={
+            linkProps ??
+            (href ? ({ href, ...anchorAttrs } as React.AnchorHTMLAttributes<HTMLAnchorElement>) : undefined)
+          }
+        />
+      );
+    case 'how_i_work':
+      // THE single How I Work card — same lib component the people-hub dashboard
+      // renders. Same `anchorProps` contract as What I Shipped above (a real
+      // href only; a fallback object would wrap the card in a dead <a>).
+      return (
+        <HowIWorkCard
+          entry={item}
+          placeholderUrl={placeholderUrl}
           anchorProps={
             linkProps ??
             (href ? ({ href, ...anchorAttrs } as React.AnchorHTMLAttributes<HTMLAnchorElement>) : undefined)

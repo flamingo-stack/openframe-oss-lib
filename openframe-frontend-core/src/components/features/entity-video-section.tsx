@@ -71,6 +71,12 @@ export interface EntityVideoSectionProps {
   srtContent?: string | null;
   /** HTTPS URL to a VTT captions file (rendered as native `<track>`). */
   captionsUrl?: string | null;
+  /**
+   * HTTPS URL to the HIGHLIGHT video's VTT captions file — same `<track>`
+   * mechanism as `captionsUrl`, applied to the Highlights tab / highlight-only
+   * player (`getCaptionsUrl(type, id, highlightSrt, { variant: 'highlight' })`).
+   */
+  highlightCaptionsUrl?: string | null;
   /** LCP hint — when true, the full-video tab's poster eager-loads. */
   priority?: boolean;
 }
@@ -94,6 +100,7 @@ export function EntityVideoSection({
   MarkdownRenderer,
   srtContent,
   captionsUrl,
+  highlightCaptionsUrl,
   priority = false,
 }: EntityVideoSectionProps) {
   const hasFullVideo = !!(youtubeUrl || mainVideoUrl);
@@ -145,6 +152,7 @@ export function EntityVideoSection({
               <Video
                 url={highlightVideoUrl!}
                 poster={highlightVideoThumbnail}
+                captionsUrl={highlightCaptionsUrl}
                 layout="centered"
               />
             </TabsContent>
@@ -164,6 +172,7 @@ export function EntityVideoSection({
           <Video
             url={highlightVideoUrl!}
             poster={highlightVideoThumbnail}
+            captionsUrl={highlightCaptionsUrl}
             layout="centered"
             priority={priority}
           />
