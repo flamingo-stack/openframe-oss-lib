@@ -21,6 +21,8 @@ import { AlertTriangle, ExternalLink, BookMarked, Sparkles, TrendingUp, Wrench }
 import { formatReleaseDate } from '../../../utils/date-formatters';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 import { Video } from '../../features/video';
+import { type CaptionSrtFields } from '../../features/captions-url';
+import { useCaptions } from '../../features/use-captions';
 import { DetailPageSkeleton } from '../detail-page-skeleton';
 import type { ChangelogEntry } from '../../../types/product-release';
 import type { TagAssoc } from '../../../types/blog';
@@ -146,6 +148,7 @@ export function ReleaseDetailPage({
   shell = true
 }: ReleaseDetailPageProps) {
   const router = useRouter();
+  const captions = useCaptions();
   // `shell` true → standalone `<PageShell>`; false → padding-only box (no nested
   // <main>) for hosts whose layout already provides the container.
   const renderShell = (node: ReactNode) =>
@@ -251,6 +254,13 @@ export function ReleaseDetailPage({
   const videoBites = release.video_bites as VideoTeaser[] | undefined;
   const highlightVideoUrl = release.highlight_video_url as string | undefined;
   const highlightVideoThumbnail = release.highlight_video_thumbnail as string | undefined;
+  // Caption tracks — host-provided values win (the hub's wrapper enriches
+  // them); otherwise built HERE from the release's SRT columns, based on
+  // `runtime.endpoints.captionsUrlPrefix` (standard runtime-endpoint wiring),
+  // so embedders get correctly proxied `<track>` URLs with zero per-host code.
+  const entityCaptions = captions.forEntity('product_release', release as unknown as CaptionSrtFields);
+  const captionsUrl = (release.captionsUrl as string | undefined) ?? entityCaptions.captionsUrl;
+  const highlightCaptionsUrl = (release.highlightCaptionsUrl as string | undefined) ?? entityCaptions.highlightCaptionsUrl;
   const breakingChanges = release.breaking_changes as ChangelogEntry[] | undefined;
   const featuresAdded = release.features_added as ChangelogEntry[] | undefined;
   const bugFixed = release.bugs_fixed as ChangelogEntry[] | undefined;
@@ -343,8 +353,8 @@ export function ReleaseDetailPage({
             bitesProfile={toStripProfile(author)}
             bitesHref={typeof release.slug === 'string' ? `/releases/${release.slug}` : undefined}
             srtContent={release?.srt_content as string | null | undefined}
-            captionsUrl={release?.captionsUrl as string | undefined}
-            highlightCaptionsUrl={release?.highlightCaptionsUrl as string | undefined}
+            captionsUrl={captionsUrl}
+            highlightCaptionsUrl={highlightCaptionsUrl}
           />
         ) : (
           <>
@@ -365,7 +375,7 @@ export function ReleaseDetailPage({
               <Video
                 url={mainVideoUrl}
                 srtContent={release?.srt_content as string | undefined}
-                captionsUrl={release?.captionsUrl as string | undefined}
+                captionsUrl={captionsUrl}
                 layout="centered"
               />
             )}
@@ -373,7 +383,7 @@ export function ReleaseDetailPage({
               <Video
                 url={highlightVideoUrl}
                 poster={highlightVideoThumbnail}
-                captionsUrl={release?.highlightCaptionsUrl as string | undefined}
+                captionsUrl={highlightCaptionsUrl}
                 layout="centered"
               />
             )}
