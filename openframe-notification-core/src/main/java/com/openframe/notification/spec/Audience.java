@@ -3,16 +3,11 @@ package com.openframe.notification.spec;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-/**
- * Recipients of one notification. Null and blank ids are dropped on construction: an absent
- * assignee means "nobody", not a caller error. An empty audience is a legal outcome — the
- * pipeline skips the notification.
- */
+// Null/blank ids are dropped: an absent assignee means "nobody", not a caller error. Empty = pipeline skips.
 public final class Audience {
 
     private static final Audience NONE = new Audience(Set.of(), Set.of());
@@ -30,41 +25,51 @@ public final class Audience {
     }
 
     public static Audience users(String... ids) {
-        return users(Arrays.asList(ids));
+        Collection<String> asList = Arrays.asList(ids);
+        return users(asList);
     }
 
     public static Audience users(Collection<String> ids) {
-        return new Audience(sanitize(ids), Set.of());
+        Set<String> sanitized = sanitize(ids);
+        return new Audience(sanitized, Set.of());
     }
 
     public static Audience machines(String... ids) {
-        return machines(Arrays.asList(ids));
+        Collection<String> asList = Arrays.asList(ids);
+        return machines(asList);
     }
 
     public static Audience machines(Collection<String> ids) {
-        return new Audience(Set.of(), sanitize(ids));
+        Set<String> sanitized = sanitize(ids);
+        return new Audience(Set.of(), sanitized);
     }
 
     public Audience andUsers(Collection<String> ids) {
-        return new Audience(union(userIds, sanitize(ids)), machineIds);
+        Set<String> sanitized = sanitize(ids);
+        Set<String> merged = union(userIds, sanitized);
+        return new Audience(merged, machineIds);
     }
 
     public Audience andMachines(String... ids) {
-        return andMachines(Arrays.asList(ids));
+        Collection<String> asList = Arrays.asList(ids);
+        return andMachines(asList);
     }
 
     public Audience andMachines(Collection<String> ids) {
-        return new Audience(userIds, union(machineIds, sanitize(ids)));
+        Set<String> sanitized = sanitize(ids);
+        Set<String> merged = union(machineIds, sanitized);
+        return new Audience(userIds, merged);
     }
 
-    /** Cuts the initiator out of the user audience; the standard "don't notify the actor" rule. */
+    // The standard "don't notify the actor" rule.
     public Audience except(String userId) {
         if (userId == null || !userIds.contains(userId)) {
             return this;
         }
         Set<String> kept = new LinkedHashSet<>(userIds);
         kept.remove(userId);
-        return new Audience(Set.copyOf(kept), machineIds);
+        Set<String> copied = Set.copyOf(kept);
+        return new Audience(copied, machineIds);
     }
 
     public boolean isEmpty() {

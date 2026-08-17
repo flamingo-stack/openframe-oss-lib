@@ -12,10 +12,7 @@ import java.util.Set;
 import static java.util.stream.Collectors.toUnmodifiableSet;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-/**
- * Immutable string-map view of a notification's facts. Validation happens once, at the producer
- * boundary ({@link #seed}); enriched values are spec-authored and therefore trusted.
- */
+// Immutable fact map. Validation happens once, at the producer boundary; enriched values are spec-authored.
 public final class Attrs {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -26,64 +23,83 @@ public final class Attrs {
         this.values = values;
     }
 
-    /** Producer boundary: every seed key present and non-blank, no keys outside the declared set. */
     public static Attrs seed(NotificationTypeSpec spec, Map<String, String> raw) {
-        Set<String> allowed = spec.seedKeys().stream().map(AttrKey::name).collect(toUnmodifiableSet());
-        for (AttrKey key : spec.seedKeys()) {
-            if (isBlank(raw.get(key.name()))) {
-                throw new IllegalArgumentException(
-                        spec.type() + ": required seed attribute '" + key.name() + "' is missing or blank");
-            }
-        }
-        for (String key : raw.keySet()) {
-            if (!allowed.contains(key)) {
-                throw new IllegalArgumentException(spec.type() + ": unknown seed attribute '" + key + "'");
-            }
-        }
-        return new Attrs(Map.copyOf(raw));
+        rejectMissingSeedKeys(spec, raw);
+        rejectUnknownSeedKeys(spec, raw);
+        Map<String, String> copied = Map.copyOf(raw);
+        return new Attrs(copied);
     }
 
     public static Attrs of(Map<String, String> values) {
-        return new Attrs(Map.copyOf(values));
+        Map<String, String> copied = Map.copyOf(values);
+        return new Attrs(copied);
     }
 
     public String get(AttrKey key) {
-        String value = values.get(key.name());
+        String name = key.name();
+        String value = values.get(name);
         if (isBlank(value)) {
-            throw new NoSuchElementException("attribute '" + key.name() + "' is absent");
+            throw new NoSuchElementException("attribute '" + name + "' is absent");
         }
         return value;
     }
 
     public Optional<String> optional(AttrKey key) {
-        return Optional.ofNullable(values.get(key.name())).filter(v -> !isBlank(v));
+        String name = key.name();
+        String value = values.get(name);
+        return Optional.ofNullable(value).filter(v -> !isBlank(v));
     }
 
     public boolean has(AttrKey key) {
-        return optional(key).isPresent();
+        Optional<String> value = optional(key);
+        return value.isPresent();
     }
 
-    /** Parses a JSON-string attribute value. The value is spec-written, so a parse failure is a spec bug. */
     public <T> T json(AttrKey key, TypeReference<T> type) {
+        String name = key.name();
         String value = get(key);
         try {
             return JSON.readValue(value, type);
         } catch (Exception ex) {
-            throw new IllegalStateException("attribute '" + key.name() + "' does not hold valid JSON", ex);
+            // The value is spec-written, so a parse failure is a spec bug, not bad input.
+            throw new IllegalStateException("attribute '" + name + "' does not hold valid JSON", ex);
         }
     }
 
-    /** Returns a copy with the value set; a null/blank value leaves the attribute absent. */
     public Attrs with(AttrKey key, String value) {
         if (isBlank(value)) {
             return this;
         }
+        String name = key.name();
         Map<String, String> next = new HashMap<>(values);
-        next.put(key.name(), value);
-        return new Attrs(Map.copyOf(next));
+        next.put(name, value);
+        Map<String, String> copied = Map.copyOf(next);
+        return new Attrs(copied);
     }
 
     public Map<String, String> asMap() {
         return values;
+    }
+
+    private static void rejectMissingSeedKeys(NotificationTypeSpec spec, Map<String, String> raw) {
+        for (AttrKey key : spec.seedKeys()) {
+            String name = key.name();
+            String value = raw.get(name);
+            if (isBlank(value)) {
+                String type = spec.type();
+                throw new IllegalArgumentException(
+                        type + ": required seed attribute '" + name + "' is missing or blank");
+            }
+        }
+    }
+
+    private static void rejectUnknownSeedKeys(NotificationTypeSpec spec, Map<String, String> raw) {
+        Set<String> allowed = spec.seedKeys().stream().map(AttrKey::name).collect(toUnmodifiableSet());
+        for (String key : raw.keySet()) {
+            if (!allowed.contains(key)) {
+                String type = spec.type();
+                throw new IllegalArgumentException(type + ": unknown seed attribute '" + key + "'");
+            }
+        }
     }
 }

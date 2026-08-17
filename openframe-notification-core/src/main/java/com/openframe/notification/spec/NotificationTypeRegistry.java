@@ -25,12 +25,15 @@ public class NotificationTypeRegistry {
     public NotificationTypeRegistry(List<NotificationTypeSpec> specs) {
         Map<String, NotificationTypeSpec> map = new HashMap<>();
         for (NotificationTypeSpec spec : specs) {
-            if (map.put(spec.type(), spec) != null) {
-                throw new IllegalStateException("Duplicate notification type spec: " + spec.type());
+            String type = spec.type();
+            NotificationTypeSpec previous = map.put(type, spec);
+            if (previous != null) {
+                throw new IllegalStateException("Duplicate notification type spec: " + type);
             }
         }
         this.byType = Map.copyOf(map);
-        log.info("Registered {} notification type(s): {}", byType.size(), new TreeSet<>(byType.keySet()));
+        TreeSet<String> sortedTypes = new TreeSet<>(byType.keySet());
+        log.info("Registered {} notification type(s): {}", byType.size(), sortedTypes);
     }
 
     public NotificationTypeSpec require(String type) {
