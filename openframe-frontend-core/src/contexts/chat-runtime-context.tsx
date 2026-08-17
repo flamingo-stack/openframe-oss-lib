@@ -161,15 +161,12 @@ export interface ChatRuntime {
      *  proxies images needs NO og-placeholder wiring. See
      *  `resolveOgPlaceholderBase` / `buildOgPlaceholderUrl` in `../utils`. */
     ogPlaceholderUrl?: string
-    /** Explicit base for the captions route (`/api/captions` — the native
+    /** Base URL prefix for the captions route (`/api/captions` — the native
      *  `<track>` VTT endpoint every video surface uses since captions stopped
      *  being burned into video pixels). Plain path base, no query params.
-     *
-     *  OPTIONAL — when unset the lib derives the base from the sibling
-     *  `imageProxyUrlPrefix` (same API base, route name swapped), then falls
-     *  back to the relative `/api/captions`. So an embedder that already
-     *  proxies images needs NO captions wiring at all. See
-     *  `buildCaptionsUrl` / `rebaseCaptionsUrl` in
+     *  Embedders point it at their proxied route (e.g. `/content/api/captions`);
+     *  unset ⇒ the same-origin relative `/api/captions` (the hub). Consumed via
+     *  `getEntityCaptionUrls` / `rebaseCaptionsUrl` in
      *  `components/features/captions-url.ts`. */
     captionsUrlPrefix?: string
     /** Supabase storage origin (e.g. `https://xyz.supabase.co`) — used

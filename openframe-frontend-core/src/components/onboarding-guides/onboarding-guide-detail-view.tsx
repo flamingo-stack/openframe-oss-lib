@@ -137,9 +137,9 @@ export function OnboardingGuideDetailView({
     )
   }
 
-  // Endpoints-aware (og-placeholder pattern): same-origin hosts get the
-  // relative `/api/captions/...` default; embedders inherit their `/content`
-  // proxy base from `runtime.endpoints` automatically — zero per-page wiring.
+  // Track URLs base on `runtime.endpoints.captionsUrlPrefix` (standard
+  // runtime-endpoint wiring); same-origin hosts leave it unset and get the
+  // relative `/api/captions/...` default. Zero per-page wiring either way.
   const { captionsUrl, highlightCaptionsUrl } = getEntityCaptionUrls(runtime?.endpoints, 'onboarding_guide', guide)
 
   const videoPoster =

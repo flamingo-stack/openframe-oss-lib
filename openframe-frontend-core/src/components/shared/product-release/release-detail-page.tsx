@@ -255,9 +255,9 @@ export function ReleaseDetailPage({
   const highlightVideoUrl = release.highlight_video_url as string | undefined;
   const highlightVideoThumbnail = release.highlight_video_thumbnail as string | undefined;
   // Caption tracks — host-provided values win (the hub's wrapper enriches
-  // them); otherwise built HERE from the release's SRT columns via the
-  // runtime endpoints (og-placeholder pattern), so embedders get correctly
-  // proxied `<track>` URLs with zero per-host wiring.
+  // them); otherwise built HERE from the release's SRT columns, based on
+  // `runtime.endpoints.captionsUrlPrefix` (standard runtime-endpoint wiring),
+  // so embedders get correctly proxied `<track>` URLs with zero per-host code.
   const entityCaptions = getEntityCaptionUrls(runtime?.endpoints, 'product_release', release as unknown as CaptionSrtFields);
   const captionsUrl = (release.captionsUrl as string | undefined) ?? entityCaptions.captionsUrl;
   const highlightCaptionsUrl = (release.highlightCaptionsUrl as string | undefined) ?? entityCaptions.highlightCaptionsUrl;

@@ -6,11 +6,11 @@
  * SSOT for fetching + shaping the widget's data on the CLIENT (any embedder
  * reuses it). The public endpoint returns the RAW body `{ walkthroughVideo }`
  * (no {success,data} wrapper). The video's `captionsUrl` is a RELATIVE
- * `/api/captions/...` path; it is rebased automatically onto the host's
- * captions base from `ChatRuntime.endpoints` (derived from
- * `imageProxyUrlPrefix`, og-placeholder pattern) — same-origin hosts and
- * embedders alike need no wiring. `transformCaptionsUrl` remains as an
- * explicit override for hosts outside a runtime provider.
+ * `/api/captions/...` path; it is rebased automatically onto
+ * `ChatRuntime.endpoints.captionsUrlPrefix` (the standard runtime-endpoint
+ * wiring) — same-origin hosts leave that unset and get the URL unchanged.
+ * `transformCaptionsUrl` remains as an explicit override for hosts outside
+ * a runtime provider.
  *
  * SSR hosts (the hub) resolve the video server-side and pass it to the widget
  * directly; they don't need this hook. It exists for client-only embedders.
@@ -28,10 +28,9 @@ export interface UseWalkthroughVideoOptions {
   initialData?: WalkthroughVideoData | null;
   enabled?: boolean;
   /** Rewrite the RELATIVE captionsUrl (e.g. prefix a `/content` proxy base).
-   *  OPTIONAL override — when unset, the base is derived from the host's
-   *  `ChatRuntime.endpoints` (`captionsUrlPrefix`, else the sibling
-   *  `imageProxyUrlPrefix` — see `rebaseCaptionsUrl`), so embedders inside a
-   *  runtime provider need no wiring here at all. */
+   *  OPTIONAL override — when unset, the URL is rebased onto
+   *  `ChatRuntime.endpoints.captionsUrlPrefix` (see `rebaseCaptionsUrl`), so
+   *  embedders inside a runtime provider need no wiring here at all. */
   transformCaptionsUrl?: (relativeUrl: string) => string;
 }
 
@@ -73,9 +72,8 @@ export function useWalkthroughVideo(opts: UseWalkthroughVideoOptions): UseWalkth
       if (transformCaptionsUrl && video.captionsUrl.startsWith('/')) {
         return { ...video, captionsUrl: transformCaptionsUrl(video.captionsUrl) };
       }
-      // Default: rebase onto the runtime's captions base (derived from
-      // captionsUrlPrefix / imageProxyUrlPrefix). Same-origin hosts get the
-      // URL back unchanged, so this is a no-op for them.
+      // Default: rebase onto `endpoints.captionsUrlPrefix`. Same-origin hosts
+      // leave it unset and get the URL back unchanged — a no-op for them.
       const rebased = rebaseCaptionsUrl(runtime?.endpoints, video.captionsUrl);
       return rebased === video.captionsUrl ? video : { ...video, captionsUrl: rebased as string };
     },

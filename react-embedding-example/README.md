@@ -116,26 +116,22 @@ itself) use the other mode instead: resolve the announcement plus the dismissal
 cookie server-side and pass `initialAnnouncement` so the bar renders in the first
 HTML byte with zero layout shift.
 
-### Video captions (zero wiring — same pattern as the OG placeholder)
+### Video captions (`endpoints.captionsUrlPrefix` — standard runtime wiring)
 
 Since lib **0.0.543** captions are no longer burned into video pixels. Every caption —
 main video AND highlight reel — is a native `<track>` served from the hub's
-`/api/captions/<entityType>/<entityId>?v=<hash>[&variant=highlight]` route. The lib
-builds every such URL through `buildCaptionsUrl` / `rebaseCaptionsUrl`
-(`components/features/captions-url.ts`), which resolve the route base from the host's
-runtime endpoints exactly like the OG placeholder does:
+`/api/captions/<entityType>/<entityId>?v=<hash>[&variant=highlight]` route. Wiring is
+the SAME as every other endpoint: one `EP.captions` entry (`src/config/endpoints.ts`)
+set as `endpoints.captionsUrlPrefix` in `content-runtime.ts`. Unset, the lib falls back
+to the same-origin relative `/api/captions` (what the hub uses).
 
-1. explicit `endpoints.captionsUrlPrefix`
-2. derived from the sibling `endpoints.imageProxyUrlPrefix` (same API base, route name
-   swapped — `/content/api/image-proxy` → `/content/api/captions`)
-3. same-origin relative `/api/captions` (the hub)
-
-This app sets `imageProxyUrlPrefix` in `content-runtime.ts`, so **captions need NO wiring
-anywhere** — the walkthrough widget, onboarding guide detail, and release detail all get
-proxied `<track>` URLs automatically, and no extra proxy rule is needed (the captions
-endpoint rides the standard `/content/api/*` mapping). Don't point tracks at the hub
-origin directly instead: cross-origin `<track>` also requires `crossOrigin` on the
-`<video>` element, which the lib's `<Video>` doesn't set — the proxy route is the
+Every video surface — release detail, onboarding guide detail, the walkthrough widget —
+derives both track URLs through the lib's `getEntityCaptionUrls` /`rebaseCaptionsUrl`
+(`components/features/captions-url.ts`) reading that one prefix from the runtime, so no
+page-level captions code exists anywhere in this app, and no extra proxy rule is needed
+(the captions endpoint rides the standard `/content/api/*` mapping). Don't point tracks
+at the hub origin directly instead: cross-origin `<track>` also requires `crossOrigin`
+on the `<video>` element, which the lib's `<Video>` doesn't set — the proxy route is the
 supported path.
 
 ### Two documented `/api` exceptions (dev only)

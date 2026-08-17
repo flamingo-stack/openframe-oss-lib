@@ -33,37 +33,21 @@ export function getCaptionsUrl(
   return `${DEFAULT_CAPTIONS_PATH}/${entityType}/${entityId}?v=${hash}${variant}`
 }
 
-/** The slice of `ChatRuntime.endpoints` this module needs — same pattern as
- *  `OgPlaceholderEndpoints` in `utils/og-placeholder.ts`. */
+/** The slice of `ChatRuntime.endpoints` this module needs. */
 export interface CaptionsEndpoints {
-  /** Explicit base for the captions route (plain path base, no query params),
-   *  e.g. `/content/api/captions`. Most hosts leave it unset and let the base
-   *  derive from `imageProxyUrlPrefix`. */
+  /** Base URL prefix for the captions route (plain path base, no query
+   *  params) — e.g. `/content/api/captions` in a proxied embedder. Unset ⇒
+   *  the same-origin relative default `/api/captions` (the hub). Wired by
+   *  hosts exactly like every other endpoint on `ChatRuntime.endpoints`. */
   captionsUrlPrefix?: string
-  /** Sibling image route under the SAME API base. When `captionsUrlPrefix` is
-   *  unset, the base is derived from this by swapping the trailing
-   *  `/image-proxy` segment for `/captions` — so a host that already proxies
-   *  images gets working caption tracks for free, with zero extra wiring. */
-  imageProxyUrlPrefix?: string
 }
 
 /** Same-origin default — for hosts that serve the route themselves (the hub).
- *  Cross-origin embedders inherit their base from `imageProxyUrlPrefix` (or
- *  set `captionsUrlPrefix` explicitly). */
+ *  Cross-origin embedders set `endpoints.captionsUrlPrefix` instead. */
 const DEFAULT_CAPTIONS_PATH = '/api/captions'
 
 function resolveCaptionsBase(endpoints?: CaptionsEndpoints | null): string {
-  if (endpoints?.captionsUrlPrefix) return endpoints.captionsUrlPrefix
-  const imageProxy = endpoints?.imageProxyUrlPrefix
-  if (imageProxy) {
-    // `/image-proxy` and `/captions` are sibling API routes under one base.
-    // Anchor to a path-segment boundary so we only rewrite the route name,
-    // never an incidental substring. Strip any baked-in query params — path
-    // segments follow this base.
-    const derived = imageProxy.replace(/\/image-proxy(?=$|[?/]).*$/, '/captions')
-    if (derived !== imageProxy) return derived
-  }
-  return DEFAULT_CAPTIONS_PATH
+  return endpoints?.captionsUrlPrefix || DEFAULT_CAPTIONS_PATH
 }
 
 /** Rebase an already-built relative `/api/captions/...` URL (e.g. one the hub
@@ -80,11 +64,10 @@ export function rebaseCaptionsUrl<T extends string | null | undefined>(
 }
 
 /**
- * The endpoints-aware entry point — `getCaptionsUrl` + base resolution from the
- * host's runtime `endpoints` (og-placeholder pattern: consumers hand over
- * `runtime?.endpoints` and nothing else). Hub/same-origin hosts resolve to the
- * relative default; embedders inherit their `/content` proxy base from
- * `imageProxyUrlPrefix` automatically.
+ * The endpoints-aware entry point — `getCaptionsUrl` based on
+ * `endpoints.captionsUrlPrefix` (consumers hand over `runtime?.endpoints` and
+ * nothing else). Hub/same-origin hosts leave the prefix unset and resolve to
+ * the relative default.
  */
 export function buildCaptionsUrl(
   endpoints: CaptionsEndpoints | null | undefined,
