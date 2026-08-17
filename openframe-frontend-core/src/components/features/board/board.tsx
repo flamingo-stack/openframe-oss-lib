@@ -81,8 +81,9 @@ export function Board({
   )
 
   // Same collision policy as before, plus the two rules that stop a cross-column
-  // move from triggering the next one — see `drop-target.ts`.
-  const dropTarget = useDropTarget()
+  // move from triggering the next one — see `drop-target.ts`. `items` is handed
+  // over because its commit is what re-arms a live freeze.
+  const dropTarget = useDropTarget(items)
 
   const handleDragStart = (e: DragStartEvent) => {
     const id = String(e.active.id)

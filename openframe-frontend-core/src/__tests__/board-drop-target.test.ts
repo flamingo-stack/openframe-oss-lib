@@ -172,6 +172,50 @@ describe('createDropTargetResolver', () => {
     expect(idsOf(resolver.detect(overA1))).toEqual(['a1'])
   })
 
+  it('settle carries the freeze past the commit it was guarding', () => {
+    // `freeze` runs in the handler, the re-measure runs in the commit that
+    // follows it. Releasing a frame after the HANDLER assumes the commit already
+    // happened; `settle` — called from an effect on the moved list — re-arms so
+    // the guard outlives the commit however late React schedules it.
+    const frames = manualFrames()
+    const resolver = createDropTargetResolver(frames.schedule)
+    const droppables = [LANE_A, LANE_B, A1, A2, B1, B2]
+    const overA1 = makeArgs({ droppables, pointer: { x: 200, y: 98 } })
+
+    resolver.detect(makeArgs({ droppables, pointer: { x: 600, y: 98 } })) // target = b1
+    resolver.freeze()
+    resolver.settle() // the commit landed
+    expect(frames.pendingCount).toBe(1)
+
+    // Still frozen on the frame the commit landed in.
+    expect(idsOf(resolver.detect(overA1))).toEqual(['b1'])
+    frames.tick()
+    expect(idsOf(resolver.detect(overA1))).toEqual(['a1'])
+  })
+
+  it('settle is inert when nothing is frozen', () => {
+    // It fires on every list change, including ones no drag caused.
+    const frames = manualFrames()
+    const resolver = createDropTargetResolver(frames.schedule)
+    resolver.settle()
+    expect(frames.pendingCount).toBe(0)
+  })
+
+  it('opens on its own when the guarded move commits nothing', () => {
+    // A move that resolves to no change never reaches an effect, so `settle`
+    // never runs. The frame `freeze` scheduled is the ceiling that keeps the
+    // board from going deaf for the rest of the drag.
+    const frames = manualFrames()
+    const resolver = createDropTargetResolver(frames.schedule)
+    const droppables = [LANE_A, LANE_B, A1, A2, B1, B2]
+    const overA1 = makeArgs({ droppables, pointer: { x: 200, y: 98 } })
+
+    resolver.detect(makeArgs({ droppables, pointer: { x: 600, y: 98 } }))
+    resolver.freeze()
+    frames.tick() // no settle() — nothing committed
+    expect(idsOf(resolver.detect(overA1))).toEqual(['a1'])
+  })
+
   it('re-arms the freeze window on every move instead of stacking frames', () => {
     const frames = manualFrames()
     const resolver = createDropTargetResolver(frames.schedule)
@@ -226,8 +270,8 @@ describe('createDropTargetResolver', () => {
 describe('useDropTarget', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it('cancels the pending freeze frame when the board unmounts mid-drag', () => {
-    // The hook builds its own resolver, so the frames are the real global ones.
+  /** The hook builds its own resolver, so it schedules on the real globals. */
+  function stubFrames() {
     const pending = new Map<number, () => void>()
     let next = 1
     vi.stubGlobal('requestAnimationFrame', (cb: () => void) => {
@@ -235,12 +279,44 @@ describe('useDropTarget', () => {
       return next++
     })
     vi.stubGlobal('cancelAnimationFrame', (id: number) => pending.delete(id))
+    return { size: () => pending.size, ids: () => [...pending.keys()] }
+  }
 
-    const { result, unmount } = renderHook(() => useDropTarget())
+  it('cancels the pending freeze frame when the board unmounts mid-drag', () => {
+    const frames = stubFrames()
+
+    const { result, unmount } = renderHook(() => useDropTarget([]))
     act(() => result.current.freeze())
-    expect(pending.size).toBe(1)
+    expect(frames.size()).toBe(1)
 
     unmount()
-    expect(pending.size).toBe(0)
+    expect(frames.size()).toBe(0)
+  })
+
+  it('re-arms a live freeze when the moved list commits', () => {
+    // The board never calls `settle` itself — committing `items` is what does
+    // it. Without this the release stays pinned to the handler that froze.
+    const frames = stubFrames()
+
+    const { result, rerender } = renderHook(({ items }) => useDropTarget(items), {
+      initialProps: { items: ['a'] },
+    })
+    act(() => result.current.freeze())
+    const scheduledByFreeze = frames.ids()
+
+    rerender({ items: ['b'] }) // the move committed
+
+    expect(frames.ids()).not.toEqual(scheduledByFreeze) // the old frame gave way
+    expect(frames.size()).toBe(1) // to exactly one new one, not a stack
+  })
+
+  it('leaves the frames alone when the list commits outside a drag', () => {
+    // Lists change for reasons no drag caused — a refetch, a live update.
+    const frames = stubFrames()
+
+    const { rerender } = renderHook(({ items }) => useDropTarget(items), { initialProps: { items: ['a'] } })
+    rerender({ items: ['b'] })
+
+    expect(frames.size()).toBe(0)
   })
 })

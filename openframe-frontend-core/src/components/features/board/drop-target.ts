@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import {
   closestCorners,
   pointerWithin,
@@ -67,15 +67,29 @@ export function detectCollisions(args: CollisionArgs, pointerHits: Collision[]):
 }
 
 /**
- * {@link createDropTargetResolver} that cleans up after itself, so a board only
+ * {@link createDropTargetResolver} wired to the React lifecycle, so a board only
  * ever calls `freeze` and `release`.
  *
- * Cancelling the pending frame on unmount is not a decision a caller makes, and
- * forgetting it is silent. It belongs to the rules, not to whoever uses them.
+ * Pass the list the board moves cards in. Its commit is what a live freeze is
+ * re-armed against (see `settle`), and dropping the pending frame on unmount is
+ * not a decision a caller makes either. Both are chores whose omission is
+ * silent, so they belong to the rules rather than to whoever uses them.
+ *
+ * `useState` rather than `useMemo` for the instance: `useMemo` is a performance
+ * hint React may discard, and this object owns a pending frame.
  */
-export function useDropTarget(): DropTargetResolver {
-  const resolver = useMemo(() => createDropTargetResolver(), [])
+export function useDropTarget(committedItems: unknown): DropTargetResolver {
+  const [resolver] = useState(createDropTargetResolver)
   useEffect(() => resolver.dispose, [resolver])
+  // `committedItems` is the trigger, not an input — the effect exists precisely
+  // to run when that list has committed, which is why the body never reads it.
+  // Taking the rule's fix (dropping the dep) would leave the effect firing once
+  // on mount, and the freeze would silently go back to releasing on the frame
+  // after the handler. dnd-kit's own example keys the same reset the same way.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the dependency IS the signal
+  useEffect(() => {
+    resolver.settle()
+  }, [committedItems, resolver])
   return resolver
 }
 
@@ -92,6 +106,23 @@ export interface DropTargetResolver {
   detect: CollisionDetection
   /** Call right before a state update moves a card between columns. */
   freeze: () => void
+  /**
+   * Re-arms a live freeze so it outlives the commit that caused it. Owned by
+   * {@link useDropTarget}, which calls it from an effect keyed on the moved
+   * list — a board should never need to.
+   *
+   * `freeze` alone releases one frame after the HANDLER runs, which assumes the
+   * state update it guards has committed by then. That holds today — dnd-kit
+   * dispatches `onDragOver` from an effect, so the update flushes in the same
+   * commit phase — but it is an assumption about scheduling, and concurrent
+   * React is free to break it. Re-arming from the commit removes the assumption;
+   * dnd-kit's own multiple-containers example releases the same way.
+   *
+   * A no-op while nothing is frozen, and the frame `freeze` scheduled stays as a
+   * ceiling: a move that resolves to no change commits nothing, and the guard
+   * still has to open on its own.
+   */
+  settle: () => void
   /** Call on drag start / end / cancel. */
   release: () => void
   /** Call on unmount — drops any pending frame. */
@@ -170,6 +201,10 @@ export function createDropTargetResolver(scheduleFrame: FrameScheduler = animati
     freeze: () => {
       settling = true
       scheduleRelease()
+    },
+
+    settle: () => {
+      if (settling) scheduleRelease()
     },
 
     release: () => {
