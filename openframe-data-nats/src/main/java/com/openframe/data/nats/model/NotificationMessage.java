@@ -11,6 +11,7 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -27,6 +28,10 @@ public class NotificationMessage {
     private NotificationCategory category;
     private NotificationContext context;
     private NotificationEventType eventType;
+    // Mirrors of the stored document's spec-driven fields; null until the emitter sets them.
+    // Additive next to `context`, which clients keep reading until they migrate.
+    private String type;
+    private Map<String, String> attributes;
 
     private List<String> notificationIds;
 }

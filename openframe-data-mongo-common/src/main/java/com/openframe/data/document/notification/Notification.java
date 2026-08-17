@@ -11,6 +11,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.Map;
 
 @Document(collection = "notifications")
 @Data
@@ -30,6 +31,15 @@ public class Notification implements TenantScoped {
     private String title;
 
     private String description;
+
+    /**
+     * Spec-driven notification type and its flat fact snapshot. Null on documents written by the
+     * legacy dispatcher path and on pre-migration history; the typed {@link #context} stays the
+     * source of truth until every reader has switched to these two fields.
+     */
+    private String type;
+
+    private Map<String, String> attributes;
 
     @CreatedDate
     @Indexed(expireAfterSeconds = NotificationRetention.HISTORY_TTL_SECONDS) // 30-day notifications-history retention

@@ -8,7 +8,7 @@ import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.RecipientType;
-import com.openframe.data.service.notification.NotificationReadStateService;
+import com.openframe.notification.readstate.NotificationReadStateService;
 import graphql.ExecutionResult;
 import graphql.relay.Relay;
 import org.junit.jupiter.api.*;
