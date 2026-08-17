@@ -6,8 +6,11 @@
  * SSOT for fetching + shaping the widget's data on the CLIENT (any embedder
  * reuses it). The public endpoint returns the RAW body `{ walkthroughVideo }`
  * (no {success,data} wrapper). The video's `captionsUrl` is a RELATIVE
- * `/api/captions/...` path; pass `transformCaptionsUrl` to route it through a
- * proxy (embedders) — omit it for same-origin hosts.
+ * `/api/captions/...` path; it is rebased automatically onto the host's
+ * captions base from `ChatRuntime.endpoints` (derived from
+ * `imageProxyUrlPrefix`, og-placeholder pattern) — same-origin hosts and
+ * embedders alike need no wiring. `transformCaptionsUrl` remains as an
+ * explicit override for hosts outside a runtime provider.
  *
  * SSR hosts (the hub) resolve the video server-side and pass it to the widget
  * directly; they don't need this hook. It exists for client-only embedders.
@@ -15,6 +18,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import type { WalkthroughVideoData } from './floating-walkthrough-video';
+import { rebaseCaptionsUrl } from './captions-url';
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
 
 export interface UseWalkthroughVideoOptions {
   /** Absolute or proxied URL of the public GET route. */
@@ -22,7 +27,11 @@ export interface UseWalkthroughVideoOptions {
   /** SSR/initial seed to avoid a loading flash. */
   initialData?: WalkthroughVideoData | null;
   enabled?: boolean;
-  /** Rewrite the RELATIVE captionsUrl (e.g. prefix a `/content` proxy base). */
+  /** Rewrite the RELATIVE captionsUrl (e.g. prefix a `/content` proxy base).
+   *  OPTIONAL override — when unset, the base is derived from the host's
+   *  `ChatRuntime.endpoints` (`captionsUrlPrefix`, else the sibling
+   *  `imageProxyUrlPrefix` — see `rebaseCaptionsUrl`), so embedders inside a
+   *  runtime provider need no wiring here at all. */
   transformCaptionsUrl?: (relativeUrl: string) => string;
 }
 
@@ -33,6 +42,7 @@ export interface UseWalkthroughVideoResult {
 
 export function useWalkthroughVideo(opts: UseWalkthroughVideoOptions): UseWalkthroughVideoResult {
   const { endpoint, initialData, enabled = true, transformCaptionsUrl } = opts;
+  const runtime = useChatRuntime();
 
   const query = useQuery<WalkthroughVideoData | null>({
     queryKey: ['walkthrough-video', endpoint],
@@ -59,10 +69,15 @@ export function useWalkthroughVideo(opts: UseWalkthroughVideoOptions): UseWalkth
     // rewrite here (not in queryFn) means a second consumer of the same
     // endpoint can't inherit this observer's proxied captionsUrl from the cache.
     select: (video) => {
-      if (video?.captionsUrl && transformCaptionsUrl && video.captionsUrl.startsWith('/')) {
+      if (!video?.captionsUrl) return video;
+      if (transformCaptionsUrl && video.captionsUrl.startsWith('/')) {
         return { ...video, captionsUrl: transformCaptionsUrl(video.captionsUrl) };
       }
-      return video;
+      // Default: rebase onto the runtime's captions base (derived from
+      // captionsUrlPrefix / imageProxyUrlPrefix). Same-origin hosts get the
+      // URL back unchanged, so this is a no-op for them.
+      const rebased = rebaseCaptionsUrl(runtime?.endpoints, video.captionsUrl);
+      return rebased === video.captionsUrl ? video : { ...video, captionsUrl: rebased as string };
     },
   });
 

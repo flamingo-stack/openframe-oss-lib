@@ -116,31 +116,27 @@ itself) use the other mode instead: resolve the announcement plus the dismissal
 cookie server-side and pass `initialAnnouncement` so the bar renders in the first
 HTML byte with zero layout shift.
 
-### Video captions — relative `/api/captions/...` track URLs (MUST be proxied)
+### Video captions (zero wiring — same pattern as the OG placeholder)
 
-Since lib **0.0.543** captions are no longer burned into video pixels (the Shotstack
-subtitle-burning stage was removed hub-side). Every caption — main video AND highlight
-reel — is a native `<track>` whose URL `getCaptionsUrl()` builds **relative**:
-`/api/captions/<entityType>/<entityId>?v=<hash>[&variant=highlight]`. Same-origin hosts
-(the hub) resolve it fine; in an embedder the browser resolves it against **this SPA's
-origin**, the track 404s, and captions silently disappear. Every video surface must
-reroute the URL through `/content`:
+Since lib **0.0.543** captions are no longer burned into video pixels. Every caption —
+main video AND highlight reel — is a native `<track>` served from the hub's
+`/api/captions/<entityType>/<entityId>?v=<hash>[&variant=highlight]` route. The lib
+builds every such URL through `buildCaptionsUrl` / `rebaseCaptionsUrl`
+(`components/features/captions-url.ts`), which resolve the route base from the host's
+runtime endpoints exactly like the OG placeholder does:
 
-- **Walkthrough widget** — pass `transformCaptionsUrl` to `useWalkthroughVideo`
-  (`src/components/walkthrough-video.tsx`).
-- **Onboarding guide detail** — pass `transformCaptionsUrl` to
-  `<OnboardingGuideDetailView>` (`src/pages/onboarding-detail.tsx`); the view builds the
-  URLs internally from the guide's SRT columns.
-- **Release detail** — the lib's `ReleaseDetailPage` reads `captionsUrl` /
-  `highlightCaptionsUrl` off the release YOUR `useRelease` hook returns; derive both with
-  `getCaptionsUrl('product_release', id, srt_content /* | highlight_srt_content */)` and
-  prefix `CONTENT_PREFIX` (`src/pages/release-detail.tsx`).
+1. explicit `endpoints.captionsUrlPrefix`
+2. derived from the sibling `endpoints.imageProxyUrlPrefix` (same API base, route name
+   swapped — `/content/api/image-proxy` → `/content/api/captions`)
+3. same-origin relative `/api/captions` (the hub)
 
-The transform is always the same one-liner: `(rel) => \`${CONTENT_PREFIX}${rel}\``. No
-extra proxy rule is needed — the captions endpoint rides the standard `/content/api/*`
-mapping. Don't point the track at the hub origin directly instead: cross-origin `<track>`
-also requires `crossOrigin` on the `<video>` element, which the lib's `<Video>` doesn't
-set — the proxy route is the supported path.
+This app sets `imageProxyUrlPrefix` in `content-runtime.ts`, so **captions need NO wiring
+anywhere** — the walkthrough widget, onboarding guide detail, and release detail all get
+proxied `<track>` URLs automatically, and no extra proxy rule is needed (the captions
+endpoint rides the standard `/content/api/*` mapping). Don't point tracks at the hub
+origin directly instead: cross-origin `<track>` also requires `crossOrigin` on the
+`<video>` element, which the lib's `<Video>` doesn't set — the proxy route is the
+supported path.
 
 ### Two documented `/api` exceptions (dev only)
 

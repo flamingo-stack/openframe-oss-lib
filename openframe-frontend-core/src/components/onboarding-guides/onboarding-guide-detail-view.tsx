@@ -29,7 +29,7 @@ import { EntityVideoSection } from '../features/entity-video-section'
 import { VideoBitesStrip } from '../features/video-bites-strip'
 import { toStripProfile } from '../features/video-bites-shared'
 import { useVideoWarmup } from '../features/use-video-warmup'
-import { getCaptionsUrl } from '../features/captions-url'
+import { getEntityCaptionUrls } from '../features/captions-url'
 import { RichMarkdownRenderer } from '../ui/markdown'
 import { EntityTagBadges } from '../features/entity-tag-badges'
 import { LoadError } from '../ui/error-state'
@@ -83,12 +83,6 @@ export interface OnboardingGuideDetailViewProps {
    *  layout already provides the page container — only the padding box renders,
    *  avoiding a nested `<main>`. */
   shell?: boolean
-  /** Rewrite the RELATIVE `/api/captions/...` track URLs the view builds from
-   *  the guide's SRT columns (e.g. prefix a `/content` proxy base). Same
-   *  contract as `useWalkthroughVideo`'s option of the same name — omit it for
-   *  same-origin hosts; cross-origin embedders MUST pass it or captions 404
-   *  against the embedder's origin. */
-  transformCaptionsUrl?: (relativeUrl: string) => string
 }
 
 export function OnboardingGuideDetailView({
@@ -106,7 +100,6 @@ export function OnboardingGuideDetailView({
   basePath = '/onboarding-guides',
   relatedContent,
   shell = true,
-  transformCaptionsUrl,
 }: OnboardingGuideDetailViewProps) {
   const resolvedBackHref = backHref ?? basePath
   const runtime = useChatRuntime()
@@ -144,14 +137,10 @@ export function OnboardingGuideDetailView({
     )
   }
 
-  // getCaptionsUrl returns a RELATIVE `/api/captions/...` path; cross-origin
-  // embedders reroute it through their content proxy via transformCaptionsUrl.
-  const proxied = (rel: string | undefined) =>
-    rel && transformCaptionsUrl ? transformCaptionsUrl(rel) : rel
-  const captionsUrl = proxied(getCaptionsUrl('onboarding_guide', guide.id, guide.srt_content))
-  const highlightCaptionsUrl = proxied(
-    getCaptionsUrl('onboarding_guide', guide.id, guide.highlight_srt_content, { variant: 'highlight' }),
-  )
+  // Endpoints-aware (og-placeholder pattern): same-origin hosts get the
+  // relative `/api/captions/...` default; embedders inherit their `/content`
+  // proxy base from `runtime.endpoints` automatically — zero per-page wiring.
+  const { captionsUrl, highlightCaptionsUrl } = getEntityCaptionUrls(runtime?.endpoints, 'onboarding_guide', guide)
 
   const videoPoster =
     guide.main_video_thumbnail ||
