@@ -1046,10 +1046,12 @@ function getServerTargetUrl(path) {
     if (x == null) { return null; }
     var url = x.protocol + '//' + x.host + '/ws/tools/agent/meshcentral-server/' + path;
 
-    // Inject Openframe JWT token
+    // Inject Openframe JWT token, only when one is actually available
     var token = mesh.authToken();
-    var separator = path.indexOf('?') !== -1 ? '&' : '?';
-    url += separator + 'authorization=' + token;
+    if (token) {
+        var separator = path.indexOf('?') !== -1 ? '&' : '?';
+        url += separator + 'authorization=' + encodeURIComponent(token);
+    }
 
     return url;
 }
