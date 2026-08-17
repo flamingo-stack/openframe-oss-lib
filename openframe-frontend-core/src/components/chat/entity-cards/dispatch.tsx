@@ -422,6 +422,13 @@ function itemVideoMetadata(item: any): Record<string, string> | null {
   if (youtubeUrl) out.youtubeUrl = youtubeUrl
   if (highlightVideoUrl) out.highlightVideoUrl = highlightVideoUrl
   if (videoPoster) out.videoPoster = videoPoster
+  // Server-minted caption <track> URLs ride the ChatRef metadata; only
+  // ChatRef-shaped items carry them (content rows don't select SRT).
+  // <ChatVideoEntityCard> rebases them onto the runtime's captions base.
+  const captionsUrl = pick(m.captionsUrl)
+  const highlightCaptionsUrl = pick(m.highlightCaptionsUrl)
+  if (captionsUrl) out.captionsUrl = captionsUrl
+  if (highlightCaptionsUrl) out.highlightCaptionsUrl = highlightCaptionsUrl
   return out.videoUrl || out.youtubeUrl || out.highlightVideoUrl ? out : null
 }
 

@@ -2,6 +2,8 @@
 
 import React from 'react'
 import { EntityVideoSection } from '../../features/entity-video-section'
+import { rebaseCaptionsUrl } from '../../features/captions-url'
+import { useChatRuntime } from '../../../contexts/chat-runtime-context'
 import type { ChatRef } from '../chat-ref.types'
 
 /**
@@ -38,12 +40,18 @@ function readString(value: unknown): string | null {
 export function ChatVideoEntityCard({
   chatRef,
 }: ChatVideoEntityCardProps): React.ReactElement {
+  const runtime = useChatRuntime()
   const m = chatRef.metadata ?? {}
   const videoUrl = readString(m.videoUrl)
   const youtubeUrl = readString(m.youtubeUrl)
   const poster = readString(m.videoPoster)
   const highlightUrl = readString(m.highlightVideoUrl)
   const highlightPoster = readString(m.highlightVideoPoster)
+  // Caption <track> URLs minted server-side (relative `/api/captions/...`),
+  // rebased onto `endpoints.captionsUrlPrefix` — the standard runtime
+  // endpoint wiring, same as every detail-page player.
+  const captionsUrl = rebaseCaptionsUrl(runtime?.endpoints, readString(m.captionsUrl))
+  const highlightCaptionsUrl = rebaseCaptionsUrl(runtime?.endpoints, readString(m.highlightCaptionsUrl))
 
   // No wrapping Card / header — the player is the whole card. The
   // 16:9 aspect / rounded-corners / border come from <Video>'s own
@@ -55,6 +63,8 @@ export function ChatVideoEntityCard({
       highlightVideoUrl={highlightUrl}
       highlightVideoThumbnail={highlightPoster}
       mainVideoPoster={poster}
+      captionsUrl={captionsUrl}
+      highlightCaptionsUrl={highlightCaptionsUrl}
       title={chatRef.title}
       // Intentionally omitted for chat density:
       //   videoSummary    — assistant text above already covers it.
