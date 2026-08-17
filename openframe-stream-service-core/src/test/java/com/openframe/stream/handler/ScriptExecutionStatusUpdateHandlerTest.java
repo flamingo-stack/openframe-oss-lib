@@ -77,7 +77,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
-        verify(scriptExecutionRepository).save(captor.capture());
+        verify(scriptExecutionRepository).applyResult(captor.capture());
         ScriptExecution saved = captor.getValue();
         assertThat(saved.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
         assertThat(saved.getExitCode()).isZero();
@@ -156,8 +156,8 @@ class ScriptExecutionStatusUpdateHandlerTest {
     }
 
     @Test
-    @DisplayName("handle: SCHEDULED source survives the RUNNING→SUCCESS transition (regression: source must not be dropped on completion)")
-    void handle_success_preservesScheduledSource() {
+    @DisplayName("handle: completion goes through the targeted applyResult ($set), NEVER a full-document save — the guard that stops a skewed deploy resetting source→MANUAL")
+    void handle_success_usesTargetedUpdateNotFullSave() {
         ScriptExecution row = runningRow(EXECUTION_ID);
         row.setSource(ExecutionSource.SCHEDULED);
         row.setScheduleId("sched-99");
@@ -167,9 +167,10 @@ class ScriptExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
-        verify(scriptExecutionRepository).save(captor.capture());
+        verify(scriptExecutionRepository).applyResult(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
-        assertThat(captor.getValue().getSource()).isEqualTo(ExecutionSource.SCHEDULED);
+        // A full-document replace is what dropped `source`; the write-back must never use it.
+        verify(scriptExecutionRepository, never()).save(any());
     }
 
     @Test
@@ -182,7 +183,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(EXECUTION_ID, 1, false, null, null, null, null), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
-        verify(scriptExecutionRepository).save(captor.capture());
+        verify(scriptExecutionRepository).applyResult(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
     }
 
@@ -196,7 +197,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(EXECUTION_ID, null, true, null, null, null, null), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
-        verify(scriptExecutionRepository).save(captor.capture());
+        verify(scriptExecutionRepository).applyResult(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(captor.getValue().getTimedOut()).isTrue();
     }
@@ -211,7 +212,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(EXECUTION_ID, 0, false, "SHELL_UNAVAILABLE", null, null, null), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
-        verify(scriptExecutionRepository).save(captor.capture());
+        verify(scriptExecutionRepository).applyResult(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(captor.getValue().getError()).isEqualTo("SHELL_UNAVAILABLE");
     }
@@ -226,7 +227,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
 
-        verify(scriptExecutionRepository, never()).save(any());
+        verify(scriptExecutionRepository, never()).applyResult(any());
     }
 
     @Test
@@ -237,7 +238,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
 
-        verify(scriptExecutionRepository, never()).save(any());
+        verify(scriptExecutionRepository, never()).applyResult(any());
     }
 
     @Test
@@ -251,7 +252,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, huge, huge), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
-        verify(scriptExecutionRepository).save(captor.capture());
+        verify(scriptExecutionRepository).applyResult(captor.capture());
         ScriptExecution saved = captor.getValue();
         assertThat(saved.getStdout().getBytes(StandardCharsets.UTF_8).length)
                 .isLessThanOrEqualTo(ScriptExecution.MAX_OUTPUT_BYTES);
@@ -297,7 +298,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         handler.handle(message, new IntegratedToolEnrichedData());
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
-        verify(scriptExecutionRepository).save(captor.capture());
+        verify(scriptExecutionRepository).applyResult(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
     }
 
@@ -331,7 +332,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         verify(scriptExecutionRepository).findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, "script-b");
         // Must NOT fall back to the ambiguous two-field lookup when scriptId is present.
         verify(scriptExecutionRepository, never()).findByMachineIdAndExecutionId(any(), any());
-        verify(scriptExecutionRepository).save(any(ScriptExecution.class));
+        verify(scriptExecutionRepository).applyResult(any(ScriptExecution.class));
     }
 
     @Test
@@ -344,7 +345,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 5L, "ok", ""), new IntegratedToolEnrichedData());
 
-        verify(scriptExecutionRepository).save(any(ScriptExecution.class));
+        verify(scriptExecutionRepository).applyResult(any(ScriptExecution.class));
         verifyNoInteractions(scheduleScriptExecutionAggregator);
     }
 
@@ -358,7 +359,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 5L, "ok", ""), new IntegratedToolEnrichedData());
 
-        verify(scriptExecutionRepository).save(any(ScriptExecution.class));
+        verify(scriptExecutionRepository).applyResult(any(ScriptExecution.class));
         // From the row, NOT the wire — the leaf's persisted (tenantId, executionId) is the source of truth.
         verify(scheduleScriptExecutionAggregator).aggregate(TENANT_ID, EXECUTION_ID);
     }
@@ -374,7 +375,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
 
-        verify(scriptExecutionRepository, never()).save(any());   // row already terminal — no leaf write
+        verify(scriptExecutionRepository, never()).applyResult(any());   // row already terminal — no leaf write
         // Aggregator IS called: it is idempotent (short-circuits on any RUNNING leaf, atomic
         // conditional-update on all-terminal), and this is our recovery from a prior aggregate()
         // that threw AFTER the leaf save succeeded on a previous delivery of the same Kafka msg.
@@ -392,7 +393,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
 
-        verify(scriptExecutionRepository, never()).save(any());
+        verify(scriptExecutionRepository, never()).applyResult(any());
         verifyNoInteractions(scheduleScriptExecutionAggregator);
     }
 
@@ -412,7 +413,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         handler.handle(message, new IntegratedToolEnrichedData());
 
         verify(scriptExecutionRepository, never()).findByMachineIdAndExecutionIdAndScriptId(any(), any(), any());
-        verify(scriptExecutionRepository, never()).save(any());
+        verify(scriptExecutionRepository, never()).applyResult(any());
     }
 
     private DeserializedDebeziumMessage messageWith(String executionId,

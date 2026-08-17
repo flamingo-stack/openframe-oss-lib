@@ -110,7 +110,7 @@ public class CommandExecutionStatusUpdateHandler
         row.setStderr(truncStderr.value);
         row.setStderrTruncated(truncStderr.truncated);
 
-        commandExecutionRepository.save(row);
+        commandExecutionRepository.applyResult(row);
         log.info("Transitioned CommandExecution row: executionId={} machineId={} status=RUNNING→{} exitCode={} timedOut={}",
                 row.getExecutionId(), row.getMachineId(), newStatus, exitCode, timedOut);
     }

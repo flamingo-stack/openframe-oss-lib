@@ -13,7 +13,7 @@ import java.util.Optional;
  * {@code ScriptExecutionRepository}.
  */
 @Repository
-public interface CommandExecutionRepository extends MongoRepository<CommandExecution, String> {
+public interface CommandExecutionRepository extends MongoRepository<CommandExecution, String>, CustomCommandExecutionRepository {
 
     /** Tenant-scoped lookup by Mongo {@code _id} — backs Relay {@code node(id)} refetch. */
     Optional<CommandExecution> findByTenantIdAndId(String tenantId, String id);
