@@ -61,7 +61,6 @@ public final class Audience {
         return new Audience(userIds, merged);
     }
 
-    // The standard "don't notify the actor" rule.
     public Audience except(String userId) {
         if (userId == null || !userIds.contains(userId)) {
             return this;

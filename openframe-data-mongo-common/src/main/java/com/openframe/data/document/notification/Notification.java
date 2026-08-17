@@ -32,11 +32,7 @@ public class Notification implements TenantScoped {
 
     private String description;
 
-    /**
-     * Spec-driven notification type and its flat fact snapshot. Null on documents written by the
-     * legacy dispatcher path and on pre-migration history; the typed {@link #context} stays the
-     * source of truth until every reader has switched to these two fields.
-     */
+    // Null on legacy-path and pre-migration documents; context stays authoritative until readers switch.
     private String type;
 
     private Map<String, String> attributes;

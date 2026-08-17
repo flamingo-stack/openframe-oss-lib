@@ -16,7 +16,7 @@ public class NotificationTypeRegistry {
 
     private final Map<String, NotificationTypeSpec> byType;
 
-    /** ObjectProvider, not List: a service with zero specs on the classpath must still boot. */
+    // ObjectProvider, not List: a service with zero specs on the classpath must still boot.
     @Autowired
     public NotificationTypeRegistry(ObjectProvider<NotificationTypeSpec> specs) {
         this(specs.orderedStream().toList());

@@ -4,7 +4,6 @@ import lombok.EqualsAndHashCode;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-// Producers and specs reference attributes only through these constants — never string literals.
 @EqualsAndHashCode
 public final class AttrKey {
 

@@ -15,10 +15,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-/**
- * Separate from NotificationNatsPublisherTest on purpose: that file is concurrently edited by the
- * in-flight notification-content PR and these cases must merge independently of it.
- */
+// Separate from NotificationNatsPublisherTest: that file is concurrently edited by the in-flight content PR.
 class NotificationNatsPublisherSpecFieldsTest {
 
     @Test

@@ -12,7 +12,6 @@ import java.util.Set;
 import static java.util.stream.Collectors.toUnmodifiableSet;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-// Immutable fact map. Validation happens once, at the producer boundary; enriched values are spec-authored.
 public final class Attrs {
 
     private static final ObjectMapper JSON = new ObjectMapper();

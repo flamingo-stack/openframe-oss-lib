@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.Locale;
 
-/** Opaque pass-through: maps and lists serialize as-is; used for `Notification.attributes`. */
 @DgsScalar(name = "JSON")
 @Component
 public class JsonScalarConfig implements Coercing<Object, Object> {

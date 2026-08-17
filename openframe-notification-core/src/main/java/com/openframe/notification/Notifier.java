@@ -17,8 +17,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 
-// Throws only on programmer errors (unknown type, broken seed) — producers keep their existing
-// catch-and-log so a notification bug never fails the business flow.
 @Slf4j
 @Service
 @RequiredArgsConstructor

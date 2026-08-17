@@ -28,8 +28,7 @@ public class NotificationMessage {
     private NotificationCategory category;
     private NotificationContext context;
     private NotificationEventType eventType;
-    // Mirrors of the stored document's spec-driven fields; null until the emitter sets them.
-    // Additive next to `context`, which clients keep reading until they migrate.
+    // Additive next to context; null until the emitter sets them.
     private String type;
     private Map<String, String> attributes;
 

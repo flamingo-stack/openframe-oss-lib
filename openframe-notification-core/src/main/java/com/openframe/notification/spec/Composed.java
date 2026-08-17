@@ -4,7 +4,6 @@ import lombok.Getter;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-// The rendered text of one notification; title is mandatory, description may be absent.
 @Getter
 public final class Composed {
 
