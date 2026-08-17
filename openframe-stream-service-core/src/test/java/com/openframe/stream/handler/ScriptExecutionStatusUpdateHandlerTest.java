@@ -13,9 +13,11 @@ import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import com.openframe.stream.service.ScheduleScriptExecutionAggregator;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,7 +59,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new ScriptExecutionStatusUpdateHandler(
-                scriptExecutionRepository, scheduleScriptExecutionAggregator, deviceOnlineDispatchRepository);
+                scriptExecutionRepository, scheduleScriptExecutionAggregator, deviceOnlineDispatchRepository, new RmmExecutionMetrics(new SimpleMeterRegistry()));
     }
 
     @Test

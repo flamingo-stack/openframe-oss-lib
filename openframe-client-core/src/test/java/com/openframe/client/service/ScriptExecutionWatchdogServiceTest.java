@@ -5,6 +5,7 @@ import com.openframe.client.service.rmm.watchdog.ScriptExecutionWatchdogService;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,7 @@ class ScriptExecutionWatchdogServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ScriptExecutionWatchdogService(repository, headerWatchdogService);
+        service = new ScriptExecutionWatchdogService(repository, headerWatchdogService, new SimpleMeterRegistry());
         ReflectionTestUtils.setField(service, "graceSeconds", GRACE);
         ReflectionTestUtils.setField(service, "fallbackThresholdSeconds", FALLBACK);
     }

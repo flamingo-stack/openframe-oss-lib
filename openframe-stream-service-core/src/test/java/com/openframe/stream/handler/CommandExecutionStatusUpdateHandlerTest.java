@@ -10,8 +10,10 @@ import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,7 +47,7 @@ class CommandExecutionStatusUpdateHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new CommandExecutionStatusUpdateHandler(commandExecutionRepository);
+        handler = new CommandExecutionStatusUpdateHandler(commandExecutionRepository, new RmmExecutionMetrics(new SimpleMeterRegistry()));
     }
 
     @Test
