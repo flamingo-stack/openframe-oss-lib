@@ -257,6 +257,10 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
         actorName: typeof data.actorName === 'string' ? data.actorName : undefined,
         actorType: typeof data.actorType === 'string' ? data.actorType : undefined,
         reason: typeof data.reason === 'string' && data.reason.trim() ? data.reason : undefined,
+        targetStatusKind:
+          typeof data.targetStatusKind === 'string' && data.targetStatusKind.trim()
+            ? data.targetStatusKind
+            : undefined,
       }
     }
 
@@ -364,6 +368,7 @@ function applyHistoryEvent(
         actorName: event.actorName,
         actorType: event.actorType,
         reason: event.reason,
+        targetStatusKind: event.targetStatusKind,
       })
       break
 

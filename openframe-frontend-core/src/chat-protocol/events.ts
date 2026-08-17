@@ -264,6 +264,8 @@ export interface TicketEventEvent extends ChatStreamEventBase {
   /** Who acted — e.g. an AI agent vs a human technician. Open string. */
   actorType?: string
   reason?: string
+  /** Kind-token the ticket reopened INTO (AI_ASSISTANCE / TECH_REQUIRED / ...). */
+  targetStatusKind?: string
 }
 
 /** Per-turn metadata. Raw wire values pass through UNVALIDATED — the

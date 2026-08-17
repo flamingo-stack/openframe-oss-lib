@@ -29,6 +29,14 @@ export interface TicketEventMessageProps extends HTMLAttributes<HTMLDivElement> 
   timestamp?: Date
 }
 
+/** Where the ticket reopened INTO → the "who picks it up next" line.
+ *  Kind-tokens per the lifecycle statuses; the vocabulary is open, so an
+ *  unrecognized target falls back to the actor heuristic below. */
+const REOPEN_TARGET_COPY: Record<string, string> = {
+  AI_ASSISTANCE: "The AI assistant will continue helping you in this conversation.",
+  TECH_REQUIRED: "A technician will reply when available.",
+}
+
 /**
  * Ticket lifecycle receipt — resolved / reopened / an unknown future kind.
  * Figma `ai-assistant-info` (type=resolved-fae | resolved-tech |
@@ -37,15 +45,16 @@ export interface TicketEventMessageProps extends HTMLAttributes<HTMLDivElement> 
  * Copy is composed client-side from the event's fields (unlike
  * `ticket_escalated`, whose body the backend authors):
  *   RESOLVED → "Resolved by {actorName}." under a green check;
- *   REOPENED → the reason when the wire carries one, otherwise who picks the
- *     conversation up next, inferred from `actorType` (an AI actor keeps
- *     assisting; anything else means a technician will reply);
+ *   REOPENED → the reason when the wire carries one; otherwise who picks the
+ *     conversation up next — `targetStatusKind` decides deterministically,
+ *     with the `actorType` heuristic as the fallback for older backends
+ *     that don't send the target;
  *   unknown kind → a neutral info line: humanized kind as the title, the
  *     reason or actor as the body. Never dropped — the vocabulary is open.
  */
 const TicketEventMessage = forwardRef<HTMLDivElement, TicketEventMessageProps>(
   ({ data, timestamp, ...props }, ref) => {
-    const { kind, actorName, actorType, reason } = data
+    const { kind, actorName, actorType, reason, targetStatusKind } = data
     const resolved = kind === TICKET_EVENT_KIND.RESOLVED
     const reopened = kind === TICKET_EVENT_KIND.REOPENED
 
@@ -55,11 +64,12 @@ const TicketEventMessage = forwardRef<HTMLDivElement, TicketEventMessageProps>(
     if (resolved) {
       body = actorName ? `Resolved by ${actorName}.` : "The ticket has been resolved."
     } else if (reopened) {
-      body = reason
-        ? `Reason: ${reason}`
-        : isAiActor(actorType)
+      body =
+        (reason ? `Reason: ${reason}` : undefined) ??
+        (targetStatusKind ? REOPEN_TARGET_COPY[targetStatusKind] : undefined) ??
+        (isAiActor(actorType)
           ? `${actorName || "Fae"} will continue assisting in this conversation.`
-          : "A technician will reply when available."
+          : "A technician will reply when available.")
     } else {
       body = reason || (actorName ? `By ${actorName}.` : undefined)
     }

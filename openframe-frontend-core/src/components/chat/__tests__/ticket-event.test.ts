@@ -45,6 +45,7 @@ describe('decodeNatsChunk — TICKET_EVENT', () => {
       actorName: 'Fae',
       actorType: 'AI',
       reason: undefined,
+      targetStatusKind: undefined,
       seq: 7,
     })
   })
@@ -56,6 +57,15 @@ describe('decodeNatsChunk — TICKET_EVENT', () => {
 
   it('prefers the transport-stamped `streamSeq` over the payload copy', () => {
     expect(decodeNatsChunk(resolvedChunk(500, { sequenceId: 499 }))).toMatchObject({ seq: 500 })
+  })
+
+  it('decodes the reopen target kind and folds blanks to undefined', () => {
+    expect(
+      decodeNatsChunk({ type: 'TICKET_EVENT', kind: 'REOPENED', targetStatusKind: 'TECH_REQUIRED', streamSeq: 8 }),
+    ).toMatchObject({ targetStatusKind: 'TECH_REQUIRED' })
+    expect(
+      decodeNatsChunk({ type: 'TICKET_EVENT', kind: 'REOPENED', targetStatusKind: ' ', streamSeq: 9 }),
+    ).toMatchObject({ targetStatusKind: undefined })
   })
 
   it('keeps unknown kinds — the vocabulary is open', () => {
@@ -175,6 +185,15 @@ describe('processHistoricalMessages — ticket event', () => {
     expect(messages).toHaveLength(1)
     expect(events(messages[0].content)[0]).toMatchObject({
       data: { kind: 'REOPENED', reason: 'The printer stopped working again' },
+    })
+  })
+
+  it('replays the persisted reopen target kind', () => {
+    const { messages } = processHistoricalMessages([
+      historyRow('m1', { type: 'TICKET_EVENT', kind: 'REOPENED', targetStatusKind: 'AI_ASSISTANCE' }),
+    ])
+    expect(events(messages[0].content)[0]).toMatchObject({
+      data: { kind: 'REOPENED', targetStatusKind: 'AI_ASSISTANCE' },
     })
   })
 
