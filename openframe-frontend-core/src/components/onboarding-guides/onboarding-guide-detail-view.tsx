@@ -29,7 +29,7 @@ import { EntityVideoSection } from '../features/entity-video-section'
 import { VideoBitesStrip } from '../features/video-bites-strip'
 import { toStripProfile } from '../features/video-bites-shared'
 import { useVideoWarmup } from '../features/use-video-warmup'
-import { getEntityCaptionUrls } from '../features/captions-url'
+import { useCaptions } from '../features/use-captions'
 import { RichMarkdownRenderer } from '../ui/markdown'
 import { EntityTagBadges } from '../features/entity-tag-badges'
 import { LoadError } from '../ui/error-state'
@@ -103,6 +103,7 @@ export function OnboardingGuideDetailView({
 }: OnboardingGuideDetailViewProps) {
   const resolvedBackHref = backHref ?? basePath
   const runtime = useChatRuntime()
+  const captions = useCaptions()
   const router = useRouter()
   // `shell` true → standalone `<PageShell>`; false → padding-only box (no nested
   // <main>) for hosts whose layout already provides the container.
@@ -137,10 +138,9 @@ export function OnboardingGuideDetailView({
     )
   }
 
-  // Track URLs base on `runtime.endpoints.captionsUrlPrefix` (standard
-  // runtime-endpoint wiring); same-origin hosts leave it unset and get the
-  // relative `/api/captions/...` default. Zero per-page wiring either way.
-  const { captionsUrl, highlightCaptionsUrl } = getEntityCaptionUrls(runtime?.endpoints, 'onboarding_guide', guide)
+  // Track URLs via the ONE captions configurer (`useCaptions`); same-origin
+  // hosts get the relative `/api/captions/...` default. Zero per-page wiring.
+  const { captionsUrl, highlightCaptionsUrl } = captions.forEntity('onboarding_guide', guide)
 
   const videoPoster =
     guide.main_video_thumbnail ||

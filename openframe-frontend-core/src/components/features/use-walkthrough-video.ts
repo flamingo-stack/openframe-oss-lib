@@ -18,8 +18,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import type { WalkthroughVideoData } from './floating-walkthrough-video';
-import { rebaseCaptionsUrl } from './captions-url';
-import { useChatRuntime } from '../../contexts/chat-runtime-context';
+import { useCaptions } from './use-captions';
 
 export interface UseWalkthroughVideoOptions {
   /** Absolute or proxied URL of the public GET route. */
@@ -41,7 +40,7 @@ export interface UseWalkthroughVideoResult {
 
 export function useWalkthroughVideo(opts: UseWalkthroughVideoOptions): UseWalkthroughVideoResult {
   const { endpoint, initialData, enabled = true, transformCaptionsUrl } = opts;
-  const runtime = useChatRuntime();
+  const captions = useCaptions();
 
   const query = useQuery<WalkthroughVideoData | null>({
     queryKey: ['walkthrough-video', endpoint],
@@ -72,9 +71,9 @@ export function useWalkthroughVideo(opts: UseWalkthroughVideoOptions): UseWalkth
       if (transformCaptionsUrl && video.captionsUrl.startsWith('/')) {
         return { ...video, captionsUrl: transformCaptionsUrl(video.captionsUrl) };
       }
-      // Default: rebase onto `endpoints.captionsUrlPrefix`. Same-origin hosts
+      // Default: rebase onto the configured captions base. Same-origin hosts
       // leave it unset and get the URL back unchanged — a no-op for them.
-      const rebased = rebaseCaptionsUrl(runtime?.endpoints, video.captionsUrl);
+      const rebased = captions.rebase(video.captionsUrl);
       return rebased === video.captionsUrl ? video : { ...video, captionsUrl: rebased as string };
     },
   });

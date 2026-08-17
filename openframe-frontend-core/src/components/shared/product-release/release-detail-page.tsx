@@ -21,8 +21,8 @@ import { AlertTriangle, ExternalLink, BookMarked, Sparkles, TrendingUp, Wrench }
 import { formatReleaseDate } from '../../../utils/date-formatters';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 import { Video } from '../../features/video';
-import { getEntityCaptionUrls, type CaptionSrtFields } from '../../features/captions-url';
-import { useChatRuntime } from '../../../contexts/chat-runtime-context';
+import { type CaptionSrtFields } from '../../features/captions-url';
+import { useCaptions } from '../../features/use-captions';
 import { DetailPageSkeleton } from '../detail-page-skeleton';
 import type { ChangelogEntry } from '../../../types/product-release';
 import type { TagAssoc } from '../../../types/blog';
@@ -148,7 +148,7 @@ export function ReleaseDetailPage({
   shell = true
 }: ReleaseDetailPageProps) {
   const router = useRouter();
-  const runtime = useChatRuntime();
+  const captions = useCaptions();
   // `shell` true → standalone `<PageShell>`; false → padding-only box (no nested
   // <main>) for hosts whose layout already provides the container.
   const renderShell = (node: ReactNode) =>
@@ -258,7 +258,7 @@ export function ReleaseDetailPage({
   // them); otherwise built HERE from the release's SRT columns, based on
   // `runtime.endpoints.captionsUrlPrefix` (standard runtime-endpoint wiring),
   // so embedders get correctly proxied `<track>` URLs with zero per-host code.
-  const entityCaptions = getEntityCaptionUrls(runtime?.endpoints, 'product_release', release as unknown as CaptionSrtFields);
+  const entityCaptions = captions.forEntity('product_release', release as unknown as CaptionSrtFields);
   const captionsUrl = (release.captionsUrl as string | undefined) ?? entityCaptions.captionsUrl;
   const highlightCaptionsUrl = (release.highlightCaptionsUrl as string | undefined) ?? entityCaptions.highlightCaptionsUrl;
   const breakingChanges = release.breaking_changes as ChangelogEntry[] | undefined;

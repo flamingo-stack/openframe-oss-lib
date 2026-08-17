@@ -9,8 +9,7 @@ import {
 } from '../ui/tabs';
 import type { VideoTeaser } from '../../types/video-processing';
 import { Video } from './video';
-import { getEntityCaptionUrlsById } from './captions-url';
-import { useChatRuntime } from '../../contexts/chat-runtime-context';
+import { useCaptions } from './use-captions';
 import { VideoBitesStrip, type VideoBiteStripItem } from './video-bites-strip';
 import { DEFAULT_VIDEO_BITES_TITLE, type VideoBiteStripProfile } from './video-bites-shared';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
@@ -114,16 +113,16 @@ export function EntityVideoSection({
   captionsEntity,
   priority = false,
 }: EntityVideoSectionProps) {
-  const runtime = useChatRuntime();
+  const captions = useCaptions();
   const hasFullVideo = !!(youtubeUrl || mainVideoUrl);
   const hasHighlight = !!highlightVideoUrl;
   const hasVideo = hasFullVideo || hasHighlight;
 
   // Caption resolution: explicit URL props win (detail pages gate on their
-  // entity's SRT columns); otherwise derive from `captionsEntity` identity via
-  // the runtime's captions base — the zero-knowledge path for chat cards.
+  // entity's SRT columns); otherwise derive from `captionsEntity` identity —
+  // the zero-knowledge path for chat cards.
   const derivedCaptions = captionsEntity
-    ? getEntityCaptionUrlsById(runtime?.endpoints, captionsEntity.type, captionsEntity.id)
+    ? captions.forEntityId(captionsEntity.type, captionsEntity.id)
     : null;
   const captionsUrl = captionsUrlProp ?? derivedCaptions?.captionsUrl;
   const highlightCaptionsUrl = highlightCaptionsUrlProp ?? derivedCaptions?.highlightCaptionsUrl;
