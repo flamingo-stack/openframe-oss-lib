@@ -78,6 +78,21 @@ export interface DropTargetResolver {
   detect: CollisionDetection
   /** Call right before a state update moves a card between columns. */
   freeze: () => void
+  /**
+   * Call from an effect keyed on the moved list, so the freeze outlives the
+   * commit that caused it rather than a fixed slice of wall clock.
+   *
+   * `freeze` alone releases one frame after the HANDLER runs, which assumes the
+   * state update it guards has committed by then. That holds today — dnd-kit
+   * dispatches `onDragOver` from an effect, so the update flushes in the same
+   * commit phase — but it is an assumption about scheduling, and React is free
+   * to break it. Re-arming from the commit removes the assumption.
+   *
+   * A no-op while nothing is frozen, and the frame `freeze` scheduled stays as a
+   * ceiling: a move that resolves to no change commits nothing, and the guard
+   * still has to open on its own.
+   */
+  settle: () => void
   /** Call on drag start / end / cancel. */
   release: () => void
   /** Call on unmount — drops any pending frame. */
@@ -117,6 +132,15 @@ export function createDropTargetResolver(scheduleFrame: FrameScheduler = animati
     cancelFrame = null
   }
 
+  /** Replaces any pending release with a fresh one, one frame out. */
+  const scheduleRelease = () => {
+    clearFrame()
+    cancelFrame = scheduleFrame(() => {
+      cancelFrame = null
+      settling = false
+    })
+  }
+
   const keepLastTarget = (args: CollisionArgs): Collision[] | null => {
     if (lastOverId === null) return null
     const last = args.droppableContainers.find(c => c.id === lastOverId)
@@ -146,11 +170,11 @@ export function createDropTargetResolver(scheduleFrame: FrameScheduler = animati
 
     freeze: () => {
       settling = true
-      clearFrame()
-      cancelFrame = scheduleFrame(() => {
-        cancelFrame = null
-        settling = false
-      })
+      scheduleRelease()
+    },
+
+    settle: () => {
+      if (settling) scheduleRelease()
     },
 
     release: () => {

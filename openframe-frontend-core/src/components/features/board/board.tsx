@@ -86,6 +86,12 @@ export function Board({
   const dropTarget = useMemo(() => createDropTargetResolver(), [])
   useEffect(() => dropTarget.dispose, [dropTarget])
 
+  // Keep a freeze alive across the commit that caused it — see `settle`. Keyed
+  // on `items` because that is the state whose change re-measures the lanes.
+  useEffect(() => {
+    dropTarget.settle()
+  }, [items, dropTarget])
+
   // One stable handler per column id. `onToggleCollapse` keeps its zero-arg
   // shape (public prop), but an inline arrow would hand every lane a new
   // function on every drag frame and defeat `BoardColumn`'s memo — which is the
