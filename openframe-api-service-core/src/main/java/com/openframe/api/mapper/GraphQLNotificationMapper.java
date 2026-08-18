@@ -37,6 +37,8 @@ public class GraphQLNotificationMapper {
                 .createdAt(notification.getCreatedAt())
                 .category(category)
                 .context(context)
+                .type(notification.getType())
+                .attributes(notification.getAttributes())
                 .read(read)
                 .build();
     }
