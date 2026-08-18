@@ -10,6 +10,8 @@ import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.AttrKey;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
+import com.openframe.notification.spec.AudienceResolver;
+import com.openframe.notification.spec.Recipients;
 import com.openframe.notification.spec.NotificationText;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
@@ -40,15 +42,18 @@ class NotificationEmitterTest {
     private enum TestType implements NotificationType { TEST_TYPE, UNREGISTERED }
 
     private NotificationBroadcaster broadcaster;
+    private AudienceResolver audienceResolver;
     private NotificationEmitter emitter;
     private TestSpec spec;
 
     @BeforeEach
     void setUp() {
         broadcaster = mock(NotificationBroadcaster.class);
+        audienceResolver = mock(AudienceResolver.class);
+        when(audienceResolver.resolve(any())).thenReturn(Recipients.of(Set.of("u-9"), Set.of()));
         spec = new TestSpec();
         NotificationTypeRegistry registry = new NotificationTypeRegistry(provider(spec));
-        emitter = new NotificationEmitter(registry, broadcaster);
+        emitter = new NotificationEmitter(registry, broadcaster, audienceResolver);
     }
 
     @Test
@@ -75,9 +80,9 @@ class NotificationEmitterTest {
     }
 
     @Test
-    @DisplayName("An empty audience is a legal outcome — nothing is broadcast, nothing thrown")
+    @DisplayName("A declaration resolving to nobody is a legal outcome — nothing is broadcast, nothing thrown")
     void empty_audience_skips() {
-        spec.audience = Audience.none();
+        when(audienceResolver.resolve(any())).thenReturn(Recipients.of(Set.of(), Set.of()));
         NotificationRequest request = NotificationRequest.of(TestType.TEST_TYPE)
                 .attr(TICKET_ID, "t-1")
                 .build();

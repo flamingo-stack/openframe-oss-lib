@@ -6,6 +6,8 @@ import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
+import com.openframe.notification.spec.AudienceResolver;
+import com.openframe.notification.spec.Recipients;
 import com.openframe.notification.spec.NotificationText;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
@@ -24,6 +26,7 @@ public class NotificationEmitter {
 
     private final NotificationTypeRegistry registry;
     private final NotificationBroadcaster broadcaster;
+    private final AudienceResolver audienceResolver;
 
     public void notify(NotificationRequest request) {
         notify(request, null);
@@ -36,13 +39,14 @@ public class NotificationEmitter {
             NotificationTypeSpec spec = registry.require(type);
             Attrs attrs = Attrs.validated(spec, request.getAttrs());
 
-            Audience audience = spec.audience(attrs);
-            if (audience.isEmpty()) {
-                log.debug("{}: audience is empty — nothing to notify", type.name());
+            Audience declared = spec.audience(attrs);
+            Recipients recipients = audienceResolver.resolve(declared);
+            if (recipients.isEmpty()) {
+                log.debug("{}: audience resolved to nobody — nothing to notify", type.name());
                 return;
             }
 
-            NotificationCommand command = buildCommand(correlationId, spec, attrs, audience);
+            NotificationCommand command = buildCommand(correlationId, spec, attrs, recipients);
             broadcaster.broadcast(command);
         } catch (RuntimeException ex) {
             log.error("Notification emission failed for type {} — swallowed, business flow unaffected",
@@ -53,12 +57,12 @@ public class NotificationEmitter {
     private static NotificationCommand buildCommand(String correlationId,
                                                     NotificationTypeSpec spec,
                                                     Attrs attrs,
-                                                    Audience audience) {
+                                                    Recipients recipients) {
         NotificationText text = spec.compose(attrs);
         String title = text.getTitle();
         String description = text.getDescription();
-        Set<String> users = audience.users();
-        Set<String> machines = audience.machines();
+        Set<String> users = recipients.getUsers();
+        Set<String> machines = recipients.getMachines();
         Map<String, String> attributes = attrs.asMap();
         NotificationSeverity severity = spec.getSeverity();
         NotificationContext legacyContext = spec.buildLegacyContext(attrs);

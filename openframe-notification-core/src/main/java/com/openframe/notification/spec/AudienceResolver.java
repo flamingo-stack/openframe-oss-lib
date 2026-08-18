@@ -19,14 +19,24 @@ public class AudienceResolver {
 
     private final UserRepository userRepository;
 
-    public Set<String> resolveActiveAdmins() {
-        Set<String> audience = new LinkedHashSet<>();
+    public Recipients resolve(Audience declared) {
+        Set<String> users = new LinkedHashSet<>(declared.userIds);
+        if (declared.allActiveAdmins) {
+            Set<String> admins = resolveActiveAdmins();
+            users.addAll(admins);
+        }
+        users.removeAll(declared.excludedUserIds);
+        return Recipients.of(users, declared.machineIds);
+    }
+
+    private Set<String> resolveActiveAdmins() {
+        Set<String> admins = new LinkedHashSet<>();
         for (User user : userRepository.findByRolesInAndStatus(ADMIN_ROLES, UserStatus.ACTIVE)) {
             String id = user.getId();
             if (id != null) {
-                audience.add(id);
+                admins.add(id);
             }
         }
-        return audience;
+        return admins;
     }
 }
