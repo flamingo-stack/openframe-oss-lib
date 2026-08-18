@@ -36,6 +36,7 @@ import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 import { useIosNativeVideoFullscreen } from './use-ios-native-video-fullscreen';
 import { saveDataEnabled } from './use-video-warmup';
+import { useAuthedAssetSrc } from '../../hooks/use-authed-asset-src';
 
 // =============================================================================
 // Dev-only hover→playing latency instrumentation gate. Always on in dev
@@ -647,6 +648,16 @@ function FilePlayer({
   // an early manifest fetch is at most one bounded manifest+segment — the
   // Save-Data verification gate covers it (see plan A2.4).
   const effectivePreload = preload ?? (saveDataEnabled() ? 'none' : 'metadata');
+  // THE captions seam. `<track src>` is a browser subresource: it carries no
+  // custom headers, so it authenticates by cookie only. Fine on the cookie-auth
+  // web, a guaranteed 401 on every HEADER-auth host — native shells and
+  // dev-ticket web — whose caption route sits behind the same proxied
+  // `/content/api/captions` path as every other embedded endpoint. Resolving it
+  // through `useAuthedAssetSrc` puts the track on the SAME single auth knob as
+  // every embedded `fetch` (adapter bearer + 401-refresh-retry), so a host
+  // configures `endpoints.captionsUrlPrefix` and nothing else — no per-surface,
+  // per-host caption plumbing. Cookie-auth hosts get the URL back untouched.
+  const resolvedCaptionsUrl = useAuthedAssetSrc(captionsUrl, 'text/vtt, */*');
   // True while hover playback is running MUTED because the browser's autoplay
   // policy blocked sound (no user activation yet). Drives the center unmute
   // control — the industry pattern (muted autoplay + explicit unmute button)
@@ -1030,10 +1041,10 @@ function FilePlayer({
         ...(fit === 'cover' ? ({ '--media-object-fit': 'cover' } as React.CSSProperties) : {}),
       }}
     >
-      {captionsUrl ? (
+      {resolvedCaptionsUrl ? (
         <track
           kind="captions"
-          src={captionsUrl}
+          src={resolvedCaptionsUrl}
           srcLang="en"
           label="English"
           default
