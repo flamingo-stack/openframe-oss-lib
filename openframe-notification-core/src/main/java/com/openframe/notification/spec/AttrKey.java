@@ -1,9 +1,11 @@
 package com.openframe.notification.spec;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+@Getter
 @EqualsAndHashCode
 public final class AttrKey {
 
@@ -18,9 +20,5 @@ public final class AttrKey {
 
     public static AttrKey of(String name) {
         return new AttrKey(name);
-    }
-
-    public String name() {
-        return name;
     }
 }

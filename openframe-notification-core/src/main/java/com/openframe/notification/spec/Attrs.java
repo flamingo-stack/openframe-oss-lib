@@ -35,7 +35,7 @@ public final class Attrs {
     }
 
     public String get(AttrKey key) {
-        String name = key.name();
+        String name = key.getName();
         String value = values.get(name);
         if (isBlank(value)) {
             throw new NoSuchElementException("attribute '" + name + "' is absent");
@@ -44,7 +44,7 @@ public final class Attrs {
     }
 
     public Optional<String> optional(AttrKey key) {
-        String name = key.name();
+        String name = key.getName();
         String value = values.get(name);
         return Optional.ofNullable(value).filter(v -> !isBlank(v));
     }
@@ -55,7 +55,7 @@ public final class Attrs {
     }
 
     public <T> T json(AttrKey key, TypeReference<T> type) {
-        String name = key.name();
+        String name = key.getName();
         String value = get(key);
         try {
             return JSON.readValue(value, type);
@@ -69,7 +69,7 @@ public final class Attrs {
         if (isBlank(value)) {
             return this;
         }
-        String name = key.name();
+        String name = key.getName();
         Map<String, String> next = new HashMap<>(values);
         next.put(name, value);
         Map<String, String> copied = Map.copyOf(next);
@@ -82,7 +82,7 @@ public final class Attrs {
 
     private static void rejectMissingSeedKeys(NotificationTypeSpec spec, Map<String, String> raw) {
         for (AttrKey key : spec.seedKeys()) {
-            String name = key.name();
+            String name = key.getName();
             String value = raw.get(name);
             if (isBlank(value)) {
                 String type = spec.type();
@@ -93,7 +93,7 @@ public final class Attrs {
     }
 
     private static void rejectUnknownSeedKeys(NotificationTypeSpec spec, Map<String, String> raw) {
-        Set<String> allowed = spec.seedKeys().stream().map(AttrKey::name).collect(toUnmodifiableSet());
+        Set<String> allowed = spec.seedKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
         for (String key : raw.keySet()) {
             if (!allowed.contains(key)) {
                 String type = spec.type();

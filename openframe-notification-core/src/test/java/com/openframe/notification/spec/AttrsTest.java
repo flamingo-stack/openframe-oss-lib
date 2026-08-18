@@ -92,6 +92,6 @@ class AttrsTest {
     @DisplayName("blank AttrKey names are rejected at construction")
     void blank_key_rejected() {
         assertThatThrownBy(() -> AttrKey.of(" ")).isInstanceOf(IllegalArgumentException.class);
-        assertThat(Optional.of(AttrKey.of("ok").name())).contains("ok");
+        assertThat(Optional.of(AttrKey.of("ok").getName())).contains("ok");
     }
 }
