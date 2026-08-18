@@ -52,6 +52,9 @@ export const EP = {
   attachmentViewPrefix: `${CONTENT}/storage/view/chat-attachments/`,
   identity: `${CONTENT}/auth/identity`,
   imageProxy: `${CONTENT}/image-proxy`,
+  // Native track VTT captions route — the lib appends /entityType/entityId?v=...
+  // so this is a prefix, not a full URL.
+  captions: `${CONTENT}/captions`,
   ogPlaceholder: (title: string) => `${CONTENT}/og-placeholder?title=${encodeURIComponent(title)}`,
   // walkthrough video (per-platform floating demo video)
   walkthroughVideo: `${CONTENT}/walkthrough-video`,

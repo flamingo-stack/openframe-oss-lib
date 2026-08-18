@@ -54,6 +54,9 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       attachmentViewUrlPrefix: EP.attachmentViewPrefix,
       identityUrl: EP.identity,
       imageProxyUrlPrefix: EP.imageProxy,
+      // Caption <track> URLs (main + highlight) for every video surface —
+      // release detail, onboarding guides, walkthrough widget — base here.
+      captionsUrlPrefix: EP.captions,
       // Help Center tickets — reads/writes + live stream + unread state,
       // all proxied under `/content` like every other endpoint (the bare
       // `/api/chat/agent/*` fallback in vite.config.ts is no longer relied
