@@ -131,7 +131,7 @@ class NotifierTest {
         }
 
         @Override public com.openframe.data.document.notification.NotificationContext buildLegacyContext(Attrs attrs) {
-            return GenericContext.builder().type(type()).payload("{}").build();
+            return GenericContext.builder().type(getType()).payload("{}").build();
         }
     }
 }
