@@ -7,7 +7,7 @@ import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.AttrKey;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
-import com.openframe.notification.spec.Composed;
+import com.openframe.notification.spec.NotificationText;
 import com.openframe.notification.spec.NotificationTypeRegistry;
 import com.openframe.notification.spec.NotificationTypeSpec;
 import org.junit.jupiter.api.BeforeEach;
@@ -107,30 +107,30 @@ class NotifierTest {
         Audience audience = Audience.users("u-9");
         String extraValue;
 
-        @Override public String type() { return "TEST_TYPE"; }
-        @Override public Set<AttrKey> seedKeys() { return Set.of(TICKET_ID); }
+        @Override public String getType() { return "TEST_TYPE"; }
+        @Override public Set<AttrKey> getRequiredSeedKeys() { return Set.of(TICKET_ID); }
 
         @Override public Attrs enrich(Attrs seed) {
             Attrs enriched = seed.with(ASSIGNEE, "u-9");
             return extraValue == null ? enriched : enriched.with(AttrKey.of("blob"), extraValue);
         }
 
-        @Override public Optional<com.openframe.data.document.notification.NotificationSettingGroup> checkbox() {
+        @Override public Optional<com.openframe.data.document.notification.NotificationSettingGroup> getSettingsGroup() {
             return Optional.empty();
         }
 
-        @Override public com.openframe.data.document.notification.NotificationCategory category() {
+        @Override public com.openframe.data.document.notification.NotificationCategory getCategory() {
             return com.openframe.data.document.notification.NotificationCategory.TICKETS;
         }
 
-        @Override public NotificationSeverity severity(Attrs attrs) { return NotificationSeverity.INFO; }
+        @Override public NotificationSeverity getSeverity() { return NotificationSeverity.INFO; }
         @Override public Audience audience(Attrs attrs) { return audience; }
 
-        @Override public Composed compose(Attrs attrs) {
-            return new Composed("Ticket " + attrs.get(TICKET_ID), "Assigned to " + attrs.get(ASSIGNEE));
+        @Override public NotificationText compose(Attrs attrs) {
+            return new NotificationText("Ticket " + attrs.get(TICKET_ID), "Assigned to " + attrs.get(ASSIGNEE));
         }
 
-        @Override public com.openframe.data.document.notification.NotificationContext legacyContext(Attrs attrs) {
+        @Override public com.openframe.data.document.notification.NotificationContext buildLegacyContext(Attrs attrs) {
             return GenericContext.builder().type(type()).payload("{}").build();
         }
     }

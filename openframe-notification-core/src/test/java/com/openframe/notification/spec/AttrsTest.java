@@ -53,7 +53,7 @@ class AttrsTest {
     @DisplayName("A declared optional key is kept when present and legal to omit")
     void optional_seed_key_kept_or_omitted() {
         NotificationTypeSpec spec = spec(Set.of(TICKET_ID));
-        when(spec.optionalSeedKeys()).thenReturn(Set.of(ACTOR_ID));
+        when(spec.getOptionalSeedKeys()).thenReturn(Set.of(ACTOR_ID));
 
         Attrs present = Attrs.seed(spec, Map.of("ticketId", "t-1", "actorId", "u-1"));
         Attrs absent = Attrs.seed(spec, Map.of("ticketId", "t-1"));
@@ -96,9 +96,9 @@ class AttrsTest {
 
     private static NotificationTypeSpec spec(Set<AttrKey> seedKeys) {
         NotificationTypeSpec spec = mock(NotificationTypeSpec.class);
-        when(spec.type()).thenReturn("TEST_TYPE");
-        when(spec.seedKeys()).thenReturn(seedKeys);
-        when(spec.optionalSeedKeys()).thenReturn(Set.of());
+        when(spec.getType()).thenReturn("TEST_TYPE");
+        when(spec.getRequiredSeedKeys()).thenReturn(seedKeys);
+        when(spec.getOptionalSeedKeys()).thenReturn(Set.of());
         return spec;
     }
 

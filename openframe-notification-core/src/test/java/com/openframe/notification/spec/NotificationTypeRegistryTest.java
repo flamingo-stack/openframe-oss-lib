@@ -51,7 +51,7 @@ class NotificationTypeRegistryTest {
 
     private static NotificationTypeSpec spec(String type) {
         NotificationTypeSpec spec = mock(NotificationTypeSpec.class);
-        when(spec.type()).thenReturn(type);
+        when(spec.getType()).thenReturn(type);
         return spec;
     }
 }

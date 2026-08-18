@@ -6,7 +6,7 @@ import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
-import com.openframe.notification.spec.Composed;
+import com.openframe.notification.spec.NotificationText;
 import com.openframe.notification.spec.NotificationTypeRegistry;
 import com.openframe.notification.spec.NotificationTypeSpec;
 import lombok.RequiredArgsConstructor;
@@ -53,14 +53,14 @@ public class Notifier {
                                                     NotificationTypeSpec spec,
                                                     Attrs attrs,
                                                     Audience audience) {
-        Composed text = spec.compose(attrs);
+        NotificationText text = spec.compose(attrs);
         String title = text.getTitle();
         String description = text.getDescription();
         Set<String> users = audience.users();
         Set<String> machines = audience.machines();
         Map<String, String> attributes = attrs.asMap();
-        NotificationSeverity severity = spec.severity(attrs);
-        NotificationContext legacyContext = spec.legacyContext(attrs);
+        NotificationSeverity severity = spec.getSeverity();
+        NotificationContext legacyContext = spec.buildLegacyContext(attrs);
         return NotificationCommand.builder()
                 .type(type)
                 .attributes(attributes)

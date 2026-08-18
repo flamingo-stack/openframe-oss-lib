@@ -5,7 +5,7 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public final class Composed {
+public final class NotificationText {
 
     private final String title;
     private final String description;

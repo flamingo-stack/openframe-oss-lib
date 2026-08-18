@@ -10,36 +10,37 @@ import java.util.Set;
 
 public interface NotificationTypeSpec {
 
-    String type();
+    String getType();
 
-    Set<AttrKey> seedKeys();
+    // Producer contract: ids plus event-only facts that cannot be re-fetched later.
+    Set<AttrKey> getRequiredSeedKeys();
 
     // Facts that may legitimately be absent (e.g. no acting user on system transitions).
-    default Set<AttrKey> optionalSeedKeys() {
+    default Set<AttrKey> getOptionalSeedKeys() {
         return Set.of();
     }
 
     Attrs enrich(Attrs seed);
 
     // Empty = no settings checkbox = the type cannot be muted (same contract as the legacy descriptors).
-    Optional<NotificationSettingGroup> checkbox();
+    Optional<NotificationSettingGroup> getSettingsGroup();
 
-    NotificationCategory category();
+    NotificationCategory getCategory();
 
-    NotificationSeverity severity(Attrs attrs);
+    NotificationSeverity getSeverity();
 
     Audience audience(Attrs attrs);
 
-    Composed compose(Attrs attrs);
+    NotificationText compose(Attrs attrs);
 
-    default Composed composeForMachine(Attrs attrs) {
+    default NotificationText composeForMachine(Attrs attrs) {
         return compose(attrs);
     }
 
-    default Set<AttrKey> actionKeys() {
+    default Set<AttrKey> getPushActionKeys() {
         return Set.of();
     }
 
     // Transitional — deleted together with the context classes; do not build on it.
-    NotificationContext legacyContext(Attrs attrs);
+    NotificationContext buildLegacyContext(Attrs attrs);
 }

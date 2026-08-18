@@ -19,7 +19,7 @@ public class NotificationTypeRegistry {
     // ObjectProvider, not List: a service with zero specs on the classpath must still boot.
     // toUnmodifiableMap throws IllegalStateException on a duplicate type — the wanted fail-fast.
     public NotificationTypeRegistry(ObjectProvider<NotificationTypeSpec> specs) {
-        this.byType = specs.stream().collect(toUnmodifiableMap(NotificationTypeSpec::type, identity()));
+        this.byType = specs.stream().collect(toUnmodifiableMap(NotificationTypeSpec::getType, identity()));
         TreeSet<String> sortedTypes = new TreeSet<>(byType.keySet());
         log.info("Registered {} notification type(s): {}", byType.size(), sortedTypes);
     }

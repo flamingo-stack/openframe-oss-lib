@@ -83,11 +83,11 @@ public final class Attrs {
     }
 
     private static void rejectMissingSeedKeys(NotificationTypeSpec spec, Map<String, String> raw) {
-        for (AttrKey key : spec.seedKeys()) {
+        for (AttrKey key : spec.getRequiredSeedKeys()) {
             String name = key.getName();
             String value = raw.get(name);
             if (isBlank(value)) {
-                String type = spec.type();
+                String type = spec.getType();
                 throw new IllegalArgumentException(
                         type + ": required seed attribute '" + name + "' is missing or blank");
             }
@@ -109,15 +109,15 @@ public final class Attrs {
             }
         }
         if (!dropped.isEmpty()) {
-            String type = spec.type();
+            String type = spec.getType();
             log.warn("{}: ignoring undeclared seed attribute(s) {}", type, dropped);
         }
         return Map.copyOf(kept);
     }
 
     private static Set<String> declaredKeyNames(NotificationTypeSpec spec) {
-        Set<String> required = spec.seedKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
-        Set<String> optional = spec.optionalSeedKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
+        Set<String> required = spec.getRequiredSeedKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
+        Set<String> optional = spec.getOptionalSeedKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
         Set<String> declared = new TreeSet<>(required);
         declared.addAll(optional);
         return declared;
