@@ -182,11 +182,6 @@ export interface ApprovalResolvedEvent extends ChatStreamEventBase {
   approvalType?: string
   resolvedByName?: string | null
   receiptText?: string
-  /** Inline post-approve card: the ref payload + its documentType +
-   *  the `[card://…]` marker (SSE only). */
-  cardRef?: unknown
-  cardType?: string
-  marker?: string
   result?: DecisionResolvedFrame['result']
   willAutoContinue?: boolean
   /** Set when the resolution came from a Product Guide frame — see {@link GuideOrigin}. */
@@ -256,6 +251,23 @@ export interface TicketEscalatedEvent extends ChatStreamEventBase {
   text?: string
 }
 
+/** Ticket lifecycle receipt (`TICKET_EVENT`) — the ticket was resolved,
+ *  reopened, etc. `kind` is an OPEN vocabulary (RESOLVED/REOPENED today):
+ *  an unknown kind still decodes and renders as a neutral line rather than
+ *  being dropped, so the backend can add kinds without a client release.
+ *  Arrives standalone (outside MESSAGE_START/END), like `ticket-escalated`. */
+export interface TicketEventEvent extends ChatStreamEventBase {
+  type: 'ticket-event'
+  kind: string
+  actorId?: string
+  actorName?: string
+  /** Who acted — e.g. an AI agent vs a human technician. Open string. */
+  actorType?: string
+  reason?: string
+  /** Kind-token the ticket reopened INTO (AI_ASSISTANCE / TECH_REQUIRED / ...). */
+  targetStatusKind?: string
+}
+
 /** Per-turn metadata. Raw wire values pass through UNVALIDATED — the
  *  consumer replicates the legacy truthiness/typeof gates (so a
  *  malformed frame degrades identically to the pre-SSOT parser). */
@@ -267,7 +279,6 @@ export interface ChatMetadataEvent extends ChatStreamEventBase {
   modelName?: string | null
   contextWindowMaxTokens?: number | null
   sources?: unknown
-  refs?: unknown
   scrollAnchor?: unknown
   /** Server-minted conversation id (`ChatMetadataFrame.conversationId`),
    *  passed through raw like every other catch-all field — the consumer
@@ -371,6 +382,7 @@ export type ChatStreamEvent =
   | EscalationOfferEvent
   | EscalationOfferResolvedEvent
   | TicketEscalatedEvent
+  | TicketEventEvent
   | ChatMetadataEvent
   | UsageEvent
   | TokenUsageEvent

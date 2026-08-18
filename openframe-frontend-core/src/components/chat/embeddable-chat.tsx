@@ -1516,7 +1516,7 @@ function EmbeddableChatInner({
   const guideUserAvatar =
     activeMode === 'guide' ? identityUser?.avatarUrl?.trim() || undefined : undefined
 
-  // Map docMessages → lib's Message type, forwarding chatRefs + scrollAnchor.
+  // Map docMessages → lib's Message type, forwarding scrollAnchor.
   const messages: Message[] = useMemo(() => {
     const cache = timestampCacheRef.current
     const seenIds = new Set<string>()
@@ -1552,7 +1552,6 @@ function EmbeddableChatInner({
         // as an ordinary bubble. This field-by-field rebuild has to forward it
         // explicitly — see `Message.hidden` and `chat-message-list`'s skip.
         ...(m.hidden ? { hidden: true } : {}),
-        ...(m.chatRefs ? { chatRefs: m.chatRefs } : {}),
         ...(m.scrollAnchor ? { scrollAnchor: m.scrollAnchor } : {}),
         // Forward attached context items so the user bubble renders its chips.
         ...(m.contextItems && m.contextItems.length > 0

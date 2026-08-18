@@ -7,8 +7,9 @@
  *
  * The client persists ONLY the server-issued conversation id (see
  * `chat-conversation-storage.ts`); this hook turns that id back into rendered
- * history: message bubbles, inline entity-card refs (per send index, same
- * `sendIdx` scheme as live turns), and the send counter.
+ * history: message bubbles and the send counter. Inline entity cards need no
+ * per-row metadata — they hydrate by id from the `[card://…]` markers in the
+ * message content via the card fetch path.
  *
  * Failure semantics: a fetch/parse failure simply leaves the UI empty — the
  * SERVER still resolves full history for the next turn (it re-reads
@@ -17,7 +18,6 @@
  */
 
 import { useEffect, useRef, useState, type MutableRefObject } from 'react'
-import type { ChatRef } from '../chat-ref.types'
 import type { Message } from './use-chat'
 import { chatAuthedFetch } from '../utils/chat-authed-fetch'
 import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../utils/auto-continuation-directive'
@@ -31,14 +31,17 @@ export interface UseChatHistoryHydrationArgs {
   historyUrl: string
   /** The server-issued conversation id (null = nothing to hydrate). */
   conversationIdRef: MutableRefObject<string | null>
-  /** Per-send inline entity-card refs — repopulated from `chat_refs`. */
-  refsMapRef: MutableRefObject<Map<number, Record<string, ChatRef>>>
   /** User-send counter — set to the hydrated user-turn count so the next
    *  live send lands on the following `sendIdx`. */
   sendCountRef: MutableRefObject<number>
   /** `useChat`'s injection primitive (replace-or-prepend). */
-  hydrateMessages: (history: Message[]) => void
-  /** Invalidates the adapter's `latestMeta` memo after refs repopulate. */
+  hydrateMessages: (
+    history: Message[],
+    /** Per-send "Sources used" chips restored from the persisted audit copy
+     *  (`[sendIdx, sources[]]` entries for the reducer's sourcesMap). */
+    sourcesSeed?: Array<[number, unknown[]]>,
+  ) => void
+  /** Invalidates the adapter's `latestMeta` memo after hydration lands. */
   bumpMetaTick: () => void
 }
 
@@ -56,7 +59,6 @@ export function useChatHistoryHydration({
   source,
   historyUrl,
   conversationIdRef,
-  refsMapRef,
   sendCountRef,
   hydrateMessages,
   bumpMetaTick,
@@ -90,6 +92,11 @@ export function useChatHistoryHydration({
         const rows = Array.isArray(body?.messages) ? body!.messages! : []
         if (cancelled || rows.length === 0) return
         const hydrated: Message[] = []
+        // Per-send "Sources used" chips, restored from the persisted audit
+        // copy the history route projects as `sources` on assistant rows —
+        // seeded into the reducer's sourcesMap so chips survive a refresh
+        // exactly like live turns. Keyed by send index (last row wins).
+        const sourcesSeed = new Map<number, unknown[]>()
         let userTurns = 0
         for (const row of rows) {
           const role =
@@ -103,13 +110,9 @@ export function useChatHistoryHydration({
             (content === '' || content.startsWith(AUTO_CONTINUATION_DIRECTIVE_PREFIX))
           if (role === 'user') {
             userTurns += 1
-          } else if (row.chat_refs && typeof row.chat_refs === 'object') {
-            // Re-attach inline entity-card refs at the send index this
-            // assistant row belongs to (same sendIdx scheme as live turns).
-            refsMapRef.current.set(
-              Math.max(0, userTurns - 1),
-              row.chat_refs as Record<string, ChatRef>,
-            )
+          }
+          if (role === 'assistant' && Array.isArray(row.sources) && row.sources.length > 0) {
+            sourcesSeed.set(Math.max(0, userTurns - 1), row.sources as unknown[])
           }
           hydrated.push({
             id: `hydrated-${String(row.seq ?? hydrated.length)}`,
@@ -123,7 +126,7 @@ export function useChatHistoryHydration({
         }
         if (cancelled || hydrated.length === 0) return
         sendCountRef.current = userTurns
-        hydrateMessages(hydrated)
+        hydrateMessages(hydrated, Array.from(sourcesSeed.entries()))
         bumpMetaTick()
       } catch {
         // Fetch failed — start empty; the server still owns history (above).

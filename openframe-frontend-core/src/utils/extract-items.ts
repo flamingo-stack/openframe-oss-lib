@@ -17,6 +17,7 @@ export function extractItems(data: unknown): unknown[] {
   if (Array.isArray(obj.items)) return obj.items
   if (Array.isArray(obj.posts)) return obj.posts
   if (Array.isArray(obj.campaigns)) return obj.campaigns
+  if (Array.isArray(obj.faqs)) return obj.faqs
   if (Array.isArray(obj.completed) || Array.isArray(obj.inProgress)) {
     // Delivery endpoint splits into completed/inProgress arrays — flatten.
     const completed = Array.isArray(obj.completed) ? obj.completed : []

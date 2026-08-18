@@ -344,25 +344,32 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
         <NavigationSidebarHeader minimized={minimized} />
 
         <div className="flex-1 flex flex-col justify-between py-4 overflow-y-auto">
-          {/* `aria-busy` on the nav, not the rows: the region is what is loading,
-              and each placeholder row is already `aria-hidden`. */}
-          <nav className="flex flex-col" aria-label="Primary navigation" aria-busy={!!loadingRows}>
-            {loadingRows
-              ? loadingRows.primary.map(key => (
-                  <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />
-                ))
-              : primaryItems.map(item => (
-                  <NavigationSidebarItemButton
-                    key={item.id}
-                    item={item}
-                    isActive={item.id === committedActiveId}
-                    isPending={item.id === pendingItemId}
-                    showLabel={showLabel}
-                    disabled={disabled}
-                    onClick={handleItemClick}
-                  />
-                ))}
-          </nav>
+          {/* The top slot and the primary nav are ONE `justify-between` child.
+              As siblings they would be three, and the spare space would open
+              between the slot and the nav instead of between the two navs. */}
+          <div className="flex flex-col">
+            {config.topSlot?.({ minimized })}
+
+            {/* `aria-busy` on the nav, not the rows: the region is what is loading,
+                and each placeholder row is already `aria-hidden`. */}
+            <nav className="flex flex-col" aria-label="Primary navigation" aria-busy={!!loadingRows}>
+              {loadingRows
+                ? loadingRows.primary.map(key => (
+                    <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />
+                  ))
+                : primaryItems.map(item => (
+                    <NavigationSidebarItemButton
+                      key={item.id}
+                      item={item}
+                      isActive={item.id === committedActiveId}
+                      isPending={item.id === pendingItemId}
+                      showLabel={showLabel}
+                      disabled={disabled}
+                      onClick={handleItemClick}
+                    />
+                  ))}
+            </nav>
+          </div>
 
           {(loadingRows ? loadingRows.secondary.length > 0 : secondaryItems.length > 0) && (
             <nav className="flex flex-col" aria-label="Secondary navigation" aria-busy={!!loadingRows}>

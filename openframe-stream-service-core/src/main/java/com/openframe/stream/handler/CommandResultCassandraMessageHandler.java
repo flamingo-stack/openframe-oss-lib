@@ -65,6 +65,8 @@ public class CommandResultCassandraMessageHandler
             return;
         }
 
+        log.debug("Handling command result (Cassandra write): executionId={} machineId={}", executionId, machineId);
+
         CommandResult row = new CommandResult();
         row.setKey(new CommandResult.CommandResultKey(executionId, machineId));
         row.setResult(buildResultJson(after));

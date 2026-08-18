@@ -34,6 +34,7 @@ import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, us
 import MuxPlayer from '@mux/mux-player-react';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { useIosNativeVideoFullscreen } from './use-ios-native-video-fullscreen';
 import { saveDataEnabled } from './use-video-warmup';
 
 // =============================================================================
@@ -937,6 +938,10 @@ function FilePlayer({
     try { el.addEventListener('ended', handler); } catch { /* ignore */ }
     return () => { try { el.removeEventListener?.('ended', handler); } catch { /* ignore */ } };
   }, []);
+
+  // In the iOS shell the fullscreen control goes to Apple's video player rather
+  // than to element fullscreen, which WebKit exits by breaking the safe areas.
+  useIosNativeVideoFullscreen(hoverPlayerRef);
 
   // Imperative handle — snapshot getters + control mutators for handoff.
   useImperativeHandle(playerHandleRef, (): VideoPlayerHandle => ({

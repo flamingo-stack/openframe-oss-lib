@@ -216,16 +216,12 @@ class ScriptExecutionDataFetcherTest {
     }
 
     @Test
-    @DisplayName("initiator: a null initiatedBy (system-triggered) resolves to the synthetic SYSTEM user — UI shows SYSTEM, not \"Unknown user\"; no DataLoader interaction")
-    void initiator_nullInitiatedBy_resolvesToSystemUser() throws Exception {
+    @DisplayName("initiator: a null initiatedBy short-circuits to null — no DataLoader interaction")
+    void initiator_nullInitiatedBy_returnsNull() throws Exception {
         DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
         doReturn(ScriptExecutionResponse.builder().initiatedBy(null).build()).when(dfe).getSource();
 
-        UserResponse result = dataFetcher.initiator(dfe).get();
-
-        assertThat(result.getId()).isEqualTo(UserResponse.SYSTEM_ID);
-        assertThat(result.getFirstName()).isEqualTo("SYSTEM");
-        verify(dfe, org.mockito.Mockito.never()).getDataLoader(any(String.class));
+        assertThat(dataFetcher.initiator(dfe).get()).isNull();
         verifyNoInteractions(scriptExecutionService);
     }
 

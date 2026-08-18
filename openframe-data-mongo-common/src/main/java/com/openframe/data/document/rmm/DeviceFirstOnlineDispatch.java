@@ -1,4 +1,4 @@
-package com.openframe.data.document.device;
+package com.openframe.data.document.rmm;
 
 import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
@@ -17,13 +17,13 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "machine_first_online_dispatch")
 @CompoundIndex(
-        name = "tenant_machineId",
-        def = "{'tenantId': 1, 'machineId': 1}",
+        name = "tenant_machineId_scheduleId",
+        def = "{'tenantId': 1, 'machineId': 1, 'scheduleId': 1}",
         unique = true)
 @CompoundIndex(
         name = "pending_by_first_seen",
-        def = "{'dispatchedAt': 1, 'firstSeenAt': 1}")
-public class MachineFirstOnlineDispatch implements TenantScoped {
+        def = "{'status': 1, 'firstSeenAt': 1}")
+public class DeviceFirstOnlineDispatch implements TenantScoped {
 
     @Id
     private String id;
@@ -32,7 +32,11 @@ public class MachineFirstOnlineDispatch implements TenantScoped {
 
     private String machineId;
 
+    private String scheduleId;
+
     private Instant firstSeenAt;
 
     private Instant dispatchedAt;
+
+    private DeviceOnlineDispatchStatus status;
 }

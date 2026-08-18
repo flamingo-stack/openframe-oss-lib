@@ -9,7 +9,9 @@ use redb::{Database, ReadableTable, ReadableTableMetadata, TableDefinition};
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
-use crate::config::update_config::{OUTBOX_MAX_ENTRIES, OUTBOX_MAX_PAYLOAD_BYTES};
+use crate::config::update_config::{
+    NATS_PAYLOAD_FALLBACK_BYTES, NATS_PAYLOAD_HEADROOM_BYTES, OUTBOX_MAX_ENTRIES,
+};
 use crate::models::RmmResult;
 
 const JOURNAL: TableDefinition<&str, &[u8]> = TableDefinition::new("journal");
@@ -22,6 +24,13 @@ const ERROR_INTERRUPTED: &str = "interrupted by agent restart; outcome unknown";
 
 pub trait ResultPublisher: Send + Sync {
     fn publish_raw(&self, subject: &str, bytes: &[u8]) -> impl Future<Output = Result<()>> + Send;
+    fn max_payload(&self) -> impl Future<Output = Option<usize>> + Send;
+}
+
+pub fn payload_limit(max_payload: Option<usize>) -> usize {
+    max_payload
+        .unwrap_or(NATS_PAYLOAD_FALLBACK_BYTES)
+        .saturating_sub(NATS_PAYLOAD_HEADROOM_BYTES)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,16 +112,16 @@ impl ResultStore {
         self.db.is_some()
     }
 
-    pub fn encode_result(result: &RmmResult) -> Vec<u8> {
+    pub fn encode_result(result: &RmmResult, max_bytes: usize) -> Vec<u8> {
         let full = serde_json::to_vec(result).unwrap_or_default();
-        if full.len() <= OUTBOX_MAX_PAYLOAD_BYTES {
+        if full.len() <= max_bytes {
             return full;
         }
         let mut capped = result.clone();
         capped.error = Some(TRUNCATION_MARKER.to_string());
         loop {
             let bytes = serde_json::to_vec(&capped).unwrap_or_default();
-            if bytes.len() <= OUTBOX_MAX_PAYLOAD_BYTES {
+            if bytes.len() <= max_bytes {
                 return bytes;
             }
             if !capped.stdout.is_empty() {
@@ -262,7 +271,7 @@ impl ResultStore {
                 script_id: record.script_id.clone(),
                 schedule_id: record.schedule_id.clone(),
             };
-            let bytes = Self::encode_result(&result);
+            let bytes = Self::encode_result(&result, payload_limit(None));
             self.complete(key, record.subject, bytes).await?;
         }
         if count > 0 {

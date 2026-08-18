@@ -70,12 +70,19 @@ export function readFetchedCardTitle(item: unknown): string | null {
   return null
 }
 
-/** Read `item.platforms` when it is an array — the hub composer keys its
- *  cross-platform topology off it; the embedder default ignores it. */
-function readPlatforms(item: unknown): Array<{ name?: string }> | undefined {
+/** Read the row's platform-association array — the hub composer keys its
+ *  cross-platform topology off it; the embedder default ignores it. Hub
+ *  list-API rows carry the array under the registry arrayKey
+ *  `<canonicalType>_platforms` (e.g. `blog_post_platforms`), with a plain
+ *  `platforms` fallback for shapes that use the generic key. */
+function readPlatforms(item: unknown, canonicalType: string): Array<{ name?: string }> | undefined {
   if (!item || typeof item !== 'object') return undefined
-  const platforms = (item as { platforms?: unknown }).platforms
-  return Array.isArray(platforms) ? (platforms as Array<{ name?: string }>) : undefined
+  const obj = item as Record<string, unknown>
+  for (const key of [`${canonicalType}_platforms`, 'platforms']) {
+    const platforms = obj[key]
+    if (Array.isArray(platforms)) return platforms as Array<{ name?: string }>
+  }
+  return undefined
 }
 
 /**
@@ -90,15 +97,16 @@ export function resolveFetchedCardHref({
   composeContentUrl,
 }: FetchedCardHrefInput): { href: string; targetPlatform: string | null } | null {
   if (!composeContentUrl || !contentRefType || !id) return null
+  const canonicalType = canonicalContentRefType(contentRefType)
   return composeContentUrl({
     // The card registry keys some entries by the legacy rail vocabulary
     // (`blog_post_existing`) because that is what `buildListUrl` expects.
     // The seam speaks the CANONICAL vocabulary — a host's `hostedTypes` /
     // `overrides` are written against `blog_post`, so an un-aliased type
     // misses them all and lands on `<origin>/blog_post_existing/<slug>`.
-    type: canonicalContentRefType(contentRefType),
+    type: canonicalType,
     identifier: id,
     slug: readSlug(item),
-    platforms: readPlatforms(item),
+    platforms: readPlatforms(item, canonicalType),
   })
 }

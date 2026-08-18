@@ -57,7 +57,6 @@ export function mapLeadingFrame(meta: any, out: ChatStreamEvent[]): void {
     const status = meta.action === 'rejected' ? 'rejected' : 'approved'
     const toolName = typeof meta.tool_name === 'string' ? meta.tool_name : undefined
     const result = meta.result ?? null
-    const card = meta.card ?? null
     out.push({
       type: 'approval-resolved',
       status,
@@ -65,9 +64,6 @@ export function mapLeadingFrame(meta: any, out: ChatStreamEvent[]): void {
       willAutoContinue: meta.willAutoContinue === true,
       ...(toolName ? { toolName } : {}),
       ...(result ? { result } : {}),
-      ...(card?.marker ? { marker: card.marker } : {}),
-      ...(card?.ref ? { cardRef: card.ref } : {}),
-      ...(card?.type ? { cardType: card.type } : {}),
       ...(typeof meta.receiptText === 'string' ? { receiptText: meta.receiptText } : {}),
       requestId: typeof meta.proposalId === 'string' ? meta.proposalId : undefined,
     })
@@ -163,7 +159,6 @@ export function mapLeadingFrame(meta: any, out: ChatStreamEvent[]): void {
     out.push({
       type: 'metadata',
       sources: meta.sources,
-      refs: meta.refs,
       provider: meta.provider,
       modelLabel: meta.modelLabel,
       modelName: meta.model,
