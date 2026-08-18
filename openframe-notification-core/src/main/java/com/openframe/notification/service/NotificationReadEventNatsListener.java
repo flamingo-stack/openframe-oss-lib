@@ -1,10 +1,10 @@
-package com.openframe.data.nats.service;
+package com.openframe.notification.service;
 
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.model.NotificationEventType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
-import com.openframe.data.service.notification.NotificationReadEvent;
-import com.openframe.data.service.notification.NotificationReadEventListener;
+import com.openframe.notification.readstate.NotificationReadEvent;
+import com.openframe.notification.readstate.NotificationReadEventListener;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;

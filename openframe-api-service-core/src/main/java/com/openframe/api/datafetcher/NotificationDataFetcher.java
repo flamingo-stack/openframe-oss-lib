@@ -16,7 +16,7 @@ import com.openframe.api.service.NotificationService;
 import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.RecipientType;
-import com.openframe.data.service.notification.NotificationReadStateService;
+import com.openframe.notification.readstate.NotificationReadStateService;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;

@@ -1,4 +1,4 @@
-package com.openframe.data.service.notification;
+package com.openframe.notification.readstate;
 
 /**
  * SPI for reacting to persisted read-state transitions (push retraction, live web updates, …).

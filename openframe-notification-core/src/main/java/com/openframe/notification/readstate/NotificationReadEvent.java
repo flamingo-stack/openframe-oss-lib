@@ -1,4 +1,4 @@
-package com.openframe.data.service.notification;
+package com.openframe.notification.readstate;
 
 import com.openframe.data.document.notification.RecipientType;
 

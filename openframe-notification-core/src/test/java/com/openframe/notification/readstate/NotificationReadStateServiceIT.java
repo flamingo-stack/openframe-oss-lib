@@ -1,13 +1,12 @@
-package com.openframe.data.integration.service.notification;
+package com.openframe.notification.readstate;
 
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
-import com.openframe.data.integration.BaseMongoIntegrationTest;
-import com.openframe.data.integration.support.IntegrationTestApplication;
-import com.openframe.data.service.notification.NotificationReadStateService;
+import com.openframe.notification.support.BaseMongoIntegrationTest;
+import com.openframe.notification.support.ReadStateIntegrationTestApplication;
 import jakarta.validation.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +25,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(classes = IntegrationTestApplication.class)
+@SpringBootTest(classes = ReadStateIntegrationTestApplication.class)
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")
 class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {

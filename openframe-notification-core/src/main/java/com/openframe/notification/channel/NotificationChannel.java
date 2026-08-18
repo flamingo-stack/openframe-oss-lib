@@ -1,4 +1,4 @@
-package com.openframe.data.nats.channel;
+package com.openframe.notification.channel;
 
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;

@@ -1,9 +1,9 @@
-package com.openframe.data.nats.service;
+package com.openframe.notification.service;
 
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
-import com.openframe.data.nats.channel.NotificationChannel;
-import com.openframe.data.nats.config.NotificationChannelExecutorConfig;
+import com.openframe.notification.channel.NotificationChannel;
+import com.openframe.notification.config.NotificationChannelExecutorConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
