@@ -1,6 +1,7 @@
 package com.openframe.notification.service;
 
 import com.openframe.data.document.notification.NotificationContext;
+import com.openframe.notification.spec.NotificationType;
 import com.openframe.data.document.notification.NotificationSeverity;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,8 +22,8 @@ public final class NotificationCommand {
     private final String correlationId;
     private final Set<String> adminAudience;
     private final Set<String> machineAudience;
-    // Null until the caller is a spec-driven Notifier; legacy dispatchers don't set them.
-    private final String type;
+    // Null until the caller is the spec-driven emitter; legacy dispatchers don't set them.
+    private final NotificationType type;
     private final Map<String, String> attributes;
 
     @Builder
@@ -33,7 +34,7 @@ public final class NotificationCommand {
                         String correlationId,
                         Set<String> adminAudience,
                         Set<String> machineAudience,
-                        String type,
+                        NotificationType type,
                         Map<String, String> attributes) {
         if (isBlank(title)) {
             throw new IllegalArgumentException("title must not be blank");

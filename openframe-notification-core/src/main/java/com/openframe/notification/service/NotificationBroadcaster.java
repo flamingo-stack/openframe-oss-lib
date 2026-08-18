@@ -10,6 +10,7 @@ import com.openframe.data.document.notification.NotificationSettings;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
+import com.openframe.notification.spec.NotificationType;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.NotificationSettingsRepository;
 import com.openframe.notification.readstate.NotificationReadStateService;
@@ -56,12 +57,14 @@ public class NotificationBroadcaster {
             return null;
         }
 
+        NotificationType commandType = command.getType();
+        String typeName = commandType == null ? null : commandType.name();
         Notification notification = Notification.builder()
                 .severity(command.getSeverity())
                 .category(category)
                 .title(command.getTitle())
                 .description(command.getDescription())
-                .type(command.getType())
+                .type(typeName)
                 .attributes(command.getAttributes())
                 .context(command.getContext())
                 .correlationId(command.getCorrelationId())

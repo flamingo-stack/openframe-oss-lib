@@ -41,6 +41,8 @@ import static org.mockito.Mockito.when;
 
 class NotificationBroadcasterTest {
 
+    private enum TestType implements com.openframe.notification.spec.NotificationType { TICKET_ASSIGNED }
+
     private NotificationRepository notificationRepository;
     private NotificationReadStateService readStateService;
     private NotificationContextDescriptorRegistry descriptorRegistry;
@@ -94,7 +96,7 @@ class NotificationBroadcasterTest {
                 .title("Ticket #1 assigned")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("TICKET_ASSIGNED"))
-                .type("TICKET_ASSIGNED")
+                .type(TestType.TICKET_ASSIGNED)
                 .attributes(java.util.Map.of("ticketId", "t-1", "assigneeUserId", "u-9"))
                 .adminAudience(Set.of("admin-1"))
                 .build();

@@ -32,7 +32,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class NotifierTest {
+class NotificationEmitterTest {
 
     private static final AttrKey TICKET_ID = AttrKey.of("ticketId");
     private static final AttrKey ASSIGNEE = AttrKey.of("assigneeUserId");
@@ -40,7 +40,7 @@ class NotifierTest {
     private enum TestType implements NotificationType { TEST_TYPE, UNREGISTERED }
 
     private NotificationBroadcaster broadcaster;
-    private Notifier notifier;
+    private NotificationEmitter emitter;
     private TestSpec spec;
 
     @BeforeEach
@@ -48,7 +48,7 @@ class NotifierTest {
         broadcaster = mock(NotificationBroadcaster.class);
         spec = new TestSpec();
         NotificationTypeRegistry registry = new NotificationTypeRegistry(provider(spec));
-        notifier = new Notifier(registry, broadcaster);
+        emitter = new NotificationEmitter(registry, broadcaster);
     }
 
     @Test
@@ -59,12 +59,12 @@ class NotifierTest {
                 .attr(ASSIGNEE, "u-9")
                 .build();
 
-        notifier.notify(request, "corr-1");
+        emitter.notify(request, "corr-1");
 
         ArgumentCaptor<NotificationCommand> command = ArgumentCaptor.forClass(NotificationCommand.class);
         verify(broadcaster).broadcast(command.capture());
         NotificationCommand sent = command.getValue();
-        assertThat(sent.getType()).isEqualTo("TEST_TYPE");
+        assertThat(sent.getType()).isEqualTo(TestType.TEST_TYPE);
         assertThat(sent.getAttributes()).containsEntry("ticketId", "t-1").containsEntry("assigneeUserId", "u-9");
         assertThat(sent.getTitle()).isEqualTo("Ticket t-1");
         assertThat(sent.getDescription()).isEqualTo("Assigned to u-9");
@@ -82,7 +82,7 @@ class NotifierTest {
                 .attr(TICKET_ID, "t-1")
                 .build();
 
-        notifier.notify(request);
+        emitter.notify(request);
 
         verify(broadcaster, never()).broadcast(any());
     }
@@ -93,8 +93,8 @@ class NotifierTest {
         NotificationRequest unregistered = NotificationRequest.of(TestType.UNREGISTERED).build();
         NotificationRequest missingRequired = NotificationRequest.of(TestType.TEST_TYPE).build();
 
-        assertThatCode(() -> notifier.notify(unregistered)).doesNotThrowAnyException();
-        assertThatCode(() -> notifier.notify(missingRequired)).doesNotThrowAnyException();
+        assertThatCode(() -> emitter.notify(unregistered)).doesNotThrowAnyException();
+        assertThatCode(() -> emitter.notify(missingRequired)).doesNotThrowAnyException();
         verify(broadcaster, never()).broadcast(any());
     }
 

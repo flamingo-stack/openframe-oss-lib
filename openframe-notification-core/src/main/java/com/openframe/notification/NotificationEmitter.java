@@ -20,7 +20,7 @@ import java.util.Set;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class Notifier {
+public class NotificationEmitter {
 
     private final NotificationTypeRegistry registry;
     private final NotificationBroadcaster broadcaster;
@@ -62,9 +62,9 @@ public class Notifier {
         Map<String, String> attributes = attrs.asMap();
         NotificationSeverity severity = spec.getSeverity();
         NotificationContext legacyContext = spec.buildLegacyContext(attrs);
-        String typeName = spec.getType().name();
+        NotificationType specType = spec.getType();
         return NotificationCommand.builder()
-                .type(typeName)
+                .type(specType)
                 .attributes(attributes)
                 .title(title)
                 .description(description)
