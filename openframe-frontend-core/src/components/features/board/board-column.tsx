@@ -1,15 +1,18 @@
 'use client'
 
-import { useDroppable } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { memo, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon'
 import { cn } from '../../../utils/cn'
+import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
+import { autoScrollColumn } from '../../../utils/auto-scroll-ancestors'
 import { BoardColumnHeader } from './board-column-header'
+import { useDropAim } from './drop-aim'
+import { DROP_LINE_ATTRIBUTE, nearestCardIn } from './lane-geometry'
 import { tintOnDark } from './color-utils'
 import { TicketCard } from './ticket-card'
 import { TicketCardSkeleton } from './ticket-card-skeleton'
-import { useLaneScrollAnchor } from './use-lane-scroll-anchor'
+import { TICKET_ID_ATTRIBUTE, useLaneScrollAnchor } from './use-lane-scroll-anchor'
 import type { BoardColumnDef, BoardTicket } from './types'
 
 export interface BoardColumnProps {
@@ -48,16 +51,50 @@ export const BoardColumn = memo(function BoardColumn({
   joinRight = false,
 }: BoardColumnProps) {
   // The drop zone is the WHOLE lane, header included — not just the list. A
-  // droppable that stops at the list leaves dead strips (the header, the
-  // padding) where the pointer is over a column yet hits nothing, and there the
-  // drop target has to be guessed from rect overlap, which is both wrong-looking
-  // and unstable. Collapsed lanes stay out: they render no list to drop into.
-  const droppableData = useMemo(() => ({ columnId: column.id, type: 'column' as const }), [column.id])
-  const { setNodeRef: setLaneRef, isOver } = useDroppable({
-    id: `column:${column.id}`,
-    data: droppableData,
-    disabled: column.dropDisabled || collapsed,
-  })
+  // target that stops at the list leaves dead strips (the header, the padding)
+  // where the pointer is over a column yet hits nothing. Collapsed lanes stay
+  // out: they render no list to drop into.
+  //
+  // A card sitting inside this lane is a drop target too, and Pragmatic reports
+  // the innermost one first — so the lane only ever answers for the gaps, and
+  // "which card" never has to be guessed from rect overlap.
+  const laneRef = useRef<HTMLDivElement>(null)
+  const [isOver, setIsOver] = useState(false)
+
+  useEffect(() => {
+    const element = laneRef.current
+    if (!element || collapsed || column.dropDisabled) return
+
+    return dropTargetForElements({
+      element,
+      canDrop: ({ source }) => {
+        if (source.data.type !== 'ticket') return false
+        const from = source.data.columnId
+        if (from === column.id) return true
+        return !column.allowedFromColumns || column.allowedFromColumns.includes(String(from))
+      },
+      // A drop that lands between cards — most of the lane, once a hovered card
+      // has opened the room the preview is drawn in — answers with the nearest
+      // card and the edge of it the pointer is on, exactly as that card would
+      // have. Reporting a bare lane instead sent the ticket to the BOTTOM of the
+      // column, which is what made small moves look like they had not worked and
+      // large ones like the only thing that did.
+      getData: ({ input, element: lane, source }) => {
+        const nearest = nearestCardIn(lane, input.clientY, String(source.data.ticketId))
+        const ticketId = nearest?.dataset.ticketId
+        // An empty lane, or one whose only card is the one being dragged: the
+        // drop appends, which is the only place it could go.
+        if (!nearest || !ticketId) return { type: 'column', columnId: column.id }
+        return attachClosestEdge(
+          { type: 'ticket', ticketId, columnId: column.id },
+          { input, element: nearest, allowedEdges: ['top', 'bottom'] },
+        )
+      },
+      onDragEnter: () => setIsOver(true),
+      onDragLeave: () => setIsOver(false),
+      onDrop: () => setIsOver(false),
+    })
+  }, [column.id, column.dropDisabled, column.allowedFromColumns, collapsed])
 
   // The header's own prop stays zero-arg; the id is bound here, where it is
   // already known, rather than by the board building one closure per lane.
@@ -65,7 +102,7 @@ export const BoardColumn = memo(function BoardColumn({
 
   return (
     <div
-      ref={setLaneRef}
+      ref={laneRef}
       className={cn(
         'flex h-full shrink-0 flex-col gap-[var(--spacing-system-sf)] overflow-hidden rounded-md border border-ods-border p-[var(--spacing-system-sf)]',
         'transition-[width] duration-300 ease-out',
@@ -121,12 +158,21 @@ function ColumnBody({
   onLoadMore,
   loadMoreRootMargin,
 }: ColumnBodyProps) {
-  const ticketIds = useMemo(() => column.tickets.map(t => t.id), [column.tickets])
-
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   useLaneScrollAnchor(scrollRef, column.tickets)
+
+  // Dragging near the top or bottom of a long lane scrolls THIS lane, and only
+  // this one — the reach past the lane's edges is vertical, so a pointer below
+  // the board is below exactly one column. The page's own scrollers are
+  // registered once by the board, not once per lane: registering them here gave
+  // `<main>` one auto-scroller per column, all pulling at the same time.
+  useEffect(() => {
+    const element = scrollRef.current
+    if (!element) return
+    return autoScrollColumn(element)
+  }, [])
 
   const loadMoreRef = useRef(onLoadMore)
   loadMoreRef.current = onLoadMore
@@ -158,29 +204,33 @@ function ColumnBody({
     // during one — and leaving both on double-corrects every insertion.
     <div
       ref={scrollRef}
-      className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-xs)] overflow-y-auto [overflow-anchor:none]"
+      // `py-[5px]`: the insertion line sits in the middle of the gap between two
+      // cards, and the first and last card have no gap on their outer side. This
+      // is the sliver it lives in there — without it the line is clipped away by
+      // this element's own overflow exactly when a card is aimed at either end.
+      className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-xs)] overflow-y-auto py-[5px] [overflow-anchor:none]"
     >
-      <SortableContext items={ticketIds} strategy={verticalListSortingStrategy}>
-        {column.isLoading ? (
-          <SkeletonStack />
-        ) : column.tickets.length === 0 ? (
-          <EmptyState />
-        ) : (
-          column.tickets.map(t => (
-            <TicketCard
-              key={t.id}
-              ticket={t}
-              columnId={column.id}
-              columnColor={column.color}
-              href={getTicketHref?.(t.id)}
-              renderAssignSlot={renderAssignSlot}
-              onApprove={onApprove}
-              onReject={onReject}
-              dragDisabled={column.dragDisabled}
-            />
-          ))
-        )}
-      </SortableContext>
+      {column.isLoading ? (
+        <SkeletonStack />
+      ) : column.tickets.length === 0 ? (
+        <EmptyState columnId={column.id} />
+      ) : (
+        column.tickets.map(t => (
+          <TicketCard
+            key={t.id}
+            ticket={t}
+            columnId={column.id}
+            columnColor={column.color}
+            href={getTicketHref?.(t.id)}
+            renderAssignSlot={renderAssignSlot}
+            onApprove={onApprove}
+            onReject={onReject}
+            dragDisabled={column.dragDisabled}
+            dropDisabled={column.dropDisabled}
+            allowedFromColumns={column.allowedFromColumns}
+          />
+        ))
+      )}
       {column.isLoadingMore && !column.isLoading && <TicketCardSkeleton />}
       {column.hasMore && <div ref={sentinelRef} aria-hidden className="h-1 shrink-0" />}
     </div>
@@ -200,7 +250,13 @@ function SkeletonStack({ count = 4 }: { count?: number }) {
   )
 }
 
-function EmptyState() {
+/** Also carries the insertion line when a drop is aimed here, since the lane has
+ *  no card to hang it off. */
+function EmptyState({ columnId }: { columnId: string }) {
+  const aim = useDropAim()
+  if (aim && aim.columnId === columnId) {
+    return <div aria-hidden {...{ [DROP_LINE_ATTRIBUTE]: '' }} className="h-0.5 shrink-0 rounded-full bg-ods-accent" />
+  }
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-lf)] p-[var(--spacing-system-lf)] text-center text-ods-text-secondary">
       <TagIcon className="h-6 w-6 shrink-0" />
