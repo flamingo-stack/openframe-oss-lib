@@ -17,6 +17,8 @@ public interface DeviceOnlineDispatchRepository extends MongoRepository<DeviceFi
 
     Optional<DeviceFirstOnlineDispatch> findByTenantIdAndMachineIdAndScheduleId(String tenantId, String machineId, String scheduleId);
 
+    List<DeviceFirstOnlineDispatch> findByTenantIdAndScheduleId(String tenantId, String scheduleId);
+
     long deleteByTenantIdAndScheduleIdAndMachineIdIn(String tenantId, String scheduleId, Collection<String> machineIds);
 
     long deleteByTenantIdAndMachineId(String tenantId, String machineId);
