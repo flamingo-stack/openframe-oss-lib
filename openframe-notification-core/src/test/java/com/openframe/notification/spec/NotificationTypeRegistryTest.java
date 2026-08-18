@@ -2,10 +2,9 @@ package com.openframe.notification.spec;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.stream.Stream;
-
-import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -14,32 +13,36 @@ import static org.mockito.Mockito.when;
 
 class NotificationTypeRegistryTest {
 
+    private enum TestType implements NotificationType { TICKET_ASSIGNED, UNREGISTERED }
+
     @Test
     void resolves_registered_spec_by_type() {
-        NotificationTypeSpec spec = spec("TICKET_ASSIGNED");
+        NotificationTypeSpec spec = spec(TestType.TICKET_ASSIGNED);
 
         NotificationTypeRegistry registry = new NotificationTypeRegistry(provider(spec));
 
-        assertThat(registry.require("TICKET_ASSIGNED")).isSameAs(spec);
+        assertThat(registry.require(TestType.TICKET_ASSIGNED)).isSameAs(spec);
     }
 
     @Test
-    @DisplayName("An unknown type is a producer bug and fails loudly at emission")
-    void unknown_type_throws() {
+    @DisplayName("A type without a registered spec is a producer bug and fails loudly at emission")
+    void unregistered_type_throws() {
         NotificationTypeRegistry registry = new NotificationTypeRegistry(provider());
 
-        assertThatThrownBy(() -> registry.require("NOPE"))
+        assertThatThrownBy(() -> registry.require(TestType.UNREGISTERED))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("NOPE");
+                .hasMessageContaining("UNREGISTERED");
     }
 
     @Test
     @DisplayName("Two specs claiming one type kill the context at startup, not a random one at runtime")
     void duplicate_type_fails_fast() {
-        ObjectProvider<NotificationTypeSpec> duplicates = provider(spec("X"), spec("X"));
+        ObjectProvider<NotificationTypeSpec> duplicates =
+                provider(spec(TestType.TICKET_ASSIGNED), spec(TestType.TICKET_ASSIGNED));
+
         assertThatThrownBy(() -> new NotificationTypeRegistry(duplicates))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("X");
+                .hasMessageContaining("TICKET_ASSIGNED");
     }
 
     @SuppressWarnings("unchecked")
@@ -49,7 +52,7 @@ class NotificationTypeRegistryTest {
         return provider;
     }
 
-    private static NotificationTypeSpec spec(String type) {
+    private static NotificationTypeSpec spec(NotificationType type) {
         NotificationTypeSpec spec = mock(NotificationTypeSpec.class);
         when(spec.getType()).thenReturn(type);
         return spec;

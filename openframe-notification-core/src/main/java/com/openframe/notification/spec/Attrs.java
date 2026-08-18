@@ -25,9 +25,9 @@ public final class Attrs {
         this.values = values;
     }
 
-    public static Attrs seed(NotificationTypeSpec spec, Map<String, String> raw) {
-        rejectMissingSeedKeys(spec, raw);
-        Map<String, String> declared = dropUndeclaredSeedKeys(spec, raw);
+    public static Attrs validated(NotificationTypeSpec spec, Map<String, String> raw) {
+        rejectMissingRequiredKeys(spec, raw);
+        Map<String, String> declared = dropUndeclaredKeys(spec, raw);
         return new Attrs(declared);
     }
 
@@ -62,7 +62,7 @@ public final class Attrs {
         try {
             return JSON.readValue(value, type);
         } catch (Exception ex) {
-            // The value is spec-written, so a parse failure is a spec bug, not bad input.
+            // The value comes from a spec factory, so a parse failure is a producer-side bug, not bad input.
             throw new IllegalStateException("attribute '" + name + "' does not hold valid JSON", ex);
         }
     }
@@ -82,21 +82,21 @@ public final class Attrs {
         return values;
     }
 
-    private static void rejectMissingSeedKeys(NotificationTypeSpec spec, Map<String, String> raw) {
-        for (AttrKey key : spec.getRequiredSeedKeys()) {
+    private static void rejectMissingRequiredKeys(NotificationTypeSpec spec, Map<String, String> raw) {
+        for (AttrKey key : spec.getRequiredKeys()) {
             String name = key.getName();
             String value = raw.get(name);
             if (isBlank(value)) {
-                String type = spec.getType();
+                String type = spec.getType().name();
                 throw new IllegalArgumentException(
-                        type + ": required seed attribute '" + name + "' is missing or blank");
+                        type + ": required attribute '" + name + "' is missing or blank");
             }
         }
     }
 
     // Undeclared keys are dropped, not rejected: a producer may start emitting a fact before the
     // catalog consumes it. The WARN is what keeps a typo in an optional key from hiding forever.
-    private static Map<String, String> dropUndeclaredSeedKeys(NotificationTypeSpec spec, Map<String, String> raw) {
+    private static Map<String, String> dropUndeclaredKeys(NotificationTypeSpec spec, Map<String, String> raw) {
         Set<String> declared = declaredKeyNames(spec);
         Map<String, String> kept = new HashMap<>();
         Set<String> dropped = new TreeSet<>();
@@ -109,15 +109,15 @@ public final class Attrs {
             }
         }
         if (!dropped.isEmpty()) {
-            String type = spec.getType();
-            log.warn("{}: ignoring undeclared seed attribute(s) {}", type, dropped);
+            String type = spec.getType().name();
+            log.warn("{}: ignoring undeclared attribute(s) {}", type, dropped);
         }
         return Map.copyOf(kept);
     }
 
     private static Set<String> declaredKeyNames(NotificationTypeSpec spec) {
-        Set<String> required = spec.getRequiredSeedKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
-        Set<String> optional = spec.getOptionalSeedKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
+        Set<String> required = spec.getRequiredKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
+        Set<String> optional = spec.getOptionalKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
         Set<String> declared = new TreeSet<>(required);
         declared.addAll(optional);
         return declared;

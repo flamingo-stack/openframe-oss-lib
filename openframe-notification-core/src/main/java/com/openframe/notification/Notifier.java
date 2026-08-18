@@ -7,6 +7,7 @@ import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
 import com.openframe.notification.spec.NotificationText;
+import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
 import com.openframe.notification.spec.NotificationTypeSpec;
 import lombok.RequiredArgsConstructor;
@@ -24,27 +25,32 @@ public class Notifier {
     private final NotificationTypeRegistry registry;
     private final NotificationBroadcaster broadcaster;
 
-    public void notify(String type, Map<String, String> seed) {
-        notify(type, seed, null);
+    public void notify(NotificationRequest request) {
+        notify(request, null);
     }
 
-    public void notify(String type, Map<String, String> seed, String correlationId) {
-        NotificationTypeSpec spec = registry.require(type);
-        Attrs seeded = Attrs.seed(spec, seed);
-        Attrs attrs = spec.enrich(seeded);
+    // Never throws: a notification bug must not fail the business flow that emitted it.
+    public void notify(NotificationRequest request, String correlationId) {
+        NotificationType type = request.getType();
+        try {
+            NotificationTypeSpec spec = registry.require(type);
+            Attrs attrs = Attrs.validated(spec, request.getAttrs());
 
-        Audience audience = spec.audience(attrs);
-        if (audience.isEmpty()) {
-            log.debug("{}: audience is empty — nothing to notify", type);
-            return;
+            Audience audience = spec.audience(attrs);
+            if (audience.isEmpty()) {
+                log.debug("{}: audience is empty — nothing to notify", type.name());
+                return;
+            }
+
+            NotificationCommand command = buildCommand(correlationId, spec, attrs, audience);
+            broadcaster.broadcast(command);
+        } catch (RuntimeException ex) {
+            log.error("Notification emission failed for type {} — swallowed, business flow unaffected",
+                    type.name(), ex);
         }
-
-        NotificationCommand command = buildCommand(type, correlationId, spec, attrs, audience);
-        broadcaster.broadcast(command);
     }
 
-    private static NotificationCommand buildCommand(String type,
-                                                    String correlationId,
+    private static NotificationCommand buildCommand(String correlationId,
                                                     NotificationTypeSpec spec,
                                                     Attrs attrs,
                                                     Audience audience) {
@@ -56,8 +62,9 @@ public class Notifier {
         Map<String, String> attributes = attrs.asMap();
         NotificationSeverity severity = spec.getSeverity();
         NotificationContext legacyContext = spec.buildLegacyContext(attrs);
+        String typeName = spec.getType().name();
         return NotificationCommand.builder()
-                .type(type)
+                .type(typeName)
                 .attributes(attributes)
                 .title(title)
                 .description(description)

@@ -1,6 +1,9 @@
 package com.openframe.notification;
 
 import com.openframe.data.document.notification.GenericContext;
+import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationContext;
+import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.notification.service.NotificationCommand;
@@ -8,20 +11,21 @@ import com.openframe.notification.spec.AttrKey;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
 import com.openframe.notification.spec.NotificationText;
+import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
 import com.openframe.notification.spec.NotificationTypeSpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -32,6 +36,8 @@ class NotifierTest {
 
     private static final AttrKey TICKET_ID = AttrKey.of("ticketId");
     private static final AttrKey ASSIGNEE = AttrKey.of("assigneeUserId");
+
+    private enum TestType implements NotificationType { TEST_TYPE, UNREGISTERED }
 
     private NotificationBroadcaster broadcaster;
     private Notifier notifier;
@@ -46,9 +52,14 @@ class NotifierTest {
     }
 
     @Test
-    @DisplayName("The pipeline in one pass: seed → enrich → compose/audience → command with type, attributes and legacy context")
+    @DisplayName("The pipeline in one pass: validate → compose/audience → command with type, attributes and legacy context")
     void happy_path_builds_the_full_command() {
-        notifier.notify("TEST_TYPE", Map.of("ticketId", "t-1"), "corr-1");
+        NotificationRequest request = NotificationRequest.of(TestType.TEST_TYPE)
+                .attr(TICKET_ID, "t-1")
+                .attr(ASSIGNEE, "u-9")
+                .build();
+
+        notifier.notify(request, "corr-1");
 
         ArgumentCaptor<NotificationCommand> command = ArgumentCaptor.forClass(NotificationCommand.class);
         verify(broadcaster).broadcast(command.capture());
@@ -67,49 +78,43 @@ class NotifierTest {
     @DisplayName("An empty audience is a legal outcome — nothing is broadcast, nothing thrown")
     void empty_audience_skips() {
         spec.audience = Audience.none();
+        NotificationRequest request = NotificationRequest.of(TestType.TEST_TYPE)
+                .attr(TICKET_ID, "t-1")
+                .build();
 
-        notifier.notify("TEST_TYPE", Map.of("ticketId", "t-1"));
+        notifier.notify(request);
 
         verify(broadcaster, never()).broadcast(any());
     }
 
     @Test
-    void unknown_type_and_broken_seed_throw() {
-        assertThatThrownBy(() -> notifier.notify("NOPE", Map.of()))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> notifier.notify("TEST_TYPE", Map.of()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("ticketId");
+    @DisplayName("Producer bugs are swallowed with an ERROR log — a notification must never fail the business flow")
+    void producer_bugs_are_swallowed() {
+        NotificationRequest unregistered = NotificationRequest.of(TestType.UNREGISTERED).build();
+        NotificationRequest missingRequired = NotificationRequest.of(TestType.TEST_TYPE).build();
+
+        assertThatCode(() -> notifier.notify(unregistered)).doesNotThrowAnyException();
+        assertThatCode(() -> notifier.notify(missingRequired)).doesNotThrowAnyException();
         verify(broadcaster, never()).broadcast(any());
     }
 
     @SuppressWarnings("unchecked")
-    private static org.springframework.beans.factory.ObjectProvider<NotificationTypeSpec> provider(NotificationTypeSpec... specs) {
-        org.springframework.beans.factory.ObjectProvider<NotificationTypeSpec> provider =
-                mock(org.springframework.beans.factory.ObjectProvider.class);
-        when(provider.stream()).thenReturn(java.util.stream.Stream.of(specs));
+    private static ObjectProvider<NotificationTypeSpec> provider(NotificationTypeSpec... specs) {
+        ObjectProvider<NotificationTypeSpec> provider = mock(ObjectProvider.class);
+        when(provider.stream()).thenReturn(Stream.of(specs));
         return provider;
     }
 
     // Hand-rolled, not a mock: the pipeline calls every spec method and a mock would silently null.
     private static class TestSpec implements NotificationTypeSpec {
+
         Audience audience = Audience.users("u-9");
 
-        @Override public String getType() { return "TEST_TYPE"; }
-        @Override public Set<AttrKey> getRequiredSeedKeys() { return Set.of(TICKET_ID); }
-
-        @Override public Attrs enrich(Attrs seed) {
-            return seed.with(ASSIGNEE, "u-9");
-        }
-
-        @Override public Optional<com.openframe.data.document.notification.NotificationSettingGroup> getSettingsGroup() {
-            return Optional.empty();
-        }
-
-        @Override public com.openframe.data.document.notification.NotificationCategory getCategory() {
-            return com.openframe.data.document.notification.NotificationCategory.TICKETS;
-        }
-
+        @Override public NotificationType getType() { return TestType.TEST_TYPE; }
+        @Override public Set<AttrKey> getRequiredKeys() { return Set.of(TICKET_ID); }
+        @Override public Set<AttrKey> getOptionalKeys() { return Set.of(ASSIGNEE); }
+        @Override public Optional<NotificationSettingGroup> getSettingsGroup() { return Optional.empty(); }
+        @Override public NotificationCategory getCategory() { return NotificationCategory.TICKETS; }
         @Override public NotificationSeverity getSeverity() { return NotificationSeverity.INFO; }
         @Override public Audience audience(Attrs attrs) { return audience; }
 
@@ -117,8 +122,8 @@ class NotifierTest {
             return new NotificationText("Ticket " + attrs.get(TICKET_ID), "Assigned to " + attrs.get(ASSIGNEE));
         }
 
-        @Override public com.openframe.data.document.notification.NotificationContext buildLegacyContext(Attrs attrs) {
-            return GenericContext.builder().type(getType()).payload("{}").build();
+        @Override public NotificationContext buildLegacyContext(Attrs attrs) {
+            return GenericContext.builder().type(getType().name()).payload("{}").build();
         }
     }
 }
