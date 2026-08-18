@@ -1,6 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { DndContext } from '@dnd-kit/core'
-import { SortableContext } from '@dnd-kit/sortable'
 import * as React from 'react'
 import {
   TicketCard,
@@ -11,22 +9,17 @@ import {
 import type { PendingToolCallData } from '../components/chat/types'
 
 // =============================================================================
-// Harness — `TicketCard` calls `useSortable`, which reads from a `DndContext` +
-// `SortableContext`. In the app the Board provides these; the story supplies a
-// minimal pair (with the card's own id registered) so drag bookkeeping resolves
-// without a full board. The card renders on `bg-ods-bg`, so we pad it on the
-// darker `bg-ods-card` column surface to keep the border readable.
+// Harness — the card registers its own drag behaviour against the DOM and needs
+// no provider around it, so the story is just the card on the column surface it
+// normally sits on (`bg-ods-card` behind the card's own `bg-ods-bg`, which is
+// what keeps its border readable).
 // =============================================================================
 
 function Harness(args: TicketCardProps) {
   return (
-    <DndContext>
-      <SortableContext items={[args.ticket.id]}>
-        <div className="w-[320px] rounded-lg bg-ods-card p-[var(--spacing-system-sf)]">
-          <TicketCard {...args} />
-        </div>
-      </SortableContext>
-    </DndContext>
+    <div className="w-[320px] rounded-lg bg-ods-card p-[var(--spacing-system-sf)]">
+      <TicketCard {...args} />
+    </div>
   )
 }
 
@@ -178,25 +171,21 @@ export const ActivityIndicators: Story = {
       { kind: 'stale', label: 'No activity for 2 hours' },
     ]
     return (
-      <DndContext>
-        <SortableContext items={activities.map((a) => `ticket-activity-${a.kind}`)}>
-          <div className="flex w-[320px] flex-col gap-[var(--spacing-system-sf)] rounded-lg bg-ods-card p-[var(--spacing-system-sf)]">
-            {activities.map((activity) => (
-              <TicketCard
-                key={activity.kind}
-                columnId="ACTIVE"
-                ticket={{
-                  ...BASE_TICKET,
-                  id: `ticket-activity-${activity.kind}`,
-                  priority: undefined,
-                  tags: undefined,
-                  activity,
-                }}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+      <div className="flex w-[320px] flex-col gap-[var(--spacing-system-sf)] rounded-lg bg-ods-card p-[var(--spacing-system-sf)]">
+        {activities.map((activity) => (
+          <TicketCard
+            key={activity.kind}
+            columnId="ACTIVE"
+            ticket={{
+              ...BASE_TICKET,
+              id: `ticket-activity-${activity.kind}`,
+              priority: undefined,
+              tags: undefined,
+              activity,
+            }}
+          />
+        ))}
+      </div>
     )
   },
 }
@@ -242,21 +231,6 @@ export const PendingTechApproval: Story = {
   },
 }
 
-/** `approved` — green check mark in the header right section (resolved look). */
-export const Approved: Story = {
-  args: {
-    ticket: {
-      id: 'ticket-approved',
-      title: 'Slack Installation',
-      ticketNumber: '#1042',
-      status: 'RESOLVED',
-      deviceHostnames: ['PR-OFFICE-02'],
-      organizationName: 'TechFlow Solutions',
-    },
-    approved: true,
-  },
-}
-
 /** `href` set — the whole card is a link (Link anchor overlays the surface). */
 export const AsLink: Story = {
   args: {
@@ -273,39 +247,27 @@ export const DragDisabled: Story = {
   },
 }
 
-/** `isOverlay` — the drag-overlay presentation (tilted + elevated shadow). */
-export const DragOverlay: Story = {
-  args: {
-    ticket: { ...BASE_TICKET, id: 'ticket-overlay' },
-    isOverlay: true,
-  },
-}
-
 /** All four priority flag colors side by side. */
 export const Priorities: Story = {
   render: () => {
     const priorities: BoardTicket['priority'][] = ['low', 'medium', 'high', 'urgent']
     return (
-      <DndContext>
-        <SortableContext items={priorities.map((p) => `ticket-prio-${p}`)}>
-          <div className="flex w-[320px] flex-col gap-[var(--spacing-system-sf)] rounded-lg bg-ods-card p-[var(--spacing-system-sf)]">
-            {priorities.map((p) => (
-              <TicketCard
-                key={p}
-                columnId="ACTIVE"
-                ticket={{
-                  ...BASE_TICKET,
-                  id: `ticket-prio-${p}`,
-                  title: `${p![0].toUpperCase()}${p!.slice(1)} priority ticket`,
-                  priority: p,
-                  tags: undefined,
-                  assignees: undefined,
-                }}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+      <div className="flex w-[320px] flex-col gap-[var(--spacing-system-sf)] rounded-lg bg-ods-card p-[var(--spacing-system-sf)]">
+        {priorities.map((p) => (
+          <TicketCard
+            key={p}
+            columnId="ACTIVE"
+            ticket={{
+              ...BASE_TICKET,
+              id: `ticket-prio-${p}`,
+              title: `${p![0].toUpperCase()}${p!.slice(1)} priority ticket`,
+              priority: p,
+              tags: undefined,
+              assignees: undefined,
+            }}
+          />
+        ))}
+      </div>
     )
   },
 }
