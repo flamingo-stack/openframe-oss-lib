@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class NotifierTest {
 
@@ -40,7 +41,8 @@ class NotifierTest {
     void setUp() {
         broadcaster = mock(NotificationBroadcaster.class);
         spec = new TestSpec();
-        notifier = new Notifier(new NotificationTypeRegistry(List.of(spec)), broadcaster);
+        NotificationTypeRegistry registry = new NotificationTypeRegistry(provider(spec));
+        notifier = new Notifier(registry, broadcaster);
     }
 
     @Test
@@ -92,7 +94,15 @@ class NotifierTest {
         verify(broadcaster, never()).broadcast(any());
     }
 
-    /** Hand-rolled, not a mock: the pipeline calls every spec method and a mock would silently null. */
+    @SuppressWarnings("unchecked")
+    private static org.springframework.beans.factory.ObjectProvider<NotificationTypeSpec> provider(NotificationTypeSpec... specs) {
+        org.springframework.beans.factory.ObjectProvider<NotificationTypeSpec> provider =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(provider.stream()).thenReturn(java.util.stream.Stream.of(specs));
+        return provider;
+    }
+
+    // Hand-rolled, not a mock: the pipeline calls every spec method and a mock would silently null.
     private static class TestSpec implements NotificationTypeSpec {
         Audience audience = Audience.users("u-9");
         String extraValue;

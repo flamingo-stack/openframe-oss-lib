@@ -3,7 +3,9 @@ package com.openframe.notification.spec;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
+import java.util.stream.Stream;
+
+import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -16,7 +18,7 @@ class NotificationTypeRegistryTest {
     void resolves_registered_spec_by_type() {
         NotificationTypeSpec spec = spec("TICKET_ASSIGNED");
 
-        NotificationTypeRegistry registry = new NotificationTypeRegistry(List.of(spec));
+        NotificationTypeRegistry registry = new NotificationTypeRegistry(provider(spec));
 
         assertThat(registry.require("TICKET_ASSIGNED")).isSameAs(spec);
     }
@@ -24,7 +26,7 @@ class NotificationTypeRegistryTest {
     @Test
     @DisplayName("An unknown type is a producer bug and fails loudly at emission")
     void unknown_type_throws() {
-        NotificationTypeRegistry registry = new NotificationTypeRegistry(List.of());
+        NotificationTypeRegistry registry = new NotificationTypeRegistry(provider());
 
         assertThatThrownBy(() -> registry.require("NOPE"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -34,9 +36,17 @@ class NotificationTypeRegistryTest {
     @Test
     @DisplayName("Two specs claiming one type kill the context at startup, not a random one at runtime")
     void duplicate_type_fails_fast() {
-        assertThatThrownBy(() -> new NotificationTypeRegistry(List.of(spec("X"), spec("X"))))
+        ObjectProvider<NotificationTypeSpec> duplicates = provider(spec("X"), spec("X"));
+        assertThatThrownBy(() -> new NotificationTypeRegistry(duplicates))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("X");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<NotificationTypeSpec> provider(NotificationTypeSpec... specs) {
+        ObjectProvider<NotificationTypeSpec> provider = mock(ObjectProvider.class);
+        when(provider.stream()).thenReturn(Stream.of(specs));
+        return provider;
     }
 
     private static NotificationTypeSpec spec(String type) {
