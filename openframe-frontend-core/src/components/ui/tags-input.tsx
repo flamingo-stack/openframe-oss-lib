@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Label } from './label'
 import { X, Plus } from "lucide-react"
 import { Input } from "./input"
 import { Button } from "./button"
@@ -66,9 +67,9 @@ export function TagsInput({
   return (
     <div className={cn("space-y-2", className)}>
       {label && (
-        <label className="text-h6 text-ods-text-primary">
+        <Label>
           {label}
-        </label>
+        </Label>
       )}
       
       <div className="flex items-center gap-2">

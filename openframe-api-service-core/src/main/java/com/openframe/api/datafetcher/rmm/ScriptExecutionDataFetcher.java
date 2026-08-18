@@ -167,7 +167,7 @@ public class ScriptExecutionDataFetcher {
     public CompletableFuture<UserResponse> initiator(DgsDataFetchingEnvironment dfe) {
         ScriptExecutionResponse execution = dfe.getSource();
         if (execution.getInitiatedBy() == null) {
-            return CompletableFuture.completedFuture(UserResponse.system());
+            return CompletableFuture.completedFuture(null);
         }
         DataLoader<String, UserResponse> loader = dfe.getDataLoader("userDataLoader");
         return loader.load(execution.getInitiatedBy());

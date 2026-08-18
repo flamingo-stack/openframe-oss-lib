@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,33 +49,33 @@ class OAuthBffControllerRefreshTest {
         ReflectionTestUtils.setField(controller, "mobileAuthEnabled", false);
     }
 
+    /**
+     * With rotation, a rejected token is routinely the LOSER of a concurrent-refresh race while
+     * the browser already holds the winner's fresh cookie — clearing cookies here destroyed valid
+     * sessions in prod (login killed 150ms after completion by a stale refresh). The 401 must
+     * leave cookies untouched.
+     */
     @Test
-    void shouldReturn401WithClearedCookiesWhenRefreshTokenRejected() {
+    void shouldReturn401WithoutTouchingCookiesWhenRefreshTokenRejected() {
         when(oauthBffService.refreshTokensPublic(eq("tenant-1"), eq("dead"), any()))
                 .thenReturn(Mono.error(new InvalidRefreshTokenException()));
-        doAnswer(inv -> {
-            inv.getArgument(0, HttpHeaders.class).add(HttpHeaders.SET_COOKIE, CLEAR_COOKIE);
-            return null;
-        }).when(cookieService).addClearAuthCookies(any(HttpHeaders.class));
 
         ResponseEntity<Void> response = controller.refresh("tenant-1", "dead", request).block();
 
         assertThat(response.getStatusCode().value()).isEqualTo(401);
-        assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).containsExactly(CLEAR_COOKIE);
+        assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).isNullOrEmpty();
+        verify(cookieService, never()).addClearAuthCookies(any(HttpHeaders.class));
     }
 
     @Test
-    void shouldReturn401WithClearedCookiesWhenLookupFindsNoToken() {
+    void shouldReturn401WithoutTouchingCookiesWhenLookupFindsNoToken() {
         when(oauthBffService.refreshTokensByLookup(eq("unknown"), any())).thenReturn(Mono.empty());
-        doAnswer(inv -> {
-            inv.getArgument(0, HttpHeaders.class).add(HttpHeaders.SET_COOKIE, CLEAR_COOKIE);
-            return null;
-        }).when(cookieService).addClearAuthCookies(any(HttpHeaders.class));
 
         ResponseEntity<Void> response = controller.refresh(null, "unknown", request).block();
 
         assertThat(response.getStatusCode().value()).isEqualTo(401);
-        assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).containsExactly(CLEAR_COOKIE);
+        assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).isNullOrEmpty();
+        verify(cookieService, never()).addClearAuthCookies(any(HttpHeaders.class));
     }
 
     @Test

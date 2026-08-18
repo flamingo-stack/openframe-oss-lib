@@ -13,7 +13,9 @@ use crate::models::{ExecutionMessage, ExecutionRequest, RmmResult};
 use crate::services::execution_service::ExecutionService;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
-use crate::services::result_store::{entry_key, now_secs, JournalRecord, ResultStore};
+use crate::services::result_store::{
+    entry_key, now_secs, payload_limit, JournalRecord, ResultStore,
+};
 use crate::services::AgentConfigurationService;
 
 pub struct ExecutionListener<M> {
@@ -153,6 +155,11 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
         Ok(())
     }
 
+    async fn encode_for_publish(&self, result: &RmmResult) -> Vec<u8> {
+        let limit = payload_limit(self.nats_message_publisher.max_payload().await);
+        ResultStore::encode_result(result, limit)
+    }
+
     async fn publish_result(
         &self,
         subject: &str,
@@ -160,7 +167,12 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
         execution_id: &str,
         script_id: &str,
     ) {
-        if let Err(e) = self.nats_message_publisher.publish(subject, result).await {
+        let bytes = self.encode_for_publish(result).await;
+        if let Err(e) = self
+            .nats_message_publisher
+            .publish_raw(subject, &bytes)
+            .await
+        {
             error!(kind = M::KIND, execution_id = %execution_id, script_id = %script_id, error = %e, "Failed to publish result");
         }
     }
@@ -225,16 +237,17 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
             let result = self.execution_service.execute(&request, machine_id).await;
             log_finished(execution_id, schedule_id, &script_id, &result);
 
-            let bytes = ResultStore::encode_result(&result);
+            let bytes = self.encode_for_publish(&result).await;
             if let Err(e) = self
                 .result_store
                 .complete(key.clone(), result_subject.to_string(), bytes)
                 .await
             {
                 error!(kind = M::KIND, execution_id = %execution_id, script_id = %script_id, error = %e, "Failed to persist result, publishing best-effort");
+                let bytes = self.encode_for_publish(&result).await;
                 match self
                     .nats_message_publisher
-                    .publish(result_subject, &result)
+                    .publish_raw(result_subject, &bytes)
                     .await
                 {
                     Ok(()) => {
@@ -264,13 +277,8 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
             let script_id = request.script_id.unwrap_or("-").to_string();
             let result = self.execution_service.execute(&request, machine_id).await;
             log_finished(execution_id, schedule_id, &script_id, &result);
-            if let Err(e) = self
-                .nats_message_publisher
-                .publish(result_subject, &result)
-                .await
-            {
-                error!(kind = M::KIND, execution_id = %execution_id, script_id = %script_id, error = %e, "Failed to publish result");
-            }
+            self.publish_result(result_subject, &result, execution_id, &script_id)
+                .await;
         }
     }
 }

@@ -1,3 +1,4 @@
+pub mod client_uninstall_message_listener;
 pub mod client_update_gate;
 pub mod execution_listener;
 pub mod tool_agent_update_listener;
@@ -5,6 +6,7 @@ pub mod tool_installation_message_listener;
 pub mod tool_restart_message_listener;
 pub mod tool_uninstall_message_listener;
 
+pub use client_uninstall_message_listener::ClientUninstallMessageListener;
 pub use execution_listener::ExecutionListener;
 pub use tool_agent_update_listener::ToolAgentUpdateListener;
 pub use tool_installation_message_listener::ToolInstallationMessageListener;

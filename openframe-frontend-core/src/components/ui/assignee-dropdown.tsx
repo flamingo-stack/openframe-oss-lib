@@ -28,6 +28,12 @@ export interface AssigneeDropdownProps {
   onAssign: (userId: string | null) => void
   variant?: 'default' | 'compact'
   className?: string
+  /**
+   * Intercepts the trigger: when set (compact variant), clicking the
+   * avatar/assign button calls this instead of opening the dropdown — e.g. to
+   * open a Take Over confirmation for tickets still worked by the AI.
+   */
+  onTriggerClick?: () => void
 }
 
 export function AssigneeDropdown(props: AssigneeDropdownProps) {
@@ -43,6 +49,7 @@ function CompactAssigneeDropdown({
   isLoading,
   onAssign,
   className,
+  onTriggerClick,
 }: AssigneeDropdownProps) {
   const hasAssignee = !!currentAssignee
 
@@ -73,9 +80,19 @@ function CompactAssigneeDropdown({
     onAssign(currentAssignee?.id === userId ? null : userId)
   }
 
+  // Board cards are links: an intercepted trigger must not navigate or bubble.
+  const handleTriggerClick = onTriggerClick
+    ? (event: React.MouseEvent) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onTriggerClick()
+      }
+    : undefined
+
   const trigger = hasAssignee ? (
     <button
       type="button"
+      onClick={handleTriggerClick}
       aria-label="Change assignee"
       className={cn(
         'shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
@@ -97,6 +114,7 @@ function CompactAssigneeDropdown({
   ) : (
     <button
       type="button"
+      onClick={handleTriggerClick}
       aria-label="Assign user"
       className={cn(
         'size-8 rounded-full border border-ods-border flex items-center justify-center shrink-0',
@@ -108,6 +126,9 @@ function CompactAssigneeDropdown({
       <UserPlusIcon className="size-4" />
     </button>
   )
+
+  // Intercepted trigger: render the plain button — no dropdown to open.
+  if (onTriggerClick) return trigger
 
   return (
     <SearchableSelect

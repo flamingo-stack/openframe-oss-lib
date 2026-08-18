@@ -370,6 +370,37 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
       }
     }
 
+    case MESSAGE_TYPE.TICKET_EVENT: {
+      // `kind` is the only required field, and deliberately an OPEN string:
+      // unknown kinds must render (as a neutral line), not be dropped.
+      const kind = typeof data.kind === 'string' ? data.kind.trim() : ''
+      if (!kind) return null
+      // This chunk names its own JetStream sequence `sequenceId` in the
+      // payload (the persisted row's `lastChunkStreamSeq` equals it — the
+      // dedupe key). Prefer the transport-stamped `streamSeq` envelope like
+      // every other chunk; fall back to the payload copy when absent.
+      const eventSeq: { seq?: number } =
+        seq.seq !== undefined
+          ? seq
+          : typeof data.sequenceId === 'number'
+            ? { seq: data.sequenceId }
+            : {}
+      return {
+        type: 'ticket-event',
+        kind,
+        actorId: typeof data.actorId === 'string' ? data.actorId : undefined,
+        actorName: typeof data.actorName === 'string' ? data.actorName : undefined,
+        actorType: typeof data.actorType === 'string' ? data.actorType : undefined,
+        reason:
+          typeof data.reason === 'string' && data.reason.trim() ? data.reason : undefined,
+        targetStatusKind:
+          typeof data.targetStatusKind === 'string' && data.targetStatusKind.trim()
+            ? data.targetStatusKind
+            : undefined,
+        ...eventSeq,
+      }
+    }
+
     case MESSAGE_TYPE.ERROR:
       return {
         type: 'error',

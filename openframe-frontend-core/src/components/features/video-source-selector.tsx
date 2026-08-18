@@ -24,7 +24,14 @@ export interface VideoSourceSelectorProps {
   /** Uploaded video URL value */
   mainVideoUrl: string;
   /** Callback when uploaded video URL changes */
-  onMainVideoUrlChange: (url: string) => void;
+  /**
+   * Fired with the uploaded/typed URL. May return a promise — the upload
+   * spinner stays up until it settles, so post-upload work (persisting the
+   * URL, capturing + persisting the poster) finishes BEFORE the loading
+   * state clears. Without this, the modal can be closed mid-capture and the
+   * thumbnail is silently lost.
+   */
+  onMainVideoUrlChange: (url: string) => void | Promise<void>;
   /** Callback to handle video upload - receives file and returns URL or throws error */
   onUploadVideo: (file: File, onProgress?: (progress: number) => void) => Promise<string>;
   /** Optional: Show AI generated badge on uploaded video */
@@ -115,8 +122,12 @@ export function VideoSourceSelector({
           setUploadProgress(progress);
         });
         setUploadProgress(100);
-        setUploadMessage('Upload complete!');
-        onMainVideoUrlChange(url);
+        setUploadMessage('Upload complete — selecting thumbnail...');
+        // Await the host's attach chain (persist URL -> capture poster ->
+        // persist poster). isUploading holds until it settles, so closing
+        // the modal can no longer race the 15-60s thumbnail capture.
+        await onMainVideoUrlChange(url);
+        setUploadMessage('Video attached!');
       } catch (err) {
         setUploadError(err instanceof Error ? err.message : 'Failed to upload video');
       } finally {

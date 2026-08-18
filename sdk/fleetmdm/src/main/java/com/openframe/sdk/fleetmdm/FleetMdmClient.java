@@ -96,7 +96,7 @@ public class FleetMdmClient {
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        
+
         if (response.statusCode() == 401) {
             throw new RuntimeException("Authentication failed. Please check your API token. Response: " + response.body());
         } else if (response.statusCode() == 404) {
@@ -332,7 +332,7 @@ public class FleetMdmClient {
 
     /**
      * Get a single query by ID from Fleet MDM
-     * 
+     *
      * @param id Query ID
      * @return Query object or null if not found
      * @throws IOException if an I/O exception occurs
@@ -347,7 +347,7 @@ public class FleetMdmClient {
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        
+
         if (response.statusCode() == 401) {
             throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
         } else if (response.statusCode() == 404) {
@@ -411,7 +411,7 @@ public class FleetMdmClient {
             HttpResponse<String> response = sendRequest(POLICIES_URL, "GET", null);
             checkResponse(response, "list Fleet policies");
             return MAPPER.convertValue(
-                    requireNode(response.body(), "policies"),
+                    listNodeOrEmpty(response.body(), "policies"),
                     MAPPER.getTypeFactory().constructCollectionType(List.class, Policy.class));
         } catch (FleetMdmApiException e) {
             throw e;
@@ -473,7 +473,7 @@ public class FleetMdmClient {
             HttpResponse<String> response = sendRequest(QUERIES_URL, "GET", null);
             checkResponse(response, "list Fleet scheduled queries");
             return MAPPER.convertValue(
-                    requireNode(response.body(), "queries"),
+                    listNodeOrEmpty(response.body(), "queries"),
                     MAPPER.getTypeFactory().constructCollectionType(List.class, Query.class));
         } catch (FleetMdmApiException e) {
             throw e;
@@ -538,7 +538,7 @@ public class FleetMdmClient {
                     checkResponse(response, "list Fleet policies");
                     try {
                         return MAPPER.convertValue(
-                                requireNode(response.body(), "policies"),
+                                listNodeOrEmpty(response.body(), "policies"),
                                 MAPPER.getTypeFactory().constructCollectionType(List.class, Policy.class));
                     } catch (Exception e) {
                         throw new FleetMdmException("Failed to parse list policies response", e);
@@ -604,7 +604,7 @@ public class FleetMdmClient {
                     checkResponse(response, "list Fleet scheduled queries");
                     try {
                         return MAPPER.convertValue(
-                                requireNode(response.body(), "queries"),
+                                listNodeOrEmpty(response.body(), "queries"),
                                 MAPPER.getTypeFactory().constructCollectionType(List.class, Query.class));
                     } catch (Exception e) {
                         throw new FleetMdmException("Failed to parse list scheduled queries response", e);
@@ -811,6 +811,15 @@ public class FleetMdmClient {
         String body = response.body() == null ? "" : response.body().trim();
         throw new FleetMdmApiException(action + " failed with HTTP " + response.statusCode()
                 + (body.isEmpty() ? "" : ": " + body), response.statusCode(), body);
+    }
+
+    private static JsonNode listNodeOrEmpty(String responseBody, String fieldName) throws Exception {
+        JsonNode root = MAPPER.readTree(responseBody);
+        JsonNode node = root.get(fieldName);
+        if (node == null || node.isNull()) {
+            return MAPPER.createArrayNode();
+        }
+        return node;
     }
 
     private static JsonNode requireNode(String responseBody, String fieldName) throws Exception {

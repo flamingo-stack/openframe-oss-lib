@@ -101,6 +101,38 @@ class CustomMachineRepositoryImplTest {
         assertThat(status).doesNotContainKey("$ne");
     }
 
+    @Test
+    @DisplayName("buildDeviceQuery: excludeStatuses (schedule picker hiding ARCHIVED/PENDING) → status $nin the hidden set, and the default $ne DELETED guard is superseded")
+    void excludeStatusesHidesThemAndSupersedesGuard() {
+        MachineQueryFilter filter = new MachineQueryFilter();
+        filter.setExcludeStatuses(List.of("DELETED", "ARCHIVED", "PENDING"));
+
+        Document q = repo.buildDeviceQuery(filter, null).getQueryObject();
+
+        Document status = statusClause(q);
+        assertThat(status).isNotNull();
+        assertThat(status).containsKey("$nin");
+        @SuppressWarnings("unchecked")
+        List<String> nin = (List<String>) status.get("$nin");
+        assertThat(nin).containsExactlyInAnyOrder("DELETED", "ARCHIVED", "PENDING");
+        assertThat(status).doesNotContainKey("$ne");
+    }
+
+    @Test
+    @DisplayName("buildDeviceQuery: excludeStatuses survives STATUS-facet self-exclusion — a hidden status must not surface as a selectable filter option")
+    void excludeStatusesAppliesEvenUnderStatusFacet() {
+        MachineQueryFilter filter = new MachineQueryFilter();
+        filter.setStatuses(List.of("ONLINE"));
+        filter.setExcludeStatuses(List.of("DELETED", "ARCHIVED", "PENDING"));
+
+        Document q = repo.buildDeviceQuery(filter, null, "status").getQueryObject();
+
+        Document status = statusClause(q);
+        assertThat(status).isNotNull();
+        assertThat(status).containsKey("$nin");
+        assertThat(status).doesNotContainKey("$in");
+    }
+
     private static MachineQueryFilter allDimensionsFilter() {
         MachineQueryFilter filter = new MachineQueryFilter();
         filter.setStatuses(List.of("ONLINE"));

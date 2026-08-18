@@ -26,6 +26,28 @@ const BASELINE: Record<string, string> = {
   product_release: '/api/releases?ids=a,b&limit=2',
   customer_interview: '/api/customer-interviews?ids=a,b&limit=2',
   investor_update: '/api/investor-updates?ids=a,b&limit=2',
+  // Not migration baselines — added 2026-08 with the everything-fetches card
+  // unification; frozen here the same way so the hub config delegations
+  // can't drift. One route per OBJECT: self tickets ride the
+  // session-scoped `/api/tickets`; internal/public github variants share
+  // their object's route (the route resolves the bound variant).
+  hubspot_ticket_self: '/api/tickets?ids=a,b',
+  github_commit: '/api/github/commits?ids=a,b',
+  github_commit_public: '/api/github/commits?ids=a,b',
+  github_pull_request: '/api/github/pull-requests?ids=a,b',
+  github_pull_request_public: '/api/github/pull-requests?ids=a,b',
+  github_pr_review: '/api/github/reviews?ids=a,b',
+  github_pr_review_public: '/api/github/reviews?ids=a,b',
+  slack_message: '/api/slack-community/messages?ids=a,b',
+  hubspot_ticket: '/api/tickets/internal?ids=a,b',
+  hubspot_ticket_anon: '/api/tickets/known-issues?ids=a,b',
+  data_room_doc: '/api/data-room/documents?ids=a,b',
+  markdown: '/api/docs/pages?ids=a,b',
+  financial_kpi: '/api/financials/kpis?ids=a,b',
+  cap_table: '/api/financials/cap-table?ids=a,b',
+  profit_loss: '/api/financials/profit-loss?ids=a,b',
+  balance_sheet: '/api/financials/balance-sheet?ids=a,b',
+  cash_flow: '/api/financials/cash-flow?ids=a,b',
 }
 
 describe('buildListUrl — byte parity with the hub mappers', () => {
@@ -107,6 +129,7 @@ describe('buildListUrl — base-path derivation (covers hub buildListBasePath)',
     customer_interview: '/api/customer-interviews',
     investor_update: '/api/investor-updates',
     marketing_campaign: '/api/admin/marketing/campaigns',
+    hubspot_ticket_self: '/api/tickets',
   }
   it.each(Object.entries(BASE_PATHS))('%s → %s', (type, base) => {
     const url = buildListUrl(type, ['__probe__'])
@@ -122,17 +145,13 @@ describe('buildListUrl — null (no list endpoint)', () => {
     expect(buildListUrl('marketing_campaign', [])).toBeNull()
   })
 
-  // No-fetch types are ABSENT keys (not enumerated as null) — their absence
-  // IS the null. Guards against accidentally adding a builder for one.
+  // Only the two genuinely un-fetchable types are ABSENT keys — their
+  // absence IS the null. `deleted_data` is a tombstone for a row that no
+  // longer exists; `video` ids are body-embed content hashes with no
+  // backing table row. Guards against accidentally adding a builder.
   it.each([
-    'github_commit',
-    'github_pr',
-    'github_review',
-    'slack_message',
-    'financial_kpi',
-    'markdown',
-    'data_room_doc',
-    'hubspot_ticket',
+    'deleted_data',
+    'video',
     'unknown_type',
   ])('%s → null', (type) => {
     expect(buildListUrl(type, ['a', 'b'])).toBeNull()

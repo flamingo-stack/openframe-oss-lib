@@ -312,8 +312,12 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         boolean statusExcluded = STATUS_FIELD.equals(excludeField);
         boolean callerConstrainsStatus = !statusExcluded && filter != null
                 && filter.getStatuses() != null && !filter.getStatuses().isEmpty();
-        if (!callerConstrainsStatus) {
+        boolean callerHidesStatuses = filter != null && filter.getExcludeStatuses() != null && !filter.getExcludeStatuses().isEmpty();
+        if (!callerConstrainsStatus && !callerHidesStatuses) {
             criteriaList.add(Criteria.where("status").ne(DeviceStatus.DELETED));
+        }
+        if (callerHidesStatuses) {
+            criteriaList.add(Criteria.where("status").nin(filter.getExcludeStatuses()));
         }
 
         if (filter != null) {
