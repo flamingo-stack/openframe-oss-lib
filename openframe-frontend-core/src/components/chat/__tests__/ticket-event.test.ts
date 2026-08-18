@@ -161,6 +161,58 @@ describe('accumulator — hydrate/catch-up overlap', () => {
     )
     expect(events(segments)).toHaveLength(2)
   })
+
+  it('renders a payload-identical REPEATED event whose first occurrence is seq-less', () => {
+    // The observed swallow: resolve -> reopen -> resolve by the SAME actor
+    // with no reason. The first resolve hydrated from history without a seq,
+    // so payload equality matched it against the NEW resolve and the final
+    // card never rendered. Only the LATEST ticket event may payload-match.
+    const accumulator = new MessageSegmentAccumulator()
+    accumulator.addTicketEvent({ kind: 'RESOLVED', actorId: 'u-1', actorName: 'Yevhenii', actorType: 'TECHNICIAN' })
+    accumulator.addTicketEvent(
+      { kind: 'REOPENED', actorId: 'u-1', actorName: 'Yevhenii', actorType: 'TECHNICIAN', targetStatusKind: 'TECH_REQUIRED' },
+      79,
+    )
+    const segments = accumulator.addTicketEvent(
+      { kind: 'RESOLVED', actorId: 'u-1', actorName: 'Yevhenii', actorType: 'TECHNICIAN' },
+      80,
+    )
+    const rendered = events(segments)
+    expect(rendered).toHaveLength(3)
+    expect(rendered[2].data.kind).toBe('RESOLVED')
+  })
+
+  it('renders an entirely seq-less repeated cycle (no sequences anywhere)', () => {
+    const accumulator = new MessageSegmentAccumulator()
+    accumulator.addTicketEvent({ kind: 'RESOLVED', actorName: 'Fae', actorType: 'AI' })
+    accumulator.addTicketEvent({ kind: 'REOPENED', actorName: 'Fae', actorType: 'AI' })
+    const segments = accumulator.addTicketEvent({ kind: 'RESOLVED', actorName: 'Fae', actorType: 'AI' })
+    expect(events(segments)).toHaveLength(3)
+  })
+})
+
+describe('chat stream reducer — onTicketEvent effect', () => {
+  it('emits the event payload so hosts can move ticket state with the card', () => {
+    const seen: unknown[] = []
+    const reducer = createChatStreamReducer({
+      transport: 'nats',
+      onEffect: (effect) => {
+        if (effect.name === 'onTicketEvent') seen.push(effect.args[0])
+      },
+    })
+    const event = decodeNatsChunk({
+      type: 'TICKET_EVENT',
+      kind: 'REOPENED',
+      actorId: 'u-1',
+      actorName: 'Yevhenii',
+      actorType: 'TECHNICIAN',
+      targetStatusKind: 'TECH_REQUIRED',
+      streamSeq: 5,
+    })
+    if (event) reducer.apply(event)
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toMatchObject({ kind: 'REOPENED', targetStatusKind: 'TECH_REQUIRED' })
+  })
 })
 
 describe('processHistoricalMessages — ticket event', () => {
