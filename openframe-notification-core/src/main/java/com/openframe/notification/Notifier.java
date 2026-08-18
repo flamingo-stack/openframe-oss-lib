@@ -13,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 
@@ -21,9 +20,6 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class Notifier {
-
-    // One oversized value would ride to every recipient in every NATS payload.
-    private static final int MAX_ATTRIBUTE_VALUE_BYTES = 8 * 1024;
 
     private final NotificationTypeRegistry registry;
     private final NotificationBroadcaster broadcaster;
@@ -36,7 +32,6 @@ public class Notifier {
         NotificationTypeSpec spec = registry.require(type);
         Attrs seeded = Attrs.seed(spec, seed);
         Attrs attrs = spec.enrich(seeded);
-        rejectOversizedAttributes(type, attrs);
 
         Audience audience = spec.audience(attrs);
         if (audience.isEmpty()) {
@@ -72,17 +67,5 @@ public class Notifier {
                 .adminAudience(users)
                 .machineAudience(machines)
                 .build();
-    }
-
-    private static void rejectOversizedAttributes(String type, Attrs attrs) {
-        for (Map.Entry<String, String> entry : attrs.asMap().entrySet()) {
-            String value = entry.getValue();
-            int size = value.getBytes(StandardCharsets.UTF_8).length;
-            if (size > MAX_ATTRIBUTE_VALUE_BYTES) {
-                String key = entry.getKey();
-                throw new IllegalArgumentException(
-                        type + ": attribute '" + key + "' exceeds " + MAX_ATTRIBUTE_VALUE_BYTES + " bytes");
-            }
-        }
     }
 }

@@ -83,17 +83,6 @@ class NotifierTest {
         verify(broadcaster, never()).broadcast(any());
     }
 
-    @Test
-    @DisplayName("An attribute value over the cap fails the emission — one oversized value would ride to every recipient")
-    void oversized_attribute_rejected() {
-        spec.extraValue = "x".repeat(9 * 1024);
-
-        assertThatThrownBy(() -> notifier.notify("TEST_TYPE", Map.of("ticketId", "t-1")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("exceeds");
-        verify(broadcaster, never()).broadcast(any());
-    }
-
     @SuppressWarnings("unchecked")
     private static org.springframework.beans.factory.ObjectProvider<NotificationTypeSpec> provider(NotificationTypeSpec... specs) {
         org.springframework.beans.factory.ObjectProvider<NotificationTypeSpec> provider =
@@ -105,14 +94,12 @@ class NotifierTest {
     // Hand-rolled, not a mock: the pipeline calls every spec method and a mock would silently null.
     private static class TestSpec implements NotificationTypeSpec {
         Audience audience = Audience.users("u-9");
-        String extraValue;
 
         @Override public String getType() { return "TEST_TYPE"; }
         @Override public Set<AttrKey> getRequiredSeedKeys() { return Set.of(TICKET_ID); }
 
         @Override public Attrs enrich(Attrs seed) {
-            Attrs enriched = seed.with(ASSIGNEE, "u-9");
-            return extraValue == null ? enriched : enriched.with(AttrKey.of("blob"), extraValue);
+            return seed.with(ASSIGNEE, "u-9");
         }
 
         @Override public Optional<com.openframe.data.document.notification.NotificationSettingGroup> getSettingsGroup() {
