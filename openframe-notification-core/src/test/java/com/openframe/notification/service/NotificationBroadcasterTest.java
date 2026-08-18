@@ -14,6 +14,9 @@ import com.openframe.data.document.notification.NotificationSettings;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.NotificationSettingsRepository;
+import com.openframe.data.repository.user.UserRepository;
+import com.openframe.notification.spec.Audience;
+import com.openframe.notification.spec.AudienceResolver;
 import com.openframe.notification.readstate.NotificationReadStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -49,6 +52,7 @@ class NotificationBroadcasterTest {
     private NotificationNatsPublisher natsPublisher;
     private NotificationChannelDispatcher channelDispatcher;
     private NotificationSettingsRepository settingsRepository;
+    private AudienceResolver audienceResolver;
     private NotificationBroadcaster broadcaster;
 
     @BeforeEach
@@ -59,6 +63,7 @@ class NotificationBroadcasterTest {
         natsPublisher = mock(NotificationNatsPublisher.class);
         channelDispatcher = mock(NotificationChannelDispatcher.class);
         settingsRepository = mock(NotificationSettingsRepository.class);
+        audienceResolver = new AudienceResolver(mock(UserRepository.class));
         broadcaster = newBroadcaster(Optional.of(natsPublisher), true);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
             Notification arg = inv.getArgument(0);
@@ -75,7 +80,7 @@ class NotificationBroadcasterTest {
                 .title("Approval required")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("APPROVAL"))
-                .adminAudience(Set.of("admin-1", "admin-2"))
+                .audience(Audience.users("admin-1", "admin-2"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -98,7 +103,7 @@ class NotificationBroadcasterTest {
                 .context(genericContext("TICKET_ASSIGNED"))
                 .type(TestType.TICKET_ASSIGNED)
                 .attributes(java.util.Map.of("ticketId", "t-1", "assigneeUserId", "u-9"))
-                .adminAudience(Set.of("admin-1"))
+                .audience(Audience.users("admin-1"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -113,6 +118,22 @@ class NotificationBroadcasterTest {
     }
 
     @Test
+    @DisplayName("Given a declaration that resolves to nobody, when broadcast is called, then nothing is persisted or published")
+    void empty_resolution_skips_broadcast() {
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Nobody home")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("X"))
+                .audience(Audience.none())
+                .build();
+
+        broadcaster.broadcast(cmd);
+
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verifyNoInteractions(natsPublisher);
+    }
+
+    @Test
     @DisplayName("Given a command with only machineAudience, when broadcast is called, then MACHINE read_state rows are created, publishToMachine fires per machine, and the channel dispatcher is never called — machines are agents, not phones")
     void machine_only_command_fans_out_to_machine_path() {
         when(descriptorRegistry.categoryOf(any(NotificationContext.class))).thenReturn(NotificationCategory.TICKETS);
@@ -120,7 +141,7 @@ class NotificationBroadcasterTest {
                 .title("Ticket update")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("TICKET_STATUS_CHANGED"))
-                .machineAudience(Set.of("m-1", "m-2"))
+                .audience(Audience.machines("m-1", "m-2"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -143,8 +164,7 @@ class NotificationBroadcasterTest {
                 .title("Ticket status changed")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("TICKET_STATUS_CHANGED"))
-                .adminAudience(Set.of("admin-1"))
-                .machineAudience(Set.of("m-1"))
+                .audience(Audience.users("admin-1").andMachines("m-1"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -165,7 +185,7 @@ class NotificationBroadcasterTest {
                 .title("Approval")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("APPROVAL"))
-                .adminAudience(Set.of("admin-1"))
+                .audience(Audience.users("admin-1"))
                 .build();
 
         Notification result = bcWithoutNats.broadcast(cmd);
@@ -185,7 +205,7 @@ class NotificationBroadcasterTest {
                 .description("Requested by 3 admins")
                 .severity(NotificationSeverity.WARNING)
                 .context(genericContext("BULK_APPROVAL"))
-                .adminAudience(Set.of("admin-1"))
+                .audience(Audience.users("admin-1"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -206,7 +226,7 @@ class NotificationBroadcasterTest {
                 .title("X")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("X"))
-                .adminAudience(Set.of("admin-1"))
+                .audience(Audience.users("admin-1"))
                 .build();
 
         Notification result = broadcaster.broadcast(cmd);
@@ -222,7 +242,7 @@ class NotificationBroadcasterTest {
                 .title("Ticket status")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("TICKET_STATUS_CHANGED"))
-                .adminAudience(Set.of("admin-1"))
+                .audience(Audience.users("admin-1"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -240,7 +260,7 @@ class NotificationBroadcasterTest {
                 .title("Approval")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("APPROVAL"))
-                .adminAudience(Set.of("admin-1"))
+                .audience(Audience.users("admin-1"))
                 .build();
 
         assertThatThrownBy(() -> broadcaster.broadcast(cmd))
@@ -259,8 +279,7 @@ class NotificationBroadcasterTest {
                 .title("Approval")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("APPROVAL"))
-                .adminAudience(Set.of("admin-1", "admin-2", "admin-3"))
-                .machineAudience(Set.of("m-1"))
+                .audience(Audience.users("admin-1", "admin-2", "admin-3").andMachines("m-1"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -279,7 +298,7 @@ class NotificationBroadcasterTest {
                 .title("Approval required")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("APPROVAL"))
-                .adminAudience(Set.of("admin-1"))
+                .audience(Audience.users("admin-1"))
                 .build();
 
         Notification result = disabled.broadcast(cmd);
@@ -295,8 +314,7 @@ class NotificationBroadcasterTest {
                 .title("Approval required")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("APPROVAL"))
-                .adminAudience(Set.of("admin-1", "admin-2"))
-                .machineAudience(Set.of("m-1"))
+                .audience(Audience.users("admin-1", "admin-2").andMachines("m-1"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -313,7 +331,7 @@ class NotificationBroadcasterTest {
                 .title("Approval required")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("APPROVAL"))
-                .adminAudience(Set.of("admin-1"))
+                .audience(Audience.users("admin-1"))
                 .build();
 
         noNats.broadcast(cmd);
@@ -386,7 +404,7 @@ class NotificationBroadcasterTest {
                 .title("Assigned")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("TICKET_ASSIGNED"))
-                .adminAudience(Set.of("muter", "keeper"))
+                .audience(Audience.users("muter", "keeper"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -407,7 +425,7 @@ class NotificationBroadcasterTest {
                 .title("X")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("X"))
-                .adminAudience(Set.of("off", "on"))
+                .audience(Audience.users("off", "on"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -426,7 +444,7 @@ class NotificationBroadcasterTest {
                 .title("X")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("UNMAPPED"))
-                .adminAudience(Set.of("a1"))
+                .audience(Audience.users("a1"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -443,7 +461,7 @@ class NotificationBroadcasterTest {
                 .title("X")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("X"))
-                .adminAudience(Set.of("a1", "a2"))
+                .audience(Audience.users("a1", "a2"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -461,7 +479,7 @@ class NotificationBroadcasterTest {
                 .title("X")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("X"))
-                .adminAudience(Set.of("a1"))
+                .audience(Audience.users("a1"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -481,7 +499,7 @@ class NotificationBroadcasterTest {
                 .title("X")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("X"))
-                .adminAudience(Set.of("a1"))
+                .audience(Audience.users("a1"))
                 .build();
 
         Notification result = broadcaster.broadcast(cmd);
@@ -502,8 +520,7 @@ class NotificationBroadcasterTest {
                 .title("X")
                 .severity(NotificationSeverity.INFO)
                 .context(genericContext("X"))
-                .adminAudience(Set.of("a1"))
-                .machineAudience(Set.of("m-1"))
+                .audience(Audience.users("a1").andMachines("m-1"))
                 .build();
 
         broadcaster.broadcast(cmd);
@@ -518,7 +535,7 @@ class NotificationBroadcasterTest {
     private NotificationBroadcaster newBroadcaster(Optional<NotificationNatsPublisher> publisher, boolean notificationsEnabled) {
         NotificationBroadcaster bc = new NotificationBroadcaster(
                 notificationRepository, readStateService, descriptorRegistry, publisher, channelDispatcher,
-                settingsRepository);
+                audienceResolver, settingsRepository);
         ReflectionTestUtils.setField(bc, "notificationsEnabled", notificationsEnabled);
         return bc;
     }

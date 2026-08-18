@@ -10,7 +10,9 @@ import com.openframe.data.document.notification.NotificationSettings;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
+import com.openframe.notification.spec.AudienceResolver;
 import com.openframe.notification.spec.NotificationType;
+import com.openframe.notification.spec.Recipients;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.NotificationSettingsRepository;
 import com.openframe.notification.readstate.NotificationReadStateService;
@@ -36,6 +38,7 @@ public class NotificationBroadcaster {
     private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
     private final NotificationChannelDispatcher channelDispatcher;
+    private final AudienceResolver audienceResolver;
     private final NotificationSettingsRepository settingsRepository;
 
     @Value("${openframe.features.notifications.enabled:false}")
@@ -48,10 +51,11 @@ public class NotificationBroadcaster {
         }
 
         NotificationCategory category = descriptorRegistry.categoryOf(command.getContext());
-        Set<String> adminAudience = command.getAdminAudience();
+        Recipients recipients = audienceResolver.resolve(command.getAudience());
+        Set<String> adminAudience = recipients.getUsers();
         NotificationContext context = command.getContext();
         Set<String> admins = withoutOptedOut(adminAudience, context);
-        Set<String> machines = command.getMachineAudience();
+        Set<String> machines = recipients.getMachines();
         if (admins.isEmpty() && machines.isEmpty()) {
             log.info("No recipients left after settings filtering — nothing persisted for '{}'", command.getTitle());
             return null;
