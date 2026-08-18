@@ -1,4 +1,4 @@
-package com.openframe.data.nats.config;
+package com.openframe.notification.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

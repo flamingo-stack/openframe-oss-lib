@@ -1,9 +1,9 @@
-package com.openframe.data.nats.service;
+package com.openframe.notification.service;
 
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.model.NotificationEventType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
-import com.openframe.data.service.notification.NotificationReadEvent;
+import com.openframe.notification.readstate.NotificationReadEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
