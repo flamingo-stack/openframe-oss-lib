@@ -54,15 +54,8 @@ export function BoardColumnHeader({
   return (
     <div className="flex items-center gap-[var(--spacing-system-xsf)]">
       <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)]">
-        <TicketStatusTag
-          status={tagStatus}
-          label={column.label}
-          color={useStatusVariant ? undefined : column.color}
-        />
-        <span
-          className="text-h5"
-          style={useStatusVariant ? undefined : { color: column.color }}
-        >
+        <TicketStatusTag status={tagStatus} label={column.label} color={useStatusVariant ? undefined : column.color} />
+        <span className="text-h5" style={useStatusVariant ? undefined : { color: column.color }}>
           {count}
         </span>
       </div>
