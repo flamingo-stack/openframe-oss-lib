@@ -8,6 +8,7 @@ import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Custom MongoTemplate-backed queries for {@link ScriptExecution}. Owner-scoped —
@@ -20,6 +21,8 @@ import java.util.Map;
  * {@code CustomScriptExecutionRepositoryImpl}.
  */
 public interface CustomScriptExecutionRepository {
+
+    Optional<ScriptExecution> findByMachineIdAndExecutionIdAndScriptId(String machineId, String executionId, String scriptId);
 
     /**
      * Cursor-paginated executions for one owner (script or schedule) within a tenant.
