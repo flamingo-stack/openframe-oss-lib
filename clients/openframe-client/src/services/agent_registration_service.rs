@@ -45,23 +45,26 @@ impl AgentRegistrationService {
 
         let credentials = Self::read_persisted_credentials().await?;
 
+        let user_id = self.resolve_user_id(credentials.as_ref());
+
         let response = match credentials {
             Some(credentials) => {
                 info!(
                     "Found saved credentials from a previous install; reinstalling with machine_id: {}",
                     credentials.machine_id
                 );
-                self.reinstall(&initial_key, credentials).await?
+                self.reinstall(&initial_key, credentials, &user_id).await?
             }
             None => {
                 info!("No saved credentials found; performing a fresh registration");
-                self.fresh_install(&initial_key).await?
+                self.fresh_install(&initial_key, &user_id).await?
             }
         };
 
         let machine_info = PersistedMachineInfo {
             machine_id: response.machine_id.clone(),
             client_secret: response.client_secret.clone(),
+            user_id: (!user_id.is_empty()).then(|| user_id.clone()),
         };
         if let Err(e) = machine_info_persistence::write(&machine_info) {
             error!("Failed to persist machine info: {}", e);
@@ -107,9 +110,28 @@ impl AgentRegistrationService {
         }
     }
 
+    /// Install-time userId wins; a reinstall without one falls back to the value
+    /// persisted at the original install, so the association survives uninstall cycles.
+    fn resolve_user_id(&self, credentials: Option<&PersistedMachineInfo>) -> String {
+        let configured = self
+            .initial_configuration_service
+            .get_user_id()
+            .unwrap_or_default();
+        if !configured.is_empty() {
+            return configured;
+        }
+        credentials
+            .and_then(|info| info.user_id.clone())
+            .unwrap_or_default()
+    }
+
     /// First install: the server generates machineId, clientSecret
-    async fn fresh_install(&self, initial_key: &str) -> Result<AgentRegistrationResponse> {
-        let request = self.build_registration_request()?;
+    async fn fresh_install(
+        &self,
+        initial_key: &str,
+        user_id: &str,
+    ) -> Result<AgentRegistrationResponse> {
+        let request = self.build_registration_request(user_id)?;
         self.registration_client
             .register(initial_key, None, request)
             .await
@@ -122,8 +144,9 @@ impl AgentRegistrationService {
         &self,
         initial_key: &str,
         machine_info: PersistedMachineInfo,
+        user_id: &str,
     ) -> Result<AgentRegistrationResponse> {
-        let request = self.build_registration_request()?;
+        let request = self.build_registration_request(user_id)?;
 
         match self
             .registration_client
@@ -135,13 +158,13 @@ impl AgentRegistrationService {
                 warn!(
                     "Server rejected the saved machine credentials; registering as a new machine"
                 );
-                self.fresh_install(initial_key).await
+                self.fresh_install(initial_key, user_id).await
             }
             Err(RegistrationError::Other(e)) => Err(e).context("Failed to reinstall agent"),
         }
     }
 
-    fn build_registration_request(&self) -> Result<AgentRegistrationRequest> {
+    fn build_registration_request(&self, user_id: &str) -> Result<AgentRegistrationRequest> {
         let hostname = self.device_data_fetcher.get_hostname().unwrap_or_default();
         if hostname.is_empty() {
             warn!("Could not resolve any hostname — registering with an empty one");
@@ -165,6 +188,7 @@ impl AgentRegistrationService {
             hostname,
             agent_version,
             organization_id,
+            user_id: user_id.to_string(),
             os_type,
             tags,
         };
