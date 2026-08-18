@@ -2,16 +2,19 @@ package com.openframe.notification.spec;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 
 import static java.util.stream.Collectors.toUnmodifiableSet;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+@Slf4j
 public final class Attrs {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -24,9 +27,8 @@ public final class Attrs {
 
     public static Attrs seed(NotificationTypeSpec spec, Map<String, String> raw) {
         rejectMissingSeedKeys(spec, raw);
-        rejectUnknownSeedKeys(spec, raw);
-        Map<String, String> copied = Map.copyOf(raw);
-        return new Attrs(copied);
+        Map<String, String> declared = dropUndeclaredSeedKeys(spec, raw);
+        return new Attrs(declared);
     }
 
     public static Attrs of(Map<String, String> values) {
@@ -92,13 +94,32 @@ public final class Attrs {
         }
     }
 
-    private static void rejectUnknownSeedKeys(NotificationTypeSpec spec, Map<String, String> raw) {
-        Set<String> allowed = spec.seedKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
-        for (String key : raw.keySet()) {
-            if (!allowed.contains(key)) {
-                String type = spec.type();
-                throw new IllegalArgumentException(type + ": unknown seed attribute '" + key + "'");
+    // Undeclared keys are dropped, not rejected: a producer may start emitting a fact before the
+    // catalog consumes it. The WARN is what keeps a typo in an optional key from hiding forever.
+    private static Map<String, String> dropUndeclaredSeedKeys(NotificationTypeSpec spec, Map<String, String> raw) {
+        Set<String> declared = declaredKeyNames(spec);
+        Map<String, String> kept = new HashMap<>();
+        Set<String> dropped = new TreeSet<>();
+        for (Map.Entry<String, String> entry : raw.entrySet()) {
+            String key = entry.getKey();
+            if (declared.contains(key)) {
+                kept.put(key, entry.getValue());
+            } else {
+                dropped.add(key);
             }
         }
+        if (!dropped.isEmpty()) {
+            String type = spec.type();
+            log.warn("{}: ignoring undeclared seed attribute(s) {}", type, dropped);
+        }
+        return Map.copyOf(kept);
+    }
+
+    private static Set<String> declaredKeyNames(NotificationTypeSpec spec) {
+        Set<String> required = spec.seedKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
+        Set<String> optional = spec.optionalSeedKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
+        Set<String> declared = new TreeSet<>(required);
+        declared.addAll(optional);
+        return declared;
     }
 }

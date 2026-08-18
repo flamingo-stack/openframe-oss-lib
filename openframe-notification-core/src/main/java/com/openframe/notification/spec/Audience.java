@@ -10,8 +10,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 // Null/blank ids are dropped: an absent assignee means "nobody", not a caller error. Empty = pipeline skips.
 public final class Audience {
 
-    private static final Audience NONE = new Audience(Set.of(), Set.of());
-
     private final Set<String> userIds;
     private final Set<String> machineIds;
 
@@ -21,7 +19,7 @@ public final class Audience {
     }
 
     public static Audience none() {
-        return NONE;
+        return new Audience(Set.of(), Set.of());
     }
 
     public static Audience users(String... ids) {

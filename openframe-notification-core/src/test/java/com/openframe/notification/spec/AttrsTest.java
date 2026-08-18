@@ -42,11 +42,24 @@ class AttrsTest {
     }
 
     @Test
-    @DisplayName("Given a key outside the declared seed set, when seeded, then rejected — typo protection for a stringly-typed map")
-    void unknown_seed_key_rejected() {
-        assertThatThrownBy(() -> Attrs.seed(spec(Set.of(TICKET_ID)), Map.of("ticketId", "t-1", "ticktId", "oops")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("ticktId");
+    @DisplayName("Undeclared seed keys are dropped, not rejected — a producer may emit a fact before the catalog consumes it")
+    void undeclared_seed_key_dropped() {
+        Attrs attrs = Attrs.seed(spec(Set.of(TICKET_ID)), Map.of("ticketId", "t-1", "futureFact", "x"));
+
+        assertThat(attrs.asMap()).containsOnlyKeys("ticketId");
+    }
+
+    @Test
+    @DisplayName("A declared optional key is kept when present and legal to omit")
+    void optional_seed_key_kept_or_omitted() {
+        NotificationTypeSpec spec = spec(Set.of(TICKET_ID));
+        when(spec.optionalSeedKeys()).thenReturn(Set.of(ACTOR_ID));
+
+        Attrs present = Attrs.seed(spec, Map.of("ticketId", "t-1", "actorId", "u-1"));
+        Attrs absent = Attrs.seed(spec, Map.of("ticketId", "t-1"));
+
+        assertThat(present.get(ACTOR_ID)).isEqualTo("u-1");
+        assertThat(absent.has(ACTOR_ID)).isFalse();
     }
 
     @Test
@@ -85,6 +98,7 @@ class AttrsTest {
         NotificationTypeSpec spec = mock(NotificationTypeSpec.class);
         when(spec.type()).thenReturn("TEST_TYPE");
         when(spec.seedKeys()).thenReturn(seedKeys);
+        when(spec.optionalSeedKeys()).thenReturn(Set.of());
         return spec;
     }
 
