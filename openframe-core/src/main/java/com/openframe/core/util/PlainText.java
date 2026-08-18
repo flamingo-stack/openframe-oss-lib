@@ -3,13 +3,13 @@ package com.openframe.core.util;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
-public final class PlainText {
+import static org.springframework.util.StringUtils.hasText;
+
+public class PlainText {
 
     public static final String ELLIPSIS = "…";
 
-    // Rules 1-9 below mirror the web client's stripNotificationMarkup(), pattern for pattern and in
-    // the same order, so a notification reads identically in the app and in a push. Any change here
-    // has to be made there too, or the two surfaces drift apart.
+    // Rule order mirrors the web client's stripNotificationMarkup(); reorder here and the two surfaces drift.
     private static final Pattern HTML_TAG = Pattern.compile("<[^>]+>");
     private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[([^\\]]*)]\\([^)]*\\)");
     private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[([^\\]]+)]\\([^)]*\\)");
@@ -19,88 +19,129 @@ public final class PlainText {
     private static final Pattern MID_LINE_HEADING = Pattern.compile("[^\\S\\n]#{2,6}[^\\S\\n]+");
     private static final Pattern BLOCKQUOTE = Pattern.compile("(?m)^[^\\S\\n]{0,3}>[^\\S\\n]?");
     private static final Pattern LIST_MARKER = Pattern.compile("(?m)^[^\\S\\n]{0,3}(?:[-*+]|\\d+\\.)[^\\S\\n]+");
-
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+
+    private static final String ALT_TEXT = "$1";
+    private static final String LINK_TEXT = "$1";
+    private static final String EMPHASISED_TEXT = "$2";
+    private static final String CODE_BODY = "$1";
 
     private PlainText() {
     }
 
     public static String sanitize(String value) {
-        if (value == null || value.isBlank()) {
+        if (!hasText(value)) {
             return null;
         }
-        String text = value;
-        text = HTML_TAG.matcher(text).replaceAll("");
-        text = MARKDOWN_IMAGE.matcher(text).replaceAll("$1");
-        text = MARKDOWN_LINK.matcher(text).replaceAll("$1");
-        text = EMPHASIS.matcher(text).replaceAll("$2");
-        text = CODE.matcher(text).replaceAll("$1");
-        text = HEADING.matcher(text).replaceAll("");
-        text = MID_LINE_HEADING.matcher(text).replaceAll(" ");
-        text = BLOCKQUOTE.matcher(text).replaceAll("");
-        text = LIST_MARKER.matcher(text).replaceAll("");
-        text = WHITESPACE.matcher(text).replaceAll(" ").trim();
-        return text.isEmpty() ? null : text;
+        String stripped = stripMarkup(value);
+        String collapsed = collapseWhitespace(stripped);
+        return collapsed.isEmpty() ? null : collapsed;
     }
 
     public static String sanitizeAndExcerpt(String value, int maxChars) {
-        return excerpt(sanitize(value), maxChars);
+        String sanitized = sanitize(value);
+        return excerpt(sanitized, maxChars);
     }
 
     public static String excerpt(String value, int maxChars) {
-        if (value == null || maxChars <= 0 || value.length() <= maxChars) {
+        if (value == null) {
+            return null;
+        }
+        if (maxChars <= 0) {
             return value;
         }
-        int budget = maxChars - ELLIPSIS.length();
+        int length = value.length();
+        if (length <= maxChars) {
+            return value;
+        }
+        int ellipsisLength = ELLIPSIS.length();
+        int budget = maxChars - ellipsisLength;
         if (budget <= 0) {
             return ELLIPSIS;
         }
-        int cut = safeSplit(value, budget);
-        String head = value.substring(0, cut);
-        // Back off to the previous word only when the cut lands *inside* one — a cut that already
-        // sits on a space is a word boundary, and backing off would drop a whole word for nothing.
-        if (!Character.isWhitespace(value.charAt(cut))) {
-            int lastSpace = head.lastIndexOf(' ');
-            if (lastSpace > 0) {
-                head = head.substring(0, lastSpace);
-            }
-        }
-        return stripTrailingPunctuation(head) + ELLIPSIS;
+        int cut = codePointSafeCut(value, budget);
+        return excerptAt(value, cut);
     }
 
     public static String excerptToBytes(String value, int maxBytes) {
-        if (value == null || maxBytes <= 0 || utf8Length(value) <= maxBytes) {
+        if (value == null) {
+            return null;
+        }
+        if (maxBytes <= 0) {
             return value;
         }
-        int budget = maxBytes - utf8Length(ELLIPSIS);
+        int length = utf8Length(value);
+        if (length <= maxBytes) {
+            return value;
+        }
+        int ellipsisBytes = utf8Length(ELLIPSIS);
+        int budget = maxBytes - ellipsisBytes;
         if (budget <= 0) {
             return "";
         }
-        StringBuilder kept = new StringBuilder();
-        int used = 0;
-        boolean cutInsideWord = false;
-        for (int i = 0; i < value.length(); ) {
-            int codePoint = value.codePointAt(i);
-            int cost = utf8Length(new String(Character.toChars(codePoint)));
-            if (used + cost > budget) {
-                cutInsideWord = !Character.isWhitespace(codePoint);
-                break;
-            }
-            kept.appendCodePoint(codePoint);
-            used += cost;
-            i += Character.charCount(codePoint);
-        }
-        if (cutInsideWord) {
-            int lastSpace = kept.lastIndexOf(" ");
-            if (lastSpace > 0) {
-                kept.setLength(lastSpace);
-            }
-        }
-        return stripTrailingPunctuation(kept.toString()) + ELLIPSIS;
+        int cut = byteBudgetCut(value, budget);
+        return excerptAt(value, cut);
     }
 
-    private static int safeSplit(String value, int index) {
-        return Character.isLowSurrogate(value.charAt(index)) ? index - 1 : index;
+    private static String stripMarkup(String value) {
+        String text = HTML_TAG.matcher(value).replaceAll("");
+        text = MARKDOWN_IMAGE.matcher(text).replaceAll(ALT_TEXT);
+        text = MARKDOWN_LINK.matcher(text).replaceAll(LINK_TEXT);
+        text = EMPHASIS.matcher(text).replaceAll(EMPHASISED_TEXT);
+        text = CODE.matcher(text).replaceAll(CODE_BODY);
+        text = HEADING.matcher(text).replaceAll("");
+        text = MID_LINE_HEADING.matcher(text).replaceAll(" ");
+        text = BLOCKQUOTE.matcher(text).replaceAll("");
+        return LIST_MARKER.matcher(text).replaceAll("");
+    }
+
+    // Notification and FCM push titles render on one line, so paragraph breaks collapse to spaces.
+    private static String collapseWhitespace(String value) {
+        return WHITESPACE.matcher(value).replaceAll(" ").trim();
+    }
+
+    private static String excerptAt(String value, int cut) {
+        String head = value.substring(0, cut);
+        String trimmed = isCutInsideWord(value, cut) ? backOffToWordBoundary(head) : head;
+        String stripped = stripTrailingPunctuation(trimmed);
+        return stripped + ELLIPSIS;
+    }
+
+    // Back off only when the cut lands inside a word — a cut already sitting on a space is a word
+    // boundary, and backing off would drop a whole word for nothing.
+    private static boolean isCutInsideWord(String value, int cut) {
+        int length = value.length();
+        if (cut >= length) {
+            return false;
+        }
+        int codePoint = value.codePointAt(cut);
+        return !Character.isWhitespace(codePoint);
+    }
+
+    private static String backOffToWordBoundary(String head) {
+        int lastSpace = head.lastIndexOf(' ');
+        return lastSpace > 0 ? head.substring(0, lastSpace) : head;
+    }
+
+    private static int codePointSafeCut(String value, int index) {
+        char at = value.charAt(index);
+        return Character.isLowSurrogate(at) ? index - 1 : index;
+    }
+
+    private static int byteBudgetCut(String value, int budget) {
+        int length = value.length();
+        int used = 0;
+        int index = 0;
+        while (index < length) {
+            int codePoint = value.codePointAt(index);
+            int cost = utf8Length(codePoint);
+            if (used + cost > budget) {
+                return index;
+            }
+            used += cost;
+            index += Character.charCount(codePoint);
+        }
+        return length;
     }
 
     private static String stripTrailingPunctuation(String value) {
@@ -115,7 +156,14 @@ public final class PlainText {
         return Character.isWhitespace(c) || c == ',' || c == ';' || c == ':' || c == '.' || c == '-';
     }
 
+    private static int utf8Length(int codePoint) {
+        char[] chars = Character.toChars(codePoint);
+        String single = new String(chars);
+        return utf8Length(single);
+    }
+
     private static int utf8Length(String value) {
-        return value.getBytes(StandardCharsets.UTF_8).length;
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        return bytes.length;
     }
 }
