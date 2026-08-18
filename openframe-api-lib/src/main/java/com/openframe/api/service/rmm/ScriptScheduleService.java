@@ -181,10 +181,8 @@ public class ScriptScheduleService {
                 .statuses(input.getStatuses())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .createdByIds(input.getAuthorIds())
-                .createdAtFrom(input.getCreatedAtFrom())
-                .createdAtTo(input.getCreatedAtTo())
-                .updatedAtFrom(input.getUpdatedAtFrom())
-                .updatedAtTo(input.getUpdatedAtTo())
+                .startAtFrom(input.getStartAtFrom())
+                .startAtTo(input.getStartAtTo())
                 .build();
     }
 
@@ -315,20 +313,18 @@ public class ScriptScheduleService {
                 || scriptIds == null || scriptIds.isEmpty()) {
             return;
         }
-        Set<String> required = schedulePlatforms.stream().map(Enum::name).collect(Collectors.toSet());
 
         List<String> incompatible = scriptService.getScriptsByIds(scriptIds).stream()
                 .filter(s -> {
-                    List<String> supported = s.getSupportedPlatforms();
+                    List<OsType> supported = s.getSupportedPlatforms();
                     return supported != null && !supported.isEmpty()
-                            && !new HashSet<>(supported).containsAll(required);
+                            && !new HashSet<>(supported).containsAll(schedulePlatforms);
                 })
                 .map(ScriptResponse::getName)
                 .toList();
 
         if (!incompatible.isEmpty()) {
-            throw new BadRequestException(
-                    "Scripts do not support the schedule's platform(s) " + required + ": " + incompatible);
+            throw new BadRequestException("Scripts do not support the schedule's platform(s) " + schedulePlatforms + ": " + incompatible);
         }
     }
 

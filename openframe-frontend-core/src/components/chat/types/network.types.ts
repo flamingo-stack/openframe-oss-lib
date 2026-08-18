@@ -61,6 +61,10 @@ export interface ChunkData {
   /** On APPROVAL_RESULT chunks: display name of the user who resolved the request. */
   resolvedByName?: string
   toolCalls?: any[]
+  /** On GUIDE chunks: a Product Guide frame the agent re-streamed verbatim from
+   *  the hub, instead of the answer text `text` carries. Decoded by
+   *  `decodeNatsChunk` through the shared leading-frame table. */
+  payload?: Record<string, unknown>
   modelName?: string
   providerName?: string
   provider?: string

@@ -3,6 +3,7 @@ package com.openframe.api.relay;
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsTypeResolver;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
+import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunResponse;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.data.document.assignment.ItemAssignment;
@@ -52,6 +53,9 @@ public class NodeTypeResolver {
         }
         if (node instanceof ScriptExecutionResponse) {
             return "ScriptExecution";
+        }
+        if (node instanceof ScriptScheduleResponse) {
+            return "ScriptSchedule";
         }
         if (node instanceof ScheduleRunResponse) {
             return "ScheduleRun";

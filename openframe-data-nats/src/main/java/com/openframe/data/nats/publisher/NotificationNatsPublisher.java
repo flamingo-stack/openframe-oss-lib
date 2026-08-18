@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -58,6 +60,27 @@ public class NotificationNatsPublisher {
         publish(topic, notification, category, eventType);
     }
 
+    /**
+     * READ/DELETED to the user's subject: ids only, no content — the client already holds the cards
+     * and merely flips/removes them.
+     */
+    public void publishReadStateToUser(String userId, List<String> notificationIds,
+                                       NotificationEventType eventType) {
+        if (isBlank(userId)) {
+            throw new IllegalArgumentException("userId must not be blank when publishing to user subject");
+        }
+        String topic = format(USER_TOPIC_TEMPLATE, userId);
+        try {
+            natsMessagePublisher.publish(topic, NotificationMessage.builder()
+                    .eventType(eventType)
+                    .notificationIds(List.copyOf(notificationIds))
+                    .build());
+        } catch (NatsException ex) {
+            log.warn("NATS publish failed for {} read-state ids on {}: {}",
+                    notificationIds.size(), topic, ex.getMessage());
+        }
+    }
+
     private void publish(String topic, Notification notification, NotificationCategory category,
                          NotificationEventType eventType) {
         if (notification == null || notification.getId() == null) {
@@ -82,6 +105,8 @@ public class NotificationNatsPublisher {
                 .createdAt(notification.getCreatedAt())
                 .category(category)
                 .context(notification.getContext())
+                .type(notification.getType())
+                .attributes(notification.getAttributes())
                 .eventType(eventType)
                 .build();
     }

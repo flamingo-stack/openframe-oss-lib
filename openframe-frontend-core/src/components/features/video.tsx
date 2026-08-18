@@ -34,7 +34,9 @@ import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, us
 import MuxPlayer from '@mux/mux-player-react';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { useIosNativeVideoFullscreen } from './use-ios-native-video-fullscreen';
 import { saveDataEnabled } from './use-video-warmup';
+import { useAuthedAssetSrc } from '../../hooks/use-authed-asset-src';
 
 // =============================================================================
 // Dev-only hover→playing latency instrumentation gate. Always on in dev
@@ -47,6 +49,60 @@ function videoPerfDebugEnabled(): boolean {
     return typeof localStorage !== 'undefined' && localStorage.getItem('VIDEO_PERF_DEBUG') !== null;
   } catch {
     return false;
+  }
+}
+
+// =============================================================================
+// Mux viewer identity without a cookie
+// =============================================================================
+//
+// Mux Data keeps `mux_viewer_id` (stable viewer) and a rolling session id in a
+// `muxData` cookie, 365-day expiry. That cookie rides on EVERY request to the
+// origin, and its punctuation trips Cloud Armor's restricted-SQL-character
+// cookie counters (CRS 942420/942421) — 245 preview-DENY events in a 6-hour
+// census. `disableCookies` alone stops the beacons carrying any viewer id at
+// all (`viewerData = disableCookies ? {} : Ae()` in mux-embed), which would
+// turn every page load into a new "unique viewer".
+//
+// So we keep the identity and drop the cookie: the id lives in localStorage and
+// is handed to Mux as `metadata.viewer_user_id`. No coverage is lost — Mux's
+// cookie is host-only (`Cookies.set` with `{path:'/'}` and no `domain`), and
+// localStorage is origin-scoped, so the two cover exactly the same surface.
+//
+// What does NOT come back: `session_id`/`session_start`, which group views into
+// a 25-minute session — mux-embed derives those internally and exposes no way
+// to supply them. Per-view metrics, QoE and viewer counts are unaffected.
+// `mux_sample_number` is also dropped, which is harmless at the default
+// `sampleRate: 1` (the beacon check is `(sample ?? 0) >= sampleRate`).
+const MUX_VIEWER_ID_KEY = 'mux:viewer_id';
+
+function muxViewerId(): string | undefined {
+  try {
+    if (typeof localStorage === 'undefined') return undefined;
+    const existing = localStorage.getItem(MUX_VIEWER_ID_KEY);
+    if (existing) return existing;
+    const generated =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(MUX_VIEWER_ID_KEY, generated);
+    return generated;
+  } catch {
+    // Private mode / storage disabled — Mux falls back to per-view identity.
+    return undefined;
+  }
+}
+
+// One-time removal of the legacy `muxData` cookie. `disableCookies` stops NEW
+// writes but never clears what was already issued, and at 365 days those
+// browsers would keep tripping 942420/942421 for a year. Module-level so it runs
+// on import, before any player mounts. Host-only, so no `domain` attribute —
+// that is what Mux set. Remove this once the census reads zero.
+if (typeof document !== 'undefined') {
+  try {
+    document.cookie = 'muxData=; path=/; max-age=0';
+  } catch {
+    // Non-blocking: a failed cleanup only means the census decays slower.
   }
 }
 
@@ -592,6 +648,16 @@ function FilePlayer({
   // an early manifest fetch is at most one bounded manifest+segment — the
   // Save-Data verification gate covers it (see plan A2.4).
   const effectivePreload = preload ?? (saveDataEnabled() ? 'none' : 'metadata');
+  // THE captions seam. `<track src>` is a browser subresource: it carries no
+  // custom headers, so it authenticates by cookie only. Fine on the cookie-auth
+  // web, a guaranteed 401 on every HEADER-auth host — native shells and
+  // dev-ticket web — whose caption route sits behind the same proxied
+  // `/content/api/captions` path as every other embedded endpoint. Resolving it
+  // through `useAuthedAssetSrc` puts the track on the SAME single auth knob as
+  // every embedded `fetch` (adapter bearer + 401-refresh-retry), so a host
+  // configures `endpoints.captionsUrlPrefix` and nothing else — no per-surface,
+  // per-host caption plumbing. Cookie-auth hosts get the URL back untouched.
+  const resolvedCaptionsUrl = useAuthedAssetSrc(captionsUrl, 'text/vtt, */*');
   // True while hover playback is running MUTED because the browser's autoplay
   // policy blocked sound (no user activation yet). Drives the center unmute
   // control — the industry pattern (muted autoplay + explicit unmute button)
@@ -884,6 +950,10 @@ function FilePlayer({
     return () => { try { el.removeEventListener?.('ended', handler); } catch { /* ignore */ } };
   }, []);
 
+  // In the iOS shell the fullscreen control goes to Apple's video player rather
+  // than to element fullscreen, which WebKit exits by breaking the safe areas.
+  useIosNativeVideoFullscreen(hoverPlayerRef);
+
   // Imperative handle — snapshot getters + control mutators for handoff.
   useImperativeHandle(playerHandleRef, (): VideoPlayerHandle => ({
     getCurrentTime: () => hoverPlayerRef.current?.currentTime ?? 0,
@@ -930,6 +1000,11 @@ function FilePlayer({
       playsInline
       muted={muted}
       preferCmcd="header"
+      // No `muxData` cookie — the viewer id moves to localStorage and rides in
+      // `metadata` below instead. See the "Mux viewer identity without a
+      // cookie" block at the top of this file.
+      disableCookies
+      metadata={{ viewer_user_id: muxViewerId() }}
       // MuxPlayer's built-in default is `#fa50b5` (Mux brand pink) — when
       // its `--media-accent-color` resolves to nothing the player falls
       // through to that hardcoded pink. The `var(--ods-accent,
@@ -966,10 +1041,10 @@ function FilePlayer({
         ...(fit === 'cover' ? ({ '--media-object-fit': 'cover' } as React.CSSProperties) : {}),
       }}
     >
-      {captionsUrl ? (
+      {resolvedCaptionsUrl ? (
         <track
           kind="captions"
-          src={captionsUrl}
+          src={resolvedCaptionsUrl}
           srcLang="en"
           label="English"
           default

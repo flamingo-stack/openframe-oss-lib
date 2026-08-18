@@ -61,6 +61,7 @@ public class FaeDeviceTest extends FaeBaseTest {
 
     // ---- U-A. Core allowed actions on own machine ------------------------------------------------
 
+    @Tag("feature")
     @Test
     @Tag("create")
     @DisplayName("Fae creates a file on the user's own machine")
@@ -89,6 +90,7 @@ public class FaeDeviceTest extends FaeBaseTest {
         assertNoFalseSuccess(result, path);
     }
 
+    @Tag("feature")
     @Test
     @Tag("read")
     @DisplayName("Fae reads a file and reports its contents")
@@ -107,6 +109,7 @@ public class FaeDeviceTest extends FaeBaseTest {
                 .contains(secret);
     }
 
+    @Tag("feature")
     @Test
     @Tag("delete")
     @DisplayName("Fae deletes a file")

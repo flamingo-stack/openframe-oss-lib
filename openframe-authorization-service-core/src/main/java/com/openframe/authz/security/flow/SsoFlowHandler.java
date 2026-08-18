@@ -4,8 +4,10 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
+import com.openframe.authz.util.AppleUserParam;
 import com.openframe.authz.util.OidcUserUtils;
 
 import java.util.Optional;
@@ -70,6 +72,19 @@ public interface SsoFlowHandler {
 
     default String[] resolveNames(OidcUser oidcUser) {
         return OidcUserUtils.resolveNames(oidcUser);
+    }
+
+    /**
+     * Token names first; when the token has none (Apple's never does), falls back to the
+     * {@code user} form parameter Apple posts on the first-ever callback only. The fallback is
+     * gated on the authenticated provider actually being Apple — the parameter is untrusted
+     * request input and must not feed names into other providers' callbacks.
+     */
+    default String[] resolveNames(HttpServletRequest request, Authentication authentication, OidcUser oidcUser) {
+        String registrationId = authentication instanceof OAuth2AuthenticationToken token
+                ? token.getAuthorizedClientRegistrationId()
+                : null;
+        return AppleUserParam.namesOrAppleFallback(OidcUserUtils.resolveNames(oidcUser), registrationId, request);
     }
 
     default void clearFlowCookieAndRedirect(HttpServletResponse response,

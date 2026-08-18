@@ -38,9 +38,8 @@ pub mod executor;
 
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
-use crate::config::update_config::{
-    DOWNLOAD_CLIENT_TIMEOUT_SECS, EXECUTION_MIN_CONCURRENCY, HTTP_CLIENT_TIMEOUT_SECS,
-};
+use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
+use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
@@ -48,10 +47,11 @@ use crate::listener::tool_installation_message_listener::ToolInstallationMessage
 use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
 use crate::listener::tool_uninstall_message_listener::ToolUninstallMessageListener;
 use crate::logging::nats_streaming::LogStreamingRunManager;
-use crate::models::{CommandMessage, ScriptMessage};
+use crate::models::{CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage};
 use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
+use crate::services::deactivation_service::DeactivationService;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
@@ -67,6 +67,8 @@ use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
 use crate::services::registration_processor::RegistrationProcessor;
+use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
+use crate::services::result_store::ResultStore;
 use crate::services::shared_token_service::SharedTokenService;
 use crate::services::token_refresh_run_manager::TokenRefreshRunManager;
 use crate::services::tool_agent_update_service::ToolAgentUpdateService;
@@ -157,13 +159,17 @@ pub struct Client {
     tool_restart_message_listener: ToolRestartMessageListener,
     openframe_client_update_listener: OpenFrameClientUpdateListener,
     tool_agent_update_listener: ToolAgentUpdateListener,
+    client_uninstall_message_listener: ClientUninstallMessageListener,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
+    script_schedule_execution_listener: ExecutionListener<ScriptScheduleExecutionMessage>,
     tool_run_manager: ToolRunManager,
     token_refresh_run_manager: TokenRefreshRunManager,
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
+    result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
+    result_store: Arc<ResultStore>,
     update_handler_service: UpdateHandlerService,
     openframe_client_info_service: OpenFrameClientInfoService,
     last_known_good_service: LastKnownGoodService,
@@ -172,6 +178,7 @@ pub struct Client {
     agent_configuration_service: AgentConfigurationService,
     installed_tools_service: InstalledToolsService,
     initial_key_service: Arc<InitialKeyService>,
+    deactivation_service: Arc<DeactivationService>,
 }
 
 impl Client {
@@ -188,6 +195,9 @@ impl Client {
 
         // Perform initial health check
         directory_manager.perform_health_check()?;
+
+        // Detects the gateway's 410 Gone (tenant deleted) and drives backoff / stop / self-uninstall.
+        let deactivation_service = DeactivationService::new(&directory_manager);
 
         // Initialize initial configuration service
         let initial_configuration_service =
@@ -242,7 +252,11 @@ impl Client {
             RegistrationProcessor::new(registration_service, config_service.clone());
 
         // Initialize authentication client
-        let auth_client = AuthClient::new(http_url.clone(), http_client.clone());
+        let auth_client = AuthClient::new(
+            http_url.clone(),
+            http_client.clone(),
+            deactivation_service.clone(),
+        );
 
         // Initialize encryption service
         let encryption_service = EncryptionService::new();
@@ -264,8 +278,11 @@ impl Client {
 
         // Initialize proactive token refresh run manager (keeps shared_token.enc valid
         // independent of NATS reconnects)
-        let token_refresh_run_manager =
-            TokenRefreshRunManager::new(auth_service.clone(), config_service.clone());
+        let token_refresh_run_manager = TokenRefreshRunManager::new(
+            auth_service.clone(),
+            config_service.clone(),
+            deactivation_service.clone(),
+        );
 
         // Initialize NATS connection manager
         let ws_url = format!("wss://{}", initial_configuration_service.get_server_url()?);
@@ -277,6 +294,7 @@ impl Client {
             initial_configuration_service.clone(),
             auth_service.clone(),
             tls_config_provider,
+            deactivation_service.clone(),
         );
 
         // Initialize tool agent file client
@@ -295,6 +313,7 @@ impl Client {
             http_url.clone(),
             initial_configuration_service.clone(),
             config_service.clone(),
+            deactivation_service.clone(),
         ));
 
         // Initialize installed tools service
@@ -349,6 +368,7 @@ impl Client {
             initial_configuration_service.clone(),
             config_service.clone(),
             tool_run_manager.clone(),
+            deactivation_service.clone(),
         );
 
         // Initialize tool connection service
@@ -465,26 +485,53 @@ impl Client {
             tool_run_manager.clone(),
         );
 
+        // Initialize client uninstall listener (dashboard-triggered device uninstall)
+        let client_uninstall_message_listener = ClientUninstallMessageListener::new(
+            nats_connection_manager.clone(),
+            deactivation_service.clone(),
+            config_service.clone(),
+        );
+
         let execution_service = ExecutionService::new();
-        let execution_concurrency = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(EXECUTION_MIN_CONCURRENCY)
-            .max(EXECUTION_MIN_CONCURRENCY);
-        let execution_semaphore = Arc::new(tokio::sync::Semaphore::new(execution_concurrency));
+
+        let result_store = Arc::new(ResultStore::open_or_degrade(
+            directory_manager
+                .secured_dir()
+                .join("scheduled_outbox.redb"),
+        ));
+        let flush_notify = Arc::new(tokio::sync::Notify::new());
+        let result_outbox_run_manager = ResultOutboxRunManager::new(
+            result_store.clone(),
+            Arc::new(nats_message_publisher.clone()),
+            flush_notify.clone(),
+        );
+        let result_store_for_recovery = result_store.clone();
+
         let command_execution_listener = ExecutionListener::<CommandMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
             execution_service.clone(),
             config_service.clone(),
-            execution_semaphore.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
         );
         let script_execution_listener = ExecutionListener::<ScriptMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
-            execution_service,
+            execution_service.clone(),
             config_service.clone(),
-            execution_semaphore,
+            result_store.clone(),
+            flush_notify.clone(),
         );
+        let script_schedule_execution_listener =
+            ExecutionListener::<ScriptScheduleExecutionMessage>::new(
+                nats_connection_manager.clone(),
+                nats_message_publisher.clone(),
+                execution_service,
+                config_service.clone(),
+                result_store.clone(),
+                flush_notify.clone(),
+            );
 
         // Initialize machine heartbeat publisher and run manager
         let machine_heartbeat_publisher =
@@ -513,13 +560,17 @@ impl Client {
             tool_restart_message_listener,
             openframe_client_update_listener,
             tool_agent_update_listener,
+            client_uninstall_message_listener,
             command_execution_listener,
             script_execution_listener,
+            script_schedule_execution_listener,
             tool_run_manager,
             token_refresh_run_manager,
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
+            result_outbox_run_manager,
+            result_store: result_store_for_recovery,
             update_handler_service,
             openframe_client_info_service,
             last_known_good_service,
@@ -527,11 +578,18 @@ impl Client {
             agent_configuration_service: config_service,
             installed_tools_service,
             initial_key_service,
+            deactivation_service,
         })
     }
 
     pub async fn start(&self) -> Result<()> {
         info!("Starting OpenFrame Client");
+
+        // Tenant-gone supervisor: stops/restarts tools and self-uninstalls off the detection path.
+        // Started first so its commands are consumed even if the startup auth loop (which itself
+        // feeds the 410s) blocks below.
+        self.deactivation_service
+            .start(self.tool_run_manager.clone());
 
         if let Err(e) = self
             .openframe_client_info_service
@@ -596,12 +654,25 @@ impl Client {
         // Start tool agent update listener in background
         self.tool_agent_update_listener.start().await?;
 
+        // Start client uninstall listener in background
+        self.client_uninstall_message_listener.start().await?;
+
+        // Recover interrupted scheduled scripts, then start the outbox flusher,
+        // both strictly before any execution listener can accept new batches
+        if let Err(e) = self.result_store.recover().await {
+            error!("Failed to recover scheduled result outbox: {:#}", e);
+        }
+        self.result_outbox_run_manager.start();
+
         info!("Starting command execution listener...");
         self.command_execution_listener.start().await?;
         info!("Command execution listener started");
         info!("Starting script execution listener...");
         self.script_execution_listener.start().await?;
         info!("Script execution listener started");
+        info!("Starting script schedule execution listener...");
+        self.script_schedule_execution_listener.start().await?;
+        info!("Script schedule execution listener started");
 
         // Start tool run manager
         self.tool_run_manager.run().await?;

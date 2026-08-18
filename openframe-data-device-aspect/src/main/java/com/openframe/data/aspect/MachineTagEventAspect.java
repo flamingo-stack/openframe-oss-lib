@@ -4,6 +4,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.service.MachineTagEventService;
+import com.openframe.data.service.machine.MachineWriteResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * AOP aspect to intercept repository save operations and delegate to RepositoryEventService.
@@ -46,6 +48,35 @@ public class MachineTagEventAspect {
         } catch (Exception e) {
             log.error("Error in afterMachineSave aspect: {}", e.getMessage(), e);
         }
+    }
+
+    /**
+     * Intercepts field-scoped Machine writes made through {@code MachineWriter}.
+     *
+     * <p>Publishes the post-update document, not the pre-image: Pinot must see the values as they now
+     * stand. An empty result means the write matched nothing (no such device, or a guard rejected it),
+     * so there is no change to announce.
+     */
+    @AfterReturning(
+            pointcut = "execution(* com.openframe.data.service.machine.MachineWriter.update(..))",
+            returning = "result"
+    )
+    public void afterMachineWriterUpdate(JoinPoint joinPoint, Object result) {
+        try {
+            machineWriteResult(result)
+                    .ifPresent(written -> machineTagEventService.processMachineSave(written.after()));
+        } catch (Exception e) {
+            log.error("Error in afterMachineWriterUpdate aspect: {}", e.getMessage(), e);
+        }
+    }
+
+    private Optional<MachineWriteResult> machineWriteResult(Object result) {
+        if (result instanceof Optional<?> optional) {
+            return optional
+                    .filter(MachineWriteResult.class::isInstance)
+                    .map(MachineWriteResult.class::cast);
+        }
+        return Optional.empty();
     }
 
     /**

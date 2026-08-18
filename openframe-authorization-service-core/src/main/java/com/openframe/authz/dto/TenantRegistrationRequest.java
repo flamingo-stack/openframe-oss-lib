@@ -1,5 +1,6 @@
 package com.openframe.authz.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.openframe.core.validation.TenantDomain;
 import com.openframe.core.validation.ValidEmail;
 import jakarta.validation.constraints.NotBlank;
@@ -52,4 +53,13 @@ public class TenantRegistrationRequest extends CoreUserRequest {
     private Integer prNumber;
 
     private RegistrationAttribution attribution;
+
+    /**
+     * Set by the SSO signup flow when the identity provider has already verified the email
+     * (claim-aware). Never bound from the HTTP request: the JSON registration endpoint receives
+     * a deserialized DTO, but marking verified requires proving control of the mailbox, which
+     * only the SSO callback or the verification link can do — hence {@code @JsonIgnore}.
+     */
+    @JsonIgnore
+    private boolean emailPreVerified;
 }

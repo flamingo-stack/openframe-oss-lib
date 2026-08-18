@@ -158,32 +158,49 @@ export function hasEmbedAuthAdapter(): boolean {
 
 /**
  * Whether `url` is an asset the browser CANNOT load natively because its
- * auth rides in request headers: the registered adapter is currently
- * supplying an `Authorization` header AND the URL's origin is one the
- * adapter explicitly sanctions for that bearer (`allowedOrigins` — the
- * host's gateway, cross-origin by construction in native shells).
+ * auth rides in request headers.
  *
- * Native asset loads (`<img src>`, CSS `background-image`) can't carry
- * custom headers, so a URL this returns `true` for must go through
- * `embedAuthedFetch` → blob object-URL instead (see `useAuthedImageSrc`).
- * Everything else — cookie-auth web (no Authorization), relative /
- * same-origin URLs (cookies work), third-party origins the bearer does
- * NOT belong to (public images) — loads natively, unchanged.
+ * Native asset loads (`<img src>`, `<track src>`, CSS `background-image`)
+ * can't carry custom headers, so a URL this returns `true` for must go
+ * through `embedAuthedFetch` → blob object-URL instead (see
+ * `useAuthedAssetSrc` / `useAuthedImageSrc`).
+ *
+ * The single signal is the registered adapter: when it supplies an
+ * `Authorization` header, the host authenticates by HEADER, so nothing the
+ * browser fetches on its own is authenticated. That holds for BOTH shapes a
+ * header-auth host takes:
+ *
+ *   - a cross-origin gateway URL — sanctioned via `allowedOrigins` (native
+ *     shells, whose page origin is `capacitor://` / `tauri://`);
+ *   - a same-origin / relative reverse-proxy path (`/content/api/...`) —
+ *     dev-ticket web, where the token lives in localStorage and there is NO
+ *     session cookie to fall back on. This case used to be excluded on the
+ *     assumption that same-origin implies "cookies work"; true for a cookie
+ *     session, false for every header-auth host, which is exactly when this
+ *     predicate is consulted at all.
+ *
+ * Everything else loads natively, unchanged: cookie-auth web (the adapter
+ * supplies no `Authorization`), no adapter at all (the hub), and third-party
+ * origins the bearer does NOT belong to (public images) — those stay out of
+ * reach of the token by the same origin rules `embedAuthedFetch` enforces.
  */
 export function needsBearerAssetFetch(url: string): boolean {
   if (typeof window === 'undefined') return false
   const adapter = getRegisteredAuthAdapter()
-  if (!adapter?.allowedOrigins?.length || adapter.getHeaders?.().Authorization === undefined) {
-    return false
-  }
+  if (!adapter || adapter.getHeaders?.().Authorization === undefined) return false
   let target: URL
+  let pageOrigin: string
   try {
     target = new URL(url, window.location.href)
+    // Same reason `assertSameOrigin` derives it this way: test environments
+    // mock `window.location` as a plain object with no `origin` field.
+    pageOrigin = new URL(window.location.href).origin
   } catch {
     return false
   }
   if (target.protocol !== 'http:' && target.protocol !== 'https:') return false
-  return adapter.allowedOrigins.includes(target.origin)
+  if (target.origin === pageOrigin) return true
+  return adapter.allowedOrigins?.includes(target.origin) ?? false
 }
 
 /**

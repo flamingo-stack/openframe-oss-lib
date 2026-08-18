@@ -3,13 +3,17 @@ package com.openframe.api.service.rmm;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
+import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
+import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -19,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,6 +31,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static java.util.stream.Collectors.toSet;
 
 @Slf4j
 @Service
@@ -37,6 +44,7 @@ public class ScriptScheduleDeviceService {
     private final MachineRepository machineRepository;
     private final ScheduleDeviceTargetResolver targetResolver;
     private final TenantIdProvider tenantIdProvider;
+    private final DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
 
     @Transactional
     public void setDevices(String scheduleId, List<String> machineIds, String actorUserId) {
@@ -62,6 +70,7 @@ public class ScriptScheduleDeviceService {
 
         if (!toRemove.isEmpty()) {
             assignedRepository.deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(tenantId, scheduleId, toRemove);
+            disarmDeviceOnline(tenantId, scheduleId, toRemove);
         }
         if (!toAdd.isEmpty()) {
             List<ScriptScheduleMachineAssigned> rows = toAdd.stream()
@@ -73,6 +82,7 @@ public class ScriptScheduleDeviceService {
                             .build())
                     .toList();
             assignedRepository.saveAll(rows);
+            armDeviceOnline(tenantId, schedule, toAdd);
         }
 
         log.info("Set {} device(s) on script schedule id={} tenantId={} (+{} -{})",
@@ -110,6 +120,7 @@ public class ScriptScheduleDeviceService {
                 .toList();
         if (!rows.isEmpty()) {
             assignedRepository.saveAll(rows);
+            armDeviceOnline(tenantId, schedule, rows.stream().map(ScriptScheduleMachineAssigned::getMachineId).collect(toSet()));
         }
         log.info("Added {} device(s) to script schedule id={} tenantId={}", rows.size(), scheduleId, tenantId);
     }
@@ -122,8 +133,9 @@ public class ScriptScheduleDeviceService {
         if (machineIds == null || machineIds.isEmpty()) {
             return;
         }
-        long removed = assignedRepository.deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(
-                tenantId, scheduleId, new LinkedHashSet<>(machineIds));
+        Set<String> ids = new LinkedHashSet<>(machineIds);
+        long removed = assignedRepository.deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(tenantId, scheduleId, ids);
+        disarmDeviceOnline(tenantId, scheduleId, ids);
         log.info("Removed {} device(s) from script schedule id={} tenantId={}", removed, scheduleId, tenantId);
     }
 
@@ -132,10 +144,37 @@ public class ScriptScheduleDeviceService {
             return;
         }
         long removed = assignedRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
+        onlineDeviceDispatchRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
         if (removed > 0) {
             log.info("Removed deleted device {} from {} schedule assignment(s) tenantId={}",
                     machineId, removed, tenantId);
         }
+    }
+
+    private void armDeviceOnline(String tenantId, ScriptSchedule schedule, Collection<String> machineIds) {
+        if (schedule.getTrigger() != ScriptScheduleTrigger.DEVICE_ONLINE || machineIds.isEmpty()) {
+            return;
+        }
+        onlineDeviceDispatchRepository.deleteByTenantIdAndScheduleIdAndMachineIdIn(tenantId, schedule.getId(), machineIds);
+        Instant now = Instant.now();
+        List<DeviceFirstOnlineDispatch> rows = machineIds.stream()
+                .map(mid -> DeviceFirstOnlineDispatch.builder()
+                        .tenantId(tenantId)
+                        .machineId(mid)
+                        .scheduleId(schedule.getId())
+                        .firstSeenAt(now)
+                        .status(DeviceOnlineDispatchStatus.NEW)
+                        .build())
+                .toList();
+        onlineDeviceDispatchRepository.saveAll(rows);
+        log.info("Armed DEVICE_ONLINE dispatch for {} device(s) scheduleId={} tenantId={}", rows.size(), schedule.getId(), tenantId);
+    }
+
+    private void disarmDeviceOnline(String tenantId, String scheduleId, Collection<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return;
+        }
+        onlineDeviceDispatchRepository.deleteByTenantIdAndScheduleIdAndMachineIdIn(tenantId, scheduleId, machineIds);
     }
 
     /**
@@ -227,8 +266,38 @@ public class ScriptScheduleDeviceService {
         schedule.setSelectionMode(ScheduleDeviceSelectionMode.CRITERIA);
         schedule.setDeviceCriteria(criteria);
         scheduleRepository.save(schedule);
+        armDeviceOnlineCriteriaMatches(tenantId, schedule);
         log.info("Applied device criteria to script schedule id={} tenantId={} by user={}: {}",
                 scheduleId, tenantId, actorUserId, criteria);
+    }
+
+    private void armDeviceOnlineCriteriaMatches(String tenantId, ScriptSchedule schedule) {
+        if (schedule.getTrigger() != ScriptScheduleTrigger.DEVICE_ONLINE) {
+            return;
+        }
+        List<String> matched = targetResolver.resolveTargetMachineIds(schedule);
+        if (matched.isEmpty()) {
+            return;
+        }
+        Set<String> alreadyArmed = onlineDeviceDispatchRepository
+                .findByTenantIdAndScheduleId(tenantId, schedule.getId()).stream()
+                .map(DeviceFirstOnlineDispatch::getMachineId)
+                .collect(toSet());
+        List<DeviceFirstOnlineDispatch> rows = matched.stream()
+                .filter(mid -> !alreadyArmed.contains(mid))
+                .map(mid -> DeviceFirstOnlineDispatch.builder()
+                        .tenantId(tenantId)
+                        .machineId(mid)
+                        .scheduleId(schedule.getId())
+                        .firstSeenAt(Instant.now())
+                        .status(DeviceOnlineDispatchStatus.NEW)
+                        .build())
+                .toList();
+        if (!rows.isEmpty()) {
+            onlineDeviceDispatchRepository.saveAll(rows);
+            log.info("Armed DEVICE_ONLINE (criteria) for {} matching device(s) scheduleId={} tenantId={}",
+                    rows.size(), schedule.getId(), tenantId);
+        }
     }
 
     /** Flip a schedule to SPECIFIC selection when devices are managed explicitly (idempotent). */

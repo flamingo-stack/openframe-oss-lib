@@ -82,6 +82,7 @@ import {
   type UseUnifiedChatModes,
 } from './hooks/use-unified-chat'
 import type { UnifiedChatState } from './types/unified-chat-state.types'
+import type { MessageSegment } from './types/message.types'
 import type {
   UseNatsChatAdapterConfig,
   FetchDialogsParams,
@@ -208,6 +209,19 @@ export interface EmbeddableChatProps {
    * `modes.mingo` (Guide-mode wiring via `modes.guide` is unaffected).
    */
   mingoState?: UnifiedChatState
+
+  /**
+   * Approval cards to pin as the sticky footer under the thread.
+   *
+   * Hosts that lift PENDING approvals out of the message list (mingo does:
+   * a pending card is filtered out of its bubble so an interrupted retry cannot
+   * render the same request twice) must hand them back here — otherwise the
+   * card exists in the reducer, is stripped on the way to the view, and is
+   * displayed nowhere at all. `ChatMessageList` renders them with the same
+   * component the inline path uses, so the approve/reject handlers stamped on
+   * the segments keep working.
+   */
+  pendingApprovals?: MessageSegment[]
 
   /**
    * Dialog-management capabilities for injected Mingo mode (`mingoState`).
@@ -909,6 +923,7 @@ function EmbeddableChatInner({
   tableIdForDocumentType,
   modes,
   mingoState,
+  pendingApprovals,
   mingoDialogCapabilities,
   activeMode: controlledActiveMode,
   onActiveModeChange,
@@ -1501,7 +1516,7 @@ function EmbeddableChatInner({
   const guideUserAvatar =
     activeMode === 'guide' ? identityUser?.avatarUrl?.trim() || undefined : undefined
 
-  // Map docMessages → lib's Message type, forwarding chatRefs + scrollAnchor.
+  // Map docMessages → lib's Message type, forwarding scrollAnchor.
   const messages: Message[] = useMemo(() => {
     const cache = timestampCacheRef.current
     const seenIds = new Set<string>()
@@ -1537,7 +1552,6 @@ function EmbeddableChatInner({
         // as an ordinary bubble. This field-by-field rebuild has to forward it
         // explicitly — see `Message.hidden` and `chat-message-list`'s skip.
         ...(m.hidden ? { hidden: true } : {}),
-        ...(m.chatRefs ? { chatRefs: m.chatRefs } : {}),
         ...(m.scrollAnchor ? { scrollAnchor: m.scrollAnchor } : {}),
         // Forward attached context items so the user bubble renders its chips.
         ...(m.contextItems && m.contextItems.length > 0
@@ -1582,6 +1596,24 @@ function EmbeddableChatInner({
       }
     },
     [sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
+  )
+
+  /**
+   * Picking an option on a clarification card — deliberately NOT `handleSend`.
+   *
+   * `handleSend` belongs to the composer: it appends the staged attachments'
+   * markdown to the text, ships the staged context items, and then clears both.
+   * Routing an ask click through it would (a) send `label + attachment markdown`
+   * where the backend's classifier expects the label VERBATIM to resolve which
+   * reading was picked, and (b) consume a draft's attachments/context into a
+   * one-word answer the user never attached them to. So the label goes out on
+   * its own and whatever is staged in the composer stays staged.
+   */
+  const handleAskSelect = useCallback(
+    (label: string) => {
+      sendMessage(label)
+    },
+    [sendMessage],
   )
 
   // Admin "try-asking chips" → GUIDE-mode quick-action chips only (Mingo mode
@@ -2332,6 +2364,9 @@ function EmbeddableChatInner({
                     <ChatMessageList
                       messages={messages}
                       isTyping={chatLoading}
+                      // Sticky footer for approvals the host lifted out of the
+                      // thread — see the prop's docblock.
+                      pendingApprovals={pendingApprovals}
                       // Real drawer: the library's smart follow. Passive in-page
                       // demo (previewMode): deterministic hard pin instead — a
                       // scripted assistant-only stream from a cold mount never
@@ -2351,6 +2386,10 @@ function EmbeddableChatInner({
                       resolveContextIcon={resolveContextIcon}
                       renderContextItem={renderContextItem}
                       renderMention={renderMention}
+                      // Gated on `chatLoading` for the same reason the composer
+                      // is: no second send while a turn is in flight. Passive
+                      // demo hosts (previewMode) stay read-only.
+                      onAskSelect={chatLoading || previewMode ? undefined : handleAskSelect}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
                       // Real Mingo drawer: hide the message-list scrollbar
                       // (scroll stays functional). Scoped here via `className`

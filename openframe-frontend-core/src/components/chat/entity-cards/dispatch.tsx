@@ -43,6 +43,7 @@ import {
   buildAnchorProps,
 } from '../utils/nav-anchor-props'
 import { safeHref } from '../utils/compact-card-classes'
+import { faqItemAnchor } from '../../../utils/faq-anchor'
 import { useChatPanel } from '../chat-panel-context'
 import { getSourceLabel } from '../utils/source-icons'
 import { SourceActionButton } from '../source-action-button'
@@ -70,14 +71,21 @@ import {
   kindLabel as githubKindLabel,
   reviewStateLabel,
 } from './github-activity-card'
-import { MingoInfoCard, type MingoInfoCardStatus } from '../mingo-info-card'
+import {
+  MingoInfoCard,
+  MingoInfoCardSkeleton,
+  type MingoInfoCardStatus,
+} from '../mingo-info-card'
 import type { ActionsMenuGroup } from '../../ui/actions-menu'
 import { MingoIcon } from '../../icons'
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon'
+import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-triangle-icon'
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon'
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon'
 import { QuestionCircleIcon } from '../../icons-v2-generated/signs-and-symbols/question-circle-icon'
 import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon'
+import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon'
+import { clickupTaskUrl } from '../utils/external-app-urls'
 import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon'
 import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-ver-icon'
 import { ChartPieIcon } from '../../icons-v2-generated/charts/chart-pie-icon'
@@ -260,12 +268,22 @@ export interface CardDiscussAction {
   run: () => void
 }
 
+/** External-app deep-link row for a card's "⋯" menu (e.g. "Open in ClickUp").
+ *  Always opens in a new tab — the destination is a third-party app, never a
+ *  hub route. */
+export interface CardExternalLink {
+  label: string
+  icon: React.ReactNode
+  href: string
+}
+
 /** Overflow-menu groups for a card (Figma `7740:55075`): the optional "Ask
  *  Mingo"/"Display" item (when the host supplied a handler) followed by "Open
  *  Details" — whose main row navigates to the card (same tab) and whose trailing
- *  ↗ side-button opens it in a new tab. Returns `undefined` when neither applies
- *  so the "⋯" button is omitted entirely. The href is already absolute
- *  (ChatCardLoader pre-resolves it). */
+ *  ↗ side-button opens it in a new tab — then the optional external-app
+ *  deep-link row (new tab). Returns `undefined` when none applies so the "⋯"
+ *  button is omitted entirely. The href is already absolute (ChatCardLoader
+ *  pre-resolves it). */
 function cardMenuGroups(
   href: string | null | undefined,
   discuss?: CardDiscussAction,
@@ -274,6 +292,9 @@ function cardMenuGroups(
    *  in the entity's own terms and mirrors the card's leading icon. Defaults to
    *  a generic "Open Details" + eye glyph. */
   openDetails?: { label: string; icon: React.ReactNode },
+  /** Optional trailing deep-link into the entity's own third-party app
+   *  (ClickUp task, …). Rendered after "Open Details", always new-tab. */
+  externalLink?: CardExternalLink,
 ) {
   const items: ActionsMenuGroup['items'] = []
   if (discuss) {
@@ -300,6 +321,15 @@ function cardMenuGroups(
       },
     })
   }
+  if (externalLink) {
+    items.push({
+      id: 'open-external',
+      label: externalLink.label,
+      icon: externalLink.icon,
+      href: externalLink.href,
+      openInNewTab: true,
+    })
+  }
   return items.length ? [{ items }] : undefined
 }
 
@@ -319,6 +349,142 @@ function hubspotStatusToVariant(
   if (s === 'CLOSED') return 'success'
   if (s === 'OPEN') return 'warning'
   return 'grey'
+}
+
+/**
+ * Decode a SELF-DESCRIBING `[card://video:<id>]` marker id into playable
+ * video metadata — the paired decoder for the hub's
+ * `DERIVE_HANDLES_BY_KIND` id minting (keep in lockstep). Embedded
+ * videos have no backing table row, so the marker id IS the payload;
+ * this is what makes video cards transport-independent (no fetch, no
+ * server-shipped metadata).
+ *   - bare 11-char id → YouTube (lite-youtube facade takes the bare id)
+ *   - `mux-<playbackId>` → `https://stream.mux.com/<playbackId>.m3u8`
+ *   - `mp4-<base64url(url)>` → decoded https URL
+ * Legacy pre-2026-08 sha1-hash ids (`<kind>-<10 hex>`) and anything
+ * undecodable return null — the caller falls through to the loader,
+ * which renders the marker as plain text (same anti-hallucination
+ * posture as every other card type).
+ */
+function decodeVideoMarkerId(id: string): { videoUrl?: string; youtubeUrl?: string } | null {
+  // Prefix checks FIRST: an id like `mux-1234567` (11 chars) would also
+  // satisfy the bare-YouTube-id pattern below.
+  const mux = id.match(/^mux-([A-Za-z0-9_-]+)$/)
+  if (mux) {
+    // Legacy sha1 ids are exactly 10 lowercase hex — not playback ids.
+    if (/^[0-9a-f]{10}$/.test(mux[1])) return null
+    return { videoUrl: `https://stream.mux.com/${mux[1]}.m3u8` }
+  }
+  const mp4 = id.match(/^mp4-([A-Za-z0-9_-]+)$/)
+  if (mp4) {
+    if (/^[0-9a-f]{10}$/.test(mp4[1])) return null
+    try {
+      const b64 = mp4[1].replace(/-/g, '+').replace(/_/g, '/')
+      const url = atob(b64)
+      // https-only — the id is model-emitted text; never let a marker
+      // smuggle a non-https src into a player.
+      if (!/^https:\/\//.test(url)) return null
+      return { videoUrl: url }
+    } catch {
+      return null
+    }
+  }
+  if (/^[A-Za-z0-9_-]{11}$/.test(id)) return { youtubeUrl: id }
+  return null
+}
+
+/** Read hero-video metadata off a FETCHED item — the API-driven
+ *  replacement for the retired refs-frame `metadata.videoUrl` check. Two item
+ *  shapes: ChatRef-shaped items (per-object hydration routes) carry the
+ *  SSOT `metadata` keys directly; content rows (public list APIs) carry
+ *  the canonical columns (`custom_video_url` for recordings,
+ *  `main_video_url` elsewhere — see the hub configs' videoUrlColumns).
+ *  Returns null when the item carries no video (compact card only). */
+function itemVideoMetadata(item: any): Record<string, string> | null {
+  const pick = (...vals: unknown[]): string | undefined => {
+    for (const v of vals) if (typeof v === 'string' && v.length > 0) return v
+    return undefined
+  }
+  const m = (item?.metadata ?? {}) as Record<string, unknown>
+  const out: Record<string, string> = {}
+  const videoUrl = pick(m.videoUrl, item?.custom_video_url, item?.main_video_url)
+  // `testimonial_video_url` is the case-study mapper's youtube column.
+  const youtubeUrl = pick(m.youtubeUrl, item?.youtube_url, item?.testimonial_video_url)
+  const highlightVideoUrl = pick(m.highlightVideoUrl, item?.highlight_video_url)
+  // `featured_image` is the customer-interview mapper's poster column.
+  const videoPoster = pick(
+    m.videoPoster,
+    item?.main_video_thumbnail,
+    item?.highlight_video_thumbnail,
+    item?.featured_image,
+  )
+  const highlightVideoPoster = pick(m.highlightVideoPoster, item?.highlight_video_thumbnail)
+  if (videoUrl) out.videoUrl = videoUrl
+  if (youtubeUrl) out.youtubeUrl = youtubeUrl
+  if (highlightVideoUrl) out.highlightVideoUrl = highlightVideoUrl
+  if (videoPoster) out.videoPoster = videoPoster
+  if (highlightVideoPoster) out.highlightVideoPoster = highlightVideoPoster
+  return out.videoUrl || out.youtubeUrl || out.highlightVideoUrl ? out : null
+}
+
+/** LOUD hydration-failure card — a card that fails to load renders a
+ *  VISIBLE error state instead of silently disappearing (explicit
+ *  product decision 2026-08-13: broken must look broken, both for
+ *  transient fetch failures and for ids the API doesn't recognize). */
+function CardLoadFailure({
+  label,
+  id,
+  detail,
+}: {
+  label: string
+  id: string
+  detail: string
+}) {
+  return (
+    <MingoInfoCard
+      title={label}
+      description={`${detail} · id: ${id}`}
+      icon={<AlertTriangleIcon size={24} />}
+      status={{ label: 'FAILED', variant: 'error' }}
+      menuAriaLabel="Card failed to load"
+    />
+  )
+}
+
+/** Build the display ref for a hydrated card PURELY from the fetched API
+ *  item — the item IS a ChatRef (minted server-side by the per-object
+ *  ref-building SSOTs), so the API is the single display-data
+ *  layer. The marker's ref contributes ONLY the loader-resolved
+ *  `url`/`targetPlatform` (embed-origin prefixing of the item's own url
+ *  via `fallbackHref`) — never titles/previews/metadata. */
+function fetchedItemDisplayRef(item: unknown, chatRef: ChatRef): ChatRef {
+  const it = item as ChatRef
+  return {
+    ...it,
+    url: chatRef.url ?? it.url ?? null,
+    targetPlatform: chatRef.targetPlatform ?? it.targetPlatform ?? null,
+  }
+}
+
+/** FAQ variant — `/api/faqs?ids=` returns faq-shaped rows
+ *  (`question`/`answer`/`section`), not ChatRefs. Same single-layer rule:
+ *  display data comes from the API row only. */
+function fetchedFaqDisplayRef(item: unknown, chatRef: ChatRef): ChatRef {
+  const it = item as { question?: unknown; answer?: unknown; section?: unknown }
+  const answer =
+    typeof it?.answer === 'string' && it.answer.trim().length > 0 ? it.answer.trim() : null
+  return {
+    type: 'faq',
+    id: chatRef.id,
+    sourceRepo: chatRef.sourceRepo,
+    title: typeof it?.question === 'string' && it.question ? it.question : chatRef.id,
+    url: chatRef.url ?? null,
+    ...(answer
+      ? { preview: answer.length > 400 ? `${answer.slice(0, 397)}…` : answer }
+      : {}),
+    metadata:
+      typeof it?.section === 'string' && it.section ? { section: it.section } : {},
+  }
 }
 
 function HubspotTicketChatCard({
@@ -629,6 +795,8 @@ function EntityMingoCard({
   isNewTab,
   menuAriaLabel,
   discuss,
+  openDetails,
+  externalLink,
 }: {
   title: React.ReactNode
   description?: React.ReactNode
@@ -639,6 +807,10 @@ function EntityMingoCard({
   isNewTab: boolean
   menuAriaLabel: string
   discuss?: CardDiscussAction
+  /** See `cardMenuGroups` — per-entity "Open Details" row override. */
+  openDetails?: { label: string; icon: React.ReactNode }
+  /** See `cardMenuGroups` — trailing third-party-app deep-link row. */
+  externalLink?: CardExternalLink
 }) {
   return (
     <MingoInfoCard
@@ -649,7 +821,7 @@ function EntityMingoCard({
       icon={fallbackIcon}
       status={status}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
-      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss, openDetails, externalLink)}
       menuAriaLabel={menuAriaLabel}
     />
   )
@@ -958,6 +1130,14 @@ function RoadmapChatCard({
   ) : (
     defaultIcon
   )
+  // Every card here is a mirrored ClickUp task whose ref id IS the ClickUp
+  // task id, so the "⋯" menu deep-links into ClickUp. internal_task's card
+  // URL already IS that deep link (its mapper resolves no public
+  // destination) — there we relabel the existing "Open Details" row instead
+  // of adding a duplicate second ClickUp row.
+  const clickupHref = clickupTaskUrl(chatRef.id)
+  const clickupIcon = <ClickupLogoIcon size={20} />
+  const cardUrlIsClickup = cardType === 'internal_task'
   return (
     <EntityMingoCard
       title={item?.title ?? ''}
@@ -968,6 +1148,14 @@ function RoadmapChatCard({
       isNewTab={isNewTab}
       discuss={discuss}
       menuAriaLabel="Roadmap actions"
+      openDetails={
+        cardUrlIsClickup ? { label: 'Open in ClickUp', icon: clickupIcon } : undefined
+      }
+      externalLink={
+        !cardUrlIsClickup && clickupHref
+          ? { label: 'Open in ClickUp', icon: clickupIcon, href: clickupHref }
+          : undefined
+      }
     />
   )
 }
@@ -976,42 +1164,74 @@ function RoadmapChatCard({
 // CHAT_CARD_REGISTRY — single source of truth.
 // =============================================================================
 
-type ChatCardRegistryEntry =
-  | {
-      mode: 'no-fetch'
-      label: string
-      bareInline?: boolean
-      displayAction?: boolean
-      render: (chatRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode
-    }
-  | {
-      mode: 'fetch'
-      label: string
-      contentRefType: string
-      displayAction?: boolean
-      /** Render the card alone — skip the `ChatCardWithDiscuss` "Ask" +
-       *  provenance source row (mirrors the no-fetch `bareInline`). */
-      bareInline?: boolean
-      skeleton: () => React.ReactNode
-      render: (item: any, chatRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode
-      /** Optional post-fetch URL synthesizer. When `chatRef.url` is null
-       *  AFTER `resolveSourceRowCTA`, the loader runs this against the
-       *  hydrated item to produce a fallback hub-internal URL (e.g.
-       *  `/admin/campaigns/${item.id}` for marketing campaigns). Result
-       *  is validated via `safeHref` before being attached to the
-       *  resolved ref — so the wrapper sees a non-null `href`, the
-       *  pre-computed `isNewTab` reflects the actual destination, and
-       *  the click goes through `handleChatNavClick` (no silent
-       *  bypass of embed-mode / close-on-nav). Takes precedence over the
-       *  `composeContentUrl` fallback below. */
-      fallbackHref?: (item: any) => string | null
-      /** Opt OUT of the post-fetch `composeContentUrl` fallback (see
-       *  `resolveFetchedCardHref`). Set for types with NO public destination
-       *  — the seam would otherwise synthesize `<contentOrigin>/<type>/<id>`
-       *  from its default branch and hand the user a 404. Types with a real
-       *  route (hosted, or covered by a host `override`) leave it unset. */
-      noComposedHref?: boolean
-    }
+/**
+ * ONE entry shape — no fetch/no-fetch mode split. Every card type fetches
+ * its data by id ("send ids → get full objects"); the ONLY entries without
+ * a `contentRefType` are the two types that have nothing server-side to
+ * fetch: `deleted_data` (a tombstone for a row that no longer exists) and
+ * `video` (body-embed content-hash ids with no backing table row) — those
+ * render straight from the server-built ref.
+ */
+interface ChatCardRegistryEntry {
+  label: string
+  /** Render the card alone — skip the `ChatCardWithDiscuss` "Ask" +
+   *  provenance source row. */
+  bareInline?: boolean
+  displayAction?: boolean
+  /** Hydration type for `useChatCardItem` → `buildListUrl`. Content types
+   *  resolve to their public list APIs; ref-shaped types resolve to the
+   *  hub's generic `/api/chat/entity-refs?type=&ids=`. ABSENT only for
+   *  `deleted_data` + `video` (see above). */
+  contentRefType?: string
+  /** Required whenever `contentRefType` is set. */
+  skeleton?: () => React.ReactNode
+  /** `item` is the fetched row (`undefined` only on the ref-only render
+   *  path — `deleted_data` / `video`). */
+  render: (item: any, chatRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode
+  /** Optional post-fetch URL synthesizer. When `chatRef.url` is null
+   *  AFTER `resolveSourceRowCTA`, the loader runs this against the
+   *  hydrated item to produce a fallback URL (e.g.
+   *  `/admin/campaigns/${item.id}` for marketing campaigns; `item.url`
+   *  for ChatRef-shaped items). Result is validated via `safeHref`
+   *  before being attached to the resolved ref — so the wrapper sees a
+   *  non-null `href`, the pre-computed `isNewTab` reflects the actual
+   *  destination, and the click goes through `handleChatNavClick` (no
+   *  silent bypass of embed-mode / close-on-nav). Takes precedence over
+   *  the `composeContentUrl` fallback below. */
+  fallbackHref?: (item: any) => string | null
+  /** Opt OUT of the post-fetch `composeContentUrl` fallback (see
+   *  `resolveFetchedCardHref`). Set for types with NO public destination
+   *  — the seam would otherwise synthesize `<contentOrigin>/<type>/<id>`
+   *  from its default branch and hand the user a 404. Types with a real
+   *  route (hosted, or covered by a host `override`) leave it unset. */
+  noComposedHref?: boolean
+}
+
+/**
+ * Entry preset for types hydrated by their per-object card route
+ * (`/api/github/commits`, `/api/slack-community/messages`, …;
+ * `hubspot_ticket_self` via `/api/tickets`) — the fetched item IS a
+ * `ChatRef`, and the API is the SINGLE display-data layer
+ * (`fetchedItemDisplayRef`): `item.url` is the canonical destination
+ * (`fallbackHref`), no `<origin>/<type>/<id>` synthesis
+ * (`noComposedHref`). Loading shows the skeleton, exactly like every
+ * other fetch card.
+ */
+function refHydratedEntry(
+  docType: string,
+  label: string,
+  renderRef: (displayRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode,
+): ChatCardRegistryEntry {
+  return {
+    label,
+    bareInline: true,
+    contentRefType: docType,
+    noComposedHref: true,
+    fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
+    skeleton: () => <MingoInfoCardSkeleton />,
+    render: (item, chatRef, opts) => renderRef(fetchedItemDisplayRef(item, chatRef), opts),
+  }
+}
 
 interface FinancialCardConfig {
   label: string
@@ -1031,27 +1251,24 @@ const FINANCIAL_CARD_CONFIGS: Record<string, FinancialCardConfig> = {
  *  family is a config map + one `registryEntries(...)` call. */
 function registryEntries<C>(
   configs: Record<string, C>,
-  build: (cfg: C) => ChatCardRegistryEntry,
+  build: (cfg: C, docType: string) => ChatCardRegistryEntry,
 ): Record<string, ChatCardRegistryEntry> {
   const out: Record<string, ChatCardRegistryEntry> = {}
-  for (const [docType, cfg] of Object.entries(configs)) out[docType] = build(cfg)
+  for (const [docType, cfg] of Object.entries(configs)) out[docType] = build(cfg, docType)
   return out
 }
 
 function financialRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  return registryEntries(FINANCIAL_CARD_CONFIGS, (cfg) => ({
-    mode: 'no-fetch',
-    label: cfg.label,
-    bareInline: true,
-    render: (chatRef, opts) => (
+  return registryEntries(FINANCIAL_CARD_CONFIGS, (cfg, docType) =>
+    refHydratedEntry(docType, cfg.label, (displayRef, opts) => (
       <GenericFinancialChatCard
-        chatRef={chatRef}
+        chatRef={displayRef}
         icon={cfg.icon()}
         isNewTab={opts.isNewTab}
         discuss={opts.discuss}
       />
-    ),
-  }))
+    )),
+  )
 }
 
 interface GitHubCardConfig {
@@ -1067,15 +1284,12 @@ const GITHUB_CARD_CONFIGS: Record<string, GitHubCardConfig> = {
   github_pr_review_public: { label: 'GitHub review (public)', kind: 'pr_review' },
 }
 function githubRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  return registryEntries(GITHUB_CARD_CONFIGS, (cfg) => ({
-    mode: 'no-fetch',
-    label: cfg.label,
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <GitHubChatCard chatRef={chatRef} kind={cfg.kind} isNewTab={opts.isNewTab}
+  return registryEntries(GITHUB_CARD_CONFIGS, (cfg, docType) =>
+    refHydratedEntry(docType, cfg.label, (displayRef, opts) => (
+      <GitHubChatCard chatRef={displayRef} kind={cfg.kind} isNewTab={opts.isNewTab}
         discuss={opts.discuss} />
-    ),
-  }))
+    )),
+  )
 }
 
 type ProgramConfigKey = 'podcast' | 'webinar' | 'event'
@@ -1091,7 +1305,6 @@ const PROGRAM_CARD_CONFIGS: Record<string, ProgramCardConfig> = {
 }
 function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(PROGRAM_CARD_CONFIGS, (cfg) => ({
-    mode: 'fetch',
     label: cfg.label,
     contentRefType: cfg.contentRefType,
     bareInline: true,
@@ -1117,6 +1330,8 @@ interface RoadmapEntryConfig {
   contentRefType: string
   /** See `ChatCardRegistryEntry.noComposedHref`. */
   noComposedHref?: boolean
+  /** See `ChatCardRegistryEntry.fallbackHref`. */
+  fallbackHref?: (item: any) => string | null
 }
 const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
   roadmap_item: { label: 'Roadmap item', cardType: 'roadmap_item', contentRefType: 'roadmap_item' },
@@ -1131,16 +1346,20 @@ const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
     contentRefType: 'internal_task',
     // Internal ClickUp work has no public destination on any platform — the
     // seam's default branch would synthesize `<hub>/internal_task/<id>`.
+    // The card's destination IS the ClickUp deep link, derived from the
+    // task id post-fetch (the refs frame used to carry it).
     noComposedHref: true,
+    fallbackHref: (item: { id?: unknown }) =>
+      item?.id != null ? clickupTaskUrl(String(item.id)) : null,
   },
 }
 function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(ROADMAP_CARD_CONFIGS, (cfg) => ({
-    mode: 'fetch',
     label: cfg.label,
     contentRefType: cfg.contentRefType,
     bareInline: true,
     ...(cfg.noComposedHref ? { noComposedHref: true } : {}),
+    ...(cfg.fallbackHref ? { fallbackHref: cfg.fallbackHref } : {}),
     skeleton: () => <RoadmapCardSkeleton size="sm" />,
     render: (item, chatRef, opts) => (
       <RoadmapChatCard
@@ -1155,98 +1374,91 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
 }
 
 const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
-  // ───────── no-fetch: ChatRef carries everything ─────────
+  // ───────── ref-shaped types: hydrated via /api/chat/entity-refs ─────────
   ...githubRegistryEntries(),
   // Generic TOMBSTONE for entities a chat action deleted (ClickUp task
-  // today; any deletable entity tomorrow). No fetch, no navigation —
-  // the entity no longer resolves anywhere; the placeholder keeps the
+  // today; any deletable entity tomorrow). No fetch (nothing exists
+  // server-side anymore), no navigation — the placeholder keeps the
   // thread's integrity (Teams/Slack "This message was deleted" pattern).
   deleted_data: {
-    mode: 'no-fetch',
     label: 'Deleted',
     bareInline: true,
-    render: (chatRef) => (
+    // The marker descriptor carries no metadata (cards hydrate by id, and a
+    // deleted entity has nothing to hydrate from), so every prop degrades to
+    // null and the card renders its generic "Deleted item" tombstone. The
+    // descriptor's `title` defaults to the raw cardId — suppress it so the
+    // strikethrough line never shows an opaque id.
+    render: (_item, chatRef) => (
       <DeletedDataCard
-        title={chatRef.title ?? null}
+        title={chatRef.title && chatRef.title !== chatRef.id ? chatRef.title : null}
         entityLabel={(chatRef.metadata?.entity_label as string | undefined) ?? null}
         recoveryNote={(chatRef.metadata?.recovery_note as string | undefined) ?? null}
       />
     ),
   },
-  slack_message: {
-    mode: 'no-fetch',
-    label: 'Slack message',
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <SlackChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
-          discuss={opts.discuss} />
-    ),
-  },
+  slack_message: refHydratedEntry('slack_message', 'Slack message', (displayRef, opts) => (
+    <SlackChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+  )),
+  // FAQ hydrates from its EXISTING public list API (`/api/faqs?ids=` —
+  // also feeding related-content rails, so its base path must not move).
+  // Rows are faq-shaped, not ChatRef-shaped, hence the bespoke row→display
+  // mapping instead of `refHydratedEntry`.
   faq: {
-    mode: 'no-fetch',
     label: 'FAQ',
     bareInline: true,
-    render: (chatRef, opts) => (
-      <FaqChatCard chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
-    ),
-  },
-  hubspot_ticket: {
-    mode: 'no-fetch',
-    label: 'HubSpot ticket',
-    // `MingoInfoCard` is the whole card — no "Ask"/provenance source row.
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
+    contentRefType: 'faq',
+    noComposedHref: true,
+    fallbackHref: (item: { id?: number | string }) =>
+      item?.id != null ? `/faqs#${faqItemAnchor(item.id)}` : null,
+    skeleton: () => <MingoInfoCardSkeleton />,
+    render: (item, chatRef, opts) => (
+      <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab}
           discuss={opts.discuss} />
     ),
   },
-  hubspot_ticket_anon: {
-    mode: 'no-fetch',
-    label: 'HubSpot ticket (anon)',
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
+  hubspot_ticket: refHydratedEntry('hubspot_ticket', 'HubSpot ticket', (displayRef, opts) => (
+    <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab}
+        discuss={opts.discuss} />
+  )),
+  hubspot_ticket_anon: refHydratedEntry(
+    'hubspot_ticket_anon',
+    'HubSpot ticket (anon)',
+    (displayRef, opts) => (
+      <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab}
           discuss={opts.discuss} />
     ),
-  },
-  hubspot_ticket_self: {
-    mode: 'no-fetch',
-    label: 'HubSpot ticket (self)',
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
+  ),
+  // Self tickets hydrate via the session-scoped `GET /api/tickets?ids=`
+  // (`selfScopeFilter` ACL) instead of the generic endpoint — the self
+  // config's searchFilter is deliberately fail-closed there. Same
+  // ChatRef item shape (`buildHubspotTicketSelfRef` SSOT), same preset.
+  hubspot_ticket_self: refHydratedEntry(
+    'hubspot_ticket_self',
+    'HubSpot ticket (self)',
+    (displayRef, opts) => (
+      <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab}
           discuss={opts.discuss} />
     ),
-  },
-  data_room_doc: {
-    mode: 'no-fetch',
-    label: 'Data-room doc',
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <DataRoomDocChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
-          discuss={opts.discuss} />
-    ),
-  },
-  markdown: {
-    mode: 'no-fetch',
-    label: 'Doc page (markdown)',
-    bareInline: true,
-    render: (chatRef, opts) => (
-      <DataRoomDocChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
-          discuss={opts.discuss} />
-    ),
-  },
+  ),
+  data_room_doc: refHydratedEntry('data_room_doc', 'Data-room doc', (displayRef, opts) => (
+    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab}
+        discuss={opts.discuss} />
+  )),
+  markdown: refHydratedEntry('markdown', 'Doc page (markdown)', (displayRef, opts) => (
+    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab}
+        discuss={opts.discuss} />
+  )),
+  // Body-synthesized video ids (`shortVideoId` content hashes / YouTube
+  // ids) have no backing table row to fetch — ref-only by nature.
   video: {
-    mode: 'no-fetch',
     label: 'Video',
     bareInline: true,
-    render: (chatRef) => <ChatInlineVideoPill chatRef={chatRef} />,
+    render: (_item, chatRef) => <ChatInlineVideoPill chatRef={chatRef} />,
   },
   ...financialRegistryEntries(),
 
-  // ───────── fetch: needs full row from list API ─────────
+  // ───────── content types: full rows from their public list APIs ─────────
   blog_post: {
-    mode: 'fetch',
     label: 'Blog post',
     contentRefType: 'blog_post_existing',
     bareInline: true,
@@ -1263,7 +1475,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   case_study: {
-    mode: 'fetch',
     label: 'Case study',
     contentRefType: 'case_study',
     bareInline: true,
@@ -1279,7 +1490,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   customer_interview: {
-    mode: 'fetch',
     label: 'Customer interview',
     contentRefType: 'customer_interview',
     bareInline: true,
@@ -1295,7 +1505,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   product_release: {
-    mode: 'fetch',
     label: 'Product release',
     contentRefType: 'product_release',
     bareInline: true,
@@ -1322,7 +1531,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   },
   ...programRegistryEntries(),
   investor_update: {
-    mode: 'fetch',
     label: 'Investor update',
     contentRefType: 'investor_update',
     bareInline: true,
@@ -1338,7 +1546,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   onboarding_guide: {
-    mode: 'fetch',
     label: 'Onboarding guide',
     contentRefType: 'onboarding_guide',
     bareInline: true,
@@ -1356,7 +1563,6 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   marketing_campaign: {
-    mode: 'fetch',
     label: 'Marketing campaign',
     contentRefType: 'marketing_campaign',
     bareInline: true,
@@ -1553,7 +1759,7 @@ export function ChatCardLoader({
   // unconditionally regardless of entry mode. For non-fetch types the
   // `contentRefType` is empty so the hook returns `isLoading=false` and
   // `item=undefined`, which we ignore.
-  const fetchEntry = entry && entry.mode === 'fetch' ? entry : null
+  const fetchEntry = entry && entry.contentRefType ? entry : null
   const { item, isLoading, isError, isFetched } = useChatCardItem<any>(
     fetchEntry?.contentRefType ?? '',
     fetchEntry ? resolvedChatRef.id : '',
@@ -1570,12 +1776,12 @@ export function ChatCardLoader({
   //   1. the registry's per-type `fallbackHref` — an explicit non-content
   //      destination (marketing campaign → `/admin/...`);
   //   2. the host's `composeContentUrl` seam via `resolveFetchedCardHref` —
-  //      the SAME resolver page cards and SSE chat cards go through. This is
-  //      what makes Mingo/NATS cards clickable: that transport ships bare
-  //      `[card://type:id]` markers with no refs metadata, so the ref reaches
+  //      the SAME resolver page cards go through. This is what makes cards
+  //      clickable on every transport: the wire ships bare
+  //      `[card://type:id]` markers with no metadata, so the ref reaches
   //      us with `url: null` and `resolveSourceRowCTA` has nothing to route.
   const composedHref =
-    fetchEntry && !resolvedChatRef.url && item && !fetchEntry.fallbackHref && !fetchEntry.noComposedHref
+    fetchEntry?.contentRefType && !resolvedChatRef.url && item && !fetchEntry.fallbackHref && !fetchEntry.noComposedHref
       ? resolveFetchedCardHref({
           contentRefType: fetchEntry.contentRefType,
           id: resolvedChatRef.id,
@@ -1681,67 +1887,52 @@ export function ChatCardLoader({
         {navWrap(node)}
       </ChatCardWithDiscuss>
     )
-  if (entry.mode === 'no-fetch') {
-    // Synthetic-ref gate. `chat-message-enhanced.tsx` builds a minimal
-    // `{ type, id, title: cardId, url: null }` ChatRef when the LLM
-    // emits `[card://<type>:<id>]` for an id the server did NOT
-    // surface (refs map miss) — typically an LLM hallucination of a
-    // composite/invented UUID. EVERY real ref carries `sourceRepo`
-    // (set by `buildChatRefFromRow` via `config.id` AND by
-    // `synthesizeVideoRefs` via `EMBEDDED_VIDEO_SOURCE_REPO`), so a
-    // missing `sourceRepo` is a reliable synthetic-ref signal.
-    //
-    // Returning null here triggers the bare-cardId fallback span in
-    // chat-message-enhanced's `<a card://...>` override — the
-    // documented "VISIBLE breakage" behavior. Without this gate, a
-    // hallucinated marker like `[card://markdown:f18945f8-<real-uuid>]`
-    // renders a `DataRoomDocChatCard` with the generic "Document"
-    // badge AND the fake id as the title — which the user can't tell
-    // apart from a real card (the entire point of the fallback
-    // comment block in chat-message-enhanced.tsx).
-    //
-    // Fetch-mode types already handle this gracefully: a synthetic
-    // id leads to a fetch miss → `!item` → null at line ~1034.
-    if (!finalChatRef.sourceRepo) return null
-    return finish(entry.render(finalChatRef, renderOpts))
+  if (!fetchEntry) {
+    // Ref-only types (`deleted_data`, `video` — nothing exists server-side
+    // to fetch): render straight from the marker's descriptor.
+    return finish(entry.render(undefined, finalChatRef, renderOpts))
   }
-  if (isLoading) return <>{entry.skeleton()}</>
+  if (isLoading) return <>{fetchEntry.skeleton?.() ?? null}</>
   if (!item) {
-    // FETCH FAILURE (non-OK response — auth blip, 5xx, rate limit) is
-    // NOT evidence of deletion: render nothing rather than a false
-    // "deleted" claim. Only a SUCCESSFUL fetch that lacks the id
-    // reaches the tombstone below.
-    if (isError) return null
-    // NEVER-FETCHED (query disabled — no list URL registered for this
-    // type, or an empty id): no request was made, so absence of `item`
-    // proves nothing. Render nothing rather than a false "deleted".
-    if (!isFetched) return null
-    // FETCH MISS. Two distinct cases, split by ref provenance:
-    //
-    //   - SERVER-BUILT ref (`sourceRepo` present — the entity provably
-    //     existed when the answer was written, its ref was persisted
-    //     with the message): the entity is GONE now (deleted /
-    //     tombstoned). Render the generic deleted-data TOMBSTONE so the
-    //     thread keeps its integrity instead of a silent gap — works
-    //     for ANY fetch-mode entity type, no per-type wiring.
-    //
-    //   - SYNTHETIC client-built ref (bare marker with no refs entry —
-    //     possibly a hallucinated id): keep the existing hide-it
-    //     behavior; a "deleted" placeholder would assert an existence
-    //     we can't vouch for.
-    if (finalChatRef.sourceRepo) {
-      return (
-        <DeletedDataCard
-          title={finalChatRef.title ?? null}
-          entityLabel={entry.label}
-          recoveryNote={
-            (finalChatRef.metadata as Record<string, unknown> | null | undefined)
-              ?.recovery_note as string | undefined ?? null
-          }
-        />
-      )
+    // FAIL LOUD (explicit product decision 2026-08-13): a card that
+    // cannot hydrate renders a VISIBLE error card — silent removal made
+    // broken answers look fine. Three distinguishable states:
+    if (isError) {
+      // Transient fetch failure (auth blip, 5xx, rate limit).
+      return <CardLoadFailure label={entry.label} id={finalChatRef.id} detail="Failed to load" />
     }
-    return null
+    if (!isFetched) {
+      // Query never ran — no list URL registered for this type / empty id.
+      return <CardLoadFailure label={entry.label} id={finalChatRef.id} detail="Not loadable" />
+    }
+    // Successful fetch, id absent — entity gone or the LLM invented the id.
+    return <CardLoadFailure label={entry.label} id={finalChatRef.id} detail="Not found" />
+  }
+  // Hero-video promotion, API-driven: when the FETCHED item carries a
+  // playable video (ChatRef-shaped items via `metadata.videoUrl` /
+  // `youtubeUrl` / `highlightVideoUrl`; content rows via the canonical
+  // `custom_video_url` / `main_video_url` columns), render the video
+  // section as a SIBLING below the compact card. NOT `<BlockCard>` —
+  // that is a render-null sentinel only chat-message-enhanced's SYNC
+  // pre-scan understands; returned from inside this loader (post-fetch,
+  // async) it renders nothing (the missing-videos regression,
+  // 2026-08-13). The loader's output already lives in a hoisted
+  // block-level sibling (`b-<key>`), so block content is legal here.
+  const videoMeta = itemVideoMetadata(item)
+  if (videoMeta) {
+    const videoRef: ChatRef = {
+      ...finalChatRef,
+      metadata: { ...(finalChatRef.metadata ?? {}), ...videoMeta },
+    }
+    return (
+      // Same 12px rhythm as the message renderer's block-sibling wrapper
+      // (`my-3` in chat-message-enhanced) so card→player spacing matches
+      // the spacing between any two hoisted blocks.
+      <div className="flex min-w-0 flex-col gap-3">
+        {finish(entry.render(item, finalChatRef, renderOpts))}
+        <ChatVideoEntityCard chatRef={videoRef} />
+      </div>
+    )
   }
   return finish(entry.render(item, finalChatRef, renderOpts))
 }
@@ -1772,11 +1963,6 @@ export function renderChatInlineEntityCard(
   } = {},
 ): React.ReactNode {
   const { onDiscuss, onDisplay, baseRoute, chipBasePlatform, extras } = options
-  const m = chatRef.metadata ?? {}
-  const hasVideo =
-    (typeof m.videoUrl === 'string' && (m.videoUrl as string).length > 0) ||
-    (typeof m.youtubeUrl === 'string' && (m.youtubeUrl as string).length > 0) ||
-    (typeof m.highlightVideoUrl === 'string' && (m.highlightVideoUrl as string).length > 0)
 
   const loader = (
     <ChatCardLoader
@@ -1789,12 +1975,29 @@ export function renderChatInlineEntityCard(
     />
   )
 
-  if (hasVideo) {
-    return (
-      <BlockCard inline={loader}>
-        <ChatVideoEntityCard chatRef={chatRef} />
-      </BlockCard>
-    )
+  // Embedded videos are SELF-DESCRIBING: the marker id alone recovers the
+  // playable URL (`decodeVideoMarkerId`), so the player renders on ANY
+  // transport with zero refs/fetch. Undecodable ids (legacy sha1 hashes,
+  // hallucinations) fall through to the loader → plain-text degrade.
+  // Hero videos on FETCHED entity types (webinars, releases, …) are
+  // handled post-fetch inside ChatCardLoader (`itemVideoMetadata`) — the
+  // marker's ref plays no part in either path.
+  if (chatRef.type === 'video') {
+    const decoded = decodeVideoMarkerId(chatRef.id)
+    if (decoded) {
+      const displayRef: ChatRef = {
+        ...chatRef,
+        title: chatRef.title && chatRef.title !== chatRef.id ? chatRef.title : 'Video',
+        url: chatRef.url ?? (decoded.videoUrl ?? (decoded.youtubeUrl ? `https://www.youtube.com/watch?v=${decoded.youtubeUrl}` : null)),
+        metadata: { ...(chatRef.metadata ?? {}), ...decoded },
+      }
+      return (
+        <BlockCard inline={<ChatInlineVideoPill chatRef={displayRef} />}>
+          <ChatVideoEntityCard chatRef={displayRef} />
+        </BlockCard>
+      )
+    }
+    return loader
   }
 
   return loader

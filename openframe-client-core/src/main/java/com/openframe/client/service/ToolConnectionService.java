@@ -74,13 +74,14 @@ public class ToolConnectionService {
             boolean lastAttempt
     ) {
         if (toolConnection.getStatus() == ConnectionStatus.DISCONNECTED) {
+            String transformedAgentToolId = toolAgentIdTransformerService.transform(toolType, openframeAgentId, agentId, lastAttempt);
             toolConnection.setStatus(ConnectionStatus.CONNECTED);
-            toolConnection.setAgentToolId(toolAgentIdTransformerService.transform(toolType, openframeAgentId, agentId, lastAttempt));
+            toolConnection.setAgentToolId(transformedAgentToolId);
             toolConnection.setConnectedAt(Instant.now());
             toolConnection.setDisconnectedAt(null);
             toolConnectionRepository.save(toolConnection);
 
-            log.info("Updated existing tool connection with machineId {} tool {} agentToolId {}", openframeAgentId, toolType, agentId);
+            log.info("Updated existing tool connection with machineId {} tool {} agentToolId {} rawAgentId {}", openframeAgentId, toolType, transformedAgentToolId, agentId);
         } else {
             // Connection is already CONNECTED
             String currentAgentToolId = toolConnection.getAgentToolId();
@@ -89,8 +90,8 @@ public class ToolConnectionService {
                 toolConnection.setAgentToolId(transformedAgentToolId);
                 toolConnection.setLastSyncAt(Instant.now());
                 toolConnectionRepository.save(toolConnection);
-                log.info("Updated agentToolId for existing connected tool connection: machineId={} tool={} oldAgentToolId={} newAgentToolId={}", 
-                        openframeAgentId, toolType, currentAgentToolId, agentId);
+                log.info("Updated agentToolId for existing connected tool connection: machineId={} tool={} oldAgentToolId={} newAgentToolId={} rawAgentId={}",
+                        openframeAgentId, toolType, currentAgentToolId, transformedAgentToolId, agentId);
             } else {
                 // Same ID and already connected - no action needed
                 log.info("Tool connection already exists with same agentToolId: machineId={} tool={} agentToolId={}", 

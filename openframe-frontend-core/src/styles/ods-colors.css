@@ -34,6 +34,24 @@
 :root,
 :root[data-theme="dark"],
 .theme-dark {
+  /* Declared color scheme — MUST track the active theme scope.
+   * Two jobs:
+   * 1. Native UA surfaces (scrollbars, form controls, date/month pickers,
+   *    <select> popups) render dark instead of default-light on the dark UI.
+   * 2. Chromium's "Auto Dark Mode for Web Contents" (WebContentsForceDark,
+   *    chrome://flags#enable-force-dark) force-processes any page that does
+   *    NOT declare a dark color-scheme. On this already-dark UI its
+   *    per-element lightness-inversion heuristics can repaint late-mounted
+   *    composited popups (Radix Select/Popover portals) with light
+   *    backgrounds and dark text while the rest of the page stays dark.
+   *    Declaring `color-scheme: dark` is the documented opt-out — Blink
+   *    skips pages whose root declares dark support. Root-cause shield for
+   *    the intermittent "light dropdown on dark admin" reports; author CSS
+   *    could never produce that state (light tokens are reachable only via
+   *    [data-theme="light"] / .theme-light, which nothing in the apps sets).
+   */
+  color-scheme: dark;
+
   /* Attention – Success */
   --ods-attention-green-success: #5ea62e;
   --ods-attention-green-success-hover: #549c24;
@@ -123,6 +141,9 @@
 /* ===================================================================== */
 :root[data-theme="light"],
 .theme-light {
+  /* Mirror of the dark scope's declaration — see the comment there. */
+  color-scheme: light;
+
   /* Attention – Success */
   --ods-attention-green-success: #4c8924;
   --ods-attention-green-success-hover: #427f1a;
@@ -254,7 +275,13 @@
   --color-bg-hover: var(--ods-system-greys-black-hover);
   --color-bg-active: var(--ods-system-greys-black-action);
   --color-bg-overlay: rgba(33, 33, 33, 0.8);
-  --color-bg-skeleton: var(--ods-system-greys-black);
+  /* Skeletons must CONTRAST with the surface they load on. `greys-black` here
+     was byte-identical to --color-bg-card, so every `bg-ods-skeleton` pulse
+     sitting on a card was invisible — it only appeared while the row's hover
+     tint lightened the ground beneath it (people-hub score table, 2026-08).
+     `soft-grey` is what `ui/Skeleton` (bg-ods-border) already pulses with, so
+     the two skeleton primitives now read as one, in both themes. */
+  --color-bg-skeleton: var(--ods-system-greys-soft-grey);
   --color-bg-surface: var(--ods-system-greys-soft-grey);
   --color-bg-surface-hover: var(--ods-system-greys-soft-grey-hover);
   --color-bg-surface-active: var(--ods-system-greys-soft-grey-action);
@@ -367,6 +394,7 @@
 /* HIGH CONTRAST (accessibility)                                         */
 /* ===================================================================== */
 .theme-high-contrast {
+  color-scheme: dark;
   --color-bg: #000000;
   --color-bg-card: #000000;
   --color-text-primary: #ffffff;

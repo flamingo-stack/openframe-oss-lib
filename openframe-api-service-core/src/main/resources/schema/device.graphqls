@@ -61,6 +61,7 @@ type Machine implements Node {
     organization: Organization
     hostname: String
     displayName: String
+    nickname: String
     serialNumber: String
     manufacturer: String
     model: String
@@ -85,6 +86,7 @@ enum DeviceStatus {
     DECOMMISSIONED,
     ONLINE,
     OFFLINE,
+    PENDING_DELETION,
     DELETED,
     ARCHIVED
 }
@@ -138,4 +140,9 @@ type InstalledAgent implements Node {
     version: String!
     createdAt: String
     updatedAt: String
+}
+
+extend type Mutation {
+
+    updateDeviceNickname(machineId: String!, nickname: String): Machine!
 }

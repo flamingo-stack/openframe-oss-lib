@@ -3,6 +3,8 @@ package com.openframe.data.nats.resolver;
 import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DownloadConfigurationLinkResolverTest {
@@ -14,7 +16,7 @@ class DownloadConfigurationLinkResolverTest {
 
     @Test
     void shouldSubstituteVersionPlaceholder() {
-        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("");
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("", null);
 
         String resolved = resolver.resolve(config(GITHUB_TEMPLATE), "1.0.19");
 
@@ -24,7 +26,7 @@ class DownloadConfigurationLinkResolverTest {
 
     @Test
     void shouldSubstituteAssetsBaseUrlPlaceholder() {
-        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("https://openframe.build");
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("https://openframe.build", null);
 
         String resolved = resolver.resolve(config(GATEWAY_TEMPLATE), "1.0.19");
 
@@ -33,7 +35,7 @@ class DownloadConfigurationLinkResolverTest {
 
     @Test
     void shouldStripTrailingSlashFromConfiguredBaseUrl() {
-        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("https://openframe.build/");
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("https://openframe.build/", null);
 
         String resolved = resolver.resolve(config(GATEWAY_TEMPLATE), "1.0.19");
 
@@ -42,7 +44,7 @@ class DownloadConfigurationLinkResolverTest {
 
     @Test
     void shouldStripAllConsecutiveTrailingSlashesFromConfiguredBaseUrl() {
-        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("https://openframe.build///");
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("https://openframe.build///", null);
 
         String resolved = resolver.resolve(config(GATEWAY_TEMPLATE), "1.0.19");
 
@@ -51,7 +53,7 @@ class DownloadConfigurationLinkResolverTest {
 
     @Test
     void shouldLeavePlaceholderUntouchedWhenBaseUrlNotConfigured() {
-        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("");
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("", null);
 
         String resolved = resolver.resolve(config(GATEWAY_TEMPLATE), "1.0.19");
 
@@ -60,11 +62,66 @@ class DownloadConfigurationLinkResolverTest {
 
     @Test
     void shouldLeaveTemplatesWithoutPlaceholdersUnchanged() {
-        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("https://openframe.build");
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver("https://openframe.build", null);
 
         String plain = "https://example.com/static/openframe-client_macos.tar.gz";
 
         assertThat(resolver.resolve(config(plain), "1.0.19")).isEqualTo(plain);
+    }
+
+    @Test
+    void shouldPreferProviderBaseUrlOverProperty() {
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver(
+                "https://openframe.build", () -> "https://tenant1.openframe.build");
+
+        String resolved = resolver.resolve(config(GATEWAY_TEMPLATE), "1.0.19");
+
+        assertThat(resolved).isEqualTo("https://tenant1.openframe.build/v0/api/assets/download?agent=chat&platform=macos");
+    }
+
+    @Test
+    void shouldStripTrailingSlashesFromProviderBaseUrl() {
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver(
+                "", () -> "https://tenant1.openframe.build//");
+
+        String resolved = resolver.resolve(config(GATEWAY_TEMPLATE), "1.0.19");
+
+        assertThat(resolved).isEqualTo("https://tenant1.openframe.build/v0/api/assets/download?agent=chat&platform=macos");
+    }
+
+    @Test
+    void shouldFallBackToPropertyWhenProviderReturnsBlank() {
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver(
+                "https://openframe.build", () -> "");
+
+        String resolved = resolver.resolve(config(GATEWAY_TEMPLATE), "1.0.19");
+
+        assertThat(resolved).isEqualTo("https://openframe.build/v0/api/assets/download?agent=chat&platform=macos");
+    }
+
+    @Test
+    void shouldFallBackToPropertyWhenProviderReturnsNull() {
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver(
+                "https://openframe.build", () -> null);
+
+        String resolved = resolver.resolve(config(GATEWAY_TEMPLATE), "1.0.19");
+
+        assertThat(resolved).isEqualTo("https://openframe.build/v0/api/assets/download?agent=chat&platform=macos");
+    }
+
+    @Test
+    void shouldConsultProviderOnEveryResolution() {
+        AtomicReference<String> providerValue = new AtomicReference<>("");
+        DownloadConfigurationLinkResolver resolver = new DownloadConfigurationLinkResolver(
+                "https://openframe.build", providerValue::get);
+
+        assertThat(resolver.resolve(config(GATEWAY_TEMPLATE), "1.0.19"))
+                .isEqualTo("https://openframe.build/v0/api/assets/download?agent=chat&platform=macos");
+
+        providerValue.set("https://tenant1.openframe.build");
+
+        assertThat(resolver.resolve(config(GATEWAY_TEMPLATE), "1.0.19"))
+                .isEqualTo("https://tenant1.openframe.build/v0/api/assets/download?agent=chat&platform=macos");
     }
 
     private DownloadConfiguration config(String linkTemplate) {

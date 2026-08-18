@@ -4,7 +4,7 @@
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 import type { ApprovalBlockVariant, AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
-import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData,
+import type { ApprovalRequestData, AskSegment, Message, MessageSegment, ToolExecutionData,
   ApprovalResolutionHandler,
 } from './message.types'
 import type { ChatRef } from '../chat-ref.types'
@@ -134,15 +134,6 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   onApprove?: ApprovalResolutionHandler
   onReject?: ApprovalResolutionHandler
   /**
-   * Per-row metadata for inline entity-card rendering (v6.1 §B.2.6+§B.2.7).
-   * Keyed by `<documentType>:<primaryKey>`. When present AND
-   * `renderEntityCard` is also provided, text segments are passed through
-   * the `remarkCardLinks` plugin and `[card://<type>:<id>]` markers
-   * expand into the host's chosen inline component. When unset (or
-   * `renderEntityCard` unset), messages render as plain markdown.
-   */
-  chatRefs?: Record<string, ChatRef>
-  /**
    * Entity-context items attached to this (user) message. When present the
    * bubble renders a read-only chip strip beneath its text (Figma node
    * 31:28709). Resolved from `UnifiedChatMessage.contextItems` by the host.
@@ -212,6 +203,15 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * simply default to undefined on the receiver.
    */
   NavLinkAnchor?: NavLinkAnchorComponent
+  /**
+   * Picks an option on an `ask` (clarification) card in this message. Receives
+   * the option's label VERBATIM — the host sends it as the user's next message
+   * and the backend resolves the reply against the labels it offered.
+   *
+   * Omit to render ask cards read-only. Keep the identity stable
+   * (`useCallback` / module const): the message memo compares it by reference.
+   */
+  onAskSelect?: (label: string) => void
 }
 
 // ========== Chat Message List Props ==========
@@ -285,6 +285,10 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  message's ChatMessageEnhanced. Owns the unified click rule
    *  (same-origin soft nav, cross-origin new tab). */
   NavLinkAnchor?: NavLinkAnchorComponent
+  /** Ask-card option pick. Forwarded verbatim to every message's
+   *  ChatMessageEnhanced; the host sends the received label as the user's next
+   *  message. Omit to render ask cards read-only. */
+  onAskSelect?: (label: string) => void
 }
 
 export interface ChatMessageListRef {
@@ -531,6 +535,10 @@ export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivEleme
    *  `'client'` = end-client (Fae desktop app) card with only the
    *  BE-generated title (`explanation`) + actions/status pill. */
   variant?: ApprovalBlockVariant
+  /** Render the footer Approve/Reject row (or the resolved-status tag).
+   *  Turn off when the viewer cannot resolve this card — matches
+   *  `ApprovalBatchMessageProps.showFooterActions`. Default true. */
+  showFooterActions?: boolean
   /** Display name of the user who resolved the request; baked into the
    *  client variant's full-text status pill ("Approved by {name}"). */
   resolvedByName?: string | null
@@ -565,6 +573,20 @@ export interface GuideDisplayProps extends HTMLAttributes<HTMLDivElement> {
    *  output a text segment gets, so `[card://]` cards and mention chips
    *  behave identically inside a guide. */
   children?: ReactNode
+}
+
+// ========== Ask Display Props ==========
+
+export interface AskDisplayProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onSelect'> {
+  /** The clarification cards to show. One entry per `ask` segment; a run of
+   *  consecutive segments is passed as ONE card with a pager, so a multi-question
+   *  turn reads as a single block instead of a stack of near-identical cards. */
+  cards: AskSegment[]
+  /** Picks an option. Receives the option's `label` VERBATIM — that string is
+   *  sent as the user's next message and the backend's classifier resolves it
+   *  against the labels it offered, so it must not be reworded. Omit to render
+   *  the card read-only (replayed history, observer surfaces). */
+  onSelect?: (label: string) => void
 }
 
 // ========== Model Display Props ==========

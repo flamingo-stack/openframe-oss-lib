@@ -4,6 +4,9 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunFilterInput;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunResponse;
 import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
+import org.springframework.data.domain.Sort;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
@@ -36,16 +39,19 @@ public class ScheduleRunService {
     public CountedGenericQueryResult<ScheduleRunResponse> list(String scheduleId,
                                                                ScheduleRunFilterInput filter,
                                                                String search,
+                                                               SortInput sort,
                                                                CursorPaginationCriteria pagination) {
         String tenantId = tenantIdProvider.getTenantId();
         CursorPaginationCriteria normalized = pagination.normalize();
         int limit = normalized.getLimit();
         ScheduleRunQueryFilter queryFilter = toQueryFilter(filter);
+        String sortField = resolveSortField(sort);
+        Sort.Direction sortDirection = resolveSortDirection(sort);
 
         long filteredCount = scheduleScriptExecutionRepository.countForSchedule(tenantId, scheduleId, queryFilter, search);
 
         List<ScheduleScriptExecution> page = scheduleScriptExecutionRepository.findPageForSchedule(
-                tenantId, scheduleId, queryFilter, search,
+                tenantId, scheduleId, queryFilter, search, sortField, sortDirection,
                 normalized.getCursor(), normalized.isBackward(), limit + 1);
 
         boolean hasMore = page.size() > limit;
@@ -64,9 +70,28 @@ public class ScheduleRunService {
 
         return CountedGenericQueryResult.<ScheduleRunResponse>builder()
                 .items(views)
-                .pageInfo(buildPageInfo(views, hasMore, normalized))
+                .pageInfo(buildPageInfo(items, hasMore, normalized, sortField))
                 .filteredCount((int) filteredCount)
                 .build();
+    }
+
+    private String resolveSortField(SortInput sort) {
+        if (sort == null || sort.getField() == null || sort.getField().isBlank()) {
+            return scheduleScriptExecutionRepository.getDefaultSortField();
+        }
+        String requested = sort.getField().trim();
+        if (!scheduleScriptExecutionRepository.isSortableField(requested)) {
+            log.warn("Invalid sort field requested for schedule runs: '{}' — falling back to default", requested);
+            return scheduleScriptExecutionRepository.getDefaultSortField();
+        }
+        return requested;
+    }
+
+    private static Sort.Direction resolveSortDirection(SortInput sort) {
+        if (sort != null && sort.getDirection() == SortDirection.ASC) {
+            return Sort.Direction.ASC;
+        }
+        return Sort.Direction.DESC;
     }
 
     public Optional<ScheduleRunResponse> findById(String id) {
@@ -104,7 +129,8 @@ public class ScheduleRunService {
                 .build();
     }
 
-    private static PageInfo buildPageInfo(List<ScheduleRunResponse> views, boolean hasMore, CursorPaginationCriteria pagination) {
+    private PageInfo buildPageInfo(List<ScheduleScriptExecution> items, boolean hasMore,
+                                   CursorPaginationCriteria pagination, String sortField) {
         boolean hasPrev;
         boolean hasNext;
         if (pagination.isBackward()) {
@@ -114,8 +140,10 @@ public class ScheduleRunService {
             hasPrev = pagination.getCursor() != null;
             hasNext = hasMore;
         }
-        String startCursor = views.isEmpty() ? null : CursorCodec.encode(views.get(0).getId());
-        String endCursor = views.isEmpty() ? null : CursorCodec.encode(views.get(views.size() - 1).getId());
+        String startCursor = items.isEmpty() ? null
+                : CursorCodec.encode(scheduleScriptExecutionRepository.encodeCursor(items.get(0), sortField));
+        String endCursor = items.isEmpty() ? null
+                : CursorCodec.encode(scheduleScriptExecutionRepository.encodeCursor(items.get(items.size() - 1), sortField));
         return PageInfo.builder()
                 .hasNextPage(hasNext)
                 .hasPreviousPage(hasPrev)

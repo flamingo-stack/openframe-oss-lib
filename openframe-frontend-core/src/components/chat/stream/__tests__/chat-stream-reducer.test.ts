@@ -186,7 +186,7 @@ describe('createChatStreamReducer — SSE kernel', () => {
     expect(r.state.streamingPhase).toBe('streaming')
   })
 
-  it('decision_resolved flips the SOURCE card, writes the receipt, and stamps chatRefs', () => {
+  it('decision_resolved flips the SOURCE card and writes the receipt', () => {
     const r = createChatStreamReducer({ transport: 'sse' })
     // Turn 1: approval card.
     r.beginSseSend({ text: 'open a ticket', assistantName: 'Mingo AI' })
@@ -206,8 +206,6 @@ describe('createChatStreamReducer — SSE kernel', () => {
       status: 'approved',
       ok: true,
       receiptText: '✅ Approved — ticket created: [card://ticket:77]',
-      cardRef: { type: 'ticket', id: '77', title: 'Broken printer' },
-      cardType: 'ticket',
     })
     r.endSseTurn()
 
@@ -217,12 +215,11 @@ describe('createChatStreamReducer — SSE kernel', () => {
     const [, sourceMsg, receiptMsg] = r.state.messages
     const card = sourceMsg.segments?.find((s) => s.type === 'approval_request')
     expect((card as { status?: string }).status).toBe('approved')
+    // The receipt's `[card://…]` marker hydrates by id via the card fetch
+    // path — no ref stamping.
     expect(receiptMsg.segments).toEqual([
       { type: 'text', text: '✅ Approved — ticket created: [card://ticket:77]\n\n' },
     ])
-    expect(receiptMsg.chatRefs?.['ticket:77']?.id).toBe('77')
-    // Per-send refs map got the ref too (sendIdx 1 — the hidden send).
-    expect(r.state.turnMeta.refs.get(1)?.['ticket:77']?.id).toBe('77')
     expect(r.state.streamingPhase).toBe('idle')
   })
 
@@ -1199,7 +1196,6 @@ describe('createChatStreamReducer — resetForDialogSwitch boundary', () => {
     expect(r.state.turnMeta.sendCount).toBe(0)
     expect(r.state.turnMeta.meta.size).toBe(0)
     expect(r.state.turnMeta.sources.size).toBe(0)
-    expect(r.state.turnMeta.refs.size).toBe(0)
   })
 
   it('SURVIVOR: approvalStatuses outlive the switch (request ids are global)', () => {
@@ -1326,5 +1322,77 @@ describe('agentBusy on initializeWithState', () => {
     const r = createChatStreamReducer({ transport: 'nats' })
     r.initializeWithState(null, { existingSegments: [{ type: 'text', text: 'done' }] })
     expect(r.state.streamingPhase).toBe('idle')
+  })
+})
+
+/**
+ * `ask` — the guide-routing clarification card. Not a delta: one chunk carries
+ * the whole card, plus the intro sentence that must render as ordinary answer
+ * text IN FRONT of it. The post-MESSAGE_END path is the interesting one — the
+ * card routinely lands in a continuation, where the delta is appended to the
+ * finished bubble rather than replacing it.
+ */
+describe('createChatStreamReducer — ask cards', () => {
+  const ask = (question: string, seq?: number, text?: string): ChatStreamEvent => ({
+    type: 'ask',
+    ...(text ? { text } : {}),
+    question,
+    options: [
+      { label: 'Find documentation', description: 'How the feature works' },
+      { label: 'Work with workspace data' },
+    ],
+    ...(seq != null ? { seq } : {}),
+  })
+
+  it('renders the intro as text ahead of the card, in one bubble', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 1 })
+    r.apply(ask('What do you want to work on?', 2, 'Docs, or your own workspace?'))
+
+    const last = r.state.messages[r.state.messages.length - 1]
+    expect(last.segments).toEqual([
+      { type: 'text', text: 'Docs, or your own workspace?' },
+      {
+        type: 'ask',
+        question: 'What do you want to work on?',
+        options: [
+          { label: 'Find documentation', description: 'How the feature works' },
+          { label: 'Work with workspace data' },
+        ],
+      },
+    ])
+  })
+
+  it('appends into the finished bubble after MESSAGE_END, keeping the reply', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 1 })
+    r.apply({ type: 'text-delta', text: 'Working on it. ', seq: 2 })
+    r.apply({ type: 'turn-end', seq: 3 })
+    r.apply(ask('Which one?', 4, 'One thing first: '))
+
+    const last = r.state.messages[r.state.messages.length - 1]
+    // The intro COALESCES onto the completed reply (same rule as a post-END
+    // `text-delta`) — a slice off the accumulator used to drop it here.
+    expect(last.segments).toEqual([
+      { type: 'text', text: 'Working on it. One thing first: ' },
+      {
+        type: 'ask',
+        question: 'Which one?',
+        options: [
+          { label: 'Find documentation', description: 'How the feature works' },
+          { label: 'Work with workspace data' },
+        ],
+      },
+    ])
+  })
+
+  it('keeps two cards in one turn as separate segments (the card pages them)', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 1 })
+    r.apply(ask('First?', 2))
+    r.apply(ask('Second?', 3))
+
+    const last = r.state.messages[r.state.messages.length - 1]
+    expect(last.segments?.map((s) => s.type)).toEqual(['ask', 'ask'])
   })
 })

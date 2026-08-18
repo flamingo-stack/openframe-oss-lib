@@ -15,6 +15,11 @@ import type {
   DecisionResolvedFrame,
   UsageTelemetry,
 } from './frames'
+// The ask card's option shape is the SEGMENT's shape — the decoder hands the
+// rows straight to the accumulator, so restating them here would be two
+// declarations of one wire contract. Type-only import from a React-free
+// module; `nats-decoder.ts` already depends on the same file for MESSAGE_TYPE.
+import type { AskOptionData } from '../components/chat/types/message.types'
 
 /** Optional envelope on every event. `seq` carries the transport's
  *  stream sequence (JetStream `streamSeq` on NATS; unused on SSE). */
@@ -63,6 +68,20 @@ export interface ThinkingDeltaEvent extends ChatStreamEventBase {
 export interface GuideDeltaEvent extends ChatStreamEventBase {
   type: 'guide-delta'
   text: string
+}
+
+/** Clarification card (NATS `ASK` chunk) — the assistant asking which reading
+ *  of an ambiguous question to answer. NOT a delta: the chunk carries the
+ *  finished card, so consumers push it whole instead of coalescing. `text` is
+ *  the intro sentence the same chunk rides along with; consumers render it as
+ *  ordinary answer text BEFORE the card. NATS-only — the SSE frame grammar has
+ *  no ask frame — but it lives in the shared union because the reducer is
+ *  transport-agnostic. */
+export interface AskEvent extends ChatStreamEventBase {
+  type: 'ask'
+  text?: string
+  question: string
+  options: AskOptionData[]
 }
 
 export interface StatusEvent extends ChatStreamEventBase {
@@ -119,6 +138,37 @@ export interface ApprovalRequestEvent extends ChatStreamEventBase {
   fields?: ApprovalRequestField[]
   toolCalls?: ApprovalToolCall[]
   status?: 'pending'
+  /** Set when the card came from a Product Guide frame — see {@link GuideOrigin}. */
+  origin?: GuideOrigin
+}
+
+/**
+ * Marks an event whose payload is a Product Guide frame, whatever transport
+ * carried it. It exists because ONE stream can now mix both worlds: the agent
+ * re-streams the hub's frames into a NATS dialog, so a card typed the hub's way
+ * (`approvalType` = the tool name, resolved through the hub's confirm route)
+ * travels beside cards typed the agent's way (`approvalType` = an approval TIER
+ * routed to human escalation).
+ *
+ * Consumers read it to keep the guide half behaving exactly as it does in the
+ * hub's own chat — NOT to give it special treatment. Without it the NATS kernel
+ * would have to guess from `approvalType`, and every tool the hub adds would
+ * silently fall into the escalation path.
+ */
+export type GuideOrigin = 'guide'
+
+/** The only value of {@link GuideOrigin}. Lives beside the type, and beside the
+ *  predicate below, because both decoders and every consumer that branches on
+ *  provenance must compare against the same token — a bare `'guide'` literal
+ *  typo silently disables the branch instead of failing to compile. */
+export const GUIDE_ORIGIN: GuideOrigin = 'guide'
+
+/** True for anything stamped as coming from the Product Guide — a stream event
+ *  or the `data` of a segment built from one. */
+export function isGuideOrigin(
+  source: { origin?: GuideOrigin | string } | null | undefined,
+): boolean {
+  return source?.origin === GUIDE_ORIGIN
 }
 
 /** An approval request was resolved (SSE `decision_resolved` frame /
@@ -132,13 +182,90 @@ export interface ApprovalResolvedEvent extends ChatStreamEventBase {
   approvalType?: string
   resolvedByName?: string | null
   receiptText?: string
-  /** Inline post-approve card: the ref payload + its documentType +
-   *  the `[card://…]` marker (SSE only). */
-  cardRef?: unknown
-  cardType?: string
-  marker?: string
   result?: DecisionResolvedFrame['result']
   willAutoContinue?: boolean
+  /** Set when the resolution came from a Product Guide frame — see {@link GuideOrigin}. */
+  origin?: GuideOrigin
+}
+
+/** The client is offered a handoff of this ticket to a human technician
+ *  (NATS `ESCALATION_OFFER` chunk in state PENDING). Distinct from
+ *  `approval-request`: it resolves through the ticket-escalation mutations,
+ *  never the tool-approval flow, and it is raised by four different origins
+ *  (Fae's own tool call, the client's header button, a deterministic
+ *  trigger, or a deferred surfacing at turn end) that all render alike. */
+export interface EscalationOfferEvent extends ChatStreamEventBase {
+  type: 'escalation-offer'
+  offerId: string
+  text: string
+  origin?: string
+}
+
+/** Wire vocabulary of `EscalationOfferData.state`. */
+export const ESCALATION_STATE = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  DECLINED: 'DECLINED',
+  SUPERSEDED: 'SUPERSEDED',
+} as const
+
+/** Terminal wire state → the shared `ChatApprovalStatus` vocabulary; `null`
+ *  for PENDING or anything unrecognized. Shared by BOTH decoders (live
+ *  chunks and persisted rows) so a state can never mean two things. */
+export function escalationResolvedStatus(
+  state: unknown,
+): EscalationOfferResolvedEvent['status'] | null {
+  switch (state) {
+    case ESCALATION_STATE.APPROVED:
+      return 'approved'
+    case ESCALATION_STATE.DECLINED:
+      return 'rejected'
+    case ESCALATION_STATE.SUPERSEDED:
+      return 'cancelled'
+    default:
+      return null
+  }
+}
+
+/** An escalation offer reached a terminal state. The wire's SUPERSEDED
+ *  (the client typed over a pending offer) maps onto `cancelled` so the
+ *  whole stack keeps ONE status vocabulary (`ChatApprovalStatus`). The
+ *  resolved chunk carries no text — consumers flip the existing block. */
+export interface EscalationOfferResolvedEvent extends ChatStreamEventBase {
+  type: 'escalation-offer-resolved'
+  offerId: string
+  status: 'approved' | 'rejected' | 'cancelled'
+  resolvedByName?: string | null
+}
+
+/** The conversation was handed off to a human technician (`TICKET_ESCALATED`).
+ *  A first-class block rather than something inferred from an offer's state,
+ *  so paths that raise no offer at all — the inactivity auto-escalation — still
+ *  produce a receipt. `text` is nullable on the wire; consumers supply the
+ *  fallback copy. */
+export interface TicketEscalatedEvent extends ChatStreamEventBase {
+  type: 'ticket-escalated'
+  ticketId: string
+  ticketNumber?: number
+  reason: string
+  text?: string
+}
+
+/** Ticket lifecycle receipt (`TICKET_EVENT`) — the ticket was resolved,
+ *  reopened, etc. `kind` is an OPEN vocabulary (RESOLVED/REOPENED today):
+ *  an unknown kind still decodes and renders as a neutral line rather than
+ *  being dropped, so the backend can add kinds without a client release.
+ *  Arrives standalone (outside MESSAGE_START/END), like `ticket-escalated`. */
+export interface TicketEventEvent extends ChatStreamEventBase {
+  type: 'ticket-event'
+  kind: string
+  actorId?: string
+  actorName?: string
+  /** Who acted — e.g. an AI agent vs a human technician. Open string. */
+  actorType?: string
+  reason?: string
+  /** Kind-token the ticket reopened INTO (AI_ASSISTANCE / TECH_REQUIRED / ...). */
+  targetStatusKind?: string
 }
 
 /** Per-turn metadata. Raw wire values pass through UNVALIDATED — the
@@ -152,7 +279,6 @@ export interface ChatMetadataEvent extends ChatStreamEventBase {
   modelName?: string | null
   contextWindowMaxTokens?: number | null
   sources?: unknown
-  refs?: unknown
   scrollAnchor?: unknown
   /** Server-minted conversation id (`ChatMetadataFrame.conversationId`),
    *  passed through raw like every other catch-all field — the consumer
@@ -163,6 +289,13 @@ export interface ChatMetadataEvent extends ChatStreamEventBase {
     routedModel?: string
     routedThinkingBudget: number | null
   }
+  /**
+   * Set when the metadata came from a Product Guide frame — see
+   * {@link GuideOrigin}. Such an event carries ONLY `conversationId`: it exists
+   * to record the hub's conversation id (every confirm-tool call must quote it
+   * back), NOT to describe the dialog's model, which stays the agent's.
+   */
+  origin?: GuideOrigin
 }
 
 /** SSE usage frames — raw wire keys (snake_case) preserved. */
@@ -241,10 +374,15 @@ export type ChatStreamEvent =
   | TextDeltaEvent
   | ThinkingDeltaEvent
   | GuideDeltaEvent
+  | AskEvent
   | StatusEvent
   | ToolExecutionEvent
   | ApprovalRequestEvent
   | ApprovalResolvedEvent
+  | EscalationOfferEvent
+  | EscalationOfferResolvedEvent
+  | TicketEscalatedEvent
+  | TicketEventEvent
   | ChatMetadataEvent
   | UsageEvent
   | TokenUsageEvent

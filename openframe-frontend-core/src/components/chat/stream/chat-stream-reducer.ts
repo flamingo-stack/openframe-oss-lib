@@ -21,7 +21,7 @@
  *     `./message-mutations`;
  *   - `useSseChatAdapter`/`useChat`'s SSE turn kernel (cumulative text
  *     replace, front-inserted thinking, approval card, `decision_resolved`
- *     receipt + cardRef stamping, sendIdx-keyed sources/refs/meta maps).
+ *     receipt, sendIdx-keyed sources/meta maps).
  *
  * Idempotency:
  *   - events whose `seq` ≤ the last applied seq are dropped (per instance);
@@ -58,7 +58,8 @@ import {
 import { getCommandText } from '../utils/tool-call-helpers'
 import { parseScrollAnchor, type ScrollAnchor } from '../utils/scroll-anchor'
 import { escapeThinkingTags } from '../../../chat-protocol/decode'
-import { buildChatRefKey } from '../types/chat.types'
+import { isGuideOrigin } from '../../../chat-protocol/events'
+import { approvalDisplaysInline, guideApprovalOrigin } from '../utils/approval-display'
 import type {
   ApprovalBatchSegment,
   ApprovalRequestSegment,
@@ -84,7 +85,6 @@ import {
   type ParticipantEvent,
   type UsageEvent,
 } from '../../../chat-protocol/events'
-import type { ChatRef } from '../chat-ref.types'
 import {
   CONTENT_DEDUP_WINDOW,
   SYSTEM_DEDUP_WINDOW,
@@ -141,13 +141,12 @@ export function createEmptyTurnMeta(): ChatTurnMeta {
 }
 
 /** SSE per-send maps, keyed by the send counter (`sendIdx`). Each user send
- *  produces ONE server-side refs/sources entry but can fan out to MULTIPLE
+ *  produces ONE server-side sources entry but can fan out to MULTIPLE
  *  assistant messages client-side — the adapter maps every following
  *  assistant message back to its send's entry. */
 export interface ChatTurnMetaState {
   meta: Map<number, ChatTurnMeta>
   sources: Map<number, unknown[]>
-  refs: Map<number, Record<string, ChatRef>>
   sendCount: number
 }
 
@@ -162,6 +161,15 @@ export interface ChatReducerState {
     contextWindowMaxTokens: number | null
   } | null
   approvalStatuses: Record<string, ChatApprovalStatus>
+  /**
+   * Hub conversation id for the Product Guide half of this dialog, learned from
+   * a guide metadata frame. The hub mints it and requires it back on every
+   * confirm-tool call, so a host resolving a guide approval card reads it from
+   * here. Null until a guide turn has streamed — an approval that arrives from
+   * history (after a reload) has no live frame to learn it from, which is why
+   * the agent should also expose it per dialog.
+   */
+  guideConversationId: string | null
 }
 
 /** Escalated-approval bookkeeping entry (mirrors the legacy processor). */
@@ -197,9 +205,11 @@ export interface ChatReducerEffect {
     | 'onEscalatedApproval'
     | 'onEscalatedApprovalResult'
     | 'onApprovalResolved'
+    | 'onEscalationOfferResolved'
     | 'onToolExecuted'
     | 'onAgentBusy'
     | 'onDialogClosed'
+    | 'onTicketEvent'
     | 'segments-after-approval-result'
   args: unknown[]
 }
@@ -424,7 +434,6 @@ export interface ChatStreamReducer {
   failSseTurn(errorMessage: string): void
   seedSseMaps(seed: {
     sources?: Array<[number, unknown[]]>
-    refs?: Array<[number, Record<string, ChatRef>]>
     sendCount?: number
   }): void
 
@@ -519,6 +528,7 @@ export function createChatStreamReducer(
   let streamingPhase: StreamingPhase = 'idle'
   let dialogTokenUsage: DialogTokenUsage | null = null
   let liveModel: ChatReducerState['liveModel'] = null
+  let guideConversationId: string | null = null
   let approvalStatuses: Record<string, ChatApprovalStatus> = {
     ...(options.approvalStatuses ?? {}),
   }
@@ -662,7 +672,6 @@ export function createChatStreamReducer(
   // SSE per-send maps + per-turn kernel.
   const metaMap = new Map<number, ChatTurnMeta>()
   const sourcesMap = new Map<number, unknown[]>()
-  const refsMap = new Map<number, Record<string, ChatRef>>()
   let sendCount = 0
   let sseCurrentText = ''
 
@@ -677,10 +686,11 @@ export function createChatStreamReducer(
       stateCache = {
         messages,
         streamingPhase,
-        turnMeta: { meta: metaMap, sources: sourcesMap, refs: refsMap, sendCount },
+        turnMeta: { meta: metaMap, sources: sourcesMap, sendCount },
         dialogTokenUsage,
         liveModel,
         approvalStatuses,
+        guideConversationId,
       }
     }
     return stateCache
@@ -988,6 +998,17 @@ export function createChatStreamReducer(
       }
 
       case 'metadata': {
+        // A guide metadata event carries ONLY the hub's conversation id (the
+        // decoder strips the rest): record it and stop. Falling through would
+        // rebuild `liveModel` from an event with no model in it and blank the
+        // dialog's model badge mid-answer.
+        if (isGuideOrigin(event)) {
+          if (typeof event.conversationId === 'string' && event.conversationId) {
+            guideConversationId = event.conversationId
+            invalidate()
+          }
+          break
+        }
         // Legacy `parseChunkToAction` action shape, reconstructed for the
         // callback contract.
         emit('onMetadata', {
@@ -1041,6 +1062,33 @@ export function createChatStreamReducer(
         break
       }
 
+      // A clarification card arrives whole, not as deltas. The intro sentence
+      // riding the same chunk goes in FIRST as ordinary answer text so it runs
+      // through the markdown body pipeline (and coalesces with any preamble the
+      // turn already streamed); the card follows as its own segment. Both land
+      // in one emit, so the bubble never shows the card ahead of its lead-in.
+      case 'ask': {
+        if (event.text) accumulator.appendText(event.text)
+        const segments = accumulator.addAsk(event.question, event.options)
+        if (isInStream || !hasEverStreamed) {
+          emitSegments(segments)
+          applySegmentsToState(segments, withSeqMeta(undefined))
+          break
+        }
+        // Post-MESSAGE_END: the delta is spelled out rather than sliced off the
+        // accumulator. `appendText` COALESCES into a trailing text segment, so a
+        // slice would silently drop the intro whenever the continuation already
+        // had text in flight; `appendToTrailingAssistant` re-coalesces it here
+        // instead, exactly like a `text-delta`.
+        const delta: MessageSegment[] = [
+          ...(event.text ? [{ type: 'text' as const, text: event.text }] : []),
+          { type: 'ask' as const, question: event.question, options: event.options },
+        ]
+        emitSegments(delta, { append: true })
+        applySegmentsToState(delta, withSeqMeta({ append: true }))
+        break
+      }
+
       case 'tool-execution': {
         const segment: ToolExecutionSegment = { type: 'tool_execution', data: event.data }
         // A starting tool run means the agent's turn is in progress even
@@ -1073,11 +1121,17 @@ export function createChatStreamReducer(
         const requestId = event.requestId
         const approvalType = event.approvalType ?? 'USER'
         const toolCalls = event.toolCalls
+        // Where this card renders is ONE rule, shared with the SSE kernel and
+        // the history replay (`approval-display`) — a Product Guide proposal
+        // that renders inline live must not move on the next page load.
+        const guideOrigin = guideApprovalOrigin(event)
+        const displayInline = (type: string) =>
+          approvalDisplaysInline(event, type, displayApprovalTypes)
 
         if (toolCalls && toolCalls.length > 0) {
           // ── Batch form ──
           const status = (approvalStatuses[requestId] || 'pending') as ChatApprovalStatus
-          if (!displayApprovalTypes.includes(approvalType)) {
+          if (!displayInline(approvalType)) {
             // Escalated: keep batch context locally for replay on result;
             // surface a summary command via the legacy escalation callback.
             const required = toolCalls.find((c) => c.requiresApproval) ?? toolCalls[0]
@@ -1099,7 +1153,15 @@ export function createChatStreamReducer(
           }
           if (batchApprovalsEnabled) {
             const before = accumulator.getSegments().length
-            const segments = accumulator.addApprovalBatch(requestId, approvalType, toolCalls, status)
+            const segments = accumulator.addApprovalBatch(
+              requestId,
+              approvalType,
+              toolCalls,
+              status,
+              undefined,
+              undefined,
+              guideOrigin,
+            )
             applyAccumulated(before, segments)
             break
           }
@@ -1117,6 +1179,8 @@ export function createChatStreamReducer(
               call.toolExplanation,
               approvalType,
               status,
+              undefined,
+              guideOrigin,
             )
           }
           applyAccumulated(before, segments)
@@ -1126,7 +1190,7 @@ export function createChatStreamReducer(
         // ── Single form ──
         const command = event.command ?? ''
         const explanation = event.explanation
-        if (displayApprovalTypes.includes(approvalType)) {
+        if (displayInline(approvalType)) {
           const status = (approvalStatuses[requestId] || 'pending') as ChatApprovalStatus
           const before = accumulator.getSegments().length
           const segments = accumulator.addApprovalRequest(
@@ -1135,6 +1199,10 @@ export function createChatStreamReducer(
             explanation,
             approvalType,
             status,
+            // SSE-shaped cards (a re-streamed Product Guide proposal) carry
+            // their body as structured rows rather than prose.
+            event.fields,
+            guideOrigin,
           )
           applyAccumulated(before, segments)
         } else {
@@ -1245,6 +1313,78 @@ export function createChatStreamReducer(
         )
         mirrorApprovalStatus(requestId, status)
         emit('onApprovalResolved', requestId, status, approvalType, resolvedByName)
+        break
+      }
+
+      case 'escalation-offer': {
+        // MUST route through `applyAccumulated`. The block reaches a client
+        // in three shapes — inline in Fae's live turn (tool origin), or with
+        // NO preceding MESSAGE_START when the backend surfaces a deferred
+        // offer at turn end or honours the header button while idle. In the
+        // latter shapes a cumulative emit would replace the trailing bubble's
+        // segments with the lone card, wiping the reply the user is reading.
+        const status = (approvalStatuses[event.offerId] || 'pending') as ChatApprovalStatus
+        const before = accumulator.getSegments().length
+        const segments = accumulator.addEscalationOffer(
+          event.offerId,
+          event.text,
+          event.origin,
+          status,
+        )
+        applyAccumulated(before, segments)
+        break
+      }
+
+      case 'escalation-offer-resolved': {
+        const { offerId, status, resolvedByName: offerResolvedBy } = event
+        // Approving hands the ticket to a human; Fae goes silent rather than
+        // resuming, so — unlike an approved command — there is no work to
+        // signal and the busy lock stays untouched.
+        accumulator.updateApprovalStatus(offerId, status, offerResolvedBy)
+        setMessagesInternal(
+          projectApprovalResolutionToMessages(messages, offerId, status, offerResolvedBy),
+        )
+        mirrorApprovalStatus(offerId, status)
+        emit('onEscalationOfferResolved', offerId, status, offerResolvedBy)
+        break
+      }
+
+      case 'ticket-escalated': {
+        // Same `applyAccumulated` routing as the offer, and for the same
+        // reason: the inactivity auto-escalation fires from a scheduler with
+        // no turn open at all, so this block routinely arrives with no
+        // preceding MESSAGE_START.
+        const before = accumulator.getSegments().length
+        const segments = accumulator.addTicketEscalated({
+          ticketId: event.ticketId,
+          ticketNumber: event.ticketNumber,
+          reason: event.reason,
+          text: event.text,
+        })
+        applyAccumulated(before, segments)
+        break
+      }
+
+      case 'ticket-event': {
+        // Standalone chunk outside MESSAGE_START/END — same routing as
+        // `ticket-escalated`. `seq` rides onto the segment: it is the event's
+        // dedupe identity (see `addTicketEvent`).
+        const before = accumulator.getSegments().length
+        const data = {
+          kind: event.kind,
+          actorId: event.actorId,
+          actorName: event.actorName,
+          actorType: event.actorType,
+          reason: event.reason,
+          targetStatusKind: event.targetStatusKind,
+        }
+        const segments = accumulator.addTicketEvent(data, seq)
+        applyAccumulated(before, segments)
+        // The card alone is not enough for a host that also tracks the
+        // ticket's state: a RESOLVED/REOPENED arriving live must move the
+        // composer lock/status chip on the same render as the card, not on
+        // the next status poll. Hosts that don't wire it lose nothing.
+        emit('onTicketEvent', data)
         break
       }
 
@@ -1378,16 +1518,7 @@ export function createChatStreamReducer(
     invalidate()
   }
 
-  function applySseApprovalResolved(event: ApprovalResolvedEvent, sendIdx: number): void {
-    // Inline post-approve card ref → per-send refs map (the marker in the
-    // receipt resolves through it on rehydration).
-    const cardRef = event.cardRef as ChatRef | undefined
-    if (cardRef?.id && event.cardType) {
-      const existing = refsMap.get(sendIdx) ?? {}
-      const key = buildChatRefKey(event.cardType, cardRef.id)
-      refsMap.set(sendIdx, { ...existing, [key]: cardRef })
-      invalidate()
-    }
+  function applySseApprovalResolved(event: ApprovalResolvedEvent): void {
     const proposalId = event.requestId
     if (!proposalId) return
 
@@ -1398,29 +1529,13 @@ export function createChatStreamReducer(
     )
 
     // Step 2 — server-rendered receipt into the CURRENT message. No
-    // server-provided copy → don't fabricate a fallback.
+    // server-provided copy → don't fabricate a fallback. The receipt's
+    // `[card://…]` marker hydrates via the card fetch path on its own —
+    // no ref stamping needed.
     const receipt = typeof event.receiptText === 'string' ? event.receiptText : null
     if (receipt === null) return
     sseCurrentText = receipt + '\n\n'
     sseWriteTrailingText(sseCurrentText)
-
-    // Step 3 — stamp the ref onto THIS assistant message so the
-    // `[card://<type>:<id>]` marker resolves via `message.chatRefs`
-    // independent of per-turn refsMap indexing.
-    const refForMessage =
-      cardRef && typeof (cardRef as { type?: unknown }).type === 'string' && typeof cardRef.id === 'string'
-        ? cardRef
-        : null
-    if (refForMessage) {
-      const last = messages[messages.length - 1]
-      if (last && last.role === 'assistant') {
-        const refKey = buildChatRefKey((refForMessage as { type: string }).type, refForMessage.id)
-        setMessagesInternal([
-          ...messages.slice(0, -1),
-          { ...last, chatRefs: { ...(last.chatRefs ?? {}), [refKey]: refForMessage } },
-        ])
-      }
-    }
   }
 
   function applySseMetadata(event: ChatMetadataEvent, sendIdx: number): void {
@@ -1433,10 +1548,6 @@ export function createChatStreamReducer(
     }
     if (event.sources) {
       sourcesMap.set(sendIdx, event.sources as unknown[])
-      invalidate()
-    }
-    if (event.refs && typeof event.refs === 'object') {
-      refsMap.set(sendIdx, event.refs as Record<string, ChatRef>)
       invalidate()
     }
     if (event.modelLabel || event.contextWindowMaxTokens || event.provider || event.modelName) {
@@ -1594,7 +1705,7 @@ export function createChatStreamReducer(
         break
       }
       case 'approval-resolved':
-        applySseApprovalResolved(event, sendIdx)
+        applySseApprovalResolved(event)
         break
       case 'metadata':
         applySseMetadata(event, sendIdx)
@@ -1630,6 +1741,7 @@ export function createChatStreamReducer(
     streamingPhase = 'idle'
     dialogTokenUsage = null
     liveModel = null
+    guideConversationId = null
     approvalStatuses = {}
     accumulator.reset()
     pendingEscalated.clear()
@@ -1643,7 +1755,6 @@ export function createChatStreamReducer(
     adoptTrailingAssistant = false
     metaMap.clear()
     sourcesMap.clear()
-    refsMap.clear()
     sendCount = 0
     sseCurrentText = ''
     invalidate()
@@ -1678,6 +1789,7 @@ export function createChatStreamReducer(
     streamingPhase = 'idle'
     dialogTokenUsage = null
     liveModel = null
+    guideConversationId = null
     accumulator.reset()
     pendingEscalated.clear()
     isInStream = false
@@ -1698,7 +1810,6 @@ export function createChatStreamReducer(
     sseCurrentText = ''
     metaMap.clear()
     sourcesMap.clear()
-    refsMap.clear()
     sendCount = 0
     invalidate()
   }
@@ -1910,9 +2021,8 @@ export function createChatStreamReducer(
       streamingPhase = 'idle'
       invalidate()
     },
-    seedSseMaps({ sources, refs, sendCount: seedSendCount }) {
+    seedSseMaps({ sources, sendCount: seedSendCount }) {
       if (sources) for (const [k, v] of sources) sourcesMap.set(k, v)
-      if (refs) for (const [k, v] of refs) refsMap.set(k, v)
       if (typeof seedSendCount === 'number') sendCount = seedSendCount
       invalidate()
     },

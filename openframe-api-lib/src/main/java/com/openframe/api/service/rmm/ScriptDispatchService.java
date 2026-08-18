@@ -9,6 +9,7 @@ import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceService;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.data.document.rmm.ExecutionSource;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
@@ -64,7 +65,7 @@ public class ScriptDispatchService {
     private final TenantIdProvider tenantIdProvider;
     private final ScriptTimeoutValidator timeoutValidator;
 
-    public DispatchResponse runScript(RunScriptInput input, String initiatedBy) {
+    public DispatchResponse runScript(RunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
         deviceService.findByMachineId(input.getMachineId())
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + input.getMachineId()));
@@ -77,14 +78,14 @@ public class ScriptDispatchService {
         // Persist the effective timeout on the row so the watchdog can derive a
         // per-execution stuck-threshold from it.
         scriptExecutionService.create(executionId, script.getId(),
-                input.getMachineId(), input.getPrivilegeLevel(), timeoutSeconds, initiatedBy);
+                input.getMachineId(), input.getPrivilegeLevel(), timeoutSeconds, initiatedBy, source);
 
         ScriptMessage message = ScriptMessage.builder()
                 .executionId(executionId)
                 .scriptId(script.getId())
                 .machineId(input.getMachineId())
                 .code(script.getScriptBody())
-                .shell(ScriptShell.valueOf(script.getShell()))
+                .shell(script.getShell())
                 .privilegeLevel(input.getPrivilegeLevel())
                 .args(ScriptArgsTokenizer.tokenize(input.getArgs() != null ? input.getArgs() : script.getDefaultArgs()))
                 .timeoutSeconds(timeoutSeconds)
@@ -100,7 +101,7 @@ public class ScriptDispatchService {
                 .build();
     }
 
-    public DispatchResponse batchRunScript(BatchRunScriptInput input, String initiatedBy) {
+    public DispatchResponse batchRunScript(BatchRunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
 
@@ -113,7 +114,7 @@ public class ScriptDispatchService {
         String executionId = UUID.randomUUID().toString();
 
         return dispatchBatch(executionId, script, machineIds, input.getPrivilegeLevel(),
-                input.getArgs(), input.getTimeoutSeconds(), input.getEnvVars(), initiatedBy);
+                input.getArgs(), input.getTimeoutSeconds(), input.getEnvVars(), initiatedBy, source);
     }
 
     /**
@@ -154,7 +155,7 @@ public class ScriptDispatchService {
         // dispatched; a schedule can outlive some of its scripts (deleted/archived), and
         // those are skipped rather than failing the run.
         Map<String, ScriptResponse> scriptsById = scriptService.getScriptsByIds(scriptIds).stream()
-                .filter(script -> ScriptStatus.ACTIVE.name().equals(script.getStatus()))
+                .filter(script -> ScriptStatus.ACTIVE.equals(script.getStatus()))
                 .collect(Collectors.toMap(ScriptResponse::getId, Function.identity(), (a, b) -> a));
 
         // Preserve run order; dedup (a shared executionId can't carry the same
@@ -189,11 +190,14 @@ public class ScriptDispatchService {
 
         // 2. Leaves: N × M ScriptExecution rows (persist per-script batch), so the watchdog
         //    and per-(script, machine) history keep working exactly as before.
+        //    runSchedule is always schedule-triggered — a technician clicked "Run now" on the
+        //    schedule; source stays SCHEDULED (the fire is a schedule fire, initiator distinguishes
+        //    who kicked it) rather than MANUAL.
         for (ScriptResponse script : runnableScripts) {
             scriptExecutionService.createBatch(executionId, script.getId(), scheduleId, machineIds,
                     script.getPrivilegeLevel(),
                     effectiveTimeout(null, script.getDefaultTimeoutSeconds()),
-                    initiatedBy);
+                    initiatedBy, ExecutionSource.SCHEDULED);
         }
 
         // 3. Build the batched agent payload once — shared across every target machine. Per-script
@@ -209,7 +213,7 @@ public class ScriptDispatchService {
                     return ScriptScheduleExecutionItem.builder()
                             .scriptId(script.getId())
                             .code(script.getScriptBody())
-                            .shell(ScriptShell.valueOf(script.getShell()))
+                            .shell(script.getShell())
                             .privilegeLevel(script.getPrivilegeLevel())
                             .args(ScriptArgsTokenizer.tokenize(effectiveArgs))
                             .timeoutSeconds(script.getDefaultTimeoutSeconds())
@@ -237,14 +241,13 @@ public class ScriptDispatchService {
     private DispatchResponse dispatchBatch(String executionId, ScriptResponse script, List<String> machineIds,
                                            PrivilegeLevel privilegeLevel, List<String> argsOverride,
                                            Integer timeoutOverride, List<ScriptEnvVarInput> envVarsOverride,
-                                           String initiatedBy) {
+                                           String initiatedBy, ExecutionSource source) {
         Integer timeoutSeconds = effectiveTimeout(timeoutOverride, script.getDefaultTimeoutSeconds());
 
         // Persist the effective timeout per row so the watchdog can derive a
         // per-execution stuck-threshold from it.
-        scriptExecutionService.createBatch(executionId, script.getId(), null, machineIds, privilegeLevel, timeoutSeconds, initiatedBy);
+        scriptExecutionService.createBatch(executionId, script.getId(), null, machineIds, privilegeLevel, timeoutSeconds, initiatedBy, source);
 
-        ScriptShell shell = ScriptShell.valueOf(script.getShell());
         List<String> args = ScriptArgsTokenizer.tokenize(argsOverride != null ? argsOverride : script.getDefaultArgs());
         List<ScriptEnvVar> envVars = mergeEnvVars(script.getEnvVars(), envVarsOverride);
 
@@ -255,7 +258,7 @@ public class ScriptDispatchService {
                         .scriptId(script.getId())
                         .machineId(machineId)
                         .code(script.getScriptBody())
-                        .shell(shell)
+                        .shell(script.getShell())
                         .privilegeLevel(privilegeLevel)
                         .args(args)
                         .timeoutSeconds(timeoutSeconds)

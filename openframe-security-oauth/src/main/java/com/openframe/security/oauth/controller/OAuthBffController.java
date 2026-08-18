@@ -116,11 +116,23 @@ public class OAuthBffController {
 
         return tokensMono
                 .map(tokens -> buildNoContentWithCookies(tokens, includeHeaders))
-                .switchIfEmpty(Mono.fromSupplier(this::unauthorizedWithClearedCookies))
+                // A rejected/unknown refresh token must NOT clear cookies. With rotation
+                // (reuseRefreshTokens=false), concurrent refreshes race: the winner rotates the
+                // token and Set-Cookies the new one; the loser's stale token lands here — and
+                // wiping cookies in that response destroys the winner's freshly established
+                // session (observed in prod: a login killed 150ms after completion by a stale
+                // refresh from the previous session). A plain 401 leaves the browser's current —
+                // possibly newer and valid — cookies intact; explicit /logout remains the only
+                // place that clears an established session.
+                .switchIfEmpty(Mono.fromSupplier(this::unauthorized))
                 .onErrorResume(InvalidRefreshTokenException.class, e -> {
-                    log.warn("Refresh rejected: {}", e.getMessage());
-                    return Mono.just(unauthorizedWithClearedCookies());
+                    log.warn("Refresh rejected (cookies preserved): {}", e.getMessage());
+                    return Mono.just(unauthorized());
                 });
+    }
+
+    private ResponseEntity<Void> unauthorized() {
+        return ResponseEntity.status(401).build();
     }
 
     @GetMapping("/logout")
@@ -134,6 +146,38 @@ public class OAuthBffController {
                 ? oauthBffService.revokeRefreshToken(tenantId, refreshToken)
                 : oauthBffService.revokeRefreshTokenByLookup(refreshToken);
         return revoke.then(Mono.just(ResponseEntity.noContent().headers(headers).build()));
+    }
+
+    /**
+     * Native Sign in with Apple (iOS): exchanges the credential from ASAuthorizationController for
+     * OpenFrame tokens. Response mirrors dev-exchange — Access-Token / Refresh-Token headers (plus
+     * auth cookies) — so the app's existing token-storage path is reused unchanged.
+     */
+    @PostMapping("/apple/native-exchange")
+    public Mono<ResponseEntity<Void>> appleNativeExchange(@RequestBody AppleNativeExchangeRequest body,
+                                                          ServerHttpRequest request) {
+        if (!mobileAuthEnabled) {
+            return Mono.just(ResponseEntity.status(404).build());
+        }
+        if (!hasText(body.tenantId()) || !hasText(body.identityToken()) || !hasText(body.authorizationCode())) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+        return oauthBffService.appleNativeExchange(
+                        body.tenantId(), body.identityToken(), body.authorizationCode(),
+                        body.nonce(), body.firstName(), body.lastName(), request)
+                .map(tokens -> buildNoContentWithCookies(tokens, true))
+                .onErrorResume(e -> {
+                    log.warn("Apple native exchange failed: {}", e.getMessage());
+                    return Mono.just(ResponseEntity.status(401).<Void>build());
+                });
+    }
+
+    public record AppleNativeExchangeRequest(String tenantId,
+                                             String identityToken,
+                                             String authorizationCode,
+                                             String nonce,
+                                             String firstName,
+                                             String lastName) {
     }
 
     @GetMapping("/dev-exchange")

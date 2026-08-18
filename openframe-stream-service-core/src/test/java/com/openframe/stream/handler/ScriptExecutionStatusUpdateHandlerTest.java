@@ -2,11 +2,15 @@ package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
+import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.ExecutionSource;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
@@ -38,18 +42,22 @@ class ScriptExecutionStatusUpdateHandlerTest {
     private static final String EXECUTION_ID = "exec-1";
     private static final String MACHINE_ID = "machine-42";
     private static final String SCRIPT_ID = "script-1";
+    private static final String SCHEDULE_ID = "sched-1";
 
     @Mock
     private ScriptExecutionRepository scriptExecutionRepository;
     @Mock
     private ScheduleScriptExecutionAggregator scheduleScriptExecutionAggregator;
+    @Mock
+    private DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
 
     private ScriptExecutionStatusUpdateHandler handler;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        handler = new ScriptExecutionStatusUpdateHandler(scriptExecutionRepository, scheduleScriptExecutionAggregator);
+        handler = new ScriptExecutionStatusUpdateHandler(
+                scriptExecutionRepository, scheduleScriptExecutionAggregator, deviceOnlineDispatchRepository);
     }
 
     @Test
@@ -79,6 +87,89 @@ class ScriptExecutionStatusUpdateHandlerTest {
         assertThat(saved.getStdoutTruncated()).isFalse();
         assertThat(saved.getFinishedAt()).isNotNull();
         assertThat(saved.getStatusChangedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("handle: a schedule result flips that (machine, schedule) DISPATCHED sentinel to PROCESSED (find + guarded save)")
+    void handle_marksDeviceOnlineDispatchProcessed() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId(SCHEDULE_ID);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+        DeviceFirstOnlineDispatch sentinel = DeviceFirstOnlineDispatch.builder()
+                .tenantId(TENANT_ID).machineId(MACHINE_ID).scheduleId(SCHEDULE_ID)
+                .status(DeviceOnlineDispatchStatus.DISPATCHED).build();
+        when(deviceOnlineDispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT_ID, MACHINE_ID, SCHEDULE_ID))
+                .thenReturn(Optional.of(sentinel));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
+
+        ArgumentCaptor<DeviceFirstOnlineDispatch> captor = ArgumentCaptor.forClass(DeviceFirstOnlineDispatch.class);
+        verify(deviceOnlineDispatchRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(DeviceOnlineDispatchStatus.PROCESSED);
+    }
+
+    @Test
+    @DisplayName("handle: ad-hoc result (no scheduleId) → no DEVICE_ONLINE sentinel is touched")
+    void handle_noScheduleId_doesNotTouchSentinel() {
+        ScriptExecution row = runningRow(EXECUTION_ID);   // scheduleId null
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
+
+        verify(deviceOnlineDispatchRepository, never()).findByTenantIdAndMachineIdAndScheduleId(any(), any(), any());
+        verify(deviceOnlineDispatchRepository, never()).save(any(DeviceFirstOnlineDispatch.class));
+    }
+
+    @Test
+    @DisplayName("handle: no sentinel for (machine, schedule) → nothing to flip, no save")
+    void handle_noSentinel_doesNotSave() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId(SCHEDULE_ID);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+        when(deviceOnlineDispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT_ID, MACHINE_ID, SCHEDULE_ID))
+                .thenReturn(Optional.empty());
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
+
+        verify(deviceOnlineDispatchRepository, never()).save(any(DeviceFirstOnlineDispatch.class));
+    }
+
+    @Test
+    @DisplayName("handle: sentinel already PROCESSED (or not DISPATCHED) → guarded, no save")
+    void handle_sentinelNotDispatched_doesNotSave() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId(SCHEDULE_ID);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+        DeviceFirstOnlineDispatch sentinel = DeviceFirstOnlineDispatch.builder()
+                .tenantId(TENANT_ID).machineId(MACHINE_ID).scheduleId(SCHEDULE_ID)
+                .status(DeviceOnlineDispatchStatus.PROCESSED).build();
+        when(deviceOnlineDispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT_ID, MACHINE_ID, SCHEDULE_ID))
+                .thenReturn(Optional.of(sentinel));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
+
+        verify(deviceOnlineDispatchRepository, never()).save(any(DeviceFirstOnlineDispatch.class));
+    }
+
+    @Test
+    @DisplayName("handle: SCHEDULED source survives the RUNNING→SUCCESS transition (regression: source must not be dropped on completion)")
+    void handle_success_preservesScheduledSource() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setSource(ExecutionSource.SCHEDULED);
+        row.setScheduleId("sched-99");
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
+
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+        assertThat(captor.getValue().getSource()).isEqualTo(ExecutionSource.SCHEDULED);
     }
 
     @Test

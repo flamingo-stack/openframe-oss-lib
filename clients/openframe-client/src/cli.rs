@@ -91,12 +91,21 @@ pub fn run() -> Result<()> {
                 println!("\n{} warning(s). Installation will proceed, but the agent may have connectivity issues.", warns);
             }
 
-            println!("\nStarting installation...\n");
-
             if let Err(e) = crate::logging::init_file_only(None, None) {
                 eprintln!("Failed to initialize logging: {}", e);
                 process::exit(1);
             }
+
+            // Healing runs only on a fresh install; a reinstall (existing client present) skips it.
+            if !Service::is_installed()
+                && !crate::doctor::healing::pending(&report.results).is_empty()
+            {
+                println!("\nAttempting automatic fixes (this may take a few minutes)...");
+                let heals = rt.block_on(crate::doctor::healing::heal(&report.results));
+                print_heal_outcomes(&heals);
+            }
+
+            println!("\nStarting installation...\n");
 
             rt.block_on(async {
                 match Service::install(params).await {
@@ -218,5 +227,19 @@ fn init_logging() {
     if let Err(e) = crate::logging::init(None, None) {
         eprintln!("Failed to initialize logging: {}", e);
         process::exit(1);
+    }
+}
+
+fn print_heal_outcomes(heals: &[crate::doctor::healing::HealResult]) {
+    use crate::doctor::healing::HealOutcome;
+    use crate::doctor::Remediation;
+    for heal in heals {
+        let label = match heal.remediation {
+            Remediation::InstallWebview2 => "WebView2 Runtime install",
+        };
+        match &heal.outcome {
+            HealOutcome::Healed => println!("  [+] {} fixed", label),
+            HealOutcome::Failed(e) => println!("  [x] {} failed: {}", label, e),
+        }
     }
 }

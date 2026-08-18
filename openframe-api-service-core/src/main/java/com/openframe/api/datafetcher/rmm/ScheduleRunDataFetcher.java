@@ -13,6 +13,7 @@ import com.openframe.api.dto.rmm.schedulerun.ScheduleRunFilters;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunResponse;
 import com.openframe.api.dto.rmm.script.ScriptFilterOption;
 import com.openframe.api.dto.shared.ConnectionArgs;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScheduleRunMapper;
@@ -58,6 +59,7 @@ public class ScheduleRunDataFetcher {
             @InputArgument @NotBlank String scheduleId,
             @InputArgument @Valid ScheduleRunFilterInput filter,
             @InputArgument String search,
+            @InputArgument @Valid SortInput sort,
             @InputArgument Integer first,
             @InputArgument String after,
             @InputArgument Integer last,
@@ -67,7 +69,7 @@ public class ScheduleRunDataFetcher {
                 .first(first).after(after).last(last).before(before)
                 .build();
         CursorPaginationCriteria pagination = mapper.toCursorPaginationCriteria(args);
-        CountedGenericQueryResult<ScheduleRunResponse> result = scheduleRunService.list(decodeId(scheduleId), filter, search, pagination);
+        CountedGenericQueryResult<ScheduleRunResponse> result = scheduleRunService.list(decodeId(scheduleId), filter, search, sort, pagination);
         return mapper.toConnection(result);
     }
 

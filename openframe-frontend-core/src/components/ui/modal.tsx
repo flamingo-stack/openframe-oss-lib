@@ -5,6 +5,14 @@ import { useEffect } from "react"
 import { usePreventScroll } from "@react-aria/overlays"
 import { cn } from "../../utils/cn"
 
+/**
+ * Sizing and the two-column editor layout moved to `ModalV2` (`size` prop +
+ * `ModalV2TwoColumn`), which is where the focus trap, Escape stacking and
+ * keyboard-inset handling already live. The class-string constants this file
+ * used to export were copied per call site and drifted; a component owns the
+ * scroll model instead. What remains here is the compact legacy dialog used by
+ * the confirm modals that have not moved yet.
+ */
 interface ModalProps {
   isOpen: boolean
   onClose: () => void
@@ -65,7 +73,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         <div 
           ref={ref}
           className={cn(
-            "relative z-10 w-full max-w-md mx-4 max-h-[90vh] flex flex-col overflow-hidden bg-ods-card border border-ods-border rounded-lg shadow-xl",
+            "relative z-10 w-full mx-4 max-w-md max-h-[90vh] flex flex-col overflow-hidden bg-ods-card border border-ods-border rounded-lg shadow-xl",
             className
           )}
           role="dialog"

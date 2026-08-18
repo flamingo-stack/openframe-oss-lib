@@ -3,6 +3,7 @@ package com.openframe.api.integration.service;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.integration.BaseMongoIntegrationTest;
 import com.openframe.api.integration.support.DeviceServiceIntegrationTestApplication;
 import com.openframe.api.service.DeviceService;
@@ -11,6 +12,7 @@ import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.repository.device.MachineRepository;
+import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -19,12 +21,17 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 
 import java.util.List;
 import java.util.Set;
 
+import static com.openframe.data.document.rmm.OsType.MAC_OS;
+import static com.openframe.data.document.rmm.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Integration tests for {@link DeviceService}'s platform-scoped picker queries against a real MongoDB.
@@ -57,15 +64,15 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("findDeviceIdsForPlatforms: a customer filter combined with a platform scope resolves (no InvalidMongoDbApiUsage), ANDing both")
     void findDeviceIdsForPlatforms_customerFilterPlusPlatform() {
-        machine("m-win-org1", "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
-        machine("m-win-org2", "org-2", DeviceType.LAPTOP, OsType.WINDOWS);
-        machine("m-mac-org1", "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
+        machine("m-win-org1", "org-1", DeviceType.LAPTOP, WINDOWS);
+        machine("m-win-org2", "org-2", DeviceType.LAPTOP, WINDOWS);
+        machine("m-mac-org1", "org-1", DeviceType.LAPTOP, MAC_OS);
 
         DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
                 .organizationIds(List.of("org-1"))
                 .build();
 
-        List<String> ids = deviceService.findDeviceIdsForPlatforms(List.of("WINDOWS"), filter, null);
+        List<String> ids = deviceService.findDeviceIdsForPlatforms(List.of(WINDOWS), filter, null);
 
         assertThat(ids).containsExactly("m-win-org1");   // org-1 AND windows
     }
@@ -73,16 +80,16 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("queryDevicesForPlatforms: a status filter combined with a platform scope resolves and counts correctly")
     void queryDevicesForPlatforms_statusFilterPlusPlatform() {
-        machine("m-online-win", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.ONLINE);
-        machine("m-offline-win", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.OFFLINE);
-        machine("m-online-mac", "org-1", DeviceType.LAPTOP, OsType.MAC_OS, DeviceStatus.ONLINE);
+        machine("m-online-win", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
+        machine("m-offline-win", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
+        machine("m-online-mac", "org-1", DeviceType.LAPTOP, MAC_OS, DeviceStatus.ONLINE);
 
         DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
                 .statuses(List.of(DeviceStatus.ONLINE))
                 .build();
 
         CountedGenericQueryResult<Machine> result = deviceService.queryDevicesForPlatforms(
-                List.of("WINDOWS"), filter, CursorPaginationCriteria.builder().limit(10).build(), null, null);
+                List.of(WINDOWS), filter, CursorPaginationCriteria.builder().limit(10).build(), null, null);
 
         assertThat(result.getFilteredCount()).isEqualTo(1);   // ONLINE AND windows
         assertThat(result.getItems()).extracting(Machine::getMachineId).containsExactly("m-online-win");
@@ -91,10 +98,10 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("findDeviceIdsForPlatforms: platform scope with no filter still resolves (empty-filter path)")
     void findDeviceIdsForPlatforms_platformOnly() {
-        machine("m-win", "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
-        machine("m-mac", "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
+        machine("m-win", "org-1", DeviceType.LAPTOP, WINDOWS);
+        machine("m-mac", "org-1", DeviceType.LAPTOP, MAC_OS);
 
-        List<String> ids = deviceService.findDeviceIdsForPlatforms(List.of("WINDOWS"), null, null);
+        List<String> ids = deviceService.findDeviceIdsForPlatforms(List.of(WINDOWS), null, null);
 
         assertThat(ids).containsExactly("m-win");
     }
@@ -102,11 +109,11 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("findDeviceIdsForPlatforms: matches osType case-insensitively across multiple platforms")
     void findDeviceIdsForPlatforms_multiPlatformCaseInsensitive() {
-        machine("m-win", "org-1", DeviceType.LAPTOP, OsType.WINDOWS);
-        machine("m-mac", "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
+        machine("m-win", "org-1", DeviceType.LAPTOP, WINDOWS);
+        machine("m-mac", "org-1", DeviceType.LAPTOP, MAC_OS);
         machine("m-lin", "org-1", DeviceType.SERVER, null);
 
-        List<String> ids = deviceService.findDeviceIdsForPlatforms(List.of("WINDOWS", "MAC_OS"), null, null);
+        List<String> ids = deviceService.findDeviceIdsForPlatforms(List.of(WINDOWS, MAC_OS), null, null);
 
         assertThat(ids).containsExactlyInAnyOrder("m-win", "m-mac");
     }
@@ -114,11 +121,11 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("queryAvailableDevicesForSchedule: default order is assigned+ONLINE, assigned+OFFLINE, unassigned+ONLINE, unassigned+OFFLINE")
     void queryAvailableDevicesForSchedule_bucketOrder() {
-        machine("a-on", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.ONLINE);
-        machine("a-off", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.OFFLINE);
-        machine("u-on1", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.ONLINE);
-        machine("u-on2", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.ONLINE);
-        machine("u-off", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.OFFLINE);
+        machine("a-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
+        machine("a-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
+        machine("u-on1", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
+        machine("u-on2", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
+        machine("u-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
 
         CountedGenericQueryResult<Machine> result = deviceService.queryAvailableDevicesForSchedule(
                 null, Set.of("a-on", "a-off"), null,
@@ -135,10 +142,10 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("queryAvailableDevicesForSchedule: compound (bucket|id) cursor paginates across a bucket boundary with no gaps or duplicates")
     void queryAvailableDevicesForSchedule_cursorPaginationAcrossBuckets() {
-        machine("a-on", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.ONLINE);
-        machine("a-off", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.OFFLINE);
-        machine("u-on", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.ONLINE);
-        machine("u-off", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.OFFLINE);
+        machine("a-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
+        machine("a-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
+        machine("u-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
+        machine("u-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
         Set<String> assigned = Set.of("a-on", "a-off");
 
         CountedGenericQueryResult<Machine> page1 = deviceService.queryAvailableDevicesForSchedule(
@@ -159,9 +166,9 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("queryAvailableDevicesForSchedule: soft-deleted (status DELETED) devices are excluded from the picker")
     void queryAvailableDevicesForSchedule_excludesDeleted() {
-        machine("live-on", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.ONLINE);
-        machine("live-off", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.OFFLINE);
-        machine("gone", "org-1", DeviceType.LAPTOP, OsType.WINDOWS, DeviceStatus.DELETED);
+        machine("live-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
+        machine("live-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
+        machine("gone", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.DELETED);
 
         CountedGenericQueryResult<Machine> result = deviceService.queryAvailableDevicesForSchedule(
                 null, Set.of(), null, CursorPaginationCriteria.builder().limit(10).build(), null);
@@ -170,6 +177,47 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
                 .containsExactlyInAnyOrder("live-on", "live-off")
                 .doesNotContain("gone");
         assertThat(result.getFilteredCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("updateNickname: atomic $set — a concurrent writer's fields survive the rename (regression: save() rewrote the whole document)")
+    void updateNickname_preservesConcurrentWrites() {
+        machine("m1", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
+        mongoTemplate.updateFirst(byMachineId("m1"),
+                new Update().set("agentReportedField", "keep-me"), Machine.class);
+
+        Machine updated = deviceService.updateNickname("m1", "  Reception iMac  ");
+
+        assertThat(updated.getNickname()).isEqualTo("Reception iMac");
+        assertThat(updated.getUpdatedAt()).isNotNull();
+
+        Document stored = mongoTemplate.findOne(byMachineId("m1"), Document.class, "machines");
+        assertThat(stored).isNotNull();
+        assertThat(stored.get("nickname")).isEqualTo("Reception iMac");
+        assertThat(stored.get("agentReportedField")).as("concurrent writer's field").isEqualTo("keep-me");
+        assertThat(stored.get("status")).isEqualTo(DeviceStatus.ONLINE.name());
+        assertThat(stored.get("osType")).isEqualTo(WINDOWS.name());
+        assertThat(stored.get("updatedAt")).isNotNull();
+    }
+
+    @Test
+    @DisplayName("updateNickname: a blank value clears the stored nickname; an unknown device throws")
+    void updateNickname_clearsAndRejectsUnknown() {
+        machine("m1", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
+        deviceService.updateNickname("m1", "Reception iMac");
+
+        assertThat(deviceService.updateNickname("m1", "   ").getNickname()).isNull();
+
+        Document stored = mongoTemplate.findOne(byMachineId("m1"), Document.class, "machines");
+        assertThat(stored).isNotNull();
+        assertThat(stored.get("nickname")).isNull();
+
+        assertThatThrownBy(() -> deviceService.updateNickname("nope", "x"))
+                .isInstanceOf(DeviceNotFoundException.class);
+    }
+
+    private static Query byMachineId(String machineId) {
+        return new Query(Criteria.where("machineId").is(machineId));
     }
 
     private void machine(String machineId, String orgId, DeviceType type, OsType osType) {

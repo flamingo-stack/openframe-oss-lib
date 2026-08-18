@@ -14,6 +14,15 @@ export {
   type AccumulatorCallbacks,
 } from './message-segment-accumulator'
 
+// Where an approval card renders — one rule for both live kernels, the history
+// replay, and hosts that sort cards between their own footer and the flow.
+export {
+  isGuideApproval,
+  guideApprovalOrigin,
+  approvalDisplaysInline,
+  isGuideApprovalSegment,
+} from './approval-display'
+
 // Historical message processing
 export {
   processHistoricalMessages,
@@ -196,8 +205,8 @@ export {
   resolveSourceIcon,
 } from './source-row-cta'
 
-// Post-fetch enrichment for the synthetic ChatRef a `[card://type:id]` marker
-// produces when the transport ships no refs metadata (Mingo/NATS).
+// Post-fetch enrichment for the minimal ChatRef descriptor a
+// `[card://type:id]` marker produces (the wire ships no card metadata).
 export {
   resolveFetchedCardHref,
   readFetchedCardTitle,
