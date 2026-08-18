@@ -4,9 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
+
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toUnmodifiableMap;
 
 @Slf4j
 @Component
@@ -15,10 +17,9 @@ public class NotificationTypeRegistry {
     private final Map<String, NotificationTypeSpec> byType;
 
     // ObjectProvider, not List: a service with zero specs on the classpath must still boot.
+    // toUnmodifiableMap throws IllegalStateException on a duplicate type — the wanted fail-fast.
     public NotificationTypeRegistry(ObjectProvider<NotificationTypeSpec> specs) {
-        Map<String, NotificationTypeSpec> map = new HashMap<>();
-        specs.stream().forEach(spec -> register(map, spec));
-        this.byType = Map.copyOf(map);
+        this.byType = specs.stream().collect(toUnmodifiableMap(NotificationTypeSpec::type, identity()));
         TreeSet<String> sortedTypes = new TreeSet<>(byType.keySet());
         log.info("Registered {} notification type(s): {}", byType.size(), sortedTypes);
     }
@@ -29,13 +30,5 @@ public class NotificationTypeRegistry {
             throw new IllegalArgumentException("Unknown notification type: " + type);
         }
         return spec;
-    }
-
-    private static void register(Map<String, NotificationTypeSpec> map, NotificationTypeSpec spec) {
-        String type = spec.type();
-        NotificationTypeSpec previous = map.put(type, spec);
-        if (previous != null) {
-            throw new IllegalStateException("Duplicate notification type spec: " + type);
-        }
     }
 }
