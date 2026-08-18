@@ -348,6 +348,7 @@ export type ContentSourceType =
   | 'onboarding_guide'    // Onboarding guides (lives on openframe platform)
   | 'walkthrough_video'   // Per-platform floating demo video (no slug, no detail page; URL is the platform home)
   | 'what_i_shipped'      // What I Shipped employee check-ins (lives on people-hub)
+  | 'how_i_work'          // How I Work employee AI-workflow sessions (lives on people-hub)
   | 'faq'                 // FAQ Q&A pair (single-page /faqs index; deep-link by category anchor)
   | 'from_scratch';
 

@@ -1,10 +1,12 @@
 package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -55,6 +57,7 @@ public class ScriptExecutionStatusUpdateHandler
 
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionAggregator scheduleScriptExecutionAggregator;
+    private final DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
 
     @Override
     public EventHandlerType getType() {
@@ -94,16 +97,43 @@ public class ScriptExecutionStatusUpdateHandler
             return;
         }
 
+        log.info("Handling SCRIPT result event: executionId={} machineId={} scriptId={}", executionId, machineId, scriptId);
+
         scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(machineId, executionId, scriptId)
                 .ifPresentOrElse(
                         row -> {
                             applyResult(row, after);
                             if (row.getScheduleId() != null) {
+                                log.info("Aggregating schedule run: tenantId={} executionId={} scheduleId={}",
+                                        row.getTenantId(), row.getExecutionId(), row.getScheduleId());
                                 scheduleScriptExecutionAggregator.aggregate(row.getTenantId(), row.getExecutionId());
                             }
+                            markDeviceOnlineDispatchProcessed(row.getTenantId(), machineId, row.getScheduleId());
                         },
                         () -> log.warn("No Execution row for executionId={} machineId={} scriptId={} — result arrived before dispatch persisted OR row was never created",
                                 executionId, machineId, scriptId));
+    }
+
+    private void markDeviceOnlineDispatchProcessed(String tenantId, String machineId, String scheduleId) {
+        if (scheduleId == null) {
+            log.debug("Script result has no scheduleId — not a DEVICE_ONLINE dispatch, skipping mark-processed (machineId={})", machineId);
+            return;
+        }
+        deviceOnlineDispatchRepository.findByTenantIdAndMachineIdAndScheduleId(tenantId, machineId, scheduleId)
+                .ifPresentOrElse(
+                        row -> {
+                            if (row.getStatus() == DeviceOnlineDispatchStatus.DISPATCHED) {
+                                row.setStatus(DeviceOnlineDispatchStatus.PROCESSED);
+                                deviceOnlineDispatchRepository.save(row);
+                                log.info("DEVICE_ONLINE dispatch marked PROCESSED: tenantId={} machineId={} scheduleId={}",
+                                        tenantId, machineId, scheduleId);
+                            } else {
+                                log.debug("DEVICE_ONLINE dispatch not in DISPATCHED (status={}) — leaving as-is: tenantId={} machineId={} scheduleId={}",
+                                        row.getStatus(), tenantId, machineId, scheduleId);
+                            }
+                        },
+                        () -> log.debug("No DEVICE_ONLINE dispatch row for tenantId={} machineId={} scheduleId={} — nothing to mark processed",
+                                tenantId, machineId, scheduleId));
     }
 
     private void applyResult(ScriptExecution row, JsonNode after) {

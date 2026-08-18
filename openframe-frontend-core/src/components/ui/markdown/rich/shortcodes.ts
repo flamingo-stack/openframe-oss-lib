@@ -78,6 +78,21 @@ export const processShortcodes = (content: string): string => {
     return placeholder;
   });
 
+  // Step 1.5: Strip well-formed `<script …>…</script>` elements from prose.
+  // Pasted social embed markup ships a loader script alongside its markup
+  // (Reddit: `<blockquote class="reddit-embed-bq">…` + embed.reddit.com
+  // widgets.js; Twitter: platform.twitter.com widgets.js). Scripts NEVER
+  // execute on this surface — the sanitize stack strips real ones — but the
+  // engine's text pre-pass escapes the tag first, so it used to render as
+  // VISIBLE source text under every embed. Runs after Step 1 so script tags
+  // inside code fences / inline code stay literal sample code; an UNCLOSED
+  // opener is left alone (falls through to today's escape-to-text behavior,
+  // which is the safe degrade). Quantifiers are hard-bounded (ReDoS).
+  processedContent = processedContent.replace(
+    /<script\b[^>]{0,2000}>[\s\S]{0,20000}?<\/script\s{0,10}>/gi,
+    ''
+  );
+
   // Step 2: Temporarily replace markdown links to protect them
   const markdownLinks: string[] = [];
   processedContent = processedContent.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match) => {

@@ -96,6 +96,11 @@ function upsertKey(seg: MessageSegment): string | null {
       return `offer:${seg.data.offerId}`
     case 'ticket_escalated':
       return `escalated:${seg.data.ticketId}`
+    case 'ticket_event':
+      // The stream sequence is the event's only stable id; a seq-less segment
+      // (hydrated history) is pushed raw — `addTicketEvent`'s payload-equality
+      // upsert owns that case.
+      return seg.streamSeq !== undefined ? `ticket-event:${seg.streamSeq}` : null
     default:
       return null
   }

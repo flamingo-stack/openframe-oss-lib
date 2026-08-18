@@ -11,7 +11,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { decodeNatsChunk } from '../nats-decoder'
+import type { ChatStreamEvent } from '../events'
+import { decodeNatsChunk, guideEventForNats } from '../nats-decoder'
 
 /** Recorded corpus of realistic NATS chunk shapes, keyed by scenario name. */
 const CORPUS: Record<string, unknown> = {
@@ -28,6 +29,69 @@ const CORPUS: Record<string, unknown> = {
   guide: { type: 'GUIDE', text: '## Enroll a device\n1. Open Settings' },
   guide_empty_string: { type: 'GUIDE', text: '' },
   guide_missing_text: { type: 'GUIDE' },
+
+  // GUIDE frames — hub frames the agent re-streams verbatim inside the same
+  // chunk type, under `payload`. They cross over by DEFAULT; only the dialog's
+  // own accounting and phase stop at the seam. See `guideEventForNats`.
+  guide_frame_text_leading: {
+    type: 'GUIDE',
+    payload: { kind: 'text-leading', text: "I'll look that up in the docs." },
+  },
+  guide_frame_thinking: {
+    type: 'GUIDE',
+    payload: { kind: 'thinking-delta', text: 'The user asked about <policies> setup' },
+  },
+  guide_frame_tool_error: {
+    type: 'GUIDE',
+    payload: { kind: 'tool_error', message: 'Could not reach HubSpot' },
+  },
+  // Dropped: would blank the model badge / relabel the turn with the hub's model.
+  guide_frame_routing: {
+    type: 'GUIDE',
+    payload: { kind: 'routing', routedComplexity: 'deep', routedModel: 'claude-x', routedThinkingBudget: 8000 },
+  },
+  guide_frame_metadata: {
+    type: 'GUIDE',
+    payload: { model: 'claude-x', modelLabel: 'Guide model', conversationId: 'conv-1' },
+  },
+  // Dropped: the dialog owns its own phase and token accounting.
+  guide_frame_status_thinking: { type: 'GUIDE', payload: { status: 'thinking' } },
+  guide_frame_usage_start: { type: 'GUIDE', payload: { kind: 'usage', stage: 'start', input_tokens: 12 } },
+  // Crosses over stamped `origin: 'guide'` — the marker that keeps the card
+  // inline and sends its buttons to the hub's confirm route.
+  guide_frame_approval_request: {
+    type: 'GUIDE',
+    payload: {
+      kind: 'approval_request',
+      proposalId: 'prop-1',
+      toolName: 'create_ticket',
+      title: 'Open a support ticket',
+      fields: [{ label: 'Subject', value: 'Agent will not enroll' }],
+    },
+  },
+  guide_frame_approval_batch: {
+    type: 'GUIDE',
+    payload: {
+      kind: 'approval_batch',
+      batchId: 'batch:prop-1',
+      proposals: [{ proposalId: 'prop-1', toolName: 'create_ticket', title: 'Open a ticket' }],
+    },
+  },
+  guide_frame_decision_resolved: {
+    type: 'GUIDE',
+    payload: { kind: 'decision_resolved', proposalId: 'prop-1', ok: true, action: 'approved', willAutoContinue: false },
+  },
+  // Malformed payloads degrade to a no-op, like every other chunk shape.
+  guide_frame_payload_not_object: { type: 'GUIDE', payload: 'text-leading' },
+  guide_frame_payload_array: { type: 'GUIDE', payload: [{ kind: 'text-leading', text: 'hi' }] },
+  guide_frame_payload_empty: { type: 'GUIDE', payload: {} },
+  // `text` wins when both are present — the body is what the agent persists.
+  guide_frame_text_wins: { type: 'GUIDE', text: 'body', payload: { kind: 'thinking-delta', text: 'ignored' } },
+  guide_frame_with_seq: {
+    type: 'GUIDE',
+    streamSeq: 77,
+    payload: { kind: 'text-leading', text: 'Checking the docs…' },
+  },
 
   // ASK — the guide-routing clarification card. `text` is the intro sentence
   // riding the same chunk; a card without a question or without usable options
@@ -193,6 +257,55 @@ const CORPUS: Record<string, unknown> = {
   ticket_escalated_missing_reason: { type: 'TICKET_ESCALATED', ticketId: 'ticket-1' },
   ticket_escalated_missing_ticket_id: { type: 'TICKET_ESCALATED', reason: 'INACTIVITY' },
 
+  // TICKET_EVENT — standalone lifecycle receipt. `kind` is an OPEN string:
+  // unknown kinds must decode (neutral render), only a missing/blank kind is
+  // malformed. The chunk names its JetStream sequence `sequenceId` in the
+  // payload; it backfills `seq` when the transport didn't stamp `streamSeq`.
+  ticket_event_resolved: {
+    type: 'TICKET_EVENT',
+    kind: 'RESOLVED',
+    actorId: 'fae',
+    actorName: 'Fae',
+    actorType: 'AI',
+    sequenceId: 412,
+  },
+  ticket_event_reopened_with_reason: {
+    type: 'TICKET_EVENT',
+    kind: 'REOPENED',
+    actorId: 'user-42',
+    actorName: 'John Smith',
+    actorType: 'CLIENT',
+    reason: 'The printer stopped working again',
+    sequenceId: 413,
+  },
+  ticket_event_unknown_kind: { type: 'TICKET_EVENT', kind: 'ON_HOLD', actorName: 'Roman Smith' },
+  // Where the ticket reopened INTO - decides the card's subtitle without
+  // guessing from the actor. Blank strings are folded to undefined.
+  ticket_event_reopened_target_kind: {
+    type: 'TICKET_EVENT',
+    kind: 'REOPENED',
+    actorId: 'user-42',
+    actorName: 'John Smith',
+    actorType: 'CLIENT',
+    targetStatusKind: 'AI_ASSISTANCE',
+    streamSeq: 414,
+  },
+  ticket_event_blank_target_kind_dropped: {
+    type: 'TICKET_EVENT',
+    kind: 'REOPENED',
+    targetStatusKind: '  ',
+    streamSeq: 415,
+  },
+  ticket_event_missing_kind: { type: 'TICKET_EVENT', actorName: 'Fae' },
+  ticket_event_blank_reason_dropped: { type: 'TICKET_EVENT', kind: 'RESOLVED', reason: '   ' },
+  // Transport-stamped streamSeq wins over the payload's sequenceId copy.
+  ticket_event_stream_seq_wins: {
+    type: 'TICKET_EVENT',
+    kind: 'RESOLVED',
+    streamSeq: 500,
+    sequenceId: 499,
+  },
+
   approval_result_approved: {
     type: 'APPROVAL_RESULT',
     approvalRequestId: 'req-1',
@@ -277,6 +390,49 @@ describe('decodeNatsChunk — golden corpus', () => {
       Object.entries(CORPUS).map(([name, chunk]) => [name, decodeNatsChunk(chunk)]),
     )
     expect(results).toMatchSnapshot()
+  })
+})
+
+describe('guideEventForNats — the two kernels reconciled', () => {
+  // The property that matters for maintenance: `leading-frames` is the ONE
+  // place a hub frame kind is taught to the client, so an event kind that
+  // reaches this adapter must cross over WITHOUT an edit here. These use event
+  // types the frame table cannot produce today on purpose — they stand in for
+  // whatever the hub ships next.
+  it('passes an unfamiliar event through unchanged', () => {
+    const ask: ChatStreamEvent = {
+      type: 'ask',
+      question: 'Which workspace?',
+      options: [{ label: 'Acme' }],
+    }
+    expect(guideEventForNats(ask)).toEqual(ask)
+  })
+
+  it('stamps origin on the events that carry it, so the card routes to the hub', () => {
+    expect(
+      guideEventForNats({ type: 'approval-request', requestId: 'prop-1', approvalType: 'create_ticket' }),
+    ).toMatchObject({ approvalType: 'create_ticket', origin: 'guide' })
+    expect(guideEventForNats({ type: 'approval-resolved', requestId: 'prop-1', status: 'approved' })).toMatchObject({
+      origin: 'guide',
+    })
+  })
+
+  it('stops the events the agent owns for this dialog', () => {
+    expect(guideEventForNats({ type: 'usage', stage: 'start', input_tokens: 10 })).toBeNull()
+    expect(guideEventForNats({ type: 'status', phase: 'thinking' })).toBeNull()
+    expect(
+      guideEventForNats({ type: 'token-usage', inputTokensSize: 1, outputTokensSize: 2, totalTokensSize: 3, contextSize: 4 }),
+    ).toBeNull()
+    expect(guideEventForNats({ type: 'dialog-closed' })).toBeNull()
+  })
+
+  it('keeps metadata only for the hub conversation id every confirm must quote back', () => {
+    expect(guideEventForNats({ type: 'metadata', conversationId: 'conv-1', modelName: 'hub-model' })).toEqual({
+      type: 'metadata',
+      conversationId: 'conv-1',
+      origin: 'guide',
+    })
+    expect(guideEventForNats({ type: 'metadata', modelName: 'hub-model' })).toBeNull()
   })
 })
 

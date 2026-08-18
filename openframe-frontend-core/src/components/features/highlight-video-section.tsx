@@ -24,10 +24,6 @@ export interface HighlightVideoSectionProps {
   targetDurationSeconds: number;
   /** Callback when target duration changes */
   onTargetDurationChange: (seconds: number) => void;
-  /** Whether to skip subtitle burning */
-  skipSubtitleBurning: boolean;
-  /** Callback when skip subtitle option changes */
-  onSkipSubtitleBurningChange: (skip: boolean) => void;
   /** Callback to trigger highlight generation */
   onGenerateHighlight: () => void;
   /** Whether highlight generation is in progress */
@@ -81,8 +77,6 @@ export function HighlightVideoSection({
   highlightVideoSource,
   targetDurationSeconds,
   onTargetDurationChange,
-  skipSubtitleBurning,
-  onSkipSubtitleBurningChange,
   onGenerateHighlight,
   isGenerating = false,
   generationProgress,
@@ -134,7 +128,7 @@ export function HighlightVideoSection({
       <div className="space-y-3 p-4 bg-ods-card rounded-lg border border-ods-border">
         <div className="flex items-center gap-4">
           <div className="flex-1">
-            <Label className="text-h6">Target Duration</Label>
+            <Label>Target Duration</Label>
             <Select
               value={targetDurationSeconds.toString()}
               onValueChange={(value) => onTargetDurationChange(parseInt(value))}
@@ -151,19 +145,6 @@ export function HighlightVideoSection({
                 <SelectItem value="300">5 minutes</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          <div className="flex items-center gap-2 pt-5">
-            <input
-              type="checkbox"
-              id="skipSubtitleBurning"
-              checked={skipSubtitleBurning}
-              onChange={(e) => onSkipSubtitleBurningChange(e.target.checked)}
-              disabled={disabled}
-              className="h-4 w-4 rounded border-ods-border bg-ods-bg-surface text-ods-accent focus:ring-ods-accent"
-            />
-            <Label htmlFor="skipSubtitleBurning" className="text-h6 cursor-pointer">
-              Skip subtitle burning
-            </Label>
           </div>
         </div>
       </div>

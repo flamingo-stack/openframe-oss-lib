@@ -3,6 +3,7 @@
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import * as React from 'react'
 import { cn } from '../../utils/cn'
+import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding'
 import { CheckIcon, PlusIcon, SearchIcon, TrashIcon } from '../icons-v2-generated'
 import { Button } from './button'
 import { Input } from './input'
@@ -59,6 +60,7 @@ export function TagSelectDropdown({
 }: TagSelectDropdownProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [search, setSearch] = React.useState('')
+  const keyboardPadding = useKeyboardCollisionPadding()
 
   React.useEffect(() => {
     if (!isOpen) setSearch('')
@@ -110,15 +112,19 @@ export function TagSelectDropdown({
         <PopoverPrimitive.Content
           align={align}
           sideOffset={6}
+          // The search field below raises the software keyboard the moment this
+          // opens — see useKeyboardCollisionPadding.
+          collisionPadding={{ bottom: keyboardPadding }}
           className={cn(
             'z-50 w-72 bg-ods-card border border-ods-border rounded-[6px] shadow-lg overflow-hidden',
+            'flex flex-col max-h-[var(--radix-popper-available-height)]',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
             'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
           )}
         >
-          <div className="border-b border-ods-border">
+          <div className="shrink-0 border-b border-ods-border">
             <Input
               autoFocus
               value={search}
@@ -134,7 +140,7 @@ export function TagSelectDropdown({
               className="rounded-none border-0"
             />
           </div>
-          <div className="max-h-72 overflow-y-auto py-[var(--spacing-system-xs)]" role="listbox">
+          <div className="min-h-0 max-h-72 overflow-y-auto py-[var(--spacing-system-xs)]" role="listbox">
             {ordered.map(opt => {
               const isSelected = selectedIds.includes(opt.id)
               return (

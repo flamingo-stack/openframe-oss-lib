@@ -53,7 +53,7 @@ export type RouteComplexity = 'trivial' | 'default' | 'complex' | 'deep'
  *
  * Older clients that don't recognize `kind: 'routing'` silently drop
  * the frame (the catch-all only matches frames carrying known fields
- * like `sources` / `refs` / `modelLabel`).
+ * like `sources` / `modelLabel`).
  */
 export interface RoutingFrame {
   kind: 'routing'
@@ -85,15 +85,12 @@ export interface StatusThinkingFrame {
 }
 
 /** Per-turn metadata frame. The emitter sends `options.metadata`
- *  verbatim; a separate refs-only frame may follow with the same shape.
- *  All fields optional — the decoder's catch-all treats ANY frame that
- *  didn't match a `kind` discriminant as metadata-ish. */
+ *  verbatim. All fields optional — the decoder's catch-all treats ANY
+ *  frame that didn't match a `kind` discriminant as metadata-ish. */
 export interface ChatMetadataFrame {
   /** Retrieval sources for the source-chip strip. Host-defined row
    *  shape (`ChatSource` on the adapter side) — opaque at wire level. */
   sources?: unknown[]
-  /** Per-row refs for inline object cards, keyed `<type>:<id>`. */
-  refs?: Record<string, unknown>
   /** Raw model id (e.g. 'claude-sonnet-x'). Presence alone triggers the
    *  client's meta merge; the value itself is not stored. */
   model?: string
@@ -207,11 +204,6 @@ export interface DecisionResolvedFrame {
     ticket_id?: string
     status?: string | null
     mirror_synced?: boolean
-  }
-  card?: {
-    type: string
-    marker: string
-    ref: unknown
   }
   /** True when the server WILL pipe an auto-continuation turn after
    *  this frame. */

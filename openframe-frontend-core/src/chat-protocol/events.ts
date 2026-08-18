@@ -138,6 +138,37 @@ export interface ApprovalRequestEvent extends ChatStreamEventBase {
   fields?: ApprovalRequestField[]
   toolCalls?: ApprovalToolCall[]
   status?: 'pending'
+  /** Set when the card came from a Product Guide frame — see {@link GuideOrigin}. */
+  origin?: GuideOrigin
+}
+
+/**
+ * Marks an event whose payload is a Product Guide frame, whatever transport
+ * carried it. It exists because ONE stream can now mix both worlds: the agent
+ * re-streams the hub's frames into a NATS dialog, so a card typed the hub's way
+ * (`approvalType` = the tool name, resolved through the hub's confirm route)
+ * travels beside cards typed the agent's way (`approvalType` = an approval TIER
+ * routed to human escalation).
+ *
+ * Consumers read it to keep the guide half behaving exactly as it does in the
+ * hub's own chat — NOT to give it special treatment. Without it the NATS kernel
+ * would have to guess from `approvalType`, and every tool the hub adds would
+ * silently fall into the escalation path.
+ */
+export type GuideOrigin = 'guide'
+
+/** The only value of {@link GuideOrigin}. Lives beside the type, and beside the
+ *  predicate below, because both decoders and every consumer that branches on
+ *  provenance must compare against the same token — a bare `'guide'` literal
+ *  typo silently disables the branch instead of failing to compile. */
+export const GUIDE_ORIGIN: GuideOrigin = 'guide'
+
+/** True for anything stamped as coming from the Product Guide — a stream event
+ *  or the `data` of a segment built from one. */
+export function isGuideOrigin(
+  source: { origin?: GuideOrigin | string } | null | undefined,
+): boolean {
+  return source?.origin === GUIDE_ORIGIN
 }
 
 /** An approval request was resolved (SSE `decision_resolved` frame /
@@ -151,13 +182,10 @@ export interface ApprovalResolvedEvent extends ChatStreamEventBase {
   approvalType?: string
   resolvedByName?: string | null
   receiptText?: string
-  /** Inline post-approve card: the ref payload + its documentType +
-   *  the `[card://…]` marker (SSE only). */
-  cardRef?: unknown
-  cardType?: string
-  marker?: string
   result?: DecisionResolvedFrame['result']
   willAutoContinue?: boolean
+  /** Set when the resolution came from a Product Guide frame — see {@link GuideOrigin}. */
+  origin?: GuideOrigin
 }
 
 /** The client is offered a handoff of this ticket to a human technician
@@ -223,6 +251,23 @@ export interface TicketEscalatedEvent extends ChatStreamEventBase {
   text?: string
 }
 
+/** Ticket lifecycle receipt (`TICKET_EVENT`) — the ticket was resolved,
+ *  reopened, etc. `kind` is an OPEN vocabulary (RESOLVED/REOPENED today):
+ *  an unknown kind still decodes and renders as a neutral line rather than
+ *  being dropped, so the backend can add kinds without a client release.
+ *  Arrives standalone (outside MESSAGE_START/END), like `ticket-escalated`. */
+export interface TicketEventEvent extends ChatStreamEventBase {
+  type: 'ticket-event'
+  kind: string
+  actorId?: string
+  actorName?: string
+  /** Who acted — e.g. an AI agent vs a human technician. Open string. */
+  actorType?: string
+  reason?: string
+  /** Kind-token the ticket reopened INTO (AI_ASSISTANCE / TECH_REQUIRED / ...). */
+  targetStatusKind?: string
+}
+
 /** Per-turn metadata. Raw wire values pass through UNVALIDATED — the
  *  consumer replicates the legacy truthiness/typeof gates (so a
  *  malformed frame degrades identically to the pre-SSOT parser). */
@@ -234,7 +279,6 @@ export interface ChatMetadataEvent extends ChatStreamEventBase {
   modelName?: string | null
   contextWindowMaxTokens?: number | null
   sources?: unknown
-  refs?: unknown
   scrollAnchor?: unknown
   /** Server-minted conversation id (`ChatMetadataFrame.conversationId`),
    *  passed through raw like every other catch-all field — the consumer
@@ -245,6 +289,13 @@ export interface ChatMetadataEvent extends ChatStreamEventBase {
     routedModel?: string
     routedThinkingBudget: number | null
   }
+  /**
+   * Set when the metadata came from a Product Guide frame — see
+   * {@link GuideOrigin}. Such an event carries ONLY `conversationId`: it exists
+   * to record the hub's conversation id (every confirm-tool call must quote it
+   * back), NOT to describe the dialog's model, which stays the agent's.
+   */
+  origin?: GuideOrigin
 }
 
 /** SSE usage frames — raw wire keys (snake_case) preserved. */
@@ -331,6 +382,7 @@ export type ChatStreamEvent =
   | EscalationOfferEvent
   | EscalationOfferResolvedEvent
   | TicketEscalatedEvent
+  | TicketEventEvent
   | ChatMetadataEvent
   | UsageEvent
   | TokenUsageEvent

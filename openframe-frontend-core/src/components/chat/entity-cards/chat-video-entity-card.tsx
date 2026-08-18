@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { EntityVideoSection } from '../../features/entity-video-section'
+import { captionsEntityTypeForDocType } from '../../features/captions-url'
 import type { ChatRef } from '../chat-ref.types'
 
 /**
@@ -55,6 +56,9 @@ export function ChatVideoEntityCard({
       highlightVideoUrl={highlightUrl}
       highlightVideoThumbnail={highlightPoster}
       mainVideoPoster={poster}
+      // Captions derive INSIDE the section from entity identity via the
+      // runtime's captions base — no caption data on the wire at all.
+      captionsEntity={{ type: captionsEntityTypeForDocType(chatRef.type), id: chatRef.id }}
       title={chatRef.title}
       // Intentionally omitted for chat density:
       //   videoSummary    — assistant text above already covers it.

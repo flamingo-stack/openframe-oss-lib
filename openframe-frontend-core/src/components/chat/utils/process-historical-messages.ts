@@ -40,7 +40,8 @@ import {
 import { ESCALATION_STATE, escalationResolvedStatus, type ChatStreamEvent } from '../../../chat-protocol/events'
 // One normalizer for ask rows, shared with the live decoder — history and the
 // stream must agree on which options are usable.
-import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder'
+import { guideFrameEvent, normalizeAskOptions } from '../../../chat-protocol/nats-decoder'
+import { approvalDisplaysInline, guideApprovalOrigin } from './approval-display'
 import { MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator'
 import { applyApprovalStatusToSegment } from '../stream/message-mutations'
 import { getCommandText } from './tool-call-helpers'
@@ -115,11 +116,21 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
       }
       return null
 
-    case MESSAGE_TYPE.GUIDE:
+    // Two persisted shapes, mirroring the live `GUIDE` chunk: the answer body
+    // (`text`) and a Product Guide frame the agent re-streamed (`payload`,
+    // persisted so a card survives a reload). Decoded through the SAME
+    // `guideFrameEvent` the live path uses — a second mapping here would let
+    // history and realtime disagree about the same bytes.
+    case MESSAGE_TYPE.GUIDE: {
       if ('text' in data && data.text) {
         return { type: 'guide-delta', text: data.text }
       }
+      const payload = 'payload' in data ? data.payload : undefined
+      if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        return guideFrameEvent(payload as Record<string, unknown>)
+      }
       return null
+    }
 
     // Same completeness gate as the live decoder (`decodeNatsChunk`): a
     // persisted row without a question or without options is not a card the
@@ -232,6 +243,27 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
       }
       return null
 
+    // Same completeness gate as the live decoder: `kind` (an OPEN string —
+    // unknown kinds render as a neutral line) is the only required field.
+    // Field names match the chunk, so ONE mapping covers both paths; the
+    // typeof gates also fold the row's GraphQL nulls to undefined.
+    case MESSAGE_TYPE.TICKET_EVENT: {
+      const kind = 'kind' in data && typeof data.kind === 'string' ? data.kind.trim() : ''
+      if (!kind) return null
+      return {
+        type: 'ticket-event',
+        kind,
+        actorId: typeof data.actorId === 'string' ? data.actorId : undefined,
+        actorName: typeof data.actorName === 'string' ? data.actorName : undefined,
+        actorType: typeof data.actorType === 'string' ? data.actorType : undefined,
+        reason: typeof data.reason === 'string' && data.reason.trim() ? data.reason : undefined,
+        targetStatusKind:
+          typeof data.targetStatusKind === 'string' && data.targetStatusKind.trim()
+            ? data.targetStatusKind
+            : undefined,
+      }
+    }
+
     case MESSAGE_TYPE.ERROR:
       if ('error' in data) {
         return {
@@ -325,6 +357,21 @@ function applyHistoryEvent(
       })
       break
 
+    // Seq-less on purpose: the persisted row's sequence lives on the message
+    // (`lastChunkStreamSeq`), not in `messageData`. A live redelivery of the
+    // same event matches this segment by payload equality (see
+    // `addTicketEvent`).
+    case 'ticket-event':
+      accumulator.addTicketEvent({
+        kind: event.kind,
+        actorId: event.actorId,
+        actorName: event.actorName,
+        actorType: event.actorType,
+        reason: event.reason,
+        targetStatusKind: event.targetStatusKind,
+      })
+      break
+
     case 'escalation-offer-resolved':
       // Recorded, not applied here: `applyOfferResolutions` runs after every
       // flush and covers the same-bubble case as well as the cross-bubble one.
@@ -361,12 +408,24 @@ function applyHistoryEvent(
       const approvalType = event.approvalType || 'CLIENT'
       const toolCalls = event.toolCalls as PendingToolCallData[] | undefined
       const isBatch = !!toolCalls && toolCalls.length > 0
+      // Same rule the live kernels use — a card must not change where it
+      // renders (or which backend its buttons hit) just because the page was
+      // reloaded and it came back through history instead of the stream.
+      const guideOrigin = guideApprovalOrigin(event)
 
-      if (!displayApprovalTypes || displayApprovalTypes.includes(approvalType)) {
+      if (approvalDisplaysInline(event, approvalType, displayApprovalTypes)) {
         if (isBatch) {
           const status = (approvalStatuses[event.requestId] as ChatApprovalStatus) || 'pending'
           if (batchApprovalsEnabled) {
-            accumulator.addApprovalBatch(event.requestId, approvalType, toolCalls!, status)
+            accumulator.addApprovalBatch(
+              event.requestId,
+              approvalType,
+              toolCalls!,
+              status,
+              undefined,
+              undefined,
+              guideOrigin,
+            )
           } else {
             // Flag OFF — unfold batch into N legacy approval cards (same id).
             for (const call of toolCalls!) {
@@ -377,6 +436,8 @@ function applyHistoryEvent(
                 call.toolExplanation,
                 approvalType,
                 status,
+                undefined,
+                guideOrigin,
               )
             }
           }
@@ -389,19 +450,28 @@ function applyHistoryEvent(
           // sticky card on every history re-process. Mirror the batch path
           // and honor `approvalStatuses`.
           const resolvedStatus = approvalStatuses[event.requestId] as ChatApprovalStatus | undefined
-          if (resolvedStatus === 'approved' || resolvedStatus === 'rejected') {
+          const isResolved = resolvedStatus === 'approved' || resolvedStatus === 'rejected'
+          // A guide card is added inline even while pending. The tracked path
+          // below ends in `flushPendingApprovals`, whose segments the consumer
+          // lifts into a sticky footer — that is the treatment for the
+          // consumer's OWN approvals, and it is not how the hub's chat renders
+          // a proposal (nor where its preamble expects it).
+          if (guideOrigin || isResolved) {
             accumulator.addApprovalRequest(
               event.requestId,
               event.command || '',
               event.explanation,
               approvalType,
-              resolvedStatus,
+              resolvedStatus ?? 'pending',
+              event.fields,
+              guideOrigin,
             )
           } else {
             accumulator.trackApprovalRequest(event.requestId, {
               command: event.command || '',
               explanation: event.explanation,
               approvalType,
+              fields: event.fields,
             })
           }
         }

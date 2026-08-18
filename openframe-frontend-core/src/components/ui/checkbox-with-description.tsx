@@ -47,7 +47,6 @@ const CheckboxWithDescription = React.forwardRef<
     <div className="flex flex-col gap-1">
       <Label
         htmlFor={id}
-        variant="small"
         spacing="tight"
         className={cn(
           "leading-none cursor-pointer",

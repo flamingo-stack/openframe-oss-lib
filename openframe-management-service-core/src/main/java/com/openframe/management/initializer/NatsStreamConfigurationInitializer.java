@@ -34,6 +34,13 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
+            // client uninstall stream (the message itself is the command, empty payload)
+            StreamConfiguration.builder()
+                    .name("CLIENT_UNINSTALL")
+                    .subjects(List.of("machine.*.client-uninstall"))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
+                    .build(),
             // tool agent update stream
             StreamConfiguration.builder()
                     .name("TOOL_UPDATE")
@@ -48,10 +55,10 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
-            // installed agent stream
+            // installed agent stream (machine-scoped and user-scoped subjects)
             StreamConfiguration.builder()
                     .name("INSTALLED_AGENTS")
-                    .subjects(List.of("machine.*.installed-agent"))
+                    .subjects(List.of("machine.*.installed-agent", "user.*.installed-agent"))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build()

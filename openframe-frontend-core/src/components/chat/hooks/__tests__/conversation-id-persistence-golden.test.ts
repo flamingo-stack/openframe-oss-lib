@@ -13,8 +13,9 @@
  *   - the wire carries ONLY the newest user message (+ the echoed
  *     conversation id) — never a replay of client history;
  *   - mount-time history hydrates from `GET <chatStreamUrl>/history` and
- *     materializes THROUGH THE REDUCER (messages, sendIdx-keyed refs, send
- *     counter — same fan-out lookup as live turns);
+ *     materializes THROUGH THE REDUCER (messages + send counter — same
+ *     fan-out lookup as live turns; inline cards hydrate by id from the
+ *     `[card://…]` markers in the content, no per-row refs);
  *   - stale keys — other proxy-auth identities AND the retired v1
  *     full-history blobs — are swept on mount; a leftover v1 blob neither
  *     crashes the adapter nor resurrects its messages.
@@ -133,8 +134,10 @@ function wireTurn(conversationId: string, answer: string): Array<string> {
   ]
 }
 
-/** Server transcript fixture — 2 turns; turn #0's assistant row carries a
- *  card ref that must land at sendIdx 0 (same fan-out scheme as live). */
+/** Server transcript fixture — 2 turns. Turn #0's assistant row still
+ *  carries a legacy `chat_refs` column (old transcripts persist it): the
+ *  client must IGNORE it — cards hydrate by id from the `[card://…]`
+ *  marker in the content. */
 const HISTORY_PAYLOAD = {
   data: {
     messages: [
@@ -318,7 +321,7 @@ describe('server-minted conversation id (full hook path)', () => {
 })
 
 describe('server-history hydration (materializes through the reducer)', () => {
-  it('rebuilds messages + sendIdx-keyed refs + send counter from the transcript', async () => {
+  it('rebuilds messages + send counter from the transcript', async () => {
     window.localStorage.setItem(CONVERSATION_KEY, JSON.stringify({ conversationId: 'conv-h1' }))
     const fetchMock = mockRoutedFetch({
       history: HISTORY_PAYLOAD,
@@ -345,13 +348,12 @@ describe('server-history hydration (materializes through the reducer)', () => {
     const historyCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/history'))
     expect(String(historyCall![0])).toContain('conversationId=conv-h1')
 
-    // Full hydrated projection — messages, roles, hidden flags, refs
-    // resolved through the reducer's fan-out lookup (send #0's assistant
-    // resolves ticket:77; send #1's does not).
+    // Full hydrated projection — messages, roles, hidden flags. The legacy
+    // `chat_refs` column on the transcript row is IGNORED: the `[card://…]`
+    // marker in the content is the only card channel (hydrate-by-id).
     expect(result.current.messages).toMatchSnapshot()
     const assistants = result.current.messages.filter((m) => m.role === 'assistant')
-    expect(assistants[0].chatRefs?.['ticket:77']?.id).toBe('77')
-    expect(assistants[1].chatRefs).toBeUndefined()
+    expect(assistants[0].content).toContain('[card://ticket:77]')
 
     // A live send continues the SAME conversation: newest-message-only body
     // with the stored id, and its sources key at the continued send index.

@@ -6,6 +6,7 @@ import * as React from "react"
 import { cn } from "../../utils/cn"
 import { useDebounce } from "../../hooks/ui/use-debounce"
 import { useAutoLimitTags } from "../../hooks/ui/use-auto-limit-tags"
+import { useKeyboardCollisionPadding } from "../../hooks/ui/use-keyboard-collision-padding"
 import { SearchIcon } from "../icons-v2-generated"
 import { XmarkCircleIcon } from "../icons-v2-generated/signs-and-symbols/xmark-circle-icon"
 import { Tag } from "./tag"
@@ -168,6 +169,7 @@ export function SearchInput({
   // ---- Popover state ----
   const [isOpen, setIsOpen] = React.useState(false)
   const [highlightedIndex, setHighlightedIndex] = React.useState(-1)
+  const keyboardPadding = useKeyboardCollisionPadding()
 
   const containerRef = React.useRef<HTMLDivElement>(null)
 
@@ -499,6 +501,7 @@ export function SearchInput({
           className={cn(
             "z-50 w-[var(--radix-popover-trigger-width)] mt-1",
             "bg-ods-card border border-ods-border rounded-[6px] overflow-hidden shadow-lg",
+            "flex flex-col max-h-[var(--radix-popper-available-height)]",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -507,6 +510,10 @@ export function SearchInput({
           )}
           sideOffset={4}
           align="start"
+          // The anchor is the search field that raises the software keyboard,
+          // so these suggestions are always positioned with the keyboard up —
+          // see useKeyboardCollisionPadding.
+          collisionPadding={{ bottom: keyboardPadding }}
           onOpenAutoFocus={(e) => {
             e.preventDefault()
             inputRef.current?.focus()
@@ -517,8 +524,8 @@ export function SearchInput({
             }
           }}
         >
-          <ScrollAreaPrimitive.Root className="overflow-hidden">
-            <ScrollAreaPrimitive.Viewport className="max-h-[320px] w-full">
+          <ScrollAreaPrimitive.Root className="flex min-h-0 flex-col overflow-hidden">
+            <ScrollAreaPrimitive.Viewport className="min-h-0 max-h-[320px] w-full">
               <div role="listbox">
                 {renderDropdownContent()}
               </div>

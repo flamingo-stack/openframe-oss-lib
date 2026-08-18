@@ -1,4 +1,5 @@
 use crate::services::agent_configuration_service::AgentConfigurationService;
+use crate::services::deactivation_service::DeactivationService;
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
 use crate::services::{AgentAuthService, InitialConfigurationService};
 use anyhow::{Context, Result};
@@ -10,6 +11,10 @@ use tokio::sync::broadcast;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
+/// Reconnect delay while the tenant is gone (suspended): backs the 5s storm off ~60x so a
+/// deleted-tenant client barely touches the gateway. Auto-reverts to 5s on recovery.
+const SUSPENDED_RECONNECT_DELAY: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+
 #[derive(Clone)]
 pub struct NatsConnectionManager {
     client: Arc<RwLock<Option<Arc<Client>>>>,
@@ -19,6 +24,7 @@ pub struct NatsConnectionManager {
     tls_config_provider: LocalTlsConfigProvider,
     initial_configuration_service: InitialConfigurationService,
     auth_service: AgentAuthService,
+    deactivation: Arc<DeactivationService>,
 }
 
 impl NatsConnectionManager {
@@ -31,6 +37,7 @@ impl NatsConnectionManager {
         initial_configuration_service: InitialConfigurationService,
         auth_service: AgentAuthService,
         tls_config_provider: LocalTlsConfigProvider,
+        deactivation: Arc<DeactivationService>,
     ) -> Self {
         let (reconnect_tx, _) = broadcast::channel(16);
         Self {
@@ -41,6 +48,7 @@ impl NatsConnectionManager {
             tls_config_provider,
             initial_configuration_service,
             auth_service,
+            deactivation,
         }
     }
 
@@ -61,6 +69,8 @@ impl NatsConnectionManager {
         // Cloned dependencies for auth callback
         let auth_service = self.auth_service.clone();
         let config_service = self.config_service.clone();
+        let deactivation = self.deactivation.clone();
+        let deactivation_for_delay = self.deactivation.clone();
         let nats_server_url = self.nats_server_url.clone();
         let nats_server_url_for_reconnect = self.nats_server_url.clone();
         let reconnect_tx = self.reconnect_tx.clone();
@@ -76,6 +86,12 @@ impl NatsConnectionManager {
             .retry_on_initial_connect()
             .max_reconnects(None)
             .reconnect_delay_callback(move |attempt| {
+                // Tenant gone: async-nats can't be stopped from here (its reconnect loop never
+                // polls Drain), but this callback IS called per attempt — so back off hard to
+                // turn the 5s WS-upgrade storm into a rare probe against the gone gateway.
+                if deactivation_for_delay.is_suspended() {
+                    return SUSPENDED_RECONNECT_DELAY;
+                }
                 warn!(
                     attempt = attempt,
                     hostname = %nats_server_url_for_reconnect,
@@ -100,12 +116,14 @@ impl NatsConnectionManager {
                 info!("Starting reauthentication");
                 let auth_service = auth_service.clone();
                 let config_service = config_service.clone();
+                let deactivation = deactivation.clone();
                 let nats_server_url = nats_server_url.clone();
 
                 async move {
                     Self::perform_reauthentication_and_build_url(
                         auth_service,
                         config_service,
+                        deactivation,
                         nats_server_url,
                     )
                     .await
@@ -135,8 +153,16 @@ impl NatsConnectionManager {
     async fn perform_reauthentication_and_build_url(
         auth_service: AgentAuthService,
         config_service: AgentConfigurationService,
+        deactivation: Arc<DeactivationService>,
         nats_server_url: String,
     ) -> std::result::Result<String, async_nats::AuthError> {
+        // Tenant gone: skip reauth so NATS reconnects fail locally instead of hammering the gateway.
+        if deactivation.is_suspended() {
+            return Err(async_nats::AuthError::new(
+                "client suspended (tenant gone); skipping NATS reauthentication".to_string(),
+            ));
+        }
+
         info!(
             hostname = %nats_server_url,
             "Auth URL callback triggered - performing reauthentication"

@@ -409,6 +409,7 @@ export type Database = {
           highlight_video_source: string | null
           highlight_video_thumbnail: string | null
           highlight_video_duration_ms: number | null
+          highlight_srt_content: string | null
           author_id: string | null
           position: 'left' | 'right'
           created_at: string
@@ -434,6 +435,7 @@ export type Database = {
           highlight_video_source?: string | null
           highlight_video_thumbnail?: string | null
           highlight_video_duration_ms?: number | null
+          highlight_srt_content?: string | null
           author_id?: string | null
           created_at?: string
           updated_at?: string
@@ -457,6 +459,7 @@ export type Database = {
           highlight_video_source?: string | null
           highlight_video_thumbnail?: string | null
           highlight_video_duration_ms?: number | null
+          highlight_srt_content?: string | null
           author_id?: string | null
           position?: 'left' | 'right'
           created_at?: string

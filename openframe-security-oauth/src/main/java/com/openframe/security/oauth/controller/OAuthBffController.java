@@ -116,11 +116,23 @@ public class OAuthBffController {
 
         return tokensMono
                 .map(tokens -> buildNoContentWithCookies(tokens, includeHeaders))
-                .switchIfEmpty(Mono.fromSupplier(this::unauthorizedWithClearedCookies))
+                // A rejected/unknown refresh token must NOT clear cookies. With rotation
+                // (reuseRefreshTokens=false), concurrent refreshes race: the winner rotates the
+                // token and Set-Cookies the new one; the loser's stale token lands here — and
+                // wiping cookies in that response destroys the winner's freshly established
+                // session (observed in prod: a login killed 150ms after completion by a stale
+                // refresh from the previous session). A plain 401 leaves the browser's current —
+                // possibly newer and valid — cookies intact; explicit /logout remains the only
+                // place that clears an established session.
+                .switchIfEmpty(Mono.fromSupplier(this::unauthorized))
                 .onErrorResume(InvalidRefreshTokenException.class, e -> {
-                    log.warn("Refresh rejected: {}", e.getMessage());
-                    return Mono.just(unauthorizedWithClearedCookies());
+                    log.warn("Refresh rejected (cookies preserved): {}", e.getMessage());
+                    return Mono.just(unauthorized());
                 });
+    }
+
+    private ResponseEntity<Void> unauthorized() {
+        return ResponseEntity.status(401).build();
     }
 
     @GetMapping("/logout")

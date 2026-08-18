@@ -29,6 +29,15 @@ struct ApiError {
     code: String,
 }
 
+/// Outcome of the uninstall deregistration call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeregistrationOutcome {
+    /// The platform accepted the deregistration.
+    Deregistered,
+    /// The platform no longer knows this machine, or the endpoint is not deployed yet.
+    AlreadyGone(StatusCode),
+}
+
 #[derive(Clone)]
 pub struct RegistrationClient {
     http_client: Client,
@@ -107,6 +116,68 @@ impl RegistrationClient {
 
         Ok(registration_response)
     }
+
+    /// Reports this machine's uninstall so the platform can run its deletion logic.
+    pub async fn deregister(
+        &self,
+        machine_info: &PersistedMachineInfo,
+    ) -> Result<DeregistrationOutcome> {
+        let url = format!("{}/clients/api/agents/uninstall", self.base_url);
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "X-Machine-Id",
+            machine_info
+                .machine_id
+                .parse()
+                .context("Failed to parse machine id header")?,
+        );
+        headers.insert(
+            "X-Client-Secret",
+            machine_info
+                .client_secret
+                .parse()
+                .context("Failed to parse client secret header")?,
+        );
+
+        // A body is required: the GCP LB rejects body-less POSTs with 411.
+        // Backend contract does not require this body.
+        let body = serde_json::json!({
+            "deletedAt": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true)
+        });
+
+        let response = self
+            .http_client
+            .post(&url)
+            .headers(headers)
+            .json(&body)
+            .send()
+            .await
+            .context("Failed to send deregistration request")?;
+
+        let status = response.status();
+        if status.is_success() {
+            return Ok(DeregistrationOutcome::Deregistered);
+        }
+        if is_already_gone(status) {
+            return Ok(DeregistrationOutcome::AlreadyGone(status));
+        }
+        let body = response.text().await.unwrap_or_default();
+        Err(anyhow::anyhow!(
+            "Deregistration failed with status {} and body {}",
+            status,
+            body
+        ))
+    }
+}
+
+/// Statuses proving a retry cannot help: the platform already forgot this machine
+/// (401/403/410) or does not expose the endpoint yet (404).
+fn is_already_gone(status: StatusCode) -> bool {
+    matches!(
+        status,
+        StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN | StatusCode::NOT_FOUND | StatusCode::GONE
+    )
 }
 
 /// Detects the HTTP 401 with a CLIENT_SECRET_* code.
@@ -118,38 +189,5 @@ fn is_client_secret_error(status: StatusCode, body: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn detects_client_secret_invalid() {
-        let body = r#"{"code":"CLIENT_SECRET_INVALID","message":"Invalid client secret"}"#;
-        assert!(is_client_secret_error(StatusCode::UNAUTHORIZED, body));
-    }
-
-    #[test]
-    fn detects_client_secret_empty() {
-        let body = r#"{"code":"CLIENT_SECRET_EMPTY","message":"Client secret is empty"}"#;
-        assert!(is_client_secret_error(StatusCode::UNAUTHORIZED, body));
-    }
-
-    #[test]
-    fn ignores_other_401_error_codes() {
-        let body = r#"{"code":"INITIAL_KEY_INVALID","message":"..."}"#;
-        assert!(!is_client_secret_error(StatusCode::UNAUTHORIZED, body));
-    }
-
-    #[test]
-    fn ignores_client_secret_error_on_non_401() {
-        let body = r#"{"code":"CLIENT_SECRET_INVALID"}"#;
-        assert!(!is_client_secret_error(StatusCode::BAD_REQUEST, body));
-    }
-
-    #[test]
-    fn handles_non_json_body() {
-        assert!(!is_client_secret_error(
-            StatusCode::UNAUTHORIZED,
-            "gateway timeout"
-        ));
-    }
-}
+#[path = "registration_client_tests.rs"]
+mod tests;

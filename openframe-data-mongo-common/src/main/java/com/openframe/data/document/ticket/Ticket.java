@@ -62,6 +62,10 @@ public class Ticket implements TenantScoped {
     @LastModifiedDate
     private Instant updatedAt;
     private Instant resolvedAt;
+    private TicketResolver resolvedBy;
+    private String resolvedById;
+    private String resolvedByName;
+    private Integer reopenCount;
     public boolean isAiDisabled() {
         return statusKind != null && statusKind != TicketStatusKind.AI_ASSISTANCE;
     }
