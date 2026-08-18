@@ -15,6 +15,9 @@ import { EP } from '../config/endpoints'
  * Host-supplied data hook — ReleaseDetailPage REQUIRES this so it fetches through the
  * app's QueryClient. Points at the hub's public single-release route
  * (`/content/api/releases/<slug>`); a miss surfaces the lib's error state (no crash).
+ * Caption `<track>` URLs are built by the lib page itself from the release's SRT
+ * columns via the runtime endpoints (proxied automatically — see README
+ * "Video captions"); the hook returns the API payload untouched.
  */
 function useRelease(slug: string | undefined) {
   const query = useQuery({
