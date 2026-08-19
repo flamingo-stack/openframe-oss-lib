@@ -85,23 +85,31 @@ class FleetMdmCacheServiceSharedClusterTest {
     }
 
     @Test
-    @DisplayName("tenant cluster + blank fleet.mdm.base-url -> refuses to start (misconfiguration)")
-    void tenantClusterRequiresBaseUrl() {
-        FleetMdmCacheService cache = new FleetMdmCacheService(mock(IntegratedToolService.class), null, null);
-        org.springframework.test.util.ReflectionTestUtils.setField(cache, "baseUrl", "");
-
-        // No resolver is deployed here, so the static property is the only way to reach Fleet:
-        // a blank value would silently disable enrichment, so startup must fail instead.
-        org.assertj.core.api.Assertions.assertThatThrownBy(cache::validateTenantConfig)
+    @DisplayName("no resolver + blank fleet.mdm.base-url -> refuses to start (URL unobtainable)")
+    void requiresBaseUrlWithoutUrlResolver() {
+        // Per-tenant cluster: the static property is the only way to reach Fleet.
+        FleetMdmCacheService tenantPlane = new FleetMdmCacheService(mock(IntegratedToolService.class), null, null);
+        org.springframework.test.util.ReflectionTestUtils.setField(tenantPlane, "baseUrl", "");
+        org.assertj.core.api.Assertions.assertThatThrownBy(tenantPlane::validateTenantConfig)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("fleet.mdm.base-url");
+
+        // Shared cluster with its URL resolver switched off (flag disabled): same verdict — the
+        // check is plane-agnostic so this cannot degrade silently.
+        FleetMdmCacheService sharedNoUrlResolver = new FleetMdmCacheService(
+                mock(IntegratedToolService.class), mock(ClusterTenantIdResolver.class), null);
+        org.springframework.test.util.ReflectionTestUtils.setField(sharedNoUrlResolver, "baseUrl", "");
+        org.assertj.core.api.Assertions.assertThatThrownBy(sharedNoUrlResolver::validateTenantConfig)
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    @DisplayName("shared cluster + blank fleet.mdm.base-url -> starts fine (URL comes per tenant)")
-    void sharedClusterAllowsBlankBaseUrl() {
+    @DisplayName("FleetBaseUrlResolver present -> blank fleet.mdm.base-url is fine (URL comes per tenant)")
+    void urlResolverMakesBaseUrlOptional() {
         FleetMdmCacheService cache = new FleetMdmCacheService(
-                mock(IntegratedToolService.class), mock(ClusterTenantIdResolver.class), null);
+                mock(IntegratedToolService.class),
+                mock(ClusterTenantIdResolver.class),
+                org.mockito.Mockito.mock(FleetBaseUrlResolver.class));
         org.springframework.test.util.ReflectionTestUtils.setField(cache, "baseUrl", "");
 
         cache.validateTenantConfig();

@@ -75,20 +75,20 @@ public class FleetMdmCacheService {
 
     @PostConstruct
     void validateTenantConfig() {
+        // A Fleet URL must be obtainable from SOMEWHERE, or no lookup could ever succeed and
+        // enrichment would be silently dead: either a FleetBaseUrlResolver derives one per
+        // tenant (shared plane), or the static property supplies it (per-tenant clusters).
+        // Deliberately plane-agnostic — a shared deployment that drops the property while its
+        // resolver is switched off would otherwise degrade invisibly.
+        if (fleetBaseUrlResolver == null && (baseUrl == null || baseUrl.isBlank())) {
+            throw new IllegalStateException(
+                    "fleet.mdm.base-url must be configured when no FleetBaseUrlResolver bean is "
+                            + "present to resolve the Fleet URL per tenant");
+        }
         // Shared cluster (per-event tenants via ClusterTenantIdResolver): a blank deployment
-        // TENANT_ID is expected — every SDK call carries the event's own tenant instead — and
-        // the Fleet URL is resolved per tenant too, so fleet.mdm.base-url may legitimately be
-        // absent here.
+        // TENANT_ID is expected — every SDK call carries the event's own tenant instead.
         if (clusterTenantIdResolver != null) {
             return;
-        }
-        // Per-tenant cluster: Fleet is in-cluster and reachable only through the static
-        // property (no FleetBaseUrlResolver is deployed to derive it per tenant). A blank value
-        // would silently disable every enrichment lookup, so fail fast instead.
-        if (baseUrl == null || baseUrl.isBlank()) {
-            throw new IllegalStateException(
-                    "fleet.mdm.base-url must be configured in a per-tenant deployment "
-                            + "(no FleetBaseUrlResolver is present to resolve it per tenant)");
         }
         FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantId);
     }
