@@ -19,7 +19,7 @@ export interface VideoTeaser {
   thumbnail_url?: string // Optional thumbnail image URL for video preview. If not provided, video player will show first frame automatically.
   published?: boolean // Controls visibility on public preview page (default: false, admin must select)
   featured?: boolean // Opts the bite into cross-entity featured pulls (homepage/configured surfaces). Independent of `published`.
-  featured_at?: string // ISO timestamp stamped when an admin features the bite (cleared on unfeature). Featured surfaces rank by THIS (fallback created_at) — ranking by created_at alone made featuring an old bite invisible under the surface cap.
+  featured_at?: string // ISO timestamp stamped when an admin features the bite (cleared on unfeature; all featured bites backfilled 2026-08-19). Featured surfaces rank by THIS — ranking by created_at made featuring an old bite invisible under the surface cap.
   source?: 'manual' | 'ai_generated' // Track origin of teaser
   created_at?: string // ISO timestamp for sorting (newer items first)
   start_time_ms?: number // Vizard extraction: clip start offset in the source video

@@ -62,18 +62,17 @@ export function sortBitesByCreatedAtDesc(a: VideoTeaser, b: VideoTeaser): number
 }
 
 /**
- * FEATURED-recency comparator: `featured_at` (stamped when an admin stars the
- * bite) with `created_at` fallback for bites featured before the stamp
- * existed; missing dates sort last. The comparator FEATURED surfaces (the
- * cross-entity aggregation + its strips) must use — ranking those surfaces by
- * `created_at` made featuring any older bite a silent no-op once the surface
- * cap filled with newer bites.
+ * FEATURED-recency comparator: `featured_at` DESC — the stamp every featured
+ * bite carries (written by the admin star toggle; pre-existing featured bites
+ * were backfilled 2026-08-19, so there is no date-fallback ranking). The
+ * comparator FEATURED surfaces (the cross-entity aggregation + its strips)
+ * must use — ranking those surfaces by `created_at` made featuring any older
+ * bite a silent no-op once the surface cap filled with newer bites. A missing
+ * stamp (only possible from a stale mid-deploy writer) sorts last.
  */
 export function sortBitesByFeaturedAtDesc(a: VideoTeaser, b: VideoTeaser): number {
-  const ta = a.featured_at ?? a.created_at
-  const tb = b.featured_at ?? b.created_at
-  if (!ta && !tb) return 0
-  if (!ta) return 1
-  if (!tb) return -1
-  return new Date(tb).getTime() - new Date(ta).getTime()
+  if (!a.featured_at && !b.featured_at) return 0
+  if (!a.featured_at) return 1
+  if (!b.featured_at) return -1
+  return new Date(b.featured_at).getTime() - new Date(a.featured_at).getTime()
 }

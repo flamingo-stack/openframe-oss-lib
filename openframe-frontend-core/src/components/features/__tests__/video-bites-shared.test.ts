@@ -39,15 +39,26 @@ describe('sortBitesByFeaturedAtDesc', () => {
     ])
   })
 
-  it('falls back to created_at for legacy bites without featured_at', () => {
-    const a = bite({ created_at: '2026-01-01T00:00:00Z' })
-    const b = bite({ created_at: '2026-02-01T00:00:00Z' })
-    expect([a, b].sort(sortBitesByFeaturedAtDesc)).toEqual([b, a])
+  it('ranks by featured_at only — created_at never influences featured order', () => {
+    // No date-fallback ranking: all featured bites carry the stamp (write
+    // path + 2026-08-19 backfill).
+    const staleStampNewClip = bite({
+      created_at: '2026-08-01T00:00:00Z',
+      featured_at: '2026-01-01T00:00:00Z',
+    })
+    const freshStampOldClip = bite({
+      created_at: '2026-01-01T00:00:00Z',
+      featured_at: '2026-08-01T00:00:00Z',
+    })
+    expect([staleStampNewClip, freshStampOldClip].sort(sortBitesByFeaturedAtDesc)).toEqual([
+      freshStampOldClip,
+      staleStampNewClip,
+    ])
   })
 
-  it('sorts bites with neither timestamp last', () => {
+  it('sorts unstamped bites last (mid-deploy transient only)', () => {
     const stamped = bite({ featured_at: '2026-01-01T00:00:00Z' })
-    const bare = bite({})
+    const bare = bite({ created_at: '2026-08-01T00:00:00Z' })
     expect([bare, stamped].sort(sortBitesByFeaturedAtDesc)).toEqual([stamped, bare])
   })
 })
