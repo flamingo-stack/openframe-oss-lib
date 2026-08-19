@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Used in Fleet activities stream processing for enriching activities with:
  * - Agent information (host-to-agent mapping)
  * - Query definitions (query metadata by ID)
- * 
+ * <p>
  * Uses Fleet MDM SDK directly instead of database access
  *
  * <p><b>Tenant model.</b> In per-tenant clusters one client carries the deployment's
@@ -56,11 +56,14 @@ public class FleetMdmCacheService {
 
     private final IntegratedToolService integratedToolService;
     private final ClusterTenantIdResolver clusterTenantIdResolver;
+    private final FleetBaseUrlResolver fleetBaseUrlResolver;
 
     public FleetMdmCacheService(IntegratedToolService integratedToolService,
-                                @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver) {
+                                @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver,
+                                @Autowired(required = false) FleetBaseUrlResolver fleetBaseUrlResolver) {
         this.integratedToolService = integratedToolService;
         this.clusterTenantIdResolver = clusterTenantIdResolver;
+        this.fleetBaseUrlResolver = fleetBaseUrlResolver;
     }
 
     @PostConstruct
@@ -115,7 +118,9 @@ public class FleetMdmCacheService {
         return getQueryById(queryId, null);
     }
 
-    /** Tenant-aware variant for the shared cluster (see class javadoc; tenant-scoped cache key). */
+    /**
+     * Tenant-aware variant for the shared cluster (see class javadoc; tenant-scoped cache key).
+     */
     @Cacheable(value = "fleetQueryCache", key = "(#eventTenantId ?: 'default') + ':' + #queryId", unless = "#result == null")
     public Query getQueryById(Long queryId, String eventTenantId) {
         log.debug("Cache miss for query_id: {}, calling Fleet MDM API", queryId);
@@ -155,7 +160,9 @@ public class FleetMdmCacheService {
         log.debug("Evicted policy cache for policy_id: {}", policyId);
     }
 
-    /** Tenant-aware evict matching the tenant-scoped cache key of {@link #getPolicyById(Long, String)}. */
+    /**
+     * Tenant-aware evict matching the tenant-scoped cache key of {@link #getPolicyById(Long, String)}.
+     */
     @CacheEvict(value = "fleetPolicyCache", key = "(#eventTenantId ?: 'default') + ':' + #policyId")
     public void evictPolicyCache(Long policyId, String eventTenantId) {
         log.debug("Evicted policy cache for policy_id: {} tenant: {}", policyId, eventTenantId);
@@ -166,7 +173,9 @@ public class FleetMdmCacheService {
         return getPolicyById(policyId, null);
     }
 
-    /** Tenant-aware variant for the shared cluster (see class javadoc; tenant-scoped cache key). */
+    /**
+     * Tenant-aware variant for the shared cluster (see class javadoc; tenant-scoped cache key).
+     */
     @Cacheable(value = "fleetPolicyCache", key = "(#eventTenantId ?: 'default') + ':' + #policyId", unless = "#result == null || !#result.isPresent()")
     public Optional<Policy> getPolicyById(Long policyId, String eventTenantId) {
         log.debug("Cache miss for policy_id: {}, calling Fleet MDM API", policyId);
@@ -222,9 +231,30 @@ public class FleetMdmCacheService {
             if (apiKey == null) {
                 return null;
             }
-            log.info("Initializing FleetMdmClient for tenant {} with baseUrl: {}", tenant, baseUrl);
-            return new FleetMdmClient(baseUrl, apiKey, tenant);
+            String tenantBaseUrl = baseUrlFor(tenant);
+            log.info("Initializing FleetMdmClient for tenant {} with baseUrl: {}", tenant, tenantBaseUrl);
+            return new FleetMdmClient(tenantBaseUrl, apiKey, tenant);
         });
+    }
+
+    /**
+     * Per-tenant base URL when a {@link FleetBaseUrlResolver} is deployed (shared cluster:
+     * the tenant's Fleet lives in that tenant's cluster, addressed via its registered internal
+     * DNS); the static {@code fleet.mdm.base-url} otherwise, and as the fallback when the
+     * resolver has no answer. The result is effectively memoized per tenant through
+     * {@code clientByTenant}, so a registration change requires a restart to pick up — cluster
+     * registrations are stable for a live tenant.
+     */
+    String baseUrlFor(String tenantId) {
+        if (fleetBaseUrlResolver == null) {
+            return baseUrl;
+        }
+        String resolved = fleetBaseUrlResolver.resolveBaseUrl(tenantId);
+        if (resolved != null && !resolved.isBlank()) {
+            return resolved;
+        }
+        log.warn("No per-tenant Fleet base URL for tenant {} — falling back to the static base url", tenantId);
+        return baseUrl;
     }
 
     private String resolveApiKey() {
