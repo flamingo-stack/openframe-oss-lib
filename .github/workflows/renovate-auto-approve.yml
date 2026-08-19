@@ -1,0 +1,19 @@
+name: Auto-approve Renovate PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  approve:
+    if: startsWith(github.head_ref, 'renovate/') && github.actor == 'ivan-flamingo'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve the Renovate PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr review "$PR_URL" --approve --body "Automated approval: Renovate branch, checks enforced by branch protection."
