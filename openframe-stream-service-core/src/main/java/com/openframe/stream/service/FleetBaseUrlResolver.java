@@ -5,9 +5,6 @@ package com.openframe.stream.service;
  *
  * <p>In per-tenant clusters the stream service and Fleet share a cluster, so the static
  * {@code fleet.mdm.base-url} (an in-cluster ClusterIP URL) is always correct and this bean is
- * absent. In the shared cluster the URL must be resolved per tenant.
- * Only the shared-plane stream deployment provides an implementation;
- * everywhere else {@link FleetMdmCacheService} keeps the static property.
  */
 public interface FleetBaseUrlResolver {
 
