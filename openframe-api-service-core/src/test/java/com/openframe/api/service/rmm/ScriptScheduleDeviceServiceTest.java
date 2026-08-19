@@ -123,6 +123,58 @@ class ScriptScheduleDeviceServiceTest {
         verify(dispatchRepository).deleteByTenantIdAndScheduleIdAndMachineIdIn(eq(TENANT_ID), eq(SCHEDULE_ID), any());
     }
 
+    @Test
+    @DisplayName("applyCriteria on a DEVICE_ONLINE schedule → arms a NEW sentinel for every currently-matching device (already-online-at-apply devices don't get a came-online event)")
+    void applyCriteria_deviceOnline_armsMatchingDevices() {
+        scheduleExistsWithTrigger(ScriptStatus.ACTIVE, com.openframe.data.document.rmm.ScriptScheduleTrigger.DEVICE_ONLINE);
+        when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m-1", "m-2"));
+        when(dispatchRepository.findByTenantIdAndScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.applyCriteria(SCHEDULE_ID, null, "user-1");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<com.openframe.data.document.rmm.DeviceFirstOnlineDispatch>> captor = ArgumentCaptor.forClass(List.class);
+        verify(dispatchRepository).saveAll(captor.capture());
+        List<com.openframe.data.document.rmm.DeviceFirstOnlineDispatch> armed = captor.getValue();
+        assertThat(armed).extracting(com.openframe.data.document.rmm.DeviceFirstOnlineDispatch::getMachineId)
+                .containsExactlyInAnyOrder("m-1", "m-2");
+        assertThat(armed).allSatisfy(r -> {
+            assertThat(r.getTenantId()).isEqualTo(TENANT_ID);
+            assertThat(r.getScheduleId()).isEqualTo(SCHEDULE_ID);
+            assertThat(r.getStatus()).isEqualTo(com.openframe.data.document.rmm.DeviceOnlineDispatchStatus.NEW);
+        });
+    }
+
+    @Test
+    @DisplayName("applyCriteria: fire-once — a device that already has a sentinel is skipped; only new matches are armed")
+    void applyCriteria_armIfAbsent_skipsAlreadyArmed() {
+        scheduleExistsWithTrigger(ScriptStatus.ACTIVE, com.openframe.data.document.rmm.ScriptScheduleTrigger.DEVICE_ONLINE);
+        when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m-1", "m-2", "m-3"));
+        when(dispatchRepository.findByTenantIdAndScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of(
+                com.openframe.data.document.rmm.DeviceFirstOnlineDispatch.builder()
+                        .tenantId(TENANT_ID).machineId("m-1").scheduleId(SCHEDULE_ID)
+                        .status(com.openframe.data.document.rmm.DeviceOnlineDispatchStatus.PROCESSED).build()));
+
+        service.applyCriteria(SCHEDULE_ID, null, "user-1");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<com.openframe.data.document.rmm.DeviceFirstOnlineDispatch>> captor = ArgumentCaptor.forClass(List.class);
+        verify(dispatchRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(com.openframe.data.document.rmm.DeviceFirstOnlineDispatch::getMachineId)
+                .containsExactlyInAnyOrder("m-2", "m-3");   // m-1 already armed → skipped
+    }
+
+    @Test
+    @DisplayName("applyCriteria on a DATE_TIME schedule → does NOT touch the DEVICE_ONLINE dispatch collection")
+    void applyCriteria_nonDeviceOnline_doesNotArm() {
+        scheduleExistsWithTrigger(ScriptStatus.ACTIVE, com.openframe.data.document.rmm.ScriptScheduleTrigger.DATE_TIME);
+
+        service.applyCriteria(SCHEDULE_ID, null, "user-1");
+
+        verify(dispatchRepository, never()).findByTenantIdAndScheduleId(any(), any());
+        verify(dispatchRepository, never()).saveAll(any());
+    }
+
     private static Machine machine(String machineId, String hostname, OsType osType) {
         Machine m = new Machine();
         m.setMachineId(machineId);
