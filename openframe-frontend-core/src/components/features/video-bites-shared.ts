@@ -60,3 +60,19 @@ export function sortBitesByCreatedAtDesc(a: VideoTeaser, b: VideoTeaser): number
   if (!b.created_at) return -1
   return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
 }
+
+/**
+ * FEATURED-recency comparator: `featured_at` DESC — the stamp every featured
+ * bite carries (written by the admin star toggle; pre-existing featured bites
+ * were backfilled 2026-08-19, so there is no date-fallback ranking). The
+ * comparator FEATURED surfaces (the cross-entity aggregation + its strips)
+ * must use — ranking those surfaces by `created_at` made featuring any older
+ * bite a silent no-op once the surface cap filled with newer bites. A missing
+ * stamp (only possible from a stale mid-deploy writer) sorts last.
+ */
+export function sortBitesByFeaturedAtDesc(a: VideoTeaser, b: VideoTeaser): number {
+  if (!a.featured_at && !b.featured_at) return 0
+  if (!a.featured_at) return 1
+  if (!b.featured_at) return -1
+  return new Date(b.featured_at).getTime() - new Date(a.featured_at).getTime()
+}
