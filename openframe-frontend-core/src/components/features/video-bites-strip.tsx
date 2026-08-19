@@ -88,6 +88,10 @@ export interface VideoBitesStripProps {
   showChevrons?: boolean;
   /** Section-level navigation fallback (per-bite `href`/`onNavigate` win). */
   onBiteNavigate?: (bite: VideoBiteStripItem, index: number) => void;
+  /** Ordering comparator. Default `sortBitesByCreatedAtDesc`; FEATURED
+   *  surfaces pass `sortBitesByFeaturedAtDesc` so display order matches the
+   *  featured-recency ranking their server aggregation is capped by. */
+  sortComparator?: (a: VideoBiteStripItem, b: VideoBiteStripItem) => number;
   className?: string;
 }
 
@@ -110,12 +114,13 @@ export function VideoBitesStrip({
   cardHeightMobile = 300,
   showChevrons = true,
   onBiteNavigate,
+  sortComparator = sortBitesByCreatedAtDesc,
   className,
 }: VideoBitesStripProps): React.ReactElement | null {
   const items = useMemo(() => {
     const filtered = filterPublished ? bites.filter(b => b.published) : [...bites];
-    return filtered.sort(sortBitesByCreatedAtDesc);
-  }, [bites, filterPublished]);
+    return filtered.sort(sortComparator);
+  }, [bites, filterPublished, sortComparator]);
 
   // Preconnect Mux/Supabase origins once so first hover starts fast.
   const warmup = useVideoWarmup<HTMLDivElement>({ videoUrl: items[0]?.url || null });
