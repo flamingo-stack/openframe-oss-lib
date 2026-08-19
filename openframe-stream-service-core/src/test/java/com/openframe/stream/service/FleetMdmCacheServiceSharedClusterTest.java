@@ -85,13 +85,25 @@ class FleetMdmCacheServiceSharedClusterTest {
     }
 
     @Test
-    @DisplayName("fail closed: blank base url and no resolver -> deployment client path also skips")
-    void deploymentClientSkipsOnBlankBaseUrl() {
-        IntegratedToolService toolService = mock(IntegratedToolService.class);
-        FleetMdmCacheService cache = new FleetMdmCacheService(toolService, null, null);
+    @DisplayName("tenant cluster + blank fleet.mdm.base-url -> refuses to start (misconfiguration)")
+    void tenantClusterRequiresBaseUrl() {
+        FleetMdmCacheService cache = new FleetMdmCacheService(mock(IntegratedToolService.class), null, null);
         org.springframework.test.util.ReflectionTestUtils.setField(cache, "baseUrl", "");
 
-        assertThat(cache.getQueryById(3L, null)).isNull();
-        verifyNoInteractions(toolService);
+        // No resolver is deployed here, so the static property is the only way to reach Fleet:
+        // a blank value would silently disable enrichment, so startup must fail instead.
+        org.assertj.core.api.Assertions.assertThatThrownBy(cache::validateTenantConfig)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("fleet.mdm.base-url");
+    }
+
+    @Test
+    @DisplayName("shared cluster + blank fleet.mdm.base-url -> starts fine (URL comes per tenant)")
+    void sharedClusterAllowsBlankBaseUrl() {
+        FleetMdmCacheService cache = new FleetMdmCacheService(
+                mock(IntegratedToolService.class), mock(ClusterTenantIdResolver.class), null);
+        org.springframework.test.util.ReflectionTestUtils.setField(cache, "baseUrl", "");
+
+        cache.validateTenantConfig();
     }
 }

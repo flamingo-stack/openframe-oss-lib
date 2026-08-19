@@ -76,9 +76,19 @@ public class FleetMdmCacheService {
     @PostConstruct
     void validateTenantConfig() {
         // Shared cluster (per-event tenants via ClusterTenantIdResolver): a blank deployment
-        // TENANT_ID is expected — every SDK call carries the event's own tenant instead.
+        // TENANT_ID is expected — every SDK call carries the event's own tenant instead — and
+        // the Fleet URL is resolved per tenant too, so fleet.mdm.base-url may legitimately be
+        // absent here.
         if (clusterTenantIdResolver != null) {
             return;
+        }
+        // Per-tenant cluster: Fleet is in-cluster and reachable only through the static
+        // property (no FleetBaseUrlResolver is deployed to derive it per tenant). A blank value
+        // would silently disable every enrichment lookup, so fail fast instead.
+        if (baseUrl == null || baseUrl.isBlank()) {
+            throw new IllegalStateException(
+                    "fleet.mdm.base-url must be configured in a per-tenant deployment "
+                            + "(no FleetBaseUrlResolver is present to resolve it per tenant)");
         }
         FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantId);
     }
@@ -204,12 +214,10 @@ public class FleetMdmCacheService {
         }
     }
 
+    // Per-tenant clusters only: reached from clientFor when no ClusterTenantIdResolver is
+    // deployed. validateTenantConfig has already guaranteed a non-blank baseUrl on that path.
     private FleetMdmClient getFleetMdmClient() {
         if (fleetMdmClient == null) {
-            if (baseUrl == null || baseUrl.isBlank()) {
-                log.warn("fleet.mdm.base-url is not configured — skipping Fleet API lookup");
-                return null;
-            }
             String apiKey = resolveApiKey();
             if (apiKey == null) {
                 return null;
