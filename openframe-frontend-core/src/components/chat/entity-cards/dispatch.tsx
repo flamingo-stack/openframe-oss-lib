@@ -418,10 +418,12 @@ function itemVideoMetadata(item: any): Record<string, string> | null {
     item?.highlight_video_thumbnail,
     item?.featured_image,
   )
+  const highlightVideoPoster = pick(m.highlightVideoPoster, item?.highlight_video_thumbnail)
   if (videoUrl) out.videoUrl = videoUrl
   if (youtubeUrl) out.youtubeUrl = youtubeUrl
   if (highlightVideoUrl) out.highlightVideoUrl = highlightVideoUrl
   if (videoPoster) out.videoPoster = videoPoster
+  if (highlightVideoPoster) out.highlightVideoPoster = highlightVideoPoster
   return out.videoUrl || out.youtubeUrl || out.highlightVideoUrl ? out : null
 }
 

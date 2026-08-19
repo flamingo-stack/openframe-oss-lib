@@ -15,7 +15,7 @@ import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
-import com.openframe.data.service.notification.NotificationReadStateService;
+import com.openframe.notification.readstate.NotificationReadStateService;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

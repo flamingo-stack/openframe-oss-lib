@@ -10,9 +10,9 @@
  * `/case-studies`, `/podcasts`, `/roadmap`, etc.
  *
  * Batching: every compact card with the same `(type, id)` shares one
- * TanStack-Query entry; multiple refs of the same type in the same
- * chat message produce ONE network request (TanStack dedups by
- * queryKey). 5-minute staleTime matches `RelatedContentSection`.
+ * TanStack-Query entry; CONCURRENT refs of the same type in the same
+ * chat message produce ONE network request (TanStack dedups in-flight
+ * fetches by queryKey). Data is always stale — see the query options.
  *
  * URL builder is read from `runtime.endpoints.buildListUrl` so the
  * embedded app can supply a per-type URL builder against the reverse
@@ -68,19 +68,15 @@ export function useChatCardItem<T = unknown>(
       return (match ?? null) as T | null
     },
     enabled: !!url && id.length > 0,
-    // Don't refetch on window focus inside the chat — the chat panel
-    // is opened and closed frequently, and re-fetching every time the
-    // user toggles back to the tab is wasteful (the row's id-keyed
-    // payload is effectively immutable).
-    refetchOnWindowFocus: false,
-    // The id-keyed payload is effectively immutable, and a fetch-mode card
+    // ALWAYS FRESH — no freshness window. Card entities are mutable
+    // (tickets, tasks change status), so a cached row is a lie waiting to
+    // render: a 5-min staleTime shipped a "NEW" badge on a ticket the
+    // receipt right above it said was just CLOSED (2026-08-18). Every
+    // mount refetches. `gcTime` is kept ONLY as render continuity: a card
     // inside a STREAMING assistant message re-mounts on every chunk as the
-    // surrounding markdown re-parses. Without a staleTime that meant a fresh
-    // network fetch + loading-skeleton flash on every single chunk. Treat the
-    // row as fresh for 5 min (matches the public pages) and keep it cached
-    // long after unmount so remounts resolve synchronously from cache — no
-    // refetch, no skeleton flash.
-    staleTime: 5 * 60 * 1000,
+    // surrounding markdown re-parses, and the previous data renders while
+    // the refetch is in flight — no skeleton flash, never stale-forever.
+    staleTime: 0,
     gcTime: 30 * 60 * 1000,
   })
   return {
