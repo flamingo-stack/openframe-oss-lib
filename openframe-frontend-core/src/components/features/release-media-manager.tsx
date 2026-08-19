@@ -169,7 +169,7 @@ export function ReleaseMediaManager({
       {media.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <Label className="text-h6 text-ods-text-primary">Media Gallery ({media.length})</Label>
+            <Label>Media Gallery ({media.length})</Label>
             <p className="text-h6 text-ods-text-secondary">Drag to reorder</p>
           </div>
 

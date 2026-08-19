@@ -30,7 +30,7 @@
 
 import { Map as MapIcon, Wrench, Rocket, GraduationCap, LifeBuoy, type LucideIcon } from 'lucide-react'
 import { releaseStatusOptions } from '../../types'
-import { DEV_SECTION_PARAM_KEYS } from './dev-section-param-keys'
+import { DEV_SECTION_PARAM_KEYS, TICKET_OPEN_PARAM } from './dev-section-param-keys'
 
 // Roadmap status options — `as const` preserves readonly tuple typing
 // across the registry boundary.
@@ -78,6 +78,12 @@ export interface OpenframeDevSection {
     placeholder: string
     /** URL search param the input writes on submit and the list reads on fetch. */
     paramKey: string
+    /** Companion URL params torn down whenever the search commits EMPTY.
+     *  For params that deep-links set TOGETHER with the search (e.g. the
+     *  tickets `?ticket=<id>&search=<id>` pair from chat cards) — clearing
+     *  the search must clear the whole linked context, not leave a stale
+     *  companion param filtering the view. */
+    clearParamKeys?: readonly string[]
   } | null
   /** Filter pill row configuration. `null` when the section has no filter (e.g. onboarding-guides). */
   filter: {
@@ -173,7 +179,14 @@ export const OPENFRAME_DEV_SECTIONS = {
       description:
         'Open new tickets, follow up on existing ones, and track responses from the team — all in one place.',
     },
-    search: { placeholder: 'Search your tickets...', paramKey: DEV_SECTION_PARAM_KEYS.search },
+    search: {
+      placeholder: 'Search your tickets...',
+      paramKey: DEV_SECTION_PARAM_KEYS.search,
+      // Chat-card deep links arrive as `?ticket=<id>&search=<id>`
+      // (buildTicketOpenHref) — clearing the search resets the whole
+      // linked context, drawer param included.
+      clearParamKeys: [TICKET_OPEN_PARAM],
+    },
     filter: {
       label: 'Status',
       paramKey: DEV_SECTION_PARAM_KEYS.status,

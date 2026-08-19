@@ -3,6 +3,8 @@ import type {
   Consumer,
   ConsumerEvents,
   ConsumerMessages,
+  DebugEvents,
+  Events,
   JsMsg,
   MsgHdrs as NatsHeaders,
   Msg,
@@ -278,14 +280,58 @@ function mapOptionsToConnectionOptions(
   }
 }
 
-function mapNatsTypeToStatus(type: unknown): NatsStatus | null {
-  const t = String(type).toLowerCase()
-  if (t.includes('disconnect')) return 'disconnected'
-  if (t === 'reconnecting') return 'reconnecting'
-  if (t === 'reconnect' || t.includes('connect')) return 'connected'
-  if (t.includes('error')) return 'error'
-  if (t.includes('close')) return 'closed'
-  return null
+/**
+ * Map a nats.ws status event onto our own status vocabulary.
+ *
+ * Exact enum matches, never substring tests. Substring matching reported
+ * `staleConnection` and `client initiated reconnect` as CONNECTED — both
+ * contain "connect" and neither contains "disconnect" — so the wrapper
+ * announced a live connection at the exact moment the client had given up on
+ * one. Downstream that is worse than silence: `NatsProvider` reads a
+ * `connected` that follows an earlier connection as a RECONNECT and bumps
+ * `reconnectionCount`, which every subscriber takes as "the tail came back" —
+ * resubscribing against a dying client and refetching persisted history.
+ * `staleConnection` is the one an idle mobile app hits routinely: no pong
+ * within `pingInterval * maxPingOut`, i.e. after a spell in the background.
+ *
+ * `StaleConnection` maps to `disconnected` rather than being ignored on the
+ * grounds that `Disconnect` follows it anyway — it does not always. nats.ws
+ * tears the transport down by draining `bufferedAmount` first, and a
+ * black-holed socket (no FIN, which is how a mobile link usually dies) never
+ * drains, so `Disconnect` can fail to arrive at all. Reporting it is then the
+ * only honest answer available: consumers stop trusting a tail the client has
+ * already given up on. It does NOT by itself recover that connection — the
+ * retry it arms short-circuits, because a protocol that never closed still
+ * reports `isConnected()`. Getting the socket back from that state needs a
+ * force-close path the client does not currently expose.
+ *
+ * The enums arrive as arguments rather than through a module-scope import
+ * because `nats.ws` is loaded lazily (see {@link importNats}) to keep this
+ * module safe to import from a Next server bundle. A hand-copied literal is
+ * what this is undoing, so it is not reintroduced here.
+ */
+function mapNatsTypeToStatus(
+  type: Events | DebugEvents,
+  events: typeof import('nats.ws').Events,
+  debugEvents: typeof import('nats.ws').DebugEvents,
+): NatsStatus | null {
+  switch (type) {
+    case events.Disconnect:
+      return 'disconnected'
+    case events.Reconnect:
+      return 'connected'
+    case events.Error:
+      return 'error'
+    case debugEvents.Reconnecting:
+    case debugEvents.ClientInitiatedReconnect:
+      return 'reconnecting'
+    case debugEvents.StaleConnection:
+      return 'disconnected'
+    // Events.Update (cluster gossip), Events.LDM and DebugEvents.PingTimer say
+    // nothing about reachability.
+    default:
+      return null
+  }
 }
 
 /**
@@ -372,15 +418,12 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
           try {
             for await (const s of conn.status()) {
               if (signal.aborted) return
-              const mapped = mapNatsTypeToStatus((s as any)?.type)
+              const mapped = mapNatsTypeToStatus(s.type, nats.Events, nats.DebugEvents)
               if (mapped) {
                 if (mapped === 'connected' && backoff) {
                   backoff.reset()
                 }
-                emitStatus({ status: mapped, data: (s as any)?.data })
-                if (mapped === 'closed') {
-                  nc = null
-                }
+                emitStatus({ status: mapped, data: s.data })
               }
             }
           } catch (e) {
