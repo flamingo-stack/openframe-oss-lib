@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { embedAuthedFetch, setEmbedAuthAdapter } from '../embed-authed-fetch'
+import { embedAuthedFetch, needsBearerAssetFetch, setEmbedAuthAdapter } from '../embed-authed-fetch'
 
 /**
  * Tests focus on the same-origin guard rather than the proxy-auth
@@ -203,5 +203,54 @@ describe('embedAuthedFetch adapter.allowedOrigins (native-shell cross-origin san
     // must not get past the protocol gate.
     setEmbedAuthAdapter({ allowedOrigins: ['null'] })
     expect(() => embedAuthedFetch('javascript:alert(1)')).toThrow(/non-http\(s\)/i)
+  })
+})
+
+/**
+ * `needsBearerAssetFetch` decides whether a `<img>` / `<track>` URL has to be
+ * blob-fetched (see `useAuthedAssetSrc`). The signal is the adapter's
+ * `Authorization` header — i.e. the host authenticates by HEADER, so nothing
+ * the browser fetches on its own carries auth, same-origin included.
+ */
+describe('needsBearerAssetFetch (native subresources that cannot carry a header)', () => {
+  const bearer = { getHeaders: () => ({ Authorization: 'Bearer t' }) }
+
+  afterEach(() => {
+    setEmbedAuthAdapter(null)
+  })
+
+  it('is false with no adapter registered (the hub — cookies or nothing)', () => {
+    expect(needsBearerAssetFetch('/content/api/captions/release/1')).toBe(false)
+  })
+
+  it('is false in cookie mode (adapter supplies no Authorization)', () => {
+    setEmbedAuthAdapter({ getHeaders: () => ({}) })
+    expect(needsBearerAssetFetch('/content/api/captions/release/1')).toBe(false)
+  })
+
+  it('is TRUE for a relative proxy path in header-auth mode (dev-ticket web)', () => {
+    setEmbedAuthAdapter(bearer)
+    expect(needsBearerAssetFetch('/content/api/captions/release/1')).toBe(true)
+  })
+
+  it('is TRUE for an absolute same-origin URL in header-auth mode', () => {
+    setEmbedAuthAdapter(bearer)
+    expect(needsBearerAssetFetch('http://localhost:3000/content/api/image-proxy?u=x')).toBe(true)
+  })
+
+  it('is TRUE for a cross-origin gateway the adapter sanctions (native shell)', () => {
+    setEmbedAuthAdapter({ ...bearer, allowedOrigins: ['https://gateway.example'] })
+    expect(needsBearerAssetFetch('https://gateway.example/content/api/captions/release/1')).toBe(true)
+  })
+
+  it('is false for a third-party origin the bearer does not belong to', () => {
+    setEmbedAuthAdapter({ ...bearer, allowedOrigins: ['https://gateway.example'] })
+    expect(needsBearerAssetFetch('https://cdn.example.com/pic.png')).toBe(false)
+  })
+
+  it('is false for non-http(s) schemes (data:/blob: assets load natively)', () => {
+    setEmbedAuthAdapter(bearer)
+    expect(needsBearerAssetFetch('data:image/png;base64,AAAA')).toBe(false)
+    expect(needsBearerAssetFetch('blob:http://localhost:3000/abc')).toBe(false)
   })
 })
