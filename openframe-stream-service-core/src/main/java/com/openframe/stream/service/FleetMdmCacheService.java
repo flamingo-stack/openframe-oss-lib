@@ -41,7 +41,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class FleetMdmCacheService {
 
-    @Value("${fleet.mdm.base-url}")
+    /**
+     * Static Fleet base URL — the norm in per-tenant clusters (in-cluster ClusterIP URL, set in
+     * the tenant plane's base config). Optional: in the shared plane the URL is resolved per
+     * tenant by {@link FleetBaseUrlResolver} instead, and a blank value here means "no static
+     * fallback" — an unresolvable tenant's lookup is then skipped (fail closed) rather than
+     * dialed against a made-up host.
+     */
+    @Value("${fleet.mdm.base-url:}")
     private String baseUrl;
 
     @Value("${TENANT_ID:}")
@@ -199,6 +206,10 @@ public class FleetMdmCacheService {
 
     private FleetMdmClient getFleetMdmClient() {
         if (fleetMdmClient == null) {
+            if (baseUrl == null || baseUrl.isBlank()) {
+                log.warn("fleet.mdm.base-url is not configured — skipping Fleet API lookup");
+                return null;
+            }
             String apiKey = resolveApiKey();
             if (apiKey == null) {
                 return null;
@@ -227,11 +238,17 @@ public class FleetMdmCacheService {
             return getFleetMdmClient();
         }
         return clientByTenant.computeIfAbsent(eventTenantId, tenant -> {
+            String tenantBaseUrl = baseUrlFor(tenant);
+            if (tenantBaseUrl == null) {
+                // Fail closed: no resolvable Fleet for this tenant and no static fallback —
+                // skip the lookup instead of dialing a made-up host.
+                log.warn("No Fleet base URL for tenant {} — skipping Fleet API lookup", tenant);
+                return null;
+            }
             String apiKey = resolveApiKey();
             if (apiKey == null) {
                 return null;
             }
-            String tenantBaseUrl = baseUrlFor(tenant);
             log.info("Initializing FleetMdmClient for tenant {} with baseUrl: {}", tenant, tenantBaseUrl);
             return new FleetMdmClient(tenantBaseUrl, apiKey, tenant);
         });
@@ -241,19 +258,24 @@ public class FleetMdmCacheService {
      * Per-tenant base URL when a {@link FleetBaseUrlResolver} is deployed (shared cluster:
      * the tenant's Fleet lives in that tenant's cluster, addressed via its registered internal
      * DNS); the static {@code fleet.mdm.base-url} otherwise, and as the fallback when the
-     * resolver has no answer. The result is effectively memoized per tenant through
-     * {@code clientByTenant}, so a registration change requires a restart to pick up — cluster
-     * registrations are stable for a live tenant.
+     * resolver has no answer. Returns {@code null} when neither yields a URL — the caller then
+     * skips the lookup (fail closed) instead of dialing a made-up host. The result is
+     * effectively memoized per tenant through {@code clientByTenant}, so a registration change
+     * requires a restart to pick up — cluster registrations are stable for a live tenant.
      */
     String baseUrlFor(String tenantId) {
-        if (fleetBaseUrlResolver == null) {
-            return baseUrl;
+        if (fleetBaseUrlResolver != null) {
+            String resolved = fleetBaseUrlResolver.resolveBaseUrl(tenantId);
+            if (resolved != null && !resolved.isBlank()) {
+                return resolved;
+            }
         }
-        String resolved = fleetBaseUrlResolver.resolveBaseUrl(tenantId);
-        if (resolved != null && !resolved.isBlank()) {
-            return resolved;
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return null;
         }
-        log.warn("No per-tenant Fleet base URL for tenant {} — falling back to the static base url", tenantId);
+        if (fleetBaseUrlResolver != null) {
+            log.warn("No per-tenant Fleet base URL for tenant {} — falling back to the static base url", tenantId);
+        }
         return baseUrl;
     }
 

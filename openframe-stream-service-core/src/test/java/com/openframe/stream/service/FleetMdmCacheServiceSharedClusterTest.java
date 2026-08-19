@@ -37,6 +37,8 @@ class FleetMdmCacheServiceSharedClusterTest {
     void tenantClusterFallsBackToDeploymentClient() {
         IntegratedToolService toolService = mock(IntegratedToolService.class);
         FleetMdmCacheService cache = new FleetMdmCacheService(toolService, null, null);
+        // fleet.mdm.base-url is optional now; the deployment-client path needs it configured.
+        org.springframework.test.util.ReflectionTestUtils.setField(cache, "baseUrl", "http://fleet-service:8080");
 
         // The deployment-client path consults the tool doc for credentials (absent here -> null
         // result), proving the fallback is taken rather than the shared-cluster skip.
@@ -63,5 +65,33 @@ class FleetMdmCacheServiceSharedClusterTest {
         FleetMdmCacheService withoutResolver = new FleetMdmCacheService(toolService, null, null);
         org.springframework.test.util.ReflectionTestUtils.setField(withoutResolver, "baseUrl", "http://static:8080");
         assertThat(withoutResolver.baseUrlFor("tenant-a")).isEqualTo("http://static:8080");
+    }
+
+    @Test
+    @DisplayName("fail closed: resolver has no answer and no static base url -> baseUrlFor null, lookup skipped")
+    void failsClosedWithoutAnyBaseUrl() {
+        IntegratedToolService toolService = mock(IntegratedToolService.class);
+        FleetBaseUrlResolver urlResolver = org.mockito.Mockito.mock(FleetBaseUrlResolver.class);
+        org.mockito.Mockito.when(urlResolver.resolveBaseUrl("tenant-x")).thenReturn(null);
+
+        // Blank fleet.mdm.base-url (the property is optional): no fallback exists.
+        FleetMdmCacheService cache = new FleetMdmCacheService(toolService, null, urlResolver);
+        org.springframework.test.util.ReflectionTestUtils.setField(cache, "baseUrl", "");
+
+        assertThat(cache.baseUrlFor("tenant-x")).isNull();
+        // The per-tenant lookup is skipped outright: no client is built, credentials never read.
+        assertThat(cache.getQueryById(3L, "tenant-x")).isNull();
+        verifyNoInteractions(toolService);
+    }
+
+    @Test
+    @DisplayName("fail closed: blank base url and no resolver -> deployment client path also skips")
+    void deploymentClientSkipsOnBlankBaseUrl() {
+        IntegratedToolService toolService = mock(IntegratedToolService.class);
+        FleetMdmCacheService cache = new FleetMdmCacheService(toolService, null, null);
+        org.springframework.test.util.ReflectionTestUtils.setField(cache, "baseUrl", "");
+
+        assertThat(cache.getQueryById(3L, null)).isNull();
+        verifyNoInteractions(toolService);
     }
 }
