@@ -18,7 +18,7 @@ import java.util.List;
  * enum change. Raw collections for the same reason; idempotent; rollback would re-break reads.
  */
 @Slf4j
-@ChangeUnit(id = "prune-retired-onboarding-steps", order = "010", author = "openframe")
+@ChangeUnit(id = "prune-retired-onboarding-steps", order = "011", author = "openframe")
 public class PruneRetiredOnboardingStepsChangeUnit {
 
     private static final String TENANT_COLLECTION = "tenant_onboarding_progress";
