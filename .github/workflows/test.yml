@@ -176,6 +176,15 @@ jobs:
       - name: Test
         run: make -C clients/openframe-client test
 
+      - name: Lint updater (cargo fmt --check + cargo clippy -D warnings)
+        run: make -C clients/openframe-client-updater lint
+
+      - name: Build updater binary
+        run: make -C clients/openframe-client-updater build
+
+      - name: Test updater
+        run: make -C clients/openframe-client-updater test
+
 
   cleanup:
     name: Cleanup

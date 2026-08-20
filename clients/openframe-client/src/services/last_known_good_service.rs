@@ -2,7 +2,7 @@ use crate::platform::directories::DirectoryManager;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tracing::{debug, info, warn};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -14,7 +14,6 @@ struct LastKnownGood {
 pub struct LastKnownGoodService {
     anchor_file_path: PathBuf,
     boot_marker_path: PathBuf,
-    logs_dir: PathBuf,
     current_exe: PathBuf,
     reserve_path: PathBuf,
 }
@@ -23,7 +22,6 @@ impl LastKnownGoodService {
     pub fn new(directory_manager: DirectoryManager) -> Result<Self> {
         let anchor_file_path = directory_manager.secured_dir().join("last_known_good.json");
         let boot_marker_path = directory_manager.secured_dir().join("boot.marker");
-        let logs_dir = directory_manager.logs_dir().to_path_buf();
 
         directory_manager
             .ensure_directories()
@@ -39,7 +37,6 @@ impl LastKnownGoodService {
         Ok(Self {
             anchor_file_path,
             boot_marker_path,
-            logs_dir,
             current_exe,
             reserve_path,
         })
@@ -150,14 +147,6 @@ impl LastKnownGoodService {
         }
     }
 
-    pub fn reserve_path(&self) -> &Path {
-        &self.reserve_path
-    }
-
-    pub fn boot_marker_path(&self) -> &Path {
-        &self.boot_marker_path
-    }
-
     pub async fn write_boot_marker(&self) -> Result<()> {
         let temp_path = self.boot_marker_path.with_extension("marker.tmp");
         fs::write(&temp_path, env!("OPENFRAME_VERSION"))
@@ -170,53 +159,5 @@ impl LastKnownGoodService {
         })?;
         debug!("Boot marker written: {}", self.boot_marker_path.display());
         Ok(())
-    }
-
-    pub fn new_transcript_path(&self, target_version: &str) -> PathBuf {
-        self.logs_dir.join(format!(
-            "updater-{}-{}.log",
-            target_version,
-            chrono::Utc::now().format("%Y%m%d%H%M%S")
-        ))
-    }
-
-    pub async fn prune_transcripts(&self, keep: usize) {
-        let entries = match fs::read_dir(&self.logs_dir) {
-            Ok(entries) => entries,
-            Err(e) => {
-                warn!("Failed to read logs dir for transcript pruning: {}", e);
-                return;
-            }
-        };
-
-        let mut transcripts: Vec<(std::time::SystemTime, PathBuf)> = entries
-            .filter_map(|e| e.ok())
-            .filter(|e| {
-                let name = e.file_name().to_string_lossy().to_string();
-                name.starts_with("updater-") && name.ends_with(".log")
-            })
-            .filter_map(|e| {
-                e.metadata()
-                    .ok()
-                    .and_then(|m| m.modified().ok())
-                    .map(|modified| (modified, e.path()))
-            })
-            .collect();
-
-        if transcripts.len() <= keep {
-            return;
-        }
-
-        transcripts.sort_by_key(|t| std::cmp::Reverse(t.0)); // newest first
-        for (_, path) in transcripts.into_iter().skip(keep) {
-            match fs::remove_file(&path) {
-                Ok(_) => info!("Removed old updater transcript: {}", path.display()),
-                Err(e) => warn!(
-                    "Failed to remove old updater transcript {}: {}",
-                    path.display(),
-                    e
-                ),
-            }
-        }
     }
 }
