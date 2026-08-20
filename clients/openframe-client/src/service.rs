@@ -212,6 +212,7 @@ impl Service {
                         let machine_info = PersistedMachineInfo {
                             machine_id,
                             client_secret,
+                            user_id: None,
                         };
                         match machine_info_persistence::write(&machine_info) {
                             Ok(()) => info!("Machine info persisted successfully"),
