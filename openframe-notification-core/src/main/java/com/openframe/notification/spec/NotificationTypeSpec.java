@@ -1,21 +1,22 @@
 package com.openframe.notification.spec;
 
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSeverity;
 
 import java.util.Optional;
 import java.util.Set;
 
-public interface NotificationTypeSpec<C extends NotificationContext> {
+public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     NotificationType getType();
 
-    Class<C> getContextClass();
+    Class<S> getSeedClass();
 
-    // The single I/O method: resolves the context's ids into the full attribute snapshot.
+    // The single I/O method: resolves the seed's ids into the full attribute snapshot.
     // Everything below runs on its result and must stay pure.
-    Attrs enrich(C context);
+    Attrs enrich(S seed);
 
     Optional<NotificationSettingGroup> getSettingsGroup();
 
@@ -36,5 +37,5 @@ public interface NotificationTypeSpec<C extends NotificationContext> {
     }
 
     // Transitional — deleted together with the legacy context classes; do not build on it.
-    com.openframe.data.document.notification.NotificationContext buildLegacyContext(Attrs attrs);
+    NotificationContext buildLegacyContext(Attrs attrs);
 }

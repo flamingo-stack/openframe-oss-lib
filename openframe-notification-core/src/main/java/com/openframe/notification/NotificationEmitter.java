@@ -1,11 +1,12 @@
 package com.openframe.notification;
 
+import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
-import com.openframe.notification.spec.NotificationContext;
+import com.openframe.notification.spec.NotificationSeed;
 import com.openframe.notification.spec.NotificationText;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
@@ -30,11 +31,11 @@ public class NotificationEmitter {
 
     // Never throws: a notification bug must not fail the business flow that emitted it.
     public void notify(NotificationRequest request, String correlationId) {
-        NotificationContext context = request.getContext();
-        NotificationType type = context.type();
+        NotificationSeed seed = request.getSeed();
+        NotificationType type = seed.type();
         try {
             NotificationTypeSpec<?> spec = registry.require(type);
-            Attrs attrs = enrich(spec, context);
+            Attrs attrs = enrich(spec, seed);
 
             Audience declared = spec.audience(attrs);
             NotificationCommand command = buildCommand(correlationId, spec, attrs, declared);
@@ -45,12 +46,12 @@ public class NotificationEmitter {
         }
     }
 
-    // The cast is the wiring check: a context whose type() routes to a spec built for another
-    // context class fails loudly here, not with a mystery deep inside enrich().
-    private static <C extends NotificationContext> Attrs enrich(NotificationTypeSpec<C> spec,
-                                                                NotificationContext context) {
-        Class<C> contextClass = spec.getContextClass();
-        C typed = contextClass.cast(context);
+    // The cast is the wiring check: a seed whose type() routes to a spec built for another
+    // seed class fails loudly here, not with a mystery deep inside enrich().
+    private static <S extends NotificationSeed> Attrs enrich(NotificationTypeSpec<S> spec,
+                                                             NotificationSeed seed) {
+        Class<S> seedClass = spec.getSeedClass();
+        S typed = seedClass.cast(seed);
         return spec.enrich(typed);
     }
 
@@ -64,7 +65,7 @@ public class NotificationEmitter {
 
         Map<String, String> attributes = attrs.asMap();
         NotificationSeverity severity = spec.getSeverity();
-        com.openframe.data.document.notification.NotificationContext legacyContext = spec.buildLegacyContext(attrs);
+        NotificationContext legacyContext = spec.buildLegacyContext(attrs);
         NotificationType specType = spec.getType();
         return NotificationCommand.builder()
                 .type(specType)
