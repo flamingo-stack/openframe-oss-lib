@@ -17,6 +17,7 @@ pub struct InstallConfigParams {
     pub server_url: Option<String>,
     pub initial_key: Option<String>,
     pub org_id: Option<String>,
+    pub user_id: Option<String>,
     pub local_mode: bool,
     pub tags: Vec<String>,
 }
@@ -48,6 +49,7 @@ impl InstallationInitialConfigService {
             server_host: server_url,
             initial_key,
             org_id,
+            user_id: params.user_id.clone().unwrap_or_default(),
             local_mode: params.local_mode,
             tags: DeviceTag::parse_from_cli(params.tags.clone()),
             ..Default::default()
