@@ -8,6 +8,13 @@ export interface FieldWrapperProps {
   /** Label text displayed above the field */
   label?: string
   /**
+   * `id` of the control the label names. Without it the label is decoration:
+   * clicking it focuses nothing and assistive tech reads the field unnamed,
+   * which is why every caller that cared was rendering its own <Label> instead
+   * of using `label` here.
+   */
+  htmlFor?: string
+  /**
    * Status message displayed below the field, on ONE line, ellipsized on
    * overflow (full text via the native `title`).
    *
@@ -33,7 +40,7 @@ const errorVariantClasses = {
 } as const
 
 const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
-  ({ label, error, errorVariant = "error", className, children }, ref) => {
+  ({ label, htmlFor, error, errorVariant = "error", className, children }, ref) => {
     const hasChrome = label != null || error != null
 
     return (
@@ -44,7 +51,7 @@ const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
           // Field-wrapped controls with `label=`-prop controls showed two label
           // sizes side by side — the exact inconsistency the admin editors kept
           // reporting. One label scale, owned here and in Field together.
-          <Label className="mb-1">
+          <Label className="mb-1" htmlFor={htmlFor}>
             {label}
           </Label>
         )}

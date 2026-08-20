@@ -8,6 +8,17 @@
  * primitives, NOT native fullscreen) showing ONLY the video: a bare 16:9 stage
  * with the player's own controls + captions. No card chrome, no summary.
  *
+ * PLACEMENT. The same card also serves as an IN-PAGE block (`placement=
+ * "inline"`): identical hover / transport / theater grammar, but laid out by
+ * the host's flow instead of pinned, filling its container at 16:9. The
+ * overlay-only behaviours drop out with it — no fixed positioning, no
+ * z-layer, no shadow, no appear delay (nothing to stagger against an
+ * already-painted page) and no footer fade (no footer to collide with). Kept
+ * as ONE component rather than a second surface: everything below the
+ * wrapper — the player mode machine, the audio invariant, the corner map,
+ * dismissal — is placement-independent, and forking it is how the two would
+ * drift.
+ *
  * All UI lives here in the lib so every platform site AND the react-embedding
  * example mount the same component; the host supplies only the video data.
  *
@@ -105,7 +116,14 @@ export interface FloatingWalkthroughVideoProps {
   /** Cookie-based dismissal (id-match, mirrors the announcement bar). `false`
    *  disables the X entirely. `storageKey` is the per-platform cookie name. */
   dismissal?: { storageKey?: string } | false;
+  /** Fades the card out while `hideNearSelector` is in view. Floating only. */
   hideNearSelector?: string;
+  /**
+   * 'floating' (default) pins the card into a bottom corner over the page;
+   * 'inline' renders it as a plain block filling its container at 16:9, for
+   * hosts placing the video inside their own layout. See the docblock.
+   */
+  placement?: 'floating' | 'inline';
   /** Route identity from the host (the lib can't observe navigation). Changing
    *  it re-queries the footer IO target. */
   pathname?: string;
@@ -132,12 +150,17 @@ export function FloatingWalkthroughVideo({
   defaultOpenPaused,
   deepLinkParam = WALKTHROUGH_OPEN_QUERY_PARAM,
   label = 'Play Demo Video',
-  appearDelayMs = 3000,
+  placement = 'floating',
+  // An inline block is part of the page the visitor is already looking at, so
+  // staggering it in only jumps the layout. The delay exists to keep the
+  // FLOATING card off the critical path — hence a per-placement default.
+  appearDelayMs = placement === 'inline' ? 0 : 3000,
   dismissal = {},
   hideNearSelector = 'footer',
   pathname,
   className,
 }: FloatingWalkthroughVideoProps): React.ReactElement | null {
+  const inline = placement === 'inline';
   const dismissEnabled = dismissal !== false;
   const storageKey = (dismissEnabled && dismissal.storageKey) || WALKTHROUGH_VIDEO_DISMISS_KEY;
   // id-match dismissal key: a new video (new id) re-shows the card. No id
@@ -257,6 +280,12 @@ export function FloatingWalkthroughVideo({
   // --- footer fade (re-query on pathname change; null-tolerant) ---
   useEffect(() => {
     if (!mounted) return;
+    // An inline card scrolls WITH the page — fading it out over the footer
+    // would blank the very block the visitor scrolled down to.
+    if (inline) {
+      setFooterHidden(false);
+      return;
+    }
     const el = typeof document !== 'undefined' ? document.querySelector(hideNearSelector) : null;
     if (!el || typeof IntersectionObserver === 'undefined') {
       setFooterHidden(false);
@@ -268,7 +297,7 @@ export function FloatingWalkthroughVideo({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [mounted, hideNearSelector, pathname]);
+  }, [mounted, inline, hideNearSelector, pathname]);
 
   // --- tab-hidden: pause resume-mode playback, keep the timestamp ---
   useEffect(() => {
@@ -697,7 +726,10 @@ export function FloatingWalkthroughVideo({
         // badge accents off it. It must live on an element that actually
         // receives pointer events — the media layer is pointer-events-none, so
         // a group inside it can never match :hover.
-        'group/card pointer-events-auto relative overflow-hidden rounded-lg border border-ods-border bg-ods-card shadow-2xl',
+        'group/card pointer-events-auto relative overflow-hidden rounded-md border border-ods-border bg-ods-card',
+        // The lift is what separates a FLOATING card from the page beneath it;
+        // an in-flow block sitting inside a host card needs no shadow at all.
+        !inline && 'shadow-2xl',
         // MOBILE = PiP dimensions, not a shrunken desktop card. This is an
         // UNINVITED overlay on the smallest screens, so it is sized against
         // the corner-PiP conventions, NOT against system PiP (which is
@@ -713,7 +745,9 @@ export function FloatingWalkthroughVideo({
         // Do NOT go below ~150px: the corner chrome (32px transport pair +
         // 32px dismiss + the title pill) stops fitting, and the card's own
         // controls — not the poster — are what set the real floor here.
-        'aspect-video w-[min(52vw,192px)] sm:w-80 transition-opacity duration-200',
+        'aspect-video transition-opacity duration-200',
+        // Inline: the HOST owns the width — the card only keeps 16:9 within it.
+        inline ? 'w-full' : 'w-[min(52vw,192px)] sm:w-80',
         footerHidden ? 'opacity-0 pointer-events-none' : 'opacity-100',
         className,
       )}
@@ -906,18 +940,23 @@ export function FloatingWalkthroughVideo({
 
   return (
     <>
-      {showCard && (
-        <div
-          className={cn(
-            'pointer-events-none fixed bottom-0 p-[var(--spacing-system-mf)]',
-            video.position === 'right' ? 'right-0' : 'left-0',
-            WALKTHROUGH_Z,
-          )}
-          style={{ paddingBottom: 'max(var(--spacing-system-mf), env(safe-area-inset-bottom))' }}
-        >
-          {collapsed}
-        </div>
-      )}
+      {showCard &&
+        (inline ? (
+          // No wrapper: a positioning / z-index / safe-area shell around an
+          // in-flow block is exactly what stops it sizing to its container.
+          collapsed
+        ) : (
+          <div
+            className={cn(
+              'pointer-events-none fixed bottom-0 p-[var(--spacing-system-mf)]',
+              video.position === 'right' ? 'right-0' : 'left-0',
+              WALKTHROUGH_Z,
+            )}
+            style={{ paddingBottom: 'max(var(--spacing-system-mf), env(safe-area-inset-bottom))' }}
+          >
+            {collapsed}
+          </div>
+        ))}
 
       <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
         <DialogPortal>
