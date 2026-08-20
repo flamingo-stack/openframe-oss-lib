@@ -11,6 +11,7 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -27,6 +28,9 @@ public class NotificationMessage {
     private NotificationCategory category;
     private NotificationContext context;
     private NotificationEventType eventType;
+    // Additive next to context; null until the emitter sets them.
+    private String type;
+    private Map<String, String> attributes;
 
     private List<String> notificationIds;
 }

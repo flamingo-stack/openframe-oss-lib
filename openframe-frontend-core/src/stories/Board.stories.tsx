@@ -232,7 +232,10 @@ export const Pagination: Story = {
   render: function Render() {
     const TOTAL = 50
     const PAGE = 10
-    const allTickets = Array.from({ length: TOTAL }, (_, i) => baseTicket(i, 'ACTIVE'))
+    // Built once: rebuilding per render hands every card a new object, which
+    // defeats the memoization the board relies on to stay smooth under a drag.
+    const allTickets = React.useMemo(() => Array.from({ length: TOTAL }, (_, i) => baseTicket(i, 'ACTIVE')), [])
+    const loadedRef = React.useRef(PAGE)
 
     const [columns, setColumns] = React.useState<BoardColumnDef[]>([
       columnFromTicketStatus('ACTIVE', allTickets.slice(0, PAGE), { total: TOTAL, hasMore: true }),
@@ -243,13 +246,19 @@ export const Pagination: Story = {
     const handleLoadMore = (columnId: string) => {
       setColumns(prev => prev.map(c => (c.id === columnId ? { ...c, isLoadingMore: true } : c)))
       setTimeout(() => {
+        // APPEND the next page. Re-slicing the seed from 0 also threw away every
+        // drop the person had made, and a drag that auto-scrolls a lane to its
+        // bottom loads a page mid-drag — so the card silently snapped back to
+        // where it started, moments after landing where it was dropped.
+        const from = loadedRef.current
+        loadedRef.current = Math.min(from + PAGE, TOTAL)
+        const page = allTickets.slice(from, loadedRef.current)
         setColumns(prev =>
-          prev.map(c => {
-            if (c.id !== columnId) return c
-            const nextTickets = allTickets.slice(0, c.tickets.length + PAGE)
-            const hasMore = nextTickets.length < TOTAL
-            return { ...c, tickets: nextTickets, hasMore, isLoadingMore: false }
-          }),
+          prev.map(c =>
+            c.id === columnId
+              ? { ...c, tickets: [...c.tickets, ...page], hasMore: loadedRef.current < TOTAL, isLoadingMore: false }
+              : c,
+          ),
         )
       }, 600)
     }

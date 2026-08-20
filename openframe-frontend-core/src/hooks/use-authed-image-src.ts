@@ -1,93 +1,24 @@
 'use client'
 
-import { useEffect, useReducer } from 'react'
-import { embedAuthedFetch, needsBearerAssetFetch } from '../utils/embed-authed-fetch'
+import { clearAuthedAssetCache, useAuthedAssetSrc } from './use-authed-asset-src'
 
 /**
- * Resolve an image URL for hosts whose auth rides in request headers
- * instead of cookies (native shells — `capacitor://localhost`,
- * `tauri://localhost` — running in bearer mode). A native `<img>` load
- * can't carry an `Authorization` header, so a gateway image URL that
- * works on the cookie-auth web 401s in a shell. When
- * `needsBearerAssetFetch` says the URL's origin is bearer-authed, this
- * hook fetches it through `embedAuthedFetch` (bearer + deduped
- * 401-refresh-retry + the adapter's cross-origin guard) and returns a
- * blob object-URL; every other URL is returned unchanged, so on the
- * cookie-auth web the hook is a pass-through.
+ * Image flavor of `useAuthedAssetSrc` — see that hook for the full contract.
+ * Kept as its own export because it is the lib's most-used consumer (avatars,
+ * entity images, markdown `<img>`) and because hosts already import this name.
  *
- * Returns `undefined` while the fetch is in flight OR after it fails, so
- * callers show their existing initials/placeholder fallback instead of a
- * broken image; a failed fetch retries on the next mount.
- *
- * Cache: module-level, session-lifetime, keyed by full URL. Gateway image
- * URLs carry a `?v=<content-hash>` cache-buster, so a changed image is a
- * new key; entries are never revoked (avatars are a few KB — refcount
- * churn isn't worth it).
- *
- * Distinct from the legacy `useAuthenticatedImage`, which ALWAYS
- * blob-fetches with `credentials: 'include'` and its own global config.
- * This hook is pass-through-first and keys off the single auth knob the
- * lib already has: the registered `EmbedAuthAdapter`.
+ * Distinct from the legacy `useAuthenticatedImage`, which ALWAYS blob-fetches
+ * with `credentials: 'include'` and its own global config. This hook is
+ * pass-through-first and keys off the single auth knob the lib already has:
+ * the registered `EmbedAuthAdapter`.
  */
-
-const resolvedCache = new Map<string, string>()
-const inFlight = new Map<string, Promise<void>>()
-let cacheGeneration = 0
-
-/**
- * Drop every cached blob and revoke its object URL. Hosts call this at
- * session end (logout / forced re-login) so a follow-on login as a
- * different identity cannot be served blobs fetched under the previous
- * one's bearer. Fetches still in flight when the clear happens are fenced
- * by a generation counter — their results are revoked instead of cached.
- */
-export function clearAuthedImageCache(): void {
-  cacheGeneration++
-  for (const url of resolvedCache.values()) URL.revokeObjectURL(url)
-  resolvedCache.clear()
-  inFlight.clear()
-}
-
-function fetchAsBlobUrl(src: string): Promise<void> {
-  let pending = inFlight.get(src)
-  if (!pending) {
-    const startedGeneration = cacheGeneration
-    pending = embedAuthedFetch(src, { headers: { Accept: 'image/*' } })
-      .then(async response => {
-        if (!response.ok) throw new Error(`image fetch failed: ${response.status}`)
-        const blobUrl = URL.createObjectURL(await response.blob())
-        if (startedGeneration === cacheGeneration) {
-          resolvedCache.set(src, blobUrl)
-        } else {
-          URL.revokeObjectURL(blobUrl)
-        }
-      })
-      .finally(() => {
-        if (inFlight.get(src) === pending) inFlight.delete(src)
-      })
-    inFlight.set(src, pending)
-  }
-  return pending
-}
-
 export function useAuthedImageSrc(src?: string | null): string | undefined {
-  const bearerSrc = src && needsBearerAssetFetch(src) ? src : null
-  const [, rerender] = useReducer((c: number) => c + 1, 0)
-
-  useEffect(() => {
-    if (!bearerSrc || resolvedCache.has(bearerSrc)) return
-    let cancelled = false
-    fetchAsBlobUrl(bearerSrc)
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) rerender()
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [bearerSrc])
-
-  if (!src) return undefined
-  if (!bearerSrc) return src
-  return resolvedCache.get(bearerSrc)
+  return useAuthedAssetSrc(src, 'image/*')
 }
+
+/**
+ * Session-end cache drop. Now an alias of `clearAuthedAssetCache` — one cache
+ * backs every authed asset (images AND caption tracks), so hosts keep calling
+ * this single function on logout / forced re-login.
+ */
+export const clearAuthedImageCache = clearAuthedAssetCache

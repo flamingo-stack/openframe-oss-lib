@@ -21,7 +21,7 @@
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <properties>
-        <revision>999-SNAPSHOT</revision>
+        <revision>6.25.30</revision>
         <java.version>21</java.version>
         <lombok.version>1.18.30</lombok.version>
         <spring-data-mongodb.version>4.2.0</spring-data-mongodb.version>
@@ -48,6 +48,7 @@
         <module>openframe-data-redis</module>
         <module>openframe-presence</module>
         <module>openframe-notification-mail</module>
+        <module>openframe-notification-core</module>
         <module>openframe-data-kafka</module>
         <module>openframe-api-lib</module>
         <module>openframe-data-cassandra</module>
@@ -134,6 +135,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-notification-mail</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-notification-core</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

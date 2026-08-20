@@ -5,7 +5,9 @@ import { EP } from '../config/endpoints'
 /**
  * Onboarding guide detail — config-only. The lib `<OnboardingGuideDetailView>`
  * fetches the guide internally; this page supplies only the route **slug** and
- * the **api route** (`EP.onboardingBySlug`).
+ * the **api route** (`EP.onboardingBySlug`). Caption `<track>` URLs are built
+ * by the view itself via the runtime endpoints (proxied automatically — see
+ * README "Video captions").
  */
 export function OnboardingDetailPage() {
   const { slug = '' } = useParams()

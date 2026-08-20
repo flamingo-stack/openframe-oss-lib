@@ -26,17 +26,24 @@ export interface NatsReconnectionBackoff {
 export interface SharedConnection {
   wsUrl: string
   client: NatsClient
-  connectPromise: Promise<void> | null
   refCount: number
   closeTimer: ReturnType<typeof setTimeout> | null
   retryTimer: ReturnType<typeof setTimeout> | null
   /**
-   * Identity of the consumer driving reconnect. When set, other consumers
-   * should observe status only and skip their own scheduleRetry — otherwise
-   * each disconnect triggers multiple concurrent connect() calls racing over
-   * connectPromise.
+   * The lifecycle driving reconnect, held as its own `scheduleRetry`. When set,
+   * other consumers observe status only and skip their own scheduleRetry —
+   * otherwise every disconnect starts one backoff schedule per attached
+   * consumer, all dialling the same connection on their own clocks.
    */
-  retryOwner: object | null
+  retryOwner: (() => void) | null
+  /**
+   * The `scheduleRetry` of every lifecycle currently observing this connection,
+   * in attach order — the same value that goes into `retryOwner`, so a
+   * lifecycle has one identity rather than two. Only the owner drives
+   * reconnect, so when it gives the loop up the roster is what a successor is
+   * found in; see {@link handOffRetry}.
+   */
+  retrySchedulers: Set<() => void>
 }
 
 export interface AcquireClientOptions {
@@ -99,11 +106,11 @@ export function acquireClient(url: string, opts?: AcquireClientOptions): SharedC
     conn = {
       wsUrl: url,
       client,
-      connectPromise: null,
       refCount: 0,
       closeTimer: null,
       retryTimer: null,
       retryOwner: null,
+      retrySchedulers: new Set(),
     }
     connections.set(url, conn)
   }
@@ -146,11 +153,13 @@ export function getSharedConnectionFor(url: string | null | undefined): SharedCo
 
 // ---------------------------------------------------------------------------
 // Connection lifecycle: retry + status loop, shared by NatsProvider and the
-// chat hooks. Each consumer that wants to drive reconnect creates an
-// ownerToken and calls startConnectionLifecycle(). The first caller to claim
-// retryOwner runs the actual retry loop; subsequent claimants observe status
-// only. When the owner unmounts and releases retryOwner, the next status
-// event lets a surviving consumer pick up ownership opportunistically.
+// chat hooks. Every consumer that wants to observe or drive reconnect calls
+// startConnectionLifecycle(). The first to claim retryOwner runs the actual
+// retry loop; later attachers observe status only. When the owner gives the
+// loop up it is handed to a survivor if the connection still needs one; while
+// the connection is healthy no handoff is needed, because the next status
+// event lets a survivor claim ownership opportunistically inside
+// scheduleRetry.
 // ---------------------------------------------------------------------------
 
 export interface ConnectionLifecycleOptions {
@@ -176,14 +185,30 @@ export interface ConnectionLifecycleHandle {
 
 const defaultShouldRetryOn = (status: NatsStatus) => status === 'closed' || status === 'disconnected'
 
+/**
+ * Offer the retry loop to another lifecycle on this connection.
+ *
+ * A retry is only ever armed from a status event or a failed dial, and a
+ * connection that is already down produces neither on its own — so whenever
+ * the owner gives the loop up while the connection still needs dialling, a
+ * successor has to be pushed rather than left waiting for an event that is not
+ * coming.
+ *
+ * Candidates that cannot service this URL decline inside `scheduleRetry`, so
+ * this walks the roster until one actually takes it. Callers must clear any
+ * timer of their own first: a successor that claims while a timer is still
+ * armed will not arm one, and the departing owner's timer no longer speaks for
+ * the connection.
+ */
+function handOffRetry(conn: SharedConnection): void {
+  for (const takeOver of conn.retrySchedulers) {
+    takeOver()
+    if (conn.retryOwner) return
+  }
+}
+
 export function startConnectionLifecycle(options: ConnectionLifecycleOptions): ConnectionLifecycleHandle {
   const { conn, wsUrl } = options
-  // Each lifecycle gets its own identity for retry ownership. The first lifecycle to claim
-  // an unowned connection drives reconnect; later attachers observe status only until the
-  // owner releases (see opportunistic claim in scheduleRetry).
-  const ownerToken = {}
-  if (!conn.retryOwner) conn.retryOwner = ownerToken
-
   let closed = false
   let retryAttempt = 0
 
@@ -195,16 +220,33 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
     }
   }
 
+  // A lifecycle's identity IS its `scheduleRetry`: that function goes on the
+  // connection's roster and, for whichever lifecycle holds the loop, into
+  // `retryOwner` — one identity, not two.
+  conn.retrySchedulers.add(scheduleRetry)
+  if (!conn.retryOwner) conn.retryOwner = scheduleRetry
+
   function scheduleRetry() {
     if (closed) return
     if (getSharedConnectionFor(wsUrl) !== conn) return
-    if (!conn.retryOwner) conn.retryOwner = ownerToken
-    if (conn.retryOwner !== ownerToken) return
+    // This lifecycle now wants a different URL, so it must not drive this
+    // connection — not from its own status events, and not as a handoff
+    // successor. Without the guard, two consumers that had both moved on
+    // passed ownership back and forth indefinitely, running onBeforeReconnect
+    // — a token refresh in the real callers — on every pass and dialling
+    // nothing. The armed callback re-checks, because the URL can move between
+    // arming and firing.
+    if (options.getFreshUrl() !== wsUrl) return
+    if (!conn.retryOwner) conn.retryOwner = scheduleRetry
+    if (conn.retryOwner !== scheduleRetry) return
 
-    if (conn.retryTimer) {
-      clearTimeout(conn.retryTimer)
-      conn.retryTimer = null
-    }
+    // One outage can raise more than one status: nats.ws reports
+    // `staleConnection` and then, once the transport is down, `disconnect`.
+    // Re-arming on the second would spend a backoff tier on the same outage —
+    // on the defaults, waiting 2000ms where the caller asked for 1000. The
+    // armed timer re-validates everything when it fires, so the first one
+    // scheduled for an outage is always the right one to keep.
+    if (conn.retryTimer) return
 
     const cfg = options.backoff ?? {}
     const fastRetries = cfg.fastRetries ?? 0
@@ -225,6 +267,16 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
       if (closed) return
       if (getSharedConnectionFor(wsUrl) !== conn) return
 
+      // Nothing to reconnect. Reached when the dial that was already in flight
+      // succeeded while this retry sat in its backoff — a handoff during a
+      // healthy first connect is enough to get here — and `onBeforeReconnect`
+      // is a token refresh in the real callers, so it must not run on a
+      // connection that came back on its own.
+      if (conn.client.isConnected()) {
+        retryAttempt = 0
+        return
+      }
+
       try {
         await options.onBeforeReconnect?.()
       } catch {
@@ -234,17 +286,33 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
       if (getSharedConnectionFor(wsUrl) !== conn) return
 
       const freshUrl = options.getFreshUrl()
-      if (freshUrl !== wsUrl) return
+      if (freshUrl !== wsUrl) {
+        // This lifecycle has moved to a different URL, so it must not dial this
+        // connection again while holding the loop — that is the dead end the
+        // rest of this module exists to avoid. Give the loop up and push it to
+        // someone still on this URL.
+        if (conn.retryOwner === scheduleRetry) {
+          conn.retryOwner = null
+          // A status that landed while the refresh above was awaited can have
+          // armed a new timer under this ownership. It belongs to a lifecycle
+          // that is leaving, and a successor claiming while it is armed would
+          // return early believing the loop is covered — then this timer fires,
+          // finds someone else owns the loop, and bails without handing on.
+          if (conn.retryTimer) {
+            clearTimeout(conn.retryTimer)
+            conn.retryTimer = null
+          }
+          handOffRetry(conn)
+        }
+        return
+      }
 
       try {
-        conn.connectPromise = null
-        conn.connectPromise = conn.client.connect()
-        await conn.connectPromise
+        await conn.client.connect()
         if (!closed && getSharedConnectionFor(wsUrl) === conn) {
           retryAttempt = 0
         }
       } catch {
-        conn.connectPromise = null
         if (!closed && getSharedConnectionFor(wsUrl) === conn) {
           scheduleRetry()
         }
@@ -269,12 +337,20 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
     emitSynthetic('connected')
   }
 
+  // Dial through the client rather than caching a promise on the connection.
+  // A `conn.connectPromise` used to be assigned here with `||=` and then left
+  // in place after a SUCCESSFUL connect, so it doubled as "this connection has
+  // been dialled at some point": a consumer that acquired a still-cached
+  // connection whose socket had since died joined that long-settled promise
+  // instead of dialling. No connect, no failure, so nothing scheduled a retry,
+  // and no status event was coming to arm one either — the connection stayed
+  // dead for as long as anything held a reference to it. `NatsClient.connect()`
+  // already short-circuits on a live connection and joins its own in-flight
+  // dial, so the second copy of that bookkeeping bought nothing.
   void (async () => {
     try {
-      conn.connectPromise ||= conn.client.connect()
-      await conn.connectPromise
+      await conn.client.connect()
     } catch {
-      conn.connectPromise = null
       if (closed) return
 
       emitSynthetic('disconnected')
@@ -286,13 +362,33 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
     stop() {
       closed = true
       unsubStatus()
+      conn.retrySchedulers.delete(scheduleRetry)
+
+      if (conn.retryOwner !== scheduleRetry) {
+        // Not ours to cancel. `retryTimer` lives on the CONNECTION, and
+        // clearing it unconditionally cancelled the owner's armed retry — so
+        // any consumer merely re-running its effect (an `enabled` toggle, a
+        // dialog closing, a route change) during a backoff killed reconnect
+        // for everyone. Nothing rescheduled it either, for the reason
+        // handOffRetry exists. The connection stayed down for good.
+        return
+      }
+
+      conn.retryOwner = null
+      const wasRetrying = conn.retryTimer !== null
       if (conn.retryTimer) {
         clearTimeout(conn.retryTimer)
         conn.retryTimer = null
       }
-      if (conn.retryOwner === ownerToken) {
-        conn.retryOwner = null
-      }
+
+      // A healthy connection with nothing armed needs no successor: the next
+      // disconnect lets a survivor claim opportunistically. `wasRetrying` is
+      // read before the clearTimeout above, and the remaining case — the timer
+      // already fired and its callback is mid-dial — is caught by the
+      // connection not being connected. The successor backs off on its OWN
+      // attempt counter, which is zero unless it has driven the loop before.
+      if (!wasRetrying && conn.client.isConnected()) return
+      handOffRetry(conn)
     },
   }
 }

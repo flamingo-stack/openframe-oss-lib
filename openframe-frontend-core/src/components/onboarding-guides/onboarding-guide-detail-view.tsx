@@ -29,7 +29,7 @@ import { EntityVideoSection } from '../features/entity-video-section'
 import { VideoBitesStrip } from '../features/video-bites-strip'
 import { toStripProfile } from '../features/video-bites-shared'
 import { useVideoWarmup } from '../features/use-video-warmup'
-import { getCaptionsUrl } from '../features/captions-url'
+import { useCaptions } from '../features/use-captions'
 import { RichMarkdownRenderer } from '../ui/markdown'
 import { EntityTagBadges } from '../features/entity-tag-badges'
 import { LoadError } from '../ui/error-state'
@@ -103,6 +103,7 @@ export function OnboardingGuideDetailView({
 }: OnboardingGuideDetailViewProps) {
   const resolvedBackHref = backHref ?? basePath
   const runtime = useChatRuntime()
+  const captions = useCaptions()
   const router = useRouter()
   // `shell` true → standalone `<PageShell>`; false → padding-only box (no nested
   // <main>) for hosts whose layout already provides the container.
@@ -137,8 +138,9 @@ export function OnboardingGuideDetailView({
     )
   }
 
-  const captionsUrl = getCaptionsUrl('onboarding_guide', guide.id, guide.srt_content)
-  const highlightCaptionsUrl = getCaptionsUrl('onboarding_guide', guide.id, guide.highlight_srt_content, { variant: 'highlight' })
+  // Track URLs via the ONE captions configurer (`useCaptions`); same-origin
+  // hosts get the relative `/api/captions/...` default. Zero per-page wiring.
+  const { captionsUrl, highlightCaptionsUrl } = captions.forEntity('onboarding_guide', guide)
 
   const videoPoster =
     guide.main_video_thumbnail ||
