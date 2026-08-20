@@ -76,6 +76,12 @@ export interface BoardColumnDef {
   statusKey?: string
   label: string
   color: string
+  /**
+   * What this column's status means, shown from an info icon in the header
+   * (e.g. the system-status descriptions from the status settings page). No
+   * icon is rendered when absent.
+   */
+  tooltip?: string
   tickets: BoardTicket[]
 
   total?: number
@@ -117,6 +123,7 @@ export function columnFromTicketStatus(
     id: status,
     label: overrides.label ?? defaults.label,
     color: overrides.color ?? defaults.color,
+    tooltip: overrides.tooltip,
     tickets,
     total: overrides.total,
     hasMore: overrides.hasMore,
