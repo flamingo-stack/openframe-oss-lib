@@ -13,6 +13,8 @@ const RECORD_KEY: &str = "MachineInfo";
 pub struct PersistedMachineInfo {
     pub machine_id: String,
     pub client_secret: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
 }
 
 // Manual Debug so `{:?}` never leaks the live client secret.
@@ -21,6 +23,7 @@ impl std::fmt::Debug for PersistedMachineInfo {
         f.debug_struct("PersistedMachineInfo")
             .field("machine_id", &self.machine_id)
             .field("client_secret", &"<redacted>")
+            .field("user_id", &self.user_id)
             .finish()
     }
 }
@@ -65,7 +68,8 @@ fn deserialize(raw: &str) -> Result<PersistedMachineInfo> {
     Ok(info)
 }
 
-/// Reject records missing either field.
+/// Reject records missing either field. `user_id` is optional and never validated —
+/// records written before the field existed must keep loading.
 fn ensure_complete(info: &PersistedMachineInfo) -> Result<()> {
     if info.machine_id.trim().is_empty() || info.client_secret.trim().is_empty() {
         anyhow::bail!("Persisted machine info is incomplete (empty field)");
@@ -386,3 +390,7 @@ fn repair_permissions() -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "machine_info_persistence_tests.rs"]
+mod tests;
