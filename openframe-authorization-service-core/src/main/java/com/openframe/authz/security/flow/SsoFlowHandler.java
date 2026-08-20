@@ -94,7 +94,9 @@ public interface SsoFlowHandler {
         clearCookie(response, flowCookie.getName());
         String path = "/oauth/continue?tenantId=" +
                 encode(tenantId, UTF_8);
-        // TODO: Add redirectTo support for local debugging
+        if (redirectTo != null && !redirectTo.isBlank()) {
+            path += "&redirectTo=" + encode(redirectTo, UTF_8);
+        }
         foundAtRoot(response, path);
     }
 }
