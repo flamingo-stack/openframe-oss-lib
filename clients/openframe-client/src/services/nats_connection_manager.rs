@@ -1,7 +1,9 @@
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
-use crate::services::{AgentAuthService, InitialConfigurationService};
+use crate::services::{
+    AgentAuthService, InitialConfigurationService, MachineIdService, MACHINE_ID_HEADER,
+};
 use anyhow::{Context, Result};
 use async_nats::{Client, Event};
 use log::error;
@@ -25,6 +27,7 @@ pub struct NatsConnectionManager {
     initial_configuration_service: InitialConfigurationService,
     auth_service: AgentAuthService,
     deactivation: Arc<DeactivationService>,
+    machine_id_service: MachineIdService,
 }
 
 impl NatsConnectionManager {
@@ -38,6 +41,7 @@ impl NatsConnectionManager {
         auth_service: AgentAuthService,
         tls_config_provider: LocalTlsConfigProvider,
         deactivation: Arc<DeactivationService>,
+        machine_id_service: MachineIdService,
     ) -> Self {
         let (reconnect_tx, _) = broadcast::channel(16);
         Self {
@@ -49,6 +53,7 @@ impl NatsConnectionManager {
             initial_configuration_service,
             auth_service,
             deactivation,
+            machine_id_service,
         }
     }
 
@@ -57,7 +62,9 @@ impl NatsConnectionManager {
     }
 
     pub async fn connect(&self) -> Result<()> {
+        // Server-assigned machine_id names the NATS connection; the local one goes in the header
         let machine_id = self.config_service.get_machine_id()?;
+        let local_machine_id = self.machine_id_service.get();
 
         info!(
             hostname = %self.nats_server_url,
@@ -129,7 +136,7 @@ impl NatsConnectionManager {
                     .await
                 }
             })
-            .custom_header("X-MACHINE-ID", &machine_id);
+            .custom_header(MACHINE_ID_HEADER, &local_machine_id);
 
         // Only add TLS config in development mode
         if self.initial_configuration_service.is_local_mode()? {

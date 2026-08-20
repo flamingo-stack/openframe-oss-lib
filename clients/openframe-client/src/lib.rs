@@ -87,6 +87,7 @@ use crate::services::{
     InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
     UpdateStateService,
 };
+use crate::services::{MachineIdService, MACHINE_ID_HEADER};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -208,8 +209,21 @@ impl Client {
         let config_service = AgentConfigurationService::new(directory_manager.clone())
             .context("Failed to initialize device configuration service")?;
 
+        let machine_id_service = MachineIdService::new(&directory_manager);
+        let machine_id = machine_id_service
+            .get_or_create()
+            .context("Failed to get or create machine ID")?;
+
+        let mut default_headers = reqwest::header::HeaderMap::new();
+        default_headers.insert(
+            MACHINE_ID_HEADER,
+            reqwest::header::HeaderValue::from_str(&machine_id)
+                .context("Invalid machine ID for header")?,
+        );
+
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(HTTP_CLIENT_TIMEOUT_SECS))
+            .default_headers(default_headers.clone())
             // disable TLS verification for dev mode only
             .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
             .no_proxy()
@@ -220,6 +234,7 @@ impl Client {
 
         let download_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(DOWNLOAD_CLIENT_TIMEOUT_SECS))
+            .default_headers(default_headers)
             .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
             .no_proxy()
             .pool_max_idle_per_host(0)
@@ -295,6 +310,7 @@ impl Client {
             auth_service.clone(),
             tls_config_provider,
             deactivation_service.clone(),
+            machine_id_service.clone(),
         );
 
         // Initialize tool agent file client
