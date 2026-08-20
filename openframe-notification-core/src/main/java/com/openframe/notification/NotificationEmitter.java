@@ -35,7 +35,7 @@ public class NotificationEmitter {
         NotificationType type = seed.type();
         try {
             NotificationTypeSpec<?> spec = registry.require(type);
-            Attrs attrs = enrich(spec, seed);
+            Attrs attrs = mapToAttrs(spec, seed);
 
             Audience declared = spec.audience(attrs);
             NotificationCommand command = buildCommand(correlationId, spec, attrs, declared);
@@ -47,12 +47,12 @@ public class NotificationEmitter {
     }
 
     // The cast is the wiring check: a seed whose type() routes to a spec built for another
-    // seed class fails loudly here, not with a mystery deep inside enrich().
-    private static <S extends NotificationSeed> Attrs enrich(NotificationTypeSpec<S> spec,
-                                                             NotificationSeed seed) {
+    // seed class fails loudly here, not with a mystery deep inside the spec.
+    private static <S extends NotificationSeed> Attrs mapToAttrs(NotificationTypeSpec<S> spec,
+                                                                 NotificationSeed seed) {
         Class<S> seedClass = spec.getSeedClass();
         S typed = seedClass.cast(seed);
-        return spec.enrich(typed);
+        return spec.attrs(typed);
     }
 
     private static NotificationCommand buildCommand(String correlationId,

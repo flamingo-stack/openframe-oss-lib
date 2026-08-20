@@ -14,9 +14,9 @@ public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     Class<S> getSeedClass();
 
-    // The single I/O method: resolves the seed's ids into the full attribute snapshot.
-    // Everything below runs on its result and must stay pure.
-    Attrs enrich(S seed);
+    // Pure seed → stored-attributes mapping. No I/O in specs: the seed arrives self-contained,
+    // and a fetch here would re-read what the producer already held at the emitting moment.
+    Attrs attrs(S seed);
 
     Optional<NotificationSettingGroup> getSettingsGroup();
 

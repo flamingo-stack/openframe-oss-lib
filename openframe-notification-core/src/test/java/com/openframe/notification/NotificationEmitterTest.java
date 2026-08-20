@@ -40,7 +40,7 @@ class NotificationEmitterTest {
 
     private enum TestType implements NotificationType { TEST_TYPE, UNREGISTERED }
 
-    private record TestSeed(String ticketId) implements NotificationSeed {
+    private record TestSeed(String ticketId, String assigneeUserId) implements NotificationSeed {
         @Override public NotificationType type() { return TestType.TEST_TYPE; }
     }
 
@@ -66,9 +66,9 @@ class NotificationEmitterTest {
     }
 
     @Test
-    @DisplayName("The pipeline in one pass: typed seed → enrich → compose/audience → command with type, attributes and legacy context")
+    @DisplayName("The pipeline in one pass: typed seed → attrs mapping → compose/audience → command with type, attributes and legacy context")
     void happy_path_builds_the_full_command() {
-        NotificationRequest request = NotificationRequest.of(new TestSeed("t-1"));
+        NotificationRequest request = NotificationRequest.of(new TestSeed("t-1", "u-9"));
 
         emitter.notify(request, "corr-1");
 
@@ -77,7 +77,7 @@ class NotificationEmitterTest {
         NotificationCommand sent = command.getValue();
         assertThat(sent.getType()).isEqualTo(TestType.TEST_TYPE);
         assertThat(sent.getAttributes())
-                .as("enrich() laid the snapshot fact on top of the seed's event fact")
+                .as("attrs() mapped the self-contained seed to the stored snapshot")
                 .containsEntry("ticketId", "t-1")
                 .containsEntry("assigneeUserId", "u-9");
         assertThat(sent.getTitle()).isEqualTo("Ticket t-1");
@@ -118,8 +118,8 @@ class NotificationEmitterTest {
         @Override public NotificationSeverity getSeverity() { return NotificationSeverity.INFO; }
         @Override public Audience audience(Attrs attrs) { return audience; }
 
-        @Override public Attrs enrich(TestSeed seed) {
-            return Attrs.of(Map.of("ticketId", seed.ticketId())).with(ASSIGNEE, "u-9");
+        @Override public Attrs attrs(TestSeed seed) {
+            return Attrs.of(Map.of("ticketId", seed.ticketId())).with(ASSIGNEE, seed.assigneeUserId());
         }
 
         @Override public NotificationText compose(Attrs attrs) {
