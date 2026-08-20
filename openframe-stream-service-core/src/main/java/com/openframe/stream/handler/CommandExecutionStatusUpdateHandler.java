@@ -6,6 +6,7 @@ import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.CommandExecutionRepository;
+import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class CommandExecutionStatusUpdateHandler
     private static final String FIELD_ERROR = "error";
 
     private final CommandExecutionRepository commandExecutionRepository;
+    private final RmmExecutionMetrics executionMetrics;
 
     @Override
     public EventHandlerType getType() {
@@ -111,6 +113,7 @@ public class CommandExecutionStatusUpdateHandler
         row.setStderrTruncated(truncStderr.truncated);
 
         commandExecutionRepository.save(row);
+        executionMetrics.recordCompleted(RmmExecutionMetrics.KIND_COMMAND, newStatus, row.getDispatchedAt(), now);
         log.info("Transitioned CommandExecution row: executionId={} machineId={} status=RUNNING→{} exitCode={} timedOut={}",
                 row.getExecutionId(), row.getMachineId(), newStatus, exitCode, timedOut);
     }
