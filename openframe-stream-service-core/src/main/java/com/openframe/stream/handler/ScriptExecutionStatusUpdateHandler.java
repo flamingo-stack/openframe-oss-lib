@@ -8,6 +8,7 @@ import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import com.openframe.stream.service.ScheduleScriptExecutionAggregator;
@@ -58,6 +59,7 @@ public class ScriptExecutionStatusUpdateHandler
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionAggregator scheduleScriptExecutionAggregator;
     private final DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
+    private final RmmExecutionMetrics executionMetrics;
 
     @Override
     public EventHandlerType getType() {
@@ -169,6 +171,7 @@ public class ScriptExecutionStatusUpdateHandler
         row.setStderrTruncated(truncStderr.truncated);
 
         scriptExecutionRepository.save(row);
+        executionMetrics.recordCompleted(RmmExecutionMetrics.KIND_SCRIPT, newStatus, row.getDispatchedAt(), now);
         log.info("Transitioned Execution row: executionId={} status=RUNNING→{} exitCode={} timedOut={}",
                 row.getExecutionId(), newStatus, exitCode, timedOut);
     }
