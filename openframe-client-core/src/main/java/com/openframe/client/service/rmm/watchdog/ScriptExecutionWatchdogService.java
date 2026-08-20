@@ -1,13 +1,12 @@
 package com.openframe.client.service.rmm.watchdog;
 
+import com.openframe.client.metrics.ScriptExecutionWatchdogMetrics;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
-import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -21,14 +20,9 @@ public class ScriptExecutionWatchdogService {
 
     private static final String STUCK_ERROR_MESSAGE_FORMAT = "No result received within %d seconds; watchdog marked execution as failed";
 
-    private static final String REAPED_COUNTER = "openframe.rmm.execution.watchdog.reaped";
-    private static final String TAG_KIND = "kind";
-    private static final String KIND_SCRIPT = "script";
-
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleJobExecutionWatchdogService headerWatchdogService;
-    @Nullable
-    private final MeterRegistry meterRegistry;
+    private final ScriptExecutionWatchdogMetrics watchdogMetrics;
 
     @Value("${openframe.rmm.execution.watchdog.grace-seconds:120}")
     private long graceSeconds;
@@ -56,9 +50,7 @@ public class ScriptExecutionWatchdogService {
         log.info("Found {} stuck Execution row(s) — transitioning to FAILED", stuck.size());
         stuck.forEach(row -> markFailing(row, now));
         scriptExecutionRepository.saveAll(stuck);
-        if (meterRegistry != null) {
-            meterRegistry.counter(REAPED_COUNTER, TAG_KIND, KIND_SCRIPT).increment(stuck.size());
-        }
+        watchdogMetrics.recordScriptReaped(stuck.size());
 
         log.info("Marked {} Execution row(s) as FAILED", stuck.size());
 
