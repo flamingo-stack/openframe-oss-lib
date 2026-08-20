@@ -6,6 +6,7 @@ import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
+import com.openframe.notification.spec.NotificationSeed;
 import com.openframe.notification.spec.NotificationText;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
@@ -30,10 +31,11 @@ public class NotificationEmitter {
 
     // Never throws: a notification bug must not fail the business flow that emitted it.
     public void notify(NotificationRequest request, String correlationId) {
-        NotificationType type = request.getType();
+        NotificationSeed seed = request.getSeed();
+        NotificationType type = seed.type();
         try {
-            NotificationTypeSpec spec = registry.require(type);
-            Attrs attrs = Attrs.validated(spec, request.getAttrs());
+            NotificationTypeSpec<?> spec = registry.require(type);
+            Attrs attrs = mapToAttrs(spec, seed);
 
             Audience declared = spec.audience(attrs);
             NotificationCommand command = buildCommand(correlationId, spec, attrs, declared);
@@ -44,8 +46,17 @@ public class NotificationEmitter {
         }
     }
 
+    // The cast is the wiring check: a seed whose type() routes to a spec built for another
+    // seed class fails loudly here, not with a mystery deep inside the spec.
+    private static <S extends NotificationSeed> Attrs mapToAttrs(NotificationTypeSpec<S> spec,
+                                                                 NotificationSeed seed) {
+        Class<S> seedClass = spec.getSeedClass();
+        S typed = seedClass.cast(seed);
+        return spec.attrs(typed);
+    }
+
     private static NotificationCommand buildCommand(String correlationId,
-                                                    NotificationTypeSpec spec,
+                                                    NotificationTypeSpec<?> spec,
                                                     Attrs attrs,
                                                     Audience audience) {
         NotificationText text = spec.compose(attrs);

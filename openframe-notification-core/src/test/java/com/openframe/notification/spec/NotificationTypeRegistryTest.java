@@ -17,7 +17,7 @@ class NotificationTypeRegistryTest {
 
     @Test
     void resolves_registered_spec_by_type() {
-        NotificationTypeSpec spec = spec(TestType.TICKET_ASSIGNED);
+        NotificationTypeSpec<?> spec = spec(TestType.TICKET_ASSIGNED);
 
         NotificationTypeRegistry registry = new NotificationTypeRegistry(provider(spec));
 
@@ -37,7 +37,7 @@ class NotificationTypeRegistryTest {
     @Test
     @DisplayName("Two specs claiming one type kill the context at startup, not a random one at runtime")
     void duplicate_type_fails_fast() {
-        ObjectProvider<NotificationTypeSpec> duplicates =
+        ObjectProvider<NotificationTypeSpec<?>> duplicates =
                 provider(spec(TestType.TICKET_ASSIGNED), spec(TestType.TICKET_ASSIGNED));
 
         assertThatThrownBy(() -> new NotificationTypeRegistry(duplicates))
@@ -46,14 +46,14 @@ class NotificationTypeRegistryTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static ObjectProvider<NotificationTypeSpec> provider(NotificationTypeSpec... specs) {
-        ObjectProvider<NotificationTypeSpec> provider = mock(ObjectProvider.class);
+    private static ObjectProvider<NotificationTypeSpec<?>> provider(NotificationTypeSpec<?>... specs) {
+        ObjectProvider<NotificationTypeSpec<?>> provider = mock(ObjectProvider.class);
         when(provider.stream()).thenReturn(Stream.of(specs));
         return provider;
     }
 
-    private static NotificationTypeSpec spec(NotificationType type) {
-        NotificationTypeSpec spec = mock(NotificationTypeSpec.class);
+    private static NotificationTypeSpec<?> spec(NotificationType type) {
+        NotificationTypeSpec<?> spec = mock(NotificationTypeSpec.class);
         when(spec.getType()).thenReturn(type);
         return spec;
     }

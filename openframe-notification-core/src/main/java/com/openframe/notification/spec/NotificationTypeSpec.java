@@ -8,15 +8,15 @@ import com.openframe.data.document.notification.NotificationSeverity;
 import java.util.Optional;
 import java.util.Set;
 
-public interface NotificationTypeSpec {
+public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     NotificationType getType();
 
-    Set<AttrKey> getRequiredKeys();
+    Class<S> getSeedClass();
 
-    default Set<AttrKey> getOptionalKeys() {
-        return Set.of();
-    }
+    // Pure seed → stored-attributes mapping. No I/O in specs: the seed arrives self-contained,
+    // and a fetch here would re-read what the producer already held at the emitting moment.
+    Attrs attrs(S seed);
 
     Optional<NotificationSettingGroup> getSettingsGroup();
 
@@ -36,6 +36,6 @@ public interface NotificationTypeSpec {
         return Set.of();
     }
 
-    // Transitional — deleted together with the context classes; do not build on it.
+    // Transitional — deleted together with the legacy context classes; do not build on it.
     NotificationContext buildLegacyContext(Attrs attrs);
 }
