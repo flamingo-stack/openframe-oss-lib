@@ -17,8 +17,8 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import type { WalkthroughVideoData } from './floating-walkthrough-video';
 import { useCaptions } from './use-captions';
+import type { WalkthroughVideoData } from './walkthrough-video';
 
 export interface UseWalkthroughVideoOptions {
   /** Absolute or proxied URL of the public GET route. */
