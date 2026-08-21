@@ -356,7 +356,7 @@ export const ProgressSizeComparison: Story = {
 export const WithTitleTag: Story = {
   args: {
     value: 75,
-    titleTag: <Tag variant="outline" label="AI-Assistance" />,
+    titleTag: <Tag variant="outline" label="AI Handling" />,
   },
   parameters: {
     docs: {

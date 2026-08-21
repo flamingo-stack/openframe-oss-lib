@@ -106,7 +106,7 @@ export interface BoardChange {
 
 const STATUS_DEFAULTS: Record<TicketStatus, { label: string; color: string }> = {
   ACTIVE: { label: 'Active', color: '#5ea62e' },
-  AI_ASSISTANCE: { label: 'AI Assistance', color: '#888888' },
+  AI_ASSISTANCE: { label: 'AI Handling', color: '#888888' },
   TECH_REQUIRED: { label: 'Tech Required', color: '#e1b32f' },
   ON_HOLD: { label: 'On Hold', color: '#f36666' },
   RESOLVED: { label: 'Resolved', color: '#888888' },

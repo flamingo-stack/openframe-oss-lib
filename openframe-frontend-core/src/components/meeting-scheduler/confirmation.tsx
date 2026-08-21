@@ -27,7 +27,7 @@ export function Confirmation({ confirmation, timezone }: ConfirmationProps) {
   }).format(new Date(confirmation.startTimeMs))
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-md)] text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-m)] text-center">
       <p className="text-h1" role="img" aria-label="Celebration">
         🎉
       </p>
