@@ -13,9 +13,11 @@ import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import com.openframe.stream.service.ScheduleScriptExecutionAggregator;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,6 +45,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     private static final String MACHINE_ID = "machine-42";
     private static final String SCRIPT_ID = "script-1";
     private static final String SCHEDULE_ID = "sched-1";
+    private static final String COMPLETED_COUNTER = "openframe.rmm.execution.completed";
 
     @Mock
     private ScriptExecutionRepository scriptExecutionRepository;
@@ -53,11 +56,12 @@ class ScriptExecutionStatusUpdateHandlerTest {
 
     private ScriptExecutionStatusUpdateHandler handler;
     private final ObjectMapper mapper = new ObjectMapper();
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() {
         handler = new ScriptExecutionStatusUpdateHandler(
-                scriptExecutionRepository, scheduleScriptExecutionAggregator, deviceOnlineDispatchRepository);
+                scriptExecutionRepository, scheduleScriptExecutionAggregator, deviceOnlineDispatchRepository, new RmmExecutionMetrics(meterRegistry));
     }
 
     @Test
@@ -87,6 +91,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         assertThat(saved.getStdoutTruncated()).isFalse();
         assertThat(saved.getFinishedAt()).isNotNull();
         assertThat(saved.getStatusChangedAt()).isNotNull();
+        assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("kind", "script", "status", "SUCCESS").counter().count()).isEqualTo(1.0);
     }
 
     @Test
@@ -227,6 +232,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
 
         verify(scriptExecutionRepository, never()).save(any());
+        assertThat(meterRegistry.find(COMPLETED_COUNTER).counter()).isNull();
     }
 
     @Test
