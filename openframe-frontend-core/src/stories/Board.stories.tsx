@@ -112,11 +112,11 @@ export const Default: Story = {
 
 /**
  * Mixed system + custom columns matching the OpenFrame Tickets layout:
- * AI-Assistance and Tech Required are system columns (default surface, joined
+ * AI Handling and Tech Required are system columns (default surface, joined
  * with no gap), middle columns are custom (tinted by color), Resolved is a
  * system column whose `RESOLVED` status gives the green-checkmark tag.
  *
- * DnD restrictions: AI-Assistance refuses drops (tickets enter via the AI
+ * DnD restrictions: AI Handling refuses drops (tickets enter via the AI
  * pipeline, not by dragging), but tickets in it can still be dragged out.
  * Resolved tickets are pinned (`dragDisabled`).
  */
@@ -124,8 +124,8 @@ export const SystemAndCustom: Story = {
   render: function Render() {
     const [columns, setColumns] = React.useState<BoardColumnDef[]>([
       {
-        id: 'ai-assistance',
-        label: 'AI-Assistance',
+        id: 'ai-handling',
+        label: 'AI Handling',
         color: '#f357bb',
         system: true,
         dropDisabled: true,

@@ -28,7 +28,7 @@ const STATUS_CONFIG: Record<TicketStatus, TicketStatusConfig> = {
     variant: 'success',
   },
   AI_ASSISTANCE: {
-    label: 'AI Assistance',
+    label: 'AI Handling',
     variant: 'outline',
   },
   TECH_REQUIRED: {
