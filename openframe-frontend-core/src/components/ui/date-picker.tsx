@@ -100,12 +100,18 @@ interface CalendarNavButtonProps {
   "aria-label"?: string;
 }
 
+/** The DS icon button, at its standard size in every placement — month
+ *  navigation is a primary control, not chrome to be shrunk to fit. What has
+ *  to give instead is the calendar's WIDTH: a `bare` host states one wide
+ *  enough for the caption to sit between the two buttons (see the meeting
+ *  scheduler's `CALENDAR_W`). */
 function CalendarNavButton({ direction, onClick, disabled, "aria-label": ariaLabel }: CalendarNavButtonProps) {
   return (
     <Button
       type="button"
       variant="outline"
       size="icon"
+      className="shrink-0"
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
@@ -118,7 +124,7 @@ function CalendarNavButton({ direction, onClick, disabled, "aria-label": ariaLab
 // DatePickerCalendar Component
 // ============================================================================
 
-interface DatePickerCalendarProps {
+export interface DatePickerCalendarProps {
   mode: DatePickerMode;
   selected: Date | DateRange | undefined;
   onSelect: (value: Date | DateRange | undefined) => void;
@@ -132,9 +138,54 @@ interface DatePickerCalendarProps {
    * lines up with the surrounding controls per the Figma filter-menu.
    */
   fluid?: boolean;
+  /**
+   * The calendar ALONE — the Figma `Date Picker` component as drawn, with no
+   * card surface and no outer inset: the nav header flush to both edges, 8px,
+   * then a full-bleed grid. Seven columns divide the container, so the
+   * cells are as wide as the host makes them.
+   *
+   * FIXED 272px tall at every one of those widths (8 + the 48px icon-button
+   * header + a 24px weekday strip + six 32px rows; 268 on a phone, where the
+   * DS icon button is 44), which is the design's own contract — the
+   * component is drawn 240 tall at 340, 282 and 240 wide. Height that ignored
+   * the width is what lets a host place it in a card that states a height, and
+   * keeps a phone-width month from becoming a 356px band.
+   *
+   * The DAY inside each cell stays square, so the selection and today's tint
+   * read as rounded squares rather than as pills stretched across a wide
+   * cell.
+   *
+   * For hosts that place the calendar inside a panel they already own — the
+   * meeting scheduler — where the standalone card chrome reads as a card
+   * inside a card and its 16px inset fights the panel's own 24px one. The
+   * popover and filter-menu keep the surface; nothing about the type, colours
+   * or day states changes between the two.
+   */
+  bare?: boolean;
+  /**
+   * Days to disable ON TOP of the `fromDate`/`toDate` bounds — a matcher, so a
+   * host can disable by predicate. "Inside the allowed window" and "actually
+   * selectable" are different questions, and only the host can answer the
+   * second (the meeting scheduler greys out days with no bookable slot).
+   */
+  disabledDays?: Matcher | Matcher[];
+  /**
+   * Controlled visible month; pair with `onMonthChange`. Omit both and the
+   * calendar owns its month, which is the right default — a host needs these
+   * only when paging is ALSO a data event, e.g. the scheduler refetches
+   * availability per month and would otherwise show an unpopulated month.
+   */
+  month?: Date;
+  onMonthChange?: (month: Date) => void;
 }
 
-function DatePickerCalendar({
+/**
+ * The calendar surface behind every date control in the design system —
+ * `DatePicker`'s popover and `DateFilterMenu` — exported so a host that needs
+ * an always-visible day grid renders THIS one. A second hand-styled day grid
+ * is how the two drift apart.
+ */
+export function DatePickerCalendar({
   mode,
   selected,
   onSelect,
@@ -143,6 +194,10 @@ function DatePickerCalendar({
   toDate,
   locale,
   fluid = false,
+  bare = false,
+  disabledDays: extraDisabledDays,
+  month: monthProp,
+  onMonthChange,
 }: DatePickerCalendarProps) {
   const today = new Date();
 
@@ -199,19 +254,105 @@ function DatePickerCalendar({
   };
 
   // Fixed 40px cells by default; in fluid mode cells flex to fill the width.
-  const cellOuter = fluid ? "flex-1 aspect-square min-w-0" : "size-10";
-  const cellInner = fluid ? "size-full" : "size-10";
+  // `bare` is a fluid layout by definition — its cell size IS container/7.
+  const isFluid = fluid || bare;
+  // BARE: fixed row height, elastic width — the Figma component is 240px tall
+  // at every width it is drawn at (340 on a phone, 282 on a tablet, 240 on the
+  // desktop card), so a month occupies the same band whatever column it lands
+  // in. 8 + the 48px header + a 24px weekday strip + six 32px rows = 272.
+  //
+  // Height that does NOT follow the width is the whole point: seven square
+  // cells across a phone's 340px would be a 356px-tall month, half again what
+  // the design budgets, and the same rule handed a wide column a month tall
+  // enough to push a card that states its height.
+  const cellOuter = bare ? "flex-1 min-w-0 h-[32px]" : isFluid ? "flex-1 aspect-square min-w-0" : "size-10";
+  // ...but the DAY ITSELF stays square inside that wider cell: `h-full` gives
+  // the button the row's height and `aspect-square` turns it into a 32x32
+  // rounded square, centred by the cell. `w-auto` is load-bearing — it drops
+  // the width the button would otherwise take, leaving `aspect-square` inert.
+  //
+  // This is why the day STATES below are painted on the button in bare mode
+  // rather than on the cell: react-day-picker puts `selected`/`today` on the
+  // cell, and a cell 48px wide by 30 tall renders the selection as a stretched
+  // pill. Same colours, same radius, smaller box.
+  const cellInner = bare
+    ? "h-full w-auto aspect-square rounded-[6px]"
+    : isFluid
+      ? "size-full"
+      : "size-10";
+  // The weekday strip is a LABEL row, not a day: `bare` gives it the height of
+  // its own text rather than a full row.
+  const weekdayOuter = bare ? "flex-1 min-w-0 h-6" : cellOuter;
+
+  // Day states, per paint target (see `cellInner`). Range mode is never bare —
+  // a range MUST fill its cells or the middle would break into islands — so
+  // only these three single-day states fork.
+  const hoverClass = bare ? "[&>button]:hover:bg-ods-bg-surface" : "hover:bg-ods-bg-surface hover:rounded-[6px]";
+  const todayClass = bare
+    ? "[&>button]:bg-ods-bg-surface [&>button]:hover:!bg-ods-bg-surface"
+    : "bg-ods-bg-surface rounded-[6px] hover:!bg-ods-bg-surface";
+  /**
+   * Today's tint applies only while today is NOT part of the selection.
+   *
+   * Both states paint the same box, and both have to use `!important` to beat
+   * react-day-picker's concatenated base classes — so on hover the two rules
+   * had equal specificity and the winner came down to their order in the
+   * generated stylesheet. Today's tint won, and a selected today turned GREY
+   * under the pointer, as if it had been deselected.
+   *
+   * Deciding it here rather than in CSS: "today" is a hint about where you
+   * are in the month, and once that day is chosen the selection is the
+   * stronger statement — there is nothing left for the tint to say.
+   */
+  const dayNumber = (date: Date): number => date.getFullYear() * 10000 + date.getMonth() * 100 + date.getDate();
+  const isSelectedDay = (date: Date): boolean => {
+    const n = dayNumber(date);
+    if (mode === "single") {
+      const picked = selected as Date | undefined;
+      return !!picked && dayNumber(picked) === n;
+    }
+    const range = rangeSelected;
+    if (!range?.from) return false;
+    if (!range.to) return dayNumber(range.from) === n;
+    return n >= dayNumber(range.from) && n <= dayNumber(range.to);
+  };
+  const isUnclaimedToday = (date: Date): boolean => dayNumber(date) === dayNumber(today) && !isSelectedDay(date);
+
+  const selectedClass = bare
+    ? "[&>button]:!bg-ods-accent [&>button]:!text-ods-card [&>button]:!font-bold [&>button]:hover:!bg-ods-accent"
+    : "!bg-ods-accent !text-ods-card !font-bold !rounded-[6px] hover:!bg-ods-accent";
+
+  // Surface + inset, per placement. Bare drops the card and the 16px inset
+  // (the host's panel provides both) and replaces the inset with the 8px the
+  // design puts between the header and the grid — the ONLY spacing it keeps.
+  const surfaceClass = bare
+    ? "flex w-full flex-col"
+    : cn("bg-ods-card border border-ods-border rounded-[6px] overflow-hidden", isFluid && "w-full");
+  // Bare: an unpadded header row over the grid, 8px apart — the calendar's
+  // whole height is the two of them added up, never the container's.
+  const captionRowClass = cn("flex items-center justify-between gap-1", bare ? "shrink-0" : "px-4 pt-4");
+  // The caption is the only elastic thing in the header: it takes the space
+  // the two fixed buttons leave and truncates rather than pushing into them.
+  // "September 2026" is ~131px at text-h4, and the two 48px buttons plus their
+  // gaps take 104 — so a `bare` host has to state a width of ~256 or more, or
+  // the label and the next-month button collide (worse in a locale with longer
+  // month names).
+  const captionClass = "min-w-0 flex-1 truncate text-center text-h4 text-ods-text-primary";
 
   const classNames: DayPickerProps["classNames"] = {
-    root: cn("p-4 date-picker-calendar", fluid && "w-full"),
-    months: "flex gap-8",
-    month: cn("flex flex-col gap-2", fluid && "w-full"),
+    root: cn(
+      "date-picker-calendar",
+      bare ? "flex w-full flex-col pt-[var(--spacing-system-xsf)]" : cn("p-4", isFluid && "w-full"),
+    ),
+    months: cn("flex gap-8", bare && "w-full"),
+    month: cn("flex flex-col", bare ? "w-full" : cn("gap-2", isFluid && "w-full")),
     month_caption: "hidden",
     nav: "hidden",
-    month_grid: cn("border-collapse", fluid && "w-full"),
+    month_grid: cn("border-collapse", bare ? "flex w-full flex-col" : isFluid && "w-full"),
     weekdays: "flex",
+    ...(bare ? { weeks: "flex flex-col" } : {}),
     weekday: cn(
-      cellOuter,
+      weekdayOuter,
       "flex items-center justify-center",
       "text-h6 text-ods-text-secondary"
     ),
@@ -222,7 +363,7 @@ function DatePickerCalendar({
       "text-h4 text-ods-text-primary",
       "cursor-pointer",
       "transition-colors duration-150",
-      "hover:bg-ods-bg-surface hover:rounded-[6px]"
+      hoverClass
     ),
     day_button: cn(
       cellInner,
@@ -230,9 +371,10 @@ function DatePickerCalendar({
       "cursor-pointer bg-transparent border-none outline-none",
       "text-inherit font-inherit"
     ),
-    today: "bg-ods-bg-surface rounded-[6px] hover:!bg-ods-bg-surface",
+    // Painted through the `todayTint` modifier instead — see `isUnclaimedToday`.
+    today: "",
     selected: cn(
-      "!bg-ods-accent !text-ods-card !font-bold !rounded-[6px] hover:!bg-ods-accent",
+      selectedClass,
       // In range mode, selected class should not override range_start/range_end/range_middle
       mode === "range" && "range-selected"
     ),
@@ -250,7 +392,19 @@ function DatePickerCalendar({
     // `disabled` <button> does not inherit the cell's cursor on its own.
     disabled: cn(
       "!text-ods-text-disabled !cursor-not-allowed hover:!bg-transparent",
-      "[&>button]:!cursor-not-allowed [&>button]:!text-ods-text-disabled"
+      "[&>button]:!cursor-not-allowed [&>button]:!text-ods-text-disabled",
+      // Also drop the `today` tint, or an unselectable today renders BLANK:
+      // `--color-text-disabled` and `--color-bg-surface` are the SAME token
+      // (`--ods-system-greys-soft-grey`), so the number disappears into the
+      // highlight — grey on identical grey. Reachable by any picker whose
+      // `fromDate` is in the future, and permanently by the meeting scheduler,
+      // where today usually has no bookable slots left.
+      //
+      // Dropping the tint rather than repainting the text: a disabled day is
+      // not actionable, so a highlight claiming otherwise is the wrong signal.
+      // The day still reads as today's position in the month by being the one
+      // dimmed cell between yesterday and tomorrow.
+      "!bg-transparent [&>button]:!bg-transparent"
     ),
     hidden: "invisible",
     // Range styles matching Figma design:
@@ -269,11 +423,19 @@ function DatePickerCalendar({
     range_middle: "range-middle !bg-ods-open-yellow-light !text-ods-card !font-medium !rounded-none hover:!bg-ods-open-yellow-light",
   };
 
-  const [month, setMonth] = React.useState<Date>(
+  // Controlled when the host passes `month`, self-owned otherwise. The
+  // internal state is kept either way so an uncontrolled calendar still works;
+  // controlled it is simply never read, which keeps `changeMonth` one path.
+  const [uncontrolledMonth, setUncontrolledMonth] = React.useState<Date>(
     mode === "single"
       ? (selected as Date) || today
       : (selected as DateRange)?.from || today
   );
+  const month = monthProp ?? uncontrolledMonth;
+  const changeMonth = (next: Date): void => {
+    setUncontrolledMonth(next);
+    onMonthChange?.(next);
+  };
 
   /**
    * `fromDate` / `toDate` → what react-day-picker **v9** actually understands.
@@ -294,8 +456,11 @@ function DatePickerCalendar({
     const matchers: Matcher[] = [];
     if (fromDate) matchers.push({ before: fromDate });
     if (toDate) matchers.push({ after: toDate });
+    if (extraDisabledDays) {
+      matchers.push(...(Array.isArray(extraDisabledDays) ? extraDisabledDays : [extraDisabledDays]));
+    }
     return matchers;
-  }, [fromDate, toDate]);
+  }, [fromDate, toDate, extraDisabledDays]);
 
   // Out-of-bounds days are disabled, not hidden — a month keeps its shape, and
   // the greyed-out day is what tells the user the bound exists. Navigation stops
@@ -311,21 +476,13 @@ function DatePickerCalendar({
   const canGoPrevious = !fromDate || monthIndex(month) > monthIndex(fromDate);
   const canGoNext = !toDate || lastVisibleMonth < monthIndex(toDate);
 
-  const handlePreviousMonth = () => {
-    setMonth((prev) => {
-      const newMonth = new Date(prev);
-      newMonth.setMonth(newMonth.getMonth() - 1);
-      return newMonth;
-    });
+  const shiftMonth = (by: number) => {
+    const next = new Date(month);
+    next.setMonth(next.getMonth() + by);
+    changeMonth(next);
   };
-
-  const handleNextMonth = () => {
-    setMonth((prev) => {
-      const newMonth = new Date(prev);
-      newMonth.setMonth(newMonth.getMonth() + 1);
-      return newMonth;
-    });
-  };
+  const handlePreviousMonth = () => shiftMonth(-1);
+  const handleNextMonth = () => shiftMonth(1);
 
   const formatMonthYear = (date: Date): string => {
     return date.toLocaleDateString("en-US", {
@@ -372,17 +529,15 @@ function DatePickerCalendar({
 
   if (mode === "single") {
     return (
-      <div className={cn("bg-ods-card border border-ods-border rounded-[6px] overflow-hidden", fluid && "w-full")}>
-        <div className="flex items-center justify-between px-4 pt-4">
+      <div className={surfaceClass}>
+        <div className={captionRowClass}>
           <CalendarNavButton
             direction="left"
             onClick={handlePreviousMonth}
             disabled={!canGoPrevious}
             aria-label="Previous month"
           />
-          <span className="text-h4 text-ods-text-primary">
-            {formatMonthYear(month)}
-          </span>
+          <span className={captionClass}>{formatMonthYear(month)}</span>
           <CalendarNavButton
             direction="right"
             onClick={handleNextMonth}
@@ -395,8 +550,10 @@ function DatePickerCalendar({
           selected={selected as Date | undefined}
           onSelect={(date) => onSelect(date)}
           month={month}
-          onMonthChange={setMonth}
+          onMonthChange={changeMonth}
           classNames={classNames}
+          modifiers={{ todayTint: isUnclaimedToday }}
+          modifiersClassNames={{ todayTint: todayClass }}
           showOutsideDays
           fixedWeeks
           disabled={disabledDays}
@@ -410,7 +567,7 @@ function DatePickerCalendar({
   // Range mode
   return (
     <div
-      className={cn("bg-ods-card border border-ods-border rounded-md overflow-hidden", fluid && "w-full")}
+      className={cn("bg-ods-card border border-ods-border rounded-md overflow-hidden", isFluid && "w-full")}
       onMouseLeave={() => setHoveredDate(undefined)}
     >
       <style>{rangeStyles}</style>
@@ -424,9 +581,7 @@ function DatePickerCalendar({
               disabled={!canGoPrevious}
               aria-label="Previous month"
             />
-            <span className="text-h4 text-ods-text-primary">
-              {formatMonthYear(month)}
-            </span>
+            <span className={captionClass}>{formatMonthYear(month)}</span>
             {monthsToShow === 1 && (
               <CalendarNavButton
                 direction="right"
@@ -442,10 +597,10 @@ function DatePickerCalendar({
             selected={draftRange}
             onSelect={(_range, triggerDate) => handleRangeSelect(triggerDate)}
             onDayMouseEnter={(day) => setHoveredDate(day)}
-            modifiers={{ preview: isPreviewDate }}
-            modifiersClassNames={{ preview: "bg-ods-bg-surface" }}
+            modifiers={{ preview: isPreviewDate, todayTint: isUnclaimedToday }}
+            modifiersClassNames={{ preview: "bg-ods-bg-surface", todayTint: todayClass }}
             month={month}
-            onMonthChange={setMonth}
+            onMonthChange={changeMonth}
             classNames={classNames}
             showOutsideDays
             fixedWeeks
@@ -460,9 +615,7 @@ function DatePickerCalendar({
           <div className="flex-1 border-l border-ods-border">
             <div className="flex items-center justify-between px-4 pt-4">
               <div className="size-10 md:size-12" />
-              <span className="text-h4 text-ods-text-primary">
-                {formatMonthYear(getSecondMonth(month))}
-              </span>
+              <span className={captionClass}>{formatMonthYear(getSecondMonth(month))}</span>
               <CalendarNavButton
                 direction="right"
                 onClick={handleNextMonth}
@@ -475,8 +628,8 @@ function DatePickerCalendar({
               selected={draftRange}
               onSelect={(_range, triggerDate) => handleRangeSelect(triggerDate)}
               onDayMouseEnter={(day) => setHoveredDate(day)}
-              modifiers={{ preview: isPreviewDate }}
-              modifiersClassNames={{ preview: "bg-ods-bg-surface" }}
+              modifiers={{ preview: isPreviewDate, todayTint: isUnclaimedToday }}
+              modifiersClassNames={{ preview: "bg-ods-bg-surface", todayTint: todayClass }}
               month={getSecondMonth(month)}
               classNames={classNames}
               showOutsideDays
