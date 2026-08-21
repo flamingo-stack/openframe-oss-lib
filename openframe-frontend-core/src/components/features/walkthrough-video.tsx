@@ -1,23 +1,35 @@
 "use client";
 
 /**
- * <FloatingWalkthroughVideo> — THE generic, embeddable per-platform demo-video
- * widget. A collapsed card pinned to a bottom corner — left unless the video
- * data says `position: 'right'` — (bite-identical hover grammar via
+ * THE generic, embeddable per-platform demo-video widget, in the two placements
+ * hosts actually mount: <FloatingWalkthroughVideo> and <InlineWalkthroughVideo>.
+ *
+ * SHARED GRAMMAR. A collapsed card (bite-identical hover grammar via
  * <VideoHoverPreviewSurface>) that opens a large in-page theater (Radix Dialog
  * primitives, NOT native fullscreen) showing ONLY the video: a bare 16:9 stage
  * with the player's own controls + captions. No card chrome, no summary.
+ *   - FLOATING pins that card to a bottom corner over the page — left unless
+ *     the video data says `position: 'right'`.
+ *   - INLINE lays it out in the host's own flow, filling its container at 16:9.
+ *     Every overlay-only behaviour drops out with the pinning: no fixed
+ *     positioning, no z-layer, no shadow, no appear delay (nothing to stagger
+ *     against an already-painted page), no footer fade (no footer to collide
+ *     with) and no dismissal (an X is an overlay's "get out of my way"; in a
+ *     host's own layout it just leaves a hole, and the cookie is per-platform,
+ *     so one dismissal in the corner would silently empty the in-page block).
  *
- * PLACEMENT. The same card also serves as an IN-PAGE block (`placement=
- * "inline"`): identical hover / transport / theater grammar, but laid out by
- * the host's flow instead of pinned, filling its container at 16:9. The
- * overlay-only behaviours drop out with it — no fixed positioning, no
- * z-layer, no shadow, no appear delay (nothing to stagger against an
- * already-painted page) and no footer fade (no footer to collide with). Kept
- * as ONE component rather than a second surface: everything below the
- * wrapper — the player mode machine, the audio invariant, the corner map,
- * dismissal — is placement-independent, and forking it is how the two would
- * drift.
+ * ONE ENGINE, TWO PRESETS. <WalkthroughVideo> below takes `placement` and is
+ * deliberately NOT exported: placement is a constant at every call site, so the
+ * public API is two components that say what they are instead of one that takes
+ * a mode — a <FloatingWalkthroughVideo placement="inline"> reads as a
+ * contradiction, and naming a family after one of its variants is what produced
+ * it. The presets are one line each; everything below the wrapper — the player
+ * mode machine, the audio invariant, the corner map, dismissal — stays shared,
+ * because forking THAT is how the two placements would drift.
+ *
+ * The split pays off in the types: the overlay-only knobs are absent from
+ * `InlineWalkthroughVideoProps` outright, so "floating only" is a compile error
+ * rather than a line of prose each caller has to read.
  *
  * All UI lives here in the lib so every platform site AND the react-embedding
  * example mount the same component; the host supplies only the video data.
@@ -89,7 +101,8 @@ export interface WalkthroughVideoData {
   position?: 'left' | 'right' | null;
 }
 
-export interface FloatingWalkthroughVideoProps {
+/** Everything the two placements share — the widget's actual contract. */
+interface WalkthroughVideoBaseProps {
   video: WalkthroughVideoData | null | undefined;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -112,23 +125,34 @@ export interface FloatingWalkthroughVideoProps {
    *  so the hydrated (non-portal) markup is identical either way. */
   deepLinkParam?: string;
   label?: string;
+  className?: string;
+}
+
+/**
+ * <FloatingWalkthroughVideo>: the shared contract plus the knobs that only mean
+ * something for an OVERLAY. Each of these is inert inline — the appear delay
+ * staggers against a page the visitor hasn't seen yet, dismissal is an overlay
+ * affordance, and the footer fade (with the `pathname` that re-queries its
+ * target) exists to keep a pinned card off the page chrome. So they live here,
+ * not in the base.
+ */
+export interface FloatingWalkthroughVideoProps extends WalkthroughVideoBaseProps {
   appearDelayMs?: number;
   /** Cookie-based dismissal (id-match, mirrors the announcement bar). `false`
    *  disables the X entirely. `storageKey` is the per-platform cookie name. */
   dismissal?: { storageKey?: string } | false;
-  /** Fades the card out while `hideNearSelector` is in view. Floating only. */
+  /** Fades the card out while `hideNearSelector` is in view. */
   hideNearSelector?: string;
-  /**
-   * 'floating' (default) pins the card into a bottom corner over the page;
-   * 'inline' renders it as a plain block filling its container at 16:9, for
-   * hosts placing the video inside their own layout. See the docblock.
-   */
-  placement?: 'floating' | 'inline';
   /** Route identity from the host (the lib can't observe navigation). Changing
    *  it re-queries the footer IO target. */
   pathname?: string;
-  className?: string;
 }
+
+/** <InlineWalkthroughVideo>: the shared contract and nothing else — see above. */
+export type InlineWalkthroughVideoProps = WalkthroughVideoBaseProps;
+
+/** Engine props. Internal: `placement` never reaches a call site. */
+type WalkthroughVideoProps = FloatingWalkthroughVideoProps & { placement: 'floating' | 'inline' };
 
 /** "Paused at the end" — used by BOTH the close snapshot and the reopen seed,
  *  which must agree or a finished video reopens at its own last frame. */
@@ -142,7 +166,7 @@ interface Handoff {
   playing: boolean;
 }
 
-export function FloatingWalkthroughVideo({
+function WalkthroughVideo({
   video,
   open: openProp,
   onOpenChange,
@@ -150,16 +174,16 @@ export function FloatingWalkthroughVideo({
   defaultOpenPaused,
   deepLinkParam = WALKTHROUGH_OPEN_QUERY_PARAM,
   label = 'Play Demo Video',
-  placement = 'floating',
-  // An inline block is part of the page the visitor is already looking at, so
-  // staggering it in only jumps the layout. The delay exists to keep the
-  // FLOATING card off the critical path — hence a per-placement default.
-  appearDelayMs = placement === 'inline' ? 0 : 3000,
+  placement,
+  // Keeps the FLOATING card off the critical path. The inline preset passes 0:
+  // an in-page block is part of a page the visitor is already looking at, so
+  // staggering it in would only jump the layout.
+  appearDelayMs = 3000,
   dismissal = {},
   hideNearSelector = 'footer',
   pathname,
   className,
-}: FloatingWalkthroughVideoProps): React.ReactElement | null {
+}: WalkthroughVideoProps): React.ReactElement | null {
   const inline = placement === 'inline';
   const dismissEnabled = dismissal !== false;
   const storageKey = (dismissEnabled && dismissal.storageKey) || WALKTHROUGH_VIDEO_DISMISS_KEY;
@@ -1031,4 +1055,27 @@ export function FloatingWalkthroughVideo({
       </DialogPrimitive.Root>
     </>
   );
+}
+
+/**
+ * The widget pinned into a bottom corner over the page — the app-shell / site
+ * placement. Every host that wants "a demo video somewhere on the page, out of
+ * the way" mounts this.
+ */
+export function FloatingWalkthroughVideo(props: FloatingWalkthroughVideoProps): React.ReactElement {
+  return <WalkthroughVideo {...props} placement="floating" />;
+}
+
+/**
+ * The same widget as an in-flow block, sized by whatever the host puts it in —
+ * for a page that gives the video a slot of its own rather than a corner.
+ *
+ * The two overlay defaults are fixed here rather than left to the caller: an
+ * in-page block has nothing to stagger against (`appearDelayMs={0}`), and a
+ * dismissable one would leave the host's layout with a hole while sharing the
+ * floating card's per-platform cookie (`dismissal={false}`). Both are stated
+ * once here instead of at every call site, where forgetting either is silent.
+ */
+export function InlineWalkthroughVideo(props: InlineWalkthroughVideoProps): React.ReactElement {
+  return <WalkthroughVideo {...props} placement="inline" appearDelayMs={0} dismissal={false} />;
 }
