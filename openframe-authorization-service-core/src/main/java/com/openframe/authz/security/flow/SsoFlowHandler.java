@@ -91,12 +91,16 @@ public interface SsoFlowHandler {
     default void clearFlowCookieAndRedirect(HttpServletResponse response,
                                             Cookie flowCookie,
                                             String tenantId,
-                                            String redirectTo) {
+                                            String redirectTo,
+                                            boolean authMobile) {
         clearCookie(response, flowCookie.getName());
         String path = "/oauth/continue?tenantId=" +
                 encode(tenantId, UTF_8);
         if (hasText(redirectTo)) {
             path += "&redirectTo=" + encode(redirectTo, UTF_8);
+        }
+        if (authMobile) {
+            path += "&authMobile=true";
         }
         foundAtRoot(response, path);
     }
