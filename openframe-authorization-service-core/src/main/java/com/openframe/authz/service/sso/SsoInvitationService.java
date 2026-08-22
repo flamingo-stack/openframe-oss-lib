@@ -36,6 +36,7 @@ public class SsoInvitationService {
                 request.getSwitchTenant(),
                 provider,
                 request.getRedirectTo(),
+                request.isAuthMobile(),
                 now,
                 now + COOKIE_TTL_SECONDS
         );
