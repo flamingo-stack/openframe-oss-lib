@@ -59,8 +59,9 @@ describe('processShortcodes script stripping', () => {
 
 /**
  * Design-doc embeds (R11): the spec's `{{figma:FILE_KEY[:NODE_ID]}}` grammar
- * is rewritten onto the canonical `{{figma:URL}}` rule, and the two Claude
- * shortcodes alias the OG link card because claude.ai serves
+ * is rewritten onto the canonical `{{figma:URL}}` rule. (Claude artifact /
+ * Claude Design links are NOT shortcodes: they are structured design-doc links
+ * rendered by `ClaudeArtifactCard`, because claude.ai serves
  * `frame-ancestors 'self'` (it cannot be framed — verified 2026-08-23).
  */
 describe('processShortcodes design-doc embeds', () => {
@@ -80,26 +81,6 @@ describe('processShortcodes design-doc embeds', () => {
     expect(output).toContain('data-figma-url="https://www.figma.com/proto/aB3xK9/Flows?node-id=1-2"');
   });
 
-  it('renders {{claude-artifact:URL}} and {{claude-design:URL}} as link-preview cards, never iframes', () => {
-    const artifact = processShortcodes('{{claude-artifact:https://claude.ai/public/artifacts/abc}}');
-    const design = processShortcodes('{{claude-design:https://claude.ai/design/xyz}}');
-    for (const out of [artifact, design]) {
-      expect(out).toContain('class="link-preview"');
-      expect(out).not.toContain('<iframe');
-    }
-    expect(artifact).toContain('data-url="https://claude.ai/public/artifacts/abc"');
-    expect(design).toContain('data-url="https://claude.ai/design/xyz"');
-  });
 
-  it('attribute-escapes the claude URL like every other shortcode', () => {
-    const output = processShortcodes('{{claude-artifact:https://claude.ai/a?x="1"}}');
-    expect(output).toContain('data-url="https://claude.ai/a?x=&quot;1&quot;"');
-    expect(output).not.toContain('x="1"');
-  });
 
-  it('is rewritten inside a code fence exactly like {{link:}} is (parity, not fence-safety)', () => {
-    const link = processShortcodes('```\n{{link:https://example.com}}\n```');
-    const claude = processShortcodes('```\n{{claude-artifact:https://claude.ai/x}}\n```');
-    expect(claude.includes('link-preview')).toBe(link.includes('link-preview'));
-  });
 });

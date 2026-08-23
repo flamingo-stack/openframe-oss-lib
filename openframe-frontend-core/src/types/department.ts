@@ -36,4 +36,9 @@ export interface DepartmentSummary {
 }
 
 /** Population a department count is taken over. */
+/**
+ * Populations the department count endpoint supports. The hub's runtime
+ * allowlist (`DEPARTMENT_COUNT_POPULATIONS` in lib/data/department-constants.ts)
+ * is the value form of this union — keep the two in step.
+ */
 export type DepartmentCountPopulation = 'directory' | 'scored'

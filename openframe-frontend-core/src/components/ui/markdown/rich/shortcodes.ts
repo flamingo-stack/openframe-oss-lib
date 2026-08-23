@@ -69,11 +69,6 @@ export const processShortcodes = (content: string): string => {
     .replace(/\{\{linkedin:([^}]+)\}\}/g, (match, url) => {
       return `\n\n<div class="linkedin-embed" data-post-url="${escapeAttr(url.trim())}"></div>\n\n`;
     })
-    // Claude artifact / Claude Design: claude.ai serves `frame-ancestors 'self'` (cannot be
-    // framed by anyone), so both render as the OG link card — never an iframe.
-    .replace(/\{\{claude-(?:artifact|design):([^}]+)\}\}/g, (match, url) => {
-      return `\n\n<div class="link-preview" data-url="${escapeAttr(url.trim())}"></div>\n\n`;
-    })
     // Link previews: {{link:URL}}
     .replace(/\{\{link:([^}]+)\}\}/g, (match, url) => {
       return `\n\n<div class="link-preview" data-url="${escapeAttr(url.trim())}"></div>\n\n`;
