@@ -159,7 +159,8 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
             </div>
           )}
 
-          <div className="flex-1 space-y-2">
+          {/* min-w-0: a wide renderLabel (e.g. a DeliveryRow) must truncate, not push the row past its host. */}
+          <div className="flex-1 min-w-0 space-y-2">
             {renderLabel && renderLabel(item, index)}
             <Input
               placeholder={placeholder}
