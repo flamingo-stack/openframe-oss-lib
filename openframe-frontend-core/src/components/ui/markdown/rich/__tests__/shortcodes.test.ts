@@ -56,3 +56,50 @@ describe('processShortcodes script stripping', () => {
     expect(output).toContain('<script>');
   });
 });
+
+/**
+ * Design-doc embeds (R11): the spec's `{{figma:FILE_KEY[:NODE_ID]}}` grammar
+ * is rewritten onto the canonical `{{figma:URL}}` rule, and the two Claude
+ * shortcodes alias the OG link card because claude.ai serves
+ * `frame-ancestors 'self'` (it cannot be framed — verified 2026-08-23).
+ */
+describe('processShortcodes design-doc embeds', () => {
+  it('rewrites {{figma:KEY:NODE}} to the canonical design URL and renders the figma embed', () => {
+    const output = processShortcodes('{{figma:aB3xK9:12-405}}');
+    expect(output).toContain('class="figma-embed"');
+    expect(output).toContain('data-figma-url="https://www.figma.com/design/aB3xK9?node-id=12-405"');
+  });
+
+  it('accepts a colon-separated node id and a bare key', () => {
+    expect(processShortcodes('{{figma:aB3xK9:12:405}}')).toContain('node-id=12-405');
+    expect(processShortcodes('{{figma:aB3xK9}}')).toContain('data-figma-url="https://www.figma.com/design/aB3xK9"');
+  });
+
+  it('leaves the existing {{figma:URL}} grammar untouched', () => {
+    const output = processShortcodes('{{figma:https://www.figma.com/proto/aB3xK9/Flows?node-id=1-2}}');
+    expect(output).toContain('data-figma-url="https://www.figma.com/proto/aB3xK9/Flows?node-id=1-2"');
+  });
+
+  it('renders {{claude-artifact:URL}} and {{claude-design:URL}} as link-preview cards, never iframes', () => {
+    const artifact = processShortcodes('{{claude-artifact:https://claude.ai/public/artifacts/abc}}');
+    const design = processShortcodes('{{claude-design:https://claude.ai/design/xyz}}');
+    for (const out of [artifact, design]) {
+      expect(out).toContain('class="link-preview"');
+      expect(out).not.toContain('<iframe');
+    }
+    expect(artifact).toContain('data-url="https://claude.ai/public/artifacts/abc"');
+    expect(design).toContain('data-url="https://claude.ai/design/xyz"');
+  });
+
+  it('attribute-escapes the claude URL like every other shortcode', () => {
+    const output = processShortcodes('{{claude-artifact:https://claude.ai/a?x="1"}}');
+    expect(output).toContain('data-url="https://claude.ai/a?x=&quot;1&quot;"');
+    expect(output).not.toContain('x="1"');
+  });
+
+  it('is rewritten inside a code fence exactly like {{link:}} is (parity, not fence-safety)', () => {
+    const link = processShortcodes('```\n{{link:https://example.com}}\n```');
+    const claude = processShortcodes('```\n{{claude-artifact:https://claude.ai/x}}\n```');
+    expect(claude.includes('link-preview')).toBe(link.includes('link-preview'));
+  });
+});

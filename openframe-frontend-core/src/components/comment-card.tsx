@@ -37,7 +37,16 @@ interface CommentCardProps {
   onDeleteComment?: (commentId: string) => void
   showVendorInfo?: boolean
   compact?: boolean
-  context: 'profile' | 'vendor'
+  /**
+   * `profile` / `vendor` = the OpenMSP comment sections (fixed-height list tiles).
+   * `design_doc` = the product-hub design-doc thread: full-height body, no vendor
+   * chrome, deletability decided by the caller via `comment.canDelete`.
+   */
+  context: 'profile' | 'vendor' | 'design_doc'
+  /** Rendered under the body — badges + per-surface actions (design-doc threads). */
+  footer?: React.ReactNode
+  /** Rendered after the card — nested replies + reply composer (design-doc threads). */
+  children?: React.ReactNode
 }
 
 export function CommentCard({ 
@@ -46,7 +55,9 @@ export function CommentCard({
   onDeleteComment, 
   showVendorInfo = true,
   compact = false,
-  context = 'profile'
+  context = 'profile',
+  footer,
+  children
 }: CommentCardProps) {
   const { user: currentUser } = useAuth()
   
@@ -69,13 +80,21 @@ export function CommentCard({
     if (context === 'vendor' && comment.user) {
       return currentUser.id === comment.user.id
     }
+
+    // Design-doc threads: ownership (own-or-DRI) is computed by the caller with the
+    // shared gate rule and handed in as `canDelete`.
+    if (context === 'design_doc') {
+      return comment.canDelete === true
+    }
     
     return false
   }
 
   const showDeleteButton = canUserDeleteComment()
+  const isThread = context === 'design_doc'
 
   return (
+    <>
     <div className="bg-ods-card border border-ods-border rounded-lg p-4 hover:border-ods-accent transition-all group overflow-hidden w-full max-w-full box-border" style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
       {/* Comment Header */}
       <div className="flex flex-col gap-3 mb-3 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between min-[420px]:gap-2 w-full">
@@ -94,7 +113,7 @@ export function CommentCard({
                 {formatActivityTime(comment.createdAt)}
               </span>
             </>
-          ) : context === 'vendor' && comment.user ? (
+          ) : (context === 'vendor' || isThread) && comment.user ? (
             <UserSummary
               name={comment.user.name}
               email=""
@@ -152,6 +171,12 @@ export function CommentCard({
             </h4>
           </div>
         )}
+        {isThread ? (
+          // Thread bodies are read in full — no fixed height, no clamp.
+          <p className="text-h4 text-ods-text-primary whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'break-word', maxWidth: '100%' }}>
+            {comment.content}
+          </p>
+        ) : (
         <div className={compact ? "h-[60px] flex items-center" : "h-[72px] flex items-center"}>
           <p className="text-h4 text-ods-text-primary line-clamp-3" style={{ 
             wordBreak: 'break-word', 
@@ -166,7 +191,11 @@ export function CommentCard({
             {comment.content}
           </p>
         </div>
+        )}
+        {footer ? <div className="pt-2 flex flex-wrap items-center gap-2">{footer}</div> : null}
       </div>
     </div>
+    {children}
+    </>
   )
 }

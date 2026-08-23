@@ -55,6 +55,12 @@ export const processShortcodes = (content: string): string => {
         : `https://twitter.com/twitter/status/${tweetInput}`;
       return `\n\n<div class="tweet-embed" data-tweet-url="${escapeAttr(tweetUrl)}"></div>\n\n`;
     })
+    // Figma by file key (spec grammar): {{figma:FILE_KEY[:NODE_ID]}} → rewritten to the
+    // canonical URL form so the {{figma:URL}} rule below owns the rendering.
+    .replace(/\{\{figma:(?!https?:)([A-Za-z0-9]+)(?::([0-9]+[-:][0-9]+))?\}\}/g, (match, key, node) => {
+      const nodeParam = node ? `?node-id=${String(node).replace(':', '-')}` : '';
+      return `{{figma:https://www.figma.com/design/${key}${nodeParam}}}`;
+    })
     // Figma embeds: {{figma:URL}}
     .replace(/\{\{figma:([^}]+)\}\}/g, (match, url) => {
       return `\n\n<div class="figma-embed" data-figma-url="${escapeAttr(url.trim())}"></div>\n\n`;
@@ -62,6 +68,11 @@ export const processShortcodes = (content: string): string => {
     // LinkedIn embeds: {{linkedin:POST_URL}}
     .replace(/\{\{linkedin:([^}]+)\}\}/g, (match, url) => {
       return `\n\n<div class="linkedin-embed" data-post-url="${escapeAttr(url.trim())}"></div>\n\n`;
+    })
+    // Claude artifact / Claude Design: claude.ai serves `frame-ancestors 'self'` (cannot be
+    // framed by anyone), so both render as the OG link card — never an iframe.
+    .replace(/\{\{claude-(?:artifact|design):([^}]+)\}\}/g, (match, url) => {
+      return `\n\n<div class="link-preview" data-url="${escapeAttr(url.trim())}"></div>\n\n`;
     })
     // Link previews: {{link:URL}}
     .replace(/\{\{link:([^}]+)\}\}/g, (match, url) => {
