@@ -126,6 +126,8 @@ export interface DesignDocParticipant {
   updated_at: string
   tasks: DesignDocClickUpTask[]
   media: DesignDocMedia[]
+  /** Section-scoped root comments (threaded). */
+  comments: DesignDocComment[]
 }
 
 export interface DesignDocCompletion {
@@ -197,7 +199,8 @@ export interface DesignDocMediaInput {
 }
 
 export interface CreateDesignDocParticipantInput {
-  department_id: string
+  /** Defaults to the assignee's profile department when omitted. */
+  department_id?: string
   assignee_id: string
 }
 
