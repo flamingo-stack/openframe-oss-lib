@@ -56,6 +56,9 @@ public class ScriptSchedule implements TenantScoped {
     @Builder.Default
     private ScriptScheduleTrigger trigger = ScriptScheduleTrigger.DATE_TIME;
 
+    @Builder.Default
+    private ScheduleOfflineBehavior offlineBehavior = ScheduleOfflineBehavior.SKIP;
+
     private Instant startAt;
 
     private Long repeat;

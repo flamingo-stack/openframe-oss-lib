@@ -4,6 +4,7 @@ import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
+import com.openframe.data.document.rmm.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import jakarta.validation.constraints.NotEmpty;
@@ -37,6 +38,8 @@ public class ScriptScheduleResponse {
     private ScheduleDeviceCriteria deviceCriteria;
 
     private ScriptScheduleTrigger trigger;
+
+    private ScheduleOfflineBehavior offlineBehavior;
 
     private Instant startAt;
     private Long repeat;

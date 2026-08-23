@@ -2,6 +2,7 @@ package com.openframe.api.dto.rmm.schedule;
 
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.OsType;
+import com.openframe.data.document.rmm.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -37,6 +38,8 @@ public class UpdateScriptScheduleInput {
 
     @NotNull
     private ScriptScheduleTrigger trigger;
+
+    private ScheduleOfflineBehavior offlineBehavior;
 
     private ScheduleDeviceSelectionMode selectionMode;
 

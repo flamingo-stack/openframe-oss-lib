@@ -5,6 +5,7 @@ import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.OsType;
 import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.ScriptSchedule;
@@ -31,6 +32,7 @@ public class ScriptScheduleMapper {
                 .scriptIds(input.getScriptIds())
                 .scriptCustomParams(toCustomParams(input.getScriptCustomParams()))
                 .trigger(defaultTrigger(input.getTrigger()))
+                .offlineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()))
                 .startAt(input.getStartAt())
                 .repeat(input.getRepeat())
                 .build();
@@ -43,6 +45,7 @@ public class ScriptScheduleMapper {
         existing.setScriptIds(input.getScriptIds());
         existing.setScriptCustomParams(toCustomParams(input.getScriptCustomParams()));
         existing.setTrigger(defaultTrigger(input.getTrigger()));
+        existing.setOfflineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()));
         existing.setSelectionMode(defaultSelectionMode(input.getSelectionMode()));
         existing.setStartAt(input.getStartAt());
         existing.setRepeat(input.getRepeat());
@@ -50,6 +53,10 @@ public class ScriptScheduleMapper {
 
     private static ScriptScheduleTrigger defaultTrigger(ScriptScheduleTrigger trigger) {
         return trigger != null ? trigger : ScriptScheduleTrigger.DATE_TIME;
+    }
+
+    private static ScheduleOfflineBehavior defaultOfflineBehavior(ScheduleOfflineBehavior behavior) {
+        return behavior != null ? behavior : ScheduleOfflineBehavior.SKIP;
     }
 
     private static ScheduleDeviceSelectionMode defaultSelectionMode(ScheduleDeviceSelectionMode mode) {
@@ -67,6 +74,7 @@ public class ScriptScheduleMapper {
                 .selectionMode(defaultSelectionMode(entity.getSelectionMode()))
                 .deviceCriteria(entity.getDeviceCriteria())
                 .trigger(defaultTrigger(entity.getTrigger()))
+                .offlineBehavior(defaultOfflineBehavior(entity.getOfflineBehavior()))
                 .startAt(entity.getStartAt())
                 .repeat(entity.getRepeat())
                 .nextRunAt(entity.getNextRunAt())
