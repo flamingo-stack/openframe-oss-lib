@@ -210,6 +210,8 @@ export interface CreateDesignDocData {
   slug: string
   tier: DesignDocTier
   summary?: string | null
+  /** Spec markdown (Why / What / How); the create screen carries the same body editor as edit. */
+  content?: string | null
   /** DRI; defaults to the caller. */
   author_id?: string | null
   participants: CreateDesignDocParticipantInput[]
