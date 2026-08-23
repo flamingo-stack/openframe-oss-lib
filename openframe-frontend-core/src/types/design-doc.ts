@@ -30,7 +30,7 @@ export type DesignDocCommentType = (typeof DESIGN_DOC_COMMENT_TYPES)[number]
 export const DESIGN_DOC_COMMENT_STATUSES = ['open', 'resolved', 'declined'] as const
 export type DesignDocCommentStatus = (typeof DESIGN_DOC_COMMENT_STATUSES)[number]
 
-export const DESIGN_DOC_LINK_TYPES = ['roadmap_task', 'figma', 'claude_artifact', 'claude_design', 'prototype', 'brief', 'other'] as const
+export const DESIGN_DOC_LINK_TYPES = ['roadmap_task', 'figma', 'claude_artifact', 'claude_design', 'brief', 'other'] as const
 export type DesignDocLinkType = (typeof DESIGN_DOC_LINK_TYPES)[number]
 
 export const DESIGN_DOC_MEDIA_TYPES = ['image', 'video', 'screenshot', 'demo'] as const
