@@ -170,7 +170,10 @@ impl ToolConnectionProcessingManager {
                     Ok(Some(_)) => {}
                     Ok(None) => {
                         info!(tool_id = %tool.tool_id, "Tool no longer installed - stopping connection processing");
-                        break;
+                        // Clean up before exiting so a reinstall with the same tool_id can spawn a fresh loop.
+                        wake_signals.write().await.remove(&tool.tool_id);
+                        running_tools.write().await.remove(&tool.tool_id);
+                        return;
                     }
                     Err(e) => {
                         warn!(tool_id = %tool.tool_id, "Cannot read installed tools registry: {e:#} - retrying");
@@ -334,8 +337,11 @@ impl ToolConnectionProcessingManager {
             }
 
             // Drop the wake entry before the mark so a successor loop's fresh entry can't be clobbered.
-            wake_signals.write().await.remove(&tool.tool_id);
-            running_tools.write().await.remove(&tool.tool_id);
+            #[allow(unreachable_code)]
+            {
+                wake_signals.write().await.remove(&tool.tool_id);
+                running_tools.write().await.remove(&tool.tool_id);
+            }
         });
 
         Ok(())
