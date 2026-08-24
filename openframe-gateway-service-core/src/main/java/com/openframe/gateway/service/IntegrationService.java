@@ -55,7 +55,7 @@ public class IntegrationService {
                 return true;
             }
         }
-        return environment.getActiveProfiles().length == 0; // Default to local if no profile set
+        return false; // Fail closed: do not rewrite URLs if no profile is explicitly set
     }
 
     public Mono<String> testIntegrationConnection(String toolId) {
