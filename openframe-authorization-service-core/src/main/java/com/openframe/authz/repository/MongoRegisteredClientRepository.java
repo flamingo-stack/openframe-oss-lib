@@ -24,12 +24,17 @@ public class MongoRegisteredClientRepository implements RegisteredClientReposito
 
     @Override
     public void save(RegisteredClient registeredClient) {
+        String id = registeredClient.getId() != null ? registeredClient.getId() : UUID.randomUUID().toString();
+        Set<String> authenticationMethods = registeredClient.getClientAuthenticationMethods().stream()
+                .map(ClientAuthenticationMethod::getValue).collect(Collectors.toSet());
+        Set<String> grantTypes = registeredClient.getAuthorizationGrantTypes().stream()
+                .map(AuthorizationGrantType::getValue).collect(Collectors.toSet());
         MongoRegisteredClient doc = MongoRegisteredClient.builder()
-                .id(registeredClient.getId() != null ? registeredClient.getId() : UUID.randomUUID().toString())
+                .id(id)
                 .clientId(registeredClient.getClientId())
                 .clientSecret(registeredClient.getClientSecret())
-                .authenticationMethods(registeredClient.getClientAuthenticationMethods().stream().map(ClientAuthenticationMethod::getValue).collect(Collectors.toSet()))
-                .grantTypes(registeredClient.getAuthorizationGrantTypes().stream().map(AuthorizationGrantType::getValue).collect(Collectors.toSet()))
+                .authenticationMethods(authenticationMethods)
+                .grantTypes(grantTypes)
                 .redirectUris(registeredClient.getRedirectUris())
                 .scopes(registeredClient.getScopes())
                 .requireProofKey(registeredClient.getClientSettings().isRequireProofKey())
