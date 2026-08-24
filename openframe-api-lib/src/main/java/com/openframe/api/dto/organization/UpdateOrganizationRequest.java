@@ -2,7 +2,10 @@ package com.openframe.api.dto.organization;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.PositiveOrZero;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,27 +15,30 @@ import java.time.LocalDate;
  * Used by both GraphQL (api-service-core) and REST (external-api).
  * All fields are optional - only provided fields will be updated.
  */
+@Getter
 @Builder
-public record UpdateOrganizationRequest(
-        String name,
+@NoArgsConstructor
+@AllArgsConstructor
+public class UpdateOrganizationRequest {
+        private String name;
 
-        String category,
+        private String category;
 
         @PositiveOrZero(message = "Number of employees must be zero or positive")
-        Integer numberOfEmployees,
+        private Integer numberOfEmployees;
 
-        String websiteUrl,
+        private String websiteUrl;
 
-        String notes,
+        private String notes;
 
         @Valid
-        ContactInformationDto contactInformation,
+        private ContactInformationDto contactInformation;
 
         @PositiveOrZero(message = "Monthly revenue must be zero or positive")
-        BigDecimal monthlyRevenue,
+        private BigDecimal monthlyRevenue;
 
-        LocalDate contractStartDate,
+        private LocalDate contractStartDate;
 
-        LocalDate contractEndDate
-) {
+        private LocalDate contractEndDate;
 }
+
