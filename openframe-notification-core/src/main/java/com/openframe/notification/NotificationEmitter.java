@@ -7,7 +7,6 @@ import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
 import com.openframe.notification.spec.NotificationSeed;
-import com.openframe.notification.spec.NotificationText;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
 import com.openframe.notification.spec.NotificationTypeSpec;
@@ -50,16 +49,14 @@ public class NotificationEmitter {
                                                                                  String correlationId) {
         Class<S> seedClass = spec.getSeedClass();
         S typed = seedClass.cast(seed);
+
         Attrs attrs = spec.attrs(typed);
-        Audience audience = spec.audience(typed);
-
-        NotificationText text = spec.compose(attrs);
-        String title = text.getTitle();
-        String description = text.getDescription();
-
         Map<String, String> attributes = attrs.asMap();
+        Audience audience = spec.audience(typed);
+        String title = spec.composeTitle(typed);
+        String description = spec.composeDescription(typed);
+        NotificationContext legacyContext = spec.buildLegacyContext(typed);
         NotificationSeverity severity = spec.getSeverity();
-        NotificationContext legacyContext = spec.buildLegacyContext(attrs);
         NotificationType specType = spec.getType();
         return NotificationCommand.builder()
                 .type(specType)
