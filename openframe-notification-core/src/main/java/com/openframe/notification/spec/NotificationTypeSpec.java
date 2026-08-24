@@ -24,7 +24,9 @@ public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     NotificationSeverity getSeverity();
 
-    Audience audience(Attrs attrs);
+    // Recipients come from the seed, not from stored attributes: an audience-only fact (e.g. a
+    // recipient-id list) must be routable without ever landing in the client-visible attribute map.
+    Audience audience(S seed);
 
     NotificationText compose(Attrs attrs);
 

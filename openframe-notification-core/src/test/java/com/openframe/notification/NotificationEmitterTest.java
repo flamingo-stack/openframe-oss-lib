@@ -116,7 +116,7 @@ class NotificationEmitterTest {
         @Override public Optional<NotificationSettingGroup> getSettingsGroup() { return Optional.empty(); }
         @Override public NotificationCategory getCategory() { return NotificationCategory.TICKETS; }
         @Override public NotificationSeverity getSeverity() { return NotificationSeverity.INFO; }
-        @Override public Audience audience(Attrs attrs) { return audience; }
+        @Override public Audience audience(TestSeed seed) { return audience; }
 
         @Override public Attrs attrs(TestSeed seed) {
             return Attrs.of(Map.of("ticketId", seed.ticketId())).with(ASSIGNEE, seed.assigneeUserId());

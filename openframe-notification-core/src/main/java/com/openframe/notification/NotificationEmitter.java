@@ -35,10 +35,7 @@ public class NotificationEmitter {
         NotificationType type = seed.type();
         try {
             NotificationTypeSpec<?> spec = registry.require(type);
-            Attrs attrs = mapToAttrs(spec, seed);
-
-            Audience declared = spec.audience(attrs);
-            NotificationCommand command = buildCommand(correlationId, spec, attrs, declared);
+            NotificationCommand command = buildCommand(spec, seed, correlationId);
             broadcaster.broadcast(command);
         } catch (RuntimeException ex) {
             log.error("Notification emission failed for type {} — swallowed, business flow unaffected",
@@ -48,17 +45,14 @@ public class NotificationEmitter {
 
     // The cast is the wiring check: a seed whose type() routes to a spec built for another
     // seed class fails loudly here, not with a mystery deep inside the spec.
-    private static <S extends NotificationSeed> Attrs mapToAttrs(NotificationTypeSpec<S> spec,
-                                                                 NotificationSeed seed) {
+    private static <S extends NotificationSeed> NotificationCommand buildCommand(NotificationTypeSpec<S> spec,
+                                                                                 NotificationSeed seed,
+                                                                                 String correlationId) {
         Class<S> seedClass = spec.getSeedClass();
         S typed = seedClass.cast(seed);
-        return spec.attrs(typed);
-    }
+        Attrs attrs = spec.attrs(typed);
+        Audience audience = spec.audience(typed);
 
-    private static NotificationCommand buildCommand(String correlationId,
-                                                    NotificationTypeSpec<?> spec,
-                                                    Attrs attrs,
-                                                    Audience audience) {
         NotificationText text = spec.compose(attrs);
         String title = text.getTitle();
         String description = text.getDescription();
