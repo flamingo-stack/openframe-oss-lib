@@ -1,6 +1,14 @@
 package com.openframe.data.document.rmm.filter;
 
-public record ExecutionOwnerScope(Type type, String id) {
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
+public class ExecutionOwnerScope {
+
+    private final Type type;
+    private final String id;
 
     public enum Type {
         SCRIPT, SCHEDULE
