@@ -13,29 +13,102 @@ import type { DepartmentRef } from './department'
 import type { EmployeeDirectoryRow } from './employee'
 
 // ---------------------------------------------------------------------------
-// Value vocabularies — TYPES ONLY.
+// Value vocabularies — DATA, not source code.
 //
-// The runtime lists live ONCE, in the hub's `lib/utils/design-doc-gate.ts`,
-// beside the labels and badge colors that make them useful; that module pins
-// each tuple against the union here at compile time, so the two cannot drift.
-// Declaring `as const` arrays here as well would ship a second copy of every
-// vocabulary that nothing reads — the copy a future contributor edits expecting
-// an effect.
+// Every enumerable design-doc value (doc status, tier, participant status,
+// comment type/status, link type, media type) is a row in the
+// `design_doc_vocabulary` table, with its label, badge colour, display order
+// and the semantic ROLES it claims. Nothing here lists members: a union of
+// literals would be a second, stale copy of that table and would make adding a
+// status a deploy instead of an INSERT.
+//
+// What stays in code is the CAPABILITY vocabulary — the role names the gate
+// understands and the renderers a link type can bind to (both declared in the
+// hub's `lib/utils/design-doc-gate.ts`). A row participates by CLAIMING a
+// capability; no engine rule ever names a value.
+//
+// The aliases below are documentation, not constraints: they mark which
+// vocabulary a string belongs to. Values are validated at the edge (the DAL
+// checks membership against the live table) and by the database itself (each
+// value column carries a composite FK into `design_doc_vocabulary`).
 // ---------------------------------------------------------------------------
 
-export type DesignDocStatus = 'draft' | 'in_review' | 'approved' | 'building' | 'shipped' | 'abandoned'
+/** One value of `design_doc_vocabulary.kind` — the STRUCTURAL list (one per
+ *  value column), the only design-doc vocabulary that is code. */
+export type DesignDocVocabularyKind =
+  | 'status'
+  | 'tier'
+  | 'participant_status'
+  | 'comment_type'
+  | 'comment_status'
+  | 'link_type'
+  | 'media_type'
 
-export type DesignDocTier = 'S' | 'M' | 'L'
+/** A `design_doc_vocabulary` row, as the DAL and the vocabulary API return it. */
+export interface DesignDocVocabularyOption {
+  id: number
+  kind: DesignDocVocabularyKind
+  value: string
+  label: string
+  /** A `StatusBadge` colorScheme name (validated against the badge's own union
+   *  when the hub reads the row — an unknown scheme degrades to 'default'). */
+  color_scheme: string
+  /** Human copy for surfaces that explain a value rather than just naming it
+   *  (the dashboard's stat tiles). */
+  description: string | null
+  display_order: number
+  is_active: boolean
+  /** Engine capabilities this member claims (`complete`, `blocks_approval`,
+   *  `locked`, …). The names live in the hub's gate module. */
+  roles: string[]
+  /** link_type only: which renderer previews it. */
+  render: DesignDocLinkRender | null
+  /** link_type only: the markdown shortcode that embeds it, and whether that
+   *  shortcode takes the author's `|title`. */
+  embed_shortcode: string | null
+  embed_with_title: boolean
+  /** link_type only: where the artifact comes from, shown beside the label. */
+  source: string | null
+  placeholder: string | null
+  /** status only: the verb on the button that moves a doc INTO this status. */
+  action_label: string | null
+}
 
-export type DesignDocParticipantStatus = 'pending' | 'in_progress' | 'completed' | 'blocked'
+/** How the doc page previews a link type. A CAPABILITY (each key is a
+ *  component in the renderer), so this one IS code — a DB row binds to it. */
+export type DesignDocLinkRender = 'task' | 'figma' | 'claude' | 'link'
 
-export type DesignDocCommentType = 'blocking' | 'suggestion' | 'question' | 'note'
+/** One legal status move, resolved to values by the DAL. */
+export interface DesignDocStatusTransition {
+  from: string
+  to: string
+  /** From-specific button copy when it differs from the target's verb
+   *  (`abandoned -> draft` reads "Reopen", not "Back to draft"). */
+  action_label: string | null
+  display_order: number
+}
 
-export type DesignDocCommentStatus = 'open' | 'resolved' | 'declined'
+/** The whole vocabulary in one payload — what every surface (server gate,
+ *  client badges, pickers, validators) reads instead of a literal list. */
+export interface DesignDocVocabulary {
+  options: DesignDocVocabularyOption[]
+  transitions: DesignDocStatusTransition[]
+}
 
-export type DesignDocLinkType = 'roadmap_task' | 'figma' | 'claude_artifact' | 'claude_design' | 'brief' | 'other'
-
-export type DesignDocMediaType = 'image' | 'video' | 'screenshot' | 'demo'
+/** A `design_doc_vocabulary.value` of kind `status`. */
+export type DesignDocStatus = string
+/** A `design_doc_vocabulary.value` of kind `tier`. */
+export type DesignDocTier = string
+/** A `design_doc_vocabulary.value` of kind `participant_status`. */
+export type DesignDocParticipantStatus = string
+/** A `design_doc_vocabulary.value` of kind `comment_type`. */
+export type DesignDocCommentType = string
+/** A `design_doc_vocabulary.value` of kind `comment_status`. */
+export type DesignDocCommentStatus = string
+/** A `design_doc_vocabulary.value` of kind `link_type`. */
+export type DesignDocLinkType = string
+/** A `design_doc_vocabulary.value` of kind `media_type`. */
+export type DesignDocMediaType = string
 
 // ---------------------------------------------------------------------------
 // Rows (as returned by the hub DAL — hydrated)
@@ -286,10 +359,10 @@ export interface DesignDocListResponse {
 
 export interface DesignDocStats {
   total: number
-  draft: number
-  in_review: number
-  approved: number
-  building: number
+  /** One count per `status` vocabulary row (zeros included), keyed by value —
+   *  never a fixed set of named keys, so a status added to the table gets a
+   *  tile without a type change. */
+  by_status: Record<string, number>
   waiting_on_me_docs: number
   waiting_on_me_tasks: number
 }
