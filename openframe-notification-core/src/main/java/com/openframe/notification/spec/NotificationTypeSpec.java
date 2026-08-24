@@ -14,8 +14,7 @@ public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     Class<S> getSeedClass();
 
-    // Pure seed → stored-attributes mapping. No I/O in specs: the seed arrives self-contained,
-    // and a fetch here would re-read what the producer already held at the emitting moment.
+    // Pure seed → stored-attributes projection: the only place deciding what clients see.
     Attrs attrs(S seed);
 
     Optional<NotificationSettingGroup> getSettingsGroup();
@@ -24,18 +23,16 @@ public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     NotificationSeverity getSeverity();
 
-    Audience audience(Attrs attrs);
+    Audience audience(S seed);
 
-    NotificationText compose(Attrs attrs);
+    String composeTitle(S seed);
 
-    default NotificationText composeForMachine(Attrs attrs) {
-        return compose(attrs);
-    }
+    String composeDescription(S seed);
 
     default Set<AttrKey> getPushActionKeys() {
         return Set.of();
     }
 
     // Transitional — deleted together with the legacy context classes; do not build on it.
-    NotificationContext buildLegacyContext(Attrs attrs);
+    NotificationContext buildLegacyContext(S seed);
 }

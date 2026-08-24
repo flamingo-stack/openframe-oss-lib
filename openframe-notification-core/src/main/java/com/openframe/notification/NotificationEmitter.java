@@ -7,7 +7,6 @@ import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
 import com.openframe.notification.spec.NotificationSeed;
-import com.openframe.notification.spec.NotificationText;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
 import com.openframe.notification.spec.NotificationTypeSpec;
@@ -35,10 +34,7 @@ public class NotificationEmitter {
         NotificationType type = seed.type();
         try {
             NotificationTypeSpec<?> spec = registry.require(type);
-            Attrs attrs = mapToAttrs(spec, seed);
-
-            Audience declared = spec.audience(attrs);
-            NotificationCommand command = buildCommand(correlationId, spec, attrs, declared);
+            NotificationCommand command = buildCommand(spec, seed, correlationId);
             broadcaster.broadcast(command);
         } catch (RuntimeException ex) {
             log.error("Notification emission failed for type {} — swallowed, business flow unaffected",
@@ -48,24 +44,19 @@ public class NotificationEmitter {
 
     // The cast is the wiring check: a seed whose type() routes to a spec built for another
     // seed class fails loudly here, not with a mystery deep inside the spec.
-    private static <S extends NotificationSeed> Attrs mapToAttrs(NotificationTypeSpec<S> spec,
-                                                                 NotificationSeed seed) {
+    private static <S extends NotificationSeed> NotificationCommand buildCommand(NotificationTypeSpec<S> spec,
+                                                                                 NotificationSeed seed,
+                                                                                 String correlationId) {
         Class<S> seedClass = spec.getSeedClass();
         S typed = seedClass.cast(seed);
-        return spec.attrs(typed);
-    }
 
-    private static NotificationCommand buildCommand(String correlationId,
-                                                    NotificationTypeSpec<?> spec,
-                                                    Attrs attrs,
-                                                    Audience audience) {
-        NotificationText text = spec.compose(attrs);
-        String title = text.getTitle();
-        String description = text.getDescription();
-
+        Attrs attrs = spec.attrs(typed);
         Map<String, String> attributes = attrs.asMap();
+        Audience audience = spec.audience(typed);
+        String title = spec.composeTitle(typed);
+        String description = spec.composeDescription(typed);
+        NotificationContext legacyContext = spec.buildLegacyContext(typed);
         NotificationSeverity severity = spec.getSeverity();
-        NotificationContext legacyContext = spec.buildLegacyContext(attrs);
         NotificationType specType = spec.getType();
         return NotificationCommand.builder()
                 .type(specType)
