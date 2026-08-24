@@ -11,7 +11,6 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
-import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.shared.ConnectionArgs;
@@ -99,7 +98,7 @@ public class DeviceDataFetcher {
             @InputArgument String search,
             @InputArgument @Valid SortInput sort) {
 
-        log.debug("Fetching devices with filter: {}, first: {}, after: {}, last: {}, before: {}, search: {}, sort: {}",
+        log.debug("Fetching devices with filter: {}, first: {}, after: {}, last: {}, search: {}, sort: {}",
             filter, first, after, last, before, search, sort);
         DeviceFilterCriteria filterOptions = mapper.toDeviceFilterCriteria(filter);
         ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
@@ -182,3 +181,4 @@ public class DeviceDataFetcher {
     }
 
 }
+
