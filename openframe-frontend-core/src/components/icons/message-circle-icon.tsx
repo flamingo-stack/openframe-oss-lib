@@ -4,11 +4,11 @@ import React from "react"
 export interface MessageCircleIconProps extends React.SVGProps<SVGSVGElement> { }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function MessageCircleIcon({ className = "h-6 w-6", color = 'white', ...props }: MessageCircleIconProps) {
+export function MessageCircleIcon({ className = "h-6 w-6", color = 'white', width = "24", height = "24", ...props }: MessageCircleIconProps) {
   return (
     <svg
-      width="24"
-      height="24"
+      width={width}
+      height={height}
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
