@@ -212,6 +212,7 @@ impl Service {
                         let machine_info = PersistedMachineInfo {
                             machine_id,
                             client_secret,
+                            user_id: None,
                         };
                         match machine_info_persistence::write(&machine_info) {
                             Ok(()) => info!("Machine info persisted successfully"),
@@ -731,8 +732,10 @@ impl Service {
     fn reg_value_to_string(raw: &winreg::RegValue) -> String {
         String::from_utf16_lossy(
             &raw.bytes
-                .chunks_exact(2)
-                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|c| u16::from_le_bytes(*c))
                 .collect::<Vec<u16>>(),
         )
         .trim_end_matches('\0')

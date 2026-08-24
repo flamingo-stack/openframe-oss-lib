@@ -2,7 +2,8 @@
 
 import { Button } from '../../ui/button/button'
 import { TicketStatusTag, resolveTicketStatus } from '../../ui/ticket-status-tag'
-import { Arrow02LeftIcon, Arrow02RightIcon, BoxArchiveIcon, PlusIcon } from '../../icons-v2-generated'
+import { TouchFriendlyTooltip } from '../../ui/touch-friendly-tooltip'
+import { Arrow02LeftIcon, Arrow02RightIcon, BoxArchiveIcon, InfoCircleIcon, PlusIcon } from '../../icons-v2-generated'
 import type { BoardColumnDef } from './types'
 
 export interface BoardColumnHeaderProps {
@@ -54,19 +55,24 @@ export function BoardColumnHeader({
   return (
     <div className="flex items-center gap-[var(--spacing-system-xsf)]">
       <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)]">
-        <TicketStatusTag
-          status={tagStatus}
-          label={column.label}
-          color={useStatusVariant ? undefined : column.color}
-        />
-        <span
-          className="text-h5"
-          style={useStatusVariant ? undefined : { color: column.color }}
-        >
+        <TicketStatusTag status={tagStatus} label={column.label} color={useStatusVariant ? undefined : column.color} />
+        <span className="text-h5" style={useStatusVariant ? undefined : { color: column.color }}>
           {count}
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-[var(--spacing-system-xxs)]">
+        {column.tooltip && (
+          <TouchFriendlyTooltip content={column.tooltip} side="bottom">
+            <Button
+              variant="transparent"
+              size="icon"
+              className="h-8 w-8 md:h-8 md:w-8 p-0"
+              aria-label={column.tooltip}
+            >
+              <InfoCircleIcon className="h-6 w-6 text-ods-text-secondary" />
+            </Button>
+          </TouchFriendlyTooltip>
+        )}
         <Button
           variant="transparent"
           size="icon"

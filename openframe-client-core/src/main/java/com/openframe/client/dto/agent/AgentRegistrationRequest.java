@@ -16,6 +16,8 @@ public class AgentRegistrationRequest {
     private String hostname;
     @NotBlank
     private String organizationId;
+    // User who installed the agent; optional — older agents don't send it
+    private String userId;
 
     // Network information
     private String ip;

@@ -21,12 +21,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
+import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 /**
  * Service for Fleet MDM cache operations using Spring Cache abstraction
  * Used in Fleet activities stream processing for enriching activities with:
  * - Agent information (host-to-agent mapping)
  * - Query definitions (query metadata by ID)
- * 
+ * <p>
  * Uses Fleet MDM SDK directly instead of database access
  *
  * <p><b>Tenant model.</b> In per-tenant clusters one client carries the deployment's
@@ -41,7 +45,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class FleetMdmCacheService {
 
-    @Value("${fleet.mdm.base-url}")
+    /**
+     * Static Fleet base URL. Optional: in the shared plane the URL is resolved per
+     * tenant by {@link FleetBaseUrlResolver}.
+     */
+    @Value("${fleet.mdm.base-url:}")
     private String baseUrl;
 
     @Value("${TENANT_ID:}")
@@ -56,15 +64,23 @@ public class FleetMdmCacheService {
 
     private final IntegratedToolService integratedToolService;
     private final ClusterTenantIdResolver clusterTenantIdResolver;
+    private final FleetBaseUrlResolver fleetBaseUrlResolver;
 
     public FleetMdmCacheService(IntegratedToolService integratedToolService,
-                                @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver) {
+                                @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver,
+                                @Autowired(required = false) FleetBaseUrlResolver fleetBaseUrlResolver) {
         this.integratedToolService = integratedToolService;
         this.clusterTenantIdResolver = clusterTenantIdResolver;
+        this.fleetBaseUrlResolver = fleetBaseUrlResolver;
     }
 
     @PostConstruct
     void validateTenantConfig() {
+        if (fleetBaseUrlResolver == null && isBlank(baseUrl)) {
+            throw new IllegalStateException(
+                    "fleet.mdm.base-url must be configured when no FleetBaseUrlResolver bean is "
+                            + "present to resolve the Fleet URL per tenant");
+        }
         // Shared cluster (per-event tenants via ClusterTenantIdResolver): a blank deployment
         // TENANT_ID is expected — every SDK call carries the event's own tenant instead.
         if (clusterTenantIdResolver != null) {
@@ -115,7 +131,9 @@ public class FleetMdmCacheService {
         return getQueryById(queryId, null);
     }
 
-    /** Tenant-aware variant for the shared cluster (see class javadoc; tenant-scoped cache key). */
+    /**
+     * Tenant-aware variant for the shared cluster (see class javadoc; tenant-scoped cache key).
+     */
     @Cacheable(value = "fleetQueryCache", key = "(#eventTenantId ?: 'default') + ':' + #queryId", unless = "#result == null")
     public Query getQueryById(Long queryId, String eventTenantId) {
         log.debug("Cache miss for query_id: {}, calling Fleet MDM API", queryId);
@@ -155,7 +173,9 @@ public class FleetMdmCacheService {
         log.debug("Evicted policy cache for policy_id: {}", policyId);
     }
 
-    /** Tenant-aware evict matching the tenant-scoped cache key of {@link #getPolicyById(Long, String)}. */
+    /**
+     * Tenant-aware evict matching the tenant-scoped cache key of {@link #getPolicyById(Long, String)}.
+     */
     @CacheEvict(value = "fleetPolicyCache", key = "(#eventTenantId ?: 'default') + ':' + #policyId")
     public void evictPolicyCache(Long policyId, String eventTenantId) {
         log.debug("Evicted policy cache for policy_id: {} tenant: {}", policyId, eventTenantId);
@@ -166,7 +186,9 @@ public class FleetMdmCacheService {
         return getPolicyById(policyId, null);
     }
 
-    /** Tenant-aware variant for the shared cluster (see class javadoc; tenant-scoped cache key). */
+    /**
+     * Tenant-aware variant for the shared cluster (see class javadoc; tenant-scoped cache key).
+     */
     @Cacheable(value = "fleetPolicyCache", key = "(#eventTenantId ?: 'default') + ':' + #policyId", unless = "#result == null || !#result.isPresent()")
     public Optional<Policy> getPolicyById(Long policyId, String eventTenantId) {
         log.debug("Cache miss for policy_id: {}, calling Fleet MDM API", policyId);
@@ -188,6 +210,8 @@ public class FleetMdmCacheService {
         }
     }
 
+    // Per-tenant clusters only: reached from clientFor when no ClusterTenantIdResolver is
+    // deployed. validateTenantConfig has already guaranteed a non-blank baseUrl on that path.
     private FleetMdmClient getFleetMdmClient() {
         if (fleetMdmClient == null) {
             String apiKey = resolveApiKey();
@@ -206,25 +230,47 @@ public class FleetMdmCacheService {
      * clients share the tool credential and base URL and differ only in the X-Tenant-Id header.
      */
     private FleetMdmClient clientFor(String eventTenantId) {
-        if (eventTenantId == null || eventTenantId.isBlank()) {
-            // Shared cluster (per-event tenants): an unresolved event tenant means the event is
-            // headed for the fail-closed drop anyway — skip the lookup instead of calling the
-            // shared Fleet without X-Tenant-Id, which its middleware would 401.
-            if (clusterTenantIdResolver != null) {
-                log.debug("No event tenant resolved — skipping Fleet API lookup in shared cluster");
-                return null;
-            }
-            // Tenant cluster: the deployment client carries the TENANT_ID env pin.
-            return getFleetMdmClient();
+        if (isBlank(eventTenantId)) {
+            return clientForUnresolvedTenant();
         }
-        return clientByTenant.computeIfAbsent(eventTenantId, tenant -> {
-            String apiKey = resolveApiKey();
-            if (apiKey == null) {
-                return null;
-            }
-            log.info("Initializing FleetMdmClient for tenant {} with baseUrl: {}", tenant, baseUrl);
-            return new FleetMdmClient(baseUrl, apiKey, tenant);
-        });
+        return clientByTenant.computeIfAbsent(eventTenantId, this::buildTenantClient);
+    }
+
+    private FleetMdmClient clientForUnresolvedTenant() {
+        if (clusterTenantIdResolver != null) {
+            log.debug("No event tenant resolved — skipping Fleet API lookup in shared cluster");
+            return null;
+        }
+        return getFleetMdmClient();
+    }
+
+    private FleetMdmClient buildTenantClient(String tenant) {
+        String tenantBaseUrl = baseUrlFor(tenant);
+        if (tenantBaseUrl == null) {
+            log.debug("No Fleet base URL for tenant {} — skipping Fleet API lookup", tenant);
+            return null;
+        }
+        String apiKey = resolveApiKey();
+        if (apiKey == null) {
+            return null;
+        }
+        log.info("Initializing FleetMdmClient for tenant {} with baseUrl: {}", tenant, tenantBaseUrl);
+        return new FleetMdmClient(tenantBaseUrl, apiKey, tenant);
+    }
+
+    String baseUrlFor(String tenantId) {
+        if (fleetBaseUrlResolver == null) {
+            return defaultIfBlank(baseUrl, null);
+        }
+        String resolved = fleetBaseUrlResolver.resolveBaseUrl(tenantId);
+        if (isNotBlank(resolved)) {
+            return resolved;
+        }
+        if (isNotBlank(baseUrl)) {
+            log.warn("No per-tenant Fleet base URL for tenant {} — falling back to the static base url", tenantId);
+            return baseUrl;
+        }
+        return null;
     }
 
     private String resolveApiKey() {
@@ -246,4 +292,3 @@ public class FleetMdmCacheService {
         return cachedApiKey;
     }
 }
-

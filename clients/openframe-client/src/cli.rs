@@ -29,6 +29,9 @@ struct InstallArgs {
     #[arg(long = "orgId")]
     org_id: Option<String>,
 
+    #[arg(long = "userId")]
+    user_id: Option<String>,
+
     #[arg(long = "tag")]
     tags: Vec<String>,
 }
@@ -39,6 +42,7 @@ impl InstallArgs {
             server_url: self.server_url.clone(),
             initial_key: self.initial_key.clone(),
             org_id: self.org_id.clone(),
+            user_id: self.user_id.clone(),
             local_mode: self.local_mode,
             tags: self.tags.clone(),
         }

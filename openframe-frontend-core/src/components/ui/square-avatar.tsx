@@ -80,6 +80,11 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
         {resolvedSrc && (
           <Image
             className="absolute -inset-px h-[calc(100%+2px)] w-[calc(100%+2px)] max-w-none object-cover"
+            // Images are draggable by default, and a draggable child WINS over a
+            // draggable ancestor: an avatar inside a drag-and-drop card lets the
+            // browser start its own "drag this picture" instead of the card's
+            // drag, so grabbing a card by its assignee did nothing.
+            draggable={false}
             src={resolvedSrc}
             alt={alt || ''}
             width={sizePx ?? sizePxBySize[size]}

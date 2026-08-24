@@ -11,7 +11,7 @@ import { ColorPresetSelect, ColorPickerInput } from './color-preset-select'
 import { Input } from './input'
 import { type TagProps } from './tag'
 import { TicketStatusTag } from './ticket-status-tag'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
+import { TouchFriendlyTooltip } from './touch-friendly-tooltip'
 
 type SystemTagVariant = Extract<TagProps['variant'], 'outline' | 'primary'>
 
@@ -35,56 +35,6 @@ export interface TicketStatusConfigRowProps {
   dragHandleProps?: DraggableSyntheticListeners
   dragHandleAttributes?: DraggableAttributes
   isDragging?: boolean
-}
-
-let dismissOpenTooltip: (() => void) | null = null
-
-function WithLeftTooltip({ content, children }: { content?: string; children: React.ReactElement }) {
-  const [open, setOpen] = React.useState(false)
-  const isTouchRef = React.useRef(false)
-  const close = React.useCallback(() => setOpen(false), [])
-
-  if (!content) return children
-
-  const toggleFromTouch = () => {
-    setOpen(prev => {
-      const next = !prev
-      if (next) {
-        if (dismissOpenTooltip && dismissOpenTooltip !== close) dismissOpenTooltip()
-        dismissOpenTooltip = close
-      } else if (dismissOpenTooltip === close) {
-        dismissOpenTooltip = null
-      }
-      return next
-    })
-  }
-
-  return (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip open={open} onOpenChange={setOpen}>
-        <TooltipTrigger
-          asChild
-          onPointerDown={e => {
-            isTouchRef.current = e.pointerType === 'touch'
-            if (!isTouchRef.current) return
-            e.preventDefault()
-            toggleFromTouch()
-          }}
-          onFocus={e => {
-            if (isTouchRef.current) e.preventDefault()
-          }}
-          onClick={e => {
-            if (isTouchRef.current) e.preventDefault()
-          }}
-        >
-          {children}
-        </TooltipTrigger>
-        <TooltipContent side="left" className="max-w-xs">
-          {content}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
 }
 
 export function TicketStatusConfigRow({
@@ -179,7 +129,7 @@ export function TicketStatusConfigRow({
 
       <div className="flex h-11 w-12 shrink-0 items-center justify-center md:h-12">
         {isSystem ? (
-          <WithLeftTooltip content={systemTooltip}>
+          <TouchFriendlyTooltip content={systemTooltip}>
             <button
               type="button"
               aria-label={systemTooltip ?? 'System status'}
@@ -187,9 +137,9 @@ export function TicketStatusConfigRow({
             >
               <InfoCircleIcon size={24} />
             </button>
-          </WithLeftTooltip>
+          </TouchFriendlyTooltip>
         ) : (
-          <WithLeftTooltip content={deleteDisabled ? deleteDisabledReason : undefined}>
+          <TouchFriendlyTooltip content={deleteDisabled ? deleteDisabledReason : undefined}>
             <span className="inline-flex">
               <Button
                 type="button"
@@ -203,7 +153,7 @@ export function TicketStatusConfigRow({
                 <TrashIcon className="text-ods-error"/>
               </Button>
             </span>
-          </WithLeftTooltip>
+          </TouchFriendlyTooltip>
         )}
       </div>
     </div>

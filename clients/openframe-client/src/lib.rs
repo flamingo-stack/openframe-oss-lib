@@ -54,6 +54,7 @@ use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
 use crate::services::github_download_service::GithubDownloadService;
+use crate::services::hostname_report_publisher::HostnameReportPublisher;
 use crate::services::initial_authentication_processor::InitialAuthenticationProcessor;
 use crate::services::installed_agent_message_publisher::InstalledAgentMessagePublisher;
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
@@ -161,6 +162,7 @@ pub struct Client {
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
+    hostname_report_publisher: HostnameReportPublisher,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
     openframe_client_info_service: OpenFrameClientInfoService,
@@ -234,7 +236,7 @@ impl Client {
         // Initialize registration service
         let registration_service = AgentRegistrationService::new(
             registration_client,
-            device_data_fetcher,
+            device_data_fetcher.clone(),
             config_service.clone(),
             initial_configuration_service.clone(),
         );
@@ -508,6 +510,12 @@ impl Client {
         let machine_heartbeat_run_manager =
             MachineHeartbeatRunManager::new(machine_heartbeat_publisher);
 
+        let hostname_report_publisher = HostnameReportPublisher::new(
+            nats_message_publisher.clone(),
+            config_service.clone(),
+            device_data_fetcher.clone(),
+        );
+
         Ok(Self {
             config,
             directory_manager,
@@ -527,6 +535,7 @@ impl Client {
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
+            hostname_report_publisher,
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
             openframe_client_info_service,
@@ -586,6 +595,9 @@ impl Client {
 
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();
+
+        // One-shot hostname report: client startup covers both machine and client restarts.
+        self.hostname_report_publisher.publish().await;
 
         //Start tool installation message listener in background
         self.tool_installation_message_listener.start().await?;

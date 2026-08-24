@@ -29,6 +29,7 @@ public class Machine implements TenantScoped {
     private Instant lastSeen;
     @Indexed
     private String organizationId;
+    private String userId;      // User who installed the agent; optional, absent for older registrations
     private String hostname;
     private String displayName;
     private String nickname;

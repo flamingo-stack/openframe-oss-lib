@@ -71,7 +71,7 @@ export const ReopenedWithReason: Story = {
 	},
 };
 
-/** Reopened into AI Assistance (targetStatusKind decides) — Figma type=reopened-fae. */
+/** Reopened into AI Handling (targetStatusKind decides) — Figma type=reopened-fae. */
 export const ReopenedFaeContinues: Story = {
 	args: {
 		data: { kind: "REOPENED", actorId: "u-7", actorName: "John Smith", actorType: "CLIENT", targetStatusKind: "AI_ASSISTANCE" },
