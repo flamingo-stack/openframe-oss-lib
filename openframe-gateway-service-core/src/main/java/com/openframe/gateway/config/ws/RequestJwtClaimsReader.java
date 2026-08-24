@@ -1,7 +1,7 @@
 package com.openframe.gateway.config.ws;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.JwtParser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -11,13 +11,14 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static com.openframe.gateway.config.ws.ToolWebSocketProxyUrlFilter.ORIGINAL_AUTHORIZATION_ATTR;
-import static com.openframe.gateway.config.ws.WebSocketServiceSecurityDecorator.CLOCK_SKEW_SECONDS;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
 @RequiredArgsConstructor
 public class RequestJwtClaimsReader {
+
+    private final JwtParser jwtParser;
 
     public Instant getExpiration(ServerWebExchange exchange) {
         Claims jwtClaims = getClaims(exchange);
@@ -44,11 +45,9 @@ public class RequestJwtClaimsReader {
             throw new IllegalStateException("No bearer token in Authorization header");
         }
 
-        String jwtClaimsPart = authorization.substring(7, authorization.lastIndexOf('.') + 1);
-        return Jwts.parserBuilder()
-                .setAllowedClockSkewSeconds(CLOCK_SKEW_SECONDS)
-                .build()
-                .parseClaimsJwt(jwtClaimsPart)
+        String jwt = authorization.substring(7);
+        return jwtParser
+                .parseClaimsJws(jwt)
                 .getBody();
     }
 
@@ -63,3 +62,4 @@ public class RequestJwtClaimsReader {
     }
 
 }
+
