@@ -6,8 +6,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -15,9 +13,15 @@ public class ReleaseVersionQueryService {
 
     private final ReleaseVersionRepository releaseVersionRepository;
 
-    public Optional<ReleaseVersion> getReleaseVersion() {
+    public boolean hasReleaseVersion() {
+        log.debug("Checking current release version presence");
+        return releaseVersionRepository.findFirstBy().isPresent();
+    }
+
+    public ReleaseVersion releaseVersion() {
         log.debug("Retrieving current release version");
-        return releaseVersionRepository.findFirstBy();
+        return releaseVersionRepository.findFirstBy()
+                .orElseThrow(() -> new IllegalStateException("release version not found"));
     }
 }
 
