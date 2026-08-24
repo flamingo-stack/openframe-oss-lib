@@ -1,5 +1,7 @@
 package com.openframe.core.exception;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
 import java.util.Collections;
@@ -23,5 +25,10 @@ public class ValidationException extends BaseException {
         return fieldErrors;
     }
 
-    public record FieldError(String field, String message) {}
+    @Getter
+    @AllArgsConstructor
+    public static class FieldError {
+        private final String field;
+        private final String message;
+    }
 }
