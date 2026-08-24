@@ -44,6 +44,13 @@ public class RestProxyService {
             "retry-after",
             "x-fleet-capabilities");
 
+    /**
+     * Explicit allowlist of tool host names known to use self-signed/internal certificates. Only for
+     * these hosts is certificate validation relaxed; all other outbound proxy TLS connections use the
+     * default (secure) trust manager.
+     */
+    private static final Set<String> INSECURE_TLS_ALLOWED_HOSTS = Set.of();
+
     private final ReactiveIntegratedToolRepository toolRepository;
     private final ToolUpstreamResolverRegistry upstreamRegistry;
     private final ToolApiKeyHeadersResolver apiKeyHeadersResolver;
@@ -211,7 +218,7 @@ public class RestProxyService {
                     .onErrorResume(this::buildErrorResponse)
                     .doOnSuccess(response -> log.debug("Successfully proxied request to {}", tool.getName()))
                     .doOnError(error -> log.error("Failed to proxy request to {}: {}", tool.getName(),
-                            error.getMessage()));
+                            error.getMessage(), error));
         } catch (Exception e) {
             log.error("Failed to proxy request to {}: {}", tool.getName(), e.getMessage());
             return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()));
@@ -237,6 +244,8 @@ public class RestProxyService {
     }
 
     private HttpClient buildHttpClient(URI targetUri) {
+        boolean useInsecureTrust = targetUri.getHost() != null
+                && INSECURE_TLS_ALLOWED_HOSTS.contains(targetUri.getHost().toLowerCase(Locale.ROOT));
         return HttpClient.create()
                 .responseTimeout(Duration.ofSeconds(60))
                 .option(io.netty.channel.ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000)
@@ -247,12 +256,15 @@ public class RestProxyService {
                         .maxHeaderSize(16384)
                         .maxInitialLineLength(16384))
                 .secure(sslSpec -> {
+                    if (!useInsecureTrust) {
+                        return;
+                    }
                     try {
                         sslSpec.sslContext(io.netty.handler.ssl.SslContextBuilder.forClient()
                                 .trustManager(InsecureTrustManagerFactory.INSTANCE)
                                 .build());
                     } catch (SSLException e) {
-                        log.error("Error configuring SSL context: {}", e.getMessage());
+                        log.error("Error configuring SSL context: {}", e.getMessage(), e);
                     }
                 })
                 .doOnConnected(conn -> {
