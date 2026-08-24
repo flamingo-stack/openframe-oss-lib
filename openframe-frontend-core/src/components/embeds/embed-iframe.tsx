@@ -93,7 +93,7 @@ export function EmbedIframe({
           allow={allow}
           referrerPolicy={referrerPolicy}
           loading={loading}
-          allowFullScreen={allow?.includes('fullscreen') ? undefined : allowFullScreen}
+          allowFullScreen={allowFullScreen}
         />
       </div>
     </>
