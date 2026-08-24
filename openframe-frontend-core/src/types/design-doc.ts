@@ -9,48 +9,43 @@
 import type { EntityAuthor } from './entity-author'
 import type { DeliveryItem } from './delivery'
 import type { DepartmentRef } from './department'
+import type { EmployeeDirectoryRow } from './employee'
 
 // ---------------------------------------------------------------------------
-// Value vocabularies (string unions + `as const` arrays; badge colors and
-// option labels are declared ONCE in the hub gate module, not here)
+// Value vocabularies — TYPES ONLY.
+//
+// The runtime lists live ONCE, in the hub's `lib/utils/design-doc-gate.ts`,
+// beside the labels and badge colors that make them useful; that module pins
+// each tuple against the union here at compile time, so the two cannot drift.
+// Declaring `as const` arrays here as well would ship a second copy of every
+// vocabulary that nothing reads — the copy a future contributor edits expecting
+// an effect.
 // ---------------------------------------------------------------------------
 
-export const DESIGN_DOC_STATUSES = ['draft', 'in_review', 'approved', 'building', 'shipped', 'abandoned'] as const
-export type DesignDocStatus = (typeof DESIGN_DOC_STATUSES)[number]
+export type DesignDocStatus = 'draft' | 'in_review' | 'approved' | 'building' | 'shipped' | 'abandoned'
 
-export const DESIGN_DOC_TIERS = ['S', 'M', 'L'] as const
-export type DesignDocTier = (typeof DESIGN_DOC_TIERS)[number]
+export type DesignDocTier = 'S' | 'M' | 'L'
 
-export const DESIGN_DOC_PARTICIPANT_STATUSES = ['pending', 'in_progress', 'completed', 'blocked'] as const
-export type DesignDocParticipantStatus = (typeof DESIGN_DOC_PARTICIPANT_STATUSES)[number]
+export type DesignDocParticipantStatus = 'pending' | 'in_progress' | 'completed' | 'blocked'
 
-export const DESIGN_DOC_COMMENT_TYPES = ['blocking', 'suggestion', 'question', 'note'] as const
-export type DesignDocCommentType = (typeof DESIGN_DOC_COMMENT_TYPES)[number]
+export type DesignDocCommentType = 'blocking' | 'suggestion' | 'question' | 'note'
 
-export const DESIGN_DOC_COMMENT_STATUSES = ['open', 'resolved', 'declined'] as const
-export type DesignDocCommentStatus = (typeof DESIGN_DOC_COMMENT_STATUSES)[number]
+export type DesignDocCommentStatus = 'open' | 'resolved' | 'declined'
 
-export const DESIGN_DOC_LINK_TYPES = ['roadmap_task', 'figma', 'claude_artifact', 'claude_design', 'brief', 'other'] as const
-export type DesignDocLinkType = (typeof DESIGN_DOC_LINK_TYPES)[number]
+export type DesignDocLinkType = 'roadmap_task' | 'figma' | 'claude_artifact' | 'claude_design' | 'brief' | 'other'
 
-export const DESIGN_DOC_MEDIA_TYPES = ['image', 'video', 'screenshot', 'demo'] as const
-export type DesignDocMediaType = (typeof DESIGN_DOC_MEDIA_TYPES)[number]
+export type DesignDocMediaType = 'image' | 'video' | 'screenshot' | 'demo'
 
 // ---------------------------------------------------------------------------
 // Rows (as returned by the hub DAL — hydrated)
 // ---------------------------------------------------------------------------
 
-/** Minimal profile identity the DAL embeds on participants / comment authors. */
-export interface DesignDocPerson {
-  id: string
-  full_name: string | null
-  avatar_url: string | null
-  job_title?: string | null
-  /** Present on the DRI/detail payload only — never on list payloads. */
-  email?: string | null
-  department_id?: string | null
-  department?: DepartmentRef | null
-}
+/**
+ * The profile identity the DAL embeds on participants / comment authors — THE
+ * shared person projection, not a second declaration of it. `email` rides the
+ * detail payload only and is stripped from lists.
+ */
+export type DesignDocPerson = EmployeeDirectoryRow
 
 export interface DesignDocClickUpTask {
   id: number
