@@ -2,6 +2,8 @@ package com.openframe.gateway.config.ws;
 
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.socket.WebSocketHandler;
@@ -33,7 +35,14 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
     private final WebSocketLoggingProperties loggingProperties;
 
     private final ConcurrentMap<String, SessionInfo> sessionRegistry = new ConcurrentHashMap<>();
-    private record SessionInfo(Instant createdAt, String path, String sub) {}
+
+    @Getter
+    @AllArgsConstructor
+    private static class SessionInfo {
+        private final Instant createdAt;
+        private final String path;
+        private final String sub;
+    }
 
     @Override
     public Mono<Void> handleRequest(ServerWebExchange exchange, WebSocketHandler defaultWebSocketHandler) {
@@ -66,7 +75,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             : session;
                     return defaultWebSocketHandler.handle(sessionToHandle);
                 } catch (Exception e) {
-                    log.warn(LOG_PREFIX + "JWT expiration read failed, closing: {}", sessionId, path, sub, e.getMessage(), e);
+                    log.warn(LOG_PREFIX + "JWT expiration read failed, closing", sessionId, path, sub, e);
                     sessionRegistry.remove(sessionId);
                     return session.close();
                 }
@@ -122,9 +131,9 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                         status -> {
                             SessionInfo info = sessionRegistry.remove(sessionId);
                             long lifetimeSec = info != null
-                                    ? Duration.between(info.createdAt(), Instant.now()).getSeconds()
+                                    ? Duration.between(info.getCreatedAt(), Instant.now()).getSeconds()
                                     : -1;
-                            String logSub = info != null ? info.sub() : sub;
+                            String logSub = info != null ? info.getSub() : sub;
                             gatewayTrafficMetrics.webSocketClosed(sessionId, path, logSub);
                             gatewayTrafficMetrics.recordSessionClosed(toolFromPath(path), status.getCode(), lifetimeSec);
                             if (loggingProperties.isDebugPath(path)) {
