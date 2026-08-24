@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.NoSuchElementException;
 
 /**
  * Backs the "Schedule Runs" tab. One row per {@link ScheduleScriptExecution} header;
@@ -94,14 +94,18 @@ public class ScheduleRunService {
         return Sort.Direction.DESC;
     }
 
-    public Optional<ScheduleRunResponse> findById(String id) {
+    public boolean hasScheduleRun(String id) {
         String tenantId = tenantIdProvider.getTenantId();
-        return scheduleScriptExecutionRepository.findByTenantIdAndId(tenantId, id)
-                .map(h -> {
-                    Map<String, Long> respondedByExecutionId = scheduleScriptExecutionRepository
-                            .countRespondedDevicesByExecutionIds(tenantId, List.of(h.getExecutionId()));
-                    return toResponse(h, respondedByExecutionId.getOrDefault(h.getExecutionId(), 0L).intValue());
-                });
+        return scheduleScriptExecutionRepository.findByTenantIdAndId(tenantId, id).isPresent();
+    }
+
+    public ScheduleRunResponse scheduleRun(String id) {
+        String tenantId = tenantIdProvider.getTenantId();
+        ScheduleScriptExecution h = scheduleScriptExecutionRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new NoSuchElementException("Schedule run not found: " + id));
+        Map<String, Long> respondedByExecutionId = scheduleScriptExecutionRepository
+                .countRespondedDevicesByExecutionIds(tenantId, List.of(h.getExecutionId()));
+        return toResponse(h, respondedByExecutionId.getOrDefault(h.getExecutionId(), 0L).intValue());
     }
 
     private static ScheduleRunQueryFilter toQueryFilter(ScheduleRunFilterInput input) {
@@ -152,3 +156,4 @@ public class ScheduleRunService {
                 .build();
     }
 }
+
