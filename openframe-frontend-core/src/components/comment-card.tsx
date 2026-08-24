@@ -38,11 +38,16 @@ interface CommentCardProps {
   showVendorInfo?: boolean
   compact?: boolean
   /**
-   * `profile` / `vendor` = the OpenMSP comment sections (fixed-height list tiles).
-   * `design_doc` = the product-hub design-doc thread: full-height body, no vendor
-   * chrome, deletability decided by the caller via `comment.canDelete`.
+   * Which HEADER this tile shows: `profile` leads with the vendor button, the
+   * others lead with the commenter. It is presentation only — every BEHAVIOUR
+   * below is a prop, so a new surface never needs a new context member.
    */
   context: 'profile' | 'vendor' | 'design_doc'
+  /**
+   * Read the body in FULL (thread reading) instead of the fixed-height,
+   * three-line list tile. Defaults to the list tile.
+   */
+  fullBody?: boolean
   /** Rendered under the body — badges + per-surface actions (design-doc threads). */
   footer?: React.ReactNode
   /** Rendered after the card — nested replies + reply composer (design-doc threads). */
@@ -56,6 +61,7 @@ export function CommentCard({
   showVendorInfo = true,
   compact = false,
   context = 'profile',
+  fullBody = false,
   footer,
   children
 }: CommentCardProps) {
@@ -67,31 +73,19 @@ export function CommentCard({
   }
 
   // Check if current user can delete this comment
+  /**
+   * Deletability is the CALLER's rule, never a per-context branch in here: an
+   * explicit `comment.canDelete` always wins (design docs compute own-or-DRI
+   * with their gate module and hand it in), and the default is the only rule
+   * this component can honestly know by itself — your own comment.
+   */
   const canUserDeleteComment = () => {
-    // If not authenticated, can't delete
     if (!currentUser) return false
-    
-    // For profile context, use the existing canDelete prop (since it's the user's own comments)
-    if (context === 'profile') {
-      return comment.canDelete !== false
-    }
-    
-    // For vendor context, check if current user is the comment creator
-    if (context === 'vendor' && comment.user) {
-      return currentUser.id === comment.user.id
-    }
-
-    // Design-doc threads: ownership (own-or-DRI) is computed by the caller with the
-    // shared gate rule and handed in as `canDelete`.
-    if (context === 'design_doc') {
-      return comment.canDelete === true
-    }
-    
-    return false
+    if (typeof comment.canDelete === 'boolean') return comment.canDelete
+    return !!comment.user && currentUser.id === comment.user.id
   }
 
   const showDeleteButton = canUserDeleteComment()
-  const isThread = context === 'design_doc'
 
   return (
     <>
@@ -113,7 +107,7 @@ export function CommentCard({
                 {formatActivityTime(comment.createdAt)}
               </span>
             </>
-          ) : (context === 'vendor' || isThread) && comment.user ? (
+          ) : comment.user ? (
             <UserSummary
               name={comment.user.name}
               email=""
@@ -171,7 +165,7 @@ export function CommentCard({
             </h4>
           </div>
         )}
-        {isThread ? (
+        {fullBody ? (
           // Thread bodies are read in full — no fixed height, no clamp.
           <p className="text-h4 text-ods-text-primary whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'break-word', maxWidth: '100%' }}>
             {comment.content}
