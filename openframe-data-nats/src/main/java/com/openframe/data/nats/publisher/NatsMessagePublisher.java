@@ -1,7 +1,6 @@
 package com.openframe.data.nats.publisher;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.core.exception.NatsException;
 import io.nats.client.Connection;
 import io.nats.client.JetStream;
 import io.nats.client.api.PublishAck;
@@ -24,7 +23,7 @@ public class NatsMessagePublisher {
             byte[] body = objectMapper.writeValueAsBytes(payload);
             natsConnection.publish(subject, body);
         } catch (Exception e) {
-            throw new NatsException("Error publishing message to subject: " + subject, e);
+            log.error("Error publishing message to subject: {}", subject, e);
         }
     }
 
@@ -34,7 +33,8 @@ public class NatsMessagePublisher {
             byte[] body = objectMapper.writeValueAsBytes(payload);
             return js.publish(subject, body);
         } catch (Exception e) {
-            throw new NatsException("Error publishing persistent message to subject: " + subject, e);
+            log.error("Error publishing persistent message to subject: {}", subject, e);
+            return null;
         }
     }
 }
