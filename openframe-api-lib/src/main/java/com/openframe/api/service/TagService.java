@@ -30,8 +30,13 @@ public class TagService {
         this.tagAssignmentRepository = tagAssignmentRepository;
     }
 
-    public Optional<Tag> findById(String id) {
-        return tagRepository.findById(id);
+    public boolean hasTag(String id) {
+        return tagRepository.findById(id).isPresent();
+    }
+
+    public Tag getTag(String id) {
+        return tagRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Tag not found: " + id));
     }
 
     /**
@@ -284,3 +289,4 @@ public class TagService {
                 .build();
     }
 }
+
