@@ -27,17 +27,7 @@ public class TenantForwardedPrefixFilter extends OncePerRequestFilter {
 
         String tenantId = TenantContext.getTenantId();
         String existing = request.getHeader(X_FORWARDED_PREFIX);
-        String requestUri = request.getRequestURI();
-        String contextPath = request.getContextPath();
-        String path;
-        if (requestUri == null) {
-            path = "/";
-        } else if (contextPath != null && !contextPath.isEmpty() && requestUri.startsWith(contextPath)) {
-            path = requestUri.substring(contextPath.length());
-            if (path.isEmpty()) path = "/";
-        } else {
-            path = requestUri;
-        }
+        String path = HttpServletRequestPathUtils.appPath(request);
 
         boolean sasEndpoint = path.contains("/.well-known/") || path.startsWith("/oauth2/") || path.startsWith("/connect/") || path.equals("/userinfo");
 
