@@ -45,21 +45,11 @@ export function MediaTypeSelector({
   className,
   disabled
 }: MediaTypeSelectorProps) {
-  // Force re-render with key to ensure Select updates
-  const [key, setKey] = React.useState(0);
-  
-  React.useEffect(() => {
-    // Force re-render when value changes
-    setKey(prev => prev + 1);
-  }, [value]);
-  
   return (
     <Select 
-      key={key}
       value={value || undefined} 
       onValueChange={onValueChange} 
       disabled={disabled}
-      defaultValue={value}
     >
       <SelectTrigger className={className}>
         <SelectValue placeholder={placeholder} />

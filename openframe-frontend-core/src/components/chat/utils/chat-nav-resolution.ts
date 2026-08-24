@@ -21,7 +21,9 @@ import type { ChatRuntime } from '../../../contexts/chat-runtime-context'
 export const NEW_TAB_FEATURES = 'noopener,noreferrer'
 
 /** Modifier-click predicate — matches the existing useNavLink branch
- *  (cmd/ctrl/shift/alt OR non-primary mouse button). */
+ *  (cmd/ctrl/shift/alt OR non-primary mouse button). An omitted
+ *  `button` field defaults to 0 (primary) so structural events without
+ *  a `button` are not mistaken for a modifier-click. */
 export function isModifierClick(e: {
   button?: number
   metaKey?: boolean
@@ -30,7 +32,7 @@ export function isModifierClick(e: {
   altKey?: boolean
 }): boolean {
   return (
-    e.button !== 0 ||
+    (e.button ?? 0) !== 0 ||
     !!e.metaKey ||
     !!e.ctrlKey ||
     !!e.shiftKey ||
@@ -149,3 +151,4 @@ export function resolveExternalNavigation(args: {
 
   return { href: abs, open }
 }
+

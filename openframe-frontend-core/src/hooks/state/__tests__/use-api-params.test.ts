@@ -217,7 +217,7 @@ describe('useApiParams', () => {
       consoleSpy.mockRestore()
     })
 
-    it('should handle null and undefined values', () => {
+    it('should handle null and undefined values by removing the URL parameter', () => {
       const params = new URLSearchParams()
       params.set('search', 'laptop')
       setMockSearchParams(params)
@@ -232,15 +232,13 @@ describe('useApiParams', () => {
         result.current.setParam('search', null)
       })
 
-      // null is now converted to string "null" instead of being filtered
+      // null should be treated as absent and remove the parameter from the URL
       const callArg = mockReplace.mock.calls[0][0]
       if (callArg && callArg !== '/') {
         const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg)
-        expect(urlParams.get('search')).toBe('null')
-      } else {
-        // If null is treated as empty, it should be removed
-        const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg)
         expect(urlParams.has('search')).toBe(false)
+      } else {
+        expect(callArg).toBe('/')
       }
     })
   })
