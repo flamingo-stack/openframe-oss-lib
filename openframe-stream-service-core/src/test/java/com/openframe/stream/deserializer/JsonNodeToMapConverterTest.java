@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -182,39 +183,19 @@ class JsonNodeToMapConverterTest {
     }
 
     /**
-     * Copy of the conversion method from IntegratedToolEventBrokerDeserializer for testing
+     * Invokes the actual conversion method on IntegratedToolEventBrokerDeserializer via reflection
+     * so this test exercises the real production logic instead of a duplicated copy.
      */
+    @SuppressWarnings("unchecked")
     private void convertJsonNodeToMap(JsonNode node, String prefix, Map<String, String> result) {
-        if (node.isObject()) {
-            var fields = node.fields();
-            while (fields.hasNext()) {
-                var entry = fields.next();
-                String key = prefix.isEmpty() ? entry.getKey() : prefix + "." + entry.getKey();
-                convertJsonNodeToMap(entry.getValue(), key, result);
-            }
-        } else if (node.isArray()) {
-            for (int i = 0; i < node.size(); i++) {
-                String key = prefix + "[" + i + "]";
-                convertJsonNodeToMap(node.get(i), key, result);
-            }
-        } else {
-            // Handle primitive values
-            String value;
-            if (node.isTextual()) {
-                value = node.asText();
-            } else if (node.isNumber()) {
-                value = node.asText(); // Preserve number format
-            } else if (node.isBoolean()) {
-                value = String.valueOf(node.asBoolean());
-            } else if (node.isNull()) {
-                value = null;
-            } else {
-                value = node.asText();
-            }
-            
-            if (value != null) {
-                result.put(prefix, value);
-            }
+        try {
+            IntegratedToolEventBrokerDeserializer deserializer = new IntegratedToolEventBrokerDeserializer();
+            Method method = IntegratedToolEventBrokerDeserializer.class.getDeclaredMethod(
+                    "convertJsonNodeToMap", JsonNode.class, String.class, Map.class);
+            method.setAccessible(true);
+            method.invoke(deserializer, node, prefix, result);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Failed to invoke production convertJsonNodeToMap method", e);
         }
     }
 } 
