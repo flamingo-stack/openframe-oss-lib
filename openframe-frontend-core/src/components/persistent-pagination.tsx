@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react"
 import { cn } from "../utils/cn"
+import { UnifiedPagination } from "./unified-pagination"
 
 interface PersistentPaginationProps {
   /**
@@ -190,7 +191,7 @@ export function PersistentPaginationWrapper({
 
   // Use UnifiedPagination directly from ui-kit instead of importing from consuming apps
   // Both Pagination and BlogPagination in multi-platform-hub are just wrappers around UnifiedPagination
-  const PaginationComponent = require('./unified-pagination').UnifiedPagination
+  const PaginationComponent = UnifiedPagination
 
   return (
     <div 
