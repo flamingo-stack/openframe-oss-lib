@@ -38,5 +38,7 @@ public class DeviceFirstOnlineDispatch implements TenantScoped {
 
     private Instant dispatchedAt;
 
+    private Instant expiresAt;
+
     private DeviceOnlineDispatchStatus status;
 }
