@@ -73,12 +73,13 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height = '480px' }:
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-h4 text-ods-text-primary">{label}</p>
+          {/* One short clause. claude.ai publishes NO per-artifact title or
+              description (its og:title is the literal string "Claude Artifact"
+              for every artifact, verified), so there is nothing to show here
+              but where the link goes — the artifact's NAME comes from the
+              link's own `title`, which the host renders above this card. */}
           <p className="truncate text-h6 text-ods-text-secondary">
-            {embedUrl
-              ? 'claude.ai · blank above? Publish → Embed settings → add this site to Allowed domains'
-              : kind === 'artifact'
-                ? 'claude.ai · only a published chat artifact can be framed · a Claude Code link opens in a new tab'
-                : 'claude.ai · opens in a new tab · claude.ai serves this surface with framing disabled'}
+            {embedUrl ? 'claude.ai · opens in a new tab' : 'claude.ai · not embeddable · opens in a new tab'}
           </p>
         </div>
         <ExternalLink className="h-4 w-4 shrink-0 text-ods-text-secondary" />
