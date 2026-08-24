@@ -359,6 +359,14 @@ export type TicketEventSegment = {
   type: 'ticket_event'
   data: TicketEventData
   streamSeq?: number
+  /** When THIS event happened (history: the persisted row's `createdAt`;
+   *  live: chunk arrival). Kept beside `streamSeq`, not in `data`: the
+   *  upsert's payload-equality fallback must keep matching a redelivered
+   *  chunk to its hydrated twin, and their times come from different clocks.
+   *  Without it the card inherits the surrounding assistant bubble's
+   *  timestamp — the FIRST row of the whole turn, so every lifecycle card
+   *  reads the same stale time. */
+  occurredAt?: Date
 }
 
 export type ErrorSegment = {
