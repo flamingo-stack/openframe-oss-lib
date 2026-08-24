@@ -47,6 +47,55 @@ function getBatchImageConfig(): Required<BatchImageFetchConfig> {
 }
 
 /**
+ * Build a full image URL and authenticated request headers for a given
+ * (possibly relative) image URL. Shared by single and batch image fetch
+ * hooks to avoid duplicating URL construction and auth-header logic.
+ */
+export function buildAuthenticatedImageRequest(
+  imageUrl: string,
+  config: { tenantHostUrl: string; enableDevMode: boolean; accessTokenKey: string }
+): { url: string; headers: Record<string, string> } {
+  const { tenantHostUrl, enableDevMode, accessTokenKey } = config
+
+  // Construct full image URL
+  let fullImageUrl: string
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    fullImageUrl = imageUrl
+  } else if (imageUrl.startsWith('/api/')) {
+    fullImageUrl = `${tenantHostUrl}${imageUrl}`
+  } else if (imageUrl.startsWith('/')) {
+    fullImageUrl = `${tenantHostUrl}/api${imageUrl}`
+  } else {
+    fullImageUrl = `${tenantHostUrl}/api/${imageUrl}`
+  }
+
+  // Add cache buster
+  const cacheBuster = `?t=${Date.now()}`
+  fullImageUrl = fullImageUrl + cacheBuster
+
+  // Prepare headers
+  const headers: Record<string, string> = {
+    'Accept': 'image/*',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache'
+  }
+
+  // Add Bearer token in dev mode
+  if (enableDevMode) {
+    try {
+      const accessToken = localStorage.getItem(accessTokenKey)
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`
+      }
+    } catch (error) {
+      // Silently continue without token
+    }
+  }
+
+  return { url: fullImageUrl, headers }
+}
+
+/**
  * Fetch multiple images with authentication in batch
  * Returns a map of original imageUrl to fetched blob URL
  *
@@ -80,40 +129,11 @@ export async function batchFetchAuthenticatedImages(
 
   const fetchPromises = imageUrls.map(async (imageUrl) => {
     try {
-      // Construct full image URL
-      let fullImageUrl: string
-      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-        fullImageUrl = imageUrl
-      } else if (imageUrl.startsWith('/api/')) {
-        fullImageUrl = `${tenantHostUrl}${imageUrl}`
-      } else if (imageUrl.startsWith('/')) {
-        fullImageUrl = `${tenantHostUrl}/api${imageUrl}`
-      } else {
-        fullImageUrl = `${tenantHostUrl}/api/${imageUrl}`
-      }
-
-      // Add cache buster
-      const cacheBuster = `?t=${Date.now()}`
-      fullImageUrl = fullImageUrl + cacheBuster
-
-      // Prepare headers
-      const headers: Record<string, string> = {
-        'Accept': 'image/*',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      }
-
-      // Add Bearer token in dev mode
-      if (enableDevMode) {
-        try {
-          const accessToken = localStorage.getItem(accessTokenKey)
-          if (accessToken) {
-            headers['Authorization'] = `Bearer ${accessToken}`
-          }
-        } catch (error) {
-          // Silently continue without token
-        }
-      }
+      const { url: fullImageUrl, headers } = buildAuthenticatedImageRequest(imageUrl, {
+        tenantHostUrl,
+        enableDevMode,
+        accessTokenKey
+      })
 
       // Fetch image
       const response = await fetch(fullImageUrl, {
@@ -229,3 +249,4 @@ export function useBatchImages(
 
   return fetchedImages
 }
+
