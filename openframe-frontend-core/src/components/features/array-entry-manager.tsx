@@ -99,11 +99,11 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
     // Prevent default paste for multi-line
     e.preventDefault();
 
-    const currentItem = items[index];
+    const currentItem = workingItems[index];
     const currentValue = (currentItem[fieldKey] as string) || '';
 
     // Build new items array
-    const newItems = [...items];
+    const newItems = [...workingItems];
 
     if (currentValue.trim() === '') {
       // If current field is empty, use first pasted value for it
@@ -118,7 +118,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
       newItems.splice(index + 1, 0, ...additionalItems);
     }
 
-    onChange(newItems);
+    setWorkingItems(newItems);
   };
 
   return (

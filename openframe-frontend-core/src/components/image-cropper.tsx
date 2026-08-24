@@ -130,8 +130,9 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
     )
 
     // If circular mode, clip to circle
+    let temp: HTMLCanvasElement | null = null
     if (circular) {
-      const temp = document.createElement("canvas")
+      temp = document.createElement("canvas")
       temp.width = outputW
       temp.height = outputH
       const tctx = temp.getContext("2d")!
@@ -146,19 +147,36 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
       ctx.drawImage(temp, 0, 0)
     }
 
-    return new Promise<ImageCropperResult>((resolve) => {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) throw new Error("Canvas export failed")
-          const reader = new FileReader()
-          reader.onloadend = () => {
-            resolve({ dataUrl: reader.result as string, blob })
-          }
-          reader.readAsDataURL(blob)
-        },
-        "image/png",
-      )
-    })
+    try {
+      return await new Promise<ImageCropperResult>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("Canvas export failed"))
+              return
+            }
+            const reader = new FileReader()
+            reader.onloadend = () => {
+              resolve({ dataUrl: reader.result as string, blob })
+            }
+            reader.onerror = () => {
+              reject(reader.error ?? new Error("Failed to read exported blob"))
+            }
+            reader.readAsDataURL(blob)
+          },
+          "image/png",
+        )
+      })
+    } finally {
+      // Release intermediate canvas contents so they can be garbage collected
+      canvas.width = 0
+      canvas.height = 0
+      if (temp) {
+        temp.width = 0
+        temp.height = 0
+        temp = null
+      }
+    }
   }, [croppedAreaPixels, circular, maxSizePx, src]) as () => Promise<ImageCropperResult | undefined>
 
   /* ------------------ Keyboard accessibility -----------------*/

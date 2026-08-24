@@ -66,7 +66,7 @@ export function SourceTooltip({ intro, sources, note, iconClassName, triggerAnch
         {note && <span className="text-ods-text-secondary">{note}</span>}
       </span>
     }>
-      <a href={sources[0].href} target="_blank" rel="noreferrer" aria-label="Source research" {...triggerAnchorProps}><Info className={iconClassName} /></a>
+      <a href={sources.length > 0 ? sources[0].href : undefined} target="_blank" rel="noreferrer" aria-label="Source research" {...triggerAnchorProps}><Info className={iconClassName} /></a>
     </FloatingTooltip>
   )
 }

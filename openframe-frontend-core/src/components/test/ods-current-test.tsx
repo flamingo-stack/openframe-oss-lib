@@ -5,7 +5,7 @@
  * to different platform types (OpenFrame, Flamingo, TMCG).
  *
  * Expected behavior:
- * - OpenFrame: Cyan (#5efaf0)
+ * - OpenFrame: Yellow (#ffc008)
  * - Flamingo: Pink (#f357bb)
  * - TMCG: Pink (#f357bb)
  * - Default: Primary text color (#fafafa)

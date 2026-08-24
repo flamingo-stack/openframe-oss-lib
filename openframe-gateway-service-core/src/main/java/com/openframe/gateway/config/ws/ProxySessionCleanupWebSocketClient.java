@@ -115,10 +115,8 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                                 return;
                             }
                             closeIfLeaked(proxySession, sessionId, target, debugPath, signal, CLEANUP_GRACE)
-                                    .onErrorResume(ex -> Mono.empty())
                                     .subscribe(null,
-                                            ex -> log.error(LOG_PREFIX + "failed to close: {}",
-                                                    sessionId, target, ex.getMessage()));
+                                            ex -> log.error(LOG_PREFIX + "failed to close", sessionId, target, ex));
                         });
             }
         };
@@ -158,3 +156,4 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
         return Mono.firstWithSignal(naturalClose, forceCloseAfterGrace);
     }
 }
+

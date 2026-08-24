@@ -197,13 +197,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
       {/* Row 2: Buttons */}
       <div className="flex flex-col gap-3">
         <AIEnrichButton
-          onClick={() => {
-            console.log('[AIEnrichSection] 🔘 Button clicked');
-            console.log('[AIEnrichSection] Loading:', loading);
-            console.log('[AIEnrichSection] Disabled:', shouldDisable);
-            console.log('[AIEnrichSection] CanEnrich:', canEnrich);
-            onEnrich();
-          }}
+          onClick={onEnrich}
           loading={loading}
           disabled={shouldDisable}
           label={buttonLabel}

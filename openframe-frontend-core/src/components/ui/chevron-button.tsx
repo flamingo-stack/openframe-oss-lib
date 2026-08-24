@@ -14,7 +14,7 @@ interface ChevronButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const ChevronButton = React.forwardRef<HTMLButtonElement, ChevronButtonProps>(
   ({ className, direction = 'down', size = 'md', isExpanded, backgroundColor, borderColor, ...props }, ref) => {
-    const Icon = (isExpanded ? ChevronUp : ChevronDown) || (direction === 'up' ? ChevronUp : ChevronDown);
+    const Icon = isExpanded !== undefined ? (isExpanded ? ChevronUp : ChevronDown) : (direction === 'up' ? ChevronUp : ChevronDown);
     const sizeClasses = {
       sm: 'h-4 w-4',
       md: 'h-5 w-5', 

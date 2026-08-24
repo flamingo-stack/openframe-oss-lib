@@ -204,6 +204,7 @@ if (targetCategory) {
 }
 
 let totalIcons = 0;
+let hadError = false;
 
 for (const category of categoriesToProcess) {
   const inputPath = join(ICONS_V2_DIR, category);
@@ -227,6 +228,7 @@ for (const category of categoriesToProcess) {
     totalIcons += count;
   } catch (error) {
     console.error(`  Error: ${error.message}`);
+    hadError = true;
   }
 }
 
@@ -247,3 +249,7 @@ const categoryExports = presentCategories
 writeFileSync(join(OUTPUT_DIR, 'index.ts'), categoryExports + '\n');
 
 console.log(`\nDone! Generated ${totalIcons} icon components.`);
+
+if (hadError) {
+  process.exit(1);
+}

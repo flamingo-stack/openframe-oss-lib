@@ -114,9 +114,7 @@ public class GatewaySecurityConfig {
                                 CLIENTS_PREFIX + "/api/agents/reinstall",
                                 CLIENTS_PREFIX + "/api/agents/uninstall",
                                 CLIENTS_PREFIX + "/api/release-version",
-                                CLIENTS_PREFIX + "/oauth/token",
-                                // TODO: removxxe after migration artifacts to GitHub
-                                CLIENTS_PREFIX + "/tool-agent/**"
+                                CLIENTS_PREFIX + "/oauth/token"
                         ).permitAll()
                         .pathMatchers(API_PREFIX + "/**").hasRole(ADMIN)
                         .pathMatchers(TOOLS_PREFIX + "/agent/**").hasRole(AGENT)

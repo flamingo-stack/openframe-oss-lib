@@ -98,9 +98,16 @@ impl InitialConfigurationService {
     pub fn save(&self, config: &InitialConfiguration) -> Result<()> {
         let config_json = serde_json::to_string_pretty(config)
             .context("Failed to serialize initial configuration to JSON")?;
-        fs::write(&self.config_file_path, config_json).with_context(|| {
+        let temp_path = self.config_file_path.with_extension("json.tmp");
+        fs::write(&temp_path, config_json).with_context(|| {
             format!(
-                "Failed to write initial configuration file: {:?}",
+                "Failed to write initial configuration temp file: {:?}",
+                temp_path
+            )
+        })?;
+        fs::rename(&temp_path, &self.config_file_path).with_context(|| {
+            format!(
+                "Failed to rename initial configuration temp file to: {:?}",
                 self.config_file_path
             )
         })?;

@@ -40,6 +40,68 @@ const useMeasuredHeight = (isOpen: boolean) => {
   return { ref, maxHeight }
 }
 
+interface FaqAccordionItemProps {
+  item: FaqItem
+  isOpen: boolean
+  toggle: (id: string | number) => void
+}
+
+function FaqAccordionItem({ item, isOpen, toggle }: FaqAccordionItemProps) {
+  const { ref, maxHeight } = useMeasuredHeight(isOpen)
+
+  return (
+    <div
+      // Per-row anchor — chat citation chips (`/faqs#faq-item-<id>`) land
+      // here via native browser hash scroll AND via `FaqSection`'s tween
+      // dispatch. `scroll-mt-24` keeps the row header below the 96px
+      // sticky nav offset (matches `<section>`'s scroll-margin for
+      // category anchors).
+      id={faqItemAnchor(item.id)}
+      className="scroll-mt-24 transition-colors hover:bg-ods-bg-hover"
+    >
+      {/* Header */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => toggle(item.id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggle(item.id);
+          }
+        }}
+        aria-expanded={isOpen}
+        className="flex w-full items-center gap-6 md:gap-10 px-6 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus transition-colors cursor-pointer"
+      >
+        <h3 className="flex-1 min-w-0 break-words">
+          {item.question}
+        </h3>
+        <Chevron02DownIcon
+          aria-hidden="true"
+          size={24}
+          className={cn(
+            'shrink-0 text-ods-text-primary transition-transform duration-300',
+            isOpen && 'rotate-180',
+          )}
+        />
+      </div>
+      {/* Content wrapper with max-height animation */}
+      <div
+        style={{ maxHeight, transition: 'max-height 0.35s ease-in-out, opacity 0.35s ease-in-out', opacity: isOpen ? 1 : 0 }}
+        className="overflow-hidden"
+      >
+        {/* break-words: FAQ answers render as plain text, so a long URL or
+            token has no wrap opportunity — and the parent is overflow-hidden,
+            which would CLIP it past the viewport on mobile. Mirrors the
+            markdown-renderer overflow-wrap fix. */}
+        <div ref={ref} className="px-6 pb-4 text-ods-text-primary text-h4 break-words">
+          {item.answer}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) {
   const [openSet, setOpenSet] = useState<Set<string | number>>(new Set(defaultOpenIds))
 
@@ -54,63 +116,14 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
 
   return (
     <div className="rounded-md border border-ods-border divide-y divide-ods-border bg-transparent overflow-hidden">
-      {items.map(item => {
-        const isOpen = openSet.has(item.id)
-        const { ref, maxHeight } = useMeasuredHeight(isOpen)
-
-        return (
-          <div
-            key={item.id}
-            // Per-row anchor — chat citation chips (`/faqs#faq-item-<id>`) land
-            // here via native browser hash scroll AND via `FaqSection`'s tween
-            // dispatch. `scroll-mt-24` keeps the row header below the 96px
-            // sticky nav offset (matches `<section>`'s scroll-margin for
-            // category anchors).
-            id={faqItemAnchor(item.id)}
-            className="scroll-mt-24 transition-colors hover:bg-ods-bg-hover"
-          >
-            {/* Header */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => toggle(item.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  toggle(item.id);
-                }
-              }}
-              aria-expanded={isOpen}
-              className="flex w-full items-center gap-6 md:gap-10 px-6 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus transition-colors cursor-pointer"
-            >
-              <h3 className="flex-1 min-w-0 break-words">
-                {item.question}
-              </h3>
-              <Chevron02DownIcon
-                aria-hidden="true"
-                size={24}
-                className={cn(
-                  'shrink-0 text-ods-text-primary transition-transform duration-300',
-                  isOpen && 'rotate-180',
-                )}
-              />
-            </div>
-            {/* Content wrapper with max-height animation */}
-            <div
-              style={{ maxHeight, transition: 'max-height 0.35s ease-in-out, opacity 0.35s ease-in-out', opacity: isOpen ? 1 : 0 }}
-              className="overflow-hidden"
-            >
-              {/* break-words: FAQ answers render as plain text, so a long URL or
-                  token has no wrap opportunity — and the parent is overflow-hidden,
-                  which would CLIP it past the viewport on mobile. Mirrors the
-                  markdown-renderer overflow-wrap fix. */}
-              <div ref={ref} className="px-6 pb-4 text-ods-text-primary text-h4 break-words">
-                {item.answer}
-              </div>
-            </div>
-          </div>
-        )
-      })}
+      {items.map(item => (
+        <FaqAccordionItem
+          key={item.id}
+          item={item}
+          isOpen={openSet.has(item.id)}
+          toggle={toggle}
+        />
+      ))}
     </div>
   )
 } 

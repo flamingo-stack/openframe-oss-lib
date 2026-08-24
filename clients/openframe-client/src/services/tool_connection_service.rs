@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::warn;
 
 use crate::models::tool_connection::ToolConnection;
 use crate::platform::directories::DirectoryManager;
@@ -52,8 +53,16 @@ impl ToolConnectionService {
         let json = fs::read_to_string(&self.file_path).with_context(|| {
             format!("Failed to read tool connections file: {:?}", self.file_path)
         })?;
-        let list: Vec<ToolConnection> = serde_json::from_str(&json)
-            .context("Failed to deserialize tool connections from JSON")?;
+        let list: Vec<ToolConnection> = match serde_json::from_str(&json) {
+            Ok(list) => list,
+            Err(err) => {
+                warn!(
+                    "Failed to deserialize tool connections from {:?}, treating as empty list: {}",
+                    self.file_path, err
+                );
+                Vec::new()
+            }
+        };
         Ok(list)
     }
 
@@ -75,10 +84,17 @@ impl ToolConnectionService {
     async fn persist(&self, list: &[ToolConnection]) -> Result<()> {
         let json = serde_json::to_string_pretty(list)
             .context("Failed to serialize tool connections to JSON")?;
-        fs::write(&self.file_path, json).with_context(|| {
+        let tmp_path = self.file_path.with_extension("json.tmp");
+        fs::write(&tmp_path, json).with_context(|| {
             format!(
-                "Failed to write tool connections file: {:?}",
-                self.file_path
+                "Failed to write tool connections temp file: {:?}",
+                tmp_path
+            )
+        })?;
+        fs::rename(&tmp_path, &self.file_path).with_context(|| {
+            format!(
+                "Failed to rename tool connections temp file {:?} to {:?}",
+                tmp_path, self.file_path
             )
         })?;
         Ok(())

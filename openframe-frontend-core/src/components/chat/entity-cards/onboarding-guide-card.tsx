@@ -56,7 +56,6 @@ export interface OnboardingGuideCardProps {
   size?: 'catalog' | 'default' | 'sm' | 'portrait'
   /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
   showTypeBadge?: boolean
-| 'default' | 'sm' | 'portrait'
   className?: string
 }
 
