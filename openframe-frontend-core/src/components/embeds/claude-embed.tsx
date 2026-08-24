@@ -1,6 +1,7 @@
 'use client'
 
-import { ExternalLink, Asterisk } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
+import { ClaudeIcon } from '../icons/claude-icon'
 import { toClaudeEmbedUrl } from '../../utils/embed-url-converters'
 
 export type ClaudeEmbedKind = 'artifact' | 'design'
@@ -64,8 +65,11 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height = '480px' }:
           embedUrl ? 'border-t border-ods-border' : ''
         }`}
       >
+        {/* Claude's OWN mark, at its own brand colour — this is Anthropic's
+            property and it is not ours to restyle. We used a generic asterisk
+            in our accent colour, which dressed their content as ours. */}
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-ods-bg-surface">
-          <Asterisk className="h-6 w-6 text-ods-accent" />
+          <ClaudeIcon className="h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-h4 text-ods-text-primary">{label}</p>
