@@ -85,11 +85,9 @@ public class EventController {
                 .endDate(endDate)
                 .build();
 
-        var result = eventService.queryEvents(
-                filterCriteria,
-                CursorPaginationCriteria.fromRest(cursor, limit),
-                search,
-                SortInput.from(sortField, sortDirection));
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.fromRest(cursor, limit);
+        SortInput sort = SortInput.from(sortField, sortDirection);
+        var result = eventService.queryEvents(filterCriteria, pagination, search, sort);
         return eventMapper.toEventsResponse(result);
     }
 
