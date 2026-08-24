@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -86,37 +87,43 @@ public class FleetMdmClient {
     /**
      * Get a single host by ID from Fleet MDM
      * @param id Host ID
-     * @return Host object or null if not found
+     * @return Optional containing the Host, or empty if not found
+     * @throws FleetMdmApiException if the API returns an error
+     * @throws FleetMdmException if the request could not be processed
      */
-    public Host getHostById(long id) throws IOException, InterruptedException {
-        HttpRequest request = addHeaders(HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + HOSTS_URL + "/" + id)))
-                .GET()
-                .timeout(Duration.ofSeconds(30))
-                .build();
+    public Optional<Host> getHostById(long id) {
+        try {
+            HttpRequest request = addHeaders(HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + HOSTS_URL + "/" + id)))
+                    .GET()
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        if (response.statusCode() == 401) {
-            throw new RuntimeException("Authentication failed. Please check your API token. Response: " + response.body());
-        } else if (response.statusCode() == 404) {
-            return null; // Host not found
-        } else if (response.statusCode() != 200) {
-            throw new RuntimeException("Failed to fetch host. Status: " + response.statusCode() + ", Response: " + response.body());
+            if (response.statusCode() == 401) {
+                throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
+            } else if (response.statusCode() == 404) {
+                return Optional.empty(); // Host not found
+            } else if (response.statusCode() != 200) {
+                throw new FleetMdmApiException("Failed to fetch host", response.statusCode(), response.body());
+            }
+
+            return Optional.of(MAPPER.treeToValue(MAPPER.readTree(response.body()).path("host"), Host.class));
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to fetch host: " + id, e);
         }
-
-        return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("host"), Host.class);
     }
 
     /**
      * Search for hosts using the provided query parameters
      * @param searchRequest Search parameters including query string, page, and per_page
      * @return List of matching Host objects
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
      */
-    public List<Host> searchHosts(HostSearchRequest searchRequest) throws IOException, InterruptedException {
+    public List<Host> searchHosts(HostSearchRequest searchRequest) {
         if (searchRequest == null) {
             throw new IllegalArgumentException("Search request cannot be null");
         }
@@ -151,11 +158,9 @@ public class FleetMdmClient {
      * Search for hosts by query string with default pagination
      * @param query Search query (e.g., hostname, UUID, IP address)
      * @return List of matching Host objects
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
      */
-    public List<Host> searchHosts(String query) throws IOException, InterruptedException {
+    public List<Host> searchHosts(String query) {
         return searchHosts(new HostSearchRequest(query));
     }
 
@@ -165,11 +170,9 @@ public class FleetMdmClient {
      * @param page Page number (0-based)
      * @param perPage Number of results per page
      * @return List of matching Host objects
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
      */
-    public List<Host> searchHosts(String query, Integer page, Integer perPage) throws IOException, InterruptedException {
+    public List<Host> searchHosts(String query, Integer page, Integer perPage) {
         return searchHosts(new HostSearchRequest(query, page, perPage));
     }
 
@@ -212,11 +215,9 @@ public class FleetMdmClient {
      * @param hostId The numeric ID of the host to query
      * @param query The osquery SQL statement to execute
      * @return QueryResult containing the query results or error information
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
      */
-    public QueryResult runQuery(long hostId, String query) throws IOException, InterruptedException {
+    public QueryResult runQuery(long hostId, String query) {
         validateQuery(query);
 
         try {
@@ -335,28 +336,32 @@ public class FleetMdmClient {
      *
      * @param id Query ID
      * @return Query object or null if not found
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
      */
-    public Query getQueryById(long id) throws IOException, InterruptedException {
-        HttpRequest request = addHeaders(HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + QUERIES_URL + "/" + id)))
-                .GET()
-                .timeout(Duration.ofSeconds(30))
-                .build();
+    public Query getQueryById(long id) {
+        try {
+            HttpRequest request = addHeaders(HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + QUERIES_URL + "/" + id)))
+                    .GET()
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        if (response.statusCode() == 401) {
-            throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
-        } else if (response.statusCode() == 404) {
-            return null; // Query not found
-        } else if (response.statusCode() != 200) {
-            throw new FleetMdmApiException("Failed to fetch query", response.statusCode(), response.body());
+            if (response.statusCode() == 401) {
+                throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
+            } else if (response.statusCode() == 404) {
+                return null; // Query not found
+            } else if (response.statusCode() != 200) {
+                throw new FleetMdmApiException("Failed to fetch query", response.statusCode(), response.body());
+            }
+
+            return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("query"), Query.class);
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to fetch query: " + id, e);
         }
-
-        return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("query"), Query.class);
     }
 
     /**
@@ -364,28 +369,32 @@ public class FleetMdmClient {
      *
      * @param id Policy ID
      * @return Policy object or null if not found
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
      */
-    public Policy getPolicyById(long id) throws IOException, InterruptedException {
-        HttpRequest request = addHeaders(HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + POLICIES_URL + "/" + id)))
-                .GET()
-                .timeout(Duration.ofSeconds(30))
-                .build();
+    public Policy getPolicyById(long id) {
+        try {
+            HttpRequest request = addHeaders(HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + POLICIES_URL + "/" + id)))
+                    .GET()
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        if (response.statusCode() == 401) {
-            throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
-        } else if (response.statusCode() == 404) {
-            return null; // Policy not found
-        } else if (response.statusCode() != 200) {
-            throw new FleetMdmApiException("Failed to fetch policy", response.statusCode(), response.body());
+            if (response.statusCode() == 401) {
+                throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
+            } else if (response.statusCode() == 404) {
+                return null; // Policy not found
+            } else if (response.statusCode() != 200) {
+                throw new FleetMdmApiException("Failed to fetch policy", response.statusCode(), response.body());
+            }
+
+            return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("policy"), Policy.class);
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to fetch policy: " + id, e);
         }
-
-        return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("policy"), Policy.class);
     }
 
     /**
