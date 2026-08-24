@@ -47,7 +47,7 @@ const RedditIcon = () => (
   <svg width="20" height="20" fill="#FF4500" viewBox="0 0 24 24">
     <circle cx="9" cy="12" r="1"/>
     <circle cx="15" cy="12" r="1"/>
-    <path d="M22 12a2 2 0 1 0-4 0c0 5.5-4.5 10-10 10S-2 17.5-2 12a2 2 0 1 0-4 0c0 7.7 6.3 14 14 14s14-6.3 14-14z"/>
+    <path d="M22 12a2 2 0 1 0-4 0c0 5.5-4.5 10-10 10S2 17.5 2 12a2 2 0 1 0-4 0c0 7.7 6.3 14 14 14s14-6.3 14-14z"/>
     <path d="M8 10c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2"/>
   </svg>
 );
@@ -237,45 +237,27 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
                                (redditData.title && redditData.title.includes('[removed]'));
 
     if (isRemovedOrDeleted) {
-      console.log('🚫 Post content removed - skipping all media extraction for:', redditData.title);
       return []; // Return empty media array for removed posts
     }
 
     const media: MediaItem[] = [];
 
-    console.log('🔍 Reddit media extraction for:', redditData.title);
-    console.log('📊 Full Reddit data structure:', {
-      url: redditData.url,
-      domain: redditData.domain,
-      post_hint: redditData.post_hint,
-      is_video: redditData.is_video,
-      media: redditData.media,
-      secure_media: redditData.secure_media,
-      preview: redditData.preview,
-      gallery_data: redditData.gallery_data,
-      media_metadata: redditData.media_metadata
-    });
-
     // 1. Check for Reddit hosted video (v.redd.it) - PRIORITY
     const video = redditData.media?.reddit_video || redditData.secure_media?.reddit_video;
     if (video && video.fallback_url) {
-      console.log('📹 Found Reddit video:', video);
-
       // Generate poster URL from video URL and preview data
       let posterUrl = '';
 
       // Try to get poster from preview images first
       if (redditData.preview?.images?.[0]?.source?.url) {
         posterUrl = redditData.preview.images[0].source.url.replace(/&amp;/g, '&');
-        console.log('✅ Using preview image as video poster:', posterUrl);
       } else {
         // Fallback: try to generate from video URL
         try {
           const baseUrl = video.fallback_url.replace(/DASH_\d+\.mp4.*$/, '');
           posterUrl = `${baseUrl}DASH_720.jpg`;
-          console.log('🎯 Generated poster URL:', posterUrl);
         } catch (e) {
-          console.log('Could not generate poster URL');
+          // Could not generate poster URL
         }
       }
 
@@ -284,13 +266,9 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
 
       // If it's a DASH URL, try to get a direct MP4 format
       if (videoUrl.includes('DASH_')) {
-        // Try different quality levels for Reddit videos
-        const baseUrl = videoUrl.replace(/DASH_\d+\.mp4.*$/, '');
-        const qualities = ['480', '360', '720', '240']; // Start with 480p for better compatibility
-
         // Use 480p as default for better compatibility
+        const baseUrl = videoUrl.replace(/DASH_\d+\.mp4.*$/, '');
         videoUrl = `${baseUrl}DASH_480.mp4`;
-        console.log('🎯 Optimized Reddit video URL for compatibility:', videoUrl);
       }
 
       media.push({
@@ -303,13 +281,11 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
       });
 
       // Return early for videos to avoid showing preview images as well
-      console.log('📋 Final Reddit media (video):', media);
       return media;
     }
 
     // 2. Check for Reddit gallery (multiple images)
     if (redditData.media_metadata && redditData.gallery_data) {
-      console.log('🖼️ Found Reddit gallery');
       const galleryItems = redditData.gallery_data.items || [];
 
       for (const item of galleryItems) {
@@ -319,7 +295,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
         if (mediaInfo && mediaInfo.s && mediaInfo.s.u) {
           // Reddit encodes URLs, need to decode
           const imageUrl = mediaInfo.s.u.replace(/&amp;/g, '&');
-          console.log('✅ Adding gallery image:', imageUrl);
 
           media.push({
             type: 'image',
@@ -332,7 +307,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
       }
 
       if (media.length > 0) {
-        console.log('📋 Final Reddit media (gallery):', media);
         return media;
       }
     }
@@ -340,7 +314,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
     // 3. Check for single image preview (but not if it's actually a video)
     if (redditData.preview?.images?.[0] && !redditData.is_video) {
       const imageData = redditData.preview.images[0];
-      console.log('🖼️ Found preview image data:', imageData);
 
       // Use best resolution that fits our constraints
       let source = imageData.source;
@@ -354,7 +327,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
 
       if (source && source.url) {
         const cleanUrl = source.url.replace(/&amp;/g, '&');
-        console.log('✅ Adding preview image:', cleanUrl);
         media.push({
           type: 'image',
           src: cleanUrl,
@@ -368,11 +340,9 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
     // 4. Check for direct media URLs (imgur, i.redd.it, etc.) - only if no other media found
     if (media.length === 0 && redditData.url) {
       const directUrl = redditData.url.toLowerCase();
-      console.log('🔗 Checking direct URL:', directUrl);
 
       // Image formats
       if (directUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i)) {
-        console.log('📸 Found direct image URL');
         media.push({
           type: 'image',
           src: redditData.url,
@@ -383,8 +353,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
       }
       // Video formats
       else if (directUrl.match(/\.(mp4|webm|mov|avi)(\?.*)?$/i)) {
-        console.log('🎬 Found direct video URL');
-
         // Try to generate poster from preview if available
         let posterUrl = '';
         if (redditData.preview?.images?.[0]?.source?.url) {
@@ -402,7 +370,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
       }
       // Special handling for imgur
       else if (directUrl.includes('imgur.com') && !directUrl.includes('.gifv')) {
-        console.log('🌐 Found Imgur link');
         // Convert imgur links to direct image links
         const imgurId = directUrl.match(/imgur\.com\/([a-zA-Z0-9]+)/)?.[1];
         if (imgurId && !directUrl.includes('/a/') && !directUrl.includes('/gallery/')) {
@@ -418,7 +385,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
       }
       // i.redd.it images
       else if (directUrl.includes('i.redd.it')) {
-        console.log('🖼️ Found i.redd.it image');
         media.push({
           type: 'image',
           src: redditData.url,
@@ -429,7 +395,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
       }
     }
 
-    console.log('📋 Final Reddit media array:', media);
     return media;
   };
 
