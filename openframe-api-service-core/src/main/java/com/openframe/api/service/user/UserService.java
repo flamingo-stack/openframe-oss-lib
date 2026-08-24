@@ -23,7 +23,6 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
 import static com.openframe.data.document.user.UserRole.ADMIN;
 import static com.openframe.data.document.user.UserRole.OWNER;
@@ -41,8 +40,13 @@ public class UserService {
     private final UserProcessor userProcessor;
     private final EmailService emailService;
 
-    public Optional<User> getUserByEmail(String email) {
-        return userRepository.findByEmail(email);
+    public boolean hasUserWithEmail(String email) {
+        return userRepository.findByEmail(email).isPresent();
+    }
+
+    public User getUserByEmailOrThrow(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException(email));
     }
 
     public boolean existsActiveUserByEmail(String email) {
