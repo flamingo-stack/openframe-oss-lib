@@ -37,7 +37,23 @@ interface CommentCardProps {
   onDeleteComment?: (commentId: string) => void
   showVendorInfo?: boolean
   compact?: boolean
-  context: 'profile' | 'vendor'
+  /**
+   * Which HEADER this tile leads with — the only thing that ever varied by
+   * surface. Two states, because there are two headers: the profile page shows
+   * a person's comments, so it leads with the VENDOR each one is about;
+   * everywhere else the vendor is the page and the commenter is the news.
+   * Every BEHAVIOUR is a prop, so a new surface never needs a new member here.
+   */
+  leadWith?: 'vendor' | 'commenter'
+  /**
+   * Read the body in FULL (thread reading) instead of the fixed-height,
+   * three-line list tile. Defaults to the list tile.
+   */
+  fullBody?: boolean
+  /** Rendered under the body — badges + per-surface actions (design-doc threads). */
+  footer?: React.ReactNode
+  /** Rendered after the card — nested replies + reply composer (design-doc threads). */
+  children?: React.ReactNode
 }
 
 export function CommentCard({ 
@@ -46,7 +62,10 @@ export function CommentCard({
   onDeleteComment, 
   showVendorInfo = true,
   compact = false,
-  context = 'profile'
+  leadWith = 'commenter',
+  fullBody = false,
+  footer,
+  children
 }: CommentCardProps) {
   const { user: currentUser } = useAuth()
   
@@ -56,32 +75,28 @@ export function CommentCard({
   }
 
   // Check if current user can delete this comment
+  /**
+   * Deletability is the CALLER's rule, never a per-surface branch in here: an
+   * explicit `comment.canDelete` always wins (design docs compute own-or-DRI
+   * with their gate module and hand it in), and the default is the only rule
+   * this component can honestly know by itself — your own comment.
+   */
   const canUserDeleteComment = () => {
-    // If not authenticated, can't delete
     if (!currentUser) return false
-    
-    // For profile context, use the existing canDelete prop (since it's the user's own comments)
-    if (context === 'profile') {
-      return comment.canDelete !== false
-    }
-    
-    // For vendor context, check if current user is the comment creator
-    if (context === 'vendor' && comment.user) {
-      return currentUser.id === comment.user.id
-    }
-    
-    return false
+    if (typeof comment.canDelete === 'boolean') return comment.canDelete
+    return !!comment.user && currentUser.id === comment.user.id
   }
 
   const showDeleteButton = canUserDeleteComment()
 
   return (
+    <>
     <div className="bg-ods-card border border-ods-border rounded-lg p-4 hover:border-ods-accent transition-all group overflow-hidden w-full max-w-full box-border" style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
       {/* Comment Header */}
       <div className="flex flex-col gap-3 mb-3 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between min-[420px]:gap-2 w-full">
         {/* Row 1: Info + Timestamp */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {context === 'profile' && comment.vendor ? (
+          {leadWith === 'vendor' && comment.vendor ? (
             <>
               {/* Vendor Button - Icon + Name */}
               <VendorDisplayButton
@@ -94,7 +109,7 @@ export function CommentCard({
                 {formatActivityTime(comment.createdAt)}
               </span>
             </>
-          ) : context === 'vendor' && comment.user ? (
+          ) : comment.user ? (
             <UserSummary
               name={comment.user.name}
               email=""
@@ -152,6 +167,12 @@ export function CommentCard({
             </h4>
           </div>
         )}
+        {fullBody ? (
+          // Thread bodies are read in full — no fixed height, no clamp.
+          <p className="text-h4 text-ods-text-primary whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'break-word', maxWidth: '100%' }}>
+            {comment.content}
+          </p>
+        ) : (
         <div className={compact ? "h-[60px] flex items-center" : "h-[72px] flex items-center"}>
           <p className="text-h4 text-ods-text-primary line-clamp-3" style={{ 
             wordBreak: 'break-word', 
@@ -166,7 +187,11 @@ export function CommentCard({
             {comment.content}
           </p>
         </div>
+        )}
+        {footer ? <div className="pt-2 flex flex-wrap items-center gap-2">{footer}</div> : null}
       </div>
     </div>
+    {children}
+    </>
   )
 }

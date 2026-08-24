@@ -38,6 +38,12 @@ const STATUS_BADGE_CLASS: Record<string, string> = {
   published: 'bg-ods-success-secondary text-ods-success',
   draft: 'bg-ods-warning-secondary text-ods-warning',
   archived: 'bg-ods-border text-ods-text-secondary',
+  // Design-doc lifecycle (product-hub) — same ODS pairs, no new palette.
+  in_review: 'bg-ods-warning-secondary text-ods-warning',
+  approved: 'bg-ods-success-secondary text-ods-success',
+  building: 'bg-ods-success-secondary text-ods-success',
+  shipped: 'bg-ods-success-secondary text-ods-success',
+  abandoned: 'bg-ods-border text-ods-text-secondary',
 }
 
 /** Shared badge treatment so an entity's own badges (discipline, level) sit

@@ -28,11 +28,13 @@ export * from './customer-interview-ai.types'
 export * from './luma'
 export * from './product-release'
 export * from './delivery'
+export * from './design-doc'
 export * from './vendor'
 export * from './vendor-links'
 export * from './video-processing'
 
 // User and profile types
+export * from './department'
 export * from './employee'
 export * from './profile'
 export * from './team'
