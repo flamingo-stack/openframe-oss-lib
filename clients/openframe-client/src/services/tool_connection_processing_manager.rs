@@ -247,13 +247,23 @@ impl ToolConnectionProcessingManager {
                         }
                         // Command returned an error before timeout
                         Ok(Err(e)) => {
-                            error!("Failed to execute agentId command: {:#} – retrying", e);
+                            error!(
+                                tool_id = %tool.tool_id,
+                                command_path = %command_path,
+                                "Failed to execute agentId command: {:#} – retrying", e
+                            );
                             backoff_agent_id_failure(&tool.tool_id, &mut agent_id_failures).await;
                             continue;
                         }
                         // Timeout expired
                         Err(_) => {
-                            error!("agentId command timed out after {AGENT_ID_COMMAND_TIMEOUT_SECONDS} seconds – killed it, retrying");
+                            let service_running = tool_service_running(&tool).await;
+                            error!(
+                                tool_id = %tool.tool_id,
+                                command_path = %command_path,
+                                service_running = ?service_running,
+                                "agentId command timed out after {AGENT_ID_COMMAND_TIMEOUT_SECONDS} seconds – killed it, retrying"
+                            );
                             backoff_agent_id_failure(&tool.tool_id, &mut agent_id_failures).await;
                             continue;
                         }
@@ -340,6 +350,18 @@ impl ToolConnectionProcessingManager {
 
         Ok(())
     }
+}
+
+/// Some(true) = the tool's service instance is live (likely holding its db); None = non-Windows, non-service install, or SCM unavailable.
+async fn tool_service_running(tool: &InstalledTool) -> Option<bool> {
+    #[cfg(target_os = "windows")]
+    if let crate::models::installed_tool::Installation::Service { service_name, .. } =
+        &tool.installation
+    {
+        return crate::platform::system_service::service_running_state(service_name).await;
+    }
+    let _ = tool;
+    None
 }
 
 /// Sleep between agentId-resolution attempts, escalating to a longer back-off once failures
