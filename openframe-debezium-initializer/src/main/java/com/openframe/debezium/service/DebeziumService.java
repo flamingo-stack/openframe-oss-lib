@@ -127,22 +127,7 @@ public class DebeziumService {
         }
     }
 
-    /**
-     * Versioned-strategy path: compare the incoming config to whatever is currently
-     * running under the latest version. If they match, do nothing. If they differ,
-     * gate the recreate on {@link RecreationTracker} (when present) to prevent
-     * register-job replay storms.
-     *
-     * <p>Special cases:
-     * <ul>
-     *   <li>{@code getConnectorConfig} returns null because Kafka Connect is
-     *       transiently unreachable → skip (don't spuriously recreate). The
-     *       distinction between "gone" (404) and "transient" is made inside
-     *       {@code getConnectorConfig}.</li>
-     *   <li>Rate-limit reached → skip with a warn; the connector keeps running
-     *       under {@code currentName} until the window rolls.</li>
-     * </ul>
-     */
+    // Versioned-strategy path: recreate under a new version only on config drift, gated by RecreationTracker.
     private void recreateOnConfigDrift(String baseName, Map<String, Object> incomingConfig, List<String> existing) {
         Optional<String> currentNameOpt = nameStrategy.currentVersion(baseName, existing);
         if (currentNameOpt.isEmpty()) {
