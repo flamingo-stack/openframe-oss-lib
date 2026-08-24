@@ -16,6 +16,8 @@ use async_nats::jetstream::consumer::push;
 use async_nats::jetstream::consumer::PushConsumer;
 use async_nats::jetstream::Message;
 use futures::{FutureExt, StreamExt};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{error, info, warn};
 
@@ -71,6 +73,7 @@ impl ToolUninstallMessageListener {
     async fn listen(&self) -> Result<()> {
         info!("Run tool uninstall message listener");
         let machine_id = self.config_service.get_machine_id()?;
+        let reprovisioning = Arc::new(AtomicBool::new(false));
 
         loop {
             let client = self.nats_connection_manager.get_client().await?;
@@ -103,7 +106,16 @@ impl ToolUninstallMessageListener {
                     }
                     _ = reconnect_rx.recv() => {
                         info!("NATS reconnected, re-provisioning tool uninstall consumer");
-                        self.create_consumer(&js, &machine_id).await;
+                        if !reprovisioning.swap(true, Ordering::SeqCst) {
+                            let listener = self.clone();
+                            let js = js.clone();
+                            let machine_id = machine_id.clone();
+                            let reprovisioning = reprovisioning.clone();
+                            tokio::spawn(async move {
+                                listener.create_consumer(&js, &machine_id).await;
+                                reprovisioning.store(false, Ordering::SeqCst);
+                            });
+                        }
                     }
                 }
             }
