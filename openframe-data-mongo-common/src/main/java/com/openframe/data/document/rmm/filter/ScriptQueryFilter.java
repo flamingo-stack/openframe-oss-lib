@@ -10,13 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/**
- * Data-layer filter criteria for {@code Script} queries. Mirrors the API-layer
- * {@code ScriptFilterInput} but lives here so the repository can stay
- * dependency-free of the API module. The service layer maps between the two.
- *
- * <p>Mirrors the {@code OrganizationQueryFilter} pattern.
- */
+// Mirrors the API-layer ScriptFilterInput so the repository stays dependency-free of the API module.
 @Data
 @Builder
 @NoArgsConstructor
@@ -27,16 +21,9 @@ public class ScriptQueryFilter {
     private List<ScriptStatus> statuses;
     private List<OsType> supportedPlatforms;
 
-    /**
-     * Match scripts assigned ANY of these tag ids. The repository resolves them
-     * into matching script ids via the {@code tag_assignments} collection.
-     * {@code null} = no tag constraint.
-     */
+    // Resolved into matching script ids via the tag_assignments collection.
     private List<String> tagIds;
 
-    /**
-     * Match scripts whose {@code createdBy} (author user id) is ANY of these.
-     * {@code null} = no author constraint.
-     */
+    // Filters by createdBy (author user id).
     private List<String> createdByIds;
 }
