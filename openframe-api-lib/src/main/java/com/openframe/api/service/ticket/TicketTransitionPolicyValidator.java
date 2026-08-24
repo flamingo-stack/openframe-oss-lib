@@ -2,13 +2,17 @@ package com.openframe.api.service.ticket;
 
 import com.openframe.api.exception.ticket.InvalidTicketTransitionException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
+import com.openframe.api.service.ticket.spi.TicketClientConversationGate;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketResolver;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
+import com.openframe.data.document.ticket.TicketStatusHistory;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.repository.ticket.TicketStatusDefinitionRepository;
+import com.openframe.data.repository.ticket.TicketStatusHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -19,7 +23,7 @@ import java.util.Set;
 import static com.openframe.data.document.ticket.TicketStatusKind.*;
 
 /**
- * The allowed-transition matrix between status kinds, plus the reopen-to-AI rule.
+ * The allowed-transition matrix between status kinds, plus the reopen-to-assistant rule.
  */
 @Component
 @RequiredArgsConstructor
@@ -39,6 +43,8 @@ public class TicketTransitionPolicyValidator {
     );
 
     private final TicketStatusDefinitionRepository statusRepository;
+    private final TicketStatusHistoryRepository historyRepository;
+    private final ObjectProvider<TicketClientConversationGate> conversationGate;
 
     public TicketStatusDefinition validateAndResolve(Ticket ticket, String toStatusId) {
         TicketStatusDefinition target = resolveTarget(toStatusId);
@@ -62,10 +68,45 @@ public class TicketTransitionPolicyValidator {
                 .toList();
     }
 
-    /** A closed ticket may only go back to the assistant when the end user was the one who closed it. */
-    private static boolean mayReopenInto(Ticket ticket, TicketStatusDefinition target) {
+    /**
+     * A closed ticket can go back to the assistant only when it never left the assistant: a client
+     * conversation exists and the ticket has never been in Tech Required or a custom status —
+     * once people owned it, reopening returns it to people. Applied both when offering targets
+     * and when validating the actual transition, so the board drag and the raw API obey the same
+     * rule the dropdown shows.
+     */
+    private boolean mayReopenInto(Ticket ticket, TicketStatusDefinition target) {
         boolean reopeningToAi = isClosed(ticket.getStatusKind()) && target.getKind() == AI_ASSISTANCE;
-        return !reopeningToAi || ticket.getResolvedBy() == TicketResolver.END_USER;
+        return !reopeningToAi || stayedWithTheAssistant(ticket);
+    }
+
+    /**
+     * Tickets closed before the history collection existed have no rows; for them the assistant's
+     * own closure (the client asked or agreed) is the only trusted proof the ticket never left.
+     */
+    private boolean stayedWithTheAssistant(Ticket ticket) {
+        if (!hasClientConversation(ticket)) {
+            return false;
+        }
+        List<TicketStatusHistory> history =
+                historyRepository.findByTicketIdOrderByCreatedAtAsc(ticket.getId());
+        if (history.isEmpty()) {
+            return ticket.getResolvedBy() == TicketResolver.END_USER;
+        }
+        return history.stream().noneMatch(TicketTransitionPolicyValidator::touchesHumanStage);
+    }
+
+    private boolean hasClientConversation(Ticket ticket) {
+        TicketClientConversationGate gate = conversationGate.getIfAvailable();
+        return gate != null && gate.hasClientConversation(ticket.getId());
+    }
+
+    private static boolean touchesHumanStage(TicketStatusHistory record) {
+        return isHumanStage(record.getFromStatusKind()) || isHumanStage(record.getToStatusKind());
+    }
+
+    private static boolean isHumanStage(String kind) {
+        return TECH_REQUIRED.name().equals(kind) || CUSTOM.name().equals(kind);
     }
 
     private static boolean isClosed(TicketStatusKind kind) {

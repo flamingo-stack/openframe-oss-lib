@@ -53,6 +53,7 @@ public class TicketLifecycleService {
     private final TenantIdProvider tenantIdProvider;
     private final TicketTagService ticketTagService;
     private final TicketResolverStamp ticketResolverStamp;
+    private final TicketStatusHistoryService historyService;
     private final List<TicketEventListener> listeners;
 
     @Transactional
@@ -81,6 +82,8 @@ public class TicketLifecycleService {
             clearResolutionTrace(context.ticket());
         }
         ticketRepository.save(context.ticket());
+        String transitionReason = hasText(input.getReopenReason()) ? input.getReopenReason() : input.getReason();
+        historyService.record(context.ticket(), context.currentStatus(), target, principal, transitionReason);
         for (TicketEventListener listener : listeners) {
             listener.onTicketTransitioned(context.ticket(), context.currentStatus(), target,
                     principal, reopening, input.getReopenReason());
