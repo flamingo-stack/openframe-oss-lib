@@ -52,13 +52,14 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
 
     @Override
     public void processMachineSaveAll(Iterable<Machine> machines) {
-        try {
-            log.debug("Processing machine saveAll event: {} machines", machines);
-            for (Machine machine : machines) {
+        log.debug("Processing machine saveAll event: {} machines", machines);
+        for (Machine machine : machines) {
+            try {
                 sendMachineEventToKafka(machine);
+            } catch (Exception e) {
+                log.error("Error processing machine {} in processMachineSaveAll: {}",
+                        machine != null ? machine.getMachineId() : null, e.getMessage(), e);
             }
-        } catch (Exception e) {
-            log.error("Error in processMachineSaveAll: {}", e.getMessage(), e);
         }
     }
 
@@ -198,7 +199,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                     MachinePinotMessage message = buildMachinePinotMessageFromParts(machine, remainingTags, remainingAssignments);
                     ossTenantKafkaProducer.publish(machineEventsTopic, machineId, message);
                 } catch (Exception e) {
-                    log.error("Error processing machine {} for tag deletion: {}", machineId, e.getMessage());
+                    log.error("Error processing machine {} for tag deletion: {}", machineId, e.getMessage(), e);
                 }
             }
 
@@ -260,7 +261,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                         log.debug("Sent update for machine {} due to tag key change", machineId);
                     }
                 } catch (Exception e) {
-                    log.error("Error processing machine {} for tag key change: {}", machineId, e.getMessage());
+                    log.error("Error processing machine {} for tag key change: {}", machineId, e.getMessage(), e);
                 }
             }
 
