@@ -41,6 +41,8 @@ public class ScriptScheduleResponse {
 
     private ScheduleOfflineBehavior offlineBehavior;
 
+    private Long reconnectWindowSeconds;
+
     private Instant startAt;
     private Long repeat;
     private Instant nextRunAt;

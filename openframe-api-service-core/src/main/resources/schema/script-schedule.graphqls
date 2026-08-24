@@ -92,6 +92,8 @@ type ScriptSchedule implements Node {
     trigger: ScriptScheduleTrigger!
     """What to do when a target device is offline at the scheduled time: SKIP (log and move on) or RETRY_ON_RECONNECT (run on reconnect). Never null; defaults to SKIP."""
     offlineBehavior: ScheduleOfflineBehavior!
+    """Max seconds to wait for an offline device to reconnect before abandoning the run. Set only when offlineBehavior is RETRY_ON_RECONNECT; null for SKIP."""
+    reconnectWindowSeconds: Long
     """First scheduled run as an absolute UTC instant (the dashboard's Date + Time). Null if the schedule has no timing set (always null for DEVICE_ONLINE)."""
     startAt: Instant
     """Recurrence interval in seconds. Null for a one-shot schedule that fires once at startAt."""
@@ -240,6 +242,8 @@ input CreateScriptScheduleInput {
     trigger: ScriptScheduleTrigger!
     "What to do when a target device is offline at the scheduled time. Null defaults to SKIP (current behaviour)."
     offlineBehavior: ScheduleOfflineBehavior
+    "Max seconds to wait for an offline device to reconnect. Set only when offlineBehavior is RETRY_ON_RECONNECT; null/ignored for SKIP."
+    reconnectWindowSeconds: Long
     "First scheduled run as an absolute UTC instant. Required when trigger is DATE_TIME (must fall on a 30-minute boundary, xx:00 or xx:30); must be null when trigger is DEVICE_ONLINE."
     startAt: Instant
     "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …); the runner ticks on that grid. Null means run once at startAt."
@@ -261,6 +265,8 @@ input UpdateScriptScheduleInput {
     trigger: ScriptScheduleTrigger!
     "What to do when a target device is offline at the scheduled time. Null defaults to SKIP (current behaviour)."
     offlineBehavior: ScheduleOfflineBehavior
+    "Max seconds to wait for an offline device to reconnect. Set only when offlineBehavior is RETRY_ON_RECONNECT; null/ignored for SKIP."
+    reconnectWindowSeconds: Long
     "How this schedule targets devices — SPECIFIC (an explicit machine set) or CRITERIA (a live rule). Null defaults to SPECIFIC, matching legacy documents. Flipping between modes leaves the join rows/rule untouched; whichever mode is active is what the resolver reads."
     selectionMode: ScheduleDeviceSelectionMode
     "First scheduled run (absolute UTC instant). Required when trigger is DATE_TIME (must fall on a 30-minute boundary, xx:00 or xx:30); must be null when trigger is DEVICE_ONLINE. Changing it reschedules the next run."

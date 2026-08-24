@@ -59,6 +59,8 @@ public class ScriptSchedule implements TenantScoped {
     @Builder.Default
     private ScheduleOfflineBehavior offlineBehavior = ScheduleOfflineBehavior.SKIP;
 
+    private Long reconnectWindowSeconds;
+
     private Instant startAt;
 
     private Long repeat;

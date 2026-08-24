@@ -33,6 +33,7 @@ public class ScriptScheduleMapper {
                 .scriptCustomParams(toCustomParams(input.getScriptCustomParams()))
                 .trigger(defaultTrigger(input.getTrigger()))
                 .offlineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()))
+                .reconnectWindowSeconds(input.getReconnectWindowSeconds())
                 .startAt(input.getStartAt())
                 .repeat(input.getRepeat())
                 .build();
@@ -46,6 +47,7 @@ public class ScriptScheduleMapper {
         existing.setScriptCustomParams(toCustomParams(input.getScriptCustomParams()));
         existing.setTrigger(defaultTrigger(input.getTrigger()));
         existing.setOfflineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()));
+        existing.setReconnectWindowSeconds(input.getReconnectWindowSeconds());
         existing.setSelectionMode(defaultSelectionMode(input.getSelectionMode()));
         existing.setStartAt(input.getStartAt());
         existing.setRepeat(input.getRepeat());
@@ -75,6 +77,7 @@ public class ScriptScheduleMapper {
                 .deviceCriteria(entity.getDeviceCriteria())
                 .trigger(defaultTrigger(entity.getTrigger()))
                 .offlineBehavior(defaultOfflineBehavior(entity.getOfflineBehavior()))
+                .reconnectWindowSeconds(entity.getReconnectWindowSeconds())
                 .startAt(entity.getStartAt())
                 .repeat(entity.getRepeat())
                 .nextRunAt(entity.getNextRunAt())

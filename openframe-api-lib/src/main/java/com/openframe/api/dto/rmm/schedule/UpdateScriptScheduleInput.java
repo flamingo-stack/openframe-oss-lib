@@ -41,6 +41,8 @@ public class UpdateScriptScheduleInput {
 
     private ScheduleOfflineBehavior offlineBehavior;
 
+    private Long reconnectWindowSeconds;
+
     private ScheduleDeviceSelectionMode selectionMode;
 
     /**

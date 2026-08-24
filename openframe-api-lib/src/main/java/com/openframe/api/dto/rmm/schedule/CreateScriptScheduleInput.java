@@ -37,6 +37,8 @@ public class CreateScriptScheduleInput {
 
     private ScheduleOfflineBehavior offlineBehavior;
 
+    private Long reconnectWindowSeconds;
+
     /**
      * First scheduled run as an absolute UTC instant (the dashboard converts the
      * chosen Date + Time to UTC). Optional — a schedule with no startAt is never
