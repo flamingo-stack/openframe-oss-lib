@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { AlertTriangle, Bell, ChevronDown, ChevronRight, Download, ExternalLink as ExternalLinkIcon, Heart, Menu, MessageSquare, Plus, Search, Settings, ShoppingCart, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Bell, ChevronDown, ChevronRight, Download, ExternalLink as ExternalLinkIcon, Heart, Menu, MessageSquare, Plus, Search, Settings, ShoppingCart, Trash2 } from 'lucide-react';
 import React from 'react';
 import { Button } from '../components/ui/button';
 
@@ -154,7 +154,7 @@ export const AllSizes: Story = {
   args: { children: 'Button' },
   render: () => (
     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-      <Button size="small-legacy">Small</Button>
+      <Button size="small">Small</Button>
       <Button size="default">Default</Button>
       <Button size="icon" leftIcon={<Settings />} aria-label="Settings" />
     </div>
@@ -209,3 +209,4 @@ export const NotificationCounters: Story = {
     </div>
   ),
 };
+
