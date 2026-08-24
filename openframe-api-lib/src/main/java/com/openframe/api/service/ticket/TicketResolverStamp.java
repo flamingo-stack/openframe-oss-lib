@@ -6,7 +6,6 @@ import com.openframe.data.repository.user.UserRepository;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import static org.springframework.util.StringUtils.hasText;
@@ -17,7 +16,6 @@ import static org.springframework.util.StringUtils.hasText;
  */
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = TicketFeature.ENABLED, havingValue = "true")
 public class TicketResolverStamp {
 
     public static final String AI_AGENT_ID = "AI_AGENT";

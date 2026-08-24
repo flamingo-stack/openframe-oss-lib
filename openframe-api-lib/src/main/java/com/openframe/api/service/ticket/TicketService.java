@@ -32,9 +32,6 @@ import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,7 +54,6 @@ import static org.springframework.util.StringUtils.hasText;
 @Validated
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@ConditionalOnProperty(name = TicketFeature.ENABLED, havingValue = "true")
 public class TicketService {
 
     public static final String ESCALATION_TRANSITION_REASON =
@@ -71,13 +67,9 @@ public class TicketService {
     private final UserRepository userRepository;
     private final AssignmentService assignmentService;
     private final TicketOrderCalculationService ticketOrderCalculationService;
-    // TODO(lifecycle-rollout): remove ObjectProvider + flag + all legacy methods below once the feature is permanent
-    private final ObjectProvider<TicketLifecycleService> ticketLifecycleServiceProvider;
+    private final TicketLifecycleService ticketLifecycleService;
     private final TicketResolverStamp ticketResolverStamp;
     private final List<TicketEventListener> listeners;
-
-    @Value("${" + TicketFeature.LIFECYCLE_ENABLED + ":false}")
-    private boolean lifecycleEnabled;
 
     /**
      * Cursor-paginated ticket listing. Cursors are raw ticket ids. AGENT principals only see the
@@ -231,14 +223,6 @@ public class TicketService {
      */
     @Transactional
     public Optional<Ticket> moveExistingTicketToTechRequired(AuthPrincipal principal, Ticket ticket, String reason) {
-        if (!lifecycleEnabled) {
-            return Optional.of(ticket);
-        }
-        TicketLifecycleService lifecycle = ticketLifecycleServiceProvider.getIfAvailable();
-        if (lifecycle == null) {
-            return Optional.of(ticket);
-        }
-
         TicketStatusKind currentKind = ticket.getStatusKind();
         if (currentKind == TicketStatusKind.TECH_REQUIRED) {
             return Optional.of(ticket);
@@ -246,7 +230,7 @@ public class TicketService {
         if (currentKind != TicketStatusKind.AI_ASSISTANCE) {
             return Optional.empty();
         }
-        Ticket transitioned = lifecycle.transitionToKind(
+        Ticket transitioned = ticketLifecycleService.transitionToKind(
                 principal, ticket.getId(), TicketStatusKind.TECH_REQUIRED, reason);
         transitioned.setOrder(computeTopOrder(transitioned));
         return Optional.of(ticketRepository.save(transitioned));
@@ -419,12 +403,9 @@ public class TicketService {
     public Ticket reorderTicket(AuthPrincipal principal, ReorderTicketInput input) {
         validateAdminAccess(principal);
 
-        // TODO(lifecycle-rollout): remove this branch and the legacy body below once the feature is permanent
-        if (shouldDelegateToLifecycle(input)) {
-            TicketLifecycleService lifecycle = ticketLifecycleServiceProvider.getIfAvailable();
-            if (lifecycle != null) {
-                return lifecycle.reorderTicket(principal, input);
-            }
+        // TODO(lifecycle-rollout): drop the legacy body below once clients always send statusId
+        if (input.getStatusId() != null) {
+            return ticketLifecycleService.reorderTicket(principal, input);
         }
 
         String ticketId = input.getId();
@@ -490,27 +471,10 @@ public class TicketService {
         validateAdminAccess(principal);
         log.info("Archiving resolved tickets by: {}, filter: {}", principal.getDisplayName(), filter);
 
-        // TODO(lifecycle-rollout): drop the legacy branch below once the feature is permanent.
-        // The legacy path operates on the dropped enum `status`, so on lifecycle tenants it would
-        // match nothing — delegate to the statusKind-based bulk archive instead.
-        if (lifecycleEnabled) {
-            TicketLifecycleService lifecycle = ticketLifecycleServiceProvider.getIfAvailable();
-            if (lifecycle != null) {
-                List<String> archivedIds = lifecycle.archiveResolvedTickets(filter);
-                listeners.forEach(listener -> listener.onTicketsArchived(archivedIds, principal));
-                log.info("Archived {} resolved tickets", archivedIds.size());
-                return archivedIds.size();
-            }
-        }
-
-        List<String> resolvedTicketIds = ticketRepository.findByStatus(TicketStatus.RESOLVED)
-                .stream().map(Ticket::getId).toList();
-
-        int archivedCount = ticketRepository.updateStatusBulk(TicketStatus.RESOLVED, TicketStatus.ARCHIVED);
-        listeners.forEach(listener -> listener.onTicketsArchived(resolvedTicketIds, principal));
-
-        log.info("Archived {} resolved tickets", archivedCount);
-        return archivedCount;
+        List<String> archivedIds = ticketLifecycleService.archiveResolvedTickets(filter);
+        listeners.forEach(listener -> listener.onTicketsArchived(archivedIds, principal));
+        log.info("Archived {} resolved tickets", archivedIds.size());
+        return archivedIds.size();
     }
 
     // ---------- internals ----------
@@ -519,51 +483,25 @@ public class TicketService {
         listeners.forEach(listener -> listener.onLegacyStatusChanged(saved, previousStatus, principal));
     }
 
-    private boolean shouldDelegateToLifecycle(ReorderTicketInput input) {
-        return lifecycleEnabled && input.getStatusId() != null;
-    }
-
-    // TODO(lifecycle-rollout): drop the legacy branch once the legacy status field is removed.
-    // With lifecycle on, columns are grouped by statusId, so a new ticket's top rank must be computed
-    // against its statusId column (the legacy status field is unset on migrated tickets and would make
-    // the column look empty). Requires the lifecycle status to be applied beforehand.
+    // Columns are grouped by statusId, so a new ticket's top rank is computed against its statusId
+    // column. Requires the lifecycle status to be applied beforehand.
     private String computeTopOrder(Ticket ticket) {
-        if (lifecycleEnabled) {
-            TicketLifecycleService lifecycle = ticketLifecycleServiceProvider.getIfAvailable();
-            if (lifecycle != null) {
-                return lifecycle.computeRankAtTop(ticket.getStatusId());
-            }
-        }
-        return ticketOrderCalculationService.computeRankAtTop(ticket.getStatus());
+        return ticketLifecycleService.computeRankAtTop(ticket.getStatusId());
     }
 
     private void applyInitialStatusIfLifecycle(Ticket ticket) {
-        if (!lifecycleEnabled) {
-            return;
-        }
-        TicketLifecycleService lifecycle = ticketLifecycleServiceProvider.getIfAvailable();
-        if (lifecycle != null) {
-            lifecycle.applyInitialStatus(ticket);
-        }
+        ticketLifecycleService.applyInitialStatus(ticket);
     }
 
     private void applyManualStatusIfLifecycle(Ticket ticket, String requestedStatusId) {
-        if (!lifecycleEnabled) {
-            return;
-        }
-        TicketLifecycleService lifecycle = ticketLifecycleServiceProvider.getIfAvailable();
-        if (lifecycle != null) {
-            lifecycle.applyManualInitialStatus(ticket, requestedStatusId);
-        }
+        ticketLifecycleService.applyManualInitialStatus(ticket, requestedStatusId);
     }
 
-    // While lifecycle is enabled, custom statuses are authoritative and transitions must go through
-    // transitionTicket; the legacy enum-based mutations would silently desync statusId/statusKind.
+    // Custom statuses are authoritative and transitions must go through transitionTicket;
+    // the legacy enum-based mutations would silently desync statusId/statusKind.
     private void ensureLegacyStatusMutationAllowed() {
-        if (lifecycleEnabled) {
-            throw new IllegalStateException(
-                    "Legacy status mutations are disabled while ticket lifecycle is enabled; use transitionTicket");
-        }
+        throw new IllegalStateException(
+                "Legacy status mutations are disabled while ticket lifecycle is enabled; use transitionTicket");
     }
 
     private boolean isStatusChanged(Ticket ticket, TicketStatus targetTicketStatus) {

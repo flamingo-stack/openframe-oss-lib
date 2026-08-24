@@ -10,7 +10,6 @@ import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -29,7 +28,6 @@ import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
 @Validated
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@ConditionalOnProperty(name = TicketFeature.ENABLED, havingValue = "true")
 public class TicketTagService {
 
     private final TagRepository tagRepository;

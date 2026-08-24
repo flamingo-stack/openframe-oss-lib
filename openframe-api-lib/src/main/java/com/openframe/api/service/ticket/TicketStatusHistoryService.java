@@ -6,7 +6,6 @@ import com.openframe.data.repository.ticket.TicketStatusHistoryRepository;
 import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
@@ -18,7 +17,6 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(name = TicketFeature.ENABLED, havingValue = "true")
 public class TicketStatusHistoryService {
 
     private final TicketStatusHistoryRepository historyRepository;

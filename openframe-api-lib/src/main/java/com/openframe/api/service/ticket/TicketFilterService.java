@@ -3,18 +3,14 @@ package com.openframe.api.service.ticket;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.dto.ticket.TicketFilterOption;
 import com.openframe.api.dto.ticket.TicketFilters;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.user.UserRepository;
 import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -28,16 +24,12 @@ import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
 @Slf4j
 @Validated
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = TicketFeature.ENABLED, havingValue = "true")
 public class TicketFilterService {
 
     private final TicketTagService ticketTagService;
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
     private final TicketStatusService ticketStatusService;
-
-    @Value("${" + TicketFeature.LIFECYCLE_ENABLED + ":false}")
-    private boolean lifecycleEnabled;
 
     public CompletableFuture<TicketFilters> getFilters(AuthPrincipal principal, TicketFilterInput filter) {
         validateAdminAccess(principal);
@@ -62,19 +54,10 @@ public class TicketFilterService {
     }
 
     private List<TicketFilterOption> getStatusOptions() {
-        // TODO(lifecycle-rollout): drop the legacy enum branch after rollout
-        if (lifecycleEnabled) {
-            return ticketStatusService.list().stream()
-                    .map(status -> TicketFilterOption.builder()
-                            .value(status.getId())
-                            .label(status.getName())
-                            .build())
-                    .toList();
-        }
-        return Arrays.stream(TicketStatus.values())
+        return ticketStatusService.list().stream()
                 .map(status -> TicketFilterOption.builder()
-                        .value(status.name())
-                        .label(status.name())
+                        .value(status.getId())
+                        .label(status.getName())
                         .build())
                 .toList();
     }

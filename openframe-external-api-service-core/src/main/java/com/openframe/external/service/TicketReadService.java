@@ -1,6 +1,5 @@
 package com.openframe.external.service;
 
-import com.openframe.api.service.ticket.TicketFeature;
 import com.openframe.api.service.ticket.TicketLifecycleService;
 import com.openframe.api.service.ticket.TicketNoteService;
 import com.openframe.api.service.ticket.TicketStatusService;
@@ -16,8 +15,6 @@ import com.openframe.external.mapper.TicketMapper;
 import com.openframe.external.mapper.TicketMapper.TicketRelations;
 import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -31,14 +28,13 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = TicketFeature.ENABLED, havingValue = "true")
 public class TicketReadService {
 
     private final TicketTagService ticketTagService;
     private final TicketNoteService ticketNoteService;
     private final TicketAttachmentRepository ticketAttachmentRepository;
     private final TicketStatusService ticketStatusService;
-    private final ObjectProvider<TicketLifecycleService> lifecycleProvider;
+    private final TicketLifecycleService ticketLifecycleService;
     private final TicketMapper ticketMapper;
 
     public TicketResponse toResponse(AuthPrincipal principal, Ticket ticket) {
@@ -57,8 +53,6 @@ public class TicketReadService {
                 .collect(Collectors.groupingBy(TicketAttachment::getTicketId));
         Map<String, TicketStatusDefinition> statusesById = ticketStatusService.list().stream()
                 .collect(Collectors.toMap(TicketStatusDefinition::getId, Function.identity(), (a, b) -> a));
-        TicketLifecycleService lifecycle = lifecycleProvider.getIfAvailable();
-
         return java.util.stream.IntStream.range(0, tickets.size())
                 .mapToObj(i -> {
                     Ticket ticket = tickets.get(i);
@@ -67,8 +61,8 @@ public class TicketReadService {
                             notesPerTicket.get(i),
                             attachmentsByTicket.getOrDefault(ticket.getId(), List.of()),
                             ticket.getStatusId() != null ? statusesById.get(ticket.getStatusId()) : null,
-                            lifecycle != null && ticket.getStatusKind() != null
-                                    ? lifecycle.availableTransitionsFor(principal, ticket) : null);
+                            ticket.getStatusKind() != null
+                                    ? ticketLifecycleService.availableTransitionsFor(principal, ticket) : null);
                     return ticketMapper.toTicketResponse(ticket, relations);
                 })
                 .toList();

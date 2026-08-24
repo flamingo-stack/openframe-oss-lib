@@ -16,7 +16,7 @@ import java.util.List;
 public class TicketFilterInput {
     @Size(max = 5)
     private List<TicketStatus> statuses;
-    /** Lifecycle feature: filter by custom status ids (openframe.features.tickets.lifecycle.enabled). */
+    /** Filter by custom status ids. */
     @Size(max = 50)
     private List<String> statusIds;
     @Size(max = 50)

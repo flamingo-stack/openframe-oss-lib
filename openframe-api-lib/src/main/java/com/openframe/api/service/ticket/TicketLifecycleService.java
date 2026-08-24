@@ -20,7 +20,6 @@ import jakarta.validation.Valid;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,14 +36,12 @@ import static org.springframework.util.StringUtils.hasText;
 
 /**
  * Lifecycle operations for custom-status tickets.
- * Active only when {@code openframe.features.tickets.lifecycle.enabled=true}.
  */
 @Service
 @Slf4j
 @Validated
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@ConditionalOnProperty(name = TicketFeature.LIFECYCLE_ENABLED, havingValue = "true")
 public class TicketLifecycleService {
 
     private final TicketRepository ticketRepository;

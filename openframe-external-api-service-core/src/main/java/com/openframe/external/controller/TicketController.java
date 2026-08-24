@@ -29,8 +29,6 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -43,7 +41,7 @@ import static org.springframework.http.HttpStatus.*;
 /**
  * External REST API for tickets. Runs the shared ticket domain services (openframe-api-lib) on
  * behalf of the API key owner, so behaviour — numbering, lifecycle rules, notifications — is the
- * same as in the dashboard. Active on deployments with {@code openframe.features.tickets.enabled}.
+ * same as in the dashboard.
  */
 @RestController
 @RequestMapping("/api/v1/tickets")
@@ -51,7 +49,6 @@ import static org.springframework.http.HttpStatus.*;
 @Slf4j
 @Validated
 @Tag(name = "Tickets API v1", description = "Ticket management endpoints")
-@ConditionalOnProperty(name = TicketFeature.ENABLED, havingValue = "true")
 public class TicketController {
 
     private final TicketService ticketService;
@@ -60,7 +57,7 @@ public class TicketController {
     private final TicketTagService ticketTagService;
     private final TicketNoteService ticketNoteService;
     private final TicketStatisticsService ticketStatisticsService;
-    private final ObjectProvider<TicketLifecycleService> lifecycleProvider;
+    private final TicketLifecycleService ticketLifecycleService;
     private final TicketReadService ticketReadService;
     private final TicketMapper ticketMapper;
     private final ApiKeyPrincipalResolver principalResolver;
@@ -278,16 +275,12 @@ public class TicketController {
 
         log.info("Transitioning ticket {} to status {} - userId: {}, apiKeyId: {}", id, request.toStatusId(), userId, apiKeyId);
         AuthPrincipal principal = principalResolver.resolve(userId);
-        TicketLifecycleService lifecycle = lifecycleProvider.getIfAvailable();
-        if (lifecycle == null) {
-            throw new IllegalStateException("Ticket lifecycle is not enabled for this tenant");
-        }
         TransitionTicketInput input = TransitionTicketInput.builder()
                 .ticketId(id)
                 .toStatusId(request.toStatusId())
                 .reason(request.reason())
                 .build();
-        return ticketReadService.toResponse(principal, lifecycle.transition(principal, input));
+        return ticketReadService.toResponse(principal, ticketLifecycleService.transition(principal, input));
     }
 
     @Operation(summary = "Assign a ticket", description = "Assign the ticket to a user (the assignee is notified)")

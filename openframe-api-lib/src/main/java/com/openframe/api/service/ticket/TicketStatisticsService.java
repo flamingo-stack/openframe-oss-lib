@@ -9,8 +9,6 @@ import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -26,7 +24,6 @@ import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
 @Validated
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@ConditionalOnProperty(name = TicketFeature.ENABLED, havingValue = "true")
 public class TicketStatisticsService {
 
     private static final String DEFAULT_TIME_FORMAT = "00:00:00";
@@ -35,23 +32,12 @@ public class TicketStatisticsService {
     private final TicketStatusService ticketStatusService;
     private final ObjectProvider<TicketRatingProvider> ratingProvider;
 
-    @Value("${" + TicketFeature.LIFECYCLE_ENABLED + ":false}")
-    private boolean lifecycleEnabled;
-
     public TicketStatistics getStatistics(AuthPrincipal principal) {
         validateAdminAccess(principal);
         log.debug("Fetching ticket statistics");
 
-        List<TicketStatusCount> statusCounts = List.of();
-        List<TicketStatusDefinitionCount> statusDefinitionCounts = List.of();
-        long totalCount;
-        if (lifecycleEnabled) {
-            statusDefinitionCounts = countByStatusDefinition();
-            totalCount = statusDefinitionCounts.stream().mapToInt(TicketStatusDefinitionCount::getCount).sum();
-        } else {
-            statusCounts = countByLegacyStatus();
-            totalCount = statusCounts.stream().mapToInt(TicketStatusCount::getCount).sum();
-        }
+        List<TicketStatusDefinitionCount> statusDefinitionCounts = countByStatusDefinition();
+        long totalCount = statusDefinitionCounts.stream().mapToInt(TicketStatusDefinitionCount::getCount).sum();
 
         Optional<Long> avgResolutionMs = ticketRepository.getAverageResolutionTimeMs();
         String formattedTime = avgResolutionMs
@@ -64,21 +50,13 @@ public class TicketStatisticsService {
 
         return TicketStatistics.builder()
                 .totalCount((int) totalCount)
-                .statusCounts(statusCounts)
+                .statusCounts(List.of())
                 .statusDefinitionCounts(statusDefinitionCounts)
                 .averageResolutionTimeFormatted(formattedTime)
                 .averageRating(averageRating)
                 .build();
     }
 
-    private List<TicketStatusCount> countByLegacyStatus() {
-        return ticketRepository.countTicketsByStatus().entrySet().stream()
-                .map(entry -> TicketStatusCount.builder()
-                        .status(entry.getKey())
-                        .count(entry.getValue().intValue())
-                        .build())
-                .toList();
-    }
 
     private List<TicketStatusDefinitionCount> countByStatusDefinition() {
         return ticketStatusService.list().stream()

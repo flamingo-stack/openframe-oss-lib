@@ -6,7 +6,6 @@ import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -14,7 +13,6 @@ import java.util.Optional;
 /** LexoRank ordering within the legacy (lifecycle-off) status columns. */
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = TicketFeature.ENABLED, havingValue = "true")
 public class TicketOrderCalculationService {
 
     private final TicketRepository ticketRepository;

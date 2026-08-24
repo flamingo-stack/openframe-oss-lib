@@ -13,7 +13,6 @@ import com.openframe.data.repository.ticket.TicketStatusHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -28,7 +27,6 @@ import static com.openframe.data.document.ticket.TicketStatusKind.*;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(name = TicketFeature.ENABLED, havingValue = "true")
 public class TicketTransitionPolicyValidator {
 
     public static final Set<TicketStatusKind> MANUALLY_CREATABLE_KINDS =

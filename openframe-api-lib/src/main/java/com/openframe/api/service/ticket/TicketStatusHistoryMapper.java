@@ -5,7 +5,6 @@ import com.openframe.data.document.ticket.TicketActorType;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusHistory;
 import com.openframe.security.authentication.AuthPrincipal;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component;
  * (id, tenantId, createdAt) are left for Mongo to fill.
  */
 @Component
-@ConditionalOnProperty(name = TicketFeature.ENABLED, havingValue = "true")
 public class TicketStatusHistoryMapper {
 
     public TicketStatusHistory toHistory(Ticket ticket, TicketStatusDefinition from, TicketStatusDefinition to,
