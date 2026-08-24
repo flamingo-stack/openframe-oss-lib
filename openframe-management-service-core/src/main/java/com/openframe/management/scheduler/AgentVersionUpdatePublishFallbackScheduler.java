@@ -40,9 +40,13 @@ public class AgentVersionUpdatePublishFallbackScheduler {
     public void publishUnpublishedEntities() {
         try {
             processOpenframeClient();
+        } catch (Exception e) {
+            log.error("Failed to publish openframe client update", e);
+        }
+        try {
             processToolAgents();
         } catch (Exception e) {
-            log.error("Agent version update publishing failed", e);
+            log.error("Failed to publish tool agent updates", e);
         }
     }
 
