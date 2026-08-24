@@ -74,7 +74,7 @@ public class ApiKeyStatsSyncService {
                     mongo.setLastUsed(lastUsed);
                 }
             } catch (Exception e) {
-                log.warn("Failed to parse lastUsed: {}", lastUsedStr);
+                log.warn("Failed to parse lastUsed: {}", lastUsedStr, e);
             }
         }
 
