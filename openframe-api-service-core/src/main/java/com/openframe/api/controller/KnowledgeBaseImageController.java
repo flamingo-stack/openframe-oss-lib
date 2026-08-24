@@ -20,14 +20,7 @@ import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Inline images for markdown content (Knowledge Base articles, ticket descriptions).
- * <p>
- * The markdown embeds the permanent {@code /knowledge-base/images/{id}} URL; GET
- * redirects to a freshly signed short-lived storage URL, so the embedded link never
- * expires while image bytes stream directly from storage. Upload is likewise direct:
- * POST returns a signed PUT URL the client uploads the file to.
- */
+// Embedded markdown URL stays permanent; GET here redirects to a freshly signed storage URL so links never expire.
 @RestController
 @RequestMapping("/knowledge-base/images")
 @RequiredArgsConstructor
