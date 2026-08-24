@@ -43,6 +43,8 @@ export interface EmbedViewerFrameProps {
   allow?: string
   allowFullScreen?: boolean
   loading?: 'eager' | 'lazy'
+  /** iframe `sandbox` — see `EmbedIframe`. Set it for user-authored contents. */
+  sandbox?: string
   /** Wrapper classes; defaults to the sheets/pdf `space-y-4`. */
   className?: string
 }
@@ -59,6 +61,7 @@ export function EmbedViewerFrame({
   allow,
   allowFullScreen,
   loading,
+  sandbox,
   className,
 }: EmbedViewerFrameProps) {
   return (
@@ -82,6 +85,7 @@ export function EmbedViewerFrame({
           allow={allow}
           allowFullScreen={allowFullScreen}
           loading={loading}
+          sandbox={sandbox}
         />
       ) : (
         <div className="flex flex-col items-center justify-center py-16 text-center">

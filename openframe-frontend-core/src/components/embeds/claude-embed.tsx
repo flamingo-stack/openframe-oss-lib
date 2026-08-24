@@ -17,6 +17,8 @@ export interface ClaudeEmbedProps {
   title?: string
   /** iframe height (CSS value), matching `FigmaEmbed`'s prop. */
   height?: string
+  /** iframe loading strategy. Defaults to `lazy`, as `FigmaEmbed` does. */
+  loading?: 'eager' | 'lazy'
 }
 
 const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
@@ -41,7 +43,7 @@ const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
  * (no embed route), an artifact whose author has not allow-listed this host,
  * or an http host (mixed content — it will not paint on `http://localhost`).
  */
-export function ClaudeEmbed({ url, kind = 'artifact', title, height = '70vh' }: ClaudeEmbedProps) {
+export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy' }: ClaudeEmbedProps) {
   const embedUrl = toClaudeEmbedUrl(url)
   return (
     <EmbedViewerFrame
@@ -63,8 +65,19 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height = '70vh' }: 
         </Button>
       }
       src={embedUrl}
-      loading="lazy"
+      loading={loading}
       height={height}
+      // Same frame contract Figma gets — an artifact is a real app: it copies
+      // to the clipboard and can go fullscreen.
+      allow="clipboard-write; clipboard-read; fullscreen"
+      // …but UNLIKE Figma, an artifact is USER-AUTHORED HTML and JS, so it is
+      // sandboxed. Omitting `allow-top-navigation` is the point: an artifact
+      // cannot navigate the page it is embedded in. `allow-same-origin` beside
+      // `allow-scripts` is what Anthropic's own embed snippet uses and is safe
+      // on a CROSS-ORIGIN frame — it grants the frame claude.ai's origin, never
+      // ours.
+      sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+      allowFullScreen
       emptyIcon={<ClaudeIcon className="w-16 h-16 mb-4" />}
       emptyMessage="Open this one in Claude · it has no embeddable view"
     />

@@ -153,6 +153,7 @@ export function buildRichEmbedOverrides({
             url={props['data-url']}
             kind={props['data-kind'] === 'design' ? 'design' : 'artifact'}
             title={props['data-title']}
+            height="70vh"
           />
         );
       }
