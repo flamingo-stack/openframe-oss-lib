@@ -20,7 +20,11 @@ public class RmmResultParser {
 
     private final ObjectMapper objectMapper;
 
-    public <T extends RmmResultMessage> T parse(byte[] payload, Class<T> targetType) throws IOException {
-        return objectMapper.readValue(payload, targetType);
+    public <T extends RmmResultMessage> T parse(byte[] payload, Class<T> targetType) {
+        try {
+            return objectMapper.readValue(payload, targetType);
+        } catch (IOException e) {
+            throw new RmmResultParseException("Failed to parse RMM result payload for type " + targetType.getName(), e);
+        }
     }
 }

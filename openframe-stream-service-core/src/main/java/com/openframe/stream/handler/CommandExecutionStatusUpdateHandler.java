@@ -9,6 +9,8 @@ import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -106,11 +108,11 @@ public class CommandExecutionStatusUpdateHandler
         row.setError(error);
 
         Truncated truncStdout = truncate(stdout);
-        row.setStdout(truncStdout.value);
-        row.setStdoutTruncated(truncStdout.truncated);
+        row.setStdout(truncStdout.getValue());
+        row.setStdoutTruncated(truncStdout.getTruncated());
         Truncated truncStderr = truncate(stderr);
-        row.setStderr(truncStderr.value);
-        row.setStderrTruncated(truncStderr.truncated);
+        row.setStderr(truncStderr.getValue());
+        row.setStderrTruncated(truncStderr.getTruncated());
 
         commandExecutionRepository.save(row);
         executionMetrics.recordCompleted(RmmExecutionMetrics.KIND_COMMAND, newStatus, row.getDispatchedAt(), now);
@@ -138,7 +140,12 @@ public class CommandExecutionStatusUpdateHandler
         return new Truncated(cut, Boolean.TRUE);
     }
 
-    private record Truncated(String value, Boolean truncated) {}
+    @Getter
+    @AllArgsConstructor
+    private static class Truncated {
+        private final String value;
+        private final Boolean truncated;
+    }
 
     private static String stringOrNull(JsonNode node, String field) {
         JsonNode v = node.get(field);

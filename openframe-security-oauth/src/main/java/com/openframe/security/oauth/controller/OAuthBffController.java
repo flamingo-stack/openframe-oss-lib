@@ -5,6 +5,8 @@ import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
 import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -159,12 +161,12 @@ public class OAuthBffController {
         if (!mobileAuthEnabled) {
             return Mono.just(ResponseEntity.status(404).build());
         }
-        if (!hasText(body.tenantId()) || !hasText(body.identityToken()) || !hasText(body.authorizationCode())) {
+        if (!hasText(body.getTenantId()) || !hasText(body.getIdentityToken()) || !hasText(body.getAuthorizationCode())) {
             return Mono.just(ResponseEntity.badRequest().build());
         }
         return oauthBffService.appleNativeExchange(
-                        body.tenantId(), body.identityToken(), body.authorizationCode(),
-                        body.nonce(), body.firstName(), body.lastName(), request)
+                        body.getTenantId(), body.getIdentityToken(), body.getAuthorizationCode(),
+                        body.getNonce(), body.getFirstName(), body.getLastName(), request)
                 .map(tokens -> buildNoContentWithCookies(tokens, true))
                 .onErrorResume(e -> {
                     log.warn("Apple native exchange failed: {}", e.getMessage());
@@ -172,12 +174,15 @@ public class OAuthBffController {
                 });
     }
 
-    public record AppleNativeExchangeRequest(String tenantId,
-                                             String identityToken,
-                                             String authorizationCode,
-                                             String nonce,
-                                             String firstName,
-                                             String lastName) {
+    @Getter
+    @AllArgsConstructor
+    public static class AppleNativeExchangeRequest {
+        private final String tenantId;
+        private final String identityToken;
+        private final String authorizationCode;
+        private final String nonce;
+        private final String firstName;
+        private final String lastName;
     }
 
     @GetMapping("/dev-exchange")
@@ -244,3 +249,4 @@ public class OAuthBffController {
     }
 
 }
+
