@@ -8,9 +8,18 @@
  *
  * Each fixture feeds a mocked global fetch whose Response body is a
  * ReadableStream of Uint8Array chunks, then snapshots the resulting
- * message state. Behaviors captured here — INCLUDING the sentinel-byte
- * mis-framing in fixture (d) — are the recorded baseline for the
- * unification reducer. Do NOT "fix" them here.
+ * message state. Behaviors captured here are the recorded baseline for
+ * the unification reducer. Do NOT "fix" them here.
+ *
+ * NOTE: fixture (d) below pins a KNOWN BUG (not intended behavior) in the
+ * decoder's use of \x1E/\x1F/\0 as sentinel bytes: a literal \x1F occurring
+ * in real answer text prematurely flips the decoder into trailer mode,
+ * silently dropping subsequent text AND the real usage trailer. This is
+ * tracked as a wire-protocol defect against the SSE encoder/decoder — see
+ * the unification plan — and must be fixed there (e.g. by escaping/encoding
+ * sentinel bytes out of band), not treated as acceptable production
+ * behavior. This test only characterizes today's decoder so regressions are
+ * visible; it is not evidence the behavior is correct.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -183,14 +192,21 @@ describe('SSE wire decode — golden fixtures (full hook path)', () => {
     expect(snapshotState(result)).toMatchSnapshot()
   })
 
-  it('(d) answer text containing literal \\x1E/\\x1F/\\0 bytes', async () => {
-    // CHARACTERIZATION: current behavior, see unification plan.
+  it('(d) BUG: answer text containing a literal \\x1F byte mis-frames and drops the real usage trailer (tracked defect, not intended behavior)', async () => {
+    // KNOWN BUG — see file-header note and unification plan. This pins
+    // TODAY's decoder output for regression visibility only; it does NOT
+    // sanction the behavior as correct.
     //  - In text mode only \x1F is scanned: literal \0 and \x1E bytes in
     //    the answer pass through into the rendered text unchanged.
     //  - The FIRST literal \x1F flips the decoder into trailer mode:
     //    everything after it (including later real text) is captured as
     //    the trailer buffer, fails JSON.parse, and is SILENTLY DROPPED —
     //    the real \x1F usage trailer is lost too (mis-framing/truncation).
+    //    TODO(sse-wire-protocol): fix the encoder/decoder to escape or
+    //    otherwise avoid colliding with sentinel bytes (\x1E/\x1F/\0) that
+    //    can legitimately appear in AI-generated answer text (binary
+    //    content, escaped code, etc.), so usage/billing telemetry is never
+    //    silently lost.
     mockFetchStream([
       METADATA_FRAME,
       '\x1E',
