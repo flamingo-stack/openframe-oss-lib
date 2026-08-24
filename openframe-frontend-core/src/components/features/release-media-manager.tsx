@@ -31,6 +31,8 @@ export function ReleaseMediaManager({
 }: ReleaseMediaManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const mediaRef = useRef(media);
+  mediaRef.current = media;
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -56,19 +58,28 @@ export function ReleaseMediaManager({
       _uploading: true
     };
 
-    onChange([...media, newMedia]);
+    const withNewMedia = [...mediaRef.current, newMedia];
+    mediaRef.current = withNewMedia;
+    onChange(withNewMedia);
     setUploadingIndex(newIndex);
 
     try {
       // Upload file
       const url = await onUpload(file, mediaType);
 
-      // Update with uploaded URL
-      const updated = [...media, { ...newMedia, media_url: url, _file: undefined, _uploading: false }];
+      // Update with uploaded URL, based on current state at completion time
+      const updated = mediaRef.current.map((item) =>
+        item === newMedia
+          ? { ...newMedia, media_url: url, _file: undefined, _uploading: false }
+          : item
+      );
+      mediaRef.current = updated;
       onChange(updated);
     } catch (error) {
       // Remove failed upload
-      onChange(media);
+      const reverted = mediaRef.current.filter((item) => item !== newMedia);
+      mediaRef.current = reverted;
+      onChange(reverted);
     } finally {
       setUploadingIndex(null);
       if (fileInputRef.current) {
