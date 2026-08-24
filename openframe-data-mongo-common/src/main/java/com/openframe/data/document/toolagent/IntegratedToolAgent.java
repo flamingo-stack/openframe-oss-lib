@@ -2,13 +2,19 @@ package com.openframe.data.document.toolagent;
 import com.openframe.data.document.TenantScoped;
 import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.clientconfiguration.PublishState;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.List;
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = "integrated_tool_agents")
 @CompoundIndex(name = "tenant_key_idx", def = "{'tenantId':1,'key':1}", unique = true, sparse = true)
 public class IntegratedToolAgent implements TenantScoped {
@@ -31,3 +37,4 @@ public class IntegratedToolAgent implements TenantScoped {
     private ToolAgentStatus status;
     private PublishState publishState;
 }
+
