@@ -2,6 +2,7 @@ package com.openframe.client.service;
 
 import com.openframe.client.event.DeviceCameOnlineEvent;
 import com.openframe.client.event.DeviceFirstConnectedEvent;
+import com.openframe.client.exception.MachineNotFoundException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
@@ -18,6 +19,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -198,6 +200,18 @@ class MachineStatusServiceTest {
 
         verify(machineRepository).updateLastSeen(MACHINE, LATER);
         verify(machineRepository, never()).save(any(Machine.class));
+    }
+
+    @Test
+    @DisplayName("M2: an event for an unknown machine fails loudly and writes nothing")
+    void unknownMachine_throwsAndWritesNothing() {
+        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.processHeartbeat(MACHINE, LATER))
+                .isInstanceOf(MachineNotFoundException.class);
+
+        verify(machineRepository, never()).save(any(Machine.class));
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
     }
 
     @Test
