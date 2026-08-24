@@ -5,6 +5,7 @@ import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.rmm.OsType;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,14 @@ public interface CustomMachineRepository {
     List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter, Collection<OsType> osTypeScope);
 
     long countMachinesByCriteria(String tenantId, MachineQueryFilter filter, Collection<OsType> osTypeScope);
+
+    /**
+     * Updates only the {@code lastSeen} timestamp of a machine, leaving every other field untouched.
+     * Deliberately bypasses {@code save}/{@code saveAll} so the Pinot publishing aspect does not fire:
+     * {@code lastSeen} is not part of the Pinot payload, so heartbeats that change nothing else must
+     * not produce a Kafka message.
+     */
+    void updateLastSeen(String machineId, Instant lastSeen);
 
     boolean isSortableField(String field);
 

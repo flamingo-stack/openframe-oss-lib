@@ -16,6 +16,7 @@ import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -363,6 +364,11 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             query.addCriteria(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
         }
         return query;
+    }
+
+    @Override
+    public void updateLastSeen(String machineId, Instant lastSeen) {
+        throw new UnsupportedOperationException("not implemented yet");
     }
 
     @Override
