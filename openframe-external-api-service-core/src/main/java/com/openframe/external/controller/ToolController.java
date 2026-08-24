@@ -69,8 +69,8 @@ public class ToolController {
                 .category(category)
                 .build();
         
-        var result = toolService.queryTools(filterCriteria, search,
-                                           SortInput.from(sortField, sortDirection));
+        SortInput sortInput = SortInput.from(sortField, sortDirection);
+        var result = toolService.queryTools(filterCriteria, search, sortInput);
         return toolMapper.toToolsResponse(result);
     }
 

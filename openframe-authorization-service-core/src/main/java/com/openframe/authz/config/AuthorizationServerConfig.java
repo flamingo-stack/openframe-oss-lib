@@ -157,8 +157,10 @@ public class AuthorizationServerConfig {
                                                                       OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer) {
         JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
         jwtGenerator.setJwtCustomizer(tokenCustomizer);
+        OAuth2AccessTokenGenerator accessTokenGenerator = new OAuth2AccessTokenGenerator();
+        OAuth2RefreshTokenGenerator refreshTokenGenerator = new OAuth2RefreshTokenGenerator();
         return new DelegatingOAuth2TokenGenerator(
-                jwtGenerator, new OAuth2AccessTokenGenerator(), new OAuth2RefreshTokenGenerator());
+                jwtGenerator, accessTokenGenerator, refreshTokenGenerator);
     }
 
     @Bean

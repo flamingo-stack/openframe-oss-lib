@@ -27,10 +27,14 @@ public class InvitationMapper {
     public Invitation toEntity(CreateInvitationRequest request) {
         Instant createdAt = Instant.now();
 
+        List<UserRole> roles = request.getRoles() != null
+                ? request.getRoles().stream().map(r -> UserRole.valueOf(r.name())).toList()
+                : List.of(ADMIN);
+
         return Invitation.builder()
                 .id(randomUUID().toString())
                 .email(request.getEmail().toLowerCase(Locale.ROOT))
-                .roles(request.getRoles() != null ? request.getRoles().stream().map(r -> UserRole.valueOf(r.name())).toList() : List.of(ADMIN))
+                .roles(roles)
                 .createdAt(createdAt)
                 .expiresAt(createdAt.plus(ttl))
                 .status(PENDING)
@@ -43,13 +47,16 @@ public class InvitationMapper {
             status = InvitationStatus.EXPIRED;
         }
 
+        List<Role> roles = entity.getRoles().stream().map(r -> Role.valueOf(r.name())).toList();
+
         return InvitationResponse.builder()
                 .id(entity.getId())
                 .email(entity.getEmail())
-                .roles(entity.getRoles().stream().map(r -> Role.valueOf(r.name())).toList())
+                .roles(roles)
                 .createdAt(entity.getCreatedAt())
                 .expiresAt(entity.getExpiresAt())
                 .status(status)
                 .build();
     }
 }
+
