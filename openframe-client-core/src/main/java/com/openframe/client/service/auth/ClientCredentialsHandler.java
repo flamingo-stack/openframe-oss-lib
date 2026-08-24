@@ -30,8 +30,9 @@ public class ClientCredentialsHandler {
 
         validateClientSecret(client, clientSecret);
 
+        String clientIdValue = client.getClientId();
         String accessToken = accessTokenGenerator.generate(client, CLIENT_CREDENTIALS_GRANT_TYPE);
-        String refreshToken = refreshTokenGenerator.generate(client.getClientId());
+        String refreshToken = refreshTokenGenerator.generate(clientIdValue);
         long accessTokenExpirationSeconds = accessTokenGenerator.getExpirationSeconds();
 
         return new AgentTokenResponse(
@@ -48,7 +49,8 @@ public class ClientCredentialsHandler {
             log.debug("Client secret validation failed for client: {} ", clientId);
             throw new IllegalArgumentException("Invalid client secret");
         }
-        log.debug("Client secret validation passed for client: " + clientId);
+        log.debug("Client secret validation passed for client: {}", clientId);
     }
 
 }
+
