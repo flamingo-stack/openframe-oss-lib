@@ -44,10 +44,6 @@ public class ToolInstallationNatsPublisher {
         return format(TOPIC_NAME_TEMPLATE, machineId);
     }
 
-    private ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool) {
-        return buildMessage(toolAgent, tool, false);
-    }
-
     private ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
         ToolInstallationMessage message = new ToolInstallationMessage();
         message.setToolAgentId(toolAgent.getKey());
