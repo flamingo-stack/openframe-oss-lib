@@ -41,17 +41,24 @@ public class DialogFixture {
      * <p>No {@code mode} is sent: the backend honours {@code request.mode} only for ADMIN actors and
      * forces {@link DialogMode#AI} for an AGENT, so passing one would just be misleading.
      *
-     * <p><b>Leaves a ticket behind.</b> For an AGENT with no {@code ticketId}, the backend auto-creates
-     * one ({@code createTicketFromDialog}) and binds the dialog to it — so "the client path needs no
-     * ticket" is true of the caller, not of the result. There is no ticket-delete mutation in the API
-     * layer, and {@link DialogResponse} does not carry the id back, so {@link #cleanup()} cannot remove
-     * it; the tickets accumulate in the test tenant. Worth a Janitor pass before this suite grows.
+     * <p><b>Known resource leak — tracked defect, no fix here yet.</b> For an AGENT with no
+     * {@code ticketId}, the backend auto-creates one ({@code createTicketFromDialog}) and binds the
+     * dialog to it — so "the client path needs no ticket" is true of the caller, not of the result.
+     * There is no ticket-delete mutation in the API layer, and {@link DialogResponse} does not carry
+     * the id back, so {@link #cleanup()} cannot remove it; the tickets accumulate in the test tenant.
+     * TODO(test-infra): file/track a defect to either (a) have the backend return the created ticket id
+     * on {@link DialogResponse} and expose a delete endpoint so {@link #cleanup()} can remove it, or
+     * (b) add a periodic janitor sweep that purges orphaned test-tenant tickets. Until one of these
+     * lands, callers of this method should be aware that every invocation leaves a ticket behind and
+     * should avoid relying on ticket-count assertions in tests that use it.
      */
     public static DialogFixture openClient() {
         DialogResponse dialog = DialogApi.createDialog(CreateDialogRequest.builder()
                 .agentType(AgentType.CLIENT)
                 .build());
-        log.info("Created CLIENT dialog {} (a ticket was auto-created for it server-side)", dialog.getId());
+        log.warn("Created CLIENT dialog {} — a ticket was auto-created for it server-side and cannot be "
+                + "cleaned up (no ticket id returned, no delete API); see openClient() Javadoc for tracked defect",
+                dialog.getId());
         return new DialogFixture(dialog.getId());
     }
 
