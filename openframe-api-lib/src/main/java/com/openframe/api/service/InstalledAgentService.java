@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -46,16 +47,33 @@ public class InstalledAgentService {
         return excludeDisconnected(installedAgentRepository.findAll());
     }
 
-    public Optional<InstalledAgent> getInstalledAgent(String id) {
-        log.debug("Getting installed agent by id: {}", id);
+    public boolean hasInstalledAgent(String id) {
+        log.debug("Checking installed agent by id: {}", id);
         return installedAgentRepository.findById(id)
-                .filter(this::isNotDisconnected);
+                .filter(this::isNotDisconnected)
+                .isPresent();
     }
 
-    public Optional<InstalledAgent> getInstalledAgentByMachineIdAndType(String machineId, String agentType) {
+    public InstalledAgent getInstalledAgent(String id) {
+        log.debug("Getting installed agent by id: {}", id);
+        return installedAgentRepository.findById(id)
+                .filter(this::isNotDisconnected)
+                .orElseThrow(() -> new NoSuchElementException("Installed agent not found for id: " + id));
+    }
+
+    public boolean hasInstalledAgentByMachineIdAndType(String machineId, String agentType) {
+        log.debug("Checking installed agent for machine: {} and type: {}", machineId, agentType);
+        return installedAgentRepository.findByMachineIdAndAgentType(machineId, agentType)
+                .filter(this::isNotDisconnected)
+                .isPresent();
+    }
+
+    public InstalledAgent getInstalledAgentByMachineIdAndType(String machineId, String agentType) {
         log.debug("Getting installed agent for machine: {} and type: {}", machineId, agentType);
         return installedAgentRepository.findByMachineIdAndAgentType(machineId, agentType)
-                .filter(this::isNotDisconnected);
+                .filter(this::isNotDisconnected)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "Installed agent not found for machineId: " + machineId + " and agentType: " + agentType));
     }
 
     private List<InstalledAgent> excludeDisconnected(List<InstalledAgent> agents) {
