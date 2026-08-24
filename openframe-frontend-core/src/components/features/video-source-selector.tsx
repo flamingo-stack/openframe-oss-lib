@@ -6,7 +6,6 @@ import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Badge } from '../ui/badge';
 import { YouTubeIcon } from '../icons/youtube-icon';
 import { Video } from './video';
 
@@ -310,3 +309,4 @@ function DefaultVideoPreview({ videoUrl, onDelete, disabled }: DefaultVideoPrevi
 }
 
 export default VideoSourceSelector;
+
