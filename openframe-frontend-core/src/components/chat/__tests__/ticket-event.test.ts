@@ -134,6 +134,21 @@ describe('chat stream reducer — ticket event', () => {
     ])
     expect(events(trailingSegments(reducer))).toHaveLength(3)
   })
+
+  it('stamps a live card with its arrival time, not the bubble timestamp', () => {
+    // The chunk carries no event time, so arrival IS the event time for a
+    // genuinely live receipt. Without the stamp the card renders the trailing
+    // bubble's timestamp — the turn's FIRST row, minutes stale by the time a
+    // resolve/reopen lands.
+    const reducer = createChatStreamReducer({ transport: 'nats' })
+    const before = Date.now()
+    feed(reducer, [resolvedChunk(1)])
+    const after = Date.now()
+    const [card] = events(trailingSegments(reducer))
+    expect(card.occurredAt).toBeInstanceOf(Date)
+    expect(card.occurredAt!.getTime()).toBeGreaterThanOrEqual(before)
+    expect(card.occurredAt!.getTime()).toBeLessThanOrEqual(after)
+  })
 })
 
 describe('accumulator — hydrate/catch-up overlap', () => {
@@ -261,5 +276,76 @@ describe('processHistoricalMessages — ticket event', () => {
       historyRow('m1', { type: 'TICKET_EVENT', actorName: 'Fae' }),
     ])
     expect(messages.flatMap((m) => events(m.content))).toHaveLength(0)
+  })
+
+  it('stamps each card with its OWN row time, not the bubble timestamp', () => {
+    // The reported bug: resolve/reopen rows grouped into one assistant bubble
+    // all rendered the bubble's timestamp — the FIRST row of the turn (the
+    // ticket-creation-era greeting), so every lifecycle card read the same
+    // stale time.
+    const rowAt = (id: string, createdAt: string, data: Record<string, unknown>): HistoricalMessage => ({
+      id,
+      createdAt,
+      owner: { type: 'ASSISTANT' },
+      messageData: [data as never],
+    })
+    const { messages } = processHistoricalMessages([
+      rowAt('m1', '2026-08-20T13:54:00Z', { type: 'TEXT', text: 'Hi! How can I help?' }),
+      rowAt('m2', '2026-08-20T14:10:00Z', { type: 'TICKET_EVENT', kind: 'RESOLVED', actorType: 'AI' }),
+      rowAt('m3', '2026-08-20T14:33:00Z', {
+        type: 'TICKET_EVENT',
+        kind: 'REOPENED',
+        actorType: 'CLIENT',
+        targetStatusKind: 'AI_ASSISTANCE',
+      }),
+    ])
+    expect(messages).toHaveLength(1)
+    // The bubble keeps the first row's time…
+    expect(messages[0].timestamp).toEqual(new Date('2026-08-20T13:54:00Z'))
+    // …but each card carries the time of its own event.
+    const cards = events(messages[0].content)
+    expect(cards.map((c) => c.occurredAt)).toEqual([
+      new Date('2026-08-20T14:10:00Z'),
+      new Date('2026-08-20T14:33:00Z'),
+    ])
+  })
+})
+
+describe('accumulator — occurredAt across the hydrate/catch-up overlap', () => {
+  it('keeps the hydrated row time when the seq-stamped redelivery carries none', () => {
+    const accumulator = new MessageSegmentAccumulator()
+    accumulator.addTicketEvent(
+      { kind: 'RESOLVED', actorId: 'fae', actorName: 'Fae', actorType: 'AI' },
+      undefined,
+      new Date('2026-08-20T14:10:00Z'),
+    )
+    // Same event redelivered live (JetStream catch-up): seq known, time not.
+    const segments = accumulator.addTicketEvent(
+      { kind: 'RESOLVED', actorId: 'fae', actorName: 'Fae', actorType: 'AI' },
+      412,
+    )
+    const rendered = events(segments)
+    expect(rendered).toHaveLength(1)
+    expect(rendered[0].streamSeq).toBe(412)
+    expect(rendered[0].occurredAt).toEqual(new Date('2026-08-20T14:10:00Z'))
+  })
+
+  it('keeps the hydrated row time over a LATE redelivery arrival stamp', () => {
+    // Reconnect catch-up redelivers an hour-old event stamped with its (late)
+    // arrival time — the hydrated twin's real row time must win.
+    const accumulator = new MessageSegmentAccumulator()
+    accumulator.addTicketEvent(
+      { kind: 'RESOLVED', actorId: 'fae', actorName: 'Fae', actorType: 'AI' },
+      undefined,
+      new Date('2026-08-20T14:10:00Z'),
+    )
+    const segments = accumulator.addTicketEvent(
+      { kind: 'RESOLVED', actorId: 'fae', actorName: 'Fae', actorType: 'AI' },
+      412,
+      new Date('2026-08-20T15:10:00Z'),
+    )
+    const rendered = events(segments)
+    expect(rendered).toHaveLength(1)
+    expect(rendered[0].occurredAt).toEqual(new Date('2026-08-20T14:10:00Z'))
   })
 })

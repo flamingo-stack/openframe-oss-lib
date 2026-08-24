@@ -550,11 +550,12 @@ export class MessageSegmentAccumulator {
    * by the same actor is payload-identical to the first resolve, and matching
    * the old card meant the final one never rendered.
    */
-  addTicketEvent(data: TicketEventData, streamSeq?: number): MessageSegment[] {
+  addTicketEvent(data: TicketEventData, streamSeq?: number, occurredAt?: Date): MessageSegment[] {
     const segment: TicketEventSegment = {
       type: 'ticket_event',
       data,
       ...(streamSeq !== undefined ? { streamSeq } : {}),
+      ...(occurredAt !== undefined ? { occurredAt } : {}),
     }
     let existingIndex =
       streamSeq !== undefined
@@ -581,7 +582,13 @@ export class MessageSegmentAccumulator {
       }
     }
     if (existingIndex !== -1) {
-      this.segments[existingIndex] = segment
+      // The FIRST-known time wins: the hydrated twin carries the row's real
+      // `createdAt`, while a catch-up redelivery only knows its (late) arrival
+      // time — replacing wholesale would regress the card to arrival or, with
+      // neither side stamped, to the bubble timestamp.
+      const existing = this.segments[existingIndex] as TicketEventSegment
+      const occurredAt = existing.occurredAt ?? segment.occurredAt
+      this.segments[existingIndex] = occurredAt !== undefined ? { ...segment, occurredAt } : segment
       return this.getSegments()
     }
     this.segments.push(segment)
@@ -734,7 +741,7 @@ export class MessageSegmentAccumulator {
           this.addTicketEscalated(segment.data)
           break
         case 'ticket_event':
-          this.addTicketEvent(segment.data, segment.streamSeq)
+          this.addTicketEvent(segment.data, segment.streamSeq, segment.occurredAt)
           break
         case 'error':
           this.addError(segment.title, segment.details)
