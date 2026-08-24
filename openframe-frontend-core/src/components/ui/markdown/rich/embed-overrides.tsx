@@ -148,7 +148,13 @@ export function buildRichEmbedOverrides({
         return <FigmaEmbed url={props['data-figma-url']} height="70vh" />;
       }
       if (className === 'claude-embed') {
-        return <ClaudeEmbed url={props['data-url']} kind={props['data-kind'] === 'design' ? 'design' : 'artifact'} />;
+        return (
+          <ClaudeEmbed
+            url={props['data-url']}
+            kind={props['data-kind'] === 'design' ? 'design' : 'artifact'}
+            title={props['data-title']}
+          />
+        );
       }
       if (className === 'linkedin-embed') {
         return <LinkedInEmbedClient url={props['data-post-url']} />;

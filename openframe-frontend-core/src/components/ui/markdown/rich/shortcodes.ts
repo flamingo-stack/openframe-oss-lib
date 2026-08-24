@@ -68,8 +68,12 @@ export const processShortcodes = (content: string): string => {
     // Claude artifact / Claude Design: {{claude-artifact:URL}} / {{claude-design:URL}}
     // — the same shape as figma, so a Claude link is a markdown BLOCK wherever
     // markdown renders, never a bespoke card one surface hand-assembles.
-    .replace(/\{\{claude-(artifact|design):([^}]+)\}\}/g, (match, kind, url) => {
-      return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"></div>\n\n`;
+    // `{{claude-artifact:URL}}` or `{{claude-artifact:URL|Name}}` — the optional
+    // name after the pipe is the ONLY source of a real title (claude.ai serves
+    // one og:title for every artifact), so the block carries it through.
+    .replace(/\{\{claude-(artifact|design):([^|}]+)(?:\|([^}]*))?\}\}/g, (match, kind, url, title) => {
+      const titleAttr = title && title.trim() ? ` data-title="${escapeAttr(title.trim())}"` : '';
+      return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"${titleAttr}></div>\n\n`;
     })
     // LinkedIn embeds: {{linkedin:POST_URL}}
     .replace(/\{\{linkedin:([^}]+)\}\}/g, (match, url) => {

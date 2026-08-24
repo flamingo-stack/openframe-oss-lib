@@ -17,9 +17,23 @@ export interface ClaudeEmbedProps {
   height?: string
 }
 
-const KIND_LABEL: Record<ClaudeEmbedKind, string> = {
-  artifact: 'Claude artifact',
-  design: 'Claude Design',
+/**
+ * The link's own address, as its name — `public/artifacts/abc-123`.
+ *
+ * Used ONLY when the author gave the link no title. It is not a label we
+ * invented: claude.ai publishes the same `og:title` ("Claude Artifact") for
+ * every artifact, and the endpoint that holds the real one is unreachable
+ * from a server, so a made-up category word ("Claude artifact") told a reader
+ * nothing they could not already see from the icon — while looking like the
+ * artifact's actual name.
+ */
+function urlAsName(url: string): string {
+  try {
+    const u = new URL(url)
+    return u.pathname.replace(/^\/+/, '').replace(/\/embed\/?$/, '') || u.hostname
+  } catch {
+    return url
+  }
 }
 
 /**
@@ -41,7 +55,7 @@ const KIND_LABEL: Record<ClaudeEmbedKind, string> = {
  *  · an http host (mixed content) — it will not paint on `http://localhost`.
  */
 export function ClaudeEmbed({ url, kind = 'artifact', title, height = '480px' }: ClaudeEmbedProps) {
-  const label = title ?? KIND_LABEL[kind]
+  const label = title?.trim() || urlAsName(url)
   const embedUrl = toClaudeEmbedUrl(url)
   return (
     <div className="overflow-hidden rounded-lg border border-ods-border bg-ods-card">
