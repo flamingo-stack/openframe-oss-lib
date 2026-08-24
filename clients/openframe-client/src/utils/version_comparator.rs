@@ -3,10 +3,10 @@ pub struct VersionComparator;
 // TODO: use during version update feature
 impl VersionComparator {
 
-    pub fn compare(&self, v1: &str, v2: &str) -> std::cmp::Ordering {
-        let v1 = semver::Version::parse(&self.normalize(v1)).unwrap();
-        let v2 = semver::Version::parse(&self.normalize(v2)).unwrap();
-        v1.cmp(&v2)
+    pub fn compare(&self, v1: &str, v2: &str) -> anyhow::Result<std::cmp::Ordering> {
+        let v1 = semver::Version::parse(&self.normalize(v1))?;
+        let v2 = semver::Version::parse(&self.normalize(v2))?;
+        Ok(v1.cmp(&v2))
     }
 
     fn normalize(&self, v: &str) -> String {
