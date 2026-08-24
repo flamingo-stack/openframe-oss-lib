@@ -103,7 +103,16 @@ impl ToolUninstallMessageListener {
                     }
                     _ = reconnect_rx.recv() => {
                         info!("NATS reconnected, re-provisioning tool uninstall consumer");
-                        self.create_consumer(&js, &machine_id).await;
+                        let new_consumer = self.create_consumer(&js, &machine_id).await;
+                        match new_consumer.messages().await {
+                            Ok(new_messages) => {
+                                messages = new_messages;
+                            }
+                            Err(e) => {
+                                error!("Failed to resubscribe to messages after reconnect: {:#}", e);
+                                return Err(anyhow::anyhow!("Failed to resubscribe after reconnect: {}", e));
+                            }
+                        }
                     }
                 }
             }
