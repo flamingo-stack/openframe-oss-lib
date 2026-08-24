@@ -652,7 +652,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 } else if (segment.type === 'ticket_escalated') {
                   return <TicketEscalatedMessage key={index} data={segment.data} timestamp={timestamp} />
                 } else if (segment.type === 'ticket_event') {
-                  return <TicketEventMessage key={index} data={segment.data} timestamp={timestamp} />
+                  // The card's own event time; the bubble timestamp is the
+                  // turn's FIRST row and lags every later lifecycle event.
+                  return <TicketEventMessage key={index} data={segment.data} timestamp={segment.occurredAt ?? timestamp} />
                 } else if (segment.type === 'error') {
                   return (
                     <ErrorMessageDisplay

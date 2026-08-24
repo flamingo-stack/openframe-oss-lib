@@ -330,6 +330,7 @@ function applyHistoryEvent(
   options: MessageProcessingOptions,
   escalatedApprovals?: EscalatedApprovals,
   offerResolutions?: OfferResolutions,
+  rowCreatedAt?: Date,
 ): void {
   // batchApprovalsEnabled is owned by the consumer (oss-tenant chat client /
   // openframe-frontend tickets). Defaults to ON so consumers that haven't
@@ -362,14 +363,21 @@ function applyHistoryEvent(
     // same event matches this segment by payload equality (see
     // `addTicketEvent`).
     case 'ticket-event':
-      accumulator.addTicketEvent({
-        kind: event.kind,
-        actorId: event.actorId,
-        actorName: event.actorName,
-        actorType: event.actorType,
-        reason: event.reason,
-        targetStatusKind: event.targetStatusKind,
-      })
+      // `rowCreatedAt` is the persisted row's own time — without it the card
+      // renders the enclosing assistant bubble's timestamp, i.e. the FIRST
+      // row of the turn, and every lifecycle card reads the same stale time.
+      accumulator.addTicketEvent(
+        {
+          kind: event.kind,
+          actorId: event.actorId,
+          actorName: event.actorName,
+          actorType: event.actorType,
+          reason: event.reason,
+          targetStatusKind: event.targetStatusKind,
+        },
+        undefined,
+        rowCreatedAt,
+      )
       break
 
     case 'escalation-offer-resolved':
@@ -738,6 +746,7 @@ export function processHistoricalMessages(
           { displayApprovalTypes, batchApprovalsEnabled, escalationOfferStates },
           escalatedApprovals,
           offerResolutions,
+          new Date(msg.createdAt),
         )
       })
 
