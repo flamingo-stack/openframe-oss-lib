@@ -15,11 +15,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * Script schedule — a named task that runs a set of existing {@link Script}s
- * (ad-hoc or, eventually, on a recurring schedule) against assigned machines.
-
- */
+// Trigger/repeat fields double as a stub for eventual recurring-schedule support.
 @Data
 @Builder
 @NoArgsConstructor
