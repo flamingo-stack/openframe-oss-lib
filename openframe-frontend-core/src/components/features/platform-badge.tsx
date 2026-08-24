@@ -39,59 +39,59 @@ const sizeClasses = {
 
 const platformColors = {
   'openmsp': {
-    bg: 'bg-[#FFC008]/10',
-    border: 'border-[#FFC008]/30',
-    text: 'text-[#FFC008]'
+    bg: 'bg-ods-warning/10',
+    border: 'border-ods-warning/30',
+    text: 'text-ods-warning'
   },
   'flamingo': {
-    bg: 'bg-[#FF006E]/10',
-    border: 'border-[#FF006E]/30',
-    text: 'text-[#FF006E]'
+    bg: 'bg-ods-accent/10',
+    border: 'border-ods-accent/30',
+    text: 'text-ods-accent'
   },
   'flamingo-teaser': {
-    bg: 'bg-[#FF006E]/10',
-    border: 'border-[#FF006E]/30',
-    text: 'text-[#FF006E]'
+    bg: 'bg-ods-accent/10',
+    border: 'border-ods-accent/30',
+    text: 'text-ods-accent'
   },
   'openframe': {
-    bg: 'bg-[#00D9D9]/10',
-    border: 'border-[#00D9D9]/30',
-    text: 'text-[#00D9D9]'
+    bg: 'bg-ods-info/10',
+    border: 'border-ods-info/30',
+    text: 'text-ods-info'
   },
   'tmcg': {
-    bg: 'bg-[#F357BB]/10',
-    border: 'border-[#F357BB]/30',
-    text: 'text-[#F357BB]'
+    bg: 'bg-ods-secondary/10',
+    border: 'border-ods-secondary/30',
+    text: 'text-ods-secondary'
   },
   'company-hub': {
-    bg: 'bg-[#f36666]/10',
-    border: 'border-[#f36666]/30',
-    text: 'text-[#f36666]'
+    bg: 'bg-ods-danger/10',
+    border: 'border-ods-danger/30',
+    text: 'text-ods-danger'
   },
   'marketing-hub': {
-    bg: 'bg-[#F357BB]/10',
-    border: 'border-[#F357BB]/30',
-    text: 'text-[#F357BB]'
+    bg: 'bg-ods-secondary/10',
+    border: 'border-ods-secondary/30',
+    text: 'text-ods-secondary'
   },
   'product-hub': {
-    bg: 'bg-[#5EA62E]/10',
-    border: 'border-[#5EA62E]/30',
-    text: 'text-[#5EA62E]'
+    bg: 'bg-ods-success/10',
+    border: 'border-ods-success/30',
+    text: 'text-ods-success'
   },
   'revenue-hub': {
-    bg: 'bg-[#FFC008]/10',
-    border: 'border-[#FFC008]/30',
-    text: 'text-[#FFC008]'
+    bg: 'bg-ods-warning/10',
+    border: 'border-ods-warning/30',
+    text: 'text-ods-warning'
   },
   'people-hub': {
-    bg: 'bg-[#5EFAF0]/10',
-    border: 'border-[#5EFAF0]/30',
-    text: 'text-[#5EFAF0]'
+    bg: 'bg-ods-info/10',
+    border: 'border-ods-info/30',
+    text: 'text-ods-info'
   },
   'universal': {
-    bg: 'bg-[#6B7280]/10',
-    border: 'border-[#6B7280]/30',
-    text: 'text-[#6B7280]'
+    bg: 'bg-ods-muted/10',
+    border: 'border-ods-muted/30',
+    text: 'text-ods-muted'
   }
 };
 
