@@ -8,6 +8,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.exception.EventNotFoundException;
 import com.openframe.data.document.event.Event;
 import com.openframe.data.document.event.filter.EventQueryFilter;
 import com.openframe.data.repository.event.EventRepository;
@@ -77,7 +78,7 @@ public class EventService {
         
         Optional<Event> existingEvent = findById(id);
         if (existingEvent.isEmpty()) {
-            throw new RuntimeException("Event not found with id: " + id);
+            throw new EventNotFoundException(id);
         }
         
         event.setId(id);
