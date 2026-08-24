@@ -74,7 +74,8 @@ public class RegistrationGenerator {
     }
 
     public static ErrorResponse existingUserResponse() {
-        return ErrorResponse.builder().code("BAD_REQUEST").message("Registration is closed for this organization").build();
+        return ErrorResponse.builder().code("BAD_REQUEST").message("User already exists").build();
     }
 
 }
+
