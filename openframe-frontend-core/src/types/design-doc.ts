@@ -160,6 +160,14 @@ export interface DesignDoc {
   content: string | null
   status: DesignDocStatus
   author_id: string | null
+  /**
+   * EVERYONE who has handed the DRI role away on this doc (appended, never
+   * overwritten). The third-party break-glass excludes all of them: a DRI who
+   * also holds management could otherwise vacate the seat, act as a "third
+   * party" on their own doc and approve it alone — and with a single scalar,
+   * simply hand the seat on twice to erase the memory of their own vacating.
+   */
+  dri_vacated_by: string[]
   approved_at: string | null
   created_at: string
   updated_at: string
