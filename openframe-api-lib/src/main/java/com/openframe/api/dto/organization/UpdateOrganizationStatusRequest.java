@@ -1,11 +1,19 @@
 package com.openframe.api.dto.organization;
 
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-public record UpdateOrganizationStatusRequest(
-        @NotNull(message = "Status is required")
-        OrganizationStatusAction status
-) {
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UpdateOrganizationStatusRequest {
+
+    @NotNull(message = "Status is required")
+    private OrganizationStatusAction status;
 
     /**
      * Allowed status transitions for organization.
