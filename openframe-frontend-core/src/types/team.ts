@@ -36,6 +36,14 @@ export interface TeamMember {
 }
 
 export interface TeamSection {
+  /**
+   * The BUCKET key this section was grouped under — the React key, and the one
+   * value guaranteed unique across sections. `department_id` is not: a profile
+   * whose `department_id` points at a row the embed could not resolve lands in
+   * the same "Other" section as the genuinely department-less, and both would
+   * render under the same fallback key.
+   */
+  key: string;
   title: string;
   /** Department display name. */
   department: string;
