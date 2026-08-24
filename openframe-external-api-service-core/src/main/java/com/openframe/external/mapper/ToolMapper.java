@@ -32,6 +32,15 @@ public class ToolMapper {
                 .platformCategory(tool.getPlatformCategory())
                 .enabled(tool.isEnabled())
                 .credentials(toToolCredentialsResponse(tool.getCredentials()))
+                .layer(tool.getLayer())
+                .layerOrder(tool.getLayerOrder())
+                .layerColor(tool.getLayerColor())
+                .metricsPath(tool.getMetricsPath())
+                .healthCheckEndpoint(tool.getHealthCheckEndpoint())
+                .healthCheckInterval(tool.getHealthCheckInterval())
+                .connectionTimeout(tool.getConnectionTimeout())
+                .readTimeout(tool.getReadTimeout())
+                .allowedEndpoints(tool.getAllowedEndpoints() != null ? List.of(tool.getAllowedEndpoints()) : null)
                 .build();
     }
 

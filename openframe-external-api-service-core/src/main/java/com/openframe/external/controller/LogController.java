@@ -24,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -57,6 +58,10 @@ public class LogController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @Parameter(description = "End date in YYYY-MM-DD format")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Inclusive lower bound on the log timestamp (ISO-8601 instant, e.g. 2024-01-15T10:00:00Z). Independent of startDate/endDate.")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant timestampFrom,
+            @Parameter(description = "Inclusive upper bound on the log timestamp (ISO-8601 instant). Independent of startDate/endDate.")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant timestampTo,
             @Parameter(description = "Tool types to filter")
             @RequestParam(required = false) List<String> toolTypes,
             @Parameter(description = "Event types to filter")
@@ -73,19 +78,21 @@ public class LogController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer limit,
             @Parameter(description = "Cursor for pagination")
             @RequestParam(required = false) String cursor,
-            @Parameter(description = "Field to sort by (e.g., eventTimestamp, severity, toolType, eventType)")
+            @Parameter(description = "Field to sort by (eventTimestamp is the only field sortable by the dashboard API; default: eventTimestamp)")
             @RequestParam(required = false) String sortField,
             @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
             @RequestParam(required = false, defaultValue = "DESC") String sortDirection,
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting logs - startDate: {}, endDate: {}, toolTypes: {}, eventTypes: {}, severities: {}, organizationIds: {}, deviceId: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}", 
-                startDate, endDate, toolTypes, eventTypes, severities, organizationIds, deviceId, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
+        log.info("Getting logs - startDate: {}, endDate: {}, timestampFrom: {}, timestampTo: {}, toolTypes: {}, eventTypes: {}, severities: {}, organizationIds: {}, deviceId: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}", 
+                startDate, endDate, timestampFrom, timestampTo, toolTypes, eventTypes, severities, organizationIds, deviceId, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
         
         LogFilterCriteria filterCriteria = LogFilterCriteria.builder()
                 .startDate(startDate)
                 .endDate(endDate)
+                .timestampFrom(timestampFrom)
+                .timestampTo(timestampTo)
                 .toolTypes(toolTypes)
                 .eventTypes(eventTypes)
                 .severities(severities)

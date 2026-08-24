@@ -31,6 +31,13 @@ public class OpenApiConfig {
                     
                     This API provides programmatic access to OpenFrame platform functionality using API keys.
                     
+                    ## Resources
+                    
+                    - **Devices** – list, filter, inspect, update status/nickname
+                    - **Organizations** – full CRUD incl. archiving
+                    - **Tickets** – list, create, update, transition, assign, tag and annotate tickets (SaaS deployments)
+                    - **Logs** / **Events** / **Tools** – read access and integration proxying
+                    
                     ## Authentication
                     
                     All endpoints require authentication using an API key. Include your API key in the `X-API-Key` header:
@@ -62,7 +69,7 @@ public class OpenApiConfig {
                     - `429` - Too Many Requests (rate limit exceeded)
                     - `500` - Internal Server Error
                     """)
-                .version("1.0.0")
+                .version("1.1.0")
                 .contact(new Contact()
                     .name("OpenFrame Team")
                     .email("support@openframe.com")

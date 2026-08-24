@@ -37,10 +37,22 @@ public class LogDetailsResponse {
     @Schema(description = "Device ID associated with the event")
     private String deviceId;
     
+    @Schema(description = "Hostname of the device associated with the event")
+    private String hostname;
+    
+    @Schema(description = "Organization ID associated with the event")
+    private String organizationId;
+    
+    @Schema(description = "Organization name associated with the event")
+    private String organizationName;
+    
     @Schema(description = "Summary of the log event")
     private String summary;
     
-    @Schema(description = "Full content of the log event")
+    @Schema(description = "Human-readable message of the log event")
+    private String message;
+    
+    @Schema(description = "Full details of the log event as a JSON string")
     private String content;
     
     @Schema(description = "Timestamp of the event")
