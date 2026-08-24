@@ -11,7 +11,6 @@ import com.openframe.notification.spec.AttrKey;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
 import com.openframe.notification.spec.NotificationSeed;
-import com.openframe.notification.spec.NotificationText;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
 import com.openframe.notification.spec.NotificationTypeSpec;
@@ -116,17 +115,21 @@ class NotificationEmitterTest {
         @Override public Optional<NotificationSettingGroup> getSettingsGroup() { return Optional.empty(); }
         @Override public NotificationCategory getCategory() { return NotificationCategory.TICKETS; }
         @Override public NotificationSeverity getSeverity() { return NotificationSeverity.INFO; }
-        @Override public Audience audience(Attrs attrs) { return audience; }
+        @Override public Audience audience(TestSeed seed) { return audience; }
 
         @Override public Attrs attrs(TestSeed seed) {
             return Attrs.of(Map.of("ticketId", seed.ticketId())).with(ASSIGNEE, seed.assigneeUserId());
         }
 
-        @Override public NotificationText compose(Attrs attrs) {
-            return new NotificationText("Ticket " + attrs.get(TICKET_ID), "Assigned to " + attrs.get(ASSIGNEE));
+        @Override public String composeTitle(TestSeed seed) {
+            return "Ticket " + seed.ticketId();
         }
 
-        @Override public NotificationContext buildLegacyContext(Attrs attrs) {
+        @Override public String composeDescription(TestSeed seed) {
+            return "Assigned to " + seed.assigneeUserId();
+        }
+
+        @Override public NotificationContext buildLegacyContext(TestSeed seed) {
             return GenericContext.builder().type(getType().name()).payload("{}").build();
         }
     }
