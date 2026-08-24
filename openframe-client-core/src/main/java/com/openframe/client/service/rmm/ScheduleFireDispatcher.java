@@ -17,6 +17,8 @@ import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -30,18 +32,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Dispatches ONE fire of a schedule: resolves what to run and where, records it, and fans it
- * out over core NATS. Split out of the orchestrator so the "run the scripts" mechanics live
- * apart from the "when to run + advance the cadence" bookkeeping.
- *
- * <p>A single fire produces (in order): one {@link ScheduleScriptExecution} header row
- * (a snapshot of the whole attempt), one {@link ScriptExecution} leaf row per (script, machine)
- * in {@code RUNNING} (persisted before publish so the watchdog can reap it), and one batched
- * {@link ScriptScheduleExecutionMessage} per machine on
- * {@code machine.{machineId}.script-schedule-execution}. Everything shares one
- * {@code executionId}, stamped with {@code scheduleId}; {@code scriptId} disambiguates leaves
- * and result frames. A fire with no scripts, no assigned devices, or no runnable (ACTIVE)
- * scripts dispatches nothing — logged, not fatal.
+ * Dispatches one fire of a schedule; split out of the orchestrator to keep run mechanics apart from cadence bookkeeping.
  */
 @Component
 @RequiredArgsConstructor
@@ -91,7 +82,7 @@ public class ScheduleFireDispatcher {
         publish(fire);
 
         log.info("Dispatched schedule fire scheduleId={} executionId={} scripts={} machines={}",
-                fire.scheduleId(), fire.executionId(), scripts.size(), machineIds.size());
+                fire.scheduleId(), fire.getExecutionId(), scripts.size(), machineIds.size());
     }
 
     private static Map<String, ScheduledScriptCustomParams> customParamsByScriptId(ScriptSchedule schedule) {
@@ -118,21 +109,21 @@ public class ScheduleFireDispatcher {
     private void saveHeader(Fire fire) {
         scheduleScriptExecutionRepository.save(ScheduleScriptExecution.builder()
                 .tenantId(fire.tenantId())
-                .executionId(fire.executionId())
+                .executionId(fire.getExecutionId())
                 .scheduleId(fire.scheduleId())
                 .initiatedBy(fire.initiatedBy())
                 .status(ExecutionStatus.RUNNING)
-                .totalMachineCount(fire.machineIds().size())
-                .dispatchedAt(fire.now())
+                .totalMachineCount(fire.getMachineIds().size())
+                .dispatchedAt(fire.getNow())
                 .build());
     }
 
     /** One RUNNING leaf row per (script, machine); mirrors the api-lib dispatch. */
     private void saveLeafRows(Fire fire) {
-        List<ScriptExecution> rows = fire.scripts().stream()
-                .flatMap(script -> fire.machineIds().stream().map(machineId -> ScriptExecution.builder()
+        List<ScriptExecution> rows = fire.getScripts().stream()
+                .flatMap(script -> fire.getMachineIds().stream().map(machineId -> ScriptExecution.builder()
                         .tenantId(fire.tenantId())
-                        .executionId(fire.executionId())
+                        .executionId(fire.getExecutionId())
                         .scriptId(script.getId())
                         .scheduleId(fire.scheduleId())
                         .machineId(machineId)
@@ -141,8 +132,8 @@ public class ScheduleFireDispatcher {
                         .initiatedBy(fire.initiatedBy())
                         .source(ExecutionSource.SCHEDULED)
                         .status(ExecutionStatus.RUNNING)
-                        .dispatchedAt(fire.now())
-                        .statusChangedAt(fire.now())
+                        .dispatchedAt(fire.getNow())
+                        .statusChangedAt(fire.getNow())
                         .build()))
                 .toList();
         scriptExecutionRepository.saveAll(rows);
@@ -150,8 +141,8 @@ public class ScheduleFireDispatcher {
 
     /** Build the shared payload once, fan out ONE message per machine. */
     private void publish(Fire fire) {
-        Map<String, ScheduledScriptCustomParams> customParamsByScriptId = customParamsByScriptId(fire.schedule());
-        List<ScriptScheduleExecutionItem> items = fire.scripts().stream()
+        Map<String, ScheduledScriptCustomParams> customParamsByScriptId = customParamsByScriptId(fire.getSchedule());
+        List<ScriptScheduleExecutionItem> items = fire.getScripts().stream()
                 .map(script -> {
                     ScheduledScriptCustomParams cp = customParamsByScriptId.get(script.getId());
                     List<String> effectiveArgs = cp != null && cp.getArgs() != null ? cp.getArgs() : script.getDefaultArgs();
@@ -169,9 +160,9 @@ public class ScheduleFireDispatcher {
                 })
                 .toList();
 
-        fire.machineIds().forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
+        fire.getMachineIds().forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
                 ScriptScheduleExecutionMessage.builder()
-                        .executionId(fire.executionId())
+                        .executionId(fire.getExecutionId())
                         .scheduleId(fire.scheduleId())
                         .machineId(machineId)
                         .initiatedBy(fire.initiatedBy())
@@ -180,8 +171,15 @@ public class ScheduleFireDispatcher {
     }
 
     /** Everything one fire needs, bundled so the persist/publish steps take a single arg. */
-    private record Fire(ScriptSchedule schedule, String executionId, List<Script> scripts,
-                        List<String> machineIds, Instant now) {
+    @Getter
+    @AllArgsConstructor
+    private static class Fire {
+        private final ScriptSchedule schedule;
+        private final String executionId;
+        private final List<Script> scripts;
+        private final List<String> machineIds;
+        private final Instant now;
+
         String tenantId() {
             return schedule.getTenantId();
         }
