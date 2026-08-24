@@ -10,8 +10,10 @@ import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,16 +38,18 @@ class CommandExecutionStatusUpdateHandlerTest {
 
     private static final String EXECUTION_ID = "exec-1";
     private static final String MACHINE_ID = "machine-42";
+    private static final String COMPLETED_COUNTER = "openframe.rmm.execution.completed";
 
     @Mock
     private CommandExecutionRepository commandExecutionRepository;
 
     private CommandExecutionStatusUpdateHandler handler;
     private final ObjectMapper mapper = new ObjectMapper();
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() {
-        handler = new CommandExecutionStatusUpdateHandler(commandExecutionRepository);
+        handler = new CommandExecutionStatusUpdateHandler(commandExecutionRepository, new RmmExecutionMetrics(meterRegistry));
     }
 
     @Test
@@ -75,6 +79,7 @@ class CommandExecutionStatusUpdateHandlerTest {
         assertThat(saved.getStdoutTruncated()).isFalse();
         assertThat(saved.getFinishedAt()).isNotNull();
         assertThat(saved.getStatusChangedAt()).isNotNull();
+        assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("kind", "command", "status", "SUCCESS").counter().count()).isEqualTo(1.0);
     }
 
     @Test
@@ -132,6 +137,7 @@ class CommandExecutionStatusUpdateHandlerTest {
         handler.handle(messageWith(0, false, null, null, null, null), new IntegratedToolEnrichedData());
 
         verify(commandExecutionRepository, never()).save(any());
+        assertThat(meterRegistry.find(COMPLETED_COUNTER).counter()).isNull();
     }
 
     @Test

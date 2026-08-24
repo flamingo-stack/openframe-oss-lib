@@ -1,10 +1,12 @@
 package com.openframe.client.service;
 
+import com.openframe.client.metrics.ScriptExecutionWatchdogMetrics;
 import com.openframe.client.service.rmm.watchdog.ScheduleJobExecutionWatchdogService;
 import com.openframe.client.service.rmm.watchdog.ScriptExecutionWatchdogService;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,11 +28,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * The watchdog stuck-threshold is per-execution: each row is reaped only once it
- * outlives its own {@code timeoutSeconds + grace}; rows without a timeout use the
- * fixed fallback. These tests lock that behaviour (grace = 120s, fallback = 600s).
- */
 @ExtendWith(MockitoExtension.class)
 class ScriptExecutionWatchdogServiceTest {
 
@@ -47,7 +44,8 @@ class ScriptExecutionWatchdogServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ScriptExecutionWatchdogService(repository, headerWatchdogService);
+        service = new ScriptExecutionWatchdogService(repository, headerWatchdogService,
+                new ScriptExecutionWatchdogMetrics(new SimpleMeterRegistry()));
         ReflectionTestUtils.setField(service, "graceSeconds", GRACE);
         ReflectionTestUtils.setField(service, "fallbackThresholdSeconds", FALLBACK);
     }

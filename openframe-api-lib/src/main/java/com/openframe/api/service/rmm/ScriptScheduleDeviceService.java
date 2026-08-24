@@ -266,8 +266,38 @@ public class ScriptScheduleDeviceService {
         schedule.setSelectionMode(ScheduleDeviceSelectionMode.CRITERIA);
         schedule.setDeviceCriteria(criteria);
         scheduleRepository.save(schedule);
+        armDeviceOnlineCriteriaMatches(tenantId, schedule);
         log.info("Applied device criteria to script schedule id={} tenantId={} by user={}: {}",
                 scheduleId, tenantId, actorUserId, criteria);
+    }
+
+    private void armDeviceOnlineCriteriaMatches(String tenantId, ScriptSchedule schedule) {
+        if (schedule.getTrigger() != ScriptScheduleTrigger.DEVICE_ONLINE) {
+            return;
+        }
+        List<String> matched = targetResolver.resolveTargetMachineIds(schedule);
+        if (matched.isEmpty()) {
+            return;
+        }
+        Set<String> alreadyArmed = onlineDeviceDispatchRepository
+                .findByTenantIdAndScheduleId(tenantId, schedule.getId()).stream()
+                .map(DeviceFirstOnlineDispatch::getMachineId)
+                .collect(toSet());
+        List<DeviceFirstOnlineDispatch> rows = matched.stream()
+                .filter(mid -> !alreadyArmed.contains(mid))
+                .map(mid -> DeviceFirstOnlineDispatch.builder()
+                        .tenantId(tenantId)
+                        .machineId(mid)
+                        .scheduleId(schedule.getId())
+                        .firstSeenAt(Instant.now())
+                        .status(DeviceOnlineDispatchStatus.NEW)
+                        .build())
+                .toList();
+        if (!rows.isEmpty()) {
+            onlineDeviceDispatchRepository.saveAll(rows);
+            log.info("Armed DEVICE_ONLINE (criteria) for {} matching device(s) scheduleId={} tenantId={}",
+                    rows.size(), schedule.getId(), tenantId);
+        }
     }
 
     /** Flip a schedule to SPECIFIC selection when devices are managed explicitly (idempotent). */

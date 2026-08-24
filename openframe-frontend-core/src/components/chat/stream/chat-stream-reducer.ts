@@ -209,6 +209,7 @@ export interface ChatReducerEffect {
     | 'onToolExecuted'
     | 'onAgentBusy'
     | 'onDialogClosed'
+    | 'onTicketEvent'
     | 'segments-after-approval-result'
   args: unknown[]
 }
@@ -1369,18 +1370,21 @@ export function createChatStreamReducer(
         // `ticket-escalated`. `seq` rides onto the segment: it is the event's
         // dedupe identity (see `addTicketEvent`).
         const before = accumulator.getSegments().length
-        const segments = accumulator.addTicketEvent(
-          {
-            kind: event.kind,
-            actorId: event.actorId,
-            actorName: event.actorName,
-            actorType: event.actorType,
-            reason: event.reason,
-            targetStatusKind: event.targetStatusKind,
-          },
-          seq,
-        )
+        const data = {
+          kind: event.kind,
+          actorId: event.actorId,
+          actorName: event.actorName,
+          actorType: event.actorType,
+          reason: event.reason,
+          targetStatusKind: event.targetStatusKind,
+        }
+        const segments = accumulator.addTicketEvent(data, seq)
         applyAccumulated(before, segments)
+        // The card alone is not enough for a host that also tracks the
+        // ticket's state: a RESOLVED/REOPENED arriving live must move the
+        // composer lock/status chip on the same render as the card, not on
+        // the next status poll. Hosts that don't wire it lose nothing.
+        emit('onTicketEvent', data)
         break
       }
 

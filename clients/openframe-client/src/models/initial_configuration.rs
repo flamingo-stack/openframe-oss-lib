@@ -10,6 +10,8 @@ pub struct InitialConfiguration {
     #[serde(default)]
     pub org_id: String,
     #[serde(default)]
+    pub user_id: String,
+    #[serde(default)]
     pub local_ca_cert_path: String,
     #[serde(default)]
     pub tags: Vec<DeviceTag>,

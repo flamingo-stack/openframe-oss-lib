@@ -41,6 +41,11 @@ impl InitialConfigurationService {
         Ok(config.org_id.clone())
     }
 
+    pub fn get_user_id(&self) -> Result<String> {
+        let config = self.get()?;
+        Ok(config.user_id.clone())
+    }
+
     pub fn get_local_ca_cert_path(&self) -> Result<String> {
         let config = self.get()?;
         Ok(config.local_ca_cert_path.clone())

@@ -34,7 +34,7 @@ export interface DashboardInfoCardProps {
   titleSlot?: React.ReactNode
   /**
    * Tag rendered in the title row, after the title (Figma "status" variant) —
-   * e.g. `<Tag variant="outline" label="AI-Assistance" />` or a TicketStatusTag.
+   * e.g. `<Tag variant="outline" label="AI Handling" />` or a TicketStatusTag.
    * Works with or without a `title`.
    */
   titleTag?: React.ReactNode

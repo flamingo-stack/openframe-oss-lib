@@ -112,11 +112,11 @@ export const Default: Story = {
 
 /**
  * Mixed system + custom columns matching the OpenFrame Tickets layout:
- * AI-Assistance and Tech Required are system columns (default surface, joined
+ * AI Handling and Tech Required are system columns (default surface, joined
  * with no gap), middle columns are custom (tinted by color), Resolved is a
  * system column whose `RESOLVED` status gives the green-checkmark tag.
  *
- * DnD restrictions: AI-Assistance refuses drops (tickets enter via the AI
+ * DnD restrictions: AI Handling refuses drops (tickets enter via the AI
  * pipeline, not by dragging), but tickets in it can still be dragged out.
  * Resolved tickets are pinned (`dragDisabled`).
  */
@@ -124,8 +124,8 @@ export const SystemAndCustom: Story = {
   render: function Render() {
     const [columns, setColumns] = React.useState<BoardColumnDef[]>([
       {
-        id: 'ai-assistance',
-        label: 'AI-Assistance',
+        id: 'ai-handling',
+        label: 'AI Handling',
         color: '#f357bb',
         system: true,
         dropDisabled: true,
@@ -232,7 +232,10 @@ export const Pagination: Story = {
   render: function Render() {
     const TOTAL = 50
     const PAGE = 10
-    const allTickets = Array.from({ length: TOTAL }, (_, i) => baseTicket(i, 'ACTIVE'))
+    // Built once: rebuilding per render hands every card a new object, which
+    // defeats the memoization the board relies on to stay smooth under a drag.
+    const allTickets = React.useMemo(() => Array.from({ length: TOTAL }, (_, i) => baseTicket(i, 'ACTIVE')), [])
+    const loadedRef = React.useRef(PAGE)
 
     const [columns, setColumns] = React.useState<BoardColumnDef[]>([
       columnFromTicketStatus('ACTIVE', allTickets.slice(0, PAGE), { total: TOTAL, hasMore: true }),
@@ -243,13 +246,19 @@ export const Pagination: Story = {
     const handleLoadMore = (columnId: string) => {
       setColumns(prev => prev.map(c => (c.id === columnId ? { ...c, isLoadingMore: true } : c)))
       setTimeout(() => {
+        // APPEND the next page. Re-slicing the seed from 0 also threw away every
+        // drop the person had made, and a drag that auto-scrolls a lane to its
+        // bottom loads a page mid-drag — so the card silently snapped back to
+        // where it started, moments after landing where it was dropped.
+        const from = loadedRef.current
+        loadedRef.current = Math.min(from + PAGE, TOTAL)
+        const page = allTickets.slice(from, loadedRef.current)
         setColumns(prev =>
-          prev.map(c => {
-            if (c.id !== columnId) return c
-            const nextTickets = allTickets.slice(0, c.tickets.length + PAGE)
-            const hasMore = nextTickets.length < TOTAL
-            return { ...c, tickets: nextTickets, hasMore, isLoadingMore: false }
-          }),
+          prev.map(c =>
+            c.id === columnId
+              ? { ...c, tickets: [...c.tickets, ...page], hasMore: loadedRef.current < TOTAL, isLoadingMore: false }
+              : c,
+          ),
         )
       }, 600)
     }

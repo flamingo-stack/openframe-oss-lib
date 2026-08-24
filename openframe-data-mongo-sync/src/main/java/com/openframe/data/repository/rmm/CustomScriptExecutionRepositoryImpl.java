@@ -13,12 +13,14 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import com.mongodb.ReadPreference;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.EnumMap;
+import java.util.Optional;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +61,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static final String FIELD_INITIATED_BY = "initiatedBy";
     private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_EXECUTION_ID = "executionId";
+    private static final String FIELD_SCRIPT_ID = "scriptId";
     private static final String FIELD_STDOUT = "stdout";
     private static final String FIELD_STDERR = "stderr";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
@@ -129,32 +132,30 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     }
 
     @Override
+    public Optional<ScriptExecution> findByMachineIdAndExecutionIdAndScriptId(String machineId, String executionId, String scriptId) {
+        Query query = new Query(Criteria.where(FIELD_MACHINE_ID).is(machineId)
+                .and(FIELD_EXECUTION_ID).is(executionId)
+                .and(FIELD_SCRIPT_ID).is(scriptId))
+                .withReadPreference(ReadPreference.primary());
+        return Optional.ofNullable(mongoTemplate.findOne(query, ScriptExecution.class));
+    }
+
+    @Override
     public LeafStatusCounts countLeavesByStatus(String tenantId, String executionId) {
         if (tenantId == null || executionId == null) {
             return new LeafStatusCounts(0, 0);
         }
-        AggregationResults<Document> results = mongoTemplate.aggregate(
-                Aggregation.newAggregation(
-                        Aggregation.match(Criteria.where(FIELD_TENANT_ID).is(tenantId)
-                                .and(FIELD_EXECUTION_ID).is(executionId)),
-                        Aggregation.group(FIELD_STATUS).count().as(FIELD_COUNT)),
-                ScriptExecution.class, Document.class);
-
-        long running = 0;
-        long failed = 0;
-        for (Document g : results.getMappedResults()) {
-            Object status = g.get(FIELD_ID);
-            if (status == null) {
-                continue;
-            }
-            long c = ((Number) g.get(FIELD_COUNT)).longValue();
-            if (ExecutionStatus.RUNNING.name().equals(status.toString())) {
-                running = c;
-            } else if (ExecutionStatus.FAILED.name().equals(status.toString())) {
-                failed = c;
-            }
-        }
+        long running = countLeavesInStatus(tenantId, executionId, ExecutionStatus.RUNNING);
+        long failed = countLeavesInStatus(tenantId, executionId, ExecutionStatus.FAILED);
         return new LeafStatusCounts(running, failed);
+    }
+
+    private long countLeavesInStatus(String tenantId, String executionId, ExecutionStatus status) {
+        Query query = new Query(Criteria.where(FIELD_TENANT_ID).is(tenantId)
+                .and(FIELD_EXECUTION_ID).is(executionId)
+                .and(FIELD_STATUS).is(status))
+                .withReadPreference(ReadPreference.primary());
+        return mongoTemplate.count(query, ScriptExecution.class);
     }
 
     // ────────── Owner-agnostic core ──────────
