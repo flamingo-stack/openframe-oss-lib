@@ -43,11 +43,9 @@ export function BulletList({
     <div className={`${spacingMap[spacing]} ${containerClassName}`}>
       {normalizedItems.map((item, index) => (
         <div key={item.id || index} className={itemClassName}>
-          {/* <div className="flex-shrink-0 mt-[0.75rem]"> */}
           <div className="flex-shrink-0 mt-1">
             <BulletIcon size={bulletSize} color={bulletColor} />
           </div>
-          {/* </div> */}
           <p className={textClassName}>
             {item.text}
           </p>
