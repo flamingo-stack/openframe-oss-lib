@@ -16,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 import static com.openframe.data.document.user.InvitationStatus.ACCEPTED;
 import static java.lang.Boolean.TRUE;
 
@@ -40,11 +42,12 @@ public class InvitationRegistrationService {
 
         var existing = userService.findActiveByEmail(invitation.getEmail());
         if (existing.isPresent()) {
-            AuthUser reuse = handleExistingActiveUser(existing.get(), targetTenantId, invitation, request);
-            if (reuse != null) {
-                markVerifiedQuietly(reuse);
-                acceptInvitation(invitation, reuse, request);
-                return reuse;
+            Optional<AuthUser> reuse = handleExistingActiveUser(existing.get(), targetTenantId, invitation, request);
+            if (reuse.isPresent()) {
+                AuthUser reusedUser = reuse.get();
+                markVerifiedQuietly(reusedUser);
+                acceptInvitation(invitation, reusedUser, request);
+                return reusedUser;
             }
         }
 
@@ -63,15 +66,15 @@ public class InvitationRegistrationService {
     /**
      * If user already belongs to target tenant: accept invitation and return existing user.
      * If user belongs to another tenant:
-     *   - when switchTenant=true: deactivate and continue (return null to proceed with creation)
+     *   - when switchTenant=true: deactivate and continue (return empty to proceed with creation)
      *   - otherwise: throw
      */
-    private AuthUser handleExistingActiveUser(AuthUser user,
+    private Optional<AuthUser> handleExistingActiveUser(AuthUser user,
                                               String targetTenantId,
                                               AuthInvitation invitation,
                                               InvitationRegistrationRequest request) {
         if (targetTenantId.equals(user.getTenantId())) {
-            return user;
+            return Optional.of(user);
         }
         if (TRUE.equals(request.getSwitchTenant())) {
             if (user.getRoles().contains(UserRole.OWNER)) {
@@ -79,7 +82,7 @@ public class InvitationRegistrationService {
             }
             userService.deactivateUser(user);
             userDeactivationProcessor.postProcessDeactivation(user);
-            return null;
+            return Optional.empty();
         }
         throw new UserActiveInAnotherTenantException(invitation.getEmail());
     }
