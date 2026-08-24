@@ -7,6 +7,8 @@ import net.schmizz.sshj.common.IOUtils;
 import net.schmizz.sshj.connection.channel.direct.Session;
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier;
 import lombok.extern.slf4j.Slf4j;
+import lombok.Getter;
+import lombok.AllArgsConstructor;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -52,7 +54,13 @@ public class SshMachineVerifier {
         this.os = os;
     }
 
-    public record ExecResult(int exitStatus, String stdout, String stderr) {
+    @Getter
+    @AllArgsConstructor
+    public static class ExecResult {
+        private final int exitStatus;
+        private final String stdout;
+        private final String stderr;
+
         public boolean ok() {
             return exitStatus == 0;
         }
@@ -87,7 +95,7 @@ public class SshMachineVerifier {
         };
         ExecResult r = exec(cmd);
         if (!r.ok()) {
-            throw new InfraFailureException("Failed to ensure scratch dir " + dir + ": " + r.stderr());
+            throw new InfraFailureException("Failed to ensure scratch dir " + dir + ": " + r.getStderr());
         }
     }
 
@@ -131,7 +139,7 @@ public class SshMachineVerifier {
             case WINDOWS -> "Get-Content -Raw -LiteralPath " + psq(path);
             case LINUX -> "cat " + shq(path);
         };
-        return exec(cmd).stdout();
+        return exec(cmd).getStdout();
     }
 
     public boolean fileExists(String path) {
@@ -157,8 +165,8 @@ public class SshMachineVerifier {
      */
     public boolean serviceRunning(String name) {
         return switch (os) {
-            case WINDOWS -> exec("(Get-Service -Name " + psq(name) + ").Status").stdout().trim().equalsIgnoreCase("Running");
-            case LINUX -> exec("systemctl is-active " + shq(name)).stdout().trim().equals("active");
+            case WINDOWS -> exec("(Get-Service -Name " + psq(name) + ").Status").getStdout().trim().equalsIgnoreCase("Running");
+            case LINUX -> exec("systemctl is-active " + shq(name)).getStdout().trim().equals("active");
         };
     }
 
@@ -171,7 +179,7 @@ public class SshMachineVerifier {
         };
         ExecResult r = exec(cmd);
         if (!r.ok()) {
-            throw new InfraFailureException("Failed to seed file " + path + ": " + r.stderr());
+            throw new InfraFailureException("Failed to seed file " + path + ": " + r.getStderr());
         }
     }
 
@@ -202,22 +210,22 @@ public class SshMachineVerifier {
 
     /** Reachability probe used as an up-front infra check. {@code hostname} works on both Windows and Linux. */
     public String hostname() {
-        return exec("hostname").stdout().trim();
+        return exec("hostname").getStdout().trim();
     }
 
     /** OS build number — ground truth for the OS-version case (e.g. Windows build {@code 20348}). */
     public String osBuild() {
         return switch (os) {
-            case WINDOWS -> exec("[System.Environment]::OSVersion.Version.Build").stdout().trim();
-            case LINUX -> exec("uname -r").stdout().trim();
+            case WINDOWS -> exec("[System.Environment]::OSVersion.Version.Build").getStdout().trim();
+            case LINUX -> exec("uname -r").getStdout().trim();
         };
     }
 
     /** Free space on the system drive in whole GB — ground truth for the disk-space case. */
     public long freeDiskGb() {
         String out = switch (os) {
-            case WINDOWS -> exec("[math]::Round((Get-PSDrive C).Free/1GB)").stdout().trim();
-            case LINUX -> exec("df -BG --output=avail / | tail -1 | tr -dc '0-9'").stdout().trim();
+            case WINDOWS -> exec("[math]::Round((Get-PSDrive C).Free/1GB)").getStdout().trim();
+            case LINUX -> exec("df -BG --output=avail / | tail -1 | tr -dc '0-9'").getStdout().trim();
         };
         try {
             return Long.parseLong(out.replaceAll("[^0-9]", ""));
