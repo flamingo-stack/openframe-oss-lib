@@ -62,7 +62,7 @@ impl VelopackUpdater {
                 UpdateCheck::UpdateAvailable(updates) => {
                     info!("Update available: {:?}", updates);
                     Ok(Some(UpdateInfo {
-                        version: self.current_version.to_string(),
+                        version: updates.TargetFullRelease.version.to_string(),
                         download_url: String::new(),
                         release_notes: String::new(),
                     }))
@@ -126,3 +126,4 @@ pub struct UpdateInfo {
     pub download_url: String,
     pub release_notes: String,
 }
+
