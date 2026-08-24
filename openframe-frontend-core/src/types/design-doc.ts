@@ -8,6 +8,7 @@
 
 import type { EntityAuthor } from './entity-author'
 import type { DeliveryItem } from './delivery'
+import type { RoadmapItem } from '../components/chat/types/entities/roadmap-item'
 import type { DepartmentRef } from './department'
 import type { EmployeeDirectoryRow } from './employee'
 
@@ -67,8 +68,13 @@ export interface DesignDocLink {
   title: string | null
   display_order: number | null
   created_at: string
-  /** `roadmap_task` links are hydrated from the mirror too. */
-  task?: DeliveryItem
+  /**
+   * A `roadmap_task` link, hydrated from the mirror as the ROADMAP item it is —
+   * so it renders with the roadmap card, the same as `/roadmap` and the chat.
+   * `undefined` = the mirror has not seen that id. (Section tasks are a
+   * different entity and carry `DeliveryItem` on `DesignDocClickUpTask`.)
+   */
+  roadmap?: RoadmapItem
 }
 
 export interface DesignDocMedia {
