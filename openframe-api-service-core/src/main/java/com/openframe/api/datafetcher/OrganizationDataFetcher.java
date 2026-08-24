@@ -15,6 +15,7 @@ import com.openframe.api.mapper.GraphQLOrganizationMapper;
 import com.openframe.api.service.OrganizationQueryService;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.service.OrganizationService;
+import graphql.GraphQLException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -82,12 +83,15 @@ public class OrganizationDataFetcher {
     public Organization organization(@InputArgument @NotBlank String id) {
         String organizationId = RELAY.fromGlobalId(id).getId();
         log.debug("Fetching organization by global ID: {}, organizationId: {}", id, organizationId);
-        return organizationService.getOrganizationByOrganizationId(organizationId).orElse(null);
+        return organizationService.getOrganizationByOrganizationId(organizationId)
+                .orElseThrow(() -> new GraphQLException("Organization not found for organizationId: " + organizationId));
     }
 
     @DgsQuery
     public Organization organizationByOrganizationId(@InputArgument @NotBlank String organizationId) {
         log.debug("Fetching organization by organizationId: {}", organizationId);
-        return organizationService.getOrganizationByOrganizationId(organizationId).orElse(null);
+        return organizationService.getOrganizationByOrganizationId(organizationId)
+                .orElseThrow(() -> new GraphQLException("Organization not found for organizationId: " + organizationId));
     }
 }
+

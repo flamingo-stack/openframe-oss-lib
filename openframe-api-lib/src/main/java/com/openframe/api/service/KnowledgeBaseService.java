@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -68,8 +67,13 @@ public class KnowledgeBaseService {
         return queryMixed(filter, search, restrictToItemIds, normalized);
     }
 
-    public Optional<KnowledgeBaseItem> getItem(String id) {
-        return repository.findById(id);
+    public boolean hasItem(String id) {
+        return repository.existsById(id);
+    }
+
+    public KnowledgeBaseItem getItemOrThrow(String id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new IllegalStateException("KB item not found: " + id));
     }
 
     public List<KnowledgeBaseItem> getAllFolders() {

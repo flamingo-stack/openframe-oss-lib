@@ -50,12 +50,24 @@ public class TimeEntryService {
     private final TimeEntryRepository timeEntryRepository;
     private final TicketQueryService ticketQueryService;
 
-    public Optional<TimeEntry> getCurrentTimer(String userId) {
-        return timeEntryRepository.findByUserIdAndEndedAtIsNull(userId);
+    public boolean hasCurrentTimer(String userId) {
+        return timeEntryRepository.findByUserIdAndEndedAtIsNull(userId).isPresent();
     }
 
-    public Optional<TimeEntry> getTimeEntry(String entryId) {
-        return timeEntryRepository.findById(entryId);
+    public TimeEntry getCurrentTimer(String userId) {
+        return timeEntryRepository.findByUserIdAndEndedAtIsNull(userId)
+                .orElseThrow(() -> new TimeEntryNotFoundException(
+                        "No active timer for user " + userId));
+    }
+
+    public boolean hasTimeEntry(String entryId) {
+        return timeEntryRepository.findById(entryId).isPresent();
+    }
+
+    public TimeEntry getTimeEntry(String entryId) {
+        return timeEntryRepository.findById(entryId)
+                .orElseThrow(() -> new TimeEntryNotFoundException(
+                        "TimeEntry " + entryId + " not found"));
     }
 
     @Transactional
@@ -150,10 +162,12 @@ public class TimeEntryService {
     @Transactional
     public boolean cancelTimer(String userId) {
         log.info("Cancelling timer for user {}", userId);
-        Optional<TimeEntry> active = timeEntryRepository.findByUserIdAndEndedAtIsNull(userId);
-        if (active.isEmpty()) return false;
-        timeEntryRepository.delete(active.get());
-        return true;
+        return timeEntryRepository.findByUserIdAndEndedAtIsNull(userId)
+                .map(e -> {
+                    timeEntryRepository.delete(e);
+                    return true;
+                })
+                .orElse(false);
     }
 
     @Transactional
@@ -254,10 +268,12 @@ public class TimeEntryService {
     @Transactional
     public boolean deleteTimeEntry(String actingUserId, String entryId) {
         log.info("Deleting time entry {} by {}", entryId, actingUserId);
-        Optional<TimeEntry> entry = timeEntryRepository.findById(entryId);
-        if (entry.isEmpty()) return false;
-        timeEntryRepository.delete(entry.get());
-        return true;
+        return timeEntryRepository.findById(entryId)
+                .map(e -> {
+                    timeEntryRepository.delete(e);
+                    return true;
+                })
+                .orElse(false);
     }
 
     public CountedGenericQueryResult<TimeEntry> queryEntries(

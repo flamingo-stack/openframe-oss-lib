@@ -9,6 +9,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.exception.OrganizationNotFoundException;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
 import com.openframe.data.repository.organization.OrganizationRepository;
@@ -32,8 +33,13 @@ public class OrganizationQueryService {
 
     private final OrganizationRepository organizationRepository;
 
-    public Optional<Organization> findByOrganizationId(String organizationId) {
-        return organizationRepository.findByOrganizationId(organizationId);
+    public boolean hasOrganization(String organizationId) {
+        return organizationRepository.findByOrganizationId(organizationId).isPresent();
+    }
+
+    public Organization getOrganization(String organizationId) {
+        return organizationRepository.findByOrganizationId(organizationId)
+                .orElseThrow(() -> new OrganizationNotFoundException(organizationId));
     }
 
     /**
@@ -63,8 +69,9 @@ public class OrganizationQueryService {
 
         List<Organization> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
+        boolean hasPreviousPage = normalizedPagination.hasCursor();
 
-        PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor(), sortField);
+        PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, hasPreviousPage, sortField);
 
         return CountedGenericQueryResult.<Organization>builder()
                 .items(pageItems)
@@ -84,8 +91,17 @@ public class OrganizationQueryService {
 
     private PageInfo buildPageInfo(List<Organization> pageItems, boolean hasNextPage, boolean hasPreviousPage,
                                    String sortField) {
-        String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(rawCursor(pageItems.getFirst(), sortField));
-        String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(rawCursor(pageItems.getLast(), sortField));
+        String startCursor = null;
+        String endCursor = null;
+        if (!pageItems.isEmpty()) {
+            Organization firstOrganization = pageItems.getFirst();
+            String firstCursorRaw = rawCursor(firstOrganization, sortField);
+            startCursor = CursorCodec.encode(firstCursorRaw);
+
+            Organization lastOrganization = pageItems.getLast();
+            String lastCursorRaw = rawCursor(lastOrganization, sortField);
+            endCursor = CursorCodec.encode(lastCursorRaw);
+        }
 
         return PageInfo.builder()
                 .hasNextPage(hasNextPage)
