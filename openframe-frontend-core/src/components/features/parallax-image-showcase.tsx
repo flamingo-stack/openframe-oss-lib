@@ -112,6 +112,23 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
     ([s, m]) => (s as number) + (m as number)
   )
   
+  // GRID TRANSFORMS - Gentler transforms for grid layout - only vertical movement
+  // These are called unconditionally to satisfy the Rules of Hooks, regardless of `layout`.
+  const scrollY_Grid = useTransform(scrollY, [0, 1000], [0, -3 * INTENSITY])
+  const scrollRotateGrid = useTransform(scrollY, [0, 1000], [0, 0.05 * INTENSITY])
+  
+  const mouseTransformYGrid = useTransform(mouseYSpring, [-20, 20], [-1 * INTENSITY, 1 * INTENSITY])
+  const mouseRotateGrid = useTransform(mouseXSpring, [-20, 20], [-0.03 * INTENSITY, 0.03 * INTENSITY])
+  
+  const yGrid = useTransform(
+    [scrollY_Grid, mouseTransformYGrid],
+    ([s, m]) => (s as number) + (m as number)
+  )
+  const rotateGrid = useTransform(
+    [scrollRotateGrid, mouseRotateGrid],
+    ([s, m]) => (s as number) + (m as number)
+  )
+  
   // Get images by position
   const leftImage = images.find(img => img.position === 'left')
   const centerImage = images.find(img => img.position === 'center')
@@ -119,22 +136,6 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
   
   // Grid Layout: Simple 3-column grid with gentler animations
   if (layout === 'grid') {
-    // Gentler transforms for grid layout - only vertical movement
-    const scrollY_Grid = useTransform(scrollY, [0, 1000], [0, -3 * INTENSITY])
-    const scrollRotateGrid = useTransform(scrollY, [0, 1000], [0, 0.05 * INTENSITY])
-    
-    const mouseTransformYGrid = useTransform(mouseYSpring, [-20, 20], [-1 * INTENSITY, 1 * INTENSITY])
-    const mouseRotateGrid = useTransform(mouseXSpring, [-20, 20], [-0.03 * INTENSITY, 0.03 * INTENSITY])
-    
-    const yGrid = useTransform(
-      [scrollY_Grid, mouseTransformYGrid],
-      ([s, m]) => (s as number) + (m as number)
-    )
-    const rotateGrid = useTransform(
-      [scrollRotateGrid, mouseRotateGrid],
-      ([s, m]) => (s as number) + (m as number)
-    )
-    
     return (
       <div 
         ref={componentRef}
