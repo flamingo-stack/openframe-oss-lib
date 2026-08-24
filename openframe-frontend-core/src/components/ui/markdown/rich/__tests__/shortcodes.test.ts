@@ -58,11 +58,11 @@ describe('processShortcodes script stripping', () => {
 });
 
 /**
- * Design-doc embeds (R11): the spec's `{{figma:FILE_KEY[:NODE_ID]}}` grammar
- * is rewritten onto the canonical `{{figma:URL}}` rule. (Claude artifact /
- * Claude Design links are NOT shortcodes: they are structured design-doc links
- * rendered by `ClaudeArtifactCard`, because claude.ai serves
- * `frame-ancestors 'self'` (it cannot be framed — verified 2026-08-23).
+ * Design-doc embeds (R11): the spec's `{{figma:FILE_KEY[:NODE_ID]}}` grammar is
+ * rewritten onto the canonical `{{figma:URL}}` rule, and Claude artifacts get
+ * the SAME treatment — a shortcode → a block the renderer maps to `ClaudeEmbed`.
+ * Both are markdown blocks, so they render identically in a spec body, a
+ * comment, or a links rail, and no surface hand-assembles its own card.
  */
 describe('processShortcodes design-doc embeds', () => {
   it('rewrites {{figma:KEY:NODE}} to the canonical design URL and renders the figma embed', () => {
@@ -79,6 +79,22 @@ describe('processShortcodes design-doc embeds', () => {
   it('leaves the existing {{figma:URL}} grammar untouched', () => {
     const output = processShortcodes('{{figma:https://www.figma.com/proto/aB3xK9/Flows?node-id=1-2}}');
     expect(output).toContain('data-figma-url="https://www.figma.com/proto/aB3xK9/Flows?node-id=1-2"');
+  });
+
+  it('renders a Claude artifact / Claude Design link as an embed block, like figma', () => {
+    const artifact = processShortcodes('{{claude-artifact:https://claude.ai/public/artifacts/abc-123}}');
+    expect(artifact).toContain('class="claude-embed"');
+    expect(artifact).toContain('data-url="https://claude.ai/public/artifacts/abc-123"');
+    expect(artifact).toContain('data-kind="artifact"');
+
+    const design = processShortcodes('{{claude-design:https://claude.ai/design/xyz}}');
+    expect(design).toContain('data-kind="design"');
+  });
+
+  it('escapes the url attribute so a crafted link cannot break out of the block', () => {
+    const output = processShortcodes('{{claude-artifact:https://claude.ai/a"><script>alert(1)</script>}}');
+    expect(output).not.toContain('<script>');
+    expect(output).toContain('&quot;');
   });
 
 

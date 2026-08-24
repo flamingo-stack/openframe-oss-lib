@@ -65,6 +65,12 @@ export const processShortcodes = (content: string): string => {
     .replace(/\{\{figma:([^}]+)\}\}/g, (match, url) => {
       return `\n\n<div class="figma-embed" data-figma-url="${escapeAttr(url.trim())}"></div>\n\n`;
     })
+    // Claude artifact / Claude Design: {{claude-artifact:URL}} / {{claude-design:URL}}
+    // — the same shape as figma, so a Claude link is a markdown BLOCK wherever
+    // markdown renders, never a bespoke card one surface hand-assembles.
+    .replace(/\{\{claude-(artifact|design):([^}]+)\}\}/g, (match, kind, url) => {
+      return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"></div>\n\n`;
+    })
     // LinkedIn embeds: {{linkedin:POST_URL}}
     .replace(/\{\{linkedin:([^}]+)\}\}/g, (match, url) => {
       return `\n\n<div class="linkedin-embed" data-post-url="${escapeAttr(url.trim())}"></div>\n\n`;

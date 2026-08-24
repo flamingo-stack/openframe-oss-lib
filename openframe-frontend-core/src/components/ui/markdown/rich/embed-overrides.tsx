@@ -17,6 +17,7 @@ import { LinkedInEmbedClient } from '../../../embeds/linkedin-embed-client';
 import { Video } from '../../../features/video';
 import { OGLinkPreview, OGLinkErrorBoundary } from '../../../embeds/og-link-preview';
 import { FigmaEmbed } from '../../../embeds/figma-embed';
+import { ClaudeEmbed } from '../../../embeds/claude-embed';
 import { MarkdownImage } from '../../../embeds/markdown-image';
 import { buildStandardLeafRenderers, hasRenderableSrc } from '../base-components';
 import type { TextSizeElement } from '../text-size';
@@ -145,6 +146,9 @@ export function buildRichEmbedOverrides({
       }
       if (className === 'figma-embed') {
         return <FigmaEmbed url={props['data-figma-url']} height="70vh" />;
+      }
+      if (className === 'claude-embed') {
+        return <ClaudeEmbed url={props['data-url']} kind={props['data-kind'] === 'design' ? 'design' : 'artifact'} />;
       }
       if (className === 'linkedin-embed') {
         return <LinkedInEmbedClient url={props['data-post-url']} />;
