@@ -15,7 +15,7 @@ public interface OAuthDevTicketStore {
     Mono<String> createTicket(TokenResponse tokens);
 
     /**
-     * Consumes (retrieves and removes) the tokens for the given ticket id. Returns null if not found.
+     * Consumes (retrieves and removes) the tokens for the given ticket id. Completes empty if not found.
      */
     Mono<TokenResponse> consumeTicket(String ticketId);
 }
