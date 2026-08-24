@@ -54,6 +54,24 @@ describe('ClaudeEmbed', () => {
     expect(container.textContent).toContain('Open in Claude')
   })
 
+  it('occupies the SAME height as a figma embed, framed or not', () => {
+    // Two embeds in one doc must read as two equal blocks — including when one
+    // of them has no embeddable view and falls back to the empty state.
+    const figmaBox = render(<FigmaEmbed url="https://www.figma.com/design/K1/x" height="70vh" />)
+      .container.querySelector('[style*="70vh"]')
+    const framed = render(<ClaudeEmbed url={PUBLISHED} height="70vh" />)
+      .container.querySelector('[style*="70vh"]')
+    const empty = render(<ClaudeEmbed url={CODE_ARTIFACT} height="70vh" />)
+      .container.querySelector('[style*="70vh"]')
+    for (const box of [figmaBox, framed, empty]) {
+      expect(box).not.toBeNull()
+      expect((box as HTMLElement).style.height).toBe('70vh')
+    }
+    // …and the empty box carries the same rounded border the iframe box does.
+    expect((empty as HTMLElement).className).toContain('rounded-lg')
+    expect((empty as HTMLElement).className).toContain('border-ods-border')
+  })
+
   it('uses the author\'s name when there is one, and the kind otherwise', () => {
     expect(render(<ClaudeEmbed url={PUBLISHED} title="Suppression brief" />).container.textContent)
       .toContain('Suppression brief')
