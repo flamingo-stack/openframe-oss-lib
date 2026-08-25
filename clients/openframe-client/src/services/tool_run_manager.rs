@@ -5,7 +5,9 @@ use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
 use crate::services::tool_kill_service::ToolKillService;
 use crate::utils::failure_log_backoff::FailureLogBackoff;
 use anyhow::{Context, Result};
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -677,6 +679,7 @@ impl ToolRunManager {
         let running_tools = self.running_tools.clone();
         let installed_tools_service = self.installed_tools_service.clone();
         let mut installation = tool.installation.clone();
+        let mut run_command_args = tool.run_command_args.clone();
 
         tokio::spawn(async move {
             let mut launch_backoff = FailureLogBackoff::new();
@@ -687,23 +690,26 @@ impl ToolRunManager {
                     break;
                 }
 
-                let mut was_updating = false;
                 while updating_tools
                     .read()
                     .await
                     .contains_key(&tool.tool_agent_id)
                 {
-                    was_updating = true;
                     info!(tool_id = %tool.tool_agent_id, "Tool is being updated, waiting...");
                     sleep(Duration::from_secs(1)).await;
                 }
 
-                if was_updating {
-                    if let Ok(Some(fresh)) = installed_tools_service
-                        .get_by_tool_agent_id(&tool.tool_agent_id)
-                        .await
-                    {
+                match installed_tools_service
+                    .get_by_tool_agent_id(&tool.tool_agent_id)
+                    .await
+                {
+                    Ok(Some(fresh)) => {
                         installation = fresh.installation;
+                        run_command_args = fresh.run_command_args;
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        warn!(tool_id = %tool.tool_agent_id, "Failed to reload tool record, launching with the last known config: {:#}", e);
                     }
                 }
 
@@ -714,29 +720,36 @@ impl ToolRunManager {
 
                 let log_attempt = launch_backoff.should_log();
 
-                let processed_args = match params_processor
-                    .process(&tool.tool_agent_id, tool.run_command_args.clone())
-                {
-                    Ok(args) => args,
-                    Err(e) => {
-                        let failures = launch_backoff.record_failure(log_attempt);
-                        if log_attempt {
-                            error!(
-                                failed_attempts = failures,
-                                "Failed to resolve tool {} run command args: {:#}",
-                                tool.tool_agent_id,
-                                e
-                            );
+                let processed_args =
+                    match params_processor.process(&tool.tool_agent_id, run_command_args.clone()) {
+                        Ok(args) => args,
+                        Err(e) => {
+                            let failures = launch_backoff.record_failure(log_attempt);
+                            if log_attempt {
+                                error!(
+                                    failed_attempts = failures,
+                                    "Failed to resolve tool {} run command args: {:#}",
+                                    tool.tool_agent_id,
+                                    e
+                                );
+                            }
+                            sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+                            continue;
                         }
-                        sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
-                        continue;
-                    }
-                };
+                    };
 
                 debug!(
                     "Running tool {} with args: {:?}",
                     tool.tool_agent_id, processed_args
                 );
+
+                if log_attempt {
+                    let mut hasher = DefaultHasher::new();
+                    processed_args.hash(&mut hasher);
+                    info!(tool_id = %tool.tool_agent_id, args_count = processed_args.len(),
+                          args_hash = format!("{:016x}", hasher.finish()),
+                          "Launching with run args reloaded from the installed tools registry");
+                }
 
                 let command_path = params_processor
                     .directory_manager
