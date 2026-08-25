@@ -4,16 +4,16 @@ import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.relay.NodeType;
-import com.openframe.api.service.DeviceService;
+import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.EventService;
 import com.openframe.api.service.InstalledAgentService;
 import com.openframe.api.service.TagService;
 import com.openframe.api.service.ToolConnectionService;
 import com.openframe.api.service.ToolService;
-import com.openframe.api.service.rmm.ScheduleRunService;
-import com.openframe.api.service.rmm.ScriptExecutionService;
-import com.openframe.api.service.rmm.ScriptScheduleService;
-import com.openframe.api.service.rmm.ScriptService;
+import com.openframe.api.service.rmm.schedule.ScheduleRunService;
+import com.openframe.api.service.rmm.script.ScriptExecutionService;
+import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
+import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.data.repository.tenant.TenantRepository;
 import com.openframe.data.service.OrganizationService;
 import graphql.relay.Relay;
@@ -39,7 +39,7 @@ public class NodeDataFetcher {
     private final InstalledAgentService installedAgentService;
     private final ScriptService scriptService;
     private final ScriptExecutionService scriptExecutionService;
-    private final ScriptScheduleService scriptScheduleService;
+    private final ScheduleScriptService scheduleScriptService;
     private final ScheduleRunService scheduleRunService;
 
     @Autowired(required = false)
@@ -80,7 +80,7 @@ public class NodeDataFetcher {
             case INSTALLED_AGENT -> installedAgentService.getInstalledAgent(globalId.getId()).orElse(null);
             case SCRIPT -> scriptService.findById(globalId.getId()).orElse(null);
             case SCRIPT_EXECUTION -> scriptExecutionService.findById(globalId.getId()).orElse(null);
-            case SCRIPT_SCHEDULE -> scriptScheduleService.findById(globalId.getId()).orElse(null);
+            case SCRIPT_SCHEDULE -> scheduleScriptService.findById(globalId.getId()).orElse(null);
             case SCHEDULE_RUN -> scheduleRunService.findById(globalId.getId()).orElse(null);
             case TENANT -> tenantRepository != null
                     ? tenantRepository.findById(globalId.getId()).orElse(null)
