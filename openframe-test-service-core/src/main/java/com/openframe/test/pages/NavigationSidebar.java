@@ -4,28 +4,9 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.WaitForSelectorState;
 
-/**
- * Page Object for the left navigation sidebar.
- * <p>
- * The sidebar is an <aside aria-label="Main navigation sidebar"> that exists
- * on every authenticated page of the application.
- * <p>
- * ── Collapsed (icon-only, width 56 px) ──────────────────────────────────────
- * Nav items show only an icon. The item label is carried as the
- * `title` attribute on the item for tooltip/accessibility purposes.
- * <p>
- * ── Expanded (icon + label, width 224 px) ───────────────────────────────────
- * Each nav item gains a <span class="text-h4"> child with the visible
- * label. A "Hide Menu" button appears at the bottom of the sidebar.
- * <p>
- * ── Element type ────────────────────────────────────────────────────────────
- * A nav item is an <a href> when it has a destination and a <button> when it
- * does not; the selectors here match either. Do not pin the tag.
- * <p>
- * ── Active item ─────────────────────────────────────────────────────────────
- * The currently active nav item carries aria-current="page" and is styled
- * with the yellow accent background.
- */
+// Nav item selectors match both <a> and <button>: which tag a given entry
+// renders as is a frontend implementation detail that has already changed
+// once and silently broke every UI test. See navigation-sidebar-item.tsx.
 public class NavigationSidebar {
 
     private final Page page;
@@ -148,38 +129,20 @@ public class NavigationSidebar {
     // State queries
     // ════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Returns {@code true} when the sidebar is in expanded (label-visible)
-     * mode (width 224 px). Returns {@code false} in icon-only mode (56 px).
-     * <p>
-     * Expansion is detected by the presence of the "Hide Menu" button, which
-     * only appears in the DOM when the sidebar is fully expanded.
-     */
+    // Expansion is detected via the "Hide Menu" button, which only exists in
+    // the DOM when the sidebar is fully expanded.
     public boolean isExpanded() {
         return hideMenuButton().isVisible();
     }
 
-    /**
-     * Returns {@code true} when the sidebar is in collapsed icon-only mode.
-     */
     public boolean isCollapsed() {
         return !isExpanded();
     }
 
-    /**
-     * Returns the {@code aria-label} value of the currently active nav item
-     * (e.g. {@code "Dashboard"}, {@code "Devices"}).
-     */
     public String getActiveNavItemLabel() {
         return activeNavItem().getAttribute("aria-label");
     }
 
-    /**
-     * Returns {@code true} when the given nav button is the currently active
-     * page item (i.e. carries {@code aria-current="page"}).
-     *
-     * @param navItemLocator one of the nav item locators from this class
-     */
     public boolean isNavItemActive(Locator navItemLocator) {
         return "page".equals(navItemLocator.getAttribute("aria-current"));
     }
@@ -188,23 +151,14 @@ public class NavigationSidebar {
     // Navigation actions
     // ════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Navigates to the Dashboard and waits for the URL to settle.
-     */
     public void goToDashboard() {
         clickNavItem(dashboardNavItem(), URL_DASHBOARD);
     }
 
-    /**
-     * Navigates to Customers.
-     */
     public void goToCustomers() {
         clickNavItem(customersNavItem(), URL_CUSTOMERS);
     }
 
-    /**
-     * Navigates to Devices.
-     */
     public DevicesPage goToDevices() {
         clickNavItem(devicesNavItem(), URL_DEVICES);
         DevicesPage devicesPage = new DevicesPage(this.page);
@@ -213,16 +167,10 @@ public class NavigationSidebar {
         return devicesPage;
     }
 
-    /**
-     * Navigates to Scripts.
-     */
     public void goToScripts() {
         clickNavItem(scriptsNavItem(), URL_SCRIPTS);
     }
 
-    /**
-     * Navigates to Monitoring.
-     */
     public MonitoringPage goToMonitoring() {
         clickNavItem(monitoringNavItem(), URL_MONITORING);
         MonitoringPage monitoringPage = new MonitoringPage(this.page);
@@ -231,44 +179,26 @@ public class NavigationSidebar {
         return monitoringPage;
     }
 
-    /**
-     * Navigates to Logs.
-     */
     public void goToLogs() {
         clickNavItem(logsNavItem(), URL_LOGS);
     }
 
-    /**
-     * Navigates to Tickets.
-     */
     public void goToTickets() {
         clickNavItem(ticketsNavItem(), URL_TICKETS);
     }
 
-    /**
-     * Navigates to Worktime.
-     */
     public void goToWorktime() {
         clickNavItem(worktimeNavItem(), URL_WORKTIME);
     }
 
-    /**
-     * Navigates to the Knowledge Base.
-     */
     public void goToKnowledgeBase() {
         clickNavItem(knowledgeBaseNavItem(), URL_KNOWLEDGE_BASE);
     }
 
-    /**
-     * Navigates to the Help Center.
-     */
     public void goToHelpCenter() {
         clickNavItem(helpCenterNavItem(), URL_HELP_CENTER);
     }
 
-    /**
-     * Navigates to Settings.
-     */
     public void goToSettings() {
         clickNavItem(settingsNavItem(), URL_SETTINGS);
     }
@@ -277,10 +207,6 @@ public class NavigationSidebar {
     // Collapse / expand
     // ════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Collapses the sidebar to icon-only mode by clicking the "Hide Menu"
-     * button. Does nothing if the sidebar is already collapsed.
-     */
     public void collapse() {
         if (isExpanded()) {
             hideMenuButton().click();
@@ -294,13 +220,6 @@ public class NavigationSidebar {
     // Private helpers
     // ════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Clicks a nav button and waits for the browser URL to contain the
-     * expected URL fragment before returning.
-     *
-     * @param item        the nav button locator
-     * @param urlFragment the URL path fragment to wait for (e.g. "/devices")
-     */
     private void clickNavItem(Locator item, String urlFragment) {
         item.click();
         page.waitForURL(

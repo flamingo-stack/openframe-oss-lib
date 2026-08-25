@@ -16,15 +16,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Locale;
 
-/**
- * Delegates 401 handling to the standard bearer-token entry point, but first makes WebSocket upgrade
- * rejections OBSERVABLE. Without this, an agent presenting an expired JWT is rejected silently
- * (Spring Security 401, nothing in gateway logs, no session ever opens) — from the outside the fleet
- * just "goes offline" one machine at a time as token rotation breaks, and the only evidence is on the
- * endpoints. A WARN log line (path + sub + why) plus the
- * {@code openframe.tenant.gateway.websocket.upgrade.rejected{tool,reason}} counter make that failure
- * mode visible on the gateway within one scrape interval.
- */
+// Makes WS upgrade auth failures observable (WARN log + counter) instead of failing silently.
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -42,10 +34,10 @@ public class WsAwareAuthenticationEntryPoint implements ServerAuthenticationEntr
             String rawToken = rawToken(request);
             String reason = classify(rawToken, ex);
             gatewayTrafficMetrics.recordUpgradeRejected(WebSocketServiceSecurityDecorator.toolFromPath(path), reason);
-            log.debug("WS upgrade REJECTED path={} sub={} reason={} : {}",
+            log.warn("WS upgrade REJECTED path={} sub={} reason={} : {}",
                     path, subOf(rawToken), reason, ex.getMessage());
         } else {
-            log.debug("Request rejected (401) path={} : {}", path, ex.getMessage());
+            log.warn("Request rejected (401) path={} : {}", path, ex.getMessage());
         }
         return delegate.commence(exchange, ex);
     }

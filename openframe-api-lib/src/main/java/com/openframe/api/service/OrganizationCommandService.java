@@ -25,12 +25,6 @@ public class OrganizationCommandService {
     private final OrganizationService organizationService;
     private final OrganizationMapper organizationMapper;
 
-    /**
-     * Create a new organization from DTO.
-     * 
-     * @param request create organization request
-     * @return created organization
-     */
     public Organization createOrganization(CreateOrganizationRequest request) {
         log.debug("Creating organization from request: {}", request.name());
         
@@ -38,14 +32,7 @@ public class OrganizationCommandService {
         return organizationService.createOrganization(organization);
     }
 
-    /**
-     * Update an existing organization from DTO.
-     * Performs partial update - only non-null fields are updated.
-     * 
-     * @param id organization database ID
-     * @param request update organization request
-     * @return updated organization
-     */
+    // Partial update: only non-null fields from request are applied
     public Organization updateOrganization(String id, UpdateOrganizationRequest request) {
         log.debug("Updating organization {} from request", id);
         
@@ -57,16 +44,10 @@ public class OrganizationCommandService {
         return organizationService.updateOrganization(toUpdate);
     }
 
-    /**
-     * Update organization status.
-     * Maps the DTO action to the domain status and delegates to OrganizationService.
-     *
-     * @param id organization database ID
-     * @param request status update request
-     */
     public void updateOrganizationStatus(String id, UpdateOrganizationStatusRequest request) {
         var newStatus = OrganizationStatus.valueOf(request.status().name());
         log.debug("Updating organization {} status to {}", id, newStatus);
         organizationService.updateOrganizationStatus(id, newStatus);
     }
 }
+
