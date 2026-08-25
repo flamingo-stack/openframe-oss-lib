@@ -79,11 +79,34 @@ export const processShortcodes = (content: string): string => {
       const tweetUrl = tweetInput.startsWith('http') ? tweetInput : `https://twitter.com/twitter/status/${tweetInput}`;
       return embedDiv('tweet-embed', 'data-tweet-url', tweetUrl);
     })
+    // Figma by file key (spec grammar): {{figma:FILE_KEY[:NODE_ID]}} → rewritten to the
+    // canonical URL form so the {{figma:URL}} rule below owns the rendering.
+    .replace(
+      /\{\{figma:(?!https?:)([A-Za-z0-9]+)(?::([0-9]+[-:][0-9]+))?\}\}/g,
+      (match: string, key: string, node: string | undefined) => {
+        const nodeParam = node ? `?node-id=${node.replace(':', '-')}` : '';
+        return `{{figma:https://www.figma.com/design/${key}${nodeParam}}}`;
+      },
+    )
     // Figma embeds: {{figma:URL}}
     .replace(/\{\{figma:([^}]+)\}\}/g, (match: string, url: string) => {
       const figmaUrl = url.trim();
       return figmaUrl ? embedDiv('figma-embed', 'data-figma-url', figmaUrl) : match;
     })
+    // Claude artifact / Claude Design: {{claude-artifact:URL}} / {{claude-design:URL}}
+    // — the same shape as figma, so a Claude link is a markdown BLOCK wherever
+    // markdown renders, never a bespoke card one surface hand-assembles.
+    // `{{claude-artifact:URL}}` or `{{claude-artifact:URL|Name}}` — the optional
+    // name after the pipe is the ONLY source of a real title (claude.ai serves
+    // one og:title for every artifact), so the block carries it through.
+    .replace(
+      /\{\{claude-(artifact|design):([^|}]+)(?:\|([^}]*))?\}\}/g,
+      (match: string, kind: string, url: string, title: string | undefined) => {
+        const name = title?.trim();
+        const titleAttr = name ? ` data-title="${escapeAttr(name)}"` : '';
+        return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"${titleAttr}></div>\n\n`;
+      },
+    )
     // LinkedIn embeds: {{linkedin:POST_URL}}
     .replace(/\{\{linkedin:([^}]+)\}\}/g, (match: string, url: string) => {
       const postUrl = url.trim();

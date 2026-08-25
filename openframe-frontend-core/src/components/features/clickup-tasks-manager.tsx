@@ -14,6 +14,11 @@ interface ClickUpTasksManagerProps {
   onChange: (tasks: ClickUpTaskLink[]) => void;
   title?: ReactNode; // Support string or ReactNode for badge integration
   className?: string;
+  /**
+   * Per-row label renderer (passthrough to ArrayEntryManager) — lets a host
+   * hydrate the bare task id with the mirror's title/status row.
+   */
+  renderLabel?: (item: ClickUpTaskLink, index: number) => ReactNode;
 }
 
 export function ClickUpTasksManager({
@@ -21,6 +26,7 @@ export function ClickUpTasksManager({
   onChange,
   title = 'ClickUp Roadmap Tasks', // Default title
   className = '',
+  renderLabel,
 }: ClickUpTasksManagerProps) {
   return (
     <ArrayEntryManager
@@ -33,6 +39,7 @@ export function ClickUpTasksManager({
       addButtonText="Add Task"
       icon={<Lightbulb className="h-5 w-5 text-ods-text-secondary" />}
       className={className}
+      renderLabel={renderLabel}
     />
   );
 }

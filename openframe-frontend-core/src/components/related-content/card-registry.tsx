@@ -160,6 +160,7 @@ const USER_PROFILE_DEFAULTS: UserProfile = {
   company: null,
   bio: null,
   employee_id: null,
+  department_id: null,
   department: null,
   role: 'user',
   msp_id: null,

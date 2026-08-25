@@ -250,6 +250,8 @@ export interface TableCardSkeletonProps {
   /** Only `key` and `width` are read, so any `TableColumn<T>[]` fits. */
   columns: ReadonlyArray<Pick<TableColumn, 'key' | 'width'>>;
   rows?: number; // Number of skeleton rows to display (default: 10)
+  /** Match a `compact` table's row height, so the first paint does not jump. */
+  compact?: boolean;
   hasActions?: boolean;
   hasChevron?: boolean;
   className?: string;

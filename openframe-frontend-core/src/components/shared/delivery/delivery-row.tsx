@@ -66,10 +66,14 @@ export interface DeliveryRowProps {
    *  paired with `scroll-mt-24` on the outer element so the row lands
    *  BELOW the sticky chrome after the scroll. */
   id?: string;
+  /** `'_blank'` renders a plain external anchor (new tab, `rel` hardened) —
+   *  for rows whose href leaves the app (e.g. the raw ClickUp task URL on the
+   *  design-doc surfaces). Internal deep-links omit it and keep the Link shim. */
+  target?: '_blank';
   className?: string;
 }
 
-export function DeliveryRow({ item, href, caption, id, className }: DeliveryRowProps) {
+export function DeliveryRow({ item, href, target, caption, id, className }: DeliveryRowProps) {
   const taskType = item.taskType as keyof typeof TASK_TYPE_LABELS;
   const typeBadgeLabel = TASK_TYPE_LABELS[taskType] || 'TASK';
   const typeBadgeTextColor = TASK_TYPE_TEXT_COLORS[taskType] || '';
@@ -88,7 +92,12 @@ export function DeliveryRow({ item, href, caption, id, className }: DeliveryRowP
           </h3>
         </div>
         <div className="flex min-h-[20px] items-center">
-          <p className="truncate uppercase tracking-[-0.28px] text-ods-text-secondary text-h5">{subtitle}</p>
+          {/* Relative time is wall-clock-derived: on an SSR host the server and
+              client render different strings a moment apart — text-only, so
+              suppress instead of forcing a client-only render. */}
+          <p className="truncate uppercase tracking-[-0.28px] text-ods-text-secondary text-h5" suppressHydrationWarning>
+            {subtitle}
+          </p>
         </div>
         <div className="flex min-h-[72px] items-center">
           <p className="line-clamp-3 break-words text-ods-text-secondary text-h4">
@@ -140,6 +149,14 @@ export function DeliveryRow({ item, href, caption, id, className }: DeliveryRowP
     href && 'cursor-pointer hover:bg-ods-bg-hover',
     className,
   );
+
+  if (href && target === '_blank') {
+    return (
+      <a href={href} id={id} className={baseClass} target="_blank" rel="noopener noreferrer">
+        {inner}
+      </a>
+    );
+  }
 
   if (href) {
     // `Link` is the env-aware embed-shim — delegates to `next/link` on

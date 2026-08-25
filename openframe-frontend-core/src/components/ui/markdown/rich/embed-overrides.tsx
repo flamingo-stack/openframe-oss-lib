@@ -11,6 +11,7 @@
  */
 import type { ElementContent } from 'hast';
 import type { Components } from 'react-markdown';
+import { ClaudeEmbed } from '../../../embeds/claude-embed';
 import { FigmaEmbed } from '../../../embeds/figma-embed';
 import { LinkedInEmbedClient } from '../../../embeds/linkedin-embed-client';
 import { MarkdownImage } from '../../../embeds/markdown-image';
@@ -46,6 +47,8 @@ type EmbedDivProps = MdRenderProps<'div'> & {
   'data-tweet-url'?: string;
   'data-url'?: string;
   'data-figma-url'?: string;
+  'data-kind'?: string;
+  'data-title'?: string;
 };
 
 export interface BuildRichEmbedOverridesOptions {
@@ -123,7 +126,9 @@ export function buildRichEmbedOverrides({
         'data-video-id': videoId,
         'data-post-url': postUrl,
         'data-tweet-url': tweetUrl,
-        'data-url': previewUrl,
+        'data-url': dataUrl,
+        'data-kind': claudeKind,
+        'data-title': claudeTitle,
         'data-figma-url': figmaUrl,
       } = divProps;
       // Each branch requires its payload attribute: a shortcode div that
@@ -140,7 +145,7 @@ export function buildRichEmbedOverrides({
         return <TwitterEmbedClient url={tweetUrl} />;
       }
       if (className === 'link-preview') {
-        const url = previewUrl;
+        const url = dataUrl;
         if (!url) {
           console.warn('Invalid URL for link preview:', url);
           return <div className="text-sm text-ods-text-secondary">Invalid link</div>;
@@ -167,6 +172,16 @@ export function buildRichEmbedOverrides({
       }
       if (className === 'figma-embed' && figmaUrl) {
         return <FigmaEmbed url={figmaUrl} height="70vh" />;
+      }
+      if (className === 'claude-embed' && dataUrl) {
+        return (
+          <ClaudeEmbed
+            url={dataUrl}
+            kind={claudeKind === 'design' ? 'design' : 'artifact'}
+            title={claudeTitle}
+            height="70vh"
+          />
+        );
       }
       if (className === 'linkedin-embed' && postUrl) {
         return <LinkedInEmbedClient url={postUrl} />;

@@ -25,6 +25,18 @@ interface ArrayEntryManagerProps<T extends object> {
   requireSave?: boolean; // If true, show "Save" button and only call onChange when clicked
   onDirtyChange?: (isDirty: boolean) => void; // Callback when dirty state changes
   renderLabel?: (item: T, index: number) => ReactNode; // Custom label/badge renderer for each entry
+  /**
+   * An optional SECOND field on each entry, edited above the main one — a
+   * human name for the thing the main field addresses.
+   *
+   * Design docs need it because a link's own title is the only name available:
+   * claude.ai serves the same `og:title` ("Claude Artifact") for every artifact
+   * and its per-artifact metadata endpoint is unreachable server-side, so an
+   * unnamed link can only ever render as its type. Omitted by every other
+   * caller, which keeps their single-field row exactly as it was.
+   */
+  titleFieldKey?: keyof T;
+  titlePlaceholder?: string;
   isSaving?: boolean; // Loading state for save button
 }
 
@@ -42,6 +54,8 @@ export function ArrayEntryManager<T extends object>({
   requireSave = false,
   onDirtyChange,
   renderLabel,
+  titleFieldKey,
+  titlePlaceholder,
   isSaving = false,
 }: ArrayEntryManagerProps<T>) {
   // Local state for draft changes (when requireSave=true)
@@ -93,9 +107,9 @@ export function ArrayEntryManager<T extends object>({
     setWorkingItems(workingItems.filter((_, i) => i !== index));
   };
 
-  const updateItem = (index: number, value: string) => {
+  const updateItem = (index: number, value: string, key: keyof T = fieldKey) => {
     const updated = [...workingItems];
-    updated[index] = { ...updated[index], [fieldKey]: value };
+    updated[index] = { ...updated[index], [key]: value };
     setWorkingItems(updated);
   };
 
@@ -178,8 +192,18 @@ export function ArrayEntryManager<T extends object>({
         <div key={index} className="flex items-center gap-3 rounded-lg border border-ods-border bg-ods-bg-surface p-3">
           {icon && <div className="flex h-8 w-8 items-center justify-center">{icon}</div>}
 
-          <div className="flex-1 space-y-2">
+          {/* min-w-0: a wide renderLabel (e.g. a DeliveryRow) must truncate, not push the row past its host. */}
+          <div className="min-w-0 flex-1 space-y-2">
             {renderLabel && renderLabel(item, index)}
+            {titleFieldKey ? (
+              <Input
+                placeholder={titlePlaceholder ?? 'Name'}
+                value={(item[titleFieldKey] as string) ?? ''}
+                onChange={e => updateItem(index, e.target.value, titleFieldKey)}
+                onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
+                className="border-ods-border bg-ods-bg text-ods-text-primary"
+              />
+            ) : null}
             <Input
               placeholder={placeholder}
               value={item[fieldKey] as string}

@@ -128,6 +128,7 @@ export * from './content-loader';
 
 // Table components
 export {
+  COMPACT_ROW_MIN_HEIGHT_PX,
   Table,
   TableCardSkeleton,
   TableCell,

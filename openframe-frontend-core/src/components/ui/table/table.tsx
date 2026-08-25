@@ -259,6 +259,7 @@ export function Table<T = TableRowData>({
           <TableCardSkeleton
             columns={columns}
             rows={skeletonRows}
+            compact={compact}
             hasActions={(rowActions?.length ?? 0) > 0}
             hasChevron={Boolean(rowHref)}
           />

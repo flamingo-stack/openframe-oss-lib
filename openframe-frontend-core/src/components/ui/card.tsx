@@ -5,7 +5,17 @@ import { type HTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
 const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('rounded-lg border bg-card text-card-foreground shadow-sm', className)} {...props} />
+  <div
+    ref={ref}
+    className={cn(
+      // `border` with NO color token resolves to `currentColor` — on a dark card
+      // with light text that paints a WHITE outline. Every ODS surface borders
+      // on `--color-border`; say so.
+      'rounded-lg border border-ods-border bg-card text-card-foreground shadow-sm',
+      className,
+    )}
+    {...props}
+  />
 ));
 Card.displayName = 'Card';
 

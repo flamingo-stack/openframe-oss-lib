@@ -1,8 +1,8 @@
 package com.openframe.api.dto.rmm.execution;
 
-import com.openframe.data.document.rmm.ExecutionSource;
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.document.rmm.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import lombok.Builder;
 import lombok.Data;
 

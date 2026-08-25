@@ -43,6 +43,8 @@ export interface EmbedViewerFrameProps {
   allow?: string;
   allowFullScreen?: boolean;
   loading?: 'eager' | 'lazy';
+  /** iframe `sandbox` — see `EmbedIframe`. Set it for user-authored contents. */
+  sandbox?: string;
   /** Wrapper classes; defaults to the sheets/pdf `space-y-4`. */
   className?: string;
 }
@@ -59,6 +61,7 @@ export function EmbedViewerFrame({
   allow,
   allowFullScreen,
   loading,
+  sandbox,
   className,
 }: EmbedViewerFrameProps) {
   return (
@@ -82,9 +85,19 @@ export function EmbedViewerFrame({
           allow={allow}
           allowFullScreen={allowFullScreen}
           loading={loading}
+          sandbox={sandbox}
         />
       ) : (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
+        // The SAME box the iframe would have filled: same height, same rounded
+        // border. A viewer whose content is missing must not collapse the page
+        // around it — two embeds side by side (a figma frame and a claude link
+        // that has no embeddable view) have to read as two equal blocks.
+        // Without a `height` the caller never asked for a fixed box, so the
+        // intrinsic `py-16` stands.
+        <div
+          className="flex flex-col items-center justify-center rounded-lg border border-ods-border px-4 py-16 text-center"
+          style={height ? { height } : undefined}
+        >
           {emptyIcon}
           <p className="text-ods-text-secondary">{emptyMessage}</p>
         </div>

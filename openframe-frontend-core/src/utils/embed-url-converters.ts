@@ -68,3 +68,35 @@ export function toFigmaOriginalUrl(url: string): string {
   }
   return url.replace(/\?.*$/, '');
 }
+
+/**
+ * The EMBED url for a published Claude artifact, or `null` when the link is not
+ * one we can frame — the Claude counterpart of `toFigmaEmbedUrl`.
+ *
+ * claude.ai serves `frame-ancestors 'self'` on the artifact page itself, but a
+ * PUBLISHED artifact also has an `/embed` route whose `frame-ancestors` carries
+ * the domains its author allow-listed under "Get embed code → Allowed domains".
+ * That is Anthropic's supported way to put an artifact on another site, so that
+ * is what the iframe points at.
+ *
+ * Returns `null` for everything else, including a Claude CODE url
+ * (`claude.ai/code/artifact/…`), whose Share dialog exposes no Embed settings
+ * and whose `/embed` path answers `frame-ancestors 'self'` (verified against
+ * real artifacts, 2026-08). A trailing `/embed` is accepted because that is the
+ * url "Get embed code" hands the author.
+ */
+export function toClaudeEmbedUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    // `claude.site/artifacts/<id>` 308-redirects to the claude.ai public url.
+    const publicId =
+      (host === 'claude.ai' && /^\/public\/artifacts\/([\w-]+)(?:\/embed)?\/?$/.exec(u.pathname)?.[1]) ||
+      (host === 'claude.site' && /^\/artifacts\/([\w-]+)(?:\/embed)?\/?$/.exec(u.pathname)?.[1]) ||
+      null;
+    return publicId ? `https://claude.ai/public/artifacts/${publicId}/embed` : null;
+  } catch {
+    return null;
+  }
+}

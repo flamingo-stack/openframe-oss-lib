@@ -34,6 +34,16 @@ export interface EmbedIframeProps {
   loading?: 'eager' | 'lazy';
   /** iframe `allowFullScreen` attribute */
   allowFullScreen?: boolean;
+  /**
+   * iframe `sandbox` attribute. Omitted by default — a first-party vendor
+   * (Figma, Google Sheets) is trusted with the full frame contract.
+   *
+   * Pass it for a frame whose contents are AUTHORED BY USERS: without the
+   * attribute an embedded document may navigate the top window, and a sandbox
+   * that omits `allow-top-navigation` takes that away. On a CROSS-ORIGIN frame
+   * `allow-same-origin` grants the frame its own origin, never the host's.
+   */
+  sandbox?: string;
 }
 
 /**
@@ -53,6 +63,7 @@ export function EmbedIframe({
   referrerPolicy,
   loading,
   allowFullScreen,
+  sandbox,
 }: EmbedIframeProps) {
   // Which src finished loading, rather than a bare "loaded" flag reset from an
   // effect on every src change. Same information, but the reset is implicit:
@@ -97,6 +108,7 @@ export function EmbedIframe({
           referrerPolicy={referrerPolicy}
           loading={loading}
           allowFullScreen={allow?.includes('fullscreen') ? undefined : allowFullScreen}
+          sandbox={sandbox}
         />
       </div>
     </>

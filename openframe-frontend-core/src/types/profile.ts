@@ -1,5 +1,7 @@
 // Profile system TypeScript interfaces for OpenMSP
 
+import type { DepartmentRef } from './department';
+
 export interface ProfileResponse {
   id: string;
   name: string;
@@ -14,7 +16,7 @@ export interface ProfileResponse {
   jobTitle: string | null;
   isCommunityMember: boolean;
   lastSignIn: string | null;
-  department: string | null;
+  department: DepartmentRef | null;
   employeeId: string | null;
 }
 

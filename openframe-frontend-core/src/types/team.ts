@@ -9,7 +9,9 @@ export interface TeamMember {
   phone?: string;
   role?: string;
   title?: string;
+  /** Display name of the department (presentational shape); `department_id` is the FK. */
   department?: string;
+  department_id?: string | null;
   team?: string;
   manager_id?: string;
   profile_image_url?: string;
@@ -32,8 +34,20 @@ export interface TeamMember {
 }
 
 export interface TeamSection {
+  /**
+   * The BUCKET key this section was grouped under — the React key, and the one
+   * value guaranteed unique across sections. `department_id` is not: a profile
+   * whose `department_id` points at a row the embed could not resolve lands in
+   * the same "Other" section as the genuinely department-less, and both would
+   * render under the same fallback key.
+   */
+  key: string;
   title: string;
+  /** Department display name. */
   department: string;
+  department_id: string | null;
+  /** `departments.display_order` — sections sort by it (no name sentinels). */
+  display_order: number;
   description: string;
   members: TeamMember[];
 }
@@ -45,5 +59,5 @@ export interface TeamData {
 
 export interface GetTeamOptions {
   includeInactive?: boolean;
-  department?: string;
+  departmentId?: string;
 }

@@ -160,6 +160,13 @@ export default defineConfig([
       'src/components/ui/markdown/__tests__/sanitize-render.test.tsx',
       'src/components/ui/markdown/__tests__/streaming.test.tsx',
       'src/components/embeds/__tests__/embed-viewer-frame.test.tsx',
+      // Same argument as its sibling above, one layer down: this file asserts
+      // on the IFRAME the frame renders — `sandbox`, `src`, `loading`, `allow`
+      // — and on the box's height and border classes. An `<iframe>` with no
+      // title exposes no accessible role, so there is no `screen` query that
+      // reaches it; the attributes ARE the contract under test (an artifact is
+      // user-authored HTML, so losing the sandbox is a security regression).
+      'src/components/embeds/__tests__/claude-embed.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',
