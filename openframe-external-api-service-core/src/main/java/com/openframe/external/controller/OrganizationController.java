@@ -79,10 +79,10 @@ public class OrganizationController {
             @Parameter(description = "Filter by organization status (ACTIVE or ARCHIVED). Defaults to ACTIVE.")
             @RequestParam(required = false) String status,
 
-            @Parameter(description = "Inclusive lower bound of the last-activity range (ISO-8601 instant, UTC). Operates on lastActivityAt.")
+            @Parameter(description = "Inclusive lower bound of the last-activity range (ISO-8601 instant, UTC). Matches updatedAt; never-updated organizations are not matched.")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant lastActivityFrom,
 
-            @Parameter(description = "Inclusive upper bound of the last-activity range (ISO-8601 instant, UTC). Operates on lastActivityAt.")
+            @Parameter(description = "Inclusive upper bound of the last-activity range (ISO-8601 instant, UTC). Matches updatedAt; never-updated organizations are not matched.")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant lastActivityTo,
 
             @Parameter(description = "Search query for organization name and category")

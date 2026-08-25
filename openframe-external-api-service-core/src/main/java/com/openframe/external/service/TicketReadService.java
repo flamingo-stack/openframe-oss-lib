@@ -38,10 +38,15 @@ public class TicketReadService {
     private final TicketMapper ticketMapper;
 
     public TicketResponse toResponse(AuthPrincipal principal, Ticket ticket) {
-        return toResponses(principal, List.of(ticket)).getFirst();
+        return toResponses(principal, List.of(ticket), true).getFirst();
     }
 
+    /** List variant: skips per-ticket availableTransitions (each one costs status/gate/history reads). */
     public List<TicketResponse> toResponses(AuthPrincipal principal, List<Ticket> tickets) {
+        return toResponses(principal, tickets, false);
+    }
+
+    private List<TicketResponse> toResponses(AuthPrincipal principal, List<Ticket> tickets, boolean includeTransitions) {
         if (tickets.isEmpty()) {
             return List.of();
         }
@@ -61,7 +66,7 @@ public class TicketReadService {
                             notesPerTicket.get(i),
                             attachmentsByTicket.getOrDefault(ticket.getId(), List.of()),
                             ticket.getStatusId() != null ? statusesById.get(ticket.getStatusId()) : null,
-                            ticket.getStatusKind() != null
+                            includeTransitions && ticket.getStatusKind() != null
                                     ? ticketLifecycleService.availableTransitionsFor(principal, ticket) : null);
                     return ticketMapper.toTicketResponse(ticket, relations);
                 })

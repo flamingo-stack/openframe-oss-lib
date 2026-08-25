@@ -41,7 +41,7 @@ public class TicketResponse {
     @Schema(description = "Current lifecycle status definition")
     private TicketStatusResponse statusDefinition;
 
-    @Schema(description = "Statuses this ticket may be transitioned to right now (use their ids with the transition endpoint)")
+    @Schema(description = "Statuses this ticket may be transitioned to right now (single-ticket reads only; null in list responses). Use their ids with the transition endpoint.")
     private List<TicketStatusResponse> availableTransitions;
 
     @Schema(description = "How the ticket was created")
