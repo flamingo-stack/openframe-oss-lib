@@ -62,6 +62,7 @@ public class TicketTransitionPolicyValidator {
         return statusRepository.findAllByOrderByPositionAsc().stream()
                 .filter(status -> allowedKinds.contains(status.getKind()))
                 .filter(status -> !isSameStatusId(status, ticket))
+                .filter(this::isManuallySelectable)
                 .filter(status -> mayReopenInto(ticket, status))
                 .toList();
     }
@@ -121,7 +122,13 @@ public class TicketTransitionPolicyValidator {
         return all.stream()
                 .filter(status -> allowedKinds.contains(status.getKind()))
                 .filter(status -> !status.getId().equals(from.getId()))
+                .filter(this::isManuallySelectable)
                 .toList();
+    }
+
+    /** AI Handling is the assistant's stage — automated flows enter it, pickers never offer it. */
+    private boolean isManuallySelectable(TicketStatusDefinition status) {
+        return status.getKind() != AI_ASSISTANCE;
     }
 
     private TicketStatusDefinition resolveTarget(String toStatusId) {

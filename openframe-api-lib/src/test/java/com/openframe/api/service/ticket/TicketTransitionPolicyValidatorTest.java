@@ -19,6 +19,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
@@ -51,6 +52,33 @@ class TicketTransitionPolicyValidatorTest {
     void setUp() {
         validator = new TicketTransitionPolicyValidator(statusRepository, historyRepository, gateProvider);
         lenient().when(gateProvider.getIfAvailable()).thenReturn(conversationGate);
+    }
+
+    @Test
+    void allowedNext_resolvedTicket_excludesAiAssistance() {
+        // setup
+        // AI Handling is filtered out before the reopen gate is ever consulted
+        when(statusRepository.findAllByOrderByPositionAsc())
+                .thenReturn(List.of(aiAssistance, inProgress, techRequired, resolved, archived));
+
+        // execution
+        List<TicketStatusDefinition> next = validator.allowedNext(closedTicket(resolved));
+
+        // verifications — AI Handling stays off the menu
+        assertThat(next).containsExactly(inProgress, techRequired, archived);
+    }
+
+    @Test
+    void allowedNextFor_resolvedStatus_excludesAiAssistance() {
+        // setup
+        List<TicketStatusDefinition> statuses =
+                List.of(aiAssistance, inProgress, techRequired, resolved, archived);
+
+        // execution
+        List<TicketStatusDefinition> next = validator.allowedNextFor(resolved, statuses);
+
+        // verifications
+        assertThat(next).containsExactly(inProgress, techRequired, archived);
     }
 
     @Test

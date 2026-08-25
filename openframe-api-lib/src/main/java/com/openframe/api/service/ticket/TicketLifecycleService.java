@@ -4,6 +4,7 @@ import com.github.pravin.raha.lexorank4j.LexoRank;
 import com.openframe.api.dto.ticket.ReorderTicketInput;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.dto.ticket.TransitionTicketInput;
+import com.openframe.api.exception.ticket.InvalidTicketTransitionException;
 import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
@@ -31,6 +32,7 @@ import java.util.Optional;
 
 import static com.openframe.api.service.ticket.TicketTransitionPolicyValidator.MANUALLY_CREATABLE_KINDS;
 import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
+import static com.openframe.data.document.ticket.TicketStatusKind.AI_ASSISTANCE;
 import static com.openframe.data.document.ticket.TicketStatusKind.RESOLVED;
 import static org.springframework.util.StringUtils.hasText;
 
@@ -55,7 +57,7 @@ public class TicketLifecycleService {
 
     @Transactional
     public Ticket transition(AuthPrincipal principal, @Valid TransitionTicketInput input) {
-        return doTransition(principal, input);
+        return doTransition(principal, input, TransitionSource.MANUAL);
     }
 
     /**
@@ -63,14 +65,15 @@ public class TicketLifecycleService {
      * here, so internal calls never self-invoke another {@code @Transactional} method through
      * {@code this} (the proxy would be bypassed and its settings silently ignored).
      */
-    private Ticket doTransition(AuthPrincipal principal, TransitionTicketInput input) {
+    private Ticket doTransition(AuthPrincipal principal, TransitionTicketInput input, TransitionSource source) {
         TransitionContext context = loadContext(input.getTicketId());
-        TicketStatusDefinition target = transitionPolicy.validateAndResolve(
-                context.ticket(), input.getToStatusId());
+        Ticket ticket = context.ticket();
+        TicketStatusDefinition target = transitionPolicy.validateAndResolve(ticket, input.getToStatusId());
 
         if (isSameStatus(context.currentStatus(), target)) {
             return context.ticket();
         }
+        validateManualTransition(ticket, target, source);
 
         boolean reopening = isReopening(context.currentStatus(), target);
         applyTransition(context.ticket(), target);
@@ -118,11 +121,12 @@ public class TicketLifecycleService {
     @Transactional
     public Ticket transitionToKind(AuthPrincipal principal, String ticketId, TicketStatusKind kind, String reason) {
         TicketStatusDefinition target = requireByKind(kind);
-        return doTransition(principal, TransitionTicketInput.builder()
+        TransitionTicketInput input = TransitionTicketInput.builder()
                 .ticketId(ticketId)
                 .toStatusId(target.getId())
                 .reason(reason)
-                .build());
+                .build();
+        return doTransition(principal, input, TransitionSource.AUTOMATED);
     }
 
     /**
@@ -133,12 +137,13 @@ public class TicketLifecycleService {
     public void reopenToKind(AuthPrincipal principal, String ticketId, TicketStatusKind kind,
                              String reason, String reopenReason) {
         TicketStatusDefinition target = requireByKind(kind);
-        doTransition(principal, TransitionTicketInput.builder()
+        TransitionTicketInput input = TransitionTicketInput.builder()
                 .ticketId(ticketId)
                 .toStatusId(target.getId())
                 .reason(reason)
                 .reopenReason(reopenReason)
-                .build());
+                .build();
+        doTransition(principal, input, TransitionSource.AUTOMATED);
     }
 
     public List<TicketStatusDefinition> availableTransitionsFor(AuthPrincipal principal, Ticket ticket) {
@@ -239,7 +244,7 @@ public class TicketLifecycleService {
                     .toStatusId(targetStatusId)
                     .reason("Reorder across columns")
                     .build();
-            doTransition(principal, transitionInput);
+            doTransition(principal, transitionInput, TransitionSource.MANUAL);
             ticket = ticketRepository.findById(input.getId())
                     .orElseThrow(() -> new TicketNotFoundException(input.getId()));
         }
@@ -369,6 +374,21 @@ public class TicketLifecycleService {
         return from.getId() != null && from.getId().equals(to.getId());
     }
 
+    /**
+     * AI Handling belongs to the assistant: only automated flows (client reopen, escalation
+     * plumbing) may move a ticket there — an admin/API transition gets the standard invalid-
+     * transition error carrying the statuses that are actually allowed.
+     */
+    private void validateManualTransition(Ticket ticket, TicketStatusDefinition target, TransitionSource source) {
+        if (source != TransitionSource.MANUAL || target.getKind() != AI_ASSISTANCE) {
+            return;
+        }
+        List<String> allowedStatusIds = transitionPolicy.allowedNext(ticket).stream()
+                .map(TicketStatusDefinition::getId)
+                .toList();
+        throw new InvalidTicketTransitionException(ticket.getStatusKind(), target.getKind(), allowedStatusIds);
+    }
+
     private TicketQueryFilter buildArchiveFilter(String resolvedStatusId, TicketFilterInput filterInput) {
         TicketQueryFilter.TicketQueryFilterBuilder builder = TicketQueryFilter.builder()
                 .statusIds(List.of(resolvedStatusId));
@@ -381,5 +401,10 @@ public class TicketLifecycleService {
 
     @Builder
     private record TransitionContext(Ticket ticket, TicketStatusDefinition currentStatus) {
+    }
+
+    private enum TransitionSource {
+        MANUAL,
+        AUTOMATED
     }
 }
