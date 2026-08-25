@@ -102,18 +102,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # `npm ci` is a clean install by design, so without this every run
-          # re-downloads the whole tree. The lockfile is the cache key.
+          # Caches ~/.npm so a run does not re-download the whole tree.
+          # Keyed on package.json, NOT package-lock.json: this repo ignores
+          # lockfiles (.gitignore), so none is committed and pointing the key at
+          # one fails the step outright with "paths were not resolved".
           cache: npm
-          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+          cache-dependency-path: ${{ matrix.path }}/package.json
 
-      # `ci` not `install`: it installs exactly the lockfile and fails if
-      # package.json and package-lock.json have drifted, so CI can never
-      # silently test a different dependency tree than a developer has.
+      # `install`, not `ci`: `npm ci` requires a committed lockfile and this
+      # repo has none. The consequence is that CI resolves dependencies afresh
+      # and can test a different tree than a developer has — worth fixing, but
+      # by committing lockfiles, which is a repo-wide policy call.
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm ci
+        run: npm install
 
       # Config smoke first: it is ~1s and a broken eslint config makes every
       # lint result below meaningless rather than failing honestly.
