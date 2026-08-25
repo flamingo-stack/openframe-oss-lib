@@ -6,7 +6,7 @@ import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.repository.rmm.CustomScriptExecutionRepository.LeafStatusCounts;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
-import com.openframe.stream.handler.rmm.ScriptExecutionStatusUpdateHandler;
+import com.openframe.stream.handler.rmm.ScriptExecutionHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,7 +16,7 @@ import java.time.Instant;
 /**
  * Rolls up leaf {@link ScriptExecution} rows into the {@link ScheduleScriptExecution}
  * header for a single schedule fire, invoked from
- * {@link ScriptExecutionStatusUpdateHandler} after each leaf
+ * {@link ScriptExecutionHandler} after each leaf
  * transitions to a terminal status.
  */
 @Service
@@ -33,7 +33,7 @@ public class ScheduleScriptExecutionAggregator {
         }
 
         LeafStatusCounts counts = scriptExecutionRepository.countLeavesByStatus(tenantId, executionId);
-        if (counts.running() > 0) {
+        if (counts.inProgress() > 0) {
             return;
         }
 

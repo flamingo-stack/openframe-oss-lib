@@ -67,6 +67,7 @@ class ScheduleFireDispatcherTest {
     @Mock private ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
     @Mock private MachineRepository machineRepository;
     @Mock private DeviceOnlineDispatchRepository dispatchRepository;
+    @Mock private com.openframe.client.service.rmm.ScriptDeliveryRetryStore retryStore;
 
     private ScheduleFireDispatcher dispatcher;
 
@@ -74,7 +75,7 @@ class ScheduleFireDispatcherTest {
     void setUp() {
         dispatcher = new ScheduleFireDispatcher(targetResolver, scriptRepository,
                 scriptExecutionRepository, scheduleScriptExecutionRepository, scriptScheduleNatsPublisher,
-                machineRepository, dispatchRepository);
+                machineRepository, dispatchRepository, retryStore);
     }
 
     @Test
@@ -108,7 +109,7 @@ class ScheduleFireDispatcherTest {
         assertThat(allRows).hasSize(4);
         assertThat(allRows).allSatisfy(r -> {
             assertThat(r.getTenantId()).isEqualTo(TENANT);
-            assertThat(r.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+            assertThat(r.getStatus()).isEqualTo(ExecutionStatus.QUEUED);
             assertThat(r.getInitiatedBy()).isEqualTo(OWNER);
             assertThat(r.getDispatchedAt()).isNotNull();
             assertThat(r.getScheduleId()).isEqualTo(SCHEDULE_ID);

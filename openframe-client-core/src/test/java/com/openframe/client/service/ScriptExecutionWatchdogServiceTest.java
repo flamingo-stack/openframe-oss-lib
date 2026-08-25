@@ -1,10 +1,12 @@
 package com.openframe.client.service;
 
 import com.openframe.client.metrics.ScriptExecutionWatchdogMetrics;
+import com.openframe.client.service.rmm.ScriptDeliveryRetryStore.RetryState;
 import com.openframe.client.service.rmm.watchdog.ScheduleJobExecutionWatchdogService;
 import com.openframe.client.service.rmm.watchdog.ScriptExecutionWatchdogService;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,11 +20,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -40,14 +44,22 @@ class ScriptExecutionWatchdogServiceTest {
     @Mock
     private ScheduleJobExecutionWatchdogService headerWatchdogService;
 
+    @Mock
+    private com.openframe.client.service.rmm.ScriptDeliveryRetryStore retryStore;
+
+    @Mock
+    private com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+
     private ScriptExecutionWatchdogService service;
 
     @BeforeEach
     void setUp() {
         service = new ScriptExecutionWatchdogService(repository, headerWatchdogService,
-                new ScriptExecutionWatchdogMetrics(new SimpleMeterRegistry()));
+                new ScriptExecutionWatchdogMetrics(new SimpleMeterRegistry()), retryStore, scriptScheduleNatsPublisher);
         ReflectionTestUtils.setField(service, "graceSeconds", GRACE);
         ReflectionTestUtils.setField(service, "fallbackThresholdSeconds", FALLBACK);
+        ReflectionTestUtils.setField(service, "retrySize", 3);
+        ReflectionTestUtils.setField(service, "queuedThresholdSeconds", 30L);
     }
 
     @Test
@@ -172,6 +184,80 @@ class ScriptExecutionWatchdogServiceTest {
         service.markStuckExecutionsAsFailed();
 
         verifyNoInteractions(headerWatchdogService);
+    }
+
+    @Test
+    @DisplayName("QUEUED retry: a stuck leaf within budget re-sends the stored message and increments — not failed")
+    void queuedRetry_withinBudget_resends() {
+        ScriptExecution q = queued("exec-1", "m-1", "s-a", 60);
+        ScriptScheduleExecutionMessage msg = ScriptScheduleExecutionMessage.builder().executionId("exec-1").machineId("m-1").build();
+        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any())).thenReturn(List.of(q));
+        when(retryStore.get("exec-1", "m-1")).thenReturn(Optional.of(new RetryState(1, msg)));
+
+        service.retryStuckQueuedDeliveries();
+
+        verify(scriptScheduleNatsPublisher).publish(eq("m-1"), eq(msg));
+        verify(retryStore).incrementRetryCount(eq("exec-1"), eq("m-1"), any());
+        verify(repository, never()).saveAll(any());   // still retrying → not failed
+    }
+
+    @Test
+    @DisplayName("QUEUED retry: budget exhausted → leaves FAILED, retry state evicted, header finalized")
+    void queuedRetry_exhausted_fails() {
+        ScriptExecution q = queued("exec-1", "m-1", "s-a", 60);
+        q.setScheduleId("sch-1");
+        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any())).thenReturn(List.of(q));
+        when(retryStore.get("exec-1", "m-1"))
+                .thenReturn(Optional.of(new RetryState(3, ScriptScheduleExecutionMessage.builder().build())));
+
+        service.retryStuckQueuedDeliveries();
+
+        verify(scriptScheduleNatsPublisher, never()).publish(any(), any());
+        ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
+        verify(repository).saveAll(captor.capture());
+        assertThat(captor.getValue()).allMatch(r -> r.getStatus() == ExecutionStatus.FAILED);
+        assertThat(captor.getValue()).allMatch(r -> r.getError() != null && r.getError().contains("could not receive"));
+        verify(retryStore).evict("exec-1", "m-1");
+        verify(headerWatchdogService).finalizeIfSettled("t-1", "exec-1");
+    }
+
+    @Test
+    @DisplayName("QUEUED retry: no stored payload (Redis gone / expired) → FAILED + evict")
+    void queuedRetry_noPayload_fails() {
+        ScriptExecution q = queued("exec-1", "m-1", "s-a", 60);
+        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any())).thenReturn(List.of(q));
+        when(retryStore.get("exec-1", "m-1")).thenReturn(Optional.empty());
+
+        service.retryStuckQueuedDeliveries();
+
+        verify(scriptScheduleNatsPublisher, never()).publish(any(), any());
+        verify(repository).saveAll(any());
+        verify(retryStore).evict("exec-1", "m-1");
+    }
+
+    @Test
+    @DisplayName("QUEUED retry: two leaves on one (executionId, machineId) collapse to a single re-send")
+    void queuedRetry_groupsByDelivery() {
+        ScriptScheduleExecutionMessage msg = ScriptScheduleExecutionMessage.builder().build();
+        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any()))
+                .thenReturn(List.of(queued("exec-1", "m-1", "s-a", 60), queued("exec-1", "m-1", "s-b", 60)));
+        when(retryStore.get("exec-1", "m-1")).thenReturn(Optional.of(new RetryState(0, msg)));
+
+        service.retryStuckQueuedDeliveries();
+
+        verify(scriptScheduleNatsPublisher, times(1)).publish(eq("m-1"), eq(msg));
+    }
+
+    private static ScriptExecution queued(String executionId, String machineId, String scriptId, long ageSeconds) {
+        return ScriptExecution.builder()
+                .id("q-" + executionId + "-" + scriptId)
+                .tenantId("t-1")
+                .executionId(executionId)
+                .machineId(machineId)
+                .scriptId(scriptId)
+                .status(ExecutionStatus.QUEUED)
+                .dispatchedAt(Instant.now().minusSeconds(ageSeconds))
+                .build();
     }
 
     private static ScriptExecution scheduleLeaf(String tenantId, String scheduleId, String executionId,

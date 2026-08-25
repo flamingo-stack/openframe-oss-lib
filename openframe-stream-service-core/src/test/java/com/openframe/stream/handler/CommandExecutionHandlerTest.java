@@ -10,7 +10,7 @@ import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
-import com.openframe.stream.handler.rmm.CommandExecutionStatusUpdateHandler;
+import com.openframe.stream.handler.rmm.CommandExecutionHandler;
 import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -35,7 +35,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class CommandExecutionStatusUpdateHandlerTest {
+class CommandExecutionHandlerTest {
 
     private static final String EXECUTION_ID = "exec-1";
     private static final String MACHINE_ID = "machine-42";
@@ -44,13 +44,13 @@ class CommandExecutionStatusUpdateHandlerTest {
     @Mock
     private CommandExecutionRepository commandExecutionRepository;
 
-    private CommandExecutionStatusUpdateHandler handler;
+    private CommandExecutionHandler handler;
     private final ObjectMapper mapper = new ObjectMapper();
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() {
-        handler = new CommandExecutionStatusUpdateHandler(commandExecutionRepository, new RmmExecutionMetrics(meterRegistry));
+        handler = new CommandExecutionHandler(commandExecutionRepository, new RmmExecutionMetrics(meterRegistry));
     }
 
     @Test

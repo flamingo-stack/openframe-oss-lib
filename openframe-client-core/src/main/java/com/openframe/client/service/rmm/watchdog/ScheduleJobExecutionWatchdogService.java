@@ -29,7 +29,7 @@ public class ScheduleJobExecutionWatchdogService {
             return false;
         }
         LeafStatusCounts counts = scriptExecutionRepository.countLeavesByStatus(tenantId, executionId);
-        if (counts.running() > 0) {
+        if (counts.inProgress() > 0) {
             return false;// still in flight → header stays RUNNING
         }
         ExecutionStatus finalStatus;

@@ -52,6 +52,7 @@ public class ScheduleFireDispatcher {
     private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
     private final MachineRepository machineRepository;
     private final DeviceOnlineDispatchRepository dispatchRepository;
+    private final ScriptDeliveryRetryStore retryStore;
 
     public void dispatch(ScheduleScript schedule, Instant now) {
         List<String> targets = targetResolver.resolveTargetMachineIds(schedule);
@@ -202,7 +203,7 @@ public class ScheduleFireDispatcher {
                         .timeoutSeconds(script.getDefaultTimeoutSeconds())
                         .initiatedBy(fire.initiatedBy())
                         .source(ExecutionSource.SCHEDULED)
-                        .status(ExecutionStatus.RUNNING)
+                        .status(ExecutionStatus.QUEUED)
                         .dispatchedAt(fire.now())
                         .statusChangedAt(fire.now())
                         .build()))
@@ -231,14 +232,17 @@ public class ScheduleFireDispatcher {
                 })
                 .toList();
 
-        fire.machineIds().forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
-                ScriptScheduleExecutionMessage.builder()
-                        .executionId(fire.executionId())
-                        .scheduleId(fire.scheduleId())
-                        .machineId(machineId)
-                        .initiatedBy(fire.initiatedBy())
-                        .scripts(items)
-                        .build()));
+        fire.machineIds().forEach(machineId -> {
+            ScriptScheduleExecutionMessage message = ScriptScheduleExecutionMessage.builder()
+                    .executionId(fire.executionId())
+                    .scheduleId(fire.scheduleId())
+                    .machineId(machineId)
+                    .initiatedBy(fire.initiatedBy())
+                    .scripts(items)
+                    .build();
+            scriptScheduleNatsPublisher.publish(machineId, message);
+            retryStore.store(fire.executionId(), machineId, message);
+        });
     }
 
     /** Everything one fire needs, bundled so the persist/publish steps take a single arg. */
