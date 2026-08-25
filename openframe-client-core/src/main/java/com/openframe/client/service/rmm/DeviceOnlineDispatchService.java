@@ -2,11 +2,10 @@ package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
-import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
-import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
+import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
+import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
@@ -21,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static java.util.stream.Collectors.groupingBy;
@@ -48,57 +48,75 @@ public class DeviceOnlineDispatchService {
         if (batch.isEmpty()) {
             return;
         }
-        log.info("DEVICE_ONLINE dispatch tick: processing up to {} pending row(s) (oldest first)", batch.size());
+        log.info("Device-online dispatch tick: processing up to {} pending row(s) (oldest first)", batch.size());
 
+        Instant now = Instant.now();
         Map<String, List<DeviceFirstOnlineDispatch>> rowsByTenant = batch.stream().collect(groupingBy(DeviceFirstOnlineDispatch::getTenantId));
 
-        List<DeviceFirstOnlineDispatch> dispatchedRows = new ArrayList<>();
+        List<DeviceFirstOnlineDispatch> changed = new ArrayList<>();
         for (Map.Entry<String, List<DeviceFirstOnlineDispatch>> e : rowsByTenant.entrySet()) {
-            dispatchedRows.addAll(processTenant(e.getKey(), e.getValue()));
+            changed.addAll(processTenant(e.getKey(), e.getValue(), now));
         }
 
-        dispatchedRows.forEach(this::markDispatched);
-        dispatchRepository.saveAll(dispatchedRows);
+        if (!changed.isEmpty()) {
+            dispatchRepository.saveAll(changed);
+        }
     }
 
-    private void markDispatched(DeviceFirstOnlineDispatch row) {
+    private void markDispatched(DeviceFirstOnlineDispatch row, Instant now) {
         row.setStatus(DeviceOnlineDispatchStatus.DISPATCHED);
-        row.setDispatchedAt(Instant.now());
+        row.setDispatchedAt(now);
     }
 
-    private List<DeviceFirstOnlineDispatch> processTenant(String tenantId, List<DeviceFirstOnlineDispatch> tenantRows) {
+    private List<DeviceFirstOnlineDispatch> processTenant(String tenantId, List<DeviceFirstOnlineDispatch> tenantRows, Instant now) {
         Set<String> machineIds = tenantRows.stream()
                 .map(DeviceFirstOnlineDispatch::getMachineId).collect(toSet());
-
         Map<String, Machine> machinesById = machineRepository
                 .findByTenantIdAndMachineIdIn(tenantId, machineIds).stream()
                 .collect(toMap(Machine::getMachineId, m -> m));
-        Map<String, ScriptSchedule> activeSchedulesById = scheduleRepository
-                .findByTenantIdAndTriggerAndStatus(tenantId, ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE).stream()
-                .collect(toMap(ScriptSchedule::getId, s -> s));
 
-        Instant now = Instant.now();
-        List<DeviceFirstOnlineDispatch> dispatched = new ArrayList<>(tenantRows.size());
+        // Load the referenced schedules by id (any trigger, ACTIVE only): DEVICE_ONLINE sentinels and
+        // DATE_TIME reconnect-retry sentinels both live here and both fire the same way.
+        Set<String> scheduleIds = tenantRows.stream()
+                .map(DeviceFirstOnlineDispatch::getScheduleId).filter(Objects::nonNull).collect(toSet());
+        Map<String, ScheduleScript> activeSchedulesById = scheduleIds.isEmpty() ? Map.of()
+                : scheduleRepository.findByTenantIdAndIdIn(tenantId, scheduleIds).stream()
+                .filter(s -> s.getStatus() == ScriptStatus.ACTIVE)
+                .collect(toMap(ScheduleScript::getId, s -> s));
+
+        List<DeviceFirstOnlineDispatch> changed = new ArrayList<>(tenantRows.size());
         for (DeviceFirstOnlineDispatch row : tenantRows) {
             try {
-                Machine machine = machinesById.get(row.getMachineId());
-                if (machine == null || machine.getStatus() != DeviceStatus.ONLINE) {
+                // Reconnect-retry window elapsed before the device came back → abandon the run.
+                // (Only retry sentinels carry expiresAt; open-ended DEVICE_ONLINE sentinels never expire.)
+                if (row.getExpiresAt() != null && row.getExpiresAt().isBefore(now)) {
+                    row.setStatus(DeviceOnlineDispatchStatus.EXPIRED);
+                    changed.add(row);
+                    log.info("Reconnect-retry expired (device never reconnected in window): machineId={} scheduleId={} tenantId={}",
+                            row.getMachineId(), row.getScheduleId(), tenantId);
                     continue;
                 }
-                ScriptSchedule schedule = row.getScheduleId() == null ? null : activeSchedulesById.get(row.getScheduleId());
+
+                Machine machine = machinesById.get(row.getMachineId());
+                if (machine == null || machine.getStatus() != DeviceStatus.ONLINE) {
+                    continue;   // still offline → leave NEW for a later tick (until it reconnects or expires)
+                }
+
+                ScheduleScript schedule = row.getScheduleId() == null ? null : activeSchedulesById.get(row.getScheduleId());
                 if (schedule != null) {
                     fireDispatcher.dispatch(schedule, List.of(row.getMachineId()), now);
-                    log.info("DEVICE_ONLINE dispatched: machineId={} scheduleId={} tenantId={}", row.getMachineId(), row.getScheduleId(), tenantId);
+                    log.info("Device-online dispatched: machineId={} scheduleId={} tenantId={}", row.getMachineId(), row.getScheduleId(), tenantId);
                 } else {
-                    log.warn("DEVICE_ONLINE dispatch: schedule missing/inactive scheduleId={} machineId={} tenantId={} — draining", row.getScheduleId(), row.getMachineId(), tenantId);
+                    log.warn("Device-online dispatch: schedule missing/inactive scheduleId={} machineId={} tenantId={} — draining", row.getScheduleId(), row.getMachineId(), tenantId);
                 }
                 // Device is online → consume the sentinel (fired, or drained if the schedule is gone).
-                dispatched.add(row);
+                markDispatched(row, now);
+                changed.add(row);
             } catch (Exception ex) {
-                log.error("DEVICE_ONLINE dispatch failed: tenantId={} machineId={} scheduleId={} (will retry next tick)",
+                log.error("Device-online dispatch failed: tenantId={} machineId={} scheduleId={} (will retry next tick)",
                         row.getTenantId(), row.getMachineId(), row.getScheduleId(), ex);
             }
         }
-        return dispatched;
+        return changed;
     }
 }

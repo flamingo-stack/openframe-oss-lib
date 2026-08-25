@@ -1,19 +1,27 @@
 package com.openframe.client.service;
 
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.document.rmm.ScheduleScriptExecution;
-import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
-import com.openframe.data.document.rmm.Script;
-import com.openframe.data.document.rmm.ScriptEnvVar;
-import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptShell;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
+import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
+import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.script.ScriptShell;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
+import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -57,20 +65,23 @@ class ScheduleFireDispatcherTest {
     @Mock private ScriptExecutionRepository scriptExecutionRepository;
     @Mock private ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
     @Mock private ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    @Mock private MachineRepository machineRepository;
+    @Mock private DeviceOnlineDispatchRepository dispatchRepository;
 
     private ScheduleFireDispatcher dispatcher;
 
     @BeforeEach
     void setUp() {
         dispatcher = new ScheduleFireDispatcher(targetResolver, scriptRepository,
-                scriptExecutionRepository, scheduleScriptExecutionRepository, scriptScheduleNatsPublisher);
+                scriptExecutionRepository, scheduleScriptExecutionRepository, scriptScheduleNatsPublisher,
+                machineRepository, dispatchRepository);
     }
 
     @Test
     @DisplayName("dispatch: header persisted RUNNING, leaves per (script, machine), ONE batched message per machine")
     void dispatch_fansOutOneBatchPerMachine() {
         Instant now = Instant.now();
-        ScriptSchedule schedule = schedule(List.of("script-a", "script-b"));
+        ScheduleScript schedule = schedule(List.of("script-a", "script-b"));
         when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m1", "m2"));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(script("script-a", ScriptShell.BASH), script("script-b", ScriptShell.POWERSHELL)));
@@ -168,7 +179,7 @@ class ScheduleFireDispatcherTest {
     @Test
     @DisplayName("dispatch(schedule, machineIds, now): fires to exactly the given machines, bypassing the assignment lookup (DEVICE_ONLINE path)")
     void dispatch_toSpecificMachines_bypassesAssignmentLookup() {
-        ScriptSchedule schedule = schedule(List.of("script-a"));
+        ScheduleScript schedule = schedule(List.of("script-a"));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(script("script-a", ScriptShell.POWERSHELL)));
 
@@ -195,7 +206,7 @@ class ScheduleFireDispatcherTest {
         scriptB.setDefaultArgs(List.of("--b-default"));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(scriptA, scriptB));
 
-        ScriptSchedule schedule = schedule(List.of("script-a", "script-b"));
+        ScheduleScript schedule = schedule(List.of("script-a", "script-b"));
         schedule.setScriptCustomParams(List.of(ScheduledScriptCustomParams.builder()
                 .scriptId("script-a")
                 .args(List.of("--custom", "42"))
@@ -230,7 +241,7 @@ class ScheduleFireDispatcherTest {
                 .defaultTimeoutSeconds(120).status(ScriptStatus.ACTIVE).build();
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(scriptA));
 
-        ScriptSchedule schedule = schedule(List.of("script-a"));
+        ScheduleScript schedule = schedule(List.of("script-a"));
         schedule.setScriptCustomParams(List.of(ScheduledScriptCustomParams.builder()
                 .scriptId("script-a")
                 .args(List.of("--custom"))   // args overridden; envVars null → inherit
@@ -247,8 +258,76 @@ class ScheduleFireDispatcherTest {
         assertThat(a.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("BASE");   // inherited default env
     }
 
-    private static ScriptSchedule schedule(List<String> scriptIds) {
-        return ScriptSchedule.builder()
+    @Test
+    @DisplayName("dispatch RETRY_ON_RECONNECT: OFFLINE target is held (sentinel armed NEW + expiresAt), ONLINE target is dispatched")
+    void dispatch_retryOnReconnect_armsOfflineDispatchesOnline() {
+        Instant now = Instant.now();
+        ScheduleScript schedule = retrySchedule(List.of("script-a"), 7200L);
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-online", "m-offline"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m-online", DeviceStatus.ONLINE), machine("m-offline", DeviceStatus.OFFLINE)));
+        when(dispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT, "m-offline", SCHEDULE_ID))
+                .thenReturn(Optional.empty());
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(script("script-a", ScriptShell.BASH)));
+
+        dispatcher.dispatch(schedule, now);
+
+        // OFFLINE → one sentinel armed NEW, expiresAt = now + window, scoped to this (schedule, machine).
+        ArgumentCaptor<DeviceFirstOnlineDispatch> sentinelCaptor = ArgumentCaptor.forClass(DeviceFirstOnlineDispatch.class);
+        verify(dispatchRepository).save(sentinelCaptor.capture());
+        DeviceFirstOnlineDispatch sentinel = sentinelCaptor.getValue();
+        assertThat(sentinel.getMachineId()).isEqualTo("m-offline");
+        assertThat(sentinel.getScheduleId()).isEqualTo(SCHEDULE_ID);
+        assertThat(sentinel.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
+        assertThat(sentinel.getExpiresAt()).isEqualTo(now.plusSeconds(7200));
+
+        // ONLINE → dispatched to ONLY m-online; header counts only the dispatched machine.
+        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
+                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
+        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
+        assertThat(msgCaptor.getValue().getMachineId()).isEqualTo("m-online");
+        ArgumentCaptor<ScheduleScriptExecution> headerCaptor = ArgumentCaptor.forClass(ScheduleScriptExecution.class);
+        verify(scheduleScriptExecutionRepository).save(headerCaptor.capture());
+        assertThat(headerCaptor.getValue().getTotalMachineCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("dispatch RETRY_ON_RECONNECT: ALL targets OFFLINE → all armed, nothing published, no header")
+    void dispatch_retryOnReconnect_allOffline_armsAllNoDispatch() {
+        Instant now = Instant.now();
+        ScheduleScript schedule = retrySchedule(List.of("script-a"), 3600L);
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m1", "m2"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m1", DeviceStatus.OFFLINE), machine("m2", DeviceStatus.OFFLINE)));
+        when(dispatchRepository.findByTenantIdAndMachineIdAndScheduleId(eq(TENANT), anyString(), eq(SCHEDULE_ID)))
+                .thenReturn(Optional.empty());
+
+        dispatcher.dispatch(schedule, now);
+
+        verify(dispatchRepository, times(2)).save(any(DeviceFirstOnlineDispatch.class));
+        verify(scheduleScriptExecutionRepository, never()).save(any());   // no online target → no fire
+        verifyNoInteractions(scriptScheduleNatsPublisher);
+    }
+
+    @Test
+    @DisplayName("dispatch RETRY_ON_RECONNECT: a non-OFFLINE status (e.g. no Machine record) is dispatched, not held")
+    void dispatch_retryOnReconnect_nonOfflineDispatched() {
+        Instant now = Instant.now();
+        ScheduleScript schedule = retrySchedule(List.of("script-a"), 3600L);
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-unknown"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of());  // no record
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(script("script-a", ScriptShell.BASH)));
+
+        dispatcher.dispatch(schedule, now);
+
+        verify(dispatchRepository, never()).save(any());                  // nothing armed
+        verify(scriptScheduleNatsPublisher).publish(eq("m-unknown"), any());   // dispatched as-is
+    }
+
+    private static ScheduleScript schedule(List<String> scriptIds) {
+        return ScheduleScript.builder()
                 .id(SCHEDULE_ID)
                 .tenantId(TENANT)
                 .name("sched")
@@ -257,6 +336,21 @@ class ScheduleFireDispatcherTest {
                 .scriptIds(scriptIds)
                 .build();
     }
+
+    private static ScheduleScript retrySchedule(List<String> scriptIds, long windowSeconds) {
+        return ScheduleScript.builder()
+                .id(SCHEDULE_ID)
+                .tenantId(TENANT)
+                .name("sched")
+                .status(ScriptStatus.ACTIVE)
+                .createdBy(OWNER)
+                .scriptIds(scriptIds)
+                .trigger(ScheduleScriptTrigger.DATE_TIME)
+                .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT)
+                .reconnectWindowSeconds(windowSeconds)
+                .build();
+    }
+
 
     private static Script script(String id, ScriptShell shell) {
         return Script.builder()
@@ -269,5 +363,13 @@ class ScheduleFireDispatcherTest {
                 .defaultTimeoutSeconds(120)
                 .status(ScriptStatus.ACTIVE)
                 .build();
+    }
+
+    private static Machine machine(String machineId, DeviceStatus status) {
+        Machine m = new Machine();
+        m.setTenantId(TENANT);
+        m.setMachineId(machineId);
+        m.setStatus(status);
+        return m;
     }
 }
