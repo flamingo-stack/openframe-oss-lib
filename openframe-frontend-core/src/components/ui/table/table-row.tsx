@@ -5,7 +5,7 @@ import React from 'react'
 import { cn } from '../../../utils/cn'
 import { Checkbox } from '../checkbox'
 import { TableCell } from './table-cell'
-import { ROW_HEIGHT_DESKTOP } from './table-skeleton'
+import { COMPACT_ROW_MIN_HEIGHT, ROW_HEIGHT_DESKTOP } from './table-skeleton'
 import type { TableRowProps } from './types'
 import { getHideClasses } from './utils'
 
@@ -99,7 +99,12 @@ export function TableRow<T = any>({
       <div
         className={cn(
           'relative flex items-center gap-4 px-4',
-          compact ? 'py-2' : cn('py-0', ROW_HEIGHT_DESKTOP),
+          // `compact` rows are content-sized, but every row in a table shows
+          // the same cell shapes, so a MIN height makes the body's height a
+          // function of the row COUNT alone. That is what lets a host reserve
+          // space for a full page and stop the layout jumping between a full
+          // page, a short last page and the skeleton.
+          compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_DESKTOP),
           isLinkMode && 'pointer-events-none'
         )}
       >

@@ -55,9 +55,25 @@ export const processShortcodes = (content: string): string => {
         : `https://twitter.com/twitter/status/${tweetInput}`;
       return `\n\n<div class="tweet-embed" data-tweet-url="${escapeAttr(tweetUrl)}"></div>\n\n`;
     })
+    // Figma by file key (spec grammar): {{figma:FILE_KEY[:NODE_ID]}} → rewritten to the
+    // canonical URL form so the {{figma:URL}} rule below owns the rendering.
+    .replace(/\{\{figma:(?!https?:)([A-Za-z0-9]+)(?::([0-9]+[-:][0-9]+))?\}\}/g, (match, key, node) => {
+      const nodeParam = node ? `?node-id=${String(node).replace(':', '-')}` : '';
+      return `{{figma:https://www.figma.com/design/${key}${nodeParam}}}`;
+    })
     // Figma embeds: {{figma:URL}}
     .replace(/\{\{figma:([^}]+)\}\}/g, (match, url) => {
       return `\n\n<div class="figma-embed" data-figma-url="${escapeAttr(url.trim())}"></div>\n\n`;
+    })
+    // Claude artifact / Claude Design: {{claude-artifact:URL}} / {{claude-design:URL}}
+    // — the same shape as figma, so a Claude link is a markdown BLOCK wherever
+    // markdown renders, never a bespoke card one surface hand-assembles.
+    // `{{claude-artifact:URL}}` or `{{claude-artifact:URL|Name}}` — the optional
+    // name after the pipe is the ONLY source of a real title (claude.ai serves
+    // one og:title for every artifact), so the block carries it through.
+    .replace(/\{\{claude-(artifact|design):([^|}]+)(?:\|([^}]*))?\}\}/g, (match, kind, url, title) => {
+      const titleAttr = title && title.trim() ? ` data-title="${escapeAttr(title.trim())}"` : '';
+      return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"${titleAttr}></div>\n\n`;
     })
     // LinkedIn embeds: {{linkedin:POST_URL}}
     .replace(/\{\{linkedin:([^}]+)\}\}/g, (match, url) => {
