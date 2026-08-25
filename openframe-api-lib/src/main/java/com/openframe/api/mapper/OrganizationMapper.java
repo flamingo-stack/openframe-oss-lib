@@ -110,6 +110,7 @@ public class OrganizationMapper {
                 .contractEndDate(organization.getContractEndDate())
                 .createdAt(organization.getCreatedAt())
                 .updatedAt(organization.getUpdatedAt())
+                .lastActivityAt(organization.getUpdatedAt() != null ? organization.getUpdatedAt() : organization.getCreatedAt())
                 .isDefault(organization.getIsDefault())
                 .status(organization.getStatus() != null ? organization.getStatus().name() : null)
                 .statusChangedAt(organization.getStatusChangedAt())

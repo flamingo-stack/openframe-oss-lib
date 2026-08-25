@@ -23,7 +23,10 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Instant;
 
 import static org.springframework.http.HttpStatus.*;
 
@@ -76,6 +79,12 @@ public class OrganizationController {
             @Parameter(description = "Filter by organization status (ACTIVE or ARCHIVED). Defaults to ACTIVE.")
             @RequestParam(required = false) String status,
 
+            @Parameter(description = "Inclusive lower bound of the last-activity range (ISO-8601 instant, UTC). Matches updatedAt; never-updated organizations are not matched.")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant lastActivityFrom,
+
+            @Parameter(description = "Inclusive upper bound of the last-activity range (ISO-8601 instant, UTC). Matches updatedAt; never-updated organizations are not matched.")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant lastActivityTo,
+
             @Parameter(description = "Search query for organization name and category")
             @RequestParam(required = false) String search,
 
@@ -85,17 +94,17 @@ public class OrganizationController {
             @Parameter(description = "Cursor for pagination (optional)")
             @RequestParam(required = false) String cursor,
 
-            @Parameter(description = "Field to sort by")
+            @Parameter(description = "Field to sort by (name, organizationId, createdAt, updatedAt)")
             @RequestParam(required = false) String sortField,
 
-            @Parameter(description = "Sort direction (ASC or DESC)")
+            @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
             @RequestParam(required = false) String sortDirection,
 
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting organizations - category: {}, minEmployees: {}, maxEmployees: {}, hasActiveContract: {}, status: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}",
-                category, minEmployees, maxEmployees, hasActiveContract, status, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
+        log.info("Getting organizations - category: {}, minEmployees: {}, maxEmployees: {}, hasActiveContract: {}, status: {}, lastActivityFrom: {}, lastActivityTo: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}",
+                category, minEmployees, maxEmployees, hasActiveContract, status, lastActivityFrom, lastActivityTo, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
 
         // Build filter options directly from query parameters
         OrganizationFilterOptions filterOptions = OrganizationFilterOptions.builder()
@@ -104,6 +113,8 @@ public class OrganizationController {
                 .maxEmployees(maxEmployees)
                 .hasActiveContract(hasActiveContract)
                 .status(status)
+                .lastActivityFrom(lastActivityFrom)
+                .lastActivityTo(lastActivityTo)
                 .build();
 
         var result = organizationQueryService.queryOrganizations(
@@ -117,7 +128,8 @@ public class OrganizationController {
 
     @Operation(
             summary = "Get organization by ID",
-            description = "Retrieve a single organization by its database ID"
+            description = "Retrieve a single organization by its organizationId (the business identifier returned as 'organizationId'). " +
+                    "Alias of /by-organization-id/{organizationId}."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved organization",
@@ -132,7 +144,7 @@ public class OrganizationController {
     @GetMapping("/{id}")
     @ResponseStatus(OK)
     public OrganizationResponse getOrganizationById(
-            @Parameter(description = "Organization database ID", required = true)
+            @Parameter(description = "Organization identifier (organizationId)", required = true)
             @PathVariable String id,
 
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
@@ -210,7 +222,7 @@ public class OrganizationController {
 
     @Operation(
             summary = "Update an existing organization",
-            description = "Update an existing organization by ID with the provided information"
+            description = "Partially update an existing organization by organizationId; only non-null fields are applied"
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Organization updated successfully",
@@ -227,7 +239,7 @@ public class OrganizationController {
     @PutMapping("/{id}")
     @ResponseStatus(OK)
     public OrganizationResponse updateOrganization(
-            @Parameter(description = "Organization database ID", required = true)
+            @Parameter(description = "Organization identifier (organizationId)", required = true)
             @PathVariable String id,
 
             @Parameter(description = "Updated organization data")
@@ -263,7 +275,7 @@ public class OrganizationController {
     @GetMapping("/{id}/can-archive")
     @ResponseStatus(OK)
     public boolean canArchiveOrganization(
-            @Parameter(description = "Organization database ID", required = true)
+            @Parameter(description = "Organization identifier (organizationId)", required = true)
             @PathVariable String id,
 
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
@@ -294,7 +306,7 @@ public class OrganizationController {
     @PatchMapping("/{id}/status")
     @ResponseStatus(NO_CONTENT)
     public void updateOrganizationStatus(
-            @Parameter(description = "Organization database ID", required = true)
+            @Parameter(description = "Organization identifier (organizationId)", required = true)
             @PathVariable String id,
 
             @Parameter(description = "Status update request")

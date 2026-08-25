@@ -53,20 +53,23 @@ public class ToolController {
             @RequestParam(required = false) String search,
             @Parameter(description = "Filter by category")
             @RequestParam(required = false) String category,
-            @Parameter(description = "Sort field")
+            @Parameter(description = "Filter by platform category")
+            @RequestParam(required = false) String platformCategory,
+            @Parameter(description = "Sort field (name, type, category, ...)")
             @RequestParam(required = false) String sortField,
             @Parameter(description = "Sort direction (ASC or DESC)")
             @RequestParam(defaultValue = "ASC") String sortDirection,
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting tools - enabled: {}, type: {}, search: {}, category: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}", 
-                enabled, type, search, category, sortField, sortDirection, userId, apiKeyId);
+        log.info("Getting tools - enabled: {}, type: {}, search: {}, category: {}, platformCategory: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}", 
+                enabled, type, search, category, platformCategory, sortField, sortDirection, userId, apiKeyId);
 
         ToolFilterCriteria filterCriteria = ToolFilterCriteria.builder()
                 .enabled(enabled)
                 .type(type)
                 .category(category)
+                .platformCategory(platformCategory)
                 .build();
         
         var result = toolService.queryTools(filterCriteria, search,
