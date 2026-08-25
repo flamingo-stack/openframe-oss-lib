@@ -28,40 +28,40 @@
  * config chain (unresolvable entries are dropped loudly at module load).
  */
 
-export type ContentRefLayout = 'list' | 'grid'
+export type ContentRefLayout = 'list' | 'grid';
 
 /** Subset of `EntityCardSize` (entity-card dispatch) appropriate for
  *  grid/list rendering in RelatedContentSection. Duplicated as a literal
  *  union here to avoid a config→component import cycle. Kept in lockstep
  *  with `EntityCardSize`; widen here when a new size is added there. */
-export type ContentRefGridSize = 'lg' | 'default' | 'sm'
+export type ContentRefGridSize = 'lg' | 'default' | 'sm';
 
 export interface ContentRefGroupConfig {
-  label: string
-  order: number
-  layout: ContentRefLayout
-  gridSize: ContentRefGridSize
+  label: string;
+  order: number;
+  layout: ContentRefLayout;
+  gridSize: ContentRefGridSize;
 }
 
 export const CONTENT_REF_GROUPS: Record<string, ContentRefGroupConfig> = {
-  investor_update:     { label: 'Investor Updates',    order: 1, layout: 'grid', gridSize: 'default' },
-  product_release:     { label: 'Product Releases',    order: 2, layout: 'list', gridSize: 'lg' },
-  podcast:             { label: 'Podcasts',            order: 3, layout: 'list', gridSize: 'default' },
-  webinar:             { label: 'Webinars',            order: 4, layout: 'list', gridSize: 'default' },
-  case_study:          { label: 'Case Studies',        order: 5, layout: 'grid', gridSize: 'default' },
-  event:               { label: 'Events',              order: 6, layout: 'list', gridSize: 'default' },
-  blog_post_existing:  { label: 'Blog Posts',          order: 7, layout: 'grid', gridSize: 'default' },
-  customer_interview:  { label: 'Customer Interviews', order: 8, layout: 'grid', gridSize: 'default' },
-  onboarding_guide:    { label: 'Onboarding Guides',   order: 9, layout: 'list', gridSize: 'default' },
-  what_i_shipped:      { label: 'What I Shipped',      order: 10, layout: 'grid', gridSize: 'default' },
-  how_i_work:          { label: 'How I Work',          order: 11, layout: 'grid', gridSize: 'default' },
-}
+  investor_update: { label: 'Investor Updates', order: 1, layout: 'grid', gridSize: 'default' },
+  product_release: { label: 'Product Releases', order: 2, layout: 'list', gridSize: 'lg' },
+  podcast: { label: 'Podcasts', order: 3, layout: 'list', gridSize: 'default' },
+  webinar: { label: 'Webinars', order: 4, layout: 'list', gridSize: 'default' },
+  case_study: { label: 'Case Studies', order: 5, layout: 'grid', gridSize: 'default' },
+  event: { label: 'Events', order: 6, layout: 'list', gridSize: 'default' },
+  blog_post_existing: { label: 'Blog Posts', order: 7, layout: 'grid', gridSize: 'default' },
+  customer_interview: { label: 'Customer Interviews', order: 8, layout: 'grid', gridSize: 'default' },
+  onboarding_guide: { label: 'Onboarding Guides', order: 9, layout: 'list', gridSize: 'default' },
+  what_i_shipped: { label: 'What I Shipped', order: 10, layout: 'grid', gridSize: 'default' },
+  how_i_work: { label: 'How I Work', order: 11, layout: 'grid', gridSize: 'default' },
+};
 
 /** Human-readable label for a content_ref `type`. Returns null when the type
  *  isn't registered — caller decides the fallback. Use `getContentRefLabelOrTitleCase`
  *  to get a consistent title-cased fallback across all surfaces. */
 export function getContentRefLabel(type: string): string | null {
-  return CONTENT_REF_GROUPS[type]?.label ?? null
+  return CONTENT_REF_GROUPS[type]?.label ?? null;
 }
 
 /** Resolved label with a single shared fallback shape — title-cased version
@@ -70,10 +70,7 @@ export function getContentRefLabel(type: string): string | null {
  *  for unregistered types is identical (no drift between "podcast guest" and
  *  "Podcast Guest"). */
 export function getContentRefLabelOrTitleCase(type: string): string {
-  return (
-    CONTENT_REF_GROUPS[type]?.label ??
-    type.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase())
-  )
+  return CONTENT_REF_GROUPS[type]?.label ?? type.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
 }
 
 /** Sort a set of present content_ref types into the canonical group order
@@ -81,11 +78,11 @@ export function getContentRefLabelOrTitleCase(type: string): string {
  *  types appended in insertion order). Used by RelatedContentSection AND the
  *  investor-email builder so cross-surface ordering stays identical. */
 export function orderContentRefTypes(present: Iterable<string>): string[] {
-  const presentSet = new Set(present)
+  const presentSet = new Set(present);
   const registeredInOrder = Object.entries(CONTENT_REF_GROUPS)
     .sort(([, a], [, b]) => a.order - b.order)
     .map(([type]) => type)
-    .filter((type) => presentSet.has(type))
-  const unregistered = [...presentSet].filter((type) => !CONTENT_REF_GROUPS[type])
-  return [...registeredInOrder, ...unregistered]
+    .filter(type => presentSet.has(type));
+  const unregistered = [...presentSet].filter(type => !CONTENT_REF_GROUPS[type]);
+  return [...registeredInOrder, ...unregistered];
 }

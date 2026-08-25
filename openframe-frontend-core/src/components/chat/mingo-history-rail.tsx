@@ -1,15 +1,14 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { Button } from '../ui/button'
-import { TabSelector } from '../ui/tab-selector'
-import { ChatsIcon } from '../icons-v2-generated/communication/chats-icon'
-import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon'
-import { AlertCircleIcon, Refresh01RightIcon } from '../icons-v2-generated'
-import { MingoChatHistory, MingoChatHistorySkeleton } from './mingo-chat-history'
-import { ChatListEmptyState } from './chat-list-empty-state'
-import type { DialogItem } from './types/component.types'
+import { cn } from '../../utils/cn';
+import { AlertCircleIcon, Refresh01RightIcon } from '../icons-v2-generated';
+import { ChatsIcon } from '../icons-v2-generated/communication/chats-icon';
+import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon';
+import { Button } from '../ui/button';
+import { TabSelector } from '../ui/tab-selector';
+import { ChatListEmptyState } from './chat-list-empty-state';
+import { MingoChatHistory, MingoChatHistorySkeleton } from './mingo-chat-history';
+import type { DialogItem } from './types/component.types';
 
 // =============================================================================
 // Types
@@ -17,50 +16,50 @@ import type { DialogItem } from './types/component.types'
 
 /** Ownership scope of the rail's dialog list — the current user's chats only,
  *  or every admin's chats in the tenant. */
-export type MingoHistoryScope = 'my' | 'all'
+export type MingoHistoryScope = 'my' | 'all';
 
 export interface MingoHistoryRailProps {
   /** Dialogs to list, assumed already sorted newest-first by the host. */
-  dialogs: ReadonlyArray<DialogItem>
+  dialogs: ReadonlyArray<DialogItem>;
   /** Currently-open dialog id (highlighted). */
-  activeDialogId?: string
+  activeDialogId?: string;
   /** Open a dialog. */
-  onSelectDialog?: (id: string) => void
+  onSelectDialog?: (id: string) => void;
   /** Start a fresh chat — clears the open conversation so the chat block shows
    *  the welcome. Rendered as the pinned "Start New Chat" button above the list,
    *  in every state (including the no-chats empty state). */
-  onNewChat?: () => void
+  onNewChat?: () => void;
   /** Request rename — enables the row "Rename chat" action. */
-  onRequestRename?: (dialog: DialogItem) => void
+  onRequestRename?: (dialog: DialogItem) => void;
   /** Request archive — enables the row "Archive chat" action. */
-  onRequestArchive?: (dialog: DialogItem) => void
+  onRequestArchive?: (dialog: DialogItem) => void;
   /** Ownership scope shown as a two-state "My Chats / All Chats" selector
    *  between "Start New Chat" and the list. Rendered only when BOTH `scope`
    *  and `onScopeChange` are provided; the host owns the state and refilters
    *  the `dialogs` it passes in. */
-  scope?: MingoHistoryScope
+  scope?: MingoHistoryScope;
   /** Scope selector change handler — see `scope`. */
-  onScopeChange?: (scope: MingoHistoryScope) => void
+  onScopeChange?: (scope: MingoHistoryScope) => void;
   /** Current server-side search term. Drives the list's "No chats found"
    *  empty state; the search INPUT itself lives in the panel header now, not
    *  in the rail body. */
-  searchQuery?: string
+  searchQuery?: string;
   /** Whether more dialogs remain (cursor pagination). */
-  hasMore?: boolean
+  hasMore?: boolean;
   /** True while the next page is loading. */
-  isLoadingMore?: boolean
+  isLoadingMore?: boolean;
   /** Fetch the next page. */
-  onLoadMore?: () => void
+  onLoadMore?: () => void;
   /** True while the FIRST page of dialogs is still loading. Renders a skeleton
    *  so the rail doesn't flash the empty state before the list arrives. */
-  isLoadingHistory?: boolean
+  isLoadingHistory?: boolean;
   /** The dialog-list load FAILED with nothing cached — renders an error + retry
    *  block instead of the empty state. */
-  loadError?: boolean
+  loadError?: boolean;
   /** Retry handler for the `loadError` state. */
-  onRetry?: () => void
+  onRetry?: () => void;
   /** Appended to the root element. */
-  className?: string
+  className?: string;
 }
 
 // =============================================================================
@@ -97,16 +96,16 @@ export function MingoHistoryRail({
   onRetry,
   className,
 }: MingoHistoryRailProps) {
-  const hasSearch = !!searchQuery?.trim()
+  const hasSearch = !!searchQuery?.trim();
   // The list (vs. the empty state) shows whenever there are chats OR an active
   // search is running — a no-match query must keep the search bar mounted
   // rather than flash the "No Current Chats" state.
-  const hasList = dialogs.length > 0 || hasSearch
+  const hasList = dialogs.length > 0 || hasSearch;
 
   return (
     <div
       className={cn(
-        'flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)]',
+        'flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)]',
         className,
       )}
     >
@@ -136,7 +135,7 @@ export function MingoHistoryRail({
         <TabSelector
           className="shrink-0"
           value={scope}
-          onValueChange={(value) => onScopeChange(value as MingoHistoryScope)}
+          onValueChange={value => onScopeChange(value as MingoHistoryScope)}
           items={[
             { id: 'my', label: 'My Chats' },
             { id: 'all', label: 'All Chats' },
@@ -145,21 +144,14 @@ export function MingoHistoryRail({
       ) : null}
 
       {loadError ? (
-        <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-[var(--spacing-system-m)] text-center">
-          <AlertCircleIcon className="h-8 w-8 text-ods-text-secondary shrink-0" />
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[var(--spacing-system-m)] text-center">
+          <AlertCircleIcon className="h-8 w-8 shrink-0 text-ods-text-secondary" />
           <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-            <p className="text-h4 text-ods-text-primary">Couldn’t load your chats</p>
-            <p className="text-h6 text-ods-text-secondary">
-              Something went wrong reaching the server. Try again.
-            </p>
+            <p className="text-ods-text-primary text-h4">Couldn’t load your chats</p>
+            <p className="text-ods-text-secondary text-h6">Something went wrong reaching the server. Try again.</p>
           </div>
           {onRetry && (
-            <Button
-              variant="outline"
-              size="small"
-              leftIcon={<Refresh01RightIcon />}
-              onClick={onRetry}
-            >
+            <Button variant="outline" size="small" leftIcon={<Refresh01RightIcon />} onClick={onRetry}>
               Try again
             </Button>
           )}
@@ -187,5 +179,5 @@ export function MingoHistoryRail({
         />
       )}
     </div>
-  )
+  );
 }

@@ -21,48 +21,48 @@
  *   - `chatRef` — pre-synthesized `ChatRef` for the Ask handler.
  */
 
-import React from 'react'
-import { FileText } from 'lucide-react'
-import { getSourceIconName } from './source-icons'
-import { getIconComponent } from './icon-registry'
-import { getBaseUrl } from '../../../utils/cn'
-import { safeHref } from './compact-card-classes'
-import type { ChatRef } from '../chat-ref.types'
-import type { ComposeContentUrl } from '../../../utils/content-href'
-import { canonicalContentRefType } from '../../../utils/list-url'
+import { FileText } from 'lucide-react';
+import type React from 'react';
+import { getBaseUrl } from '../../../utils/cn';
+import type { ComposeContentUrl } from '../../../utils/content-href';
+import { canonicalContentRefType } from '../../../utils/list-url';
+import type { ChatRef } from '../chat-ref.types';
+import { safeHref } from './compact-card-classes';
+import { getIconComponent } from './icon-registry';
+import { getSourceIconName } from './source-icons';
 
 /** Path sanitization — keep alphanumerics, slash, dash, dot, underscore;
  *  strip everything else. Defends against a hostile mapper returning a
  *  path with `..` traversal or query-string injection. */
 function sanitizePath(path: string): string {
-  return (path || '').replace(/[^a-zA-Z0-9/_\-.]/g, '')
+  return (path || '').replace(/[^a-zA-Z0-9/_\-.]/g, '');
 }
 
 export interface SourceRowInput {
   /** RagTableConfig.id (e.g. 'blog-posts', 'financial-cap-table'). Drives
    *  icon resolution via `SOURCE_ICON_NAMES` + `ICON_REGISTRY`. */
-  sourceRepo?: string | null
+  sourceRepo?: string | null;
   /** The config's `documentType` (e.g. 'blog_post', 'cap_table'). Drives
    *  the Ask drill-in's `ChatRef.type`. */
-  documentType?: string | null
+  documentType?: string | null;
   /** Primary-key value of the row (config.primaryKey). Required for Ask. */
-  id?: string | null
+  id?: string | null;
   /** Display title. */
-  title: string
+  title: string;
   /** Resolved public URL when the row HAS a viewer. `null`/undefined when
    *  the row has no public destination — surface decides Ask-only behavior. */
-  externalUrl?: string | null
+  externalUrl?: string | null;
   /** Platform that owns `externalUrl`. */
-  targetPlatform?: string | null
+  targetPlatform?: string | null;
   /** In-app navigator path (e.g. `legal/fundraising/.../safe`). */
-  path?: string | null
+  path?: string | null;
 }
 
 export interface SourceRowContext {
   /** Chat shell's base route — `/data-room`, `/knowledge-base`, etc. */
-  baseRoute?: string
+  baseRoute?: string;
   /** Cross-platform target for the chip / card click. */
-  chipBasePlatform?: string
+  chipBasePlatform?: string;
   /**
    * Host-supplied current-platform identifier. Used as the
    * `targetPlatform` for path-based fallback URLs that point to the
@@ -70,7 +70,7 @@ export interface SourceRowContext {
    * `null` targetPlatform — consumers fall back to their legacy
    * origin-check.
    */
-  currentPlatform?: string | null
+  currentPlatform?: string | null;
   /**
    * Host-supplied reverse map: documentType → tableId. Used to derive
    * `sourceRepo` from `documentType` when the caller didn't supply it
@@ -78,7 +78,7 @@ export interface SourceRowContext {
    * the resolver falls back to the documentType reverse-map miss and
    * keeps the FileText icon.
    */
-  tableIdForDocumentType?: (documentType: string) => string | null
+  tableIdForDocumentType?: (documentType: string) => string | null;
   /**
    * Host-supplied unified content-href resolver (`runtime.composeContentUrl`).
    * When provided, entity rows WITH a public `externalUrl` resolve their href
@@ -87,7 +87,7 @@ export interface SourceRowContext {
    * types, the hub URL otherwise). When omitted, the row's `externalUrl` is used
    * verbatim (legacy).
    */
-  composeContentUrl?: ComposeContentUrl
+  composeContentUrl?: ComposeContentUrl;
   /**
    * Host-supplied per-`documentType` doc-viewer targets — the UNIFIED, DYNAMIC
    * replacement for the single `chipBasePlatform`. Maps a doc-table documentType
@@ -98,24 +98,24 @@ export interface SourceRowContext {
    * data_room_doc→company-hub/data-room) instead of one static fallback for all.
    * Wins over `chipBasePlatform` when a row's documentType has an entry.
    */
-  docPlatformTargets?: Record<string, { platform: string; basePath: string }>
+  docPlatformTargets?: Record<string, { platform: string; basePath: string }>;
 }
 
 export interface SourceRowCTA {
   /** Source icon component. Always defined — falls back to `FileText`. */
-  icon: React.ComponentType<{ className?: string }>
+  icon: React.ComponentType<{ className?: string }>;
   /** Human-readable label for the icon. */
-  iconLabel: string
+  iconLabel: string;
   /** Resolved destination URL. `null` when the row has no openable
    *  target. Already passed through `safeHref()`. */
-  href: string | null
+  href: string | null;
   /** Platform that owns the destination. `null` when the row has no
    *  openable target OR the destination is external/unknown. */
-  targetPlatform: string | null
+  targetPlatform: string | null;
   /** When true, the surface can fire the Ask drill-in flow for this row. */
-  askable: boolean
+  askable: boolean;
   /** Pre-synthesized `ChatRef` for the Ask handler. `null` when not askable. */
-  chatRef: ChatRef | null
+  chatRef: ChatRef | null;
 }
 
 /**
@@ -127,9 +127,9 @@ export interface SourceRowCTA {
  */
 export function sourceRowCtxFromRuntime(
   runtime: {
-    source?: string
-    composeContentUrl?: ComposeContentUrl
-    docPlatformTargets?: SourceRowContext['docPlatformTargets']
+    source?: string;
+    composeContentUrl?: ComposeContentUrl;
+    docPlatformTargets?: SourceRowContext['docPlatformTargets'];
   },
   surface: { baseRoute?: string; chipBasePlatform?: string } = {},
 ): SourceRowContext {
@@ -139,7 +139,7 @@ export function sourceRowCtxFromRuntime(
     docPlatformTargets: runtime.docPlatformTargets,
     baseRoute: surface.baseRoute,
     chipBasePlatform: surface.chipBasePlatform,
-  }
+  };
 }
 
 /**
@@ -148,10 +148,10 @@ export function sourceRowCtxFromRuntime(
  * via `ICON_REGISTRY`.
  */
 function pickSourceIcon(sourceRepo: string | null, documentType: string | null | undefined) {
-  const iconName = sourceRepo ? getSourceIconName(sourceRepo) : undefined
-  const icon = iconName ? getIconComponent(iconName) : FileText
-  const iconLabel = documentType ?? 'Source'
-  return { icon, iconLabel }
+  const iconName = sourceRepo ? getSourceIconName(sourceRepo) : undefined;
+  const icon = iconName ? getIconComponent(iconName) : FileText;
+  const iconLabel = documentType ?? 'Source';
+  return { icon, iconLabel };
 }
 
 /**
@@ -160,7 +160,7 @@ function pickSourceIcon(sourceRepo: string | null, documentType: string | null |
  * `docPlatformTargets` map by (markdown = product docs, data_room_doc = data room),
  * declared once so the two can't silently diverge.
  */
-export const DOC_TABLE_TYPES = ['markdown', 'data_room_doc'] as const
+export const DOC_TABLE_TYPES = ['markdown', 'data_room_doc'] as const;
 
 /**
  * Only doc-table rows (DOC_TABLE_TYPES) fall back to doc-viewer navigation when no
@@ -168,7 +168,7 @@ export const DOC_TABLE_TYPES = ['markdown', 'data_room_doc'] as const
  * rows MUST come with an explicit `externalUrl` from the mapper.
  */
 function shouldFallbackToPathNav(row: SourceRowInput): boolean {
-  return !!row.documentType && (DOC_TABLE_TYPES as readonly string[]).includes(row.documentType)
+  return !!row.documentType && (DOC_TABLE_TYPES as readonly string[]).includes(row.documentType);
 }
 
 /**
@@ -176,25 +176,23 @@ function shouldFallbackToPathNav(row: SourceRowInput): boolean {
  * no logging. Call from any surface (chip, card, search result) with the
  * same row shape and get the same answer back.
  */
-export function resolveSourceRowCTA(
-  row: SourceRowInput,
-  ctx: SourceRowContext = {},
-): SourceRowCTA {
+export function resolveSourceRowCTA(row: SourceRowInput, ctx: SourceRowContext = {}): SourceRowCTA {
   // Derive sourceRepo from documentType when the caller didn't supply
   // it. Inline cards know `ref.type` (documentType) but not `sourceRepo`;
   // chips and search results have sourceRepo directly. The host supplies
   // the reverse map via `ctx.tableIdForDocumentType`.
-  const sourceRepo = row.sourceRepo
-    ?? (row.documentType && ctx.tableIdForDocumentType ? ctx.tableIdForDocumentType(row.documentType) : null)
-    ?? null
+  const sourceRepo =
+    row.sourceRepo ??
+    (row.documentType && ctx.tableIdForDocumentType ? ctx.tableIdForDocumentType(row.documentType) : null) ??
+    null;
 
-  const { icon, iconLabel } = pickSourceIcon(sourceRepo, row.documentType)
+  const { icon, iconLabel } = pickSourceIcon(sourceRepo, row.documentType);
 
   // URL resolution. `idValue` (row primary key) is shared with the Ask
   // drill-in check below.
-  let href: string | null = null
-  let targetPlatform: string | null = null
-  const idValue = (row.id ?? '').trim()
+  let href: string | null = null;
+  let targetPlatform: string | null = null;
+  const idValue = (row.id ?? '').trim();
   if (row.path && shouldFallbackToPathNav(row) && !row.externalUrl) {
     // Doc-table (markdown / data-room PDF) with no public URL. Resolve where its
     // viewer lives, in priority order (NOT a content type the composeContentUrl
@@ -206,26 +204,26 @@ export function resolveSourceRowCTA(
     //      for every doc; only safe when a surface sees just one doc source).
     //   3. baseRoute — the host serves the doc viewer in-app → relative path nav.
     //   else → null (no viewer configured → Ask-only).
-    const safePath = sanitizePath(row.path)
+    const safePath = sanitizePath(row.path);
     if (safePath) {
-      const docTarget = row.documentType ? ctx.docPlatformTargets?.[row.documentType] : undefined
+      const docTarget = row.documentType ? ctx.docPlatformTargets?.[row.documentType] : undefined;
       if (docTarget) {
         // Trim leading/trailing (and collapse empty) segments WITHOUT a regex — the
         // slash-stripping regex `/^\/+|\/+$/g` tripped CodeQL's js/polynomial-redos (high)
         // since `\/+$` backtracks on inputs with many '/'. split/filter/join is linear.
-        const seg = docTarget.basePath.split('/').filter(Boolean).join('/')
-        const base = `${getBaseUrl(docTarget.platform)}${seg ? `/${seg}` : ''}/`
-        href = safeHref(new URL(safePath, base).toString()) ?? null
-        targetPlatform = docTarget.platform
+        const seg = docTarget.basePath.split('/').filter(Boolean).join('/');
+        const base = `${getBaseUrl(docTarget.platform)}${seg ? `/${seg}` : ''}/`;
+        href = safeHref(new URL(safePath, base).toString()) ?? null;
+        targetPlatform = docTarget.platform;
       } else if (ctx.chipBasePlatform) {
-        const base = `${getBaseUrl(ctx.chipBasePlatform)}/knowledge-base/`
-        href = safeHref(new URL(safePath, base).toString()) ?? null
-        targetPlatform = ctx.chipBasePlatform
+        const base = `${getBaseUrl(ctx.chipBasePlatform)}/knowledge-base/`;
+        href = safeHref(new URL(safePath, base).toString()) ?? null;
+        targetPlatform = ctx.chipBasePlatform;
       } else if (ctx.baseRoute) {
-        const synthetic = `https://_internal_.local${ctx.baseRoute.startsWith('/') ? ctx.baseRoute : '/' + ctx.baseRoute}/`
-        const absolute = new URL(safePath, synthetic).toString()
-        href = safeHref(absolute.replace('https://_internal_.local', '')) ?? null
-        targetPlatform = ctx.currentPlatform ?? null
+        const synthetic = `https://_internal_.local${ctx.baseRoute.startsWith('/') ? ctx.baseRoute : '/' + ctx.baseRoute}/`;
+        const absolute = new URL(safePath, synthetic).toString();
+        href = safeHref(absolute.replace('https://_internal_.local', '')) ?? null;
+        targetPlatform = ctx.currentPlatform ?? null;
       }
     }
   } else if (ctx.composeContentUrl && row.documentType && row.externalUrl) {
@@ -241,35 +239,39 @@ export function resolveSourceRowCTA(
       identifier: idValue,
       externalUrl: row.externalUrl,
       targetPlatform: row.targetPlatform ?? null,
-    })
-    href = composed.href ? (safeHref(composed.href) ?? null) : null
-    targetPlatform = composed.targetPlatform
+    });
+    href = composed.href ? (safeHref(composed.href) ?? null) : null;
+    targetPlatform = composed.targetPlatform;
   } else if (row.externalUrl) {
     // No composer wired → legacy: the RAG externalUrl verbatim.
-    href = safeHref(row.externalUrl) ?? null
-    targetPlatform = row.targetPlatform ?? null
+    href = safeHref(row.externalUrl) ?? null;
+    targetPlatform = row.targetPlatform ?? null;
   }
 
-  // Ask drill-in viability. (`idValue` computed above.)
-  const askable = !!(idValue && row.documentType)
-  const chatRef: ChatRef | null = askable
-    ? ({
-        type: row.documentType!,
-        ...(sourceRepo ? { sourceRepo } : {}),
-        id: idValue,
-        title: row.title,
-        url: href,
-        targetPlatform,
-        // Carry `path` so a downstream inline card (rendered from this
-        // chatRef on a subsequent turn) gets the same doc-tree-swap
-        // routing the chip already used. Without it, the Ask drill-in
-        // would resolve to a same-tab full-page nav even when an in-app
-        // path is available.
-        ...(row.path ? { metadata: { path: row.path } } : {}),
-      } as ChatRef)
-    : null
+  // Ask drill-in viability. (`idValue` computed above.) `documentType` is read
+  // into a local so the ternary below branches on the VALUE — a `!!(...)`
+  // boolean flag proves nothing to the compiler about `row.documentType`.
+  const documentType = row.documentType;
+  const askable = !!(idValue && documentType);
+  const chatRef: ChatRef | null =
+    idValue && documentType
+      ? {
+          type: documentType,
+          ...(sourceRepo ? { sourceRepo } : {}),
+          id: idValue,
+          title: row.title,
+          url: href,
+          targetPlatform,
+          // Carry `path` so a downstream inline card (rendered from this
+          // chatRef on a subsequent turn) gets the same doc-tree-swap
+          // routing the chip already used. Without it, the Ask drill-in
+          // would resolve to a same-tab full-page nav even when an in-app
+          // path is available.
+          ...(row.path ? { metadata: { path: row.path } } : {}),
+        }
+      : null;
 
-  return { icon, iconLabel, href, targetPlatform, askable, chatRef }
+  return { icon, iconLabel, href, targetPlatform, askable, chatRef };
 }
 
 /**
@@ -286,17 +288,16 @@ export function resolveSourceIcon(
   input: { sourceRepo?: string | null; documentType?: string | null } | string | null | undefined,
   ctx: { tableIdForDocumentType?: (documentType: string) => string | null } = {},
 ): {
-  Icon: React.ComponentType<{ className?: string }>
-  label: string
+  Icon: React.ComponentType<{ className?: string }>;
+  label: string;
 } {
-  if (!input) return { Icon: FileText, label: 'Source' }
-  const { sourceRepo, documentType } = typeof input === 'string'
-    ? { sourceRepo: null, documentType: input }
-    : input
-  if (!sourceRepo && !documentType) return { Icon: FileText, label: 'Source' }
-  const resolvedRepo = sourceRepo
-    ?? (documentType && ctx.tableIdForDocumentType ? ctx.tableIdForDocumentType(documentType) : null)
-    ?? null
-  const { icon, iconLabel } = pickSourceIcon(resolvedRepo, documentType)
-  return { Icon: icon, label: iconLabel }
+  if (!input) return { Icon: FileText, label: 'Source' };
+  const { sourceRepo, documentType } = typeof input === 'string' ? { sourceRepo: null, documentType: input } : input;
+  if (!sourceRepo && !documentType) return { Icon: FileText, label: 'Source' };
+  const resolvedRepo =
+    sourceRepo ??
+    (documentType && ctx.tableIdForDocumentType ? ctx.tableIdForDocumentType(documentType) : null) ??
+    null;
+  const { icon, iconLabel } = pickSourceIcon(resolvedRepo, documentType);
+  return { Icon: icon, label: iconLabel };
 }

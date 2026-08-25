@@ -56,3 +56,55 @@ describe('processShortcodes script stripping', () => {
     expect(output).toContain('<script>');
   });
 });
+
+/**
+ * Steps 3.5-5 restore the code-block / markdown-link / table-row placeholders.
+ * They used to restore with a plain string replacement, which re-interprets
+ * `$&`, `` $` ``, `$'` and `$$` IN THE REPLACEMENT — so a fenced shell snippet
+ * containing `$$` or `$'…'` was silently rewritten.
+ */
+describe('processShortcodes placeholder restore', () => {
+  it('restores a fenced block containing `$$` verbatim', () => {
+    const output = processShortcodes('```bash\ntmp=/tmp/x.$$\n```\n\nTrailing prose.');
+    expect(output).toContain('tmp=/tmp/x.$$');
+  });
+
+  it("does not splice the rest of the document into a fence containing `$'`", () => {
+    const output = processShortcodes("```bash\nsep=$'\\n'\n```\n\nTrailing prose.");
+    expect(output).toContain("sep=$'\\n'");
+    // `$'` used to expand to everything AFTER the placeholder, duplicating it.
+    expect(output.match(/Trailing prose\./g)).toHaveLength(1);
+  });
+
+  it('restores inline code containing `$&` verbatim', () => {
+    const output = processShortcodes('Use `perl -pe "s/x/[$&]/"` for that.');
+    expect(output).toContain('s/x/[$&]/');
+  });
+});
+
+/**
+ * Every `embed-overrides.tsx` div branch requires its `data-*` payload; a
+ * blank one renders as an empty div (previously: a permanently broken
+ * player). A whitespace-only shortcode payload must therefore stay literal
+ * text rather than expanding into a payload-less embed div.
+ */
+describe('processShortcodes blank shortcode payloads', () => {
+  it.each([
+    ['{{youtube:   }}', 'youtube-embed'],
+    ['{{figma:   }}', 'figma-embed'],
+    ['{{linkedin:   }}', 'linkedin-embed'],
+    ['{{link:   }}', 'link-preview'],
+    ['{{reddit:   }}', 'reddit-embed'],
+    ['{{tweet:   }}', 'tweet-embed'],
+  ])('leaves %s as literal text instead of emitting a payload-less %s', (input, className) => {
+    const output = processShortcodes(input);
+    expect(output).not.toContain(className);
+    expect(output).toContain(input);
+  });
+
+  it('still expands a well-formed shortcode', () => {
+    expect(processShortcodes('{{youtube: dQw4w9WgXcQ }}')).toContain(
+      '<div class="youtube-embed" data-video-id="dQw4w9WgXcQ"></div>',
+    );
+  });
+});

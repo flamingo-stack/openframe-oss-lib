@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `next/dynamic` shim — environment-aware lazy loader.
@@ -21,37 +21,36 @@
  * delegates to `next/dynamic`. Without registration, `ssr` / `loading`
  * options are ignored (React.lazy doesn't support them).
  */
-import { lazy, type ComponentType, type ReactNode } from 'react'
+import { lazy, type ComponentType, type ReactNode } from 'react';
 
 interface DynamicOptions {
   loading?: (props: {
-    error?: Error | null
-    isLoading?: boolean
-    pastDelay?: boolean
-    retry?: () => void
-    timedOut?: boolean
-  }) => ReactNode | null
-  ssr?: boolean
-  suspense?: boolean
+    error?: Error | null;
+    isLoading?: boolean;
+    pastDelay?: boolean;
+    retry?: () => void;
+    timedOut?: boolean;
+  }) => ReactNode | null;
+  ssr?: boolean;
+  suspense?: boolean;
 }
 
-type DynamicLoader<P> = () => Promise<{ default: ComponentType<P> } | ComponentType<P>>
+type DynamicLoader<P> = () => Promise<{ default: ComponentType<P> } | ComponentType<P>>;
 
 /** Matches `next/dynamic`'s exported signature. */
-type DynamicFn = <P extends Record<string, any> = Record<string, never>>(
+type DynamicFn = <P extends object = Record<string, never>>(
   loader: DynamicLoader<P>,
   options?: DynamicOptions,
-) => ComponentType<P>
+) => ComponentType<P>;
 
 const fallback: DynamicFn = (loader, _options) => {
   // React.lazy expects a loader returning { default }. Wrap loaders
   // that return a bare component (legacy next/dynamic shape).
-  const wrapped = () =>
-    loader().then((mod: any) => ('default' in mod ? mod : { default: mod }))
-  return lazy(wrapped) as unknown as ComponentType<any>
-}
+  const wrapped = () => loader().then(mod => ('default' in mod ? mod : { default: mod }));
+  return lazy(wrapped);
+};
 
-let impl: DynamicFn = fallback
+let impl: DynamicFn = fallback;
 
 /**
  * Register the real `next/dynamic` so this shim delegates to it instead
@@ -59,12 +58,12 @@ let impl: DynamicFn = fallback
  * signature must match `next/dynamic`'s default export.
  */
 export function registerDynamic(fn: DynamicFn): void {
-  impl = fn
+  impl = fn;
 }
 
-export default function dynamic<P extends Record<string, any> = Record<string, never>>(
+export default function dynamic<P extends object = Record<string, never>>(
   loader: DynamicLoader<P>,
   options?: DynamicOptions,
 ): ComponentType<P> {
-  return impl(loader, options)
+  return impl(loader, options);
 }

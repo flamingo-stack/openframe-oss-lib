@@ -17,23 +17,33 @@
  *     `array[1]` or `foo[12]bar` is untouched.
  */
 
-import type { Plugin } from "unified"
-import type { Root, Text } from "mdast"
-import { visit } from "unist-util-visit"
+import type { Root, Text } from 'mdast';
+import type { Plugin } from 'unified';
+import { visit } from 'unist-util-visit';
 
-const CITATION_REGEX = /(^|\s)\[\d{1,2}(?:\s*,\s*\d{1,2})*\](?=[\s.,;:!?)\]]|$)/g
+const CITATION_REGEX = /(^|\s)\[\d{1,2}(?:\s*,\s*\d{1,2})*\](?=[\s.,;:!?)\]]|$)/g;
 
 export const remarkStripCitations: Plugin<[], Root> = () => {
   return (tree: Root) => {
-    visit(tree, "text", (node: Text) => {
-      if (!node.value || !node.value.includes("[")) return
-      const withoutCitations = node.value.replace(CITATION_REGEX, "$1")
+    visit(tree, 'text', (node: Text, index, parent) => {
+      if (!parent || typeof index !== 'number') return;
+      if (!node.value || !node.value.includes('[')) return;
+      const withoutCitations = node.value.replace(CITATION_REGEX, '$1');
       // No citation matched → leave the node untouched, INCLUDING its
       // whitespace (collapsing unconditionally would rewrite deliberate
       // spacing in prose like `array[1]  value`).
-      if (withoutCitations === node.value) return
-      // Collapse doubled spaces the removal can leave mid-sentence.
-      node.value = withoutCitations.replace(/ {2,}/g, " ")
-    })
-  }
-}
+      if (withoutCitations === node.value) return;
+      // Replace the text node rather than editing `node.value` in place —
+      // same idiom as remark-card-links / remark-mention-chips next door, and
+      // the node the visitor was handed is left alone. The spread keeps
+      // `position` so source mapping survives. Length is unchanged, so the
+      // walker needs no index steering: it has already captured the original
+      // leaf and moves on to the next sibling, never re-entering this slot.
+      parent.children.splice(index, 1, {
+        ...node,
+        // Collapse doubled spaces the removal can leave mid-sentence.
+        value: withoutCitations.replace(/ {2,}/g, ' '),
+      });
+    });
+  };
+};

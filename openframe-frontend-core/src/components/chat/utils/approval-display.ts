@@ -16,28 +16,26 @@
  * to a human who has no way to act on it.
  */
 
-import type { GuideOrigin } from '../../../chat-protocol/events'
-import { GUIDE_ORIGIN, isGuideOrigin } from '../../../chat-protocol/events'
-import type { MessageSegment } from '../types/message.types'
+import type { GuideOrigin } from '../../../chat-protocol/events';
+import { GUIDE_ORIGIN, isGuideOrigin } from '../../../chat-protocol/events';
+import type { MessageSegment } from '../types/message.types';
 
 /** Anything carrying the optional `origin` marker: a stream event, or the
  *  `data` of a rendered segment. */
 interface OriginBearing {
-  origin?: GuideOrigin | string
+  origin?: GuideOrigin | string;
 }
 
 /** True when this approval was minted by the Product Guide (the hub) rather
  *  than by the agent's own tool-approval tiering. */
 export function isGuideApproval(source: OriginBearing | null | undefined): boolean {
-  return isGuideOrigin(source)
+  return isGuideOrigin(source);
 }
 
 /** The marker to stamp onto a built segment, or undefined for agent approvals.
  *  Keeps `origin` out of segment data unless it means something. */
-export function guideApprovalOrigin(
-  source: OriginBearing | null | undefined,
-): GuideOrigin | undefined {
-  return isGuideApproval(source) ? GUIDE_ORIGIN : undefined
+export function guideApprovalOrigin(source: OriginBearing | null | undefined): GuideOrigin | undefined {
+  return isGuideApproval(source) ? GUIDE_ORIGIN : undefined;
 }
 
 /**
@@ -53,8 +51,8 @@ export function approvalDisplaysInline(
   approvalType: string,
   displayApprovalTypes?: readonly string[],
 ): boolean {
-  if (isGuideApproval(source)) return true
-  return !displayApprovalTypes || displayApprovalTypes.includes(approvalType)
+  if (isGuideApproval(source)) return true;
+  return !displayApprovalTypes || displayApprovalTypes.includes(approvalType);
 }
 
 /**
@@ -65,6 +63,6 @@ export function approvalDisplaysInline(
  * footer — and to route its buttons to the hub rather than to the agent.
  */
 export function isGuideApprovalSegment(segment: MessageSegment): boolean {
-  if (segment.type !== 'approval_request' && segment.type !== 'approval_batch') return false
-  return isGuideApproval(segment.data)
+  if (segment.type !== 'approval_request' && segment.type !== 'approval_batch') return false;
+  return isGuideApproval(segment.data);
 }

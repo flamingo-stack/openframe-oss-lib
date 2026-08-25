@@ -1,6 +1,15 @@
-import '@testing-library/jest-dom'
-import { beforeEach, vi } from 'vitest'
-import { registerNavigation } from './src/embed-shims/next-navigation'
+import '@testing-library/jest-dom';
+import { beforeEach, vi } from 'vitest';
+import { registerNavigation, type NavigationImpl } from './src/embed-shims/next-navigation';
+
+/**
+ * The router surface the shim hands to consumers. Derived from the shim's own
+ * registration contract rather than restated here, so the mocks below are
+ * type-checked against the real `replace(href, { scroll })` signature that
+ * `useApiParams` / `useQueryParams` actually call — and so `mock.calls[n][0]`
+ * reads back as `string`, not `any`, in the tests that assert on the URL.
+ */
+type MockRouter = ReturnType<NavigationImpl['useRouter']>;
 
 // --- Web Storage on Node >= 22 -------------------------------------------
 //
@@ -21,58 +30,58 @@ import { registerNavigation } from './src/embed-shims/next-navigation'
 // implementation is left completely untouched. Keep it version-agnostic
 // rather than requiring every developer to pass a Node flag.
 function installLocalStorageIfMissing(): void {
-  let usable = false
+  let usable = false;
   try {
-    usable = typeof globalThis.localStorage?.getItem === 'function'
+    usable = typeof globalThis.localStorage?.getItem === 'function';
   } catch {
     // Node's getter can throw rather than return undefined depending on the
     // release/flags — treat any access failure as "must polyfill".
-    usable = false
+    usable = false;
   }
-  if (usable) return
+  if (usable) return;
 
   // Faithful to the Web Storage spec on the surface the code under test uses:
   // keys and values are coerced to strings, `getItem` returns `null` (not
   // `undefined`) for a miss, and `length`/`key()` reflect insertion order.
   class MemoryStorage implements Storage {
-    #map = new Map<string, string>()
+    #map = new Map<string, string>();
 
     get length(): number {
-      return this.#map.size
+      return this.#map.size;
     }
 
     clear(): void {
-      this.#map.clear()
+      this.#map.clear();
     }
 
     getItem(key: string): string | null {
-      const value = this.#map.get(String(key))
-      return value === undefined ? null : value
+      const value = this.#map.get(String(key));
+      return value === undefined ? null : value;
     }
 
     key(index: number): string | null {
-      return Array.from(this.#map.keys())[index] ?? null
+      return Array.from(this.#map.keys())[index] ?? null;
     }
 
     removeItem(key: string): void {
-      this.#map.delete(String(key))
+      this.#map.delete(String(key));
     }
 
     setItem(key: string, value: string): void {
-      this.#map.set(String(key), String(value))
+      this.#map.set(String(key), String(value));
     }
 
-    [name: string]: unknown
+    [name: string]: unknown;
   }
 
   Object.defineProperty(globalThis, 'localStorage', {
     value: new MemoryStorage(),
     configurable: true,
     writable: true,
-  })
+  });
 }
 
-installLocalStorageIfMissing()
+installLocalStorageIfMissing();
 
 // --- Shared mock state ---------------------------------------------------
 //
@@ -84,31 +93,31 @@ installLocalStorageIfMissing()
 // use-query-params, unified-pagination, etc.) sees the mocked router +
 // searchParams.
 
-export const mockReplace = vi.fn()
-export const mockPush = vi.fn()
+export const mockReplace = vi.fn<MockRouter['replace']>();
+export const mockPush = vi.fn<MockRouter['push']>();
 
 // `currentSearchParams` is read on every render via the registered hook,
 // so tests can swap it between assertions and the next renderHook() call
 // picks up the new value. The exported `mockSearchParams` Proxy reads
 // through to whatever this variable points at so direct property access
 // (`mockSearchParams.get('foo')`) stays current after `setMockSearchParams`.
-let currentSearchParams = new URLSearchParams()
+let currentSearchParams = new URLSearchParams();
 
 export function setMockSearchParams(params: URLSearchParams): void {
-  currentSearchParams = params
+  currentSearchParams = params;
 }
 
 export const mockSearchParams = new Proxy({} as URLSearchParams, {
   get(_target, prop) {
-    const value = (currentSearchParams as unknown as Record<PropertyKey, unknown>)[prop]
-    return typeof value === 'function' ? value.bind(currentSearchParams) : value
+    const value = (currentSearchParams as unknown as Record<PropertyKey, unknown>)[prop];
+    return typeof value === 'function' ? value.bind(currentSearchParams) : value;
   },
-})
+});
 
 registerNavigation({
   useRouter: () => ({
-    replace: mockReplace as (href: string) => void,
-    push: mockPush as (href: string) => void,
+    replace: mockReplace,
+    push: mockPush,
     back: vi.fn(),
     forward: vi.fn(),
     refresh: vi.fn(),
@@ -116,11 +125,17 @@ registerNavigation({
   }),
   useSearchParams: () => currentSearchParams,
   usePathname: () => '/',
-  useParams: <T extends Record<string, string | string[]>>() => ({} as T),
-  redirect: ((url: string) => { throw new Error(`[test] redirect(${url})`) }) as never,
-  permanentRedirect: ((url: string) => { throw new Error(`[test] permanentRedirect(${url})`) }) as never,
-  notFound: (() => { throw new Error('[test] notFound()') }) as never,
-})
+  useParams: <T extends Record<string, string | string[]>>() => ({}) as T,
+  redirect: ((url: string) => {
+    throw new Error(`[test] redirect(${url})`);
+  }) as never,
+  permanentRedirect: ((url: string) => {
+    throw new Error(`[test] permanentRedirect(${url})`);
+  }) as never,
+  notFound: (() => {
+    throw new Error('[test] notFound()');
+  }) as never,
+});
 
 // Mock `window.location` with the methods jsdom doesn't expose as fns.
 // Shim consumers that don't go through the router (e.g. `permanentRedirect`
@@ -136,11 +151,11 @@ Object.defineProperty(window, 'location', {
     reload: vi.fn(),
   },
   writable: true,
-})
+});
 
 // Reset mock call history + URL between tests so assertions stay isolated.
 beforeEach(() => {
-  mockReplace.mockClear()
-  mockPush.mockClear()
-  currentSearchParams = new URLSearchParams()
-})
+  mockReplace.mockClear();
+  mockPush.mockClear();
+  currentSearchParams = new URLSearchParams();
+});

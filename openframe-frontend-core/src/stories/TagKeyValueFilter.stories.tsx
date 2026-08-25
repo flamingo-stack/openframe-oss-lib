@@ -77,14 +77,8 @@ export const Standalone: Story = {
     const [tags, setTags] = useState<string[]>([]);
     return (
       <div style={{ width: 360 }}>
-        <p className="text-ods-text-secondary text-sm mb-3">
-          Selected: {tags.length === 0 ? 'none' : tags.join(', ')}
-        </p>
-        <TagKeyValueFilter
-          keys={sampleKeys}
-          selectedTags={tags}
-          onTagsChange={setTags}
-        />
+        <p className="mb-3 text-sm text-ods-text-secondary">Selected: {tags.length === 0 ? 'none' : tags.join(', ')}</p>
+        <TagKeyValueFilter keys={sampleKeys} selectedTags={tags} onTagsChange={setTags} />
       </div>
     );
   },
@@ -95,21 +89,11 @@ export const Standalone: Story = {
  */
 export const WithPreselected: Story = {
   render: function Render() {
-    const [tags, setTags] = useState<string[]>([
-      'site:chicago',
-      'site:school1',
-      'env:production',
-    ]);
+    const [tags, setTags] = useState<string[]>(['site:chicago', 'site:school1', 'env:production']);
     return (
       <div style={{ width: 360 }}>
-        <p className="text-ods-text-secondary text-sm mb-3">
-          Selected: {tags.join(', ')}
-        </p>
-        <TagKeyValueFilter
-          keys={sampleKeys}
-          selectedTags={tags}
-          onTagsChange={setTags}
-        />
+        <p className="mb-3 text-sm text-ods-text-secondary">Selected: {tags.join(', ')}</p>
+        <TagKeyValueFilter keys={sampleKeys} selectedTags={tags} onTagsChange={setTags} />
       </div>
     );
   },
@@ -123,7 +107,7 @@ export const WithTagSearchInput: Story = {
     const [tags, setTags] = useState<string[]>(['site:chicago', 'env:production']);
     const [search, setSearch] = useState('');
 
-    const tagOptions: TagSearchOption[] = tags.map((t) => ({ label: t, value: t }));
+    const tagOptions: TagSearchOption[] = tags.map(t => ({ label: t, value: t }));
 
     return (
       <div style={{ width: 600 }} className="flex flex-col gap-4">
@@ -131,15 +115,14 @@ export const WithTagSearchInput: Story = {
           tags={tagOptions}
           searchValue={search}
           onSearchChange={setSearch}
-          onTagRemove={(val) => setTags((t) => t.filter((x) => x !== val))}
-          onClearAll={() => { setTags([]); setSearch(''); }}
+          onTagRemove={val => setTags(t => t.filter(x => x !== val))}
+          onClearAll={() => {
+            setTags([]);
+            setSearch('');
+          }}
           placeholder="Search devices..."
         />
-        <TagKeyValueFilter
-          keys={sampleKeys}
-          selectedTags={tags}
-          onTagsChange={setTags}
-        />
+        <TagKeyValueFilter keys={sampleKeys} selectedTags={tags} onTagsChange={setTags} />
       </div>
     );
   },
@@ -156,11 +139,9 @@ export const InsideFilterModal: Story = {
 
     return (
       <div>
-        <div className="flex gap-3 items-center">
+        <div className="flex items-center gap-3">
           <Button onClick={() => setIsOpen(true)}>Open Filter</Button>
-          <span className="text-ods-text-secondary text-sm">
-            Tags: {tags.length === 0 ? 'none' : tags.join(', ')}
-          </span>
+          <span className="text-sm text-ods-text-secondary">Tags: {tags.length === 0 ? 'none' : tags.join(', ')}</span>
         </div>
         <FilterModal
           isOpen={isOpen}

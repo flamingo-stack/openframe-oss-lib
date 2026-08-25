@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * @deprecated The canonical implementation lives at
@@ -22,4 +22,4 @@ export {
   clearEmbedProxyAuth as clearChatProxyAuth,
   getPersistedProxyEmail,
   applyProxyAuth,
-} from '../../../utils/embed-proxy-auth-storage'
+} from '../../../utils/embed-proxy-auth-storage';

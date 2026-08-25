@@ -1,14 +1,14 @@
-'use client'
+'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import { contentFetch } from '../utils/embed-content-fetch'
-import { MAX_MONTH_OFFSET } from '../utils/hubspot-meetings-convention'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type {
   BookingConfirmation,
   MeetingAvailability,
   MeetingBookingErrorCode,
-} from '../schemas/meeting-booking-schema'
+} from '../schemas/meeting-booking-schema';
+import { contentFetch } from '../utils/embed-content-fetch';
+import { MAX_MONTH_OFFSET } from '../utils/hubspot-meetings-convention';
 
 /**
  * useMeetingBooking — data layer for `<HubSpotMeetingScheduler>` (the widget
@@ -46,10 +46,10 @@ import type {
  */
 
 export interface BookingResult {
-  ok: boolean
-  confirmation?: BookingConfirmation
-  code?: MeetingBookingErrorCode
-  message?: string
+  ok: boolean;
+  confirmation?: BookingConfirmation;
+  code?: MeetingBookingErrorCode;
+  message?: string;
 }
 
 const KNOWN_CODES: MeetingBookingErrorCode[] = [
@@ -58,55 +58,55 @@ const KNOWN_CODES: MeetingBookingErrorCode[] = [
   'LINK_GONE',
   'TEMPORARILY_UNAVAILABLE',
   'MEETING_UNAVAILABLE',
-]
+];
 
 /** ~half HubSpot's own slot volatility window — see the docblock. */
-const AVAILABILITY_STALE_MS = 30_000
+const AVAILABILITY_STALE_MS = 30_000;
 
 /** Query key for one month of one link. Exported so a host can prefetch or
  *  invalidate a month it knows changed (e.g. after booking elsewhere). */
 export function meetingAvailabilityKey(apiBaseUrl: string, meetingId: string, monthOffset: number) {
-  return ['meeting-availability', apiBaseUrl, meetingId, monthOffset] as const
+  return ['meeting-availability', apiBaseUrl, meetingId, monthOffset] as const;
 }
 
 export function useMeetingBooking(options: {
-  meetingId: string
-  apiBaseUrl?: string
-  initialAvailability?: MeetingAvailability
+  meetingId: string;
+  apiBaseUrl?: string;
+  initialAvailability?: MeetingAvailability;
 }) {
-  const { meetingId, apiBaseUrl = '', initialAvailability } = options
-  const queryClient = useQueryClient()
+  const { meetingId, apiBaseUrl = '', initialAvailability } = options;
+  const queryClient = useQueryClient();
 
-  const seededOffset = initialAvailability?.meetingId === meetingId ? initialAvailability.monthOffset : undefined
-  const [monthOffset, setMonthOffsetState] = useState(seededOffset ?? 0)
+  const seededOffset = initialAvailability?.meetingId === meetingId ? initialAvailability.monthOffset : undefined;
+  const [monthOffset, setMonthOffsetState] = useState(seededOffset ?? 0);
 
   const setMonthOffset = useCallback((offset: number) => {
-    setMonthOffsetState(Math.max(0, Math.min(MAX_MONTH_OFFSET, offset)))
-  }, [])
+    setMonthOffsetState(Math.max(0, Math.min(MAX_MONTH_OFFSET, offset)));
+  }, []);
 
   // Link switch resets paging — without this, the new link is queried at the
   // PREVIOUS link's month. Layout effect so the query below sees the reset
   // offset in the same commit.
-  const prevMeetingIdRef = useRef(meetingId)
+  const prevMeetingIdRef = useRef(meetingId);
   useLayoutEffect(() => {
-    if (prevMeetingIdRef.current === meetingId) return
-    prevMeetingIdRef.current = meetingId
-    setMonthOffsetState(0)
-  }, [meetingId])
+    if (prevMeetingIdRef.current === meetingId) return;
+    prevMeetingIdRef.current = meetingId;
+    setMonthOffsetState(0);
+  }, [meetingId]);
 
   // The SSR seed covers exactly one (link, month) cell of the cache.
   const seed =
     initialAvailability?.meetingId === meetingId && initialAvailability.monthOffset === monthOffset
       ? initialAvailability
-      : undefined
+      : undefined;
 
   const availabilityQuery = useQuery({
     queryKey: meetingAvailabilityKey(apiBaseUrl, meetingId, monthOffset),
     queryFn: async ({ signal }) => {
-      const params = new URLSearchParams({ meeting: meetingId, monthOffset: String(monthOffset) })
-      const res = await contentFetch(`${apiBaseUrl}/api/meetings/availability?${params}`, { signal })
-      if (!res.ok) throw new Error(`availability ${res.status}`)
-      return (await res.json()) as MeetingAvailability
+      const params = new URLSearchParams({ meeting: meetingId, monthOffset: String(monthOffset) });
+      const res = await contentFetch(`${apiBaseUrl}/api/meetings/availability?${params}`, { signal });
+      if (!res.ok) throw new Error(`availability ${res.status}`);
+      return (await res.json()) as MeetingAvailability;
     },
     staleTime: AVAILABILITY_STALE_MS,
     initialData: seed,
@@ -114,7 +114,7 @@ export function useMeetingBooking(options: {
     // scaffolding for a 60-second-volatile resource, not truth, so it paints
     // immediately AND is refetched immediately.
     initialDataUpdatedAt: seed ? 0 : undefined,
-  })
+  });
 
   const refetchAvailability = useCallback(async () => {
     // Recovery path (a slot taken from under the visitor): drop the cached
@@ -123,49 +123,54 @@ export function useMeetingBooking(options: {
     // grid up rather than blanking the card.
     await queryClient
       .invalidateQueries({ queryKey: meetingAvailabilityKey(apiBaseUrl, meetingId, monthOffset) })
-      .catch(() => undefined)
-  }, [queryClient, apiBaseUrl, meetingId, monthOffset])
+      .catch(() => undefined);
+  }, [queryClient, apiBaseUrl, meetingId, monthOffset]);
 
   const bookMutation = useMutation<BookingResult, never, Record<string, unknown>>({
-    mutationFn: async (payload) => {
+    mutationFn: async payload => {
       try {
         const res = await contentFetch(`${apiBaseUrl}/api/meetings/book`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        })
-        const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
-        if (res.ok) return { ok: true, confirmation: data as unknown as BookingConfirmation }
-        const rawCode = typeof data.code === 'string' ? data.code : ''
+        });
+        const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        if (res.ok) return { ok: true, confirmation: data as unknown as BookingConfirmation };
+        const rawCode = typeof data.code === 'string' ? data.code : '';
         const code = (KNOWN_CODES as string[]).includes(rawCode)
           ? (rawCode as MeetingBookingErrorCode)
-          : 'TEMPORARILY_UNAVAILABLE'
-        return { ok: false, code, message: typeof data.error === 'string' ? data.error : undefined }
+          : 'TEMPORARILY_UNAVAILABLE';
+        return { ok: false, code, message: typeof data.error === 'string' ? data.error : undefined };
       } catch {
-        return { ok: false, code: 'TEMPORARILY_UNAVAILABLE' }
+        return { ok: false, code: 'TEMPORARILY_UNAVAILABLE' };
       }
     },
     // A booking is not a read — never retried, at any layer.
     retry: false,
-  })
+  });
 
   // `isPending` alone would not stop a second submit dispatched in the same
   // tick as the first; the ref closes that window the way the pre-query
   // implementation did.
-  const submittingRef = useRef(false)
-  const { mutateAsync } = bookMutation
+  // Holds the identity of the submit that owns the lock (`null` = idle) rather
+  // than a bare boolean, so the release below — which runs after an await — can
+  // check that the lock it clears is still its own rather than clearing
+  // whatever happens to be there when the booking settles.
+  const submittingRef = useRef<object | null>(null);
+  const { mutateAsync } = bookMutation;
   const book = useCallback(
     async (payload: Record<string, unknown>): Promise<BookingResult> => {
-      if (submittingRef.current) return { ok: false, code: 'VALIDATION', message: 'Already submitting' }
-      submittingRef.current = true
+      if (submittingRef.current !== null) return { ok: false, code: 'VALIDATION', message: 'Already submitting' };
+      const submitToken: object = {};
+      submittingRef.current = submitToken;
       try {
-        return await mutateAsync(payload)
+        return await mutateAsync(payload);
       } finally {
-        submittingRef.current = false
+        if (submittingRef.current === submitToken) submittingRef.current = null;
       }
     },
     [mutateAsync],
-  )
+  );
 
   return {
     availability: availabilityQuery.data ?? null,
@@ -179,5 +184,5 @@ export function useMeetingBooking(options: {
     refetchAvailability,
     book,
     isSubmitting: bookMutation.isPending,
-  } as const
+  } as const;
 }

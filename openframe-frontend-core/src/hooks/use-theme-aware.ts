@@ -7,6 +7,6 @@ export function useThemeAware() {
     isDarkMode: false,
     platform: 'default',
     isDark: false,
-    accentColor: '#FFC008'
+    accentColor: '#FFC008',
   };
 }

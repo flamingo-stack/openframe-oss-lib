@@ -21,14 +21,14 @@ import type {
   MessageSegment,
   ToolExecutionSegment,
   ToolExecutionData,
-} from '../types'
-import type { UnifiedChatMessage } from '../types/unified-chat-state.types'
+} from '../types';
+import type { UnifiedChatMessage } from '../types/unified-chat-state.types';
 
 export function nextId(role: 'user' | 'assistant'): string {
   // Date.now() + counter sliver keeps ids monotonic even when two
   // messages are produced inside the same ms tick (user + assistant
   // placeholder fire back-to-back from a single sendMessage call).
-  return `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  return `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 /**
@@ -36,30 +36,27 @@ export function nextId(role: 'user' | 'assistant'): string {
  * screen. Content-window dedup is the LAST layer (seq-less transports only)
  * — see the layer list in `chat-stream-reducer.ts`.
  */
-export const CONTENT_DEDUP_WINDOW = 4
-export const SYSTEM_DEDUP_WINDOW = 10
+export const CONTENT_DEDUP_WINDOW = 4;
+export const SYSTEM_DEDUP_WINDOW = 10;
 
 export function hasRecentMessage(
   prev: UnifiedChatMessage[],
   predicate: (message: UnifiedChatMessage) => boolean,
   window: number,
 ): boolean {
-  const start = Math.max(0, prev.length - window)
+  const start = Math.max(0, prev.length - window);
   for (let i = prev.length - 1; i >= start; i--) {
-    if (predicate(prev[i])) return true
+    if (predicate(prev[i])) return true;
   }
-  return false
+  return false;
 }
 
 /**
  * Replace (or append) the trailing assistant message with the latest
  * accumulated segments.
  */
-export function updateTrailingAssistant(
-  prev: UnifiedChatMessage[],
-  segments: MessageSegment[],
-): UnifiedChatMessage[] {
-  const last = prev[prev.length - 1]
+export function updateTrailingAssistant(prev: UnifiedChatMessage[], segments: MessageSegment[]): UnifiedChatMessage[] {
+  const last = prev[prev.length - 1];
   if (!last || last.role !== 'assistant') {
     // No placeholder exists — append a fresh assistant message.
     return [
@@ -70,9 +67,9 @@ export function updateTrailingAssistant(
         content: '',
         segments,
       },
-    ]
+    ];
   }
-  return [...prev.slice(0, -1), { ...last, segments }]
+  return [...prev.slice(0, -1), { ...last, segments }];
 }
 
 /**
@@ -89,20 +86,20 @@ export function updateTrailingAssistant(
 function upsertKey(seg: MessageSegment): string | null {
   switch (seg.type) {
     case 'approval_batch':
-      return `batch:${seg.data.approvalRequestId}`
+      return `batch:${seg.data.approvalRequestId}`;
     case 'approval_request':
-      return `req:${seg.data.requestId}:${seg.data.command}`
+      return `req:${seg.data.requestId}:${seg.data.command}`;
     case 'escalation_offer':
-      return `offer:${seg.data.offerId}`
+      return `offer:${seg.data.offerId}`;
     case 'ticket_escalated':
-      return `escalated:${seg.data.ticketId}`
+      return `escalated:${seg.data.ticketId}`;
     case 'ticket_event':
       // The stream sequence is the event's only stable id; a seq-less segment
       // (hydrated history) is pushed raw — `addTicketEvent`'s payload-equality
       // upsert owns that case.
-      return seg.streamSeq !== undefined ? `ticket-event:${seg.streamSeq}` : null
+      return seg.streamSeq !== undefined ? `ticket-event:${seg.streamSeq}` : null;
     default:
-      return null
+      return null;
   }
 }
 
@@ -116,41 +113,38 @@ export function appendToTrailingAssistant(
   prev: UnifiedChatMessage[],
   segments: MessageSegment[],
 ): UnifiedChatMessage[] {
-  if (segments.length === 0) return prev
-  const last = prev[prev.length - 1]
+  if (segments.length === 0) return prev;
+  const last = prev[prev.length - 1];
   if (!last || last.role !== 'assistant') {
-    return [
-      ...prev,
-      { id: nextId('assistant'), role: 'assistant', content: '', segments },
-    ]
+    return [...prev, { id: nextId('assistant'), role: 'assistant', content: '', segments }];
   }
-  const merged = [...(last.segments ?? [])]
+  const merged = [...(last.segments ?? [])];
   for (const seg of segments) {
-    const tail = merged[merged.length - 1]
-    const key = upsertKey(seg)
+    const tail = merged[merged.length - 1];
+    const key = upsertKey(seg);
     if (seg.type === 'text' && tail?.type === 'text') {
-      merged[merged.length - 1] = { type: 'text', text: tail.text + seg.text }
+      merged[merged.length - 1] = { type: 'text', text: tail.text + seg.text };
     } else if (seg.type === 'thinking' && tail?.type === 'thinking') {
-      merged[merged.length - 1] = { type: 'thinking', text: tail.text + seg.text }
+      merged[merged.length - 1] = { type: 'thinking', text: tail.text + seg.text };
     } else if (seg.type === 'guide' && tail?.type === 'guide') {
-      merged[merged.length - 1] = { type: 'guide', text: tail.text + seg.text }
+      merged[merged.length - 1] = { type: 'guide', text: tail.text + seg.text };
     } else if (key) {
       // Block deltas must be IDEMPOTENT: an emit can be seen twice (live plus
       // the JetStream catch-up replay over hydrated history), so upsert on the
       // block's identity instead of raw-appending a duplicate card.
-      const idx = merged.findIndex((m) => upsertKey(m) === key)
-      if (idx !== -1) merged[idx] = seg
-      else merged.push(seg)
+      const idx = merged.findIndex(m => upsertKey(m) === key);
+      if (idx !== -1) merged[idx] = seg;
+      else merged.push(seg);
     } else {
       // Other non-text segments are pushed RAW on purpose: EXECUTING↔EXECUTED
       // pairing and batch merging are `applyToolExecutionToMessages`'s job
       // (post-END tool chunks never reach this helper — the reducer routes
       // them cross-message). Running the accumulator here would double-apply
       // those rules.
-      merged.push(seg)
+      merged.push(seg);
     }
   }
-  return [...prev.slice(0, -1), { ...last, segments: merged }]
+  return [...prev.slice(0, -1), { ...last, segments: merged }];
 }
 
 // =============================================================================
@@ -165,24 +159,21 @@ export function appendToTrailingAssistant(
  * segment projection below rides this scaffold instead of re-implementing
  * the changed-flag dance.
  */
-function mapSegments(
-  prev: UnifiedChatMessage[],
-  fn: (s: MessageSegment) => MessageSegment,
-): UnifiedChatMessage[] {
-  let changed = false
-  const next = prev.map((m) => {
-    if (m.role !== 'assistant' || !m.segments) return m
-    let msgChanged = false
-    const segs = m.segments.map((s) => {
-      const out = fn(s)
-      if (out !== s) msgChanged = true
-      return out
-    })
-    if (!msgChanged) return m
-    changed = true
-    return { ...m, segments: segs }
-  })
-  return changed ? next : prev
+function mapSegments(prev: UnifiedChatMessage[], fn: (s: MessageSegment) => MessageSegment): UnifiedChatMessage[] {
+  let changed = false;
+  const next = prev.map(m => {
+    if (m.role !== 'assistant' || !m.segments) return m;
+    let msgChanged = false;
+    const segs = m.segments.map(s => {
+      const out = fn(s);
+      if (out !== s) msgChanged = true;
+      return out;
+    });
+    if (!msgChanged) return m;
+    changed = true;
+    return { ...m, segments: segs };
+  });
+  return changed ? next : prev;
 }
 
 /**
@@ -209,35 +200,31 @@ export function applyApprovalStatusToSegment(
   resolvedByName?: string | null,
 ): MessageSegment {
   if (s.type === 'approval_request' && s.data.requestId === requestId && s.status !== status) {
-    return { ...s, status }
+    return { ...s, status };
   }
   if (s.type === 'escalation_offer') {
-    if (s.data.offerId !== requestId) return s
-    const nextResolvedBy = resolvedByName ?? s.resolvedByName
+    if (s.data.offerId !== requestId) return s;
+    const nextResolvedBy = resolvedByName ?? s.resolvedByName;
     // Status alone is not enough to early-out: the host overlay flips the
     // status first and the persisted row supplies the resolver name after, so
     // bailing on an unchanged status drops the "by {name}" stamp.
-    if (s.status === status && nextResolvedBy === s.resolvedByName) return s
-    return { ...s, status, resolvedByName: nextResolvedBy }
+    if (s.status === status && nextResolvedBy === s.resolvedByName) return s;
+    return { ...s, status, resolvedByName: nextResolvedBy };
   }
-  if (s.type !== 'approval_batch') return s
-  const isAnchor = s.data.approvalRequestId === requestId
-  const hasRow = s.data.toolCalls?.some((c) => c.toolExecutionRequestId === requestId)
-  if (!isAnchor && !hasRow) return s
-  const nextResolvedBy = resolvedByName ?? s.resolvedByName
+  if (s.type !== 'approval_batch') return s;
+  const isAnchor = s.data.approvalRequestId === requestId;
+  const hasRow = s.data.toolCalls?.some(c => c.toolExecutionRequestId === requestId);
+  if (!isAnchor && !hasRow) return s;
+  const nextResolvedBy = resolvedByName ?? s.resolvedByName;
   const nextExecutions = hasRow
     ? {
         ...(s.data.executions ?? {}),
         [requestId]: { status: 'done' as const, success: status === 'approved' },
       }
-    : s.data.executions
-  const nextStatus = isAnchor ? status : s.status
-  if (
-    s.status === nextStatus &&
-    nextResolvedBy === s.resolvedByName &&
-    nextExecutions === s.data.executions
-  ) {
-    return s
+    : s.data.executions;
+  const nextStatus = isAnchor ? status : s.status;
+  if (s.status === nextStatus && nextResolvedBy === s.resolvedByName && nextExecutions === s.data.executions) {
+    return s;
   }
   return {
     ...s,
@@ -247,7 +234,7 @@ export function applyApprovalStatusToSegment(
       ...s.data,
       ...(nextExecutions ? { executions: nextExecutions } : {}),
     },
-  }
+  };
 }
 
 /**
@@ -261,10 +248,10 @@ export function nextBatchExecution(
   prevExec: ApprovalBatchExecutionState | undefined,
   toolData: ToolExecutionData,
 ): ApprovalBatchExecutionState | null {
-  if (toolData.type === 'EXECUTING_TOOL' && prevExec?.status === 'done') return null
+  if (toolData.type === 'EXECUTING_TOOL' && prevExec?.status === 'done') return null;
   return toolData.type === 'EXECUTED_TOOL'
     ? { status: 'done', result: toolData.result, success: toolData.success }
-    : { status: 'executing', result: prevExec?.result, success: prevExec?.success }
+    : { status: 'executing', result: prevExec?.result, success: prevExec?.success };
 }
 
 /** The executions-map triple-spread — one home for the write shape. */
@@ -276,7 +263,7 @@ export function withBatchExecution<S extends { data: { executions?: Record<strin
   return {
     ...seg,
     data: { ...seg.data, executions: { ...(seg.data.executions ?? {}), [execId]: state } },
-  }
+  };
 }
 
 /**
@@ -292,11 +279,11 @@ export function projectBatchStatusToMessages(
   anchorId: string,
   status: ChatApprovalStatus,
 ): UnifiedChatMessage[] {
-  return mapSegments(prev, (s) => {
-    if (s.type !== 'approval_batch') return s
-    if (s.data.approvalRequestId !== anchorId || s.status === status) return s
-    return { ...s, status }
-  })
+  return mapSegments(prev, s => {
+    if (s.type !== 'approval_batch') return s;
+    if (s.data.approvalRequestId !== anchorId || s.status === status) return s;
+    return { ...s, status };
+  });
 }
 
 /**
@@ -309,17 +296,14 @@ export function projectBatchRowFailureToMessages(
   prev: UnifiedChatMessage[],
   rowRequestId: string,
 ): UnifiedChatMessage[] {
-  return mapSegments(prev, (s) => {
-    if (
-      s.type !== 'approval_batch' ||
-      !s.data.toolCalls?.some((c) => c.toolExecutionRequestId === rowRequestId)
-    ) {
-      return s
+  return mapSegments(prev, s => {
+    if (s.type !== 'approval_batch' || !s.data.toolCalls?.some(c => c.toolExecutionRequestId === rowRequestId)) {
+      return s;
     }
-    const existing = s.data.executions?.[rowRequestId]
-    if (existing?.status === 'done') return s
-    return withBatchExecution(s, rowRequestId, { status: 'done', success: false })
-  })
+    const existing = s.data.executions?.[rowRequestId];
+    if (existing?.status === 'done') return s;
+    return withBatchExecution(s, rowRequestId, { status: 'done', success: false });
+  });
 }
 
 /**
@@ -329,31 +313,21 @@ export function projectBatchRowFailureToMessages(
  * continuation text would duplicate. A `completed` segment replaces the last
  * `started` one in place.
  */
-export function upsertTrailingCompaction(
-  prev: UnifiedChatMessage[],
-  segments: MessageSegment[],
-): UnifiedChatMessage[] {
-  const compaction = [...segments].reverse().find((s) => s.type === 'context_compaction')
-  if (!compaction) return prev
-  const last = prev[prev.length - 1]
+export function upsertTrailingCompaction(prev: UnifiedChatMessage[], segments: MessageSegment[]): UnifiedChatMessage[] {
+  const compaction = [...segments].reverse().find(s => s.type === 'context_compaction');
+  if (!compaction) return prev;
+  const last = prev[prev.length - 1];
   if (!last || last.role !== 'assistant') {
-    return [
-      ...prev,
-      { id: nextId('assistant'), role: 'assistant', content: '', segments: [compaction] },
-    ]
+    return [...prev, { id: nextId('assistant'), role: 'assistant', content: '', segments: [compaction] }];
   }
-  const existing = last.segments ?? []
+  const existing = last.segments ?? [];
   // LAST 'started' segment (not first): with repeated compactions in one
   // bubble the earlier ones are already completed-in-place, so the newest
   // 'started' is the only one this completion can belong to.
-  const startedIdx = existing
-    .map((s) => s.type === 'context_compaction' && s.status === 'started')
-    .lastIndexOf(true)
+  const startedIdx = existing.map(s => s.type === 'context_compaction' && s.status === 'started').lastIndexOf(true);
   const merged =
-    startedIdx !== -1
-      ? existing.map((s, i) => (i === startedIdx ? compaction : s))
-      : [...existing, compaction]
-  return [...prev.slice(0, -1), { ...last, segments: merged }]
+    startedIdx !== -1 ? existing.map((s, i) => (i === startedIdx ? compaction : s)) : [...existing, compaction];
+  return [...prev.slice(0, -1), { ...last, segments: merged }];
 }
 
 /** Scoped value-compare for the fields a tool merge writes (status/type,
@@ -369,16 +343,12 @@ function sameToolData(a: ToolExecutionData, b: ToolExecutionData): boolean {
     a.result === b.result &&
     a.success === b.success &&
     a.toolExecutionRequestId === b.toolExecutionRequestId &&
-    (a.parameters === b.parameters ||
-      JSON.stringify(a.parameters ?? null) === JSON.stringify(b.parameters ?? null))
-  )
+    (a.parameters === b.parameters || JSON.stringify(a.parameters ?? null) === JSON.stringify(b.parameters ?? null))
+  );
 }
 
-function sameExecutionState(
-  a: ApprovalBatchExecutionState | undefined,
-  b: ApprovalBatchExecutionState,
-): boolean {
-  return !!a && a.status === b.status && a.result === b.result && a.success === b.success
+function sameExecutionState(a: ApprovalBatchExecutionState | undefined, b: ApprovalBatchExecutionState): boolean {
+  return !!a && a.status === b.status && a.result === b.result && a.success === b.success;
 }
 
 /**
@@ -397,9 +367,9 @@ export function applyToolExecutionToMessages(
   prev: UnifiedChatMessage[],
   segment: ToolExecutionSegment,
 ): UnifiedChatMessage[] {
-  const merged = mergeToolExecutionIfPresent(prev, segment)
-  if (merged !== null) return merged
-  return appendToTrailingAssistant(prev, [segment])
+  const merged = mergeToolExecutionIfPresent(prev, segment);
+  if (merged !== null) return merged;
+  return appendToTrailingAssistant(prev, [segment]);
 }
 
 /**
@@ -414,35 +384,35 @@ export function mergeToolExecutionIfPresent(
   prev: UnifiedChatMessage[],
   segment: ToolExecutionSegment,
 ): UnifiedChatMessage[] | null {
-  const toolData = segment.data
-  const execId = toolData.toolExecutionRequestId
+  const toolData = segment.data;
+  const execId = toolData.toolExecutionRequestId;
 
   for (let i = prev.length - 1; i >= 0; i--) {
-    const message = prev[i]
-    if (message.role !== 'assistant' || !message.segments) continue
+    const message = prev[i];
+    if (message.role !== 'assistant' || !message.segments) continue;
 
     for (let j = message.segments.length - 1; j >= 0; j--) {
-      const seg = message.segments[j]
+      const seg = message.segments[j];
 
       if (
         execId &&
         seg.type === 'approval_batch' &&
-        seg.data.toolCalls.some((c) => c.toolExecutionRequestId === execId)
+        seg.data.toolCalls.some(c => c.toolExecutionRequestId === execId)
       ) {
-        const prevExec: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId]
+        const prevExec: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId];
         // Shared rule (`nextBatchExecution`): folds the never-downgrade
         // guard (JetStream redelivery of EXECUTING after EXECUTED
         // landed — null = matched-with-no-change, caller doesn't append
         // either) and the EXECUTED/EXECUTING ternary.
-        const nextExec = nextBatchExecution(prevExec, toolData)
-        if (nextExec === null) return prev
+        const nextExec = nextBatchExecution(prevExec, toolData);
+        if (nextExec === null) return prev;
         // Value-level no-op (replayed duplicate) → prior references.
-        if (sameExecutionState(prevExec, nextExec)) return prev
-        const nextSegments = [...message.segments]
-        nextSegments[j] = withBatchExecution(seg, execId, nextExec)
-        const next = [...prev]
-        next[i] = { ...message, segments: nextSegments }
-        return next
+        if (sameExecutionState(prevExec, nextExec)) return prev;
+        const nextSegments = [...message.segments];
+        nextSegments[j] = withBatchExecution(seg, execId, nextExec);
+        const next = [...prev];
+        next[i] = { ...message, segments: nextSegments };
+        return next;
       }
 
       if (seg.type === 'tool_execution') {
@@ -458,30 +428,30 @@ export function mergeToolExecutionIfPresent(
           ? seg.data.toolExecutionRequestId === execId
           : seg.data.type === 'EXECUTING_TOOL' &&
             seg.data.integratedToolType === toolData.integratedToolType &&
-            seg.data.toolFunction === toolData.toolFunction
-        if (!matches) continue
+            seg.data.toolFunction === toolData.toolFunction;
+        if (!matches) continue;
         // Never downgrade a completed segment back to EXECUTING (replayed
         // EXECUTING chunk after its EXECUTED already landed).
         if (toolData.type === 'EXECUTING_TOOL' && seg.data.type === 'EXECUTED_TOOL') {
-          return prev
+          return prev;
         }
         const mergedData: ToolExecutionData = {
           ...toolData,
           toolTitle: toolData.toolTitle ?? seg.data.toolTitle,
           parameters: toolData.parameters || seg.data.parameters,
-        }
+        };
         // Value-level no-op (replayed duplicate) → prior references.
-        if (sameToolData(seg.data, mergedData)) return prev
-        const nextSegments = [...message.segments]
-        nextSegments[j] = { type: 'tool_execution', data: mergedData }
-        const next = [...prev]
-        next[i] = { ...message, segments: nextSegments }
-        return next
+        if (sameToolData(seg.data, mergedData)) return prev;
+        const nextSegments = [...message.segments];
+        nextSegments[j] = { type: 'tool_execution', data: mergedData };
+        const next = [...prev];
+        next[i] = { ...message, segments: nextSegments };
+        return next;
       }
     }
   }
 
-  return null
+  return null;
 }
 
 /**
@@ -496,7 +466,5 @@ export function projectApprovalResolutionToMessages(
   status: ChatApprovalStatus,
   resolvedByName?: string | null,
 ): UnifiedChatMessage[] {
-  return mapSegments(prev, (s) =>
-    applyApprovalStatusToSegment(s, requestId, status, resolvedByName),
-  )
+  return mapSegments(prev, s => applyApprovalStatusToSegment(s, requestId, status, resolvedByName));
 }

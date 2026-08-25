@@ -102,17 +102,54 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          # `npm ci` is a clean install by design, so without this every run
+          # re-downloads the whole tree. The lockfile is the cache key.
+          cache: npm
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
 
+      # `ci` not `install`: it installs exactly the lockfile and fails if
+      # package.json and package-lock.json have drifted, so CI can never
+      # silently test a different dependency tree than a developer has.
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm install
+        run: npm ci
 
+      # Config smoke first: it is ~1s and a broken eslint config makes every
+      # lint result below meaningless rather than failing honestly.
+      - name: Lint Config Smoke
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm run lint:config-smoke
+
+      # No `continue-on-error` — a failing tsc MUST block the merge.
       - name: Type Check
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
         run: npm run type-check
-        continue-on-error: true
+
+      - name: Lint
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm run lint
+
+      # Separate step, not folded into Lint: it needs a TypeScript program and
+      # an 8 GB heap, and it is the slowest check in the job. Keeping it apart
+      # makes a failure legible at a glance and lets the fast pass fail early.
+      - name: Lint (type-aware)
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm run lint:types
+
+      - name: Lint (import cycles)
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm run lint:cycles
+
+      - name: Format
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm run format
 
       - name: Test
         if: steps.should_run.outputs.run == 'true'

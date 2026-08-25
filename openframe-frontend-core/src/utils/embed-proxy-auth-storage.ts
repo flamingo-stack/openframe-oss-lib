@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Client-side persistence for embed-surface proxy credentials
@@ -36,33 +36,36 @@
  * contract; renaming it would log everyone out).
  */
 
-import { createLocalStorageAdapter } from './local-storage-adapter'
-import { getAppType } from './app-config'
+import { getAppType } from './app-config';
+import { createLocalStorageAdapter } from './local-storage-adapter';
 
 export interface EmbedProxyAuth {
-  secret: string
-  email: string
+  secret: string;
+  email: string;
   /** Optional identity passthrough — empty/omitted = not sent. Server
    *  parses these as `X-Chat-{First,Last}-Name` / `X-Chat-Avatar-Url` and
    *  threads them through `resolveChatProxyIdentity`'s returned user. */
-  firstName?: string
-  lastName?: string
-  avatarUrl?: string
+  firstName?: string;
+  lastName?: string;
+  avatarUrl?: string;
 }
 
 function isValidPersistedAuth(value: unknown): value is EmbedProxyAuth {
-  if (!value || typeof value !== 'object') return false
-  const v = value as Record<string, unknown>
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
   if (
-    typeof v.secret !== 'string' || v.secret.trim().length === 0 ||
-    typeof v.email !== 'string' || v.email.trim().length === 0
-  ) return false
+    typeof v.secret !== 'string' ||
+    v.secret.trim().length === 0 ||
+    typeof v.email !== 'string' ||
+    v.email.trim().length === 0
+  )
+    return false;
   // Optional fields: when present must be strings. Empty string is treated
   // as absent later (in `getEmbedProxyAuth`).
-  if (v.firstName != null && typeof v.firstName !== 'string') return false
-  if (v.lastName != null && typeof v.lastName !== 'string') return false
-  if (v.avatarUrl != null && typeof v.avatarUrl !== 'string') return false
-  return true
+  if (v.firstName != null && typeof v.firstName !== 'string') return false;
+  if (v.lastName != null && typeof v.lastName !== 'string') return false;
+  if (v.avatarUrl != null && typeof v.avatarUrl !== 'string') return false;
+  return true;
 }
 
 const adapter = createLocalStorageAdapter<EmbedProxyAuth>({
@@ -78,14 +81,14 @@ const adapter = createLocalStorageAdapter<EmbedProxyAuth>({
   // tradeoff prior `sessionStorage` setup demanded — rejected. See
   // file-level doc comment for the security tradeoff rationale.
   backend: 'local',
-})
+});
 
 /** Trim + null-coerce an optional identity field so consumers can do
  *  `auth.firstName ?? ''` without worrying about whitespace-only strings. */
 function normalizeOptional(value: string | undefined): string | undefined {
-  if (!value) return undefined
-  const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : undefined
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 /**
@@ -94,15 +97,15 @@ function normalizeOptional(value: string | undefined): string | undefined {
  * callers treat that as "fall back to cookie auth".
  */
 export function getEmbedProxyAuth(): EmbedProxyAuth | null {
-  const persisted = adapter.load()
-  if (!persisted) return null
+  const persisted = adapter.load();
+  if (!persisted) return null;
   return {
     secret: persisted.secret,
     email: persisted.email.trim().toLowerCase(),
     firstName: normalizeOptional(persisted.firstName),
     lastName: normalizeOptional(persisted.lastName),
     avatarUrl: normalizeOptional(persisted.avatarUrl),
-  }
+  };
 }
 
 /**
@@ -110,8 +113,8 @@ export function getEmbedProxyAuth(): EmbedProxyAuth | null {
  * this to pre-fill the email field on mount.
  */
 export function getPersistedProxyEmail(): string | null {
-  const persisted = adapter.load()
-  return persisted?.email.trim().toLowerCase() ?? null
+  const persisted = adapter.load();
+  return persisted?.email.trim().toLowerCase() ?? null;
 }
 
 /** Save the proxy creds. Secret + email are required; identity-passthrough
@@ -123,12 +126,12 @@ export function setEmbedProxyAuth(value: EmbedProxyAuth): void {
     firstName: normalizeOptional(value.firstName),
     lastName: normalizeOptional(value.lastName),
     avatarUrl: normalizeOptional(value.avatarUrl),
-  })
+  });
 }
 
 /** Drop the persisted creds. */
 export function clearEmbedProxyAuth(): void {
-  adapter.clear()
+  adapter.clear();
 }
 
 /**
@@ -146,18 +149,18 @@ export function applyProxyAuth(
   url: string,
   baseHeaders: Record<string, string> = { 'Content-Type': 'application/json' },
 ): { url: string; headers: Record<string, string> } {
-  const auth = getEmbedProxyAuth()
-  const headers = { ...baseHeaders }
+  const auth = getEmbedProxyAuth();
+  const headers = { ...baseHeaders };
   if (auth?.secret) {
-    headers.Authorization = `Bearer ${auth.secret}`
+    headers.Authorization = `Bearer ${auth.secret}`;
   }
   if (auth?.email) {
-    headers['X-Chat-Act-As'] = auth.email
+    headers['X-Chat-Act-As'] = auth.email;
   }
   // Optional identity passthrough — only attached when present so the
   // server's "required vs optional" header shape stays exact.
-  if (auth?.firstName) headers['X-Chat-First-Name'] = auth.firstName
-  if (auth?.lastName) headers['X-Chat-Last-Name'] = auth.lastName
-  if (auth?.avatarUrl) headers['X-Chat-Avatar-Url'] = auth.avatarUrl
-  return { url, headers }
+  if (auth?.firstName) headers['X-Chat-First-Name'] = auth.firstName;
+  if (auth?.lastName) headers['X-Chat-Last-Name'] = auth.lastName;
+  if (auth?.avatarUrl) headers['X-Chat-Avatar-Url'] = auth.avatarUrl;
+  return { url, headers };
 }

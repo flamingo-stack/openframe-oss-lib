@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * <CardsStrip> — THE horizontal card-strip engine (single source of truth).
@@ -42,15 +42,15 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { cn } from '../../utils/cn';
-import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
 import { useMarqueeEngine } from '../../hooks/ui/use-marquee-engine';
 import { useResetOnPageHidden } from '../../hooks/ui/use-reset-on-page-hidden';
 import { useSuppressCloneFocus } from '../../hooks/ui/use-suppress-clone-focus';
-import { Button } from '../ui/button';
-import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
+import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
+import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { Button } from '../ui/button';
 
 // =============================================================================
 // Types
@@ -196,18 +196,14 @@ function ManagedCell({
       onFocus={() => ctx.onActivate(ctx.cardKey)}
       onBlur={e => {
         // Intra-cell focus moves must not blip the pause off.
-        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        if (e.currentTarget.contains(e.relatedTarget)) return;
         ctx.onDeactivate(ctx.cardKey);
       }}
     >
       {/* INNER: clone a11y — `aria-hidden` + focusable descendants forced out of
           the tab order (useSuppressCloneFocus), but pointer events preserved so
           a visible clone card stays clickable. Cards untouched. */}
-      <div
-        ref={cloneRef}
-        className="h-full [&>*]:h-full [&>a>*]:h-full"
-        aria-hidden={ctx.isClone || undefined}
-      >
+      <div ref={cloneRef} className="h-full [&>*]:h-full [&>a>*]:h-full" aria-hidden={ctx.isClone || undefined}>
         {item as React.ReactNode}
       </div>
     </div>
@@ -289,7 +285,11 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     watch('(prefers-reduced-motion: reduce)', setReducedMotion);
     watch('(hover: none)', setIsTouch);
     watch('(max-width: 767px)', setIsMobile);
-    return () => subs.forEach(fn => fn());
+    return () => {
+      subs.forEach(fn => {
+        fn();
+      });
+    };
   }, []);
 
   // ---- overflow measurement ---------------------------------------------------
@@ -322,7 +322,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     measure();
     const scroller = scrollerRef.current;
     const track = trackRef.current;
-    if (!scroller || !track || typeof ResizeObserver === 'undefined') return;
+    if (!scroller || !track || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(measure);
     ro.observe(scroller);
     ro.observe(track);
@@ -342,11 +342,10 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   const [nearViewport, setNearViewport] = useState(true);
   useEffect(() => {
     const el = wrapperRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(
-      entries => setNearViewport(entries[0]?.isIntersecting ?? true),
-      { rootMargin: '200px' },
-    );
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(entries => setNearViewport(entries[0]?.isIntersecting ?? true), {
+      rootMargin: '200px',
+    });
     io.observe(el);
     return () => io.disconnect();
   }, []);
@@ -417,14 +416,17 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     if (e.pointerType === 'touch') return;
     hoverPointerRef.current = { x: e.clientX, y: e.clientY, inside: true };
   }, []);
-  const onHoverPointerLeave = useCallback((e: React.PointerEvent) => {
-    if (e.pointerType === 'touch') return;
-    hoverPointerRef.current.inside = false;
-    // The pointer left the whole scroller — no card can be hovered anymore
-    // (covers leave events swallowed by DOM churn under the cursor).
-    const current = activeKeyRef.current;
-    if (current !== null) deactivate(current);
-  }, [deactivate]);
+  const onHoverPointerLeave = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.pointerType === 'touch') return;
+      hoverPointerRef.current.inside = false;
+      // The pointer left the whole scroller — no card can be hovered anymore
+      // (covers leave events swallowed by DOM churn under the cursor).
+      const current = activeKeyRef.current;
+      if (current !== null) deactivate(current);
+    },
+    [deactivate],
+  );
   // Unconditional hover-clear (any pointer type) — the self-heal for a MISSED
   // `pointerleave`. A leave can be swallowed by a tab blur, an interrupted
   // pointer (pointercancel), or an overlay mounting under the cursor, leaving
@@ -514,66 +516,94 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   const cardElIdxRef = useRef(new Map<Element, number>());
   const cardElNearRef = useRef(new Map<Element, boolean>());
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(entries => {
-      for (const e of entries) cardElNearRef.current.set(e.target, e.isIntersecting);
-      const next = new Set<number>();
-      cardElNearRef.current.forEach((near, el) => {
-        if (!near) return;
-        const idx = cardElIdxRef.current.get(el);
-        if (idx !== undefined) next.add(idx);
-      });
-      setMountedIdx(prev => {
-        if (prev.size === next.size) {
-          let same = true;
-          next.forEach(i => { if (!prev.has(i)) same = false; });
-          if (same) return prev;
-        }
-        return next;
-      });
-    }, { rootMargin: NEAR_VIEWPORT_ROOT_MARGIN });
+    if (typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(
+      entries => {
+        for (const e of entries) cardElNearRef.current.set(e.target, e.isIntersecting);
+        const next = new Set<number>();
+        cardElNearRef.current.forEach((near, el) => {
+          if (!near) return;
+          const idx = cardElIdxRef.current.get(el);
+          if (idx !== undefined) next.add(idx);
+        });
+        setMountedIdx(prev => {
+          if (prev.size === next.size) {
+            let same = true;
+            next.forEach(i => {
+              if (!prev.has(i)) same = false;
+            });
+            if (same) return prev;
+          }
+          return next;
+        });
+      },
+      { rootMargin: NEAR_VIEWPORT_ROOT_MARGIN },
+    );
     cardObserverRef.current = io;
-    cardElIdxRef.current.forEach((_idx, el) => io.observe(el));
-    return () => { io.disconnect(); cardObserverRef.current = null; };
+    cardElIdxRef.current.forEach((_idx, el) => {
+      io.observe(el);
+    });
+    return () => {
+      io.disconnect();
+      cardObserverRef.current = null;
+    };
   }, []);
   // Stable per-index ref callbacks (a fresh closure per render would detach/
   // re-attach the observer every render). React 19 ref-cleanup unregisters.
-  const cardRefFnsRef = useRef(new Map<number, (el: HTMLDivElement | null) => (() => void) | undefined>());
-  const getCardRef = useCallback((idx: number) => {
-    let fn = cardRefFnsRef.current.get(idx);
-    if (!fn) {
-      fn = (el: HTMLDivElement | null) => {
-        if (!el) return undefined;
-        cardElIdxRef.current.set(el, idx);
-        cardObserverRef.current?.observe(el);
-        return () => {
-          cardElIdxRef.current.delete(el);
-          cardElNearRef.current.delete(el);
-          cardObserverRef.current?.unobserve(el);
+  // The table is an instance-lifetime object from `useState`, not a ref:
+  // `getCardRef` is CALLED during render (from the JSX below), so reaching
+  // through `.current` there is a ref read in render. Filling it during render
+  // is safe in a way a general ref write is not — the entry for an index is a
+  // pure function of that index, so a discarded render attempt can only
+  // install exactly what the retry would have installed.
+  const [cardRefFns] = useState(() => new Map<number, (el: HTMLDivElement | null) => (() => void) | undefined>());
+  const getCardRef = useCallback(
+    (idx: number) => {
+      let fn = cardRefFns.get(idx);
+      if (!fn) {
+        fn = (el: HTMLDivElement | null) => {
+          if (!el) return undefined;
+          cardElIdxRef.current.set(el, idx);
+          cardObserverRef.current?.observe(el);
+          return () => {
+            cardElIdxRef.current.delete(el);
+            cardElNearRef.current.delete(el);
+            cardObserverRef.current?.unobserve(el);
+          };
         };
-      };
-      cardRefFnsRef.current.set(idx, fn);
-    }
-    return fn;
-  }, []);
+        cardRefFns.set(idx, fn);
+      }
+      return fn;
+    },
+    [cardRefFns],
+  );
 
   // ---- manual navigation -----------------------------------------------------------
-  const scrollByCard = useCallback((dir: 1 | -1) => {
-    const scroller = scrollerRef.current;
-    const track = trackRef.current;
-    if (!scroller || !track) return;
-    const firstCard = track.firstElementChild as HTMLElement | null;
-    const step = (firstCard?.offsetWidth ?? 320) + TRACK_GAP_PX;
-    chevronSuppressUntilRef.current = performance.now() + CHEVRON_SUPPRESS_MS;
-    if (marqueeActiveRef.current) {
-      // Wrap-aware glide via the rAF engine (see engine comment) — clicks
-      // accumulate distance instead of racing browser smooth-scroll targets.
-      glideBy(dir * step);
-    } else {
-      // No clones/seam without the marquee — native smooth scroll is safe.
-      scroller.scrollBy({ left: dir * step, behavior: 'smooth' });
-    }
-  }, [glideBy]);
+  // Refreshed in an unconditional effect rather than in the render body: the
+  // readers are a chevron click and a scroll handler, both past a commit.
+  const marqueeActiveRef = useRef(false);
+  useEffect(() => {
+    marqueeActiveRef.current = marqueeActive;
+  });
+  const scrollByCard = useCallback(
+    (dir: 1 | -1) => {
+      const scroller = scrollerRef.current;
+      const track = trackRef.current;
+      if (!scroller || !track) return;
+      const firstCard = track.firstElementChild as HTMLElement | null;
+      const step = (firstCard?.offsetWidth ?? 320) + TRACK_GAP_PX;
+      chevronSuppressUntilRef.current = performance.now() + CHEVRON_SUPPRESS_MS;
+      if (marqueeActiveRef.current) {
+        // Wrap-aware glide via the rAF engine (see engine comment) — clicks
+        // accumulate distance instead of racing browser smooth-scroll targets.
+        glideBy(dir * step);
+      } else {
+        // No clones/seam without the marquee — native smooth scroll is safe.
+        scroller.scrollBy({ left: dir * step, behavior: 'smooth' });
+      }
+    },
+    [glideBy],
+  );
 
   const onUserScrollIntent = useCallback(() => {
     userScrollSuppressUntilRef.current = performance.now() + USER_SCROLL_SUPPRESS_MS;
@@ -581,12 +611,18 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   // Suppress ONLY on genuine horizontal-scroll intent. Vertical page-scroll
   // wheel events over the strip and plain clicks (pointerdown) used to arm the
   // 3s suppression — the "marquee resumes only after a delay" bug.
-  const onWheelIntent = useCallback((e: React.WheelEvent) => {
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) onUserScrollIntent();
-  }, [onUserScrollIntent]);
-  const onPointerDownIntent = useCallback((e: React.PointerEvent) => {
-    if (e.pointerType === 'touch') onUserScrollIntent();
-  }, [onUserScrollIntent]);
+  const onWheelIntent = useCallback(
+    (e: React.WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) onUserScrollIntent();
+    },
+    [onUserScrollIntent],
+  );
+  const onPointerDownIntent = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.pointerType === 'touch') onUserScrollIntent();
+    },
+    [onUserScrollIntent],
+  );
 
   // Never-ending strip: re-center across the clone seam on EVERY scroll
   // (manual wheel/drag/chevron included — the rAF only wraps while the
@@ -600,8 +636,6 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   // exactly 0" check that stuck leftward scrolling is gone. Initial rest at
   // 0 warps once to `half` — pixel-identical, and it buys leftward headroom
   // immediately.
-  const marqueeActiveRef = useRef(false);
-  marqueeActiveRef.current = marqueeActive;
   const onSeamWarp = useCallback(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
@@ -623,7 +657,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       scroller.scrollLeft = sl;
       marqueePosRef.current = sl;
     }
-  }, [syncHoverIfScrolled, seamBuffer]);
+  }, [syncHoverIfScrolled, seamBuffer, marqueePosRef]);
 
   // ---- render ----------------------------------------------------------------
 
@@ -635,14 +669,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     // Managed cell — the ONLY place cell width / activation / clone a11y are
     // encoded for children mode (extracted to a component so the clone
     // focus-suppression hook can run per cell; see ManagedCell).
-    return (
-      <ManagedCell
-        item={item}
-        ctx={ctx}
-        cardWidthMobile={cardWidthMobile}
-        cardWidthDesktop={cardWidthDesktop}
-      />
-    );
+    return <ManagedCell item={item} ctx={ctx} cardWidthMobile={cardWidthMobile} cardWidthDesktop={cardWidthDesktop} />;
   };
 
   if (items.length === 0) return null;
@@ -651,12 +678,13 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
 
   return (
     <div
-      ref={node => { wrapperRef.current = node; rootRef?.(node); }}
-      className={cn('flex flex-col gap-6 w-full min-w-0', className)}
+      ref={node => {
+        wrapperRef.current = node;
+        rootRef?.(node);
+      }}
+      className={cn('flex w-full min-w-0 flex-col gap-6', className)}
     >
-      {showTitle && title && (
-        <h2 className={`${SECTION_HEADING_CLASS} break-words`}>{title}</h2>
-      )}
+      {showTitle && title && <h2 className={`${SECTION_HEADING_CLASS} break-words`}>{title}</h2>}
       {headerSlot}
 
       <div className="relative">
@@ -714,7 +742,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
               size="icon"
               aria-label={prevLabel}
               onClick={() => scrollByCard(-1)}
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-10"
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2"
               leftIcon={<Chevron02LeftIcon />}
             />
             <Button
@@ -723,7 +751,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
               size="icon"
               aria-label={nextLabel}
               onClick={() => scrollByCard(1)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-10"
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2"
               leftIcon={<Chevron02RightIcon />}
             />
           </>

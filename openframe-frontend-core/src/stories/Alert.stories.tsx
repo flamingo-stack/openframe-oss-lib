@@ -53,12 +53,15 @@ export const Warning: Story = {
 export const EmailVerification: Story = {
   args: { variant: 'warning' },
   render: args => (
-    <Alert {...args} className="flex items-center justify-center gap-[var(--spacing-system-m)] p-[var(--spacing-system-s)]">
+    <Alert
+      {...args}
+      className="flex items-center justify-center gap-[var(--spacing-system-m)] p-[var(--spacing-system-s)]"
+    >
       <span className="shrink-0">
         <AlertTriangleIcon size={24} />
       </span>
-      <p className="flex-1 text-h4 font-bold">Verify your email to keep access to system.</p>
-      <button type="button" className="shrink-0 text-h4 font-medium underline whitespace-nowrap">
+      <p className="flex-1 font-bold text-h4">Verify your email to keep access to system.</p>
+      <button type="button" className="shrink-0 whitespace-nowrap font-medium underline text-h4">
         Resend Verification Mail
       </button>
     </Alert>

@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from 'zod';
 
 /**
  * Meeting-booking wire contracts + validation factory.
@@ -31,31 +31,31 @@ import { z } from 'zod'
  * from busy-time data.
  */
 export interface MeetingAvailability {
-  meetingId: string
-  monthOffset: number
-  hasMore: boolean
+  meetingId: string;
+  monthOffset: number;
+  hasMore: boolean;
   /** Offered durations in ms — HubSpot's native unit for the booking POST. */
-  durationsMs: number[]
+  durationsMs: number[];
   /** Bookable slot start times (epoch ms), keyed by duration in ms. */
-  slotsByDurationMs: Record<string, number[]>
-  formFields: MeetingFormField[]
+  slotsByDurationMs: Record<string, number[]>;
+  formFields: MeetingFormField[];
   /** Verbatim whitelist-copy of HubSpot's `legalConsentOptions` when consent is enabled; null when disabled. */
-  legalConsent: MeetingLegalConsent | null
+  legalConsent: MeetingLegalConsent | null;
   /**
    * Who the visitor is meeting — whitelisted DISPLAY projection the host DAL
    * builds from its own people data (e.g. a profiles table matched
    * server-side). NEVER carries emails or busy-time data; optional so
    * existing hosts stay wire-compatible.
    */
-  hosts?: MeetingHost[]
+  hosts?: MeetingHost[];
 }
 
 /** Display-only host identity for the scheduler's context panel. */
 export interface MeetingHost {
-  name: string
-  avatarUrl: string | null
+  name: string;
+  avatarUrl: string | null;
   /** Job title / role line under the name (null → omitted). */
-  title: string | null
+  title: string | null;
 }
 
 /**
@@ -64,34 +64,34 @@ export interface MeetingHost {
  * host pages. Never carries organizer emails/busy-time data.
  */
 export interface SchedulingLink {
-  id: string
+  id: string;
   /** The link's public HubSpot booking URL — escape-hatch target only. */
-  link: string
+  link: string;
   /** HubSpot slug path — the row's in-app destination is `<basePath>/<slug>`. */
-  slug: string
+  slug: string;
   /** Audience group key (slugified audience label; `"other"` in scope=all). */
-  purpose: string
-  title: string
-  description: string | null
-  kind: 'personal' | 'team'
+  purpose: string;
+  title: string;
+  description: string | null;
+  kind: 'personal' | 'team';
   /** Display-only minutes projection (booking stays ms end-to-end). */
-  durationsMinutes: number[]
-  hosts: MeetingHost[]
+  durationsMinutes: number[];
+  hosts: MeetingHost[];
   /** Earliest bookable slot (epoch ms) from the current-month payload. */
-  nextAvailableMs: number | null
+  nextAvailableMs: number | null;
 }
 
 export interface SchedulingLinksPayload {
-  purposes: Array<{ purpose: string; label: string; links: SchedulingLink[] }>
-  fetchedAt: string
+  purposes: Array<{ purpose: string; label: string; links: SchedulingLink[] }>;
+  fetchedAt: string;
 }
 
 export interface MeetingFormField {
-  name: string
-  label: string
-  type: string
-  required: boolean
-  options?: string[]
+  name: string;
+  label: string;
+  type: string;
+  required: boolean;
+  options?: string[];
 }
 
 /**
@@ -100,16 +100,16 @@ export interface MeetingFormField {
  * `communicationTypeId`.
  */
 export interface MeetingLegalConsent {
-  processingConsentText: string
-  processingConsentCheckboxLabel: string | null
-  communicationConsentText: string | null
+  processingConsentText: string;
+  processingConsentCheckboxLabel: string | null;
+  communicationConsentText: string | null;
   communicationConsentCheckboxes: Array<{
-    communicationTypeId: string
-    label: string
-    required: boolean
-  }>
-  privacyPolicyText: string | null
-  isLegitimateInterest: boolean
+    communicationTypeId: string;
+    label: string;
+    required: boolean;
+  }>;
+  privacyPolicyText: string | null;
+  isLegitimateInterest: boolean;
 }
 
 /**
@@ -118,10 +118,10 @@ export interface MeetingLegalConsent {
  * treatment as the two GETs. Nothing organizer-derived.
  */
 export interface BookingConfirmation {
-  meetingId: string
-  title: string
-  startTimeMs: number
-  durationMs: number
+  meetingId: string;
+  title: string;
+  startTimeMs: number;
+  durationMs: number;
 }
 
 /**
@@ -131,11 +131,7 @@ export interface BookingConfirmation {
  * (escape hatch, not a retry timer); `LINK_GONE` → link deleted upstream.
  */
 export type MeetingBookingErrorCode =
-  | 'SLOT_TAKEN'
-  | 'VALIDATION'
-  | 'LINK_GONE'
-  | 'TEMPORARILY_UNAVAILABLE'
-  | 'MEETING_UNAVAILABLE'
+  'SLOT_TAKEN' | 'VALIDATION' | 'LINK_GONE' | 'TEMPORARILY_UNAVAILABLE' | 'MEETING_UNAVAILABLE';
 
 // ---------------------------------------------------------------------------
 // Field-type vocabulary — ONE set drives the renderer AND the validator
@@ -149,18 +145,18 @@ export type MeetingBookingErrorCode =
  * half-working native form). Exact upstream type strings are pinned against
  * the rollout fixture link — extend here (renderer + validator move together).
  */
-export const SUPPORTED_FORM_FIELD_TYPES = ['text', 'textarea', 'select', 'radio', 'checkbox'] as const
-export type SupportedFormFieldType = (typeof SUPPORTED_FORM_FIELD_TYPES)[number]
+export const SUPPORTED_FORM_FIELD_TYPES = ['text', 'textarea', 'select', 'radio', 'checkbox'] as const;
+export type SupportedFormFieldType = (typeof SUPPORTED_FORM_FIELD_TYPES)[number];
 
 export function isSupportedFormField(field: MeetingFormField): boolean {
-  return (SUPPORTED_FORM_FIELD_TYPES as readonly string[]).includes(field.type)
+  return (SUPPORTED_FORM_FIELD_TYPES as readonly string[]).includes(field.type);
 }
 
 // ---------------------------------------------------------------------------
 // Validators (single home — client widget and server rebuild both use these)
 // ---------------------------------------------------------------------------
 
-const IANA_TZ_RE = /^(?:UTC|[A-Za-z_]+(?:\/[A-Za-z0-9_+\-]+)+)$/
+const IANA_TZ_RE = /^(?:UTC|[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+)+)$/;
 
 /**
  * IANA timezone check. Shape prefilter, then the authoritative resolution
@@ -169,21 +165,21 @@ const IANA_TZ_RE = /^(?:UTC|[A-Za-z_]+(?:\/[A-Za-z0-9_+\-]+)+)$/
  * (verified in Node), which is a legitimate booking zone. Reject, never coerce.
  */
 export function isValidIanaTimezone(tz: string): boolean {
-  if (!IANA_TZ_RE.test(tz)) return false
+  if (!IANA_TZ_RE.test(tz)) return false;
   try {
-    new Intl.DateTimeFormat('en-US', { timeZone: tz })
-    return true
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+    return true;
   } catch {
-    return false
+    return false;
   }
 }
 
 /** BCP-47 locale shape check via `Intl.getCanonicalLocales`. Reject, never coerce. */
 export function isValidBcp47Locale(locale: string): boolean {
   try {
-    return Intl.getCanonicalLocales(locale).length > 0
+    return Intl.getCanonicalLocales(locale).length > 0;
   } catch {
-    return false
+    return false;
   }
 }
 
@@ -209,93 +205,90 @@ export function isValidBcp47Locale(locale: string): boolean {
  * in the visitor's local time) — this schema is the ONLY place a
  * client-supplied zone is accepted; the availability path is UTC-pinned.
  */
-export function makeBookingSchema(
-  formFields: MeetingFormField[],
-  legalConsent: MeetingLegalConsent | null,
-) {
-  const answers: Record<string, z.ZodTypeAny> = {}
+export function makeBookingSchema(formFields: MeetingFormField[], legalConsent: MeetingLegalConsent | null) {
+  const answers: Record<string, z.ZodTypeAny> = {};
   for (const field of formFields) {
-    if (!isSupportedFormField(field)) continue // unsupported types are fail-closed at render time
-    let validator: z.ZodTypeAny
+    if (!isSupportedFormField(field)) continue; // unsupported types are fail-closed at render time
+    let validator: z.ZodTypeAny;
     switch (field.type as SupportedFormFieldType) {
       case 'checkbox':
-        validator = z.boolean()
-        break
+        validator = z.boolean();
+        break;
       case 'select':
       case 'radio':
-        validator = z
-          .string()
-          .refine((v) => !v || (field.options ?? []).includes(v), {
-            message: `Please choose a valid option for ${field.label}`,
-          })
-        break
+        validator = z.string().refine(v => !v || (field.options ?? []).includes(v), {
+          message: `Please choose a valid option for ${field.label}`,
+        });
+        break;
       case 'textarea':
-        validator = z.string().max(5000, { message: `${field.label} is too long` })
-        break
+        validator = z.string().max(5000, { message: `${field.label} is too long` });
+        break;
       case 'text':
       default:
-        validator = z.string().max(1000, { message: `${field.label} is too long` })
-        break
+        validator = z.string().max(1000, { message: `${field.label} is too long` });
+        break;
     }
     if (field.required) {
       validator =
         field.type === 'checkbox'
           ? z.literal(true, { message: `${field.label} is required` })
-          : (validator as z.ZodString).min(1, { message: `${field.label} is required` })
+          : (validator as z.ZodString).min(1, { message: `${field.label} is required` });
     } else if (field.type !== 'checkbox') {
-      validator = (validator as z.ZodString).optional().or(z.literal(''))
+      validator = (validator as z.ZodString).optional().or(z.literal(''));
     } else {
-      validator = z.boolean().optional()
+      validator = z.boolean().optional();
     }
-    answers[field.name] = validator
+    answers[field.name] = validator;
   }
 
   const requiredConsentIds = (legalConsent?.communicationConsentCheckboxes ?? [])
-    .filter((c) => c.required)
-    .map((c) => c.communicationTypeId)
+    .filter(c => c.required)
+    .map(c => c.communicationTypeId);
 
   // A required answer cannot be enforced by an `.optional()` parent object —
   // omitting the `formFields` key entirely would skip every per-question
   // rule. When the link declares at least one required supported question,
   // the object itself is required.
-  const hasRequiredAnswers = formFields.some((f) => isSupportedFormField(f) && f.required)
-  const answersObject = z.object(answers)
+  const hasRequiredAnswers = formFields.some(f => isSupportedFormField(f) && f.required);
+  const answersObject = z.object(answers);
 
-  return z
-    .object({
-      meetingId: z.string().min(1),
-      startTimeMs: z.number().int().positive(),
-      durationMs: z.number().int().positive(),
-      firstName: z.string().min(1, { message: 'First name is required' }).max(255),
-      lastName: z.string().min(1, { message: 'Last name is required' }).max(255),
-      email: z.string().email({ message: 'Please enter a valid email address' }).max(255),
-      timezone: z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' }),
-      locale: z.string().refine(isValidBcp47Locale, { message: 'Invalid locale' }).optional(),
-      // Plain `.optional()` (no `.default()`) so zod's input and output types
-      // match — react-hook-form's zodResolver needs them identical, and the
-      // server handles `undefined` explicitly anyway. REQUIRED when the link
-      // declares required questions (see `hasRequiredAnswers` above).
-      formFields: hasRequiredAnswers ? answersObject : answersObject.optional(),
-      legalConsentResponses: z
-        .array(z.object({ communicationTypeId: z.string(), consented: z.boolean() }))
-        .optional(),
-    })
-    // Object-level rule: `.refine` on an `.optional()` field is skipped when
-    // the field is absent — required consents must reject even on a payload
-    // that omits the array entirely.
-    .superRefine((data, ctx) => {
-      const responses = data.legalConsentResponses ?? []
-      const ok = requiredConsentIds.every((id) =>
-        responses.some((r) => r.communicationTypeId === id && r.consented === true),
-      )
-      if (!ok) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['legalConsentResponses'],
-          message: 'Required consent checkboxes must be accepted',
-        })
-      }
-    })
+  return (
+    z
+      .object({
+        meetingId: z.string().min(1),
+        startTimeMs: z.number().int().positive(),
+        durationMs: z.number().int().positive(),
+        firstName: z.string().min(1, { message: 'First name is required' }).max(255),
+        lastName: z.string().min(1, { message: 'Last name is required' }).max(255),
+        email: z.string().email({ message: 'Please enter a valid email address' }).max(255),
+        timezone: z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' }),
+        locale: z.string().refine(isValidBcp47Locale, { message: 'Invalid locale' }).optional(),
+        // Plain `.optional()` (no `.default()`) so zod's input and output types
+        // match — react-hook-form's zodResolver needs them identical, and the
+        // server handles `undefined` explicitly anyway. REQUIRED when the link
+        // declares required questions (see `hasRequiredAnswers` above).
+        formFields: hasRequiredAnswers ? answersObject : answersObject.optional(),
+        legalConsentResponses: z
+          .array(z.object({ communicationTypeId: z.string(), consented: z.boolean() }))
+          .optional(),
+      })
+      // Object-level rule: `.refine` on an `.optional()` field is skipped when
+      // the field is absent — required consents must reject even on a payload
+      // that omits the array entirely.
+      .superRefine((data, ctx) => {
+        const responses = data.legalConsentResponses ?? [];
+        const ok = requiredConsentIds.every(id =>
+          responses.some(r => r.communicationTypeId === id && r.consented === true),
+        );
+        if (!ok) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['legalConsentResponses'],
+            message: 'Required consent checkboxes must be accepted',
+          });
+        }
+      })
+  );
 }
 
-export type MeetingBookingPayload = z.infer<ReturnType<typeof makeBookingSchema>>
+export type MeetingBookingPayload = z.infer<ReturnType<typeof makeBookingSchema>>;

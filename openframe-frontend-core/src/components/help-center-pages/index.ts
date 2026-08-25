@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Help Center pages — ready-made, full-page components (each owns the canonical
@@ -17,25 +17,19 @@
 
 // New combined pages. (The Help Center *index* landing is intentionally NOT
 // here — it stays a host-local page; its links + icons are app-specific.)
-export { RoadmapPage, type RoadmapPageProps } from './roadmap-page'
-export { ProductReleasesListPage, type ProductReleasesListPageProps } from './product-releases-list-page'
-export { DeliveryPage, type DeliveryPageProps } from './delivery-page'
-export {
-  OnboardingGuidesCatalogPage,
-  type OnboardingGuidesCatalogPageProps,
-} from './onboarding-guides-catalog-page'
+export { RoadmapPage, type RoadmapPageProps } from './roadmap-page';
+export { ProductReleasesListPage, type ProductReleasesListPageProps } from './product-releases-list-page';
+export { DeliveryPage, type DeliveryPageProps } from './delivery-page';
+export { OnboardingGuidesCatalogPage, type OnboardingGuidesCatalogPageProps } from './onboarding-guides-catalog-page';
 
 // Existing full-pages re-exported for a single Help Center import site.
-export { FaqDocumentPage, type FaqDocumentPageProps } from '../faq'
-export { LegalDocumentPage, type LegalDocumentPageProps } from '../shared/legal-document'
+export { FaqDocumentPage, type FaqDocumentPageProps } from '../faq';
+export { LegalDocumentPage, type LegalDocumentPageProps } from '../shared/legal-document';
 export {
   ReleaseDetailPage,
   type ReleaseDetailPageProps,
   type VideoDisplaySectionProps,
-} from '../shared/product-release'
-export {
-  OnboardingGuideDetailView,
-  type OnboardingGuideDetailViewProps,
-} from '../onboarding-guides'
-export { DocsHubPage } from '../docs'
-export { HelpCenterList } from '../tickets'
+} from '../shared/product-release';
+export { OnboardingGuideDetailView, type OnboardingGuideDetailViewProps } from '../onboarding-guides';
+export { DocsHubPage } from '../docs';
+export { HelpCenterList } from '../tickets';

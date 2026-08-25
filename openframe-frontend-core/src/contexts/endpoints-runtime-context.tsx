@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Endpoints runtime — sibling of ChatRuntime. Carries the API path
@@ -21,22 +21,22 @@
  * trigger unnecessary re-fetches.
  */
 
-import { createContext, useContext } from 'react'
+import { createContext, useContext } from 'react';
 
 export interface EndpointsRuntime {
   /** GET active announcement (used by `<AnnouncementBar>` mount fetch + refocus revalidation). */
-  announcementsUrl: string
+  announcementsUrl: string;
   accessCode: {
     /** POST validate access code. */
-    validateUrl: string
+    validateUrl: string;
     /** POST consume / redeem access code after registration. */
-    consumeUrl: string
-  }
+    consumeUrl: string;
+  };
   /** POST contact-form submission. */
-  contactUrl: string
+  contactUrl: string;
 }
 
-export const EndpointsRuntimeContext = createContext<EndpointsRuntime | null>(null)
+export const EndpointsRuntimeContext = createContext<EndpointsRuntime | null>(null);
 
 /**
  * Optional read — returns null when no provider is mounted. Use for
@@ -44,7 +44,7 @@ export const EndpointsRuntimeContext = createContext<EndpointsRuntime | null>(nu
  * polling on a page rendered outside the provider tree).
  */
 export function useEndpointsRuntime(): EndpointsRuntime | null {
-  return useContext(EndpointsRuntimeContext)
+  return useContext(EndpointsRuntimeContext);
 }
 
 /**
@@ -55,14 +55,14 @@ export function useEndpointsRuntime(): EndpointsRuntime | null {
  * `<EndpointsRuntimeContext.Provider value={mockedEndpoints}>`.
  */
 export function useRequiredEndpointsRuntime(): EndpointsRuntime {
-  const v = useContext(EndpointsRuntimeContext)
+  const v = useContext(EndpointsRuntimeContext);
   if (!v) {
     throw new Error(
       '[endpoints-runtime] hook called outside an <EndpointsRuntimeContext.Provider>. ' +
         'Hub: mount <HubRuntimeProvider> in your providers tree. ' +
         'Embedded app: mount your own provider with proxied URLs at the tree root. ' +
         'Tests/Storybook: wrap render() in <EndpointsRuntimeContext.Provider value={mocked}>.',
-    )
+    );
   }
-  return v
+  return v;
 }

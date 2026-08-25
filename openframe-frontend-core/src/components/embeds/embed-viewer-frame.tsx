@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { EmbedIframe } from './embed-iframe'
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import { EmbedIframe } from './embed-iframe';
 
 /**
  * EmbedViewerFrame — the ONE viewer shell shared by every embed viewer
@@ -28,23 +28,23 @@ import { EmbedIframe } from './embed-iframe'
  */
 export interface EmbedViewerFrameProps {
   /** Header icon, already sized by the caller (the viewers pass `w-5 h-5`). */
-  icon: React.ReactNode
-  title: string
+  icon: React.ReactNode;
+  title: string;
   /** `h3` = `h2.text-h3` (sheets/pdf, default); `h6` = `span.text-h6 font-semibold` (figma). */
-  titleVariant?: 'h3' | 'h6'
+  titleVariant?: 'h3' | 'h6';
   /** Rendered verbatim in the header row — the caller owns its own container/state. */
-  actions?: React.ReactNode
+  actions?: React.ReactNode;
   /** Iframe source; falsy renders the inline empty state under the header. */
-  src: string | null | undefined
+  src: string | null | undefined;
   /** Large icon for the inline empty state (the viewers pass `w-16 h-16`). */
-  emptyIcon?: React.ReactNode
-  emptyMessage?: string
-  height?: string
-  allow?: string
-  allowFullScreen?: boolean
-  loading?: 'eager' | 'lazy'
+  emptyIcon?: React.ReactNode;
+  emptyMessage?: string;
+  height?: string;
+  allow?: string;
+  allowFullScreen?: boolean;
+  loading?: 'eager' | 'lazy';
   /** Wrapper classes; defaults to the sheets/pdf `space-y-4`. */
-  className?: string
+  className?: string;
 }
 
 export function EmbedViewerFrame({
@@ -64,12 +64,12 @@ export function EmbedViewerFrame({
   return (
     <div className={cn('space-y-4', className)}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
           {icon}
           {titleVariant === 'h3' ? (
-            <h2 className="text-h3 text-ods-text-primary truncate">{title}</h2>
+            <h2 className="truncate text-ods-text-primary text-h3">{title}</h2>
           ) : (
-            <span className="text-h6 font-semibold text-ods-text-primary truncate">{title}</span>
+            <span className="truncate font-semibold text-ods-text-primary text-h6">{title}</span>
           )}
         </div>
         {actions}
@@ -90,5 +90,5 @@ export function EmbedViewerFrame({
         </div>
       )}
     </div>
-  )
+  );
 }

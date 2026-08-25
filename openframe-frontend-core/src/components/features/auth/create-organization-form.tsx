@@ -1,64 +1,64 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../../utils/cn'
-import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
-import { Button } from '../../ui/button'
-import { CheckboxBlock } from '../../ui/checkbox-block'
-import { Input } from '../../ui/input'
-import type { AuthSsoProvider } from './sso-providers'
-import { SsoProviderButtons } from './sso-providers'
-import { TermsAgreementLabel } from './terms-agreement-label'
+import type { KeyboardEvent, ReactNode } from 'react';
+import { useDeferredError } from '../../../hooks/ui/use-deferred-error';
+import { cn } from '../../../utils/cn';
+import { Button } from '../../ui/button';
+import { CheckboxBlock } from '../../ui/checkbox-block';
+import { Input } from '../../ui/input';
+import type { AuthSsoProvider } from './sso-providers';
+import { SsoProviderButtons } from './sso-providers';
+import { TermsAgreementLabel } from './terms-agreement-label';
 
 export interface CreateOrganizationFormProps {
   /** Controlled field values */
-  email: string
-  organizationName: string
-  domain: string
-  agreedToTerms: boolean
+  email: string;
+  organizationName: string;
+  domain: string;
+  agreedToTerms: boolean;
   /** Change handlers */
-  onEmailChange: (value: string) => void
-  onOrganizationNameChange: (value: string) => void
-  onDomainChange: (value: string) => void
-  onAgreedToTermsChange: (checked: boolean) => void
+  onEmailChange: (value: string) => void;
+  onOrganizationNameChange: (value: string) => void;
+  onDomainChange: (value: string) => void;
+  onAgreedToTermsChange: (checked: boolean) => void;
   /** Primary submit ("Continue") */
-  onSubmit: () => void
+  onSubmit: () => void;
   /** Suffix rendered inside the domain input, e.g. ".openframe.ai" */
-  domainSuffix?: string
-  domainPlaceholder?: string
-  termsUrl?: string
-  privacyPolicyUrl?: string
-  submitLabel?: string
+  domainSuffix?: string;
+  domainPlaceholder?: string;
+  termsUrl?: string;
+  privacyPolicyUrl?: string;
+  submitLabel?: string;
   /** Disables just the primary submit (fields stay editable). */
-  submitDisabled?: boolean
-  loading?: boolean
-  disabled?: boolean
+  submitDisabled?: boolean;
+  loading?: boolean;
+  disabled?: boolean;
   errors?: {
-    email?: string
-    organizationName?: string
-    domain?: string
-    terms?: string
-  }
+    email?: string;
+    organizationName?: string;
+    domain?: string;
+    terms?: string;
+  };
   /** Informational status under the email field (e.g. live availability). `errors.email` wins. */
-  emailStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' }
+  emailStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' };
   /** Informational status under the domain field (e.g. live availability). `errors.domain` wins. */
-  domainStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' }
+  domainStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' };
   /** Extra content rendered under the domain field, e.g. suggested available domains. */
-  domainSlot?: React.ReactNode
+  domainSlot?: ReactNode;
   /**
    * SSO registration alternatives rendered below the primary submit behind an
    * "or continue with" divider. The form fields stay editable — gate the
    * buttons with `ssoDisabled` (e.g. until the form validates).
    */
-  ssoProviders?: AuthSsoProvider[]
-  onSsoClick?: (provider: AuthSsoProvider) => void
+  ssoProviders?: AuthSsoProvider[];
+  onSsoClick?: (provider: AuthSsoProvider) => void;
   /** Disables the provider buttons (e.g. until the form validates). */
-  ssoDisabled?: boolean
+  ssoDisabled?: boolean;
   /** Verb prefix for provider buttons, e.g. "Continue with". Ignored for "openframe". */
-  ssoActionLabel?: string
+  ssoActionLabel?: string;
   /** Divider text between the primary submit and the SSO buttons. */
-  dividerLabel?: string
-  className?: string
+  dividerLabel?: string;
+  className?: string;
 }
 
 /**
@@ -95,19 +95,19 @@ export function CreateOrganizationForm({
   dividerLabel = 'or continue with',
   className,
 }: CreateOrganizationFormProps) {
-  const hasSso = !!ssoProviders && ssoProviders.length > 0
-  const fieldsDisabled = disabled || loading
+  const hasSso = !!ssoProviders && ssoProviders.length > 0;
+  const fieldsDisabled = disabled || loading;
 
   // Validation messages are deferred while the user is typing (shown on blur or after a pause).
-  const emailErr = useDeferredError(errors?.email, email)
-  const orgNameErr = useDeferredError(errors?.organizationName, organizationName)
-  const domainErr = useDeferredError(errors?.domain, domain)
+  const emailErr = useDeferredError(errors?.email, email);
+  const orgNameErr = useDeferredError(errors?.organizationName, organizationName);
+  const domainErr = useDeferredError(errors?.domain, domain);
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldsDisabled) {
-      onSubmit()
+      onSubmit();
     }
-  }
+  };
 
   return (
     <div
@@ -118,8 +118,8 @@ export function CreateOrganizationForm({
     >
       {/* Header */}
       <div className="flex flex-col">
-        <h1 className="text-h2 text-ods-text-primary tracking-[-0.64px]">Create Organization</h1>
-        <p className="text-h4 text-ods-text-secondary">Start your journey with OpenFrame.</p>
+        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">Create Organization</h1>
+        <p className="text-ods-text-secondary text-h4">Start your journey with OpenFrame.</p>
       </div>
 
       {/* Email + Organization Name — single column on every breakpoint */}
@@ -132,7 +132,7 @@ export function CreateOrganizationForm({
         errorVariant={emailErr.error ? 'error' : emailStatus?.variant}
         disabled={fieldsDisabled}
         onBlur={emailErr.onBlur}
-        onChange={(event) => onEmailChange(event.target.value)}
+        onChange={event => onEmailChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
       <Input
@@ -142,7 +142,7 @@ export function CreateOrganizationForm({
         error={orgNameErr.error}
         disabled={fieldsDisabled}
         onBlur={orgNameErr.onBlur}
-        onChange={(event) => onOrganizationNameChange(event.target.value)}
+        onChange={event => onOrganizationNameChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
 
@@ -157,7 +157,7 @@ export function CreateOrganizationForm({
           disabled={fieldsDisabled}
           onBlur={domainErr.onBlur}
           endAdornment={domainSuffix ? <span className="whitespace-nowrap">{domainSuffix}</span> : undefined}
-          onChange={(event) => onDomainChange(event.target.value)}
+          onChange={event => onDomainChange(event.target.value)}
           onKeyDown={handleKeyDown}
         />
         {domainSlot && <div className="pt-[var(--spacing-system-s)]">{domainSlot}</div>}
@@ -191,11 +191,11 @@ export function CreateOrganizationForm({
         <>
           <div className="flex items-center gap-[var(--spacing-system-s)]">
             <div className="h-px flex-1 bg-ods-border" />
-            <span className="text-h6 text-ods-text-secondary">{dividerLabel}</span>
+            <span className="text-ods-text-secondary text-h6">{dividerLabel}</span>
             <div className="h-px flex-1 bg-ods-border" />
           </div>
           <SsoProviderButtons
-            providers={ssoProviders!}
+            providers={ssoProviders}
             onSsoClick={onSsoClick}
             actionLabel={ssoActionLabel}
             disabled={disabled || loading || ssoDisabled}
@@ -203,5 +203,5 @@ export function CreateOrganizationForm({
         </>
       )}
     </div>
-  )
+  );
 }

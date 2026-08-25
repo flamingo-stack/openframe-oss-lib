@@ -1,11 +1,10 @@
-'use client'
+'use client';
 
-import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
-import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
-import { preserveOffsetOnSource } from '@atlaskit/pragmatic-drag-and-drop/element/preserve-offset-on-source'
-import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview'
-import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
-import Link from '../../../embed-shims/next-link'
+import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { preserveOffsetOnSource } from '@atlaskit/pragmatic-drag-and-drop/element/preserve-offset-on-source';
+import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview';
 import {
   memo,
   useEffect,
@@ -16,7 +15,12 @@ import {
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
-} from 'react'
+} from 'react';
+import Link from '../../../embed-shims/next-link';
+import { cn } from '../../../utils/cn';
+import { formatTicketRelativeTime, formatTicketFullTimestamp } from '../../../utils/date-utils';
+import { holdMoveDragEffect } from '../../../utils/drag-effect';
+import { getReadableTextColor } from '../../../utils/ods-color-utils';
 import {
   ClockIcon,
   DotsLoaderIcon,
@@ -24,50 +28,46 @@ import {
   Flag02Icon,
   MessagesIcon,
   UserCheckIcon,
-} from '../../icons-v2-generated'
-import { DeletedUserAvatar } from '../../ui/deleted-user-avatar'
-import { SquareAvatar } from '../../ui/square-avatar'
-import { Tag } from '../../ui/tag'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip'
-import { cn } from '../../../utils/cn'
-import { holdMoveDragEffect } from '../../../utils/drag-effect'
-import { getReadableTextColor } from '../../../utils/ods-color-utils'
-import { formatTicketRelativeTime, formatTicketFullTimestamp } from '../../../utils/date-utils'
-import { BoardTicketApproval } from './board-ticket-approval'
-import { useBoardLift, useDropAim } from './drop-aim'
-import { useIsLanding } from './pending-move'
-import { DROP_LINE_ATTRIBUTE } from './lane-geometry'
-import { TICKET_ID_ATTRIBUTE } from './use-lane-scroll-anchor'
-import type { BoardPriority, BoardTicket, BoardTicketActivityKind } from './types'
+} from '../../icons-v2-generated';
+import { DeletedUserAvatar } from '../../ui/deleted-user-avatar';
+import { SquareAvatar } from '../../ui/square-avatar';
+import { Tag } from '../../ui/tag';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip';
+import { BoardTicketApproval } from './board-ticket-approval';
+import { useBoardLift, useDropAim } from './drop-aim';
+import { DROP_LINE_ATTRIBUTE } from './lane-geometry';
+import { useIsLanding } from './pending-move';
+import type { BoardPriority, BoardTicket, BoardTicketActivityKind } from './types';
+import { TICKET_ID_ATTRIBUTE } from './use-lane-scroll-anchor';
 
 const PRIORITY_COLOR_CLASS: Record<BoardPriority, string> = {
   low: 'text-ods-text-secondary',
   medium: 'text-ods-info',
   high: 'text-ods-warning',
   urgent: 'text-ods-error',
-}
+};
 
 /** How faded the card is where it would land. Matches what dnd-kit left behind. */
-const DRAGGED_CARD_OPACITY = 0.4
+const DRAGGED_CARD_OPACITY = 0.4;
 
 /** How solid the card under the pointer is. Jira's look: carried, not lifted off
  *  the page entirely. */
-export const DRAG_PREVIEW_OPACITY = 0.9
+export const DRAG_PREVIEW_OPACITY = 0.9;
 
-const MAX_VISIBLE_TAGS = 2
-const MAX_VISIBLE_ASSIGNEES = 3
+const MAX_VISIBLE_TAGS = 2;
+const MAX_VISIBLE_ASSIGNEES = 3;
 
 const ACTIVITY_DEFAULT_LABEL: Record<BoardTicketActivityKind, string> = {
   'ai-working': 'AI assistant is working',
   'user-typing': 'User typing',
   'waiting-external': 'Waiting for client response',
   stale: 'No activity',
-}
+};
 
 /** Shared card shell (border / padding / bg). Same footprint for the draggable
  *  board card and the static {@link TicketCardView}. */
 const TICKET_CARD_SHELL =
-  'relative flex flex-col gap-[var(--spacing-system-sf)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] select-none text-left'
+  'relative flex flex-col gap-[var(--spacing-system-sf)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] select-none text-left';
 
 // =============================================================================
 // Presentational body — the ONE ticket-card design, no drag/link/board context.
@@ -75,25 +75,25 @@ const TICKET_CARD_SHELL =
 // =============================================================================
 
 export interface TicketCardBodyProps {
-  ticket: BoardTicket
-  columnColor?: string
-  renderAssignSlot?: (ticket: BoardTicket) => ReactNode
+  ticket: BoardTicket;
+  columnColor?: string;
+  renderAssignSlot?: (ticket: BoardTicket) => ReactNode;
   /** Approval callbacks receive the request id directly (the draggable
    *  `TicketCard` adapts its own `(ticketId, requestId)` signature onto these). */
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
+  onApprove?: (requestId?: string) => void | Promise<void>;
+  onReject?: (requestId?: string) => void | Promise<void>;
 }
 
 /** The card's inner content: title + device/org, priority + assignees, tags,
  *  timestamp, "New Message", and the approval row. Pure — driven only by props. */
 export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprove, onReject }: TicketCardBodyProps) {
-  const showNewMessage = !!ticket.hasNewMessage && !!columnColor
-  const newMessageTextColor = columnColor ? getReadableTextColor(columnColor) : undefined
+  const showNewMessage = !!ticket.hasNewMessage && !!columnColor;
+  const newMessageTextColor = columnColor ? getReadableTextColor(columnColor) : undefined;
 
-  const showDeviceRow = !!(ticket.deviceHostnames?.length || ticket.organizationName)
-  const deviceText = [ticket.deviceHostnames?.join(', '), ticket.organizationName].filter(Boolean).join(', ')
+  const showDeviceRow = !!(ticket.deviceHostnames?.length || ticket.organizationName);
+  const deviceText = [ticket.deviceHostnames?.join(', '), ticket.organizationName].filter(Boolean).join(', ');
 
-  const hasRightSection = !!(ticket.priority || ticket.assignees?.length || renderAssignSlot)
+  const hasRightSection = !!(ticket.priority || ticket.assignees?.length || renderAssignSlot);
   const rightSection = hasRightSection ? (
     <div className="pointer-events-auto flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
       {ticket.priority && (
@@ -106,42 +106,50 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
         renderAssignSlot(ticket)
       ) : ticket.assignees?.length ? (
         <div className="flex -space-x-2">
-          {ticket.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map(a =>
-            a.deleted ? (
-              <DeletedUserAvatar key={a.id} size="sm" accessibleLabel={`Deleted user: ${a.name ?? a.initials ?? a.id}`} />
-            ) : (
-              <SquareAvatar
-                key={a.id}
-                src={a.avatarUrl}
-                alt={a.name ?? a.initials ?? a.id}
-                fallback={a.name ?? a.initials}
-                size="sm"
-                variant="round"
-              />
-            ),
-          )}
+          {ticket.assignees
+            .slice(0, MAX_VISIBLE_ASSIGNEES)
+            .map(a =>
+              a.deleted ? (
+                <DeletedUserAvatar
+                  key={a.id}
+                  size="sm"
+                  accessibleLabel={`Deleted user: ${a.name ?? a.initials ?? a.id}`}
+                />
+              ) : (
+                <SquareAvatar
+                  key={a.id}
+                  src={a.avatarUrl}
+                  alt={a.name ?? a.initials ?? a.id}
+                  fallback={a.name ?? a.initials}
+                  size="sm"
+                  variant="round"
+                />
+              ),
+            )}
           {ticket.assignees.length > MAX_VISIBLE_ASSIGNEES && (
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-h6 text-ods-text-secondary">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-ods-text-secondary text-h6">
               +{ticket.assignees.length - MAX_VISIBLE_ASSIGNEES}
             </div>
           )}
         </div>
       ) : null}
     </div>
-  ) : null
+  ) : null;
 
-  const timestampLabel = ticket.createdAt ? formatTicketRelativeTime(ticket.createdAt) : null
-  const tooltipLabel = ticket.createdAt ? formatTicketFullTimestamp(ticket.createdAt) : null
+  const timestampLabel = ticket.createdAt ? formatTicketRelativeTime(ticket.createdAt) : null;
+  const tooltipLabel = ticket.createdAt ? formatTicketFullTimestamp(ticket.createdAt) : null;
 
   return (
     <>
       <div className="flex items-start gap-[var(--spacing-system-sf)]">
         <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-zero)]" title={ticket.title}>
-          <p className="text-h3 truncate text-ods-text-primary">{ticket.title}</p>
+          <p className="truncate text-ods-text-primary text-h3">{ticket.title}</p>
           {showDeviceRow && (
-            <div className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)] text-h6 text-ods-text-secondary">
+            <div className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)] text-ods-text-secondary text-h6">
               <LaptopIcon className="size-4 shrink-0" />
-              <span className="truncate" title={deviceText}>{deviceText}</span>
+              <span className="truncate" title={deviceText}>
+                {deviceText}
+              </span>
             </div>
           )}
         </div>
@@ -152,14 +160,14 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <p className="pointer-events-auto text-h6 truncate text-ods-text-secondary">{timestampLabel}</p>
+              <p className="pointer-events-auto truncate text-ods-text-secondary text-h6">{timestampLabel}</p>
             </TooltipTrigger>
             <TooltipContent>{tooltipLabel}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       )}
       {ticket.escalatedByUser && (
-        <div className="flex items-center gap-[var(--spacing-system-xxs)] text-h6 text-ods-open-yellow">
+        <div className="flex items-center gap-[var(--spacing-system-xxs)] text-ods-open-yellow text-h6">
           <UserCheckIcon className="size-4 shrink-0" />
           <span className="truncate">Escalated by User</span>
         </div>
@@ -191,7 +199,7 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
         <BoardTicketApproval pendingApproval={ticket.pendingApproval} onApprove={onApprove} onReject={onReject} />
       )}
     </>
-  )
+  );
 }
 
 // =============================================================================
@@ -200,10 +208,10 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
 // =============================================================================
 
 export interface TicketCardViewProps extends TicketCardBodyProps {
-  className?: string
+  className?: string;
   /** Merged over the shell's own — the board uses it to fade the copy it leaves
    *  behind and to place the one that follows the pointer. */
-  style?: CSSProperties
+  style?: CSSProperties;
 }
 
 /**
@@ -212,8 +220,8 @@ export interface TicketCardViewProps extends TicketCardBodyProps {
  * anywhere from static props. Use this outside a `<Board>`.
  */
 export function TicketCardView({ className, style, ...bodyProps }: TicketCardViewProps) {
-  const { ticket, columnColor } = bodyProps
-  const showNewMessage = !!ticket.hasNewMessage && !!columnColor
+  const { ticket, columnColor } = bodyProps;
+  const showNewMessage = !!ticket.hasNewMessage && !!columnColor;
   return (
     <div
       className={cn(TICKET_CARD_SHELL, className)}
@@ -223,7 +231,7 @@ export function TicketCardView({ className, style, ...bodyProps }: TicketCardVie
         <TicketCardBody {...bodyProps} />
       </div>
     </div>
-  )
+  );
 }
 
 // =============================================================================
@@ -231,20 +239,20 @@ export function TicketCardView({ className, style, ...bodyProps }: TicketCardVie
 // =============================================================================
 
 export interface TicketCardProps {
-  ticket: BoardTicket
-  columnId: string
-  columnColor?: string
-  href?: string
-  dragDisabled?: boolean
+  ticket: BoardTicket;
+  columnId: string;
+  columnColor?: string;
+  href?: string;
+  dragDisabled?: boolean;
   /** The owning column's drop rules. A card is a drop target in its own right,
    *  and Pragmatic does not let a lane's `canDrop` veto its children — so the
    *  rules have to be answered here too, or a blocked lane still accepts a drop
    *  straight onto one of its cards. */
-  dropDisabled?: boolean
-  allowedFromColumns?: string[]
-  renderAssignSlot?: (ticket: BoardTicket) => ReactNode
-  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
-  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
+  dropDisabled?: boolean;
+  allowedFromColumns?: string[];
+  renderAssignSlot?: (ticket: BoardTicket) => ReactNode;
+  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>;
+  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>;
 }
 
 /** Memoized: a drag moves one card, but it re-renders the column lists around
@@ -252,7 +260,7 @@ export interface TicketCardProps {
  *  must pass stable `renderAssignSlot` / `onApprove` / `onReject` (useCallback)
  *  for this to bite — an inline arrow re-renders every card on every keystroke
  *  anywhere in the page. */
-export const TicketCard = memo(function TicketCard({
+export const TicketCard = memo(function TicketCardImpl({
   ticket,
   columnId,
   columnColor,
@@ -264,21 +272,26 @@ export const TicketCard = memo(function TicketCard({
   onApprove,
   onReject,
 }: TicketCardProps) {
-  const ref = useRef<HTMLDivElement>(null)
+  const ref = useRef<HTMLDivElement>(null);
   // Read at drag start rather than captured: the registration below is keyed on
   // the ticket's id, so capturing the object would hand a renamed or re-tagged
   // ticket to the drag — and to the preview drawn from it — as it was when the
   // card first mounted.
-  const ticketRef = useRef(ticket)
-  ticketRef.current = ticket
-  const [isDragging, setIsDragging] = useState(false)
+  // Refreshed in an unconditional effect rather than in the render body: it is
+  // only ever read at drag start, which is past a commit, and a render attempt
+  // React discards must not be able to hand the drag a ticket nobody saw.
+  const ticketRef = useRef(ticket);
+  useEffect(() => {
+    ticketRef.current = ticket;
+  });
+  const [isDragging, setIsDragging] = useState(false);
   // Set by the board for the moment after a drop in which this card is already
   // in its new slot and the drag preview is still gliding into it.
-  const isLanding = useIsLanding(ticket.id)
+  const isLanding = useIsLanding(ticket.id);
 
   // Where the drop points, worked out once for the whole board — see
   // `drop-aim.ts` for why this stopped being each card's own business.
-  const aim = useDropAim()
+  const aim = useDropAim();
   // Matched on the LANE as well as the card, and both halves are load-bearing.
   // The board resolves one landing place, in one named lane; a ticket id is only
   // unique within a lane here, because each lane is its own query and a ticket
@@ -286,30 +299,30 @@ export const TicketCard = memo(function TicketCard({
   // caught up. Matching on the id alone drew the line in both lanes at once —
   // including a lane that refuses the card altogether, since the aim it was
   // drawing came from the other one.
-  const closestEdge = aim && aim.columnId === columnId && aim.ticketId === ticket.id ? aim.edge : null
+  const closestEdge = aim && aim.columnId === columnId && aim.ticketId === ticket.id ? aim.edge : null;
   // Not lane-scoped, and deliberately: `aim.columnId` is where the card is
   // GOING, while the card being carried is still sitting in the lane it came
   // from. True for a pointer drag and for a keyboard lift alike — the aim always
   // names the card being moved, whichever picked it up.
-  const isSource = isDragging || aim?.ticket.id === ticket.id
+  const isSource = isDragging || aim?.ticket.id === ticket.id;
 
-  const lift = useBoardLift()
+  const lift = useBoardLift();
   const handleKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     // Space lifts; Enter is left to the link, which opens the ticket.
-    if (e.key !== ' ' || dragDisabled || !lift) return
-    e.preventDefault()
-    lift(ticket.id)
-  }
+    if (e.key !== ' ' || dragDisabled || !lift) return;
+    e.preventDefault();
+    lift(ticket.id);
+  };
 
   // Both roles live on the same element, and both keep their state HERE. That is
   // the point of the whole drag stack: hovering this card re-renders this card,
   // not the board — nothing subscribes upward, so cost does not grow with how
   // many cards are mounted.
   useEffect(() => {
-    const element = ref.current
-    if (!element || dragDisabled) return
+    const element = ref.current;
+    if (!element || dragDisabled) return undefined;
 
-    const identity = { type: 'ticket' as const, ticketId: ticket.id, columnId }
+    const identity = { type: 'ticket' as const, ticketId: ticket.id, columnId };
 
     return combine(
       // Before anything else: the drag has to start as a "move", or its first
@@ -339,21 +352,21 @@ export const TicketCard = memo(function TicketCard({
          * and no chance of it rendering a loading state into the picture.
          */
         onGenerateDragPreview: ({ nativeSetDragImage, location, source }) => {
-          const { width } = source.element.getBoundingClientRect()
+          const { width } = source.element.getBoundingClientRect();
           setCustomNativeDragPreview({
             nativeSetDragImage,
             // Holds the card under the same part of itself it was grabbed by.
             getOffset: preserveOffsetOnSource({ element: source.element, input: location.current.input }),
             render: ({ container }) => {
-              const clone = source.element.cloneNode(true) as HTMLElement
+              const clone = source.element.cloneNode(true) as HTMLElement;
               // The card is a flex item stretched by its lane; on its own it
               // would shrink to its contents.
-              clone.style.width = `${width}px`
-              clone.style.opacity = String(DRAG_PREVIEW_OPACITY)
-              clone.classList.add('shadow-card-hover')
-              container.appendChild(clone)
+              clone.style.width = `${width}px`;
+              clone.style.opacity = String(DRAG_PREVIEW_OPACITY);
+              clone.classList.add('shadow-card-hover');
+              container.appendChild(clone);
             },
-          })
+          });
         },
         onDragStart: () => setIsDragging(true),
         onDrop: () => setIsDragging(false),
@@ -361,11 +374,11 @@ export const TicketCard = memo(function TicketCard({
       dropTargetForElements({
         element,
         canDrop: ({ source }) => {
-          if (source.data.type !== 'ticket' || source.data.ticketId === ticket.id) return false
-          const from = String(source.data.columnId)
-          if (from === columnId) return true
-          if (dropDisabled) return false
-          return !allowedFromColumns || allowedFromColumns.includes(from)
+          if (source.data.type !== 'ticket' || source.data.ticketId === ticket.id) return false;
+          const from = String(source.data.columnId);
+          if (from === columnId) return true;
+          if (dropDisabled) return false;
+          return !allowedFromColumns || allowedFromColumns.includes(from);
         },
         // The edge rides along in the drop target's own data, so the board reads
         // "above or below this card" straight off the drop it receives.
@@ -380,17 +393,17 @@ export const TicketCard = memo(function TicketCard({
         // reaching room a card has opened: nothing moves during a drag here.
         getIsSticky: () => true,
       }),
-    )
-  }, [ticket.id, columnId, dragDisabled, dropDisabled, allowedFromColumns])
+    );
+  }, [ticket.id, columnId, dragDisabled, dropDisabled, allowedFromColumns]);
 
-  const showNewMessage = !!ticket.hasNewMessage && !!columnColor
+  const showNewMessage = !!ticket.hasNewMessage && !!columnColor;
 
-  const style: CSSProperties = {}
-  if (showNewMessage) style.borderColor = columnColor
+  const style: CSSProperties = {};
+  if (showNewMessage) style.borderColor = columnColor;
 
   const handleClick = (e: MouseEvent) => {
-    if (isDragging) e.preventDefault()
-  }
+    if (isDragging) e.preventDefault();
+  };
 
   // Held as one memoized element, not re-created per render. A card being
   // dragged over re-renders on every edge flip — it owns the hover state that
@@ -409,14 +422,14 @@ export const TicketCard = memo(function TicketCard({
       />
     ),
     [ticket, columnColor, renderAssignSlot, onApprove, onReject],
-  )
+  );
 
   // No transition on the margins below, and that is not a style choice: room is
   // opened at one card and given back at another, and a transition interrupted
   // part-way — which is every target change while the pointer keeps moving —
   // restarts from where it got to, so the two ends run at different rates and
   // the lane's height wanders. The rearrangement is instant instead.
-  const cardClasses = cn(TICKET_CARD_SHELL, !dragDisabled && 'cursor-pointer')
+  const cardClasses = cn(TICKET_CARD_SHELL, !dragDisabled && 'cursor-pointer');
 
   const outerProps = {
     ref,
@@ -425,9 +438,9 @@ export const TicketCard = memo(function TicketCard({
     // Read by the lane's scroll anchor to keep the list still when tickets are
     // inserted above the viewport — see `use-lane-scroll-anchor.ts`.
     [TICKET_ID_ATTRIBUTE]: ticket.id,
-  }
+  };
 
-  const innerWrapperClass = 'relative z-10 flex flex-col gap-[var(--spacing-system-sf)]'
+  const innerWrapperClass = 'relative z-10 flex flex-col gap-[var(--spacing-system-sf)]';
 
   if (isSource) {
     // Stays exactly where it is, faded. NOTHING about the lane moves during a
@@ -438,12 +451,12 @@ export const TicketCard = memo(function TicketCard({
     // Safe to do from state: React commits this AFTER the `dragstart` handler
     // returns, and it is only removing the source synchronously inside that
     // handler that lets a browser abort the drag.
-    style.opacity = DRAGGED_CARD_OPACITY
+    style.opacity = DRAGGED_CARD_OPACITY;
   } else if (isLanding) {
     // Already here, and the preview is on its way to this exact box. Hidden and
     // not removed: the slot it holds is what the preview is aiming at, and it is
     // what keeps the lane from moving again the instant it settled.
-    style.visibility = 'hidden'
+    style.visibility = 'hidden';
   }
 
   /**
@@ -471,7 +484,7 @@ export const TicketCard = memo(function TicketCard({
         closestEdge === 'top' ? '-top-[5px]' : '-bottom-[5px]',
       )}
     />
-  ) : null
+  ) : null;
 
   if (href) {
     return (
@@ -489,7 +502,7 @@ export const TicketCard = memo(function TicketCard({
         />
         <div className={cn('pointer-events-none', innerWrapperClass)}>{body}</div>
       </div>
-    )
+    );
   }
 
   return (
@@ -505,12 +518,12 @@ export const TicketCard = memo(function TicketCard({
       />
       <div className={cn('pointer-events-none', innerWrapperClass)}>{body}</div>
     </div>
-  )
-})
+  );
+});
 
 function TicketTagRow({ tags }: { tags: string[] }) {
-  const visible = tags.slice(0, MAX_VISIBLE_TAGS)
-  const hidden = tags.length - visible.length
+  const visible = tags.slice(0, MAX_VISIBLE_TAGS);
+  const hidden = tags.length - visible.length;
 
   return (
     <div className="flex h-8 flex-wrap items-start gap-[var(--spacing-system-xxs)] overflow-clip">
@@ -519,5 +532,5 @@ function TicketTagRow({ tags }: { tags: string[] }) {
       ))}
       {hidden > 0 && <Tag variant="outline" label={`+${hidden}`} />}
     </div>
-  )
+  );
 }

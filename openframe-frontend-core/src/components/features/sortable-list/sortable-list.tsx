@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
-import { dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
-import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/utils/prevent-unhandled'
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/utils/prevent-unhandled';
 import {
   createContext,
   type ReactNode,
@@ -13,49 +13,49 @@ import {
   useMemo,
   useRef,
   useState,
-} from 'react'
-import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect'
-import { autoScrollAncestors, autoScrollBothWays } from '../../../utils/auto-scroll-ancestors'
-import { type DragSlots, measureSlots, resolveSlot, shiftFor } from './slot-geometry'
+} from 'react';
+import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
+import { autoScrollAncestors, autoScrollBothWays } from '../../../utils/auto-scroll-ancestors';
+import { type DragSlots, measureSlots, resolveSlot, shiftFor } from './slot-geometry';
 
 /** Marks the elements the list reorders. Set by `useSortableItem`, never by hand. */
-export const SORTABLE_ITEM_ATTRIBUTE = 'data-sortable-item'
+export const SORTABLE_ITEM_ATTRIBUTE = 'data-sortable-item';
 
 /** How long a displaced item takes to slide into the slot it is giving up. */
-const SHIFT_MS = 200
+const SHIFT_MS = 200;
 /** How long the dropped item takes to travel from the pointer into its slot. */
-const DROP_MS = 150
-const EASING = 'cubic-bezier(0.2, 0, 0, 1)'
+const DROP_MS = 150;
+const EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 
 interface SortableListContextValue {
   /** Distinguishes this list's drags from any other list's on the page. */
-  dragType: string
-  disabled: boolean
+  dragType: string;
+  disabled: boolean;
   /** Reorders the list. Used by the drop AND by a handle's arrow keys. */
-  reorder: (from: number, to: number) => void
+  reorder: (from: number, to: number) => void;
   /** Every registered item, in DOM order. */
-  readItems: () => HTMLElement[]
+  readItems: () => HTMLElement[];
 }
 
-const SortableListContext = createContext<SortableListContextValue | null>(null)
+const SortableListContext = createContext<SortableListContextValue | null>(null);
 
 export function useSortableListContext(): SortableListContextValue {
-  const context = useContext(SortableListContext)
-  if (!context) throw new Error('useSortableItem must be used inside a <SortableList>')
-  return context
+  const context = useContext(SortableListContext);
+  if (!context) throw new Error('useSortableItem must be used inside a <SortableList>');
+  return context;
 }
 
 export interface SortableListProps {
   /** Called once, on drop or on an arrow key — never mid-drag. */
-  onReorder: (from: number, to: number) => void
+  onReorder: (from: number, to: number) => void;
   /**
    * Names an item for the live region, e.g. `index => scripts[index].name`.
    * Without it a move is announced as "Item moved to position 2 of 5".
    */
-  getItemLabel?: (index: number) => string | undefined
-  disabled?: boolean
-  className?: string
-  children: ReactNode
+  getItemLabel?: (index: number) => string | undefined;
+  disabled?: boolean;
+  className?: string;
+  children: ReactNode;
 }
 
 /**
@@ -81,45 +81,55 @@ export interface SortableListProps {
  * rules it sorts by live in `slot-geometry.ts`.
  */
 export function SortableList({ onReorder, getItemLabel, disabled = false, className, children }: SortableListProps) {
-  const listRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null);
   // Stable across renders and never rendered, so there is no hydration to
   // mismatch — unlike keying a drag on a random per-item id.
-  const dragType = useId()
-  const [announcement, setAnnouncement] = useState('')
+  const dragType = useId();
+  const [announcement, setAnnouncement] = useState('');
 
-  const onReorderRef = useRef(onReorder)
-  onReorderRef.current = onReorder
-  const getItemLabelRef = useRef(getItemLabel)
-  getItemLabelRef.current = getItemLabel
+  // Refreshed in an unconditional effect rather than in the render body: both
+  // are read only from a drag or keyboard-move handler, which cannot run
+  // before a commit, and a render attempt React discards must not be able to
+  // leave a reorder callback behind that never took effect.
+  const onReorderRef = useRef(onReorder);
+  const getItemLabelRef = useRef(getItemLabel);
+  useEffect(() => {
+    onReorderRef.current = onReorder;
+    getItemLabelRef.current = getItemLabel;
+  });
 
   // Where every item sat on screen the instant the drop happened — the "First"
-  // of the FLIP played once the reorder has committed.
-  const flipFrom = useRef<Array<readonly [HTMLElement, number]> | null>(null)
-  const [flipTick, setFlipTick] = useState(0)
-  const flipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // of the FLIP played once the reorder has committed. A LOOKUP TABLE keyed by
+  // element, not a list to iterate: the "Last" is measured on the items the
+  // list actually has after the reorder commit (re-queried from the DOM), and
+  // this only answers "where was this one?". An item the reorder removed is
+  // therefore skipped instead of being styled as a detached node.
+  const flipFrom = useRef<Map<HTMLElement, number> | null>(null);
+  const [flipTick, setFlipTick] = useState(0);
+  const flipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const readItems = useCallback(
     () => [...(listRef.current?.querySelectorAll<HTMLElement>(`[${SORTABLE_ITEM_ATTRIBUTE}]`) ?? [])],
     [],
-  )
+  );
 
   /** The one way this list ever changes: say what happened, then do it. */
   const reorder = useCallback(
     (from: number, to: number) => {
-      if (from === to) return
-      const label = getItemLabelRef.current?.(from) ?? 'Item'
-      setAnnouncement(`${label} moved to position ${to + 1} of ${readItems().length}.`)
-      onReorderRef.current(from, to)
+      if (from === to) return;
+      const label = getItemLabelRef.current?.(from) ?? 'Item';
+      setAnnouncement(`${label} moved to position ${to + 1} of ${readItems().length}.`);
+      onReorderRef.current(from, to);
     },
     [readItems],
-  )
+  );
 
   useEffect(() => {
-    const list = listRef.current
-    if (!list) return
+    const list = listRef.current;
+    if (!list) return undefined;
 
     /** Alive for one drag; this effect body is its whole scope. */
-    let drag: (DragSlots & { items: HTMLElement[]; to: number; startY: number }) | null = null
+    let drag: (DragSlots & { items: HTMLElement[]; to: number; startY: number }) | null = null;
 
     return combine(
       // Dragging towards the edge of the screen — or past it — scrolls whatever
@@ -141,74 +151,74 @@ export function SortableList({ onReorder, getItemLabel, disabled = false, classN
           // the page has none — and a native drag with no target under it falls
           // back to the browser's own drop effect, which is `copy` and draws the
           // green plus cursor. This holds it at `move` for the whole drag.
-          preventUnhandled.start()
-          const items = readItems()
-          const from = items.indexOf(source.element as HTMLElement)
-          if (from < 0) return
-          const gap = Number.parseFloat(getComputedStyle(list).rowGap) || 0
+          preventUnhandled.start();
+          const items = readItems();
+          const from = items.indexOf(source.element);
+          if (from < 0) return;
+          const gap = Number.parseFloat(getComputedStyle(list).rowGap) || 0;
           // The list's own top is the frame of reference for the whole drag, so
           // that auto-scrolling under the pointer changes nothing but the origin.
-          const origin = list.getBoundingClientRect().top
+          const origin = list.getBoundingClientRect().top;
           drag = {
             ...measureSlots(items, from, gap, origin),
             items,
             to: from,
             startY: location.current.input.clientY - origin,
-          }
+          };
         },
 
         onDrag: ({ location }) => {
-          const current = drag
-          if (!current) return
+          const current = drag;
+          if (!current) return;
           // Re-read the origin every frame: auto-scroll moves the list under a
           // pointer that has not moved, and the item has to keep up with it.
-          const offset = location.current.input.clientY - list.getBoundingClientRect().top - current.startY
+          const offset = location.current.input.clientY - list.getBoundingClientRect().top - current.startY;
 
           // Vertical only, the way `restrictToVerticalAxis` pinned it, and with
           // no transition: this one tracks the pointer exactly.
-          const dragged = current.items[current.from]
-          dragged.style.transition = 'none'
-          dragged.style.transform = `translateY(${offset}px)`
+          const dragged = current.items[current.from];
+          dragged.style.transition = 'none';
+          dragged.style.transform = `translateY(${offset}px)`;
 
-          const to = resolveSlot(current, current.to, offset)
+          const to = resolveSlot(current, current.to, offset);
           // Re-applying an unchanged shift would restart its transition every
           // frame, so the items would creep instead of sliding.
-          if (to === current.to) return
-          current.to = to
+          if (to === current.to) return;
+          current.to = to;
 
-          current.items.forEach((item, index) => {
-            if (index === current.from) return
-            const shift = shiftFor(current, index, to)
-            item.style.transition = `transform ${SHIFT_MS}ms ${EASING}`
-            item.style.transform = shift ? `translateY(${shift}px)` : ''
-          })
+          for (const [index, item] of current.items.entries()) {
+            if (index === current.from) continue;
+            const shift = shiftFor(current, index, to);
+            item.style.transition = `transform ${SHIFT_MS}ms ${EASING}`;
+            item.style.transform = shift ? `translateY(${shift}px)` : '';
+          }
         },
 
         onDrop: ({ location }) => {
-          preventUnhandled.stop()
-          const finished = drag
-          drag = null
-          if (!finished) return
+          preventUnhandled.stop();
+          const finished = drag;
+          drag = null;
+          if (!finished) return;
 
           // Read where everything IS, transforms and all, before letting go of
           // them — this is what the drop animation plays back from.
-          flipFrom.current = finished.items.map(item => [item, item.getBoundingClientRect().top] as const)
-          if (flipTimer.current) clearTimeout(flipTimer.current)
+          flipFrom.current = new Map(finished.items.map(item => [item, item.getBoundingClientRect().top]));
+          if (flipTimer.current) clearTimeout(flipTimer.current);
           for (const item of finished.items) {
-            item.style.transition = 'none'
-            item.style.transform = ''
+            item.style.transition = 'none';
+            item.style.transform = '';
           }
 
           // Empty means released outside the list, or cancelled with Escape —
           // the item still has to travel back to its own slot, so the animation
           // is scheduled either way.
-          const cancelled = location.current.dropTargets.length === 0
-          setFlipTick(tick => tick + 1)
-          if (!cancelled) reorder(finished.from, finished.to)
+          const cancelled = location.current.dropTargets.length === 0;
+          setFlipTick(tick => tick + 1);
+          if (!cancelled) reorder(finished.from, finished.to);
         },
       }),
-    )
-  }, [dragType, readItems, reorder])
+    );
+  }, [dragType, readItems, reorder]);
 
   // Runs after the commit that carries BOTH the reorder and the tick above, so
   // the DOM is already in its final order — which is why `onReorder` never has
@@ -217,44 +227,49 @@ export function SortableList({ onReorder, getItemLabel, disabled = false, classN
   // during the drag are already in place and come out with a delta of zero, so
   // this animates the dropped item and nothing else.
   useIsomorphicLayoutEffect(() => {
-    const from = flipFrom.current
-    flipFrom.current = null
-    if (!from) return
+    const from = flipFrom.current;
+    flipFrom.current = null;
+    if (!from) return;
 
-    const moving: HTMLElement[] = []
-    for (const [item, top] of from) {
-      const delta = top - item.getBoundingClientRect().top
-      if (!delta) continue
-      item.style.transition = 'none'
-      item.style.transform = `translateY(${delta}px)`
-      moving.push(item)
+    const moving: HTMLElement[] = [];
+    // The "Last" is measured on the list as it stands NOW — re-queried, not
+    // replayed from the pre-drop capture, so an item the reorder dropped is
+    // simply absent instead of being animated as a node no longer in the tree.
+    for (const item of readItems()) {
+      const top = from.get(item);
+      if (top === undefined) continue;
+      const delta = top - item.getBoundingClientRect().top;
+      if (!delta) continue;
+      item.style.transition = 'none';
+      item.style.transform = `translateY(${delta}px)`;
+      moving.push(item);
     }
-    if (moving.length === 0) return
+    if (moving.length === 0) return;
 
     // One forced reflow, so the browser takes the inverted position as the
     // animation's starting point instead of coalescing it away unseen.
-    void listRef.current?.offsetHeight
+    void listRef.current?.offsetHeight;
 
     for (const item of moving) {
-      item.style.transition = `transform ${DROP_MS}ms ${EASING}`
-      item.style.transform = ''
+      item.style.transition = `transform ${DROP_MS}ms ${EASING}`;
+      item.style.transform = '';
     }
     flipTimer.current = setTimeout(() => {
-      for (const item of moving) item.style.transition = ''
-    }, DROP_MS)
-  }, [flipTick])
+      for (const item of moving) item.style.transition = '';
+    }, DROP_MS);
+  }, [flipTick, readItems]);
 
   useEffect(
     () => () => {
-      if (flipTimer.current) clearTimeout(flipTimer.current)
+      if (flipTimer.current) clearTimeout(flipTimer.current);
     },
     [],
-  )
+  );
 
   const context = useMemo<SortableListContextValue>(
     () => ({ dragType, disabled, reorder, readItems }),
     [dragType, disabled, reorder, readItems],
-  )
+  );
 
   return (
     <SortableListContext.Provider value={context}>
@@ -266,5 +281,5 @@ export function SortableList({ onReorder, getItemLabel, disabled = false, classN
         </p>
       </div>
     </SortableListContext.Provider>
-  )
+  );
 }

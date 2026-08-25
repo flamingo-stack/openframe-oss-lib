@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
-import { makeComposeContentUrl } from '../../../../utils/content-href'
-import { resolveFetchedCardHref } from '../resolve-fetched-card-href'
+import { describe, expect, it } from 'vitest';
+import { makeComposeContentUrl } from '../../../../utils/content-href';
+import { resolveFetchedCardHref } from '../resolve-fetched-card-href';
 
-const HUB = 'https://www.flamingo.run'
+const HUB = 'https://www.flamingo.run';
 
 /** The OpenFrame Help Center seam, verbatim in shape from
  *  `openframe-oss-frontend/src/app/(app)/help-center/help-center-content-href.ts`. */
@@ -16,12 +16,12 @@ const compose = makeComposeContentUrl({
     case_study: 'case-studies',
   },
   overrides: {
-    roadmap_item: (id) => ({
+    roadmap_item: id => ({
       href: `/help-center/roadmap?search=${encodeURIComponent(id)}`,
       targetPlatform: null,
     }),
   },
-})
+});
 
 describe('resolveFetchedCardHref — Mingo cards with no ref metadata', () => {
   it('override type deep-links on the MARKER id, not the fetched row id', () => {
@@ -34,8 +34,8 @@ describe('resolveFetchedCardHref — Mingo cards with no ref metadata', () => {
         item: { id: 'db-uuid-9', title: 'Deep Google Workspace tenant management' },
         composeContentUrl: compose,
       }),
-    ).toEqual({ href: '/help-center/roadmap?search=86ad3qvv5', targetPlatform: null })
-  })
+    ).toEqual({ href: '/help-center/roadmap?search=86ad3qvv5', targetPlatform: null });
+  });
 
   it('hosted type uses the fetched row slug for its in-app detail route', () => {
     expect(
@@ -45,8 +45,8 @@ describe('resolveFetchedCardHref — Mingo cards with no ref metadata', () => {
         item: { id: 'row-uuid-1', slug: 'v1-2-0' },
         composeContentUrl: compose,
       }),
-    ).toEqual({ href: '/help-center/releases/v1-2-0', targetPlatform: null })
-  })
+    ).toEqual({ href: '/help-center/releases/v1-2-0', targetPlatform: null });
+  });
 
   it('hosted type with no slug falls back to the marker id', () => {
     expect(
@@ -56,8 +56,8 @@ describe('resolveFetchedCardHref — Mingo cards with no ref metadata', () => {
         item: { id: 'guide-7' },
         composeContentUrl: compose,
       }),
-    ).toEqual({ href: '/help-center/onboarding-guides/guide-7', targetPlatform: null })
-  })
+    ).toEqual({ href: '/help-center/onboarding-guides/guide-7', targetPlatform: null });
+  });
 
   it('non-hosted type resolves to the content hub', () => {
     expect(
@@ -67,8 +67,8 @@ describe('resolveFetchedCardHref — Mingo cards with no ref metadata', () => {
         item: { id: 'cs-1', slug: 'acme-migration' },
         composeContentUrl: compose,
       }),
-    ).toEqual({ href: `${HUB}/case-studies/acme-migration`, targetPlatform: null })
-  })
+    ).toEqual({ href: `${HUB}/case-studies/acme-migration`, targetPlatform: null });
+  });
 
   it('legacy rail-vocab alias resolves to the SAME url as the canonical type', () => {
     // The card registry keys blog entries by `blog_post_existing` (what
@@ -79,19 +79,19 @@ describe('resolveFetchedCardHref — Mingo cards with no ref metadata', () => {
       id: 'p1',
       item: { id: 'p1', slug: 'bitwarden-review-for-msps' },
       composeContentUrl: compose,
-    })
+    });
     const alias = resolveFetchedCardHref({
       contentRefType: 'blog_post_existing',
       id: 'p1',
       item: { id: 'p1', slug: 'bitwarden-review-for-msps' },
       composeContentUrl: compose,
-    })
-    expect(alias).toEqual(canonical)
+    });
+    expect(alias).toEqual(canonical);
     expect(alias).toEqual({
       href: `${HUB}/blog/bitwarden-review-for-msps`,
       targetPlatform: null,
-    })
-  })
+    });
+  });
 
   it('no seam wired → null (card stays unlinked, pre-existing behavior)', () => {
     expect(
@@ -100,13 +100,11 @@ describe('resolveFetchedCardHref — Mingo cards with no ref metadata', () => {
         id: '86ad3qvv5',
         item: { id: '86ad3qvv5' },
       }),
-    ).toBeNull()
-  })
+    ).toBeNull();
+  });
 
   it('guards a missing type / id / malformed item', () => {
-    expect(
-      resolveFetchedCardHref({ contentRefType: '', id: 'x', item: {}, composeContentUrl: compose }),
-    ).toBeNull()
+    expect(resolveFetchedCardHref({ contentRefType: '', id: 'x', item: {}, composeContentUrl: compose })).toBeNull();
     expect(
       resolveFetchedCardHref({
         contentRefType: 'case_study',
@@ -114,7 +112,7 @@ describe('resolveFetchedCardHref — Mingo cards with no ref metadata', () => {
         item: {},
         composeContentUrl: compose,
       }),
-    ).toBeNull()
+    ).toBeNull();
     // A non-object item (or a non-string slug) must not throw — it just loses
     // the slug hint and falls back to the marker id.
     expect(
@@ -124,9 +122,9 @@ describe('resolveFetchedCardHref — Mingo cards with no ref metadata', () => {
         item: { slug: 42 },
         composeContentUrl: compose,
       }),
-    ).toEqual({ href: `${HUB}/case-studies/cs-2`, targetPlatform: null })
-  })
-})
+    ).toEqual({ href: `${HUB}/case-studies/cs-2`, targetPlatform: null });
+  });
+});
 
 describe('makeComposeContentUrl — the new `slug` hint', () => {
   it('externalUrl still wins over the hint (SSE path unchanged)', () => {
@@ -137,20 +135,20 @@ describe('makeComposeContentUrl — the new `slug` hint', () => {
         slug: 'from-the-row',
         externalUrl: `${HUB}/releases/from-the-url`,
       }),
-    ).toEqual({ href: '/help-center/releases/from-the-url', targetPlatform: null })
-  })
+    ).toEqual({ href: '/help-center/releases/from-the-url', targetPlatform: null });
+  });
 
   it('applies to non-hosted types too — hub detail routes are slug-based', () => {
     expect(compose({ type: 'blog_post', identifier: 'id-1', slug: 'hello-world' })).toEqual({
       href: `${HUB}/blog/hello-world`,
       targetPlatform: null,
-    })
-  })
+    });
+  });
 
   it('no hint → identifier, unchanged for page-view and SSE callers', () => {
     expect(compose({ type: 'blog_post', identifier: 'hello-world' })).toEqual({
       href: `${HUB}/blog/hello-world`,
       targetPlatform: null,
-    })
-  })
-})
+    });
+  });
+});

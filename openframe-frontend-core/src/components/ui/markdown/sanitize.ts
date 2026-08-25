@@ -34,10 +34,10 @@
  * because parse5's tokenizer would otherwise swallow the remainder of the
  * document into it before the sanitizer ever runs. See RAWTEXT_TAGS below.
  */
-import { defaultSchema } from 'rehype-sanitize'
-import { visit } from 'unist-util-visit'
-import { defaultUrlTransform } from 'react-markdown'
-import { createFenceTracker, isBlankLine } from '../../../utils/markdown-fences'
+import type { Element, ElementContent, Properties, Root, RootContent } from 'hast';
+import { defaultUrlTransform } from 'react-markdown';
+import { defaultSchema } from 'rehype-sanitize';
+import { createFenceTracker, isBlankLine } from '../../../utils/markdown-fences';
 
 // ---------------------------------------------------------------------------
 // Shared tag allowlist (pre-pass baseline)
@@ -54,26 +54,105 @@ import { createFenceTracker, isBlankLine } from '../../../utils/markdown-fences'
  */
 export const SAFE_HTML_TAGS = new Set([
   // Block + inline text
-  'a', 'abbr', 'address', 'article', 'aside', 'b', 'bdi', 'bdo', 'blockquote',
-  'br', 'caption', 'cite', 'code', 'col', 'colgroup', 'data', 'dd', 'del',
-  'details', 'dfn', 'div', 'dl', 'dt', 'em', 'figcaption', 'figure', 'footer',
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'i', 'ins',
-  'kbd', 'li', 'main', 'mark', 'nav', 'ol', 'p', 'pre', 'q', 'rp', 'rt',
-  'ruby', 's', 'samp', 'section', 'small', 'span', 'strong', 'sub', 'summary',
-  'sup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'time', 'tr', 'u',
-  'ul', 'var', 'wbr',
+  'a',
+  'abbr',
+  'address',
+  'article',
+  'aside',
+  'b',
+  'bdi',
+  'bdo',
+  'blockquote',
+  'br',
+  'caption',
+  'cite',
+  'code',
+  'col',
+  'colgroup',
+  'data',
+  'dd',
+  'del',
+  'details',
+  'dfn',
+  'div',
+  'dl',
+  'dt',
+  'em',
+  'figcaption',
+  'figure',
+  'footer',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'header',
+  'hgroup',
+  'hr',
+  'i',
+  'ins',
+  'kbd',
+  'li',
+  'main',
+  'mark',
+  'nav',
+  'ol',
+  'p',
+  'pre',
+  'q',
+  'rp',
+  'rt',
+  'ruby',
+  's',
+  'samp',
+  'section',
+  'small',
+  'span',
+  'strong',
+  'sub',
+  'summary',
+  'sup',
+  'table',
+  'tbody',
+  'td',
+  'tfoot',
+  'th',
+  'thead',
+  'time',
+  'tr',
+  'u',
+  'ul',
+  'var',
+  'wbr',
   // Deprecated presentational tags that REAL authored content still carries.
   // They rendered before the unification (neither old renderer had a
   // pre-pass), so escaping them to visible `&lt;center&gt;` source text was a
   // regression. `font` gets its legacy attributes below so the sanitizer
   // doesn't reduce it to a bare no-op tag. (`marquee` stays out — it is
   // animated chrome, not text markup, and no audit hit found it.)
-  'center', 'font', 'big',
+  'center',
+  'font',
+  'big',
   // Media ('video' intentionally excluded — see the header comment)
-  'img', 'picture', 'source', 'audio', 'iframe', 'track',
+  'img',
+  'picture',
+  'source',
+  'audio',
+  'iframe',
+  'track',
   // Forms (rehype-raw allows them; mostly harmless for chat output)
-  'button', 'input', 'label', 'select', 'option', 'optgroup', 'textarea', 'form', 'fieldset', 'legend',
-])
+  'button',
+  'input',
+  'label',
+  'select',
+  'option',
+  'optgroup',
+  'textarea',
+  'form',
+  'fieldset',
+  'legend',
+]);
 
 /**
  * Inline SVG element set, in the CANONICAL case parse5 produces for SVG
@@ -96,11 +175,30 @@ export const SAFE_HTML_TAGS = new Set([
  * `SVG_ONLY_ANCESTORS` below; outside `<svg>` the sanitizer drops them.
  */
 export const SVG_TAGS = new Set([
-  'svg', 'path', 'circle', 'ellipse', 'g', 'rect', 'line', 'polyline',
-  'polygon', 'text', 'tspan', 'defs', 'use', 'symbol', 'title', 'desc',
-  'marker', 'mask', 'pattern', 'linearGradient', 'radialGradient', 'stop',
+  'svg',
+  'path',
+  'circle',
+  'ellipse',
+  'g',
+  'rect',
+  'line',
+  'polyline',
+  'polygon',
+  'text',
+  'tspan',
+  'defs',
+  'use',
+  'symbol',
+  'title',
+  'desc',
+  'marker',
+  'mask',
+  'pattern',
+  'linearGradient',
+  'radialGradient',
+  'stop',
   'clipPath',
-])
+]);
 
 /**
  * Required-ancestor constraints for the SVG-only tags (hast-util-sanitize
@@ -134,7 +232,7 @@ const SVG_ONLY_ANCESTORS: Record<string, string[]> = {
   linearGradient: ['svg'],
   radialGradient: ['svg'],
   clipPath: ['svg'],
-}
+};
 
 /**
  * THE effective tag list for a composition, canonical case — the single
@@ -145,17 +243,12 @@ const SVG_ONLY_ANCESTORS: Record<string, string[]> = {
  * tag hast-util-sanitize would keep (`strike`, `tt`, …).
  */
 function effectiveTagList(extraAllowedHtmlTags?: string[]): string[] {
-  return [
-    ...(defaultSchema.tagNames ?? []),
-    ...SAFE_HTML_TAGS,
-    ...SVG_TAGS,
-    ...(extraAllowedHtmlTags ?? []),
-  ]
+  return [...(defaultSchema.tagNames ?? []), ...SAFE_HTML_TAGS, ...SVG_TAGS, ...(extraAllowedHtmlTags ?? [])];
 }
 
 /** Effective pre-pass tag set for a composition (lowercased for lookup). */
 export function buildEffectiveTagSet(extraAllowedHtmlTags?: string[]): Set<string> {
-  return new Set(effectiveTagList(extraAllowedHtmlTags).map((t) => t.toLowerCase()))
+  return new Set(effectiveTagList(extraAllowedHtmlTags).map(t => t.toLowerCase()));
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +306,7 @@ const EXTRA_ATTRIBUTES: Record<string, Array<string | [string, ...unknown[]]>> =
   label: ['htmlFor'],
   col: ['span'],
   colgroup: ['span'],
-}
+};
 
 /**
  * SVG presentation/geometry attributes, keyed the way hast keys them:
@@ -228,34 +321,76 @@ const EXTRA_ATTRIBUTES: Record<string, Array<string | [string, ...unknown[]]>> =
  * renderers kept it; the URL guards in rehypeStripUnsafe still apply).
  */
 const SVG_ATTRIBUTES = [
-  'viewBox', 'xmlns', 'd', 'fill', 'stroke', 'cx', 'cy', 'r', 'rx', 'ry',
-  'x', 'y', 'x1', 'y1', 'x2', 'y2', 'points', 'transform', 'opacity',
-  'offset', 'width', 'height', 'style',
+  'viewBox',
+  'xmlns',
+  'd',
+  'fill',
+  'stroke',
+  'cx',
+  'cy',
+  'r',
+  'rx',
+  'ry',
+  'x',
+  'y',
+  'x1',
+  'y1',
+  'x2',
+  'y2',
+  'points',
+  'transform',
+  'opacity',
+  'offset',
+  'width',
+  'height',
+  'style',
   // NOTE the exact casing: property-information's SVG map uses
   // `strokeDashArray` / `strokeDashOffset` / `strokeMiterLimit` (capital
   // A/O/L), NOT the react-DOM spellings. A near-miss here fails SILENTLY —
   // the attribute is simply stripped. Verify against
   // node_modules/property-information/lib/svg.js before adding one.
-  'strokeWidth', 'strokeDashArray', 'strokeDashOffset', 'strokeMiterLimit',
-  'strokeOpacity', 'strokeLinecap', 'strokeLinejoin',
-  'fillRule', 'fillOpacity',
-  'stopColor', 'stopOpacity',
-  'fontSize', 'fontFamily', 'fontWeight', 'fontStyle', 'fontStretch',
-  'textAnchor', 'dominantBaseline', 'alignmentBaseline', 'letterSpacing',
-  'dx', 'dy', 'markerEnd', 'markerMid', 'markerStart',
-  'gradientUnits', 'gradientTransform', 'patternUnits', 'maskUnits',
+  'strokeWidth',
+  'strokeDashArray',
+  'strokeDashOffset',
+  'strokeMiterLimit',
+  'strokeOpacity',
+  'strokeLinecap',
+  'strokeLinejoin',
+  'fillRule',
+  'fillOpacity',
+  'stopColor',
+  'stopOpacity',
+  'fontSize',
+  'fontFamily',
+  'fontWeight',
+  'fontStyle',
+  'fontStretch',
+  'textAnchor',
+  'dominantBaseline',
+  'alignmentBaseline',
+  'letterSpacing',
+  'dx',
+  'dy',
+  'markerEnd',
+  'markerMid',
+  'markerStart',
+  'gradientUnits',
+  'gradientTransform',
+  'patternUnits',
+  'maskUnits',
   'preserveAspectRatio',
-  'clipPath', 'clipRule',
+  'clipPath',
+  'clipRule',
   // `href` / `xlink:href` stay DELIBERATELY DISALLOWED on SVG elements:
   // `<use href>` pulls in an external document fragment and the hast key
   // (`xlinkHref`) is outside rehypeStripUnsafe's URL_ATTRS check, so it
   // would be an unguarded URL sink. Consequence, stated plainly: PASTED
   // ICON SPRITES THAT RELY ON `<use href="#id">` RENDER EMPTY. Hand-drawn
   // inline SVG (the audited real-content case) is unaffected.
-]
+];
 
 export interface BuildSanitizeSchemaOptions {
-  extraAllowedHtmlTags?: string[]
+  extraAllowedHtmlTags?: string[];
 }
 
 /**
@@ -274,22 +409,22 @@ export function buildSanitizeSchema(options: BuildSanitizeSchemaOptions = {}) {
   // foreign-content tags camelCased (`linearGradient`), HTML tags
   // lowercased — admitting both keeps the schema list a superset of the
   // (lowercased) pre-pass set, so the two are equal case-insensitively.
-  const tagNames = new Set<string>()
+  const tagNames = new Set<string>();
   for (const tag of effectiveTagList(options.extraAllowedHtmlTags)) {
-    tagNames.add(tag)
-    tagNames.add(tag.toLowerCase())
+    tagNames.add(tag);
+    tagNames.add(tag.toLowerCase());
   }
 
   const attributes: Record<string, Array<string | [string, ...unknown[]]>> = {
     ...(defaultSchema.attributes as Record<string, Array<string | [string, ...unknown[]]>>),
-  }
+  };
   for (const [tag, attrs] of Object.entries(EXTRA_ATTRIBUTES)) {
-    attributes[tag] = [...(attributes[tag] ?? []), ...attrs]
+    attributes[tag] = [...(attributes[tag] ?? []), ...attrs];
   }
   for (const tag of SVG_TAGS) {
-    attributes[tag] = [...(attributes[tag] ?? []), ...SVG_ATTRIBUTES]
-    const lower = tag.toLowerCase()
-    if (lower !== tag) attributes[lower] = [...(attributes[lower] ?? []), ...SVG_ATTRIBUTES]
+    attributes[tag] = [...(attributes[tag] ?? []), ...SVG_ATTRIBUTES];
+    const lower = tag.toLowerCase();
+    if (lower !== tag) attributes[lower] = [...(attributes[lower] ?? []), ...SVG_ATTRIBUTES];
   }
 
   // MAKE THE PER-TAG LISTS ACTUALLY AUTHORITATIVE.
@@ -323,23 +458,33 @@ export function buildSanitizeSchema(options: BuildSanitizeSchemaOptions = {}) {
   // reverting it). Pinned by ./__tests__/sanitize-render.test.tsx so the fact
   // stays recorded rather than re-derived.
   const STAR_FORM_ATTRIBUTES = new Set([
-    'action', 'method', 'encType', 'name', 'value',
-    'size', 'maxLength', 'readOnly', 'accept', 'acceptCharset', 'multiple', 'prompt',
-  ])
-  attributes['*'] = (attributes['*'] ?? []).filter((attr) => {
-    const key = Array.isArray(attr) ? attr[0] : attr
-    return !STAR_FORM_ATTRIBUTES.has(key as string)
-  })
+    'action',
+    'method',
+    'encType',
+    'name',
+    'value',
+    'size',
+    'maxLength',
+    'readOnly',
+    'accept',
+    'acceptCharset',
+    'multiple',
+    'prompt',
+  ]);
+  attributes['*'] = (attributes['*'] ?? []).filter(attr => {
+    const key = Array.isArray(attr) ? attr[0] : attr;
+    return !STAR_FORM_ATTRIBUTES.has(key);
+  });
 
   // SVG-only tags are pinned to an `svg` ancestor (canonical AND lowercase
   // spelling, matching the tagNames treatment above) so a bare `<title>` /
   // `<text>` / `<g>` in prose is DROPPED instead of hijacking the page.
   const ancestors: Record<string, string[]> = {
     ...(defaultSchema.ancestors as Record<string, string[]> | undefined),
-  }
+  };
   for (const [tag, required] of Object.entries(SVG_ONLY_ANCESTORS)) {
-    ancestors[tag] = required
-    ancestors[tag.toLowerCase()] = required
+    ancestors[tag] = required;
+    ancestors[tag.toLowerCase()] = required;
   }
 
   // `required.input` is CLEARED — see the `input` note in EXTRA_ATTRIBUTES.
@@ -349,8 +494,8 @@ export function buildSanitizeSchema(options: BuildSanitizeSchemaOptions = {}) {
   // lost. The attribute allowlist pins `type` to the literal `checkbox`.
   const required: Record<string, Record<string, unknown>> = {
     ...(defaultSchema.required as Record<string, Record<string, unknown>> | undefined),
-  }
-  delete required.input
+  };
+  delete required.input;
 
   return {
     ...defaultSchema,
@@ -364,14 +509,14 @@ export function buildSanitizeSchema(options: BuildSanitizeSchemaOptions = {}) {
       ...defaultSchema.protocols,
       href: [...(defaultSchema.protocols?.href ?? []), 'card', 'mention'],
     },
-  }
+  };
 }
 
 // ---------------------------------------------------------------------------
 // rehypeStripUnsafe — defense-in-depth strip pass (kept verbatim from the
 // pre-unification SimpleMarkdownRenderer)
 // ---------------------------------------------------------------------------
-const EVENT_HANDLER_ATTR_RE = /^on[a-z]+$/i
+const EVENT_HANDLER_ATTR_RE = /^on[a-z]+$/i;
 
 /**
  * CSS declarations that take an element OUT of the document flow, i.e. the
@@ -382,9 +527,9 @@ const EVENT_HANDLER_ATTR_RE = /^on[a-z]+$/i
  * `top:0;z-index:…` still floats content over the page.
  */
 const POSITIONING_DECL_RE =
-  /(?:^|[\s;])(?:position|z-index|inset(?:-block|-inline)?(?:-start|-end)?|top|right|bottom|left)\s*:/i
-const JAVASCRIPT_URL_RE = /^[\s\x00-\x1f]*javascript:/i
-const DATA_URL_RE = /^[\s\x00-\x1f]*data:/i
+  /(?:^|[\s;])(?:position|z-index|inset(?:-block|-inline)?(?:-start|-end)?|top|right|bottom|left)\s*:/i;
+const JAVASCRIPT_URL_RE = /^[\s\x00-\x1f]*javascript:/i;
+const DATA_URL_RE = /^[\s\x00-\x1f]*data:/i;
 const URL_ATTRS = new Set([
   'href',
   'src',
@@ -395,7 +540,7 @@ const URL_ATTRS = new Set([
   'data',
   'action',
   'background',
-])
+]);
 
 /**
  * Returns true if any candidate in an `srcset` attribute has a dangerous
@@ -406,103 +551,159 @@ const URL_ATTRS = new Set([
  */
 function srcsetHasUnsafeCandidate(srcset: string): boolean {
   for (const candidate of srcset.split(',')) {
-    const url = candidate.trim().split(/\s+/)[0] ?? ''
-    if (JAVASCRIPT_URL_RE.test(url) || DATA_URL_RE.test(url)) return true
+    const url = candidate.trim().split(/\s+/)[0] ?? '';
+    if (JAVASCRIPT_URL_RE.test(url) || DATA_URL_RE.test(url)) return true;
   }
-  return false
+  return false;
 }
 
-const STRIP_ELEMENTS = new Set([
-  'script',
-  'style',
-  'noscript',
-  'noembed',
-  'object',
-  'embed',
-  'applet',
-  'base',
-  'meta',
-])
+const STRIP_ELEMENTS = new Set(['script', 'style', 'noscript', 'noembed', 'object', 'embed', 'applet', 'base', 'meta']);
 
-export function rehypeStripUnsafe() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (tree: any) => {
-    visit(tree, 'element', (node: any, index: number | undefined, parent: any) => {
-      const tag = String(node.tagName ?? '').toLowerCase()
-      if (STRIP_ELEMENTS.has(tag)) {
-        if (parent && typeof index === 'number') {
-          parent.children.splice(index, 1)
-          // Return the numeric index so the walker resumes at the slot the
-          // removed node vacated.
-          return index
-        }
-        // Root-level strip element — neutralize in place.
-        node.children = []
-        node.tagName = 'span'
-        node.properties = {}
-        return
-      }
-      if (!node.properties || typeof node.properties !== 'object') return
-      for (const key of Object.keys(node.properties)) {
-        if (EVENT_HANDLER_ATTR_RE.test(key)) {
-          delete node.properties[key]
-          continue
-        }
-        if (URL_ATTRS.has(key.toLowerCase())) {
-          const raw = node.properties[key]
-          const v = Array.isArray(raw) ? raw[0] : raw
-          if (typeof v === 'string') {
-            const unsafe =
-              key.toLowerCase() === 'srcset'
-                ? srcsetHasUnsafeCandidate(v)
-                : JAVASCRIPT_URL_RE.test(v) || DATA_URL_RE.test(v)
-            if (unsafe) {
-              delete node.properties[key]
-              continue
-            }
-          }
-        }
-        if (tag === 'iframe' && key.toLowerCase() === 'srcdoc') {
-          delete node.properties[key]
-          continue
-        }
-        // OVERLAY / UI-REDRESS GUARD. `style` is allowed (a content audit found
-        // real published posts relying on it for `div.takeaway`, table styling
-        // and reddit blockquotes), but the positioning subset of CSS is not a
-        // decoration — it is a way to lift untrusted markup out of the message
-        // body and put it over the whole application. Verified before this
-        // guard: a single chat message containing
-        //   <iframe src="https://evil.example/phish"
-        //           style="position:fixed;top:0;left:0;width:100vw;height:100vh;
-        //                  z-index:2147483647">
-        // rendered an attacker-controlled cross-origin document covering the
-        // entire viewport above every piece of app chrome (toasts at z-9999
-        // included); the `<span style="position:fixed;inset:0">` variant does the
-        // same with no frame at all. Chat content is model output, so this is
-        // reachable from untrusted input.
-        //
-        // Only the escape-the-flow declarations are dropped, and per-declaration
-        // rather than by discarding the whole attribute, so ordinary decorative
-        // styling on the same element survives. THE TRADE-OFF, STATED: authored
-        // content that legitimately wanted `position:sticky` (a pinned table
-        // header, say) loses it — deliberately, because there is no way to tell
-        // it apart from the redress payload at this layer, and a sticky header is
-        // a smaller loss than a full-page phishing surface.
-        if (key.toLowerCase() === 'style') {
-          const raw = node.properties[key]
-          if (typeof raw === 'string' && POSITIONING_DECL_RE.test(raw)) {
-            const cleaned = raw
-              .split(';')
-              .filter((decl) => !POSITIONING_DECL_RE.test(decl))
-              .join(';')
-              .trim()
-            if (cleaned === '' || cleaned === ';') delete node.properties[key]
-            else node.properties[key] = cleaned
-          }
+/**
+ * Returns `properties` with the unsafe attributes dropped or rewritten, or the
+ * ORIGINAL object when nothing had to change.
+ *
+ * Copy-on-write: the clone is allocated only once a key actually has to move,
+ * so a clean element keeps its own properties object — and, via
+ * `scrubElement`, its node identity.
+ */
+function scrubProperties(properties: Properties, tag: string): Properties {
+  if (!properties || typeof properties !== 'object') return properties;
+
+  let next: Properties | undefined;
+
+  for (const key of Object.keys(properties)) {
+    const lower = key.toLowerCase();
+    const raw = properties[key];
+
+    if (EVENT_HANDLER_ATTR_RE.test(key)) {
+      next ??= { ...properties };
+      delete next[key];
+      continue;
+    }
+    if (URL_ATTRS.has(lower)) {
+      const v = Array.isArray(raw) ? raw[0] : raw;
+      if (typeof v === 'string') {
+        const unsafe =
+          lower === 'srcset' ? srcsetHasUnsafeCandidate(v) : JAVASCRIPT_URL_RE.test(v) || DATA_URL_RE.test(v);
+        if (unsafe) {
+          next ??= { ...properties };
+          delete next[key];
+          continue;
         }
       }
-    })
+    }
+    if (tag === 'iframe' && lower === 'srcdoc') {
+      next ??= { ...properties };
+      delete next[key];
+      continue;
+    }
+    // OVERLAY / UI-REDRESS GUARD. `style` is allowed (a content audit found
+    // real published posts relying on it for `div.takeaway`, table styling
+    // and reddit blockquotes), but the positioning subset of CSS is not a
+    // decoration — it is a way to lift untrusted markup out of the message
+    // body and put it over the whole application. Verified before this
+    // guard: a single chat message containing
+    //   <iframe src="https://evil.example/phish"
+    //           style="position:fixed;top:0;left:0;width:100vw;height:100vh;
+    //                  z-index:2147483647">
+    // rendered an attacker-controlled cross-origin document covering the
+    // entire viewport above every piece of app chrome (toasts at z-9999
+    // included); the `<span style="position:fixed;inset:0">` variant does the
+    // same with no frame at all. Chat content is model output, so this is
+    // reachable from untrusted input.
+    //
+    // Only the escape-the-flow declarations are dropped, and per-declaration
+    // rather than by discarding the whole attribute, so ordinary decorative
+    // styling on the same element survives. THE TRADE-OFF, STATED: authored
+    // content that legitimately wanted `position:sticky` (a pinned table
+    // header, say) loses it — deliberately, because there is no way to tell
+    // it apart from the redress payload at this layer, and a sticky header is
+    // a smaller loss than a full-page phishing surface.
+    if (lower === 'style' && typeof raw === 'string' && POSITIONING_DECL_RE.test(raw)) {
+      const cleaned = raw
+        .split(';')
+        .filter(decl => !POSITIONING_DECL_RE.test(decl))
+        .join(';')
+        .trim();
+      next ??= { ...properties };
+      if (cleaned === '' || cleaned === ';') delete next[key];
+      else next[key] = cleaned;
+    }
   }
+
+  return next ?? properties;
+}
+
+/**
+ * `undefined` when the element is strip-listed (the caller drops it, subtree
+ * and all); otherwise the element with its attributes scrubbed and its
+ * children rebuilt. Returns the ORIGINAL node when nothing changed.
+ */
+function scrubElement(node: Element): Element | undefined {
+  const tag = String(node.tagName ?? '').toLowerCase();
+  if (STRIP_ELEMENTS.has(tag)) return undefined;
+  const properties = scrubProperties(node.properties, tag);
+  const children = scrubElementChildren(node.children);
+  if (properties === node.properties && children === node.children) return node;
+  return { ...node, properties, children };
+}
+
+function scrubElementChildren(children: ElementContent[]): ElementContent[] {
+  const out: ElementContent[] = [];
+  let changed = false;
+  for (const child of children) {
+    if (child.type !== 'element') {
+      out.push(child);
+      continue;
+    }
+    const kept = scrubElement(child);
+    if (kept === undefined) {
+      changed = true;
+      continue;
+    }
+    if (kept !== child) changed = true;
+    out.push(kept);
+  }
+  return changed ? out : children;
+}
+
+/**
+ * Defense-in-depth strip pass: drops the never-safe elements outright and
+ * scrubs event handlers, unsafe URL schemes, `iframe[srcdoc]` and the
+ * positioning subset of `style` off everything else.
+ *
+ * A pure rebuild rather than an in-place walk. `rehype-raw` and
+ * `rehype-sanitize` — the two passes immediately before this one in
+ * engine.tsx — are both non-mutating transformers that return a fresh tree,
+ * and unified threads a returned tree into the next plugin, so this matches
+ * the pipeline it sits in. Untouched nodes come back by identity, so only the
+ * spine above an actual edit is reallocated.
+ *
+ * Equivalent to the previous `unist-util-visit` version: the scrub is a pure
+ * function of a single node (no cross-node state), so traversal order cannot
+ * affect the result, and dropping a strip-listed element here removes exactly
+ * the subtree the old `splice`-then-`return index` removed.
+ */
+export function rehypeStripUnsafe() {
+  return (tree: Root): Root => {
+    const out: RootContent[] = [];
+    let changed = false;
+    for (const child of tree.children) {
+      if (child.type !== 'element') {
+        out.push(child);
+        continue;
+      }
+      const kept = scrubElement(child);
+      if (kept === undefined) {
+        changed = true;
+        continue;
+      }
+      if (kept !== child) changed = true;
+      out.push(kept);
+    }
+    return changed ? { ...tree, children: out } : tree;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -512,7 +713,7 @@ export function rehypeStripUnsafe() {
 // hard-bounded (tag name ≤63 chars, attrs ≤4096) so matching is
 // constant-time per tag. Anything longer falls through as plain text —
 // the safe-degrade behavior for HTML-in-markdown.
-const TAG_LIKE_REGEX = /<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})((?:\s[^>]{0,4096}?)?)(\/?)>/g
+const TAG_LIKE_REGEX = /<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})((?:\s[^>]{0,4096}?)?)(\/?)>/g;
 
 /**
  * Tags whose HTML content model is RAWTEXT / RCDATA / PLAINTEXT: once parse5
@@ -538,9 +739,7 @@ const TAG_LIKE_REGEX = /<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})((?:\s[^>]{0,4096}?)?)
  * `closed-*` fixtures). This check is deliberately independent of the
  * allowlist — it constrains tags the sanitizer WOULD keep.
  */
-const RAWTEXT_TAGS = new Set([
-  'title', 'textarea', 'iframe', 'xmp', 'noembed', 'noframes', 'plaintext',
-])
+const RAWTEXT_TAGS = new Set(['title', 'textarea', 'iframe', 'xmp', 'noembed', 'noframes', 'plaintext']);
 
 /**
  * Fenced code blocks and inline code spans — the regions whose `<tags>` are
@@ -571,8 +770,7 @@ const RAWTEXT_TAGS = new Set([
  * INLINE-CODE region is derived separately, by `findInlineCodeRanges` below —
  * which is no longer a regex and no longer shares this one's length cap.
  */
-const PROTECTED_SPAN_RE =
-  /^ {0,3}(`{3,}|~{3,})[\s\S]*?^ {0,3}\1[^\n]*$|(`+)[^\n]{0,4096}?\2/gm
+const PROTECTED_SPAN_RE = /^ {0,3}(`{3,}|~{3,})[\s\S]*?^ {0,3}\1[^\n]*$|(`+)[^\n]{0,4096}?\2/gm;
 
 /**
  * The INLINE-CODE half of `PROTECTED_SPAN_RE`, on its own — the mask's only
@@ -628,7 +826,7 @@ const PROTECTED_SPAN_RE =
  * `escapeLeftoverTagStarts`. In the carve, "not known to be code" means ESCAPE,
  * so an over-cap span there costs a code sample rendered as escaped text.
  */
-const BACKTICK_CODE = 0x60
+const BACKTICK_CODE = 0x60;
 
 /**
  * PARAGRAPH SEGMENTS, NOT LINES (round 18 — SECURITY). A CommonMark code span
@@ -653,86 +851,86 @@ const BACKTICK_CODE = 0x60
  * other way, so at worst a multi-line code sample renders as escaped text.
  */
 function findInlineCodeRanges(source: string): Array<[number, number]> {
-  const ranges: Array<[number, number]> = []
-  const len = source.length
-  let pos = 0
+  const ranges: Array<[number, number]> = [];
+  const len = source.length;
+  let pos = 0;
   while (pos <= len) {
     // Grow one PARAGRAPH SEGMENT: the maximal run of non-blank lines starting
     // at or after `pos`. `segStart`/`segEnd` bound it; blank lines never enter.
-    let segStart = -1
-    let segEnd = -1
+    let segStart = -1;
+    let segEnd = -1;
     while (pos <= len) {
-      let end = source.indexOf('\n', pos)
-      if (end === -1) end = len
-      const blank = isBlankLine(source.slice(pos, end))
-      if (blank && segStart !== -1) break
+      let end = source.indexOf('\n', pos);
+      if (end === -1) end = len;
+      const blank = isBlankLine(source.slice(pos, end));
+      if (blank && segStart !== -1) break;
       if (!blank) {
-        if (segStart === -1) segStart = pos
-        segEnd = end
+        if (segStart === -1) segStart = pos;
+        segEnd = end;
       }
-      pos = end === len ? len + 1 : end + 1
+      pos = end === len ? len + 1 : end + 1;
     }
-    if (segStart === -1) break
-    const lineStart = segStart
-    const lineEnd = segEnd
-    const runStart: number[] = []
-    const runLen: number[] = []
+    if (segStart === -1) break;
+    const lineStart = segStart;
+    const lineEnd = segEnd;
+    const runStart: number[] = [];
+    const runLen: number[] = [];
     for (let i = lineStart; i < lineEnd; i++) {
-      if (source.charCodeAt(i) !== BACKTICK_CODE) continue
-      let j = i + 1
-      while (j < lineEnd && source.charCodeAt(j) === BACKTICK_CODE) j++
-      runStart.push(i)
-      runLen.push(j - i)
-      i = j - 1
+      if (source.charCodeAt(i) !== BACKTICK_CODE) continue;
+      let j = i + 1;
+      while (j < lineEnd && source.charCodeAt(j) === BACKTICK_CODE) j++;
+      runStart.push(i);
+      runLen.push(j - i);
+      i = j - 1;
     }
-    const n = runStart.length
+    const n = runStart.length;
     if (n > 0) {
       // suffMax[t] = longest run at or after t; 0 past the end.
-      const suffMax = new Array<number>(n + 1).fill(0)
-      for (let t = n - 1; t >= 0; t--) suffMax[t] = Math.max(runLen[t], suffMax[t + 1])
-      let cursor = lineStart
-      let idx = 0
+      const suffMax = new Array<number>(n + 1).fill(0);
+      for (let t = n - 1; t >= 0; t--) suffMax[t] = Math.max(runLen[t], suffMax[t + 1]);
+      let cursor = lineStart;
+      let idx = 0;
       while (idx < n) {
-        const runEnd = runStart[idx] + runLen[idx]
+        const runEnd = runStart[idx] + runLen[idx];
         // The scan resumes at the END of the previous match, which can land
         // MID-RUN — exactly as the global regex's `lastIndex` did. The
         // REMAINDER of the run is then an opener in its own right (`` `a`` ``
         // matches twice), so clamp rather than skip.
         if (runEnd <= cursor) {
-          idx++
-          continue
+          idx++;
+          continue;
         }
-        const p = Math.max(runStart[idx], cursor)
-        const openLen = runEnd - p
+        const p = Math.max(runStart[idx], cursor);
+        const openLen = runEnd - p;
         // Largest closer length reachable via a LATER run, and via THIS one.
-        const kLater = Math.min(openLen, suffMax[idx + 1])
-        const kSame = openLen >> 1
-        const k = Math.max(kLater, kSame)
+        const kLater = Math.min(openLen, suffMax[idx + 1]);
+        const kSame = openLen >> 1;
+        const k = Math.max(kLater, kSame);
         // No match is possible only when this is the last run and it is a
         // single backtick — every longer run closes on itself, so advancing by
         // one character (what the regex does) cannot find one either.
         if (k < 1) {
-          cursor = runEnd
-          idx++
-          continue
+          cursor = runEnd;
+          idx++;
+          continue;
         }
-        let q = kSame >= k ? p + k : -1
+        let q = kSame >= k ? p + k : -1;
         if (q === -1)
           for (let t = idx + 1; t < n; t++)
             if (runLen[t] >= k) {
-              q = runStart[t]
-              break
+              q = runStart[t];
+              break;
             }
-        ranges.push([p, q + k])
-        cursor = q + k
+        ranges.push([p, q + k]);
+        cursor = q + k;
       }
     }
   }
-  return ranges
+  return ranges;
 }
 
 /** Exported for the differential fuzz against the retired regex. */
-export const __findInlineCodeRangesForTest = findInlineCodeRanges
+export const __findInlineCodeRangesForTest = findInlineCodeRanges;
 
 /**
  * ASCII-ONLY case fold. `String.prototype.toLowerCase()` is NOT
@@ -751,7 +949,7 @@ export const __findInlineCodeRangesForTest = findInlineCodeRanges
  * fixture corpus in the parity test — that invariant is the actual guard.
  */
 function foldAsciiCase(text: string): string {
-  return text.replace(/[A-Z]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 32))
+  return text.replace(/[A-Z]/g, c => String.fromCharCode(c.charCodeAt(0) + 32));
 }
 
 /**
@@ -1135,33 +1333,33 @@ function foldAsciiCase(text: string): string {
  * regression.
  */
 function blankRanges(masked: string, ranges: Array<[number, number]>): string {
-  if (ranges.length === 0) return masked
-  const parts: string[] = []
-  let cursor = 0
+  if (ranges.length === 0) return masked;
+  const parts: string[] = [];
+  let cursor = 0;
   for (const [from, to] of ranges) {
-    parts.push(masked.slice(cursor, from), masked.slice(from, to).replace(/[^\n]/g, ' '))
-    cursor = to
+    parts.push(masked.slice(cursor, from), masked.slice(from, to).replace(/[^\n]/g, ' '));
+    cursor = to;
   }
-  parts.push(masked.slice(cursor))
-  return parts.join('')
+  parts.push(masked.slice(cursor));
+  return parts.join('');
 }
 
 /** One scannable line: where it starts, and (for container-nested scans) where
  *  its scanned content starts once the container prefix is stripped. */
 interface MaskLine {
-  start: number
-  contentStart: number
-  content: string
+  start: number;
+  contentStart: number;
+  content: string;
 }
 
 function toMaskLines(source: string): MaskLine[] {
-  const out: MaskLine[] = []
-  let offset = 0
+  const out: MaskLine[] = [];
+  let offset = 0;
   for (const line of source.split('\n')) {
-    out.push({ start: offset, contentStart: offset, content: line })
-    offset += line.length + 1
+    out.push({ start: offset, contentStart: offset, content: line });
+    offset += line.length + 1;
   }
-  return out
+  return out;
 }
 
 /**
@@ -1180,21 +1378,21 @@ function toMaskLines(source: string): MaskLine[] {
  *    a prose opener above it stayed live.
  */
 function blankFencedRegions(masked: string, lines: MaskLine[]): string {
-  const fences = createFenceTracker()
-  const ranges: Array<[number, number]> = []
-  let openStart: number | null = null
-  let lastEnd = 0
+  const fences = createFenceTracker();
+  const ranges: Array<[number, number]> = [];
+  let openStart: number | null = null;
+  let lastEnd = 0;
   for (const line of lines) {
-    const role = fences.push(line.content)
-    lastEnd = line.contentStart + line.content.length
-    if (role === 'open') openStart = line.start
+    const role = fences.push(line.content);
+    lastEnd = line.contentStart + line.content.length;
+    if (role === 'open') openStart = line.start;
     else if (role === 'close' && openStart !== null) {
-      ranges.push([openStart, lastEnd])
-      openStart = null
+      ranges.push([openStart, lastEnd]);
+      openStart = null;
     }
   }
-  if (openStart !== null) ranges.push([openStart, lastEnd])
-  return blankRanges(masked, ranges)
+  if (openStart !== null) ranges.push([openStart, lastEnd]);
+  return blankRanges(masked, ranges);
 }
 
 /**
@@ -1243,18 +1441,21 @@ function blankFencedRegions(masked: string, lines: MaskLine[]): string {
  * worth its risk because it is unconditional over an entire list item; this
  * one is not, so it is documented rather than implemented.
  */
-const LIST_MARKER_RE = /^([ \t]*)(?:[-*+]|\d{1,9}[.)])([ \t]+)(?=\S)/
+const LIST_MARKER_RE = /^([ \t]*)(?:[-*+]|\d{1,9}[.)])([ \t]+)(?=\S)/;
 
 /** Visual column of `upTo` chars of `line`, expanding tabs to 4-col stops. */
 function visualColumn(line: string, upTo: number): number {
-  let col = 0
-  for (let i = 0; i < upTo; i++) col = line[i] === '\t' ? col + 4 - (col % 4) : col + 1
-  return col
+  let col = 0;
+  for (let i = 0; i < upTo; i++) col = line[i] === '\t' ? col + 4 - (col % 4) : col + 1;
+  return col;
 }
 
 function leadingIndent(line: string): number {
-  const ws = /^[ \t]*/.exec(line)![0]
-  return visualColumn(line, ws.length)
+  // `[ \t]*` is anchored and nullable, so it always matches (possibly empty);
+  // `?? ''` is the same zero-length match the engine would return, expressed
+  // without asserting on `exec`'s nullable result.
+  const ws = /^[ \t]*/.exec(line)?.[0] ?? '';
+  return visualColumn(line, ws.length);
 }
 
 /** Character index at which `line` reaches visual column `col`, or -1 when the
@@ -1263,39 +1464,38 @@ function leadingIndent(line: string): number {
  *  cut at a character boundary; -1 makes the caller decline to strip, which
  *  leaves the line looking indented and therefore blanks MORE (fail-CLOSED). */
 function charIndexAtColumn(line: string, col: number): number {
-  let c = 0
+  let c = 0;
   for (let i = 0; i < line.length; i++) {
-    if (c === col) return i
-    c = line[i] === '\t' ? c + 4 - (c % 4) : c + 1
-    if (c > col) return -1
+    if (c === col) return i;
+    c = line[i] === '\t' ? c + 4 - (c % 4) : c + 1;
+    if (c > col) return -1;
   }
-  return c === col ? line.length : -1
+  return c === col ? line.length : -1;
 }
 
 function blankIndentedCode(masked: string, lines: MaskLine[]): string {
-  const listContentCols: number[] = []
-  const ranges: Array<[number, number]> = []
+  const listContentCols: number[] = [];
+  const ranges: Array<[number, number]> = [];
   for (const line of lines) {
     // CommonMark's blank line (spaces/tabs, `\r`-tolerant), NOT `trim()` — see
     // `isBlankLine`. An NBSP-only line is CONTENT, and skipping it here as
     // "blank" is the same one-character reopening documented there.
-    if (isBlankLine(line.content)) continue
-    const indent = leadingIndent(line.content)
-    const top = listContentCols.length ? listContentCols[listContentCols.length - 1] : 0
+    if (isBlankLine(line.content)) continue;
+    const indent = leadingIndent(line.content);
+    const top = listContentCols.length ? listContentCols[listContentCols.length - 1] : 0;
     if (indent >= top + 4) {
-      ranges.push([line.contentStart, line.contentStart + line.content.length])
-      continue
+      ranges.push([line.contentStart, line.contentStart + line.content.length]);
+      continue;
     }
-    while (listContentCols.length && indent < listContentCols[listContentCols.length - 1])
-      listContentCols.pop()
-    const marker = LIST_MARKER_RE.exec(line.content)
+    while (listContentCols.length && indent < listContentCols[listContentCols.length - 1]) listContentCols.pop();
+    const marker = LIST_MARKER_RE.exec(line.content);
     if (marker) {
-      const markerEndCol = visualColumn(line.content, marker[0].length - marker[2].length)
-      const contentCol = visualColumn(line.content, marker[0].length)
-      listContentCols.push(contentCol - markerEndCol > 4 ? markerEndCol + 1 : contentCol)
+      const markerEndCol = visualColumn(line.content, marker[0].length - marker[2].length);
+      const contentCol = visualColumn(line.content, marker[0].length);
+      listContentCols.push(contentCol - markerEndCol > 4 ? markerEndCol + 1 : contentCol);
     }
   }
-  return blankRanges(masked, ranges)
+  return blankRanges(masked, ranges);
 }
 
 /** Re-derive scannable lines from the CURRENT mask, preserving each line's
@@ -1303,10 +1503,10 @@ function blankIndentedCode(masked: string, lines: MaskLine[]): string {
  *  offsets transfer verbatim). See `blankIndentedCode`'s SCAN-SOURCE
  *  INVERSION. */
 function remapToMask(masked: string, lines: MaskLine[]): MaskLine[] {
-  return lines.map((line) => ({
+  return lines.map(line => ({
     ...line,
     content: masked.slice(line.contentStart, line.contentStart + line.content.length),
-  }))
+  }));
 }
 
 /**
@@ -1327,17 +1527,17 @@ function remapToMask(masked: string, lines: MaskLine[]): MaskLine[] {
  * fenced / inline / indented / quoted code is spaces by now and matches
  * nothing, and a genuine prose comment is untouched by any of them.
  */
-const HTML_COMMENT_RE = /<!--[\s\S]*?-->|<!--[\s\S]*$/g
+const HTML_COMMENT_RE = /<!--[\s\S]*?-->|<!--[\s\S]*$/g;
 
 function blankComments(masked: string, source: string): string {
-  HTML_COMMENT_RE.lastIndex = 0
-  const ranges: Array<[number, number]> = []
-  let m: RegExpExecArray | null
+  HTML_COMMENT_RE.lastIndex = 0;
+  const ranges: Array<[number, number]> = [];
+  let m: RegExpExecArray | null;
   while ((m = HTML_COMMENT_RE.exec(source)) !== null) {
-    ranges.push([m.index, m.index + m[0].length])
-    if (m[0].length === 0) HTML_COMMENT_RE.lastIndex++
+    ranges.push([m.index, m.index + m[0].length]);
+    if (m[0].length === 0) HTML_COMMENT_RE.lastIndex++;
   }
-  return blankRanges(masked, ranges)
+  return blankRanges(masked, ranges);
 }
 
 /**
@@ -1399,7 +1599,7 @@ function blankComments(masked: string, source: string): string {
  * would let a 4-column-indented definition line escape the code path it
  * currently falls into.
  */
-const LINK_DEF_CONTAINER_PREFIX = ' {0,3}(?:>[ \\t]?)*[ \\t]{0,16}(?:(?:[-*+]|\\d{1,9}[.)])[ \\t]{1,16})?'
+const LINK_DEF_CONTAINER_PREFIX = ' {0,3}(?:>[ \\t]?)*[ \\t]{0,16}(?:(?:[-*+]|\\d{1,9}[.)])[ \\t]{1,16})?';
 /**
  * NO REGEX, AND NO LENGTH BOUND, ON LABEL / DESTINATION / TITLE
  * (round 20 removed the `{0,999}` caps; round 21 removed the regexes).
@@ -1481,35 +1681,36 @@ const LINK_DEF_CONTAINER_PREFIX = ' {0,3}(?:>[ \\t]?)*[ \\t]{0,16}(?:(?:[-*+]|\\
  *  scan below advances through it, which is what makes them all backslash-aware
  *  and all monotonic. */
 function skipEscaped(s: string, i: number): number {
-  return s[i] === '\\' ? i + 2 : i + 1
+  return s[i] === '\\' ? i + 2 : i + 1;
 }
 
 /** First UNESCAPED occurrence of `ch` in `s` at or after `at`, else -1. */
 function findUnescaped(s: string, at: number, ch: string): number {
-  for (let i = at; i < s.length; i = skipEscaped(s, i)) if (s[i] === ch) return i
-  return -1
+  for (let i = at; i < s.length; i = skipEscaped(s, i)) if (s[i] === ch) return i;
+  return -1;
 }
 
-const isSpaceTab = (ch: string): boolean => ch === ' ' || ch === '\t'
+const isSpaceTab = (ch: string): boolean => ch === ' ' || ch === '\t';
 
 function skipSpaces(s: string, i: number): number {
-  while (i < s.length && isSpaceTab(s[i])) i++
-  return i
+  let at = i;
+  while (at < s.length && isSpaceTab(s[at])) at++;
+  return at;
 }
 
 /** Lines are `\n`-split, so a CRLF document leaves a trailing `\r`. The pass
  *  blanks WHOLE lines, so dropping it costs no offset accuracy. */
-const stripCr = (s: string): string => (s.endsWith('\r') ? s.slice(0, -1) : s)
+const stripCr = (s: string): string => (s.endsWith('\r') ? s.slice(0, -1) : s);
 
-const TITLE_CLOSE: Record<string, string> = { '"': '"', "'": "'", '(': ')' }
+const TITLE_CLOSE: Record<string, string> = { '"': '"', "'": "'", '(': ')' };
 
 /** Index just past a title whose opening delimiter is at `i`, or -1 when the
  *  title does not close on this line. CommonMark ALLOWS a title to span lines,
  *  so -1 is a CONTINUATION signal, never a decline. */
 function parseTitleOnLine(s: string, i: number): number {
-  const close = TITLE_CLOSE[s[i]]
-  for (let q = i + 1; q < s.length; q = skipEscaped(s, q)) if (s[q] === close) return q + 1
-  return -1
+  const close = TITLE_CLOSE[s[i]];
+  for (let q = i + 1; q < s.length; q = skipEscaped(s, q)) if (s[q] === close) return q + 1;
+  return -1;
 }
 
 /** Index just past a destination at `i`, or -1.
@@ -1521,12 +1722,12 @@ function parseTitleOnLine(s: string, i: number): number {
  *  REAL. Blanking it would over-escape a genuine element. */
 function parseDestOnLine(s: string, i: number): number {
   if (s[i] === '<') {
-    for (let q = i + 1; q < s.length; q = skipEscaped(s, q)) if (s[q] === '>') return q + 1
-    return -1
+    for (let q = i + 1; q < s.length; q = skipEscaped(s, q)) if (s[q] === '>') return q + 1;
+    return -1;
   }
-  let q = i
-  while (q < s.length && !isSpaceTab(s[q])) q = skipEscaped(s, q)
-  return q > i ? Math.min(q, s.length) : -1
+  let q = i;
+  while (q < s.length && !isSpaceTab(s[q])) q = skipEscaped(s, q);
+  return q > i ? Math.min(q, s.length) : -1;
 }
 
 /** What the remainder of ONE line says about the definition being consumed. */
@@ -1535,7 +1736,7 @@ type DefTail =
   | { k: 'needDest' } // nothing on this line; the destination follows
   | { k: 'needTitle' } // destination taken; a title MAY follow on a later line
   | { k: 'openTitle'; close: string } // a title opened here and did not close
-  | { k: 'decline' } // not definition-shaped after all (see below)
+  | { k: 'decline' }; // not definition-shaped after all (see below)
 
 /**
  * RECOGNITION DECLINE, reachability, for every `decline` this returns:
@@ -1557,25 +1758,25 @@ type DefTail =
  * around an inline link's `[…]`.
  */
 function parseDefTail(c: string, at: number): DefTail {
-  let q = skipSpaces(c, at)
-  if (q >= c.length) return { k: 'needDest' }
-  const destEnd = parseDestOnLine(c, q)
-  if (destEnd < 0) return { k: 'decline' }
-  q = destEnd
-  const gap = skipSpaces(c, q)
-  if (gap >= c.length) return { k: 'needTitle' }
-  if (gap === q) return { k: 'decline' }
-  return parseTitleTail(c, gap)
+  let q = skipSpaces(c, at);
+  if (q >= c.length) return { k: 'needDest' };
+  const destEnd = parseDestOnLine(c, q);
+  if (destEnd < 0) return { k: 'decline' };
+  q = destEnd;
+  const gap = skipSpaces(c, q);
+  if (gap >= c.length) return { k: 'needTitle' };
+  if (gap === q) return { k: 'decline' };
+  return parseTitleTail(c, gap);
 }
 
 /** The title half of `parseDefTail`, also used for a BARE title continuation
  *  line. Same decline reachability. */
 function parseTitleTail(c: string, q: number): DefTail {
-  const close = TITLE_CLOSE[c[q]]
-  if (!close) return { k: 'decline' }
-  const end = parseTitleOnLine(c, q)
-  if (end < 0) return { k: 'openTitle', close }
-  return skipSpaces(c, end) >= c.length ? { k: 'done' } : { k: 'decline' }
+  const close = TITLE_CLOSE[c[q]];
+  if (!close) return { k: 'decline' };
+  const end = parseTitleOnLine(c, q);
+  if (end < 0) return { k: 'openTitle', close };
+  return skipSpaces(c, end) >= c.length ? { k: 'done' } : { k: 'decline' };
 }
 
 /**
@@ -1586,14 +1787,17 @@ function parseTitleTail(c: string, q: number): DefTail {
  * columns beyond the enclosing content column, i.e. INDENTED CODE that
  * `blankIndentedCode` has already blanked.
  */
-const LINK_DEF_CONT_PREFIX_RE = / {0,3}(?:>[ \t]?)*[ \t]{0,16}/y
+const LINK_DEF_CONT_PREFIX_RE = / {0,3}(?:>[ \t]?)*[ \t]{0,16}/y;
 /** `\[(?!\^)` — a GFM FOOTNOTE definition is NOT a link reference definition;
  *  its content is block-parsed and may hold real HTML (round 19). */
-const LINK_DEF_OPEN_RE = new RegExp(`^${LINK_DEF_CONTAINER_PREFIX}\\[(?!\\^)`)
+const LINK_DEF_OPEN_RE = new RegExp(`^${LINK_DEF_CONTAINER_PREFIX}\\[(?!\\^)`);
 
 function contPrefixLen(c: string): number {
-  LINK_DEF_CONT_PREFIX_RE.lastIndex = 0
-  return LINK_DEF_CONT_PREFIX_RE.exec(c)![0].length
+  LINK_DEF_CONT_PREFIX_RE.lastIndex = 0;
+  // Every quantifier in the sticky pattern is `{0,n}` / `*`, so it always
+  // matches at index 0 — an empty match has length 0, which is what `?? 0`
+  // stands in for.
+  return LINK_DEF_CONT_PREFIX_RE.exec(c)?.[0].length ?? 0;
 }
 
 /**
@@ -1621,15 +1825,15 @@ function findLabelClose(
   from: number,
 ): { line: number; colon: number } | { stoppedAt: number } {
   for (let j = i; j < lines.length; j++) {
-    const c = stripCr(lines[j].content)
-    if (j > i && isBlankLine(c)) return { stoppedAt: j }
+    const c = stripCr(lines[j].content);
+    if (j > i && isBlankLine(c)) return { stoppedAt: j };
     for (let q = j === i ? from : contPrefixLen(c); q < c.length; q = skipEscaped(c, q)) {
-      if (c[q] === '[') return { stoppedAt: j }
-      if (c[q] !== ']') continue
-      return c[q + 1] === ':' ? { line: j, colon: q + 1 } : { stoppedAt: j }
+      if (c[q] === '[') return { stoppedAt: j };
+      if (c[q] !== ']') continue;
+      return c[q + 1] === ':' ? { line: j, colon: q + 1 } : { stoppedAt: j };
     }
   }
-  return { stoppedAt: lines.length }
+  return { stoppedAt: lines.length };
 }
 
 /**
@@ -1656,10 +1860,10 @@ function findLabelClose(
  * a quote or ON a list-marker line is covered by the SINGLE top-level call.
  */
 function blankLinkDefinitions(masked: string, lines: MaskLine[]): string {
-  const ranges: Array<[number, number]> = []
+  const ranges: Array<[number, number]> = [];
   const blankLine = (line: MaskLine): void => {
-    ranges.push([line.contentStart, line.contentStart + line.content.length])
-  }
+    ranges.push([line.contentStart, line.contentStart + line.content.length]);
+  };
 
   /**
    * THE ONE GIVE-UP CHANNEL. A construct already recognized as a definition can
@@ -1670,72 +1874,71 @@ function blankLinkDefinitions(masked: string, lines: MaskLine[]): string {
    * which is the default this channel exists to guarantee.
    */
   const blankLinesToParagraphBound = (from: number, stop: (c: string) => boolean): number => {
-    let k = from
+    let k = from;
     for (; k < lines.length; k++) {
-      const c = stripCr(lines[k].content)
-      if (isBlankLine(c)) break
-      blankLine(lines[k])
+      const c = stripCr(lines[k].content);
+      if (isBlankLine(c)) break;
+      blankLine(lines[k]);
       if (stop(c)) {
-        k++
-        break
+        k++;
+        break;
       }
     }
-    return k - 1
-  }
+    return k - 1;
+  };
 
-  let i = 0
+  let i = 0;
   while (i < lines.length) {
-    const line = lines[i]
+    const line = lines[i];
     if (line.content.indexOf('[') === -1) {
-      i++
-      continue
+      i++;
+      continue;
     }
-    const open = LINK_DEF_OPEN_RE.exec(line.content)
+    const open = LINK_DEF_OPEN_RE.exec(line.content);
     if (!open) {
-      i++
-      continue
+      i++;
+      continue;
     }
-    const close = findLabelClose(lines, i, open[0].length)
+    const close = findLabelClose(lines, i, open[0].length);
     if ('stoppedAt' in close) {
-      i = Math.max(close.stoppedAt, i + 1)
-      continue
+      i = Math.max(close.stoppedAt, i + 1);
+      continue;
     }
-    const head = stripCr(lines[close.line].content)
-    let tail = parseDefTail(head, close.colon + 1)
+    const head = stripCr(lines[close.line].content);
+    let tail = parseDefTail(head, close.colon + 1);
     // A late RECOGNITION verdict unwinds the WHOLE construct: remark emits every
     // line of it as text, so nothing may be blanked.
     if (tail.k === 'decline') {
-      i = Math.max(close.line, i + 1)
-      continue
+      i = Math.max(close.line, i + 1);
+      continue;
     }
     // COMMITTED. From here every exit blanks.
-    for (let j = i; j <= close.line; j++) blankLine(lines[j])
-    let j = close.line
+    for (let j = i; j <= close.line; j++) blankLine(lines[j]);
+    let j = close.line;
     while (tail.k !== 'done') {
       if (tail.k === 'openTitle') {
-        const closer = tail.close
-        j = blankLinesToParagraphBound(j + 1, (c) => findUnescaped(c, 0, closer) !== -1)
-        break
+        const closer = tail.close;
+        j = blankLinesToParagraphBound(j + 1, c => findUnescaped(c, 0, closer) !== -1);
+        break;
       }
-      const k = j + 1
-      if (k >= lines.length) break
-      const c = stripCr(lines[k].content)
-      if (isBlankLine(c)) break
-      const at = contPrefixLen(c)
-      const next: DefTail =
-        tail.k === 'needDest' ? parseDefTail(c, at) : parseTitleTail(c, skipSpaces(c, at))
+      const k = j + 1;
+      if (k >= lines.length) break;
+      const c = stripCr(lines[k].content);
+      if (isBlankLine(c)) break;
+      const at = contPrefixLen(c);
+      const next: DefTail = tail.k === 'needDest' ? parseDefTail(c, at) : parseTitleTail(c, skipSpaces(c, at));
       // The definition is already COMPLETE without this line (a destination-only
       // definition needs no title; a `[a]:` with no parseable destination is not
       // a definition at all and remark emits the following line as text), so this
       // is a RECOGNITION boundary, not a give-up.
-      if (next.k === 'decline') break
-      blankLine(lines[k])
-      j = k
-      tail = next
+      if (next.k === 'decline') break;
+      blankLine(lines[k]);
+      j = k;
+      tail = next;
     }
-    i = j + 1
+    i = j + 1;
   }
-  return blankRanges(masked, mergeRanges(ranges))
+  return blankRanges(masked, mergeRanges(ranges));
 }
 
 /**
@@ -1759,10 +1962,10 @@ function blankLinkDefinitions(masked: string, lines: MaskLine[]): string {
  */
 const FOOTNOTE_DEF_OPEN_RE = new RegExp(
   '^ {0,3}(?:>[ \\t]?)*[ \\t]{0,16}(?:(?:[-*+]|\\d{1,9}[.)])[ \\t]{1,16})*\\[\\^',
-)
+);
 /** A blockquote run, WITHOUT swallowing the indent after it — the footnote-body
  *  continuation test has to MEASURE that indent, which `contPrefixLen` eats. */
-const FOOTNOTE_QUOTE_PREFIX_RE = / {0,3}(?:>[ \t]?)*/y
+const FOOTNOTE_QUOTE_PREFIX_RE = / {0,3}(?:>[ \t]?)*/y;
 
 /**
  * micromark's `normalizeIdentifier`, byte-for-byte: collapse every whitespace
@@ -1776,7 +1979,7 @@ function normalizeFootnoteLabel(label: string): string {
     .replace(/[\t\n\r ]+/g, ' ')
     .replace(/^ | $/g, '')
     .toLowerCase()
-    .toUpperCase()
+    .toUpperCase();
 }
 
 /** End index of the label opened by `[^` at `open`, i.e. the index of its
@@ -1784,10 +1987,10 @@ function normalizeFootnoteLabel(label: string): string {
  *  unescaped `[` inside voids the label exactly as it does for a link label. */
 function footnoteLabelEnd(c: string, open: number): number {
   for (let q = open + 2; q < c.length; q = skipEscaped(c, q)) {
-    if (c[q] === '[') return -1
-    if (c[q] === ']') return q
+    if (c[q] === '[') return -1;
+    if (c[q] === ']') return q;
   }
-  return -1
+  return -1;
 }
 
 /**
@@ -1901,19 +2104,19 @@ function blankUnreferencedFootnotes(masked: string, lines: MaskLine[], folded: s
   // below it would be the most expensive one in the mask, for a construct
   // almost nothing contains (measured: no regression at 989 KB on a corpus with
   // no footnotes at all).
-  if (masked.indexOf('[^') === -1) return masked
+  if (masked.indexOf('[^') === -1) return masked;
   // The MASK's text for a line, sliced on demand. `remapToMask` would allocate a
   // second object per line of the whole document for a pass that usually touches
   // one of them.
   const text = (line: MaskLine): string =>
-    stripCr(masked.slice(line.contentStart, line.contentStart + line.content.length))
+    stripCr(masked.slice(line.contentStart, line.contentStart + line.content.length));
   // …and the REFERENCE-ONLY copy, blanked further (see `footnoteReferenceMask`).
   // Built ONLY past the `[^` guard, so a document without footnotes pays nothing.
   // Length-preserving like every other mask, so an index means the same byte in
   // both copies.
-  const refMask = footnoteReferenceMask(masked, folded)
+  const refMask = footnoteReferenceMask(masked, folded);
   const refText = (line: MaskLine): string =>
-    stripCr(refMask.slice(line.contentStart, line.contentStart + line.content.length))
+    stripCr(refMask.slice(line.contentStart, line.contentStart + line.content.length));
 
   // PASS 1 — the DEFINITION on each line (from the mask) and every `[^label]`
   // that is a REFERENCE (from the ref-mask). A group is a DEFINITION only where
@@ -1922,70 +2125,70 @@ function blankUnreferencedFootnotes(masked: string, lines: MaskLine[], folded: s
   // Occurrences are reached with `indexOf`, never a per-character walk: the pass
   // runs over EVERY line of the document and a char walk would make it the most
   // expensive one in the mask for a construct almost no line contains.
-  const referenced = new Set<string>()
-  const defAt: Array<number | null> = []
+  const referenced = new Set<string>();
+  const defAt: Array<number | null> = [];
   for (const line of lines) {
-    const c = text(line)
-    let isDef: number | null = null
+    const c = text(line);
+    let isDef: number | null = null;
     if (c.indexOf('[^') !== -1) {
-      const open = FOOTNOTE_DEF_OPEN_RE.exec(c)
+      const open = FOOTNOTE_DEF_OPEN_RE.exec(c);
       if (open !== null) {
         // The opener is line-anchored past a whitespace/marker prefix, so its
         // `[` can never carry a backslash escape — the prefix would not match.
-        const defOpen = open[0].length - 2
-        const end = footnoteLabelEnd(c, defOpen)
-        if (end !== -1 && c[end + 1] === ':') isDef = defOpen
+        const defOpen = open[0].length - 2;
+        const end = footnoteLabelEnd(c, defOpen);
+        if (end !== -1 && c[end + 1] === ':') isDef = defOpen;
       }
     }
-    defAt.push(isDef)
-    const rc = refText(line)
+    defAt.push(isDef);
+    const rc = refText(line);
     for (let q = rc.indexOf('[^'); q !== -1; q = rc.indexOf('[^', q)) {
       // Escape-aware without the walk: an ODD run of backslashes before the `[`
       // escapes it, an EVEN one is escaped backslashes and leaves `[` live.
-      let back = q
-      while (back > 0 && rc[back - 1] === '\\') back--
+      let back = q;
+      while (back > 0 && rc[back - 1] === '\\') back--;
       if ((q - back) % 2 === 1) {
-        q += 2
-        continue
+        q += 2;
+        continue;
       }
-      const end = footnoteLabelEnd(rc, q)
-      if (end === -1) break
-      if (q !== isDef) referenced.add(normalizeFootnoteLabel(rc.slice(q + 2, end)))
-      q = end + 1
+      const end = footnoteLabelEnd(rc, q);
+      if (end === -1) break;
+      if (q !== isDef) referenced.add(normalizeFootnoteLabel(rc.slice(q + 2, end)));
+      q = end + 1;
     }
   }
 
   // PASS 2 — blank each definition whose label nothing references, body included.
   // Slices the REAL mask, never the ref-mask.
-  const ranges: Array<[number, number]> = []
+  const ranges: Array<[number, number]> = [];
   for (let i = 0; i < lines.length; i++) {
-    const at = defAt[i]
-    if (at === null) continue
-    const head = text(lines[i])
-    const end = footnoteLabelEnd(head, at)
-    if (referenced.has(normalizeFootnoteLabel(head.slice(at + 2, end)))) continue
-    let j = i
-    let sawBlank = false
+    const at = defAt[i];
+    if (at === null) continue;
+    const head = text(lines[i]);
+    const end = footnoteLabelEnd(head, at);
+    if (referenced.has(normalizeFootnoteLabel(head.slice(at + 2, end)))) continue;
+    let j = i;
+    let sawBlank = false;
     for (let k = i + 1; k < lines.length; k++) {
-      const c = text(lines[k])
+      const c = text(lines[k]);
       if (isBlankLine(c)) {
-        sawBlank = true
-        continue
+        sawBlank = true;
+        continue;
       }
       // A second definition ends this one; over-blanking a REFERENCED
       // neighbour's body would show it as escaped source (cosmetic, but avoidable).
-      if (defAt[k] !== null) break
+      if (defAt[k] !== null) break;
       // After a blank line only an INDENTED block continues the footnote; before
       // one, any non-blank line is a lazy paragraph continuation.
-      if (sawBlank && footnoteIndentCols(c) < 4) break
-      j = k
+      if (sawBlank && footnoteIndentCols(c) < 4) break;
+      j = k;
     }
     for (let k = i; k <= j; k++) {
-      const line = lines[k]
-      ranges.push([line.contentStart, line.contentStart + line.content.length])
+      const line = lines[k];
+      ranges.push([line.contentStart, line.contentStart + line.content.length]);
     }
   }
-  return blankRanges(masked, mergeRanges(ranges))
+  return blankRanges(masked, mergeRanges(ranges));
 }
 
 /**
@@ -2017,18 +2220,6 @@ function blankUnreferencedFootnotes(masked: string, lines: MaskLine[], folded: s
  * That is why this copy may apply passes out of the pipeline's order and may
  * use a block model that only approximates remark's.
  */
-function footnoteReferenceMask(masked: string, folded: string): string {
-  let ref = blankInlineLinkPayloads(masked, folded)
-  ref = blankBracketLabels(ref, folded, { footnoteLabels: false })
-  ref = blankRanges(
-    ref,
-    mergeRanges(computeHtmlBlockRanges(folded).map(({ start, end }) => [start, end])),
-  )
-  ref = blankComments(ref, ref)
-  ref = ref.replace(AUTOLINK_LIKE_RE, (m) => ' '.repeat(m.length))
-  return blankTagAttributes(ref)
-}
-
 /** AUTOLINKS, both spellings, DELIBERATELY over-wide (this regex is only ever
  *  applied to the reference-counting copy, where over-blanking is free): a
  *  CommonMark `<scheme:…>` autolink and a GFM LITERAL autolink both become an
@@ -2037,7 +2228,16 @@ function footnoteReferenceMask(masked: string, folded: string): string {
  *  so an ordinary `see https://e.example [^f]` keeps its REAL reference. Email
  *  autolinks are deliberately absent: a `[` voids the email shape, so `[^f]`
  *  inside one IS a real reference (verified — remark emits the footnote). */
-const AUTOLINK_LIKE_RE = /<[a-z][a-z0-9+.-]{1,31}:[^\s<>]*>|(?:https?:\/\/|www\.)[^\s<]*/gi
+const AUTOLINK_LIKE_RE = /<[a-z][a-z0-9+.-]{1,31}:[^\s<>]*>|(?:https?:\/\/|www\.)[^\s<]*/gi;
+
+function footnoteReferenceMask(masked: string, folded: string): string {
+  let ref = blankInlineLinkPayloads(masked, folded);
+  ref = blankBracketLabels(ref, folded, { footnoteLabels: false });
+  ref = blankRanges(ref, mergeRanges(computeHtmlBlockRanges(folded).map(({ start, end }) => [start, end])));
+  ref = blankComments(ref, ref);
+  ref = ref.replace(AUTOLINK_LIKE_RE, m => ' '.repeat(m.length));
+  return blankTagAttributes(ref);
+}
 
 /** Blank the ATTRIBUTE RUN of every tag-like span, length-preserving. Blanking
  *  the WHOLE tag would blank real `</tag>` closers too, so only the run between
@@ -2050,18 +2250,19 @@ function blankTagAttributes(masked: string): string {
     TAG_LIKE_REGEX,
     (_m, slash: string, tag: string, rest: string, selfClose: string) =>
       `<${slash}${tag}${' '.repeat(rest.length)}${selfClose}>`,
-  )
+  );
 }
 
 /** Leading indent of `c` in COLUMNS (tabs advance to the next multiple of 4)
  *  measured PAST the blockquote run, which is the column GFM measures a
  *  footnote's continuation blocks at. */
 function footnoteIndentCols(c: string): number {
-  FOOTNOTE_QUOTE_PREFIX_RE.lastIndex = 0
-  let q = FOOTNOTE_QUOTE_PREFIX_RE.exec(c)![0].length
-  let col = 0
-  for (; q < c.length && isSpaceTab(c[q]); q++) col = c[q] === '\t' ? col + 4 - (col % 4) : col + 1
-  return col
+  FOOTNOTE_QUOTE_PREFIX_RE.lastIndex = 0;
+  // Nullable sticky prefix — always matches at index 0, empty at worst.
+  let q = FOOTNOTE_QUOTE_PREFIX_RE.exec(c)?.[0].length ?? 0;
+  let col = 0;
+  for (; q < c.length && isSpaceTab(c[q]); q++) col = c[q] === '\t' ? col + 4 - (col % 4) : col + 1;
+  return col;
 }
 
 /**
@@ -2144,16 +2345,16 @@ function footnoteIndentCols(c: string): number {
  * `limit` only when input remains PAST the cap, -1 when the input is exhausted.
  * The cap path still blanks THROUGH (round 20's fix is untouched).
  */
-const INLINE_LINK_PAYLOAD_MAX = 1024
+const INLINE_LINK_PAYLOAD_MAX = 1024;
 
 const isInlineSpace = (ch: string): boolean =>
-  ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '\f' || ch === '\v'
+  ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '\f' || ch === '\v';
 
 /** Index of the payload's closing `)`, or the cap index when the payload runs
  *  past `INLINE_LINK_PAYLOAD_MAX` (blank through the cap), or -1 when the shape
  *  does not parse. `from` is the index just past the `](`. */
 function parseInlineLinkPayload(s: string, from: number): number {
-  const limit = Math.min(s.length, from + INLINE_LINK_PAYLOAD_MAX)
+  const limit = Math.min(s.length, from + INLINE_LINK_PAYLOAD_MAX);
   // What a `q >= limit` exit MEANS, which is not one thing (round 22):
   //  - the CAP truncated a payload that still has input after it → `limit`,
   //    "blank through the cap" (round 20; the caller widens to `paragraphEnd`);
@@ -2163,111 +2364,111 @@ function parseInlineLinkPayload(s: string, from: number): number {
   //    token), where returning `limit` widened the blank to the paragraph end
   //    and escaped an earlier opener that unescaped again once the link
   //    completed — a visible flicker.
-  const overflow = limit < s.length ? limit : -1
-  let q = from
-  while (q < limit && isInlineSpace(s[q])) q++
+  const overflow = limit < s.length ? limit : -1;
+  let q = from;
+  while (q < limit && isInlineSpace(s[q])) q++;
   // DESTINATION — angle-bracketed, or a bare run with BALANCED parens.
   if (s[q] === '<') {
-    q++
-    while (q < limit && s[q] !== '>' && s[q] !== '\n') q += s[q] === '\\' ? 2 : 1
-    if (q >= limit) return overflow
-    if (s[q] !== '>') return -1
-    q++
+    q++;
+    while (q < limit && s[q] !== '>' && s[q] !== '\n') q += s[q] === '\\' ? 2 : 1;
+    if (q >= limit) return overflow;
+    if (s[q] !== '>') return -1;
+    q++;
   } else {
-    let depth = 0
+    let depth = 0;
     while (q < limit) {
-      const ch = s[q]
+      const ch = s[q];
       if (ch === '\\') {
-        q += 2
-        continue
+        q += 2;
+        continue;
       }
-      if (isInlineSpace(ch)) break
-      if (ch === '(') depth++
+      if (isInlineSpace(ch)) break;
+      if (ch === '(') depth++;
       else if (ch === ')') {
-        if (depth === 0) break
-        depth--
+        if (depth === 0) break;
+        depth--;
       }
-      q++
+      q++;
     }
-    if (q >= limit) return overflow
-    if (depth !== 0) return -1
+    if (q >= limit) return overflow;
+    if (depth !== 0) return -1;
   }
   // TITLE — `"…"`, `'…'` or `(…)`, separated from the destination by space.
-  const beforeGap = q
-  while (q < limit && isInlineSpace(s[q])) q++
-  const open = s[q]
+  const beforeGap = q;
+  while (q < limit && isInlineSpace(s[q])) q++;
+  const open = s[q];
   if (q > beforeGap && (open === '"' || open === "'" || open === '(')) {
-    const close = open === '(' ? ')' : open
-    let depth = 1
-    q++
+    const close = open === '(' ? ')' : open;
+    let depth = 1;
+    q++;
     while (q < limit) {
-      const ch = s[q]
+      const ch = s[q];
       if (ch === '\\') {
-        q += 2
-        continue
+        q += 2;
+        continue;
       }
-      if (open === '(' && ch === '(') depth++
-      else if (ch === close && --depth === 0) break
-      q++
+      if (open === '(' && ch === '(') depth++;
+      else if (ch === close && --depth === 0) break;
+      q++;
     }
-    if (q >= limit) return overflow
-    if (s[q] !== close) return -1
-    q++
-    while (q < limit && isInlineSpace(s[q])) q++
+    if (q >= limit) return overflow;
+    if (s[q] !== close) return -1;
+    q++;
+    while (q < limit && isInlineSpace(s[q])) q++;
   }
-  if (q >= limit) return overflow
-  return s[q] === ')' ? q : -1
+  if (q >= limit) return overflow;
+  return s[q] === ')' ? q : -1;
 }
 
 /** Start index of the first BLANK line at or after `from`, i.e. the end of the
  *  paragraph `from` sits in — the widest span an inline construct may cover. */
 function paragraphEnd(s: string, from: number): number {
-  let lineStart = s.indexOf('\n', from)
+  let lineStart = s.indexOf('\n', from);
   while (lineStart !== -1) {
-    lineStart += 1
-    const next = s.indexOf('\n', lineStart)
-    const line = s.slice(lineStart, next === -1 ? s.length : next)
-    if (isBlankLine(line)) return lineStart
-    if (next === -1) break
-    lineStart = next
+    lineStart += 1;
+    const next = s.indexOf('\n', lineStart);
+    const line = s.slice(lineStart, next === -1 ? s.length : next);
+    if (isBlankLine(line)) return lineStart;
+    if (next === -1) break;
+    lineStart = next;
   }
-  return s.length
+  return s.length;
 }
 
 function blankInlineLinkPayloads(masked: string, source: string): string {
-  const ranges: Array<[number, number]> = []
-  let i = source.indexOf('](')
+  const ranges: Array<[number, number]> = [];
+  let i = source.indexOf('](');
   while (i !== -1) {
-    const from = i + 2
-    const cap = Math.min(source.length, from + INLINE_LINK_PAYLOAD_MAX)
-    const close = parseInlineLinkPayload(source, from)
+    const from = i + 2;
+    const cap = Math.min(source.length, from + INLINE_LINK_PAYLOAD_MAX);
+    const close = parseInlineLinkPayload(source, from);
     if (close < 0) {
-      i = source.indexOf('](', i + 1)
-      continue
+      i = source.indexOf('](', i + 1);
+      continue;
     }
     // A CAPPED payload (`close === cap`) has an unknown end, so blank to the end
     // of the paragraph — see the docblock. A parsed one blanks exactly.
-    const end = close >= cap ? paragraphEnd(source, from) : close
-    if (end > from) ranges.push([from, end])
+    const end = close >= cap ? paragraphEnd(source, from) : close;
+    if (end > from) ranges.push([from, end]);
     // Ascending and non-overlapping: resume past the range just blanked.
-    i = source.indexOf('](', Math.max(end, from))
+    i = source.indexOf('](', Math.max(end, from));
   }
-  return blankRanges(masked, ranges)
+  return blankRanges(masked, ranges);
 }
 
 /** Sort + merge so overlapping/nested finds satisfy `blankRanges`' contract
  *  (non-overlapping, ascending). Empty ranges are dropped. */
 function mergeRanges(ranges: Array<[number, number]>): Array<[number, number]> {
-  ranges.sort((a, b) => a[0] - b[0])
-  const out: Array<[number, number]> = []
+  ranges.sort((a, b) => a[0] - b[0]);
+  const out: Array<[number, number]> = [];
   for (const [from, to] of ranges) {
-    if (to <= from) continue
-    const last = out[out.length - 1]
+    if (to <= from) continue;
+    const last = out[out.length - 1];
     if (last && from <= last[1]) {
-      if (to > last[1]) last[1] = to
-    } else out.push([from, to])
+      if (to > last[1]) last[1] = to;
+    } else out.push([from, to]);
   }
-  return out
+  return out;
 }
 
 /**
@@ -2335,10 +2536,10 @@ function blankBracketLabels(
   source: string,
   { footnoteLabels = true }: { footnoteLabels?: boolean } = {},
 ): string {
-  if (source.indexOf('[') === -1) return masked
-  const ranges: Array<[number, number]> = []
+  if (source.indexOf('[') === -1) return masked;
+  const ranges: Array<[number, number]> = [];
   /** Open `[` positions, innermost last. */
-  const open: number[] = []
+  const open: number[] = [];
   /**
    * The most recently CLOSED group AT EACH NESTING DEPTH, for the `][` / `][]`
    * adjacencies. Round 23: this used to be a SINGLE `prev`, which any NESTED
@@ -2348,46 +2549,46 @@ function blankBracketLabels(
    * was a live fail-open through `blankUnreferencedFootnotes`' phantom count.
    * Depth-keyed, siblings are compared with siblings.
    */
-  const prevByDepth: Array<{ open: number; close: number } | null> = []
+  const prevByDepth: Array<{ open: number; close: number } | null> = [];
   for (let i = 0; i < source.length; i++) {
-    const ch = source[i]
+    const ch = source[i];
     if (ch === '\\') {
-      i++
-      continue
+      i++;
+      continue;
     }
     if (ch === '[') {
-      open.push(i)
+      open.push(i);
       // Whatever closed at this depth before belongs OUTSIDE the group just
       // opened, so it cannot be adjacent to anything inside it.
-      prevByDepth[open.length] = null
-      continue
+      prevByDepth[open.length] = null;
+      continue;
     }
-    if (ch !== ']') continue
-    const from = open.pop()
+    if (ch !== ']') continue;
+    const from = open.pop();
     if (from === undefined) {
-      prevByDepth[0] = null
-      continue
+      prevByDepth[0] = null;
+      continue;
     }
-    const prev = prevByDepth[open.length] ?? null
+    const prev = prevByDepth[open.length] ?? null;
     // IMAGE alt — `![…]`, every image spelling.
-    if (from > 0 && source[from - 1] === '!') ranges.push([from + 1, i])
+    if (from > 0 && source[from - 1] === '!') ranges.push([from + 1, i]);
     // FOOTNOTE label — `[^…]`, reference and definition alike. Suppressed for
     // the reference-counting copy only (`footnoteReferenceMask`), where blanking
     // the labels would erase the very references being counted.
-    if (footnoteLabels && source[from + 1] === '^') ranges.push([from + 2, i])
+    if (footnoteLabels && source[from + 1] === '^') ranges.push([from + 2, i]);
     // REFERENCE label — the second group of `[…][…]`, or, when that group is
     // EMPTY (`[…][]`), the first group, which is then the identifier.
     if (prev !== null && prev.close === from - 1) {
-      if (i === from + 1) ranges.push([prev.open + 1, prev.close])
-      else ranges.push([from + 1, i])
+      if (i === from + 1) ranges.push([prev.open + 1, prev.close]);
+      else ranges.push([from + 1, i]);
     }
-    prevByDepth[open.length] = { open: from, close: i }
+    prevByDepth[open.length] = { open: from, close: i };
   }
-  return blankRanges(masked, mergeRanges(ranges))
+  return blankRanges(masked, mergeRanges(ranges));
 }
 
 /** `> ` / `>` container prefixes, including nested ones (`> > `). */
-const BLOCKQUOTE_PREFIX_RE = /^(?: {0,3}>[ \t]?)+/
+const BLOCKQUOTE_PREFIX_RE = /^(?: {0,3}>[ \t]?)+/;
 
 /**
  * EXACT NO-OP GUARDS for the container cross-calls (round 19 — performance).
@@ -2407,8 +2608,8 @@ const BLOCKQUOTE_PREFIX_RE = /^(?: {0,3}>[ \t]?)+/
  * into an approximation of "probably nothing here"; that is how the eight
  * fail-open instances above were born.
  */
-const hasListMarker = (line: MaskLine): boolean => LIST_MARKER_RE.test(line.content)
-const hasQuotePrefix = (line: MaskLine): boolean => BLOCKQUOTE_PREFIX_RE.test(line.content)
+const hasListMarker = (line: MaskLine): boolean => LIST_MARKER_RE.test(line.content);
+const hasQuotePrefix = (line: MaskLine): boolean => BLOCKQUOTE_PREFIX_RE.test(line.content);
 
 /**
  * WINDOWED RUNS (round 19 — performance, and the same lesson as `blankRanges`
@@ -2432,31 +2633,31 @@ const hasQuotePrefix = (line: MaskLine): boolean => BLOCKQUOTE_PREFIX_RE.test(li
  * `masked` inside its `flush` is the regression.
  */
 function rebaseRun(run: MaskLine[], from: number): MaskLine[] {
-  return run.map((line) => ({
+  return run.map(line => ({
     start: line.start - from,
     contentStart: line.contentStart - from,
     content: line.content,
-  }))
+  }));
 }
 
 function spliceWindows(masked: string, edits: Array<[number, number, string]>): string {
-  if (edits.length === 0) return masked
-  const parts: string[] = []
-  let cursor = 0
+  if (edits.length === 0) return masked;
+  const parts: string[] = [];
+  let cursor = 0;
   for (const [from, to, text] of edits) {
-    if (from > cursor) parts.push(masked.slice(cursor, from))
-    parts.push(text)
-    cursor = to
+    if (from > cursor) parts.push(masked.slice(cursor, from));
+    parts.push(text);
+    cursor = to;
   }
-  parts.push(masked.slice(cursor))
-  return parts.join('')
+  parts.push(masked.slice(cursor));
+  return parts.join('');
 }
 
 /** The window a run occupies: from the first line's START (fence ranges are
  *  anchored there, before any container prefix) to the last line's END. */
 function runWindow(run: MaskLine[]): [number, number] {
-  const last = run[run.length - 1]
-  return [run[0].start, last.contentStart + last.content.length]
+  const last = run[run.length - 1];
+  return [run[0].start, last.contentStart + last.content.length];
 }
 
 /**
@@ -2482,7 +2683,7 @@ function runWindow(run: MaskLine[]): [number, number] {
  * shelter. Do NOT convert this into a `return` / `continue`: skipping is the
  * fail-OPEN direction and would be a new instance of the class.
  */
-const CONTAINER_NEST_LIMIT = 64
+const CONTAINER_NEST_LIMIT = 64;
 
 /**
  * Blank code regions inside BLOCKQUOTES.
@@ -2559,27 +2760,27 @@ const CONTAINER_NEST_LIMIT = 64
  * 40000 (469 KB, 11 ms, closer masked at every depth).
  */
 function blankQuotedCode(masked: string, lines: MaskLine[], depth = 0): string {
-  let run: MaskLine[] = []
+  let run: MaskLine[] = [];
   // One edit per run, spliced in a SINGLE fold at the end — see `spliceWindows`.
-  const edits: Array<[number, number, string]> = []
+  const edits: Array<[number, number, string]> = [];
   const flush = () => {
-    if (run.length === 0) return
-    const [from, to] = runWindow(run)
-    const wl = rebaseRun(run, from)
-    let win = masked.slice(from, to)
+    if (run.length === 0) return;
+    const [from, to] = runWindow(run);
+    const wl = rebaseRun(run, from);
+    let win = masked.slice(from, to);
     // Depth limit: blank the run WHOLE rather than recurse — see
     // `CONTAINER_NEST_LIMIT`. Fail-closed, never a skip.
     if (depth >= CONTAINER_NEST_LIMIT) {
-      edits.push([from, to, blankRanges(win, [[0, win.length]])])
-      run = []
-      return
+      edits.push([from, to, blankRanges(win, [[0, win.length]])]);
+      run = [];
+      return;
     }
     // The nested FENCE scan needs the unmasked `run` content (the inline-code
     // pass would have blinded it), but the nested INDENTED scan needs the CURRENT
     // mask — see `blankIndentedCode`'s SCAN-SOURCE INVERSION.
-    const afterFences = blankFencedRegions(win, wl)
-    win = blankIndentedCode(afterFences, remapToMask(afterFences, wl))
-    win = blankLinkDefinitions(win, wl)
+    const afterFences = blankFencedRegions(win, wl);
+    win = blankIndentedCode(afterFences, remapToMask(afterFences, wl));
+    win = blankLinkDefinitions(win, wl);
     // …and the LIST-container pass, mirroring the call `blankListItemCode`
     // already makes in the other direction. Without it a fenced sample inside a
     // LIST ITEM inside a QUOTE was seen by NO pass: `FENCE_RE` caps fence indent
@@ -2589,24 +2790,24 @@ function blankQuotedCode(masked: string, lines: MaskLine[], depth = 0): string {
     // starts at 8 and never reaches it either. Reproduced live for textarea and
     // iframe, at both list spellings, the tab spelling and depth-2 quotes;
     // `escapeUnknownHtmlTags` returned the input BYTE-IDENTICAL.
-    if (wl.some(hasListMarker)) win = blankListItemCode(win, wl, depth + 1)
-    edits.push([from, to, win])
-    run = []
-  }
+    if (wl.some(hasListMarker)) win = blankListItemCode(win, wl, depth + 1);
+    edits.push([from, to, win]);
+    run = [];
+  };
   for (const line of lines) {
-    const prefix = BLOCKQUOTE_PREFIX_RE.exec(line.content)
+    const prefix = BLOCKQUOTE_PREFIX_RE.exec(line.content);
     if (!prefix) {
-      flush()
-      continue
+      flush();
+      continue;
     }
     run.push({
       start: line.start,
       contentStart: line.contentStart + prefix[0].length,
       content: line.content.slice(prefix[0].length),
-    })
+    });
   }
-  flush()
-  return spliceWindows(masked, edits)
+  flush();
+  return spliceWindows(masked, edits);
 }
 
 /**
@@ -2641,32 +2842,32 @@ function blankQuotedCode(masked: string, lines: MaskLine[], depth = 0): string {
  * documents) costs at most a code sample rendered as escaped text.
  */
 function blankListItemCode(masked: string, lines: MaskLine[], depth = 0): string {
-  const cols: number[] = []
-  let run: MaskLine[] = []
-  let runCol = 0
+  const cols: number[] = [];
+  let run: MaskLine[] = [];
+  let runCol = 0;
   // One edit per run, spliced in a SINGLE fold at the end — see `spliceWindows`.
-  const edits: Array<[number, number, string]> = []
+  const edits: Array<[number, number, string]> = [];
   const flush = () => {
-    if (run.length === 0) return
-    const [from, to] = runWindow(run)
-    const wl = rebaseRun(run, from)
-    let win = masked.slice(from, to)
+    if (run.length === 0) return;
+    const [from, to] = runWindow(run);
+    const wl = rebaseRun(run, from);
+    let win = masked.slice(from, to);
     // Depth limit: blank the run WHOLE rather than recurse — see
     // `CONTAINER_NEST_LIMIT`. Fail-closed, never a skip.
     if (depth >= CONTAINER_NEST_LIMIT) {
-      edits.push([from, to, blankRanges(win, [[0, win.length]])])
-      run = []
-      return
+      edits.push([from, to, blankRanges(win, [[0, win.length]])]);
+      run = [];
+      return;
     }
     // The nested FENCE scan needs unmasked content; the nested INDENTED scan
     // needs the CURRENT mask — exactly `blankQuotedCode`'s split. The nested
     // QUOTED scan is needed too: `BLOCKQUOTE_PREFIX_RE` is anchored at columns
     // 0..3, so a quoted fence inside a column-4 item was missed by BOTH
     // containers' passes (`bq-in-col4-item`, reproduced live).
-    const afterFences = blankFencedRegions(win, wl)
-    win = blankIndentedCode(afterFences, remapToMask(afterFences, wl))
-    win = blankLinkDefinitions(win, wl)
-    if (wl.some(hasQuotePrefix)) win = blankQuotedCode(win, wl, depth + 1)
+    const afterFences = blankFencedRegions(win, wl);
+    win = blankIndentedCode(afterFences, remapToMask(afterFences, wl));
+    win = blankLinkDefinitions(win, wl);
+    if (wl.some(hasQuotePrefix)) win = blankQuotedCode(win, wl, depth + 1);
     // …and ITSELF, the symmetric counterpart of the `blankQuotedCode →
     // blankListItemCode` call above (round 19 — tenth instance of the fail-open
     // class). `LIST_MARKER_RE` is anchored at `^` and matches only the FIRST
@@ -2690,20 +2891,20 @@ function blankListItemCode(masked: string, lines: MaskLine[], depth = 0): string
     // non-negative integer, so the chain is finite; a run with no marker at all
     // pushes no column, leaves `top === 0`, opens no run and the recursion stops
     // one level down — which is exactly what `hasListMarker` short-circuits.
-    if (wl.some(hasListMarker)) win = blankListItemCode(win, wl, depth + 1)
-    edits.push([from, to, win])
-    run = []
-  }
+    if (wl.some(hasListMarker)) win = blankListItemCode(win, wl, depth + 1);
+    edits.push([from, to, win]);
+    run = [];
+  };
   for (const line of lines) {
     // A blank line does not close a list item, so it stays in the run — the
     // nested tracker needs it to see the paragraph break. CommonMark's blank
     // line, not `trim()` (see `isBlankLine`).
     if (isBlankLine(line.content)) {
-      if (run.length > 0) run.push({ ...line, content: '' })
-      continue
+      if (run.length > 0) run.push({ ...line, content: '' });
+      continue;
     }
-    const indent = leadingIndent(line.content)
-    while (cols.length > 0 && indent < cols[cols.length - 1]) cols.pop()
+    const indent = leadingIndent(line.content);
+    while (cols.length > 0 && indent < cols[cols.length - 1]) cols.pop();
     // THE MARKER LINE IS ITSELF ITEM CONTENT (round 18 — eighth instance of the
     // fail-open class). The marker used to be pushed AFTER the run-membership
     // decision, so `top` was read from the enclosing state and the marker line
@@ -2728,16 +2929,16 @@ function blankListItemCode(masked: string, lines: MaskLine[], depth = 0): string
     // index can only be 0 when the requested column is 0), so every line put in
     // a run still strictly shortens and the measure `M(run)` in
     // `blankQuotedCode`'s termination proof still strictly decreases.
-    const marker = LIST_MARKER_RE.exec(line.content)
+    const marker = LIST_MARKER_RE.exec(line.content);
     if (marker) {
-      const markerEndCol = visualColumn(line.content, marker[0].length - marker[2].length)
-      const contentCol = visualColumn(line.content, marker[0].length)
-      cols.push(contentCol - markerEndCol > 4 ? markerEndCol + 1 : contentCol)
+      const markerEndCol = visualColumn(line.content, marker[0].length - marker[2].length);
+      const contentCol = visualColumn(line.content, marker[0].length);
+      cols.push(contentCol - markerEndCol > 4 ? markerEndCol + 1 : contentCol);
     }
-    const top = cols.length > 0 ? cols[cols.length - 1] : 0
+    const top = cols.length > 0 ? cols[cols.length - 1] : 0;
     if (top !== runCol) {
-      flush()
-      runCol = top
+      flush();
+      runCol = top;
     }
     // EVERY list item is re-scanned at its own content column (round 19 — ninth
     // instance of the fail-open class). The gate used to be `top >= 4`, on the
@@ -2760,21 +2961,21 @@ function blankListItemCode(masked: string, lines: MaskLine[], depth = 0): string
     // monotonic, so re-scanning narrow items can only blank MORE, and
     // termination is unaffected (`top >= 1` still implies `cut >= 1`).
     if (top >= 1) {
-      const cut = charIndexAtColumn(line.content, top)
+      const cut = charIndexAtColumn(line.content, top);
       if (cut < 0) {
-        flush()
-        runCol = 0
+        flush();
+        runCol = 0;
       } else {
         run.push({
           start: line.start,
           contentStart: line.contentStart + cut,
           content: line.content.slice(cut),
-        })
+        });
       }
     }
   }
-  flush()
-  return spliceWindows(masked, edits)
+  flush();
+  return spliceWindows(masked, edits);
 }
 
 /**
@@ -2831,26 +3032,26 @@ function blankListItemCode(masked: string, lines: MaskLine[], depth = 0): string
  * pinned by `unclosed-fence-body-renders-escaped` rather than left as prose.
  */
 function buildCloserHaystack(text: string): string {
-  const folded = foldAsciiCase(text)
-  const lines = toMaskLines(folded)
+  const folded = foldAsciiCase(text);
+  const lines = toMaskLines(folded);
   // 1. Inline code spans (the only non-line-state code region). Uncapped and
   //    backtracking-free — see `findInlineCodeRanges`; an over-cap span used to
   //    be skipped entirely and sheltered a live RAWTEXT opener.
-  let masked = blankRanges(folded, findInlineCodeRanges(folded))
+  let masked = blankRanges(folded, findInlineCodeRanges(folded));
   // 2. Every BLOCK-level code form, derived from line state over `folded`:
   //    fences (tracker-accurate, closed and EOF-terminated alike), indented
   //    code, blockquoted code, and HTML comments. Each of these carried a
   //    reproduced live-textarea swallow before it was masked.
-  masked = blankFencedRegions(masked, lines)
+  masked = blankFencedRegions(masked, lines);
   //    The indented pass walks the CURRENT mask (not `folded`) so a list marker
   //    written inside a fence cannot shift its content-column stack — see its
   //    SCAN-SOURCE INVERSION note. `blankQuotedCode` still gets the unmasked
   //    lines because its NESTED fence scan needs them, and applies the same
   //    inversion internally.
-  masked = blankIndentedCode(masked, remapToMask(masked, lines))
+  masked = blankIndentedCode(masked, remapToMask(masked, lines));
   //    …and LINK REFERENCE DEFINITIONS, which remark consumes whole and emits
   //    nothing for, so a `</textarea>` in a destination or title is not a closer.
-  masked = blankLinkDefinitions(masked, lines)
+  masked = blankLinkDefinitions(masked, lines);
   //    …and the GFM FOOTNOTE definitions that pass deliberately refuses, but only
   //    the UNREFERENCED ones: remark-gfm drops those whole, so their bodies are
   //    not document text either. It reads the CURRENT mask for DEFINITIONS and a
@@ -2866,32 +3067,32 @@ function buildCloserHaystack(text: string): string {
   //        alike" — after it, EVERY reference is gone and every referenced
   //        definition would be over-blanked into escaped source. Hence the
   //        separate scratch copy instead of a reorder.
-  masked = blankUnreferencedFootnotes(masked, lines, folded)
+  masked = blankUnreferencedFootnotes(masked, lines, folded);
   //    …and the INLINE link/image spelling of the same shelter, which remark
   //    likewise turns into href/title attributes. Container-agnostic, so like
   //    the definition pass it needs exactly one top-level call.
-  masked = blankInlineLinkPayloads(masked, folded)
+  masked = blankInlineLinkPayloads(masked, folded);
   //    …and the BRACKET half of that same class — an image's alt, a reference
   //    label, a footnote label — which remark consumes into an attribute or an
   //    identifier. Container-agnostic, so likewise exactly one top-level call.
-  masked = blankBracketLabels(masked, folded)
-  masked = blankQuotedCode(masked, lines)
+  masked = blankBracketLabels(masked, folded);
+  masked = blankQuotedCode(masked, lines);
   //    …and the LIST-container analogue, for items whose content column exceeds
   //    the 3-column fence-indent cap. Monotonic, so its position among the
   //    block passes is not load-bearing.
-  masked = blankListItemCode(masked, lines)
+  masked = blankListItemCode(masked, lines);
   // Comments scan the MASKED copy, not `folded` — see `blankComments`. Must
   // stay LAST: it relies on every code region already being blanked.
-  masked = blankComments(masked, masked)
+  masked = blankComments(masked, masked);
   // 3. Attribute regions. Blanking the WHOLE tag would blank real `</tag>`
   //    closers too (and break the closed-form fixtures), so only the
   //    attribute run between the tag name and the `>` is cleared.
-  masked = blankTagAttributes(masked)
-  return masked
+  masked = blankTagAttributes(masked);
+  return masked;
 }
 
 /** Exported for the length-preservation invariant test only. */
-export const __buildCloserHaystackForTest = buildCloserHaystack
+export const __buildCloserHaystackForTest = buildCloserHaystack;
 
 /**
  * True when a well-formed `</tag>` (optional trailing whitespace) occurs at
@@ -2901,15 +3102,14 @@ export const __buildCloserHaystackForTest = buildCloserHaystack
  * an injection footgun on the next edit.
  */
 function hasLaterCloser(lowerSource: string, tag: string, from: number): boolean {
-  const needle = `</${tag}`
-  let cursor = from
+  const needle = `</${tag}`;
+  let cursor = from;
   for (;;) {
-    const at = lowerSource.indexOf(needle, cursor)
-    if (at === -1) return false
+    const at = lowerSource.indexOf(needle, cursor);
+    if (at === -1) return false;
     // Only `</tag>` or `</tag   >` closes it; `</tagfoo>` is a different tag.
-    if (/^\s*>/.test(lowerSource.slice(at + needle.length, at + needle.length + 64)))
-      return true
-    cursor = at + needle.length
+    if (/^\s*>/.test(lowerSource.slice(at + needle.length, at + needle.length + 64))) return true;
+    cursor = at + needle.length;
   }
 }
 
@@ -2920,10 +3120,10 @@ function hasLaterCloser(lowerSource: string, tag: string, from: number): boolean
  */
 function isMaskedBlank(lowerSource: string, from: number, to: number): boolean {
   for (let i = from; i < to; i++) {
-    const c = lowerSource[i]
-    if (c !== ' ' && c !== '\n') return false
+    const c = lowerSource[i];
+    if (c !== ' ' && c !== '\n') return false;
   }
-  return true
+  return true;
 }
 
 /**
@@ -2944,22 +3144,22 @@ function isMaskedBlank(lowerSource: string, from: number, to: number): boolean {
  * See the matching note on `escapeOutsideFences` for the one cosmetic cost.
  */
 function hasUnbalancedRawtextOpener(span: string): boolean {
-  if (span.indexOf('<') === -1) return false
-  const open = new Map<string, number>()
-  TAG_LIKE_REGEX.lastIndex = 0
-  let m: RegExpExecArray | null
+  if (span.indexOf('<') === -1) return false;
+  const open = new Map<string, number>();
+  TAG_LIKE_REGEX.lastIndex = 0;
+  let m: RegExpExecArray | null;
   while ((m = TAG_LIKE_REGEX.exec(span)) !== null) {
-    const [, slash, tag] = m
-    const lower = tag.toLowerCase()
-    if (!RAWTEXT_TAGS.has(lower)) continue
+    const [, slash, tag] = m;
+    const lower = tag.toLowerCase();
+    if (!RAWTEXT_TAGS.has(lower)) continue;
     if (slash === '') {
-      open.set(lower, (open.get(lower) ?? 0) + 1)
+      open.set(lower, (open.get(lower) ?? 0) + 1);
     } else {
-      open.set(lower, Math.max(0, (open.get(lower) ?? 0) - 1))
+      open.set(lower, Math.max(0, (open.get(lower) ?? 0) - 1));
     }
   }
-  for (const count of open.values()) if (count > 0) return true
-  return false
+  for (const count of open.values()) if (count > 0) return true;
+  return false;
 }
 
 /**
@@ -3006,38 +3206,92 @@ function hasUnbalancedRawtextOpener(span: string): boolean {
  * they stay two walks.
  */
 interface HtmlBlockRange {
-  start: number
-  end: number
+  start: number;
+  end: number;
 }
 
 /** CommonMark start-condition 6 tag list (verbatim from the spec). */
 const HTML_BLOCK_TYPE_6_TAGS = new Set([
-  'address', 'article', 'aside', 'base', 'basefont', 'blockquote', 'body',
-  'caption', 'center', 'col', 'colgroup', 'dd', 'details', 'dialog', 'dir',
-  'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form',
-  'frame', 'frameset', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header',
-  'hr', 'html', 'iframe', 'legend', 'li', 'link', 'main', 'menu', 'menuitem',
-  'nav', 'noframes', 'ol', 'optgroup', 'option', 'p', 'param', 'search',
-  'section', 'summary', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead',
-  'title', 'tr', 'track', 'ul',
-])
+  'address',
+  'article',
+  'aside',
+  'base',
+  'basefont',
+  'blockquote',
+  'body',
+  'caption',
+  'center',
+  'col',
+  'colgroup',
+  'dd',
+  'details',
+  'dialog',
+  'dir',
+  'div',
+  'dl',
+  'dt',
+  'fieldset',
+  'figcaption',
+  'figure',
+  'footer',
+  'form',
+  'frame',
+  'frameset',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'head',
+  'header',
+  'hr',
+  'html',
+  'iframe',
+  'legend',
+  'li',
+  'link',
+  'main',
+  'menu',
+  'menuitem',
+  'nav',
+  'noframes',
+  'ol',
+  'optgroup',
+  'option',
+  'p',
+  'param',
+  'search',
+  'section',
+  'summary',
+  'table',
+  'tbody',
+  'td',
+  'tfoot',
+  'th',
+  'thead',
+  'title',
+  'tr',
+  'track',
+  'ul',
+]);
 
-const HTML_BLOCK_START_1 = /^ {0,3}<(?:script|pre|style|textarea)(?:[ \t>]|\r?$)/i
-const HTML_BLOCK_END_1 = /<\/(?:script|pre|style|textarea)>/i
-const HTML_BLOCK_START_2 = /^ {0,3}<!--/
-const HTML_BLOCK_START_3 = /^ {0,3}<\?/
-const HTML_BLOCK_START_4 = /^ {0,3}<![a-zA-Z]/
-const HTML_BLOCK_START_5 = /^ {0,3}<!\[CDATA\[/
-const HTML_BLOCK_START_6 = /^ {0,3}<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})(?:[ \t]|\/?>|\r?$)/
+const HTML_BLOCK_START_1 = /^ {0,3}<(?:script|pre|style|textarea)(?:[ \t>]|\r?$)/i;
+const HTML_BLOCK_END_1 = /<\/(?:script|pre|style|textarea)>/i;
+const HTML_BLOCK_START_2 = /^ {0,3}<!--/;
+const HTML_BLOCK_START_3 = /^ {0,3}<\?/;
+const HTML_BLOCK_START_4 = /^ {0,3}<![a-zA-Z]/;
+const HTML_BLOCK_START_5 = /^ {0,3}<!\[CDATA\[/;
+const HTML_BLOCK_START_6 = /^ {0,3}<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})(?:[ \t]|\/?>|\r?$)/;
 /** A COMPLETE open or closing tag, alone on its line. Attribute run bounded for
  *  the same ReDoS reason as `TAG_LIKE_REGEX`. */
 const HTML_BLOCK_START_7 =
-  /^ {0,3}(?:<[a-zA-Z][a-zA-Z0-9-]{0,63}(?:\s[^>]{0,4096}?)?\/?>|<\/[a-zA-Z][a-zA-Z0-9-]{0,63}[ \t]{0,64}>)[ \t]*\r?$/
+  /^ {0,3}(?:<[a-zA-Z][a-zA-Z0-9-]{0,63}(?:\s[^>]{0,4096}?)?\/?>|<\/[a-zA-Z][a-zA-Z0-9-]{0,63}[ \t]{0,64}>)[ \t]*\r?$/;
 /** Lines that are NOT ordinary paragraph text (so condition 7 may start after
  *  them). A lone tag line is deliberately ABSENT: under CommonMark it cannot
  *  interrupt a paragraph, so it continues one. */
 const NON_PARAGRAPH_LINE_RE =
-  /^ {0,3}(?:#{1,6}(?:[ \t]|\r?$)|>|[-*+](?:[ \t]|\r?$)|\d{1,9}[.)](?:[ \t]|\r?$)|`{3,}|~{3,}|=+[ \t]*\r?$|(?:[-*_][ \t]*){3,}\r?$)/
+  /^ {0,3}(?:#{1,6}(?:[ \t]|\r?$)|>|[-*+](?:[ \t]|\r?$)|\d{1,9}[.)](?:[ \t]|\r?$)|`{3,}|~{3,}|=+[ \t]*\r?$|(?:[-*_][ \t]*){3,}\r?$)/;
 
 /**
  * CONTAINER NORMALIZATION (round 13). Every start/end condition above is
@@ -3103,48 +3357,48 @@ const NON_PARAGRAPH_LINE_RE =
  * The blockquote half reuses `BLOCKQUOTE_PREFIX_RE` — the mask's existing
  * blockquote-stripping SSOT — so the two walks agree on what a quote marker is.
  */
-const LIST_MARKER_PREFIX_RE = /^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]{1,64}|\r?$)/
+const LIST_MARKER_PREFIX_RE = /^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]{1,64}|\r?$)/;
 
 /** Expand tabs to 4-column tab stops, so character offsets in the result ARE
  *  columns. Same stop rule as `visualColumn` (the mask's SSOT for this). */
 function expandTabs(s: string): string {
-  if (s.indexOf('\t') === -1) return s
-  let out = ''
-  for (const ch of s) out += ch === '\t' ? ' '.repeat(4 - (out.length % 4)) : ch
-  return out
+  if (s.indexOf('\t') === -1) return s;
+  let out = '';
+  for (const ch of s) out += ch === '\t' ? ' '.repeat(4 - (out.length % 4)) : ch;
+  return out;
 }
 
 interface NormalizedLine {
   /** The line with its container prefix removed (start/end conditions match this). */
-  text: string
+  text: string;
   /** Content column of a list marker this line OPENED, or -1 if it opened none. */
-  openedListCol: number
+  openedListCol: number;
 }
 
 /** `rawLine` is expanded to column stops FIRST, so every length taken below is a
  *  column count. Callers that compare against the input must compare against
  *  `expandTabs(rawLine)`, not `rawLine` — see `computeHtmlBlockRanges`. */
 function stripContainerPrefix(rawLine: string, listContentCol: number): NormalizedLine {
-  const line = expandTabs(rawLine)
-  let rest = line
-  let openedListCol = -1
+  const line = expandTabs(rawLine);
+  let rest = line;
+  let openedListCol = -1;
   // The enclosing item's continuation indent, consumable ONCE.
-  let indentBudget = listContentCol
+  let indentBudget = listContentCol;
   // Containers nest in either order (`- > <div>`, `> - <div>`), so alternate
   // until nothing more is consumed. Bounded so a pathological line of markers
   // cannot make this super-linear.
   for (let depth = 0; depth < 16; depth++) {
-    const bq = BLOCKQUOTE_PREFIX_RE.exec(rest)
+    const bq = BLOCKQUOTE_PREFIX_RE.exec(rest);
     if (bq !== null && bq[0].length > 0) {
-      rest = rest.slice(bq[0].length)
-      if (openedListCol >= 0) openedListCol = line.length - rest.length
-      continue
+      rest = rest.slice(bq[0].length);
+      if (openedListCol >= 0) openedListCol = line.length - rest.length;
+      continue;
     }
-    const li = LIST_MARKER_PREFIX_RE.exec(rest)
+    const li = LIST_MARKER_PREFIX_RE.exec(rest);
     if (li !== null) {
-      rest = rest.slice(li[0].length)
-      openedListCol = line.length - rest.length
-      continue
+      rest = rest.slice(li[0].length);
+      openedListCol = line.length - rest.length;
+      continue;
     }
     // Continuation line of the open list item: drop up to the content column of
     // leading whitespace (never more, and never non-whitespace) — then KEEP
@@ -3156,17 +3410,17 @@ function stripContainerPrefix(rawLine: string, listContentCol: number): Normaliz
     // either to be seen. Guarded on "this line opened no list marker", which is
     // what makes it a continuation line at all.
     if (openedListCol < 0 && indentBudget > 0) {
-      let i = 0
-      while (i < indentBudget && i < rest.length && rest[i] === ' ') i++
-      indentBudget = 0
+      let i = 0;
+      while (i < indentBudget && i < rest.length && rest[i] === ' ') i++;
+      indentBudget = 0;
       if (i > 0) {
-        rest = rest.slice(i)
-        continue
+        rest = rest.slice(i);
+        continue;
       }
     }
-    break
+    break;
   }
-  return { text: rest, openedListCol }
+  return { text: rest, openedListCol };
 }
 
 /**
@@ -3181,59 +3435,59 @@ function stripContainerPrefix(rawLine: string, listContentCol: number): Normaliz
 function htmlBlockEnds(kind: number, line: string): boolean {
   switch (kind) {
     case 1:
-      return HTML_BLOCK_END_1.test(line)
+      return HTML_BLOCK_END_1.test(line);
     case 2:
-      return line.indexOf('-->') !== -1
+      return line.indexOf('-->') !== -1;
     case 3:
-      return line.indexOf('?>') !== -1
+      return line.indexOf('?>') !== -1;
     case 4:
-      return line.indexOf('>') !== -1
+      return line.indexOf('>') !== -1;
     default:
-      return line.indexOf(']]>') !== -1
+      return line.indexOf(']]>') !== -1;
   }
 }
 
 function htmlBlockStartKind(line: string, inParagraph: boolean): number | null {
-  if (line.indexOf('<') === -1) return null
-  if (HTML_BLOCK_START_1.test(line)) return 1
-  if (HTML_BLOCK_START_2.test(line)) return 2
-  if (HTML_BLOCK_START_3.test(line)) return 3
-  if (HTML_BLOCK_START_5.test(line)) return 5
-  if (HTML_BLOCK_START_4.test(line)) return 4
-  const six = HTML_BLOCK_START_6.exec(line)
-  if (six && HTML_BLOCK_TYPE_6_TAGS.has(six[2].toLowerCase())) return 6
+  if (line.indexOf('<') === -1) return null;
+  if (HTML_BLOCK_START_1.test(line)) return 1;
+  if (HTML_BLOCK_START_2.test(line)) return 2;
+  if (HTML_BLOCK_START_3.test(line)) return 3;
+  if (HTML_BLOCK_START_5.test(line)) return 5;
+  if (HTML_BLOCK_START_4.test(line)) return 4;
+  const six = HTML_BLOCK_START_6.exec(line);
+  if (six && HTML_BLOCK_TYPE_6_TAGS.has(six[2].toLowerCase())) return 6;
   // Condition 7 is the ONLY one that cannot interrupt a paragraph.
-  if (!inParagraph && HTML_BLOCK_START_7.test(line)) return 7
-  return null
+  if (!inParagraph && HTML_BLOCK_START_7.test(line)) return 7;
+  return null;
 }
 
 function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
-  if (text.indexOf('<') === -1) return []
-  const ranges: HtmlBlockRange[] = []
-  const fences = createFenceTracker()
-  let kind: number | null = null
-  let start = 0
-  let lastEnd = 0
-  let inParagraph = false
-  let offset = 0
+  if (text.indexOf('<') === -1) return [];
+  const ranges: HtmlBlockRange[] = [];
+  const fences = createFenceTracker();
+  let kind: number | null = null;
+  let start = 0;
+  let lastEnd = 0;
+  let inParagraph = false;
+  let offset = 0;
   // Container state for the normalization above. `listContentCol` is the width
   // of the innermost list marker seen; `openPrefixLen` is how many prefix
   // COLUMNS the CURRENTLY open block consumed on its OPENING line, which decides
   // whose notion of "blank line" terminates a type-6/7 block (see below).
-  let listContentCol = 0
-  let openPrefixLen = 0
+  let listContentCol = 0;
+  let openPrefixLen = 0;
   for (const line of text.split('\n')) {
-    const lineStart = offset
-    const lineEnd = offset + line.length
-    offset = lineEnd + 1
+    const lineStart = offset;
+    const lineEnd = offset + line.length;
+    offset = lineEnd + 1;
     // Columns, not characters (see `expandTabs`). Every comparison against "the
     // line as written" below must use THIS, or a tab-prefixed container reads as
     // a container that opened nothing.
-    const expanded = expandTabs(line)
-    const norm = stripContainerPrefix(expanded, listContentCol)
-    if (norm.openedListCol >= 0) listContentCol = norm.openedListCol
-    else if (!isBlankLine(norm.text) && norm.text === expanded) listContentCol = 0
-    const normBlank = isBlankLine(norm.text)
+    const expanded = expandTabs(line);
+    const norm = stripContainerPrefix(expanded, listContentCol);
+    if (norm.openedListCol >= 0) listContentCol = norm.openedListCol;
+    else if (!isBlankLine(norm.text) && norm.text === expanded) listContentCol = 0;
+    const normBlank = isBlankLine(norm.text);
     // A type-6/7 block ends at the first blank line. At top level the raw line
     // decides — a bare `-` or `>` line inside a top-level HTML block is CONTENT,
     // and treating it as blank would END the range early (the one
@@ -3261,30 +3515,29 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
     // a live `<textarea>` / third-party `<iframe>` reached the DOM
     // (`escapeUnknownHtmlTags` returned the input BYTE-IDENTICAL). One
     // invisible character reopened the whole shelter class.
-    const blank =
-      openPrefixLen > 0 ? isBlankLine(expanded.slice(openPrefixLen)) : isBlankLine(line)
+    const blank = openPrefixLen > 0 ? isBlankLine(expanded.slice(openPrefixLen)) : isBlankLine(line);
     if (kind !== null) {
       // Types 6 and 7 end at (and EXCLUDE) the first blank line; 1..5 end on
       // the line that satisfies their closer, INCLUSIVE.
       if (kind >= 6) {
         if (blank) {
-          ranges.push({ start, end: lastEnd })
-          kind = null
-          openPrefixLen = 0
-          inParagraph = false
-          continue
+          ranges.push({ start, end: lastEnd });
+          kind = null;
+          openPrefixLen = 0;
+          inParagraph = false;
+          continue;
         }
-        lastEnd = lineEnd
-        continue
+        lastEnd = lineEnd;
+        continue;
       }
-      lastEnd = lineEnd
+      lastEnd = lineEnd;
       if (htmlBlockEnds(kind, norm.text)) {
-        ranges.push({ start, end: lineEnd })
-        kind = null
-        openPrefixLen = 0
-        inParagraph = false
+        ranges.push({ start, end: lineEnd });
+        kind = null;
+        openPrefixLen = 0;
+        inParagraph = false;
       }
-      continue
+      continue;
     }
     // Outside a block: keep fence state, so a start condition written inside a
     // genuine fenced code sample cannot open one. Fed the RAW line ON PURPOSE —
@@ -3294,33 +3547,32 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
     // blockquote is invisible here, so its content lines can open a bogus block:
     // more detection, i.e. the fail-CLOSED direction.
     if (fences.push(line) !== 'text') {
-      inParagraph = false
-      continue
+      inParagraph = false;
+      continue;
     }
-    const started = htmlBlockStartKind(norm.text, inParagraph)
+    const started = htmlBlockStartKind(norm.text, inParagraph);
     if (started !== null) {
-      inParagraph = false
+      inParagraph = false;
       // 1..5 may satisfy their end condition on the START line itself.
       if (started < 6 && htmlBlockEnds(started, norm.text)) {
-        ranges.push({ start: lineStart, end: lineEnd })
-        continue
+        ranges.push({ start: lineStart, end: lineEnd });
+        continue;
       }
-      kind = started
-      openPrefixLen = expanded.length - norm.text.length
-      start = lineStart
-      lastEnd = lineEnd
-      continue
+      kind = started;
+      openPrefixLen = expanded.length - norm.text.length;
+      start = lineStart;
+      lastEnd = lineEnd;
+      continue;
     }
     // Paragraph state uses the NORMALIZED blank: a container's own filler line
     // (`>`, `> >`) separates paragraphs inside the container. Erring toward
     // "not in a paragraph" only ENABLES the type-7 start condition — more
     // detection, the fail-CLOSED direction.
-    inParagraph =
-      !normBlank && leadingIndent(norm.text) < 4 && !NON_PARAGRAPH_LINE_RE.test(norm.text)
+    inParagraph = !normBlank && leadingIndent(norm.text) < 4 && !NON_PARAGRAPH_LINE_RE.test(norm.text);
   }
   // An unterminated block runs to end of input, exactly as the tokenizer treats it.
-  if (kind !== null) ranges.push({ start, end: lastEnd })
-  return ranges
+  if (kind !== null) ranges.push({ start, end: lastEnd });
+  return ranges;
 }
 
 /**
@@ -3391,49 +3643,40 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
  * view of an over-cap span in a document the mask ALSO declines to blank — both
  * of those round CLOSED per the table, i.e. they cost at worst a visible `&lt;`.
  */
-const LEFTOVER_TAG_START_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})(?=[\s>])/g
+const LEFTOVER_TAG_START_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})(?=[\s>])/g;
 
 function escapeLeftoverTagStarts(gap: string, lowerSource: string, gapOffset: number): string {
-  if (gap.indexOf('<') === -1) return gap
-  LEFTOVER_TAG_START_RE.lastIndex = 0
-  return gap.replace(
-    LEFTOVER_TAG_START_RE,
-    (m: string, slash: string, tag: string, at: number) =>
-      isMaskedBlank(lowerSource, gapOffset + at, gapOffset + at + m.length)
-        ? m
-        : `&lt;${slash}${tag}`,
-  )
+  if (gap.indexOf('<') === -1) return gap;
+  LEFTOVER_TAG_START_RE.lastIndex = 0;
+  return gap.replace(LEFTOVER_TAG_START_RE, (m: string, slash: string, tag: string, at: number) =>
+    isMaskedBlank(lowerSource, gapOffset + at, gapOffset + at + m.length) ? m : `&lt;${slash}${tag}`,
+  );
 }
 
-export function escapeUnknownHtmlTags(
-  text: string,
-  allowedTags: Set<string> = SAFE_HTML_TAGS,
-): string {
-  if (!text || text.indexOf('<') === -1) return text
+export function escapeUnknownHtmlTags(text: string, allowedTags: Set<string> = SAFE_HTML_TAGS): string {
+  if (!text || text.indexOf('<') === -1) return text;
   // Masked, length-preserving, lowercased whole-document copy for the RAWTEXT
   // closer lookup — the closer may live in a later segment than the opener,
   // so the search must span the ENTIRE source, not the segment being escaped,
   // and must ignore closers that are only code samples / attribute text.
-  const lowerSource = buildCloserHaystack(text)
+  const lowerSource = buildCloserHaystack(text);
   // HTML-block ranges for the CARVE BALANCE GUARD below. Computed LAZILY: only
   // a protected span that actually carries an unbalanced RAWTEXT opener needs
   // them, which no ordinary message has.
-  let htmlBlocks: HtmlBlockRange[] | null = null
+  let htmlBlocks: HtmlBlockRange[] | null = null;
   const spanInsideHtmlBlock = (from: number, to: number): boolean => {
-    htmlBlocks ??= computeHtmlBlockRanges(text)
-    return htmlBlocks.some((r) => r.start < to && r.end > from)
-  }
+    htmlBlocks ??= computeHtmlBlockRanges(text);
+    return htmlBlocks.some(r => r.start < to && r.end > from);
+  };
   // Carve out fenced code blocks AND inline-backtick spans so `<their>`
   // examples inside code are preserved verbatim.
-  const parts: string[] = []
-  let cursor = 0
-  PROTECTED_SPAN_RE.lastIndex = 0
-  let span: RegExpExecArray | null
+  const parts: string[] = [];
+  let cursor = 0;
+  PROTECTED_SPAN_RE.lastIndex = 0;
+  let span: RegExpExecArray | null;
   while ((span = PROTECTED_SPAN_RE.exec(text)) !== null) {
     if (span.index > cursor) {
-      parts.push(
-        escapeOutsideFences(text.slice(cursor, span.index), allowedTags, lowerSource, cursor),
-      )
+      parts.push(escapeOutsideFences(text.slice(cursor, span.index), allowedTags, lowerSource, cursor));
     }
     // INTERSECTION GUARD (soundness, not an instance patch). A protected span
     // is pushed through VERBATIM, so a live RAWTEXT opener inside one never
@@ -3487,23 +3730,20 @@ export function escapeUnknownHtmlTags(
     // verbatim. That is strictly weaker than "the carve never over-detects" — an
     // over-detected span with no RAWTEXT opener in it is still pushed verbatim,
     // which stays cosmetic-only.
-    const isFence = span[1] !== undefined
-    const spanEnd = span.index + span[0].length
+    const isFence = span[1] !== undefined;
+    const spanEnd = span.index + span[0].length;
     parts.push(
       isMaskedBlank(lowerSource, span.index, spanEnd) &&
-        !(
-          hasUnbalancedRawtextOpener(span[0]) &&
-          (isFence || spanInsideHtmlBlock(span.index, spanEnd))
-        )
+        !(hasUnbalancedRawtextOpener(span[0]) && (isFence || spanInsideHtmlBlock(span.index, spanEnd)))
         ? span[0]
         : escapeOutsideFences(span[0], allowedTags, lowerSource, span.index),
-    )
-    cursor = span.index + span[0].length
+    );
+    cursor = span.index + span[0].length;
   }
   if (cursor < text.length) {
-    parts.push(escapeOutsideFences(text.slice(cursor), allowedTags, lowerSource, cursor))
+    parts.push(escapeOutsideFences(text.slice(cursor), allowedTags, lowerSource, cursor));
   }
-  return parts.join('')
+  return parts.join('');
 }
 
 /**
@@ -3520,24 +3760,18 @@ function escapeOutsideFences(
   lowerSource: string,
   segmentOffset: number,
 ): string {
-  const out: string[] = []
-  let cursor = 0
-  TAG_LIKE_REGEX.lastIndex = 0
-  let m: RegExpExecArray | null
+  const out: string[] = [];
+  let cursor = 0;
+  TAG_LIKE_REGEX.lastIndex = 0;
+  let m: RegExpExecArray | null;
   while ((m = TAG_LIKE_REGEX.exec(segment)) !== null) {
-    const [match, slash, tag, rest, selfClose] = m
+    const [match, slash, tag, rest, selfClose] = m;
     if (m.index > cursor)
-      out.push(
-        escapeLeftoverTagStarts(
-          segment.slice(cursor, m.index),
-          lowerSource,
-          segmentOffset + cursor,
-        ),
-      )
-    const lower = tag.toLowerCase()
-    const escaped = `&lt;${slash}${tag}${rest}${selfClose}&gt;`
+      out.push(escapeLeftoverTagStarts(segment.slice(cursor, m.index), lowerSource, segmentOffset + cursor));
+    const lower = tag.toLowerCase();
+    const escaped = `&lt;${slash}${tag}${rest}${selfClose}&gt;`;
     if (!allowedTags.has(lower)) {
-      out.push(escaped)
+      out.push(escaped);
     } else if (slash === '' && RAWTEXT_TAGS.has(lower)) {
       // Allowlisted — but an UNCLOSED RAWTEXT opener would swallow the rest of
       // the document during tokenization, before any allowlist applies.
@@ -3557,16 +3791,16 @@ function escapeOutsideFences(
       // not-really-code is routed through this function whole, so bare `<tag`
       // starts in its GAPS are escaped too — the mask check in
       // `escapeLeftoverTagStarts` keeps that off genuine code regions.
-      const afterTag = segmentOffset + m.index + match.length
-      out.push(hasLaterCloser(lowerSource, lower, afterTag) ? match : escaped)
+      const afterTag = segmentOffset + m.index + match.length;
+      out.push(hasLaterCloser(lowerSource, lower, afterTag) ? match : escaped);
     } else {
-      out.push(match)
+      out.push(match);
     }
-    cursor = m.index + match.length
+    cursor = m.index + match.length;
   }
   if (cursor < segment.length)
-    out.push(escapeLeftoverTagStarts(segment.slice(cursor), lowerSource, segmentOffset + cursor))
-  return out.join('')
+    out.push(escapeLeftoverTagStarts(segment.slice(cursor), lowerSource, segmentOffset + cursor));
+  return out.join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -3579,6 +3813,6 @@ function escapeOutsideFences(
  */
 export function cardAwareUrlTransform(url: string, key: string): string {
   if (key === 'href' && typeof url === 'string' && (url.startsWith('card://') || url.startsWith('mention://')))
-    return url
-  return defaultUrlTransform(url)
+    return url;
+  return defaultUrlTransform(url);
 }

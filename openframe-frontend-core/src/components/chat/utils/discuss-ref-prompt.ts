@@ -20,15 +20,15 @@
  * switch to it and drop `includeReference` — the prose stays put.
  */
 
-import { sanitizeTitleForChat } from './slash-dispatch-utils'
+import { sanitizeTitleForChat } from './slash-dispatch-utils';
 
 export interface DiscussPromptRef {
   /** documentType, e.g. `'roadmap_item'`. */
-  type: string
+  type: string;
   /** Primary key — the id from the `[card://type:id]` marker. */
-  id: string
+  id: string;
   /** Display title. May be the bare id on a synthetic ref (Mingo). */
-  title?: string | null
+  title?: string | null;
 }
 
 export interface BuildDiscussPromptOptions {
@@ -37,7 +37,7 @@ export interface BuildDiscussPromptOptions {
    * still points the agent at the exact row. Default `false` — the SSE path
    * sends `entityIdFilter` and must keep the sentence clean.
    */
-  includeReference?: boolean
+  includeReference?: boolean;
 }
 
 /**
@@ -49,15 +49,12 @@ export interface BuildDiscussPromptOptions {
  * Mingo `[card://…]` marker produces before its row loads) is treated as
  * missing, so the prompt never degrades to `Tell me more about 86ad3qvv5`.
  */
-export function buildDiscussPrompt(
-  reference: DiscussPromptRef,
-  options: BuildDiscussPromptOptions = {},
-): string {
-  const id = (reference.id ?? '').trim()
-  const rawTitle = (reference.title ?? '').trim()
-  const usableTitle = rawTitle && rawTitle !== id ? sanitizeTitleForChat(rawTitle) : ''
-  const prompt = `Tell me more about ${usableTitle || 'this item'}`
-  if (!options.includeReference || !id) return prompt
+export function buildDiscussPrompt(reference: DiscussPromptRef, options: BuildDiscussPromptOptions = {}): string {
+  const id = (reference.id ?? '').trim();
+  const rawTitle = (reference.title ?? '').trim();
+  const usableTitle = rawTitle && rawTitle !== id ? sanitizeTitleForChat(rawTitle) : '';
+  const prompt = `Tell me more about ${usableTitle || 'this item'}`;
+  if (!options.includeReference || !id) return prompt;
   // Only worth the noise when the reference adds something the title doesn't.
-  return `${prompt} (${reference.type} ${id})`
+  return `${prompt} (${reference.type} ${id})`;
 }

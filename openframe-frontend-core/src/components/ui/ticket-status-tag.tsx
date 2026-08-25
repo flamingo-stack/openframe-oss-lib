@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import type React from 'react';
 import { cn } from '../../utils/cn';
 import { deriveActiveColor, deriveHoverColor, getReadableTextColor } from '../../utils/ods-color-utils';
 import { CheckCircleIcon, Chevron02DownIcon } from '../icons-v2-generated';
@@ -251,7 +251,7 @@ export function TicketStatusTag({
       label={label ?? config.label}
       variant={variant ?? config.variant}
       icon={showIcon ? config.icon : undefined}
-      className={cn('shrink-0 w-fit', customColorClasses, className)}
+      className={cn('w-fit shrink-0', customColorClasses, className)}
       style={customStyle}
     />
   );
@@ -297,7 +297,7 @@ export function TicketStatusTag({
             // separated chevron section (the common dropdown-button seam).
             tagVariants({ variant: variant ?? config.variant }),
             'w-fit shrink-0 items-stretch justify-start gap-0 overflow-hidden p-0',
-            'disabled:opacity-60 disabled:cursor-not-allowed',
+            'disabled:cursor-not-allowed disabled:opacity-60',
             // Custom color: bg/hover/active from the CSS vars set above.
             customColorClasses,
             className,
@@ -305,7 +305,7 @@ export function TicketStatusTag({
         >
           <span className="flex items-center gap-[var(--spacing-system-xxs)] px-[var(--spacing-system-xsf)]">
             {showIcon && config.icon && (
-              <span className="flex items-center justify-center size-5 shrink-0">{config.icon}</span>
+              <span className="flex size-5 shrink-0 items-center justify-center">{config.icon}</span>
             )}
             <span className="truncate">{label ?? config.label}</span>
           </span>

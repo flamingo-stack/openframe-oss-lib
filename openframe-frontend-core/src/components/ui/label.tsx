@@ -1,10 +1,10 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import * as LabelPrimitive from "@radix-ui/react-label"
-import { cva, type VariantProps } from "class-variance-authority"
+import * as LabelPrimitive from '@radix-ui/react-label';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from 'react';
 
-import { cn } from "../../utils/cn"
+import { cn } from '../../utils/cn';
 
 /**
  * THE form label. One treatment, stated once:
@@ -24,42 +24,35 @@ import { cn } from "../../utils/cn"
  * chrome, checkbox/radio rows, upload dropzones) — those are interaction
  * wrappers, not text labels, and must not inherit this typography.
  */
-const labelVariants = cva(
-  "block text-h6 text-ods-text-primary",
-  {
-    variants: {
-      variant: {
-        default: "",
-        /** @deprecated alias of `default` — the three small scales converged on text-h6. */
-        small: "",
-        /** @deprecated alias of `default`. */
-        medium: "",
-        large: "text-h4"
-      },
-      spacing: {
-        none: "",
-        tight: "mb-0.5",
-        normal: "mb-2",
-        loose: "mb-3"
-      }
+const labelVariants = cva('block text-ods-text-primary text-h6', {
+  variants: {
+    variant: {
+      default: '',
+      /** @deprecated alias of `default` — the three small scales converged on text-h6. */
+      small: '',
+      /** @deprecated alias of `default`. */
+      medium: '',
+      large: 'text-h4',
     },
-    defaultVariants: {
-      variant: "default",
-      spacing: "none"
-    }
-  }
-)
+    spacing: {
+      none: '',
+      tight: 'mb-0.5',
+      normal: 'mb-2',
+      loose: 'mb-3',
+    },
+  },
+  defaultVariants: {
+    variant: 'default',
+    spacing: 'none',
+  },
+});
 
-const Label = React.forwardRef<
-  React.ElementRef<typeof LabelPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root> & VariantProps<typeof labelVariants>
+const Label = forwardRef<
+  ElementRef<typeof LabelPrimitive.Root>,
+  ComponentPropsWithoutRef<typeof LabelPrimitive.Root> & VariantProps<typeof labelVariants>
 >(({ className, variant, spacing, ...props }, ref) => (
-  <LabelPrimitive.Root
-    ref={ref}
-    className={cn(labelVariants({ variant, spacing }), className)}
-    {...props}
-  />
-))
-Label.displayName = LabelPrimitive.Root.displayName
+  <LabelPrimitive.Root ref={ref} className={cn(labelVariants({ variant, spacing }), className)} {...props} />
+));
+Label.displayName = LabelPrimitive.Root.displayName;
 
-export { Label }
+export { Label };

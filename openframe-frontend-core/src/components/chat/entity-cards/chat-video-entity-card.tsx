@@ -1,9 +1,9 @@
-"use client"
+'use client';
 
-import React from 'react'
-import { EntityVideoSection } from '../../features/entity-video-section'
-import { captionsEntityTypeForDocType } from '../../features/captions-url'
-import type { ChatRef } from '../chat-ref.types'
+import type React from 'react';
+import { captionsEntityTypeForDocType } from '../../features/captions-url';
+import { EntityVideoSection } from '../../features/entity-video-section';
+import type { ChatRef } from '../chat-ref.types';
 
 /**
  * <ChatVideoEntityCard> — chat-side inline render for video-bearing
@@ -29,22 +29,20 @@ import type { ChatRef } from '../chat-ref.types'
 export interface ChatVideoEntityCardProps {
   /** Required. `metadata.videoUrl` / `youtubeUrl` / `highlightVideoUrl`
    *  control routing inside `<EntityVideoSection>`. */
-  chatRef: ChatRef
+  chatRef: ChatRef;
 }
 
 function readString(value: unknown): string | null {
-  return typeof value === 'string' && value.length > 0 ? value : null
+  return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-export function ChatVideoEntityCard({
-  chatRef,
-}: ChatVideoEntityCardProps): React.ReactElement {
-  const m = chatRef.metadata ?? {}
-  const videoUrl = readString(m.videoUrl)
-  const youtubeUrl = readString(m.youtubeUrl)
-  const poster = readString(m.videoPoster)
-  const highlightUrl = readString(m.highlightVideoUrl)
-  const highlightPoster = readString(m.highlightVideoPoster)
+export function ChatVideoEntityCard({ chatRef }: ChatVideoEntityCardProps): React.ReactElement {
+  const m = chatRef.metadata ?? {};
+  const videoUrl = readString(m.videoUrl);
+  const youtubeUrl = readString(m.youtubeUrl);
+  const poster = readString(m.videoPoster);
+  const highlightUrl = readString(m.highlightVideoUrl);
+  const highlightPoster = readString(m.highlightVideoPoster);
 
   // No wrapping Card / header — the player is the whole card. The
   // 16:9 aspect / rounded-corners / border come from <Video>'s own
@@ -66,5 +64,5 @@ export function ChatVideoEntityCard({
       //   videoBites      — separate ask; chat doesn't surface bites
       //                     today (planned follow-up).
     />
-  )
+  );
 }

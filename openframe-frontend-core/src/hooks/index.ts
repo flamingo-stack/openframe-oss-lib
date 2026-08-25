@@ -1,39 +1,39 @@
 // Hooks exports
-export * from './ui'
-export * from './platform'
-export * from './use-toast'
-export * from './use-contact-submission'
-export * from './use-copy-to-clipboard'
+export * from './ui';
+export * from './platform';
+export * from './use-toast';
+export * from './use-contact-submission';
+export * from './use-copy-to-clipboard';
 
 // Image authentication hooks
-export * from './use-batch-images'
-export * from './use-authenticated-image'
-export * from './use-authed-asset-src'
-export * from './use-authed-image-src'
+export * from './use-batch-images';
+export * from './use-authenticated-image';
+export * from './use-authed-asset-src';
+export * from './use-authed-image-src';
 
 // URL State Management hooks
-export * from './state'
+export * from './state';
 
 // NATS hooks
-export * from './nats/use-nats-client'
+export * from './nats/use-nats-client';
 
 // Viewport / lazy-mount primitive (shared IO singleton)
-export * from './use-near-viewport'
+export * from './use-near-viewport';
 
 // Access code integration — pairs with the standalone helpers in
 // `utils/access-code-client`. Lives in `hooks/` so the createContext
 // pulled in via EndpointsRuntimeContext doesn't end up in the
 // server-safe utils bundle.
-export * from './use-access-code-integration'
+export * from './use-access-code-integration';
 
 // THE og-placeholder URL hook (endpoints-driven; no injected builder)
-export * from './use-og-placeholder-url'
+export * from './use-og-placeholder-url';
 
 // Deep-link "scroll to URL hash" after data loads. Pairs with URL
 // composers that emit `?<filter>=<id>#<prefix>-<id>` — the filter
 // narrows the list, the hash scrolls the matching DOM id.
-export * from './use-scroll-to-hash'
+export * from './use-scroll-to-hash';
 
 // Invisible bot-protection client primitive (honeypot ref + submit-timing).
 // Pairs with the server-safe decision fn in `utils/humanity-signals`.
-export * from './use-humanity-signals'
+export * from './use-humanity-signals';

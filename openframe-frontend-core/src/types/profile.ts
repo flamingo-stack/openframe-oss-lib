@@ -68,7 +68,7 @@ export interface ActivityResponse {
     slug: string;
     logo: string | null;
   } | null;
-  metadata: Record<string, any> | null;
+  metadata: Record<string, unknown> | null;
 }
 
 export interface ProfileData {
@@ -128,4 +128,4 @@ export interface ProfileLoadingState {
   favorites: boolean;
   comments: boolean;
   activities: boolean;
-} 
+}

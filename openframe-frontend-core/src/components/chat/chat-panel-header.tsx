@@ -1,69 +1,69 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
+import type { ReactNode } from 'react';
+import { cn } from '../../utils/cn';
 import {
   Chevron02LeftIcon,
   Ellipsis01Icon,
   ClockHistoryIcon,
   Refresh01LeftIcon,
   SearchIcon,
-} from '../icons-v2-generated'
-import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
-import { ChatHeaderIconButton } from './chat-header-icon-button'
-import { ChatHeaderSearchField } from './chat-header-search-field'
-import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
-import { ChatPanelHeaderMobile } from './chat-panel-header-mobile'
-import { SquareAvatar } from '../ui/square-avatar'
+} from '../icons-v2-generated';
+import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
+import { SquareAvatar } from '../ui/square-avatar';
+import { ChatHeaderIconButton } from './chat-header-icon-button';
+import { ChatHeaderSearchField } from './chat-header-search-field';
+import { ChatPanelHeaderMobile } from './chat-panel-header-mobile';
 
 export interface ChatPanelHeaderProps {
   /** Show the back-chevron + bold (h3) title. When false, the static list
    *  title (h4) is shown with no back affordance. */
-  showBack?: boolean
+  showBack?: boolean;
   /** Title text (next to the back chevron, or the static list title). */
-  title: string
+  title: string;
   /** Optional sub-line under the title (e.g. the signed-in user's name).
    *  Rendered muted (`h6`) beneath the title in every view that has one. */
-  subtitle?: React.ReactNode
+  subtitle?: ReactNode;
   /** Person identity shown as a 32px round avatar at the right edge of the
    *  title cell (Figma 113:63273): the dialog OWNER in a conversation, the
    *  signed-in user on the New Chat compose view. Initials fall back from
    *  `name` when `avatarUrl` is absent/failing. Omit to hide. */
-  avatar?: { name?: string | null; avatarUrl?: string | null }
+  avatar?: { name?: string | null; avatarUrl?: string | null };
   /** Accessible label for the back chevron. */
-  backAriaLabel?: string
+  backAriaLabel?: string;
   /** The open conversation is an archived chat (read-only). */
-  isArchivedView?: boolean
+  isArchivedView?: boolean;
   /** Back-chevron handler. Required only when `showBack` — the list view has no
    *  back affordance. */
-  onBack?: () => void
+  onBack?: () => void;
   /** Close the panel. */
-  onClose: () => void
+  onClose: () => void;
   /** Restore/unarchive — renders the refresh button (archived view only). */
-  onRestore?: () => void
+  onRestore?: () => void;
   /** Rename — adds the "Rename chat" item to the ⋯ menu. */
-  onRename?: () => void
+  onRename?: () => void;
   /** Archive — adds the "Archive chat" item to the ⋯ menu. */
-  onArchive?: () => void
+  onArchive?: () => void;
   /** Open the Chat Archive page — renders the clock button (list view only). */
-  onOpenArchive?: () => void
+  onOpenArchive?: () => void;
   /** Force the COMPACT (`h-14` desktop-style) bar at every width, skipping the
    *  full-screen mobile header. For EMBEDDED surfaces (e.g. a small preview
    *  panel) where the phone-sized full-bleed header (large `text-h2` title) is
    *  wrong regardless of viewport. Default false = viewport-responsive. */
-  compact?: boolean
+  compact?: boolean;
   /** Toggle the dialog-list search field — renders a magnifier button (list
    *  view only), before the archive clock. */
-  onToggleSearch?: () => void
+  onToggleSearch?: () => void;
   /** Whether the search field is currently open. When true (and `onSearchChange`
    *  is wired) the title area is REPLACED in place by the inline search field
    *  and the magnifier toggle is hidden. */
-  searchActive?: boolean
+  searchActive?: boolean;
   /** Seeds the inline search field when it opens (current search term). */
-  searchQuery?: string
+  searchQuery?: string;
   /** Emits the debounced search term from the inline field. Enables the
    *  in-header search experience (list view only). */
-  onSearchChange?: (query: string) => void
+  onSearchChange?: (query: string) => void;
 }
 
 /**
@@ -92,12 +92,12 @@ export function ChatPanelHeader({
   onSearchChange,
 }: ChatPanelHeaderProps) {
   // Search open (with a wired handler) swaps the title for the inline field.
-  const searchInline = searchActive && !!onSearchChange
+  const searchInline = searchActive && !!onSearchChange;
   // Desktop ⋯ menu (active, non-archived conversation only) — rename / archive.
   const menuItems = [
     onRename && { id: 'rename', label: 'Rename chat', onClick: onRename },
     onArchive && { id: 'archive', label: 'Archive chat', onClick: onArchive },
-  ].filter(Boolean) as ActionsMenuItem[]
+  ].filter(Boolean) as ActionsMenuItem[];
 
   return (
     <>
@@ -125,18 +125,14 @@ export function ChatPanelHeader({
           bar with full-height divider action cells. */}
       <div
         className={cn(
-          'flex-shrink-0 h-14 w-full overflow-hidden border-b border-ods-border bg-ods-card',
+          'h-14 w-full flex-shrink-0 overflow-hidden border-b border-ods-border bg-ods-card',
           compact ? 'flex' : 'hidden md:flex',
         )}
       >
         {/* Back — a full-height leading cell (right divider), the same
             `ChatHeaderIconButton` primitive as the trailing ⋯ / close cells. */}
         {showBack && (
-          <ChatHeaderIconButton
-            divider="right"
-            onClick={onBack}
-            aria-label={backAriaLabel}
-          >
+          <ChatHeaderIconButton divider="right" onClick={onBack} aria-label={backAriaLabel}>
             <Chevron02LeftIcon size={24} />
           </ChatHeaderIconButton>
         )}
@@ -149,12 +145,10 @@ export function ChatPanelHeader({
             onCollapse={onToggleSearch}
           />
         ) : (
-          <div className="flex flex-1 min-w-0 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
+          <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
             <div className="flex min-w-0 flex-col">
-              <p className="truncate text-h3 leading-tight text-ods-text-primary">{title}</p>
-              {subtitle && (
-                <p className="truncate text-h6 leading-tight text-ods-text-secondary">{subtitle}</p>
-              )}
+              <p className="truncate leading-tight text-ods-text-primary text-h3">{title}</p>
+              {subtitle && <p className="truncate leading-tight text-ods-text-secondary text-h6">{subtitle}</p>}
             </div>
             {avatar && (avatar.name || avatar.avatarUrl) ? (
               // Owner avatar at the title cell's right edge (Figma 113:63273).
@@ -183,7 +177,7 @@ export function ChatPanelHeader({
         {showBack && !isArchivedView && menuItems.length > 0 && (
           <ActionsMenuDropdown
             triggerAriaLabel="Chat actions"
-            onCloseAutoFocus={(e) => e.preventDefault()}
+            onCloseAutoFocus={e => e.preventDefault()}
             groups={[{ items: menuItems }]}
             customTrigger={
               <ChatHeaderIconButton aria-label="Chat actions">
@@ -196,11 +190,7 @@ export function ChatPanelHeader({
         {/* Dialog search toggle — list view only, before the archive entry.
             Hidden while search is open (the inline field owns the magnifier). */}
         {!showBack && !searchInline && onToggleSearch && (
-          <ChatHeaderIconButton
-            onClick={onToggleSearch}
-            aria-label="Search chats"
-            aria-pressed={searchActive}
-          >
+          <ChatHeaderIconButton onClick={onToggleSearch} aria-label="Search chats" aria-pressed={searchActive}>
             <SearchIcon size={24} />
           </ChatHeaderIconButton>
         )}
@@ -217,5 +207,5 @@ export function ChatPanelHeader({
         </ChatHeaderIconButton>
       </div>
     </>
-  )
+  );
 }

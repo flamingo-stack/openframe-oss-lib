@@ -21,7 +21,74 @@ It is a **built package**: tsup compiles `src/` into `dist/` (ESM + CJS, plus `t
 - `npm run test` / `test:run` / `test:coverage` — vitest (jsdom)
 - `npm run generate:icons` — regenerate `icons-v2-generated/` from raw SVGs in `src/components/icons-v2/` (never hand-edit generated files)
 - `npm run storybook` — Storybook on port 6006
-- `npm run lint` — placeholder (no linter configured; unlike openframe-frontend there is no Biome here)
+- `npm run lint` — ESLint, fast pass (no type information), cached. **This is the one to run on your own changes.**
+- `npm run lint:fix` — the same with autofix
+- `npm run lint:types` — the type-aware pass (floating promises, the `no-unsafe-*` family). Needs an 8 GB heap and a full TypeScript program, so it is a separate stage — run it before pushing, not while iterating. It is deliberately NOT cached: results depend on other files, so a per-file cache entry goes stale when a different module changes
+- `npm run lint:cycles` — circular-import check. A CI-only stage, deliberately NOT in `verify`. Not cached either: a cycle is a property of the graph, not of one file. It was reporting zero findings until 2026-08-25 because its config spread the cycles layer standalone instead of over `...base`, in which shape the rule silently finds nothing — see the note at the top of `eslint.cycles.mjs`
+- `npm run lint:config-smoke` — not ESLint: a node script that imports every `eslint-config/` entry point and asserts it loads with the expected config-object count. Run it after ANY edit to `eslint.config.mjs`, `eslint.types.mjs` or `eslint-config/**` — a truncated or half-written config shows up here as a changed count, where ESLint itself would just crash with an unhelpful parse error
+- `npm run format` / `format:fix` — Prettier (Biome was removed on 2026-08-24)
+- `npm run verify` — every gate, cheapest-first so it fails fast: config-smoke → lint → type-check → types → the full test suite (`lint:cycles` is not in it). This is the "am I done?" command; run it before handing off a diff.
+
+### Which of these to run when
+
+**After you finish a change, run `npm run lint`** — the fast, cached pass. That is the linter
+meant for the inner loop, and the only ESLint script worth running by hand while you work.
+
+**Run it after a batch of edits, not after every one.** It is a whole-repo pass, so firing it on
+each keystroke or each file just interrupts you without telling you anything new; finish the
+change you are making, then lint it.
+
+**Never run the slow passes while iterating.** `lint:cycles` walks the whole import graph and
+`lint:types` builds a full TypeScript program with an 8 GB heap. Neither is an inner-loop tool:
+`lint:types` belongs in `verify` before you hand off a diff, and `lint:cycles` belongs to CI.
+
+| When | Command |
+|---|---|
+| after a batch of changes | `npm run lint` |
+| after a batch of changes | `npm run type-check` |
+| the file you touched | `npx vitest run <path>` |
+| after ANY edit to a config | `npm run lint:config-smoke` |
+| before handing off a diff | `npm run verify` |
+| CI only — do not run locally | `npm run lint:cycles` |
+
+**`lint` + `tsc` passing does NOT mean the code is sound.** The type-aware pass is where the
+real defects live, because `any` flowing through code *compiles perfectly* — that is the entire
+reason the `no-unsafe-*` family exists. The 2026-08-25 burndown found, behind exactly that:
+NaN'd token sums, `"[object Object]"` rendered in three user-facing error surfaces, a release page
+that blanked on any API error, and a module-level cache poisoned for the whole session. None of
+them were visible to `npm run lint` or to `tsc`.
+
+That is an argument for reaching the type-aware pass early, not for running it repo-wide while you
+iterate. Point it at the paths you touched instead — `npx eslint <paths> --config eslint.types.mjs`
+— and a finding is much cheaper to fix while you still have that file's context.
+
+**Two cache facts worth knowing:** the ESLint cache is keyed on a hash of the config, so editing
+`eslint-config/**` or `eslint.*.mjs` invalidates it wholesale and the next `lint` re-checks
+everything. And only `lint` caches — `lint:types` and `lint:cycles` pass `--no-cache` on purpose,
+because their results depend on *other* files (types cross module boundaries; a cycle is a property
+of the graph), so a per-file cache entry is stale the moment a different file changes.
+
+### Suppressing a lint finding is not allowed
+
+`eslint-disable` comments do nothing: `noInlineConfig` is on, and every inert directive is reported,
+so a run with one in it fails. `@ts-ignore` and `@ts-nocheck` are errors; `@ts-expect-error` needs a
+real explanation of at least 20 characters. Do not add any of them, and do not widen a type to `any`
+to get a green run.
+
+If a rule is genuinely wrong for this codebase, change the rule in `eslint-config/` and say why in
+the PR — that is a reviewable decision. Silencing it in a source file is not.
+
+**There is no suppressions baseline.** It was drained to zero on 2026-08-25 and the mechanism was
+removed: no `eslint-suppressions*.json` files, no `--suppressions-location` in any script. Do not
+reintroduce it — not with `--suppress-all`, not with `--suppress-rule`, not by recreating the files.
+A baseline entry carries no reason and never expires, so it reads as debt forever and hides real
+regressions in the noise.
+
+Every finding must therefore be either fixed or covered by a named `files:`-scoped block that spells
+out WHY. `eslint.config.mjs` holds those for the fast pass; type-aware rules (the `no-unsafe-*`
+family, `require-await`, `no-floating-promises`) must be exempted in `eslint.types.mjs` **after**
+`...typeChecked` — a block for them placed in `eslint.config.mjs` is silently overridden and does
+nothing.
 
 ## Core Rules (read before editing)
 

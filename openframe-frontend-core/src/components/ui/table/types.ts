@@ -1,156 +1,164 @@
-import { ReactNode } from 'react'
+import type { ElementType, ReactNode } from 'react';
 
 /** @deprecated Use types from `data-table` instead. */
-export type TailwindBreakpoint = 'md' | 'lg' | 'xl' | '2xl'
+export type TailwindBreakpoint = 'md' | 'lg' | 'xl' | '2xl';
+
+/**
+ * Default row shape for the legacy table generics — an object with unknown
+ * columns. Every real call site passes its own row type; this only keeps the
+ * bare `TableColumn` / `TableProps` spellings usable.
+ */
+export type TableRowData = Record<string, unknown>;
 
 /** @deprecated Use types from `data-table` instead. */
-export interface TableColumn<T = any> {
-  key: string
-  label: string
-  width?: string // e.g., 'w-40', 'flex-1', 'w-32'
-  align?: 'left' | 'center' | 'right'
-  sortable?: boolean
-  filterable?: boolean
-  hideAt?: TailwindBreakpoint | TailwindBreakpoint[]
-  renderCell?: (item: T, column: TableColumn<T>) => ReactNode
-  renderHeader?: () => ReactNode
-  className?: string
+export interface TableColumn<T = TableRowData> {
+  key: string;
+  label: string;
+  width?: string; // e.g., 'w-40', 'flex-1', 'w-32'
+  align?: 'left' | 'center' | 'right';
+  sortable?: boolean;
+  filterable?: boolean;
+  hideAt?: TailwindBreakpoint | TailwindBreakpoint[];
+  renderCell?: (item: T, column: TableColumn<T>) => ReactNode;
+  renderHeader?: () => ReactNode;
+  className?: string;
   // Sorting
-  sortKey?: string
-  sortFunction?: (a: T, b: T) => number
+  sortKey?: string;
+  sortFunction?: (a: T, b: T) => number;
   // Filtering
-  filterOptions?: FilterOption[]
-  filterKey?: string
-  filterFunction?: (item: T, filterValue: any) => boolean
+  filterOptions?: FilterOption[];
+  filterKey?: string;
+  filterFunction?: (item: T, filterValue: FilterOption['value']) => boolean;
 }
 
 /** @deprecated Use types from `data-table` instead. */
 export interface FilterOption {
-  id: string
-  label: string
-  value: any
+  id: string;
+  label: string;
+  value: string | number | boolean;
 }
 
 /** @deprecated Use types from `data-table` instead. */
 export interface FilterSection {
-  id: string
-  title: string
-  type: 'checkbox' | 'radio' | 'select'
-  options: FilterOption[]
-  allowSelectAll?: boolean
+  id: string;
+  title: string;
+  type: 'checkbox' | 'radio' | 'select';
+  options: FilterOption[];
+  allowSelectAll?: boolean;
 }
 
 /** @deprecated Use types from `data-table` instead. */
 export interface TableFilters {
-  [columnKey: string]: any[]
+  /** Selected option ids for a column — what `FiltersDropdown` emits. */
+  [columnKey: string]: string[];
 }
 
 /** @deprecated Use types from `data-table` instead. */
 export interface CursorPagination {
-  hasNextPage: boolean
-  hasPreviousPage?: boolean
-  isFirstPage?: boolean
-  startCursor?: string | null
-  endCursor?: string | null
-  currentCount?: number
-  totalCount?: number | null
-  onNext?: (cursor: string) => void
-  onPrevious?: (cursor: string) => void
-  onReset?: () => void
-  itemName?: string
-  showInfo?: boolean
-  compact?: boolean
-  resetButtonLabel?: string
-  resetButtonIcon?: 'home' | 'rotate'
+  hasNextPage: boolean;
+  hasPreviousPage?: boolean;
+  isFirstPage?: boolean;
+  startCursor?: string | null;
+  endCursor?: string | null;
+  currentCount?: number;
+  totalCount?: number | null;
+  onNext?: (cursor: string) => void;
+  onPrevious?: (cursor: string) => void;
+  onReset?: () => void;
+  itemName?: string;
+  showInfo?: boolean;
+  compact?: boolean;
+  resetButtonLabel?: string;
+  resetButtonIcon?: 'home' | 'rotate';
 }
 
 /** @deprecated Use types from `data-table` instead. */
 export interface PagePagination {
-  currentPage: number
-  totalPages: number
-  pageSize?: number
-  totalItems?: number
-  onPageChange: (page: number) => void
+  currentPage: number;
+  totalPages: number;
+  pageSize?: number;
+  totalItems?: number;
+  onPageChange: (page: number) => void;
 }
 
 /** @deprecated Use types from `data-table` instead. */
 export interface InfiniteScrollConfig {
-  hasNextPage: boolean
-  isFetchingNextPage: boolean
-  onLoadMore: () => void
-  skeletonRows?: number
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  onLoadMore: () => void;
+  skeletonRows?: number;
 }
 
 /** @deprecated Use types from `data-table` instead. */
-export interface TableProps<T = any> {
+export interface TableProps<T = TableRowData> {
   // Data
-  data: T[]
-  columns: TableColumn<T>[]
-  rowKey: keyof T | ((item: T) => string)
+  data: T[];
+  columns: TableColumn<T>[];
+  rowKey: keyof T | ((item: T) => string);
 
   // States
-  loading?: boolean
-  emptyMessage?: string
+  loading?: boolean;
+  emptyMessage?: string;
 
   // Skeleton configuration
-  skeletonRows?: number // Number of skeleton rows to show when loading (default: 10)
+  skeletonRows?: number; // Number of skeleton rows to show when loading (default: 10)
 
   // Styling
-  className?: string
-  containerClassName?: string
-  headerClassName?: string
-  rowClassName?: string | ((item: T, index: number) => string)
+  className?: string;
+  containerClassName?: string;
+  headerClassName?: string;
+  rowClassName?: string | ((item: T, index: number) => string);
   /** Compact mode: smaller row height for dense data lists */
-  compact?: boolean
+  compact?: boolean;
 
   // Interactions
-  onRowClick?: (item: T) => void
+  onRowClick?: (item: T) => void;
 
   // Row Actions
-  rowActions?: RowAction<T>[]
+  rowActions?: RowAction<T>[];
   // Custom renderer for the actions area (e.g., kebab/dots menu)
-  renderRowActions?: (item: T) => ReactNode
+  renderRowActions?: (item: T) => ReactNode;
 
   /**
    * When provided, renders a right-pointing chevron link at the end of every row
    * pointing at rowHref(item). Uses the shared Button component with href support,
    * so middle-click / Cmd+click / right-click "open in new tab" work natively.
    */
-  rowHref?: (item: T) => string | null | undefined
+  rowHref?: (item: T) => string | null | undefined;
 
   // Sorting
-  sortBy?: string
-  sortDirection?: 'asc' | 'desc'
-  onSort?: (column: string, direction: 'asc' | 'desc') => void
-  defaultSort?: { column: string; direction: 'asc' | 'desc' }
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
+  onSort?: (column: string, direction: 'asc' | 'desc') => void;
+  defaultSort?: { column: string; direction: 'asc' | 'desc' };
 
   // Filtering
-  filters?: TableFilters
-  onFilterChange?: (filters: TableFilters) => void
-  showFilters?: boolean
+  filters?: TableFilters;
+  onFilterChange?: (filters: TableFilters) => void;
+  showFilters?: boolean;
 
   // Selection
-  selectable?: boolean
-  selectedRows?: T[]
-  onSelectionChange?: (selected: T[]) => void
-  selectAllLabel?: string
+  selectable?: boolean;
+  selectedRows?: T[];
+  onSelectionChange?: (selected: T[]) => void;
+  selectAllLabel?: string;
 
   // Bulk Actions
-  bulkActions?: BulkAction<T>[]
-  showToolbar?: boolean
+  bulkActions?: BulkAction<T>[];
+  showToolbar?: boolean;
 
   // Pagination - supports both cursor and page-based
-  cursorPagination?: CursorPagination
-  pagePagination?: PagePagination
-  paginationClassName?: string
+  cursorPagination?: CursorPagination;
+  pagePagination?: PagePagination;
+  paginationClassName?: string;
 
   // Infinite scroll - auto-loads next page when scrolling near bottom
-  infiniteScroll?: InfiniteScrollConfig
+  infiniteScroll?: InfiniteScrollConfig;
 
   // Sticky header - keeps column headers visible while scrolling
-  stickyHeader?: boolean
+  stickyHeader?: boolean;
   /** Tailwind top class for sticky header offset, e.g. "top-[72px]" */
-  stickyHeaderOffset?: string
+  stickyHeaderOffset?: string;
 
   /**
    * Opt-in: render body rows as `motion.div` with `layout="position"` so a data
@@ -159,100 +167,102 @@ export interface TableProps<T = any> {
    * site (pass `false` when reduced motion is requested) so the lib prop stays
    * purely mechanical and adds zero motion runtime when off.
    */
-  animateRowReorder?: boolean
+  animateRowReorder?: boolean;
 }
 
 /** @deprecated Use types from `data-table` instead. */
-export interface BulkAction<T = any> {
-  label: string
-  icon?: ReactNode
-  onClick: (selectedItems: T[]) => void
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive'
-  requiresSelection?: boolean
-  className?: string
+export interface BulkAction<T = TableRowData> {
+  label: string;
+  icon?: ReactNode;
+  onClick: (selectedItems: T[]) => void;
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
+  requiresSelection?: boolean;
+  className?: string;
 }
 
 /** @deprecated Use types from `data-table` instead. */
-export interface RowAction<T = any> {
-  label: string
-  icon?: ReactNode
-  onClick: (item: T) => void
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive'
-  className?: string
-  hideOnMobile?: boolean
+export interface RowAction<T = TableRowData> {
+  label: string;
+  icon?: ReactNode;
+  onClick: (item: T) => void;
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
+  className?: string;
+  hideOnMobile?: boolean;
 }
 
 /** @deprecated Use types from `data-table` instead. */
-export interface TableHeaderProps<T = any> {
-  columns: TableColumn<T>[]
-  className?: string
+export interface TableHeaderProps<T = TableRowData> {
+  columns: TableColumn<T>[];
+  className?: string;
   // Sorting
-  sortBy?: string
-  sortDirection?: 'asc' | 'desc'
-  onSort?: (column: string, direction: 'asc' | 'desc') => void
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
+  onSort?: (column: string, direction: 'asc' | 'desc') => void;
   // Filtering
-  filters?: TableFilters
-  onFilterChange?: (filters: TableFilters) => void
+  filters?: TableFilters;
+  onFilterChange?: (filters: TableFilters) => void;
   // Selection
-  selectable?: boolean
-  allSelected?: boolean
-  someSelected?: boolean
-  onSelectAll?: () => void
-  totalItemsCount: number
+  selectable?: boolean;
+  allSelected?: boolean;
+  someSelected?: boolean;
+  onSelectAll?: () => void;
+  totalItemsCount: number;
   // Sticky
-  stickyHeader?: boolean
-  stickyHeaderOffset?: string
+  stickyHeader?: boolean;
+  stickyHeaderOffset?: string;
 }
 
 /** @deprecated Use types from `data-table` instead. */
-export interface TableRowProps<T = any> {
-  item: T
-  columns: TableColumn<T>[]
-  onClick?: (item: T) => void
-  href?: string
-  className?: string | ((item: T, index: number) => string)
-  index: number
-  isMobile?: boolean
-  compact?: boolean
+export interface TableRowProps<T = TableRowData> {
+  item: T;
+  columns: TableColumn<T>[];
+  onClick?: (item: T) => void;
+  href?: string;
+  className?: string | ((item: T, index: number) => string);
+  index: number;
+  isMobile?: boolean;
+  compact?: boolean;
   // Selection
-  selectable?: boolean
-  selected?: boolean
-  onSelect?: (item: T) => void
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (item: T) => void;
   /** Opt-in FLIP reorder — see `TableProps.animateRowReorder`. Forwarded by `Table`. */
-  animateRowReorder?: boolean
+  animateRowReorder?: boolean;
   /**
    * Internal: the lazily-resolved framer-motion `motion.div`, injected by `Table`
-   * so framer-motion stays out of the default bundle. `any` so this module never
-   * statically references framer-motion. Plain `<div>` is used until it's set.
+   * so framer-motion stays out of the default bundle. Typed as a bare
+   * `ElementType` so this module never statically references framer-motion.
+   * Plain `<div>` is used until it's set.
    */
-  motionDiv?: any
+  motionDiv?: ElementType;
 }
 
 /** @deprecated Use types from `data-table` instead. */
 export interface TableCellProps {
-  children: ReactNode
-  align?: 'left' | 'center' | 'right'
-  className?: string
-  width?: string
+  children: ReactNode;
+  align?: 'left' | 'center' | 'right';
+  className?: string;
+  width?: string;
 }
 
 /** @deprecated Use types from `data-table` instead. */
 export interface TableCardSkeletonProps {
-  columns: TableColumn[]
-  rows?: number // Number of skeleton rows to display (default: 10)
-  hasActions?: boolean
-  hasChevron?: boolean
-  className?: string
-  rowClassName?: string // Additional classes for each skeleton row
+  /** Only `key` and `width` are read, so any `TableColumn<T>[]` fits. */
+  columns: ReadonlyArray<Pick<TableColumn, 'key' | 'width'>>;
+  rows?: number; // Number of skeleton rows to display (default: 10)
+  hasActions?: boolean;
+  hasChevron?: boolean;
+  className?: string;
+  rowClassName?: string; // Additional classes for each skeleton row
 }
 
 /** @deprecated Use types from `data-table` instead. */
 export interface TableEmptyStateProps {
-  message?: string
-  icon?: ReactNode
+  message?: string;
+  icon?: ReactNode;
   action?: {
-    label: string
-    onClick: () => void
-  }
-  className?: string
+    label: string;
+    onClick: () => void;
+  };
+  className?: string;
 }

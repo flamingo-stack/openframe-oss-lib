@@ -1,17 +1,17 @@
-'use client'
+'use client';
 
-import { cn } from '../../../utils/cn'
-import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon'
-import { Button } from '../../ui/button'
+import { cn } from '../../../utils/cn';
+import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { Button } from '../../ui/button';
 
 export interface InviteLinkInvalidModalProps {
-  onBackToLogin: () => void
+  onBackToLogin: () => void;
   /** Dismiss (X). Defaults to onBackToLogin. */
-  onClose?: () => void
-  title?: string
-  description?: string
-  backLabel?: string
-  className?: string
+  onClose?: () => void;
+  title?: string;
+  description?: string;
+  backLabel?: string;
+  className?: string;
 }
 
 /**
@@ -28,18 +28,28 @@ export function InviteLinkInvalidModal({
   className,
 }: InviteLinkInvalidModalProps) {
   return (
-    <div className={cn('flex min-h-screen w-full items-end justify-center bg-ods-bg p-[var(--spacing-system-l)] md:items-center', className)}>
+    <div
+      className={cn(
+        'flex min-h-screen w-full items-end justify-center bg-ods-bg p-[var(--spacing-system-l)] md:items-center',
+        className,
+      )}
+    >
       <div className="flex w-full max-w-[600px] flex-col gap-[var(--spacing-system-l)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xl)]">
         {/* Title + close */}
         <div className="flex items-center gap-[var(--spacing-system-mf)]">
-          <h1 className="flex-1 text-h2 text-ods-text-primary tracking-[-0.64px]">{title}</h1>
+          <h1 className="flex-1 tracking-[-0.64px] text-ods-text-primary text-h2">{title}</h1>
           {/* Close (X) — desktop/tablet only, per design */}
-          <button type="button" aria-label="Close" onClick={onClose ?? onBackToLogin} className="hidden shrink-0 text-ods-text-primary md:block">
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose ?? onBackToLogin}
+            className="hidden shrink-0 text-ods-text-primary md:block"
+          >
             <XmarkIcon className="h-6 w-6" />
           </button>
         </div>
 
-        <p className="text-h4 text-ods-text-primary">{description}</p>
+        <p className="text-ods-text-primary text-h4">{description}</p>
 
         {/* Action — right half, matching the design */}
         <div className="flex items-center gap-[var(--spacing-system-l)]">
@@ -50,5 +60,5 @@ export function InviteLinkInvalidModal({
         </div>
       </div>
     </div>
-  )
+  );
 }

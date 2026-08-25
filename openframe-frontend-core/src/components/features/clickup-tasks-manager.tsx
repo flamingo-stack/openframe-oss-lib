@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { ArrayEntryManager } from './array-entry-manager';
 import { Lightbulb } from 'lucide-react';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { ArrayEntryManager } from './array-entry-manager';
 
 export interface ClickUpTaskLink {
   clickup_task_id: string; // Just the task ID
@@ -20,7 +20,7 @@ export function ClickUpTasksManager({
   tasks,
   onChange,
   title = 'ClickUp Roadmap Tasks', // Default title
-  className = ''
+  className = '',
 }: ClickUpTasksManagerProps) {
   return (
     <ArrayEntryManager
@@ -31,7 +31,7 @@ export function ClickUpTasksManager({
       placeholder="Task ID (e.g., 86cq2uabk)"
       emptyMessage='No ClickUp tasks linked. Click "Add Task" to link roadmap items.'
       addButtonText="Add Task"
-      icon={<Lightbulb className="w-5 h-5 text-ods-text-secondary" />}
+      icon={<Lightbulb className="h-5 w-5 text-ods-text-secondary" />}
       className={className}
     />
   );

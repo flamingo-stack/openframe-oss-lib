@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * SimpleMarkdownRenderer — the chat/doc composition over the unified
@@ -8,14 +8,13 @@
  * layering `additionalRemarkPlugins` (card/mention links) and
  * `componentOverrides` exactly as before.
  */
-import React from 'react';
-import { MarkdownEngine, type MarkdownEngineProps } from './engine';
+import type React from 'react';
 import type { ResolveLinkResult } from '../../../types/doc-source';
+import { MarkdownEngine, type MarkdownEngineProps } from './engine';
 
 export type { ResolveLinkResult };
 
-export interface SimpleMarkdownRendererProps
-  extends Omit<MarkdownEngineProps, 'extraAllowedHtmlTags'> {}
+export interface SimpleMarkdownRendererProps extends Omit<MarkdownEngineProps, 'extraAllowedHtmlTags'> {}
 
 /**
  * A type-narrowed ALIAS of the engine, not a wrapper: the composition adds
@@ -24,5 +23,4 @@ export interface SimpleMarkdownRendererProps
  * bought nothing and cost an extra shallow-compare pass plus a fiber per
  * chat segment.
  */
-export const SimpleMarkdownRenderer =
-  MarkdownEngine as React.NamedExoticComponent<SimpleMarkdownRendererProps>;
+export const SimpleMarkdownRenderer = MarkdownEngine as React.NamedExoticComponent<SimpleMarkdownRendererProps>;

@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * @deprecated The canonical implementation lives at
@@ -14,4 +14,4 @@
  * contract the rename intentionally does NOT touch.
  */
 
-export { embedAuthedFetch as chatAuthedFetch } from '../../../utils/embed-authed-fetch'
+export { embedAuthedFetch as chatAuthedFetch } from '../../../utils/embed-authed-fetch';
