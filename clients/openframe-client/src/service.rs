@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::runtime::Runtime;
 use tracing::{error, info, warn};
 
@@ -283,9 +283,13 @@ impl Service {
             InstallationInitialConfigService::new(dir_manager.clone())
                 .context("Failed to initialize InstallationInitialConfigService")?;
 
-        installation_initial_config_service
-            .build_and_save(params)
-            .context("Failed to process initial configuration during service installation")?;
+        if params.is_parameterless() {
+            info!("Parameterless install — configuration deferred to 'openframe auth'");
+        } else {
+            installation_initial_config_service
+                .build_and_save(params)
+                .context("Failed to process initial configuration during service installation")?;
+        }
 
         // Get the current executable path
         let current_exe_path =
@@ -366,6 +370,10 @@ impl Service {
             info!(
                 "Binary installed successfully. You can now use 'openframe' command from anywhere."
             );
+
+            if let Err(e) = Self::create_alias(&install_path) {
+                warn!("Failed to create 'openframe' alias: {:#}", e);
+            }
 
             #[cfg(target_os = "windows")]
             {
@@ -513,6 +521,8 @@ impl Service {
                 .ok()
         };
 
+        Self::remove_alias(&install_path);
+
         // Call platform-specific uninstall implementation
         #[cfg(target_os = "windows")]
         {
@@ -566,11 +576,81 @@ impl Service {
         #[cfg(target_os = "windows")]
         crate::platform::windows_path_migration::run();
 
+        // Awaiting-auth gate: after a parameterless install there is no initial
+        // configuration yet, and constructing the client without one would fail and
+        // crash-loop the service. Idle here until `openframe auth` writes it.
+        let initial_config_service =
+            crate::services::InitialConfigurationService::new(dir_manager.clone())
+                .context("Failed to initialize initial configuration service")?;
+        if !initial_config_service.is_configured() {
+            info!(
+                "Not authenticated yet — waiting for configuration (run 'openframe auth' with your tenant parameters)"
+            );
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(
+                    crate::config::update_config::AWAITING_AUTH_POLL_SECS,
+                ))
+                .await;
+                if initial_config_service.is_configured() {
+                    info!("Configuration detected — starting the client");
+                    break;
+                }
+            }
+        }
+
         // Initialize the client
         let client = Client::new()?;
 
         // Start the client
         client.start().await
+    }
+
+    /// `openframe` next to the installed `openframe-client`, so the documented
+    /// commands (`openframe auth ...`) work as typed.
+    fn alias_path(install_path: &Path) -> PathBuf {
+        #[cfg(target_os = "windows")]
+        {
+            install_path.with_file_name("openframe.exe")
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            install_path.with_file_name("openframe")
+        }
+    }
+
+    fn create_alias(install_path: &Path) -> Result<()> {
+        let alias = Self::alias_path(install_path);
+        if alias.symlink_metadata().map(|_| true).unwrap_or(false) {
+            std::fs::remove_file(&alias)
+                .with_context(|| format!("Failed to remove existing alias {}", alias.display()))?;
+        }
+
+        // Windows has no reliable symlink without extra privileges; a hard link
+        // shares the same file, with a plain copy as the fallback.
+        #[cfg(target_os = "windows")]
+        {
+            if std::fs::hard_link(install_path, &alias).is_err() {
+                std::fs::copy(install_path, &alias)
+                    .with_context(|| format!("Failed to copy alias to {}", alias.display()))?;
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            std::os::unix::fs::symlink(install_path, &alias)
+                .with_context(|| format!("Failed to symlink alias at {}", alias.display()))?;
+        }
+
+        info!("Created 'openframe' alias at {}", alias.display());
+        Ok(())
+    }
+
+    fn remove_alias(install_path: &Path) {
+        let alias = Self::alias_path(install_path);
+        if alias.symlink_metadata().is_ok() {
+            if let Err(e) = std::fs::remove_file(&alias) {
+                warn!("Failed to remove alias {}: {:#}", alias.display(), e);
+            }
+        }
     }
 
     /// Get the standard installation location for the OpenFrame binary

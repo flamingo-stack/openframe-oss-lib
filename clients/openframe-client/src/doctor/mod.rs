@@ -189,6 +189,36 @@ pub async fn run_preinstall(params: &InstallConfigParams) -> DoctorReport {
     }
 }
 
+/// Pre-auth validation: the params and the network they point at, checked while
+/// the user is at the keyboard — nothing is written unless this passes.
+pub async fn run_auth(params: &InstallConfigParams) -> DoctorReport {
+    let mut results = Vec::new();
+
+    results.push(check_required_args(params));
+    if results.last().unwrap().status == CheckStatus::Fail {
+        return DoctorReport {
+            results,
+            title: "authentication diagnostics",
+        };
+    }
+
+    results.push(check_admin_privileges());
+    if results.last().unwrap().status == CheckStatus::Fail {
+        return DoctorReport {
+            results,
+            title: "authentication diagnostics",
+        };
+    }
+
+    let server_url = params.server_url.as_deref().unwrap_or_default();
+    run_network_checks(&mut results, server_url).await;
+
+    DoctorReport {
+        results,
+        title: "authentication diagnostics",
+    }
+}
+
 /// Post-install health check. Reads config from disk, checks admin + network.
 pub async fn run_healthcheck() -> DoctorReport {
     let mut results = Vec::new();
@@ -246,13 +276,11 @@ pub async fn run_healthcheck() -> DoctorReport {
             }
         },
         Err(_) => {
-            results.push(CheckResult::fail(
+            // Not an error: a parameterless install runs unauthenticated until
+            // `openframe auth` writes the config.
+            results.push(CheckResult::info(
                 CheckCategory::Command,
-                "Config: initial_config.json",
-                format!(
-                    "Config not found at {}. Is the agent installed?",
-                    config_path.display()
-                ),
+                "Awaiting authentication — run 'openframe auth' with your tenant parameters to connect this device",
             ));
             return DoctorReport {
                 results,

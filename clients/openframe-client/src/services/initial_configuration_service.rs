@@ -56,6 +56,15 @@ impl InitialConfigurationService {
         Ok(config.tags)
     }
 
+    /// True once a usable configuration exists on disk — the awaiting-auth gate's
+    /// release condition. Requires a parseable file with a non-empty server host
+    /// so a partially written file cannot release the gate.
+    pub fn is_configured(&self) -> bool {
+        self.get()
+            .map(|config| !config.server_host.trim().is_empty())
+            .unwrap_or(false)
+    }
+
     fn get(&self) -> Result<InitialConfiguration> {
         if !self.config_file_path.exists() {
             return Err(anyhow::anyhow!("Initial configuration file does not exist"));

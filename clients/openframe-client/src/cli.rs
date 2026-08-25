@@ -53,6 +53,8 @@ impl InstallArgs {
 enum Commands {
     /// Install the OpenFrame client as a system service
     Install(InstallArgs),
+    /// Authenticate an installed client with its tenant (second step after a parameterless install)
+    Auth(InstallArgs),
     /// Uninstall the OpenFrame client service
     Uninstall,
     /// Run the OpenFrame client directly (not as a service)
@@ -78,22 +80,33 @@ pub fn run() -> Result<()> {
         Some(Commands::Install(args)) => {
             crate::banner::print();
             let params = args.to_params();
+            let parameterless = params.is_parameterless();
 
-            let report = rt.block_on(crate::doctor::run_preinstall(&params));
-            report.print();
+            // Parameterless (package-manager) install skips the preinstall diagnostics:
+            // there are no tenant params to validate and no server to probe yet — those
+            // move to `auth`, along with the WebView2 heal. Only the admin guard remains
+            // (the install operations inherently need elevation).
+            let heal_candidates = if parameterless {
+                crate::platform::permissions::PermissionUtils::require_admin();
+                Vec::new()
+            } else {
+                let report = rt.block_on(crate::doctor::run_preinstall(&params));
+                report.print();
 
-            if report.has_failures() {
-                println!(
-                    "\n{} check(s) failed. Please fix the issues above and try again.",
-                    report.failure_count()
-                );
-                process::exit(1);
-            }
+                if report.has_failures() {
+                    println!(
+                        "\n{} check(s) failed. Please fix the issues above and try again.",
+                        report.failure_count()
+                    );
+                    process::exit(1);
+                }
 
-            let warns = report.warn_count();
-            if warns > 0 {
-                println!("\n{} warning(s). Installation will proceed, but the agent may have connectivity issues.", warns);
-            }
+                let warns = report.warn_count();
+                if warns > 0 {
+                    println!("\n{} warning(s). Installation will proceed, but the agent may have connectivity issues.", warns);
+                }
+                report.results
+            };
 
             if let Err(e) = crate::logging::init_file_only(None, None) {
                 eprintln!("Failed to initialize logging: {}", e);
@@ -102,10 +115,10 @@ pub fn run() -> Result<()> {
 
             // Healing runs only on a fresh install; a reinstall (existing client present) skips it.
             if !Service::is_installed()
-                && !crate::doctor::healing::pending(&report.results).is_empty()
+                && !crate::doctor::healing::pending(&heal_candidates).is_empty()
             {
                 println!("\nAttempting automatic fixes (this may take a few minutes)...");
-                let heals = rt.block_on(crate::doctor::healing::heal(&report.results));
+                let heals = rt.block_on(crate::doctor::healing::heal(&heal_candidates));
                 print_heal_outcomes(&heals);
             }
 
@@ -115,6 +128,10 @@ pub fn run() -> Result<()> {
                 match Service::install(params).await {
                     Ok(_) => {
                         println!("OpenFrame agent installed successfully.");
+                        if parameterless {
+                            println!("\nNot authenticated yet — get your auth command at https://{{your-tenant}}.openframe.ai/devices/new");
+                            println!("Updates are managed by the OpenFrame platform.");
+                        }
                         process::exit(0);
                     }
                     Err(e) => {
@@ -124,6 +141,69 @@ pub fn run() -> Result<()> {
                     }
                 }
             });
+        }
+        Some(Commands::Auth(args)) => {
+            crate::banner::print();
+            let params = args.to_params();
+
+            let report = rt.block_on(crate::doctor::run_auth(&params));
+            report.print();
+
+            if report.has_failures() {
+                println!(
+                    "\n{} check(s) failed. Nothing was saved — fix the issues above and run 'openframe auth' again.",
+                    report.failure_count()
+                );
+                process::exit(1);
+            }
+
+            let warns = report.warn_count();
+            if warns > 0 {
+                println!(
+                    "\n{} warning(s). Authentication will proceed, but the agent may have connectivity issues.",
+                    warns
+                );
+            }
+
+            if let Err(e) = crate::logging::init_file_only(None, None) {
+                eprintln!("Failed to initialize logging: {}", e);
+                process::exit(1);
+            }
+
+            // Two-step installs heal WebView2 here instead of at install time — same
+            // checks → heal → act ordering as the parameterized install flow.
+            let webview2 = crate::doctor::checks::check_webview2_runtime()
+                .into_iter()
+                .collect::<Vec<_>>();
+            if !crate::doctor::healing::pending(&webview2).is_empty() {
+                println!("\nAttempting automatic fixes (this may take a few minutes)...");
+                let heals = rt.block_on(crate::doctor::healing::heal(&webview2));
+                print_heal_outcomes(&heals);
+            }
+
+            println!("\nSaving authentication...\n");
+
+            let config_service = match crate::installation_initial_config_service::InstallationInitialConfigService::new(
+                crate::platform::DirectoryManager::new(),
+            ) {
+                Ok(service) => service,
+                Err(e) => {
+                    error!("Failed to initialize configuration service: {:#}", e);
+                    process::exit(1);
+                }
+            };
+
+            match config_service.build_and_save(params) {
+                Ok(()) => {
+                    println!("Authentication saved. The device will register within a minute.");
+                    process::exit(0);
+                }
+                Err(e) => {
+                    error!("Failed to save authentication: {:#}", e);
+                    println!("Authentication failed. Check logs for details.");
+                    process::exit(1);
+                }
+            }
         }
         Some(Commands::Doctor) => {
             let report = rt.block_on(crate::doctor::run_healthcheck());

@@ -5,6 +5,7 @@ pub const MIN_BINARY_SIZE_BYTES: u64 = 1024 * 100; // 100 KB
 
 // HTTP client timeouts
 pub const HTTP_CLIENT_TIMEOUT_SECS: u64 = 120; // control-plane (auth, registration, heartbeat, key fetch)
+pub const AWAITING_AUTH_POLL_SECS: u64 = 15; // unauthenticated service polling for the config `auth` writes
 pub const DOWNLOAD_CLIENT_TIMEOUT_SECS: u64 = 300; // binary downloads (GitHub, Artifactory, tool API)
 
 // Consumer retry
