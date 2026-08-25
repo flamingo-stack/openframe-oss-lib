@@ -1,8 +1,8 @@
 package com.openframe.data.repository.rmm;
 
 import com.mongodb.ReadPreference;
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

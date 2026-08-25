@@ -4,12 +4,12 @@ import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
-import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
-import com.openframe.data.document.rmm.OsType;
-import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
-import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
+import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -22,8 +22,8 @@ import java.util.List;
 @Component
 public class ScriptScheduleMapper {
 
-    public ScriptSchedule toEntity(String tenantId, CreateScriptScheduleInput input) {
-        return ScriptSchedule.builder()
+    public ScheduleScript toEntity(String tenantId, CreateScriptScheduleInput input) {
+        return ScheduleScript.builder()
                 .tenantId(tenantId)
                 .name(input.getName())
                 .description(input.getDescription())
@@ -31,32 +31,40 @@ public class ScriptScheduleMapper {
                 .scriptIds(input.getScriptIds())
                 .scriptCustomParams(toCustomParams(input.getScriptCustomParams()))
                 .trigger(defaultTrigger(input.getTrigger()))
+                .offlineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()))
+                .reconnectWindowSeconds(input.getReconnectWindowSeconds())
                 .startAt(input.getStartAt())
                 .repeat(input.getRepeat())
                 .build();
     }
 
-    public void updateEntity(ScriptSchedule existing, UpdateScriptScheduleInput input) {
+    public void updateEntity(ScheduleScript existing, UpdateScriptScheduleInput input) {
         existing.setName(input.getName());
         existing.setDescription(input.getDescription());
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setScriptIds(input.getScriptIds());
         existing.setScriptCustomParams(toCustomParams(input.getScriptCustomParams()));
         existing.setTrigger(defaultTrigger(input.getTrigger()));
+        existing.setOfflineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()));
+        existing.setReconnectWindowSeconds(input.getReconnectWindowSeconds());
         existing.setSelectionMode(defaultSelectionMode(input.getSelectionMode()));
         existing.setStartAt(input.getStartAt());
         existing.setRepeat(input.getRepeat());
     }
 
-    private static ScriptScheduleTrigger defaultTrigger(ScriptScheduleTrigger trigger) {
-        return trigger != null ? trigger : ScriptScheduleTrigger.DATE_TIME;
+    private static ScheduleScriptTrigger defaultTrigger(ScheduleScriptTrigger trigger) {
+        return trigger != null ? trigger : ScheduleScriptTrigger.DATE_TIME;
+    }
+
+    private static ScheduleOfflineBehavior defaultOfflineBehavior(ScheduleOfflineBehavior behavior) {
+        return behavior != null ? behavior : ScheduleOfflineBehavior.SKIP;
     }
 
     private static ScheduleDeviceSelectionMode defaultSelectionMode(ScheduleDeviceSelectionMode mode) {
         return mode != null ? mode : ScheduleDeviceSelectionMode.SPECIFIC;
     }
 
-    public ScriptScheduleResponse toResponse(ScriptSchedule entity) {
+    public ScriptScheduleResponse toResponse(ScheduleScript entity) {
         return ScriptScheduleResponse.builder()
                 .id(entity.getId())
                 .name(entity.getName())
@@ -67,6 +75,8 @@ public class ScriptScheduleMapper {
                 .selectionMode(defaultSelectionMode(entity.getSelectionMode()))
                 .deviceCriteria(entity.getDeviceCriteria())
                 .trigger(defaultTrigger(entity.getTrigger()))
+                .offlineBehavior(defaultOfflineBehavior(entity.getOfflineBehavior()))
+                .reconnectWindowSeconds(entity.getReconnectWindowSeconds())
                 .startAt(entity.getStartAt())
                 .repeat(entity.getRepeat())
                 .nextRunAt(entity.getNextRunAt())

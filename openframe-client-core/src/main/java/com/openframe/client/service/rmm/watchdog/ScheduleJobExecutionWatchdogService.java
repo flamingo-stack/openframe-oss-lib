@@ -1,7 +1,7 @@
 package com.openframe.client.service.rmm.watchdog;
 
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.document.rmm.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
 import com.openframe.data.repository.rmm.CustomScriptExecutionRepository.LeafStatusCounts;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
