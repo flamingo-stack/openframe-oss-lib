@@ -6,13 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Published by the agent on {@code machine.{machineId}.execution.acknowledge} the moment it accepts a
- * dispatched script and starts running it. Flips the leaf {@code ScriptExecution} from {@code QUEUED}
- * to {@code RUNNING} and confirms delivery, so the client stops retrying that (executionId, machineId).
- *
- * <p>{@code scheduleId} is present for schedule-triggered runs and null for others.
- */
 @Data
 @Builder
 @NoArgsConstructor

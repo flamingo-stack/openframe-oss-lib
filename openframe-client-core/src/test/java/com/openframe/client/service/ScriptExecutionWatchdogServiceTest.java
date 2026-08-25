@@ -198,7 +198,7 @@ class ScriptExecutionWatchdogServiceTest {
 
         verify(scriptScheduleNatsPublisher).publish(eq("m-1"), eq(msg));
         verify(retryStore).incrementRetryCount(eq("exec-1"), eq("m-1"), any());
-        verify(repository, never()).saveAll(any());   // still retrying → not failed
+        verify(repository, never()).saveAll(any());
     }
 
     @Test

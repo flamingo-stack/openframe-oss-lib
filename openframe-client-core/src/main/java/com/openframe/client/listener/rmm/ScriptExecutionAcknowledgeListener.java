@@ -15,13 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
-/**
- * Subscribes to delivery acknowledgements the agent publishes over core NATS on
- * {@code machine.*.execution.acknowledge} when it accepts and starts a dispatched script. Each ack
- * flips its leaf from {@code QUEUED} to {@code RUNNING} and stops the delivery retry for that machine.
- *
- * <p>Mirrors {@link ScriptResultListener}: a non-durable core-NATS subscription managed by a Dispatcher.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j

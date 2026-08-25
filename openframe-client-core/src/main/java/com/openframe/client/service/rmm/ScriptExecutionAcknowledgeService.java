@@ -9,11 +9,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 
-/**
- * Handles an agent's delivery acknowledgement: flips the leaf {@code ScriptExecution} from
- * {@code QUEUED} to {@code RUNNING} and evicts the delivery-retry state, since the ack proves the
- * whole (executionId, machineId) batch reached the agent.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
