@@ -250,6 +250,7 @@ export function Table<T = any>({
           <TableCardSkeleton
             columns={columns}
             rows={skeletonRows}
+            compact={compact}
             hasActions={Boolean(rowActions) && rowActions!.length > 0}
             hasChevron={Boolean(rowHref)}
           />

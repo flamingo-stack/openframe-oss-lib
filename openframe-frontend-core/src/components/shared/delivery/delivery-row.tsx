@@ -68,12 +68,17 @@ export interface DeliveryRowProps {
    *  paired with `scroll-mt-24` on the outer element so the row lands
    *  BELOW the sticky chrome after the scroll. */
   id?: string
+  /** `'_blank'` renders a plain external anchor (new tab, `rel` hardened) —
+   *  for rows whose href leaves the app (e.g. the raw ClickUp task URL on the
+   *  design-doc surfaces). Internal deep-links omit it and keep the Link shim. */
+  target?: '_blank'
   className?: string
 }
 
 export function DeliveryRow({
   item,
   href,
+  target,
   caption,
   id,
   className,
@@ -100,7 +105,10 @@ export function DeliveryRow({
           </h3>
         </div>
         <div className="min-h-[20px] flex items-center">
-          <p className="text-h5 text-ods-text-secondary uppercase tracking-[-0.28px] truncate">
+          {/* Relative time is wall-clock-derived: on an SSR host the server and
+              client render different strings a moment apart — text-only, so
+              suppress instead of forcing a client-only render. */}
+          <p className="text-h5 text-ods-text-secondary uppercase tracking-[-0.28px] truncate" suppressHydrationWarning>
             {subtitle}
           </p>
         </div>
@@ -154,6 +162,14 @@ export function DeliveryRow({
     href && 'hover:bg-ods-bg-hover cursor-pointer',
     className,
   )
+
+  if (href && target === '_blank') {
+    return (
+      <a href={href} id={id} className={baseClass} target="_blank" rel="noopener noreferrer">
+        {inner}
+      </a>
+    )
+  }
 
   if (href) {
     // `Link` is the env-aware embed-shim — delegates to `next/link` on

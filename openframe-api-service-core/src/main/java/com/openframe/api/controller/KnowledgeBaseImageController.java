@@ -3,7 +3,7 @@ package com.openframe.api.controller;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseImageUploadRequest;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseImageUploadResponse;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseImageUpload;
-import com.openframe.api.service.KnowledgeBaseImageService;
+import com.openframe.api.service.knowledgebase.KnowledgeBaseImageService;
 import com.openframe.data.service.GcsPresignedUrlService;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;

@@ -6,15 +6,20 @@ import com.openframe.api.dto.rmm.script.RunScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
-import com.openframe.api.service.DeviceService;
+import com.openframe.api.service.device.DeviceService;
+import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
+import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
+import com.openframe.api.service.rmm.script.ScriptDispatchService;
+import com.openframe.api.service.rmm.script.ScriptExecutionService;
+import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.api.service.rmm.script.ScriptTimeoutValidator;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.ExecutionSource;
-import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
-import com.openframe.data.document.rmm.ScriptEnvVar;
-import com.openframe.data.document.rmm.ScriptShell;
+import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
@@ -31,8 +36,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 
-import static com.openframe.data.document.rmm.ScriptShell.BASH;
-import static com.openframe.data.document.rmm.ScriptStatus.ACTIVE;
+import static com.openframe.data.document.rmm.script.ScriptShell.BASH;
+import static com.openframe.data.document.rmm.script.ScriptStatus.ACTIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,9 +68,9 @@ class ScriptDispatchServiceTest {
     @Mock
     private com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
     @Mock
-    private ScriptScheduleService scriptScheduleService;
+    private ScheduleScriptService scheduleScriptService;
     @Mock
-    private ScriptScheduleDeviceService scriptScheduleDeviceService;
+    private ScheduleScriptDeviceService scheduleScriptDeviceService;
     @Mock
     private com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
     @Mock
@@ -384,8 +389,8 @@ class ScriptDispatchServiceTest {
                                         .envVars(List.of(new ScriptEnvVar("OVERRIDE", "v", false)))
                                         .build()))
                         .build();
-        when(scriptScheduleService.get(scheduleId)).thenReturn(schedule);
-        when(scriptScheduleDeviceService.getMachineIds(scheduleId)).thenReturn(List.of(MACHINE_ID));
+        when(scheduleScriptService.get(scheduleId)).thenReturn(schedule);
+        when(scheduleScriptDeviceService.getMachineIds(scheduleId)).thenReturn(List.of(MACHINE_ID));
         when(scriptService.getScriptsByIds(List.of(SCRIPT_ID))).thenReturn(List.of(
                 ScriptResponse.builder()
                         .id(SCRIPT_ID).name("disk").shell(BASH).scriptBody("df -h")

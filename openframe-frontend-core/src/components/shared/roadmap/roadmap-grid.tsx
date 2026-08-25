@@ -100,6 +100,15 @@ export interface RoadmapGridProps {
   /** Show the desktop left margin (~120px) that aligns the grid with the page
    *  hero. Default `true`. Related-content rails pass `false`. */
   showLeftMargin?: boolean;
+  /**
+   * Columns at `md` and up. Default `2` (the roadmap page).
+   *
+   * A card in this grid needs real width — its title, status badge, target
+   * version and vote row sit on one line each. Two columns inside a NARROW
+   * host (a modal rail, a sidebar) halve an already-small container and crush
+   * every one of them, so such hosts pass `1`.
+   */
+  columns?: 1 | 2;
   /** URL builder for the per-task refresh call after a successful vote. */
   buildRefreshUrl?: (taskId: string) => string;
   /** Voting hook options (vote endpoint + storage key). */
@@ -122,18 +131,26 @@ export interface RoadmapGridProps {
 function RoadmapGridSingle({
   items,
   showLeftMargin,
+  columns = 2,
   getVote,
   onVote,
   votingTasks,
 }: {
   items: RoadmapItem[];
   showLeftMargin: boolean;
+  columns?: 1 | 2;
   getVote: (taskId: string) => 'up' | 'down' | null;
   onVote: (taskId: string, voteType: 'up' | 'down') => void;
   votingTasks: Set<string>;
 }) {
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${showLeftMargin ? 'md:ml-[120px]' : ''}`}>
+    // LITERAL class strings: an interpolated `md:grid-cols-${n}` is invisible
+    // to Tailwind's scanner and is never generated.
+    <div
+      className={`grid grid-cols-1 gap-6 ${columns === 2 ? 'md:grid-cols-2' : ''} ${
+        showLeftMargin ? 'md:ml-[120px]' : ''
+      }`}
+    >
       {items.map((item) => (
         // DOM id + sticky-header scroll offset live ON RoadmapCard's own
         // outer element (no wrapper div). Anchor mirrors
@@ -157,6 +174,7 @@ export function RoadmapGrid({
   items,
   onItemUpdate,
   showLeftMargin = true,
+  columns = 2,
   buildRefreshUrl = DEFAULT_BUILD_REFRESH_URL,
   votingOptions,
   groupByQuarter = false,
@@ -255,6 +273,7 @@ export function RoadmapGrid({
       <RoadmapGridSingle
         items={items}
         showLeftMargin={showLeftMargin}
+        columns={columns}
         getVote={getVote}
         onVote={handleVote}
         votingTasks={votingTasks}
@@ -305,6 +324,7 @@ export function RoadmapGrid({
               <RoadmapGridSingle
                 items={itemsByQuarter[quarter]}
                 showLeftMargin={showLeftMargin}
+                columns={columns}
                 getVote={getVote}
                 onVote={handleVote}
                 votingTasks={votingTasks}

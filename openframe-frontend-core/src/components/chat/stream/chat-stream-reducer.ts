@@ -1378,7 +1378,13 @@ export function createChatStreamReducer(
           reason: event.reason,
           targetStatusKind: event.targetStatusKind,
         }
-        const segments = accumulator.addTicketEvent(data, seq)
+        // The chunk carries no event time, so stamp arrival — for a genuinely
+        // live event that IS the event time. Without it the card falls back to
+        // the enclosing bubble's timestamp: the turn's FIRST row, minutes
+        // stale by the time a resolve/reopen lands. A catch-up redelivery of
+        // an already-hydrated event does NOT regress to arrival time —
+        // `addTicketEvent` keeps the first-known `occurredAt` on upsert.
+        const segments = accumulator.addTicketEvent(data, seq, new Date())
         applyAccumulated(before, segments)
         // The card alone is not enough for a host that also tracks the
         // ticket's state: a RESOLVED/REOPENED arriving live must move the

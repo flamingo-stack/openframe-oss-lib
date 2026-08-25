@@ -7,12 +7,26 @@ import type { TableCardSkeletonProps } from './types'
 // INNER row heights: the bordered row card adds 1px top + bottom, so the
 // outer block totals the designed 68px / 80px.
 const ROW_HEIGHT_DESKTOP = 'h-[66px] md:h-[78px]'
+/**
+ * A `compact` row's floor. Compact rows are content-sized (`py-2`), but every
+ * row in one table renders the same cell shapes, so pinning a minimum makes the
+ * body's height a function of the ROW COUNT alone — which is what lets a host
+ * reserve space for a full page and stop the layout jumping between a full
+ * page, a short last page and the skeleton. The skeleton uses it too, so the
+ * loading state is exactly as tall as the rows that replace it.
+ */
+const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]'
+/** The same 56, as a number, for hosts reserving `rows x height` of space.
+ *  A LITERAL class above and a literal number here: an interpolated Tailwind
+ *  class is invisible to the scanner and is never generated. */
+const COMPACT_ROW_MIN_HEIGHT_PX = 56
 const ROW_HEIGHT_MOBILE = 'h-[66px]'
 
 /** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
 export function TableCardSkeleton({
   columns,
   rows = 10,
+  compact = false,
   hasActions = false,
   hasChevron = false,
   className,
@@ -33,9 +47,12 @@ export function TableCardSkeleton({
           )}
         >
           {/* Desktop Skeleton */}
+          {/* Matches the ROW it stands in for: a compact row is content-sized
+              with a floor, a normal row is a fixed height. Using the taller of
+              the two here made every compact table jump on its first paint. */}
           <div className={cn(
-            'hidden md:flex items-center gap-4 px-4 py-0',
-            ROW_HEIGHT_DESKTOP,
+            'hidden md:flex items-center gap-4 px-4',
+            compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_DESKTOP),
             rowClassName
           )}>
             {columns.map((column) => (
@@ -94,4 +111,4 @@ export function TableCardSkeleton({
 }
 
 /** @deprecated */
-export { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE }
+export { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, COMPACT_ROW_MIN_HEIGHT, COMPACT_ROW_MIN_HEIGHT_PX }
