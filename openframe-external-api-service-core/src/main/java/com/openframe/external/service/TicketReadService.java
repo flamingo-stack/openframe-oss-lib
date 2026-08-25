@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -58,7 +59,7 @@ public class TicketReadService {
                 .collect(Collectors.groupingBy(TicketAttachment::getTicketId));
         Map<String, TicketStatusDefinition> statusesById = ticketStatusService.list().stream()
                 .collect(Collectors.toMap(TicketStatusDefinition::getId, Function.identity(), (a, b) -> a));
-        return java.util.stream.IntStream.range(0, tickets.size())
+        return IntStream.range(0, tickets.size())
                 .mapToObj(i -> {
                     Ticket ticket = tickets.get(i);
                     TicketRelations relations = new TicketRelations(

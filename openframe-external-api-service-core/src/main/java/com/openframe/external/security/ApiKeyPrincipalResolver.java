@@ -12,6 +12,8 @@ import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 import static org.springframework.util.StringUtils.hasText;
 
 /**
@@ -41,7 +43,7 @@ public class ApiKeyPrincipalResolver {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .roles(UserRole.effective(user.getRoles()).stream().map(Enum::name).toList())
-                .scopes(java.util.List.of())
+                .scopes(List.of())
                 .tenantId(tenantIdProvider.getTenantId())
                 .actorType(ActorType.ADMIN)
                 .build();

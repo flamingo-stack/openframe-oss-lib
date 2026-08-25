@@ -177,7 +177,7 @@ public class LogController {
             @Parameter(description = "Event type of the log entry", required = true)
             @RequestParam String eventType,
             @Parameter(description = "Timestamp of the log entry", required = true)
-            @RequestParam java.time.Instant timestamp,
+            @RequestParam Instant timestamp,
             @Parameter(description = "Tool event ID", required = true)
             @RequestParam String toolEventId,
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
