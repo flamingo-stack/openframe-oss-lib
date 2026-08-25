@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
+import static org.springframework.util.StringUtils.hasText;
 
 
 @Component
@@ -82,7 +83,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
      * cookie minted before this field existed; the flow cookie lives 10 minutes, so just let it pass.
      */
     private void requireEmailMatchesForm(String formEmail, String ssoEmail) {
-        if (formEmail == null || formEmail.isBlank()) {
+        if (!hasText(formEmail)) {
             return;
         }
         if (!formEmail.trim().equalsIgnoreCase(ssoEmail)) {
