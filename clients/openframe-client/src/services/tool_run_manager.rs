@@ -5,9 +5,7 @@ use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
 use crate::services::tool_kill_service::ToolKillService;
 use crate::utils::failure_log_backoff::FailureLogBackoff;
 use anyhow::{Context, Result};
-use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -699,18 +697,12 @@ impl ToolRunManager {
                     sleep(Duration::from_secs(1)).await;
                 }
 
-                match installed_tools_service
+                if let Ok(Some(fresh)) = installed_tools_service
                     .get_by_tool_agent_id(&tool.tool_agent_id)
                     .await
                 {
-                    Ok(Some(fresh)) => {
-                        installation = fresh.installation;
-                        run_command_args = fresh.run_command_args;
-                    }
-                    Ok(None) => {}
-                    Err(e) => {
-                        warn!(tool_id = %tool.tool_agent_id, "Failed to reload tool record, launching with the last known config: {:#}", e);
-                    }
+                    installation = fresh.installation;
+                    run_command_args = fresh.run_command_args;
                 }
 
                 if !running_tools.read().await.contains(&tool.tool_agent_id) {
@@ -742,14 +734,6 @@ impl ToolRunManager {
                     "Running tool {} with args: {:?}",
                     tool.tool_agent_id, processed_args
                 );
-
-                if log_attempt {
-                    let mut hasher = DefaultHasher::new();
-                    processed_args.hash(&mut hasher);
-                    info!(tool_id = %tool.tool_agent_id, args_count = processed_args.len(),
-                          args_hash = format!("{:016x}", hasher.finish()),
-                          "Launching with run args reloaded from the installed tools registry");
-                }
 
                 let command_path = params_processor
                     .directory_manager
