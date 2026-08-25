@@ -27,6 +27,10 @@ export interface MingoChatHistoryProps {
   /** Request archive — enables the row "Archive chat" action. The host opens
    *  the Archive confirmation modal. */
   onRequestArchive?: (dialog: DialogItem) => void
+  /** Request a shareable link — enables the row "Copy chat link" action. The host
+   *  owns the URL shape and the copy itself (the list knows neither the app's
+   *  routes nor whether a clipboard is available). */
+  onRequestCopyLink?: (dialog: DialogItem) => void
   /** Current server-side search term. Drives the "No chats found" empty state;
    *  the search INPUT lives in the panel header, not in this list. The host
    *  owns the term and refetches server-side — the list does no filtering. */
@@ -95,6 +99,7 @@ interface RowProps {
   isActive: boolean
   onSelect?: (id: string) => void
   onRequestRename?: (dialog: DialogItem) => void
+  onRequestCopyLink?: (dialog: DialogItem) => void
   onRequestArchive?: (dialog: DialogItem) => void
 }
 
@@ -102,12 +107,13 @@ function MingoChatHistoryRow({
   dialog,
   isActive,
   onSelect,
+  onRequestCopyLink,
   onRequestRename,
   onRequestArchive,
 }: RowProps) {
   const title = dialog.title || 'Untitled Chat'
   const unread = dialog.unreadMessagesCount ?? 0
-  const hasMenu = !!onRequestRename || !!onRequestArchive
+  const hasMenu = !!onRequestRename || !!onRequestArchive || !!onRequestCopyLink
   const owner = dialog.owner
   const hasAvatar = !!(owner?.name || owner?.avatarUrl)
   // Keep the `⋯` visible while its menu is open — once Radix moves focus into
@@ -115,6 +121,11 @@ function MingoChatHistoryRow({
   const [menuOpen, setMenuOpen] = React.useState(false)
 
   const menuItems = [
+    onRequestCopyLink && {
+      id: 'copy-link',
+      label: 'Copy chat link',
+      onClick: () => onRequestCopyLink(dialog),
+    },
     onRequestRename && {
       id: 'rename',
       label: 'Rename chat',
@@ -333,6 +344,7 @@ export function MingoChatHistory({
   dialogs,
   activeDialogId,
   onSelectDialog,
+  onRequestCopyLink,
   onRequestRename,
   onRequestArchive,
   searchQuery,
@@ -413,6 +425,7 @@ export function MingoChatHistory({
                       dialog={dialog}
                       isActive={dialog.id === activeDialogId}
                       onSelect={onSelectDialog}
+                      onRequestCopyLink={onRequestCopyLink}
                       onRequestRename={onRequestRename}
                       onRequestArchive={onRequestArchive}
                     />
