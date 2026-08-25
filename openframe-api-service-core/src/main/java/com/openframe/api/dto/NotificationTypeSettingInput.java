@@ -8,8 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class NotificationTypeSetting {
+public class NotificationTypeSettingInput {
     private NotificationSettingGroup group;
-    private String label;
     private boolean enabled;
 }
