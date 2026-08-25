@@ -75,8 +75,6 @@ public class DeviceOnlineDispatchService {
                 .findByTenantIdAndMachineIdIn(tenantId, machineIds).stream()
                 .collect(toMap(Machine::getMachineId, m -> m));
 
-        // Load the referenced schedules by id (any trigger, ACTIVE only): DEVICE_ONLINE sentinels and
-        // DATE_TIME reconnect-retry sentinels both live here and both fire the same way.
         Set<String> scheduleIds = tenantRows.stream()
                 .map(DeviceFirstOnlineDispatch::getScheduleId).filter(Objects::nonNull).collect(toSet());
         Map<String, ScheduleScript> activeSchedulesById = scheduleIds.isEmpty() ? Map.of()
@@ -87,8 +85,6 @@ public class DeviceOnlineDispatchService {
         List<DeviceFirstOnlineDispatch> changed = new ArrayList<>(tenantRows.size());
         for (DeviceFirstOnlineDispatch row : tenantRows) {
             try {
-                // Reconnect-retry window elapsed before the device came back → abandon the run.
-                // (Only retry sentinels carry expiresAt; open-ended DEVICE_ONLINE sentinels never expire.)
                 if (row.getExpiresAt() != null && row.getExpiresAt().isBefore(now)) {
                     row.setStatus(DeviceOnlineDispatchStatus.EXPIRED);
                     changed.add(row);
@@ -99,7 +95,7 @@ public class DeviceOnlineDispatchService {
 
                 Machine machine = machinesById.get(row.getMachineId());
                 if (machine == null || machine.getStatus() != DeviceStatus.ONLINE) {
-                    continue;   // still offline → leave NEW for a later tick (until it reconnects or expires)
+                    continue;   // still offline -> leave NEW for a later tick (until it reconnects or expires)
                 }
 
                 ScheduleScript schedule = row.getScheduleId() == null ? null : activeSchedulesById.get(row.getScheduleId());

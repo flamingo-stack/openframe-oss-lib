@@ -273,7 +273,6 @@ class ScheduleFireDispatcherTest {
 
         dispatcher.dispatch(schedule, now);
 
-        // OFFLINE → one sentinel armed NEW, expiresAt = now + window, scoped to this (schedule, machine).
         ArgumentCaptor<DeviceFirstOnlineDispatch> sentinelCaptor = ArgumentCaptor.forClass(DeviceFirstOnlineDispatch.class);
         verify(dispatchRepository).save(sentinelCaptor.capture());
         DeviceFirstOnlineDispatch sentinel = sentinelCaptor.getValue();
@@ -282,7 +281,6 @@ class ScheduleFireDispatcherTest {
         assertThat(sentinel.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
         assertThat(sentinel.getExpiresAt()).isEqualTo(now.plusSeconds(7200));
 
-        // ONLINE → dispatched to ONLY m-online; header counts only the dispatched machine.
         ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
                 ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
         verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
