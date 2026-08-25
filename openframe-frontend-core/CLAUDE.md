@@ -90,6 +90,30 @@ family, `require-await`, `no-floating-promises`) must be exempted in `eslint.typ
 `...typeChecked` — a block for them placed in `eslint.config.mjs` is silently overridden and does
 nothing.
 
+### Do not bypass the git hooks
+
+`pre-commit` runs lint-staged (`eslint --fix` + Prettier on staged files). `pre-push`
+runs `type-check` + `lint` over the whole package, because a type error your change
+caused in a *different* module is invisible to a staged-files check.
+
+Do not get around them — not with `--no-verify` or `-n`, not with `HUSKY=0`, not by
+unsetting `core.hooksPath`. **Reaching for the flag because a check went red is
+exactly the thing being ruled out.** A failing hook is a real finding; fix it.
+
+**One legitimate exception: when the HOOK is the hazard, not the code.** lint-staged
+stashes the working tree to isolate staged content, and on a very large commit that
+stash is a genuine risk — it is how this tree was once reduced to 29 files with a
+truncated source file mid-session. If you bypass for that reason you must first run
+the equivalent checks by hand over the whole package (`npm run lint`,
+`npm run type-check`, `npx prettier --check .`) and say so, with the reason, in the
+commit message or to the user. Never bypass silently, and never to save time.
+
+**The hooks are not the last line of defence — CI is.** `All Checks` is a required
+status check and covers config-smoke, tsc, both lint passes, the cycle pass, Prettier,
+the test suite and the build. A `--no-verify` commit cannot merge past a red gate; it
+only costs a wasted CI run. That is why this is a discipline rule rather than a
+security boundary — and also why bypassing buys you nothing.
+
 ## Core Rules (read before editing)
 
 ### 1. Check if a component already exists before creating a new one
