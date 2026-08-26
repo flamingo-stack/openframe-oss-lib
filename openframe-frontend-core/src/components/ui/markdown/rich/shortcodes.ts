@@ -84,7 +84,14 @@ export const processShortcodes = (content: string): string => {
     .replace(/\{\{claude-(artifact|design):([^}]+)\}\}/g, (match, kind, rest) => {
       const parts = String(rest).split('|');
       const url = parts[0];
-      const last = parts.length > 1 ? parts[parts.length - 1].trim() : '';
+      // A mirror needs its OWN slot: emitters always write the title slot
+      // even when empty (`URL||SRC` — see the hub's buildEmbedMarkdown),
+      // so a two-segment form is ALWAYS `URL|TITLE`, and a path-shaped
+      // title there ("/roadmap") stays a title. The residual ambiguity —
+      // a THREE-segment form whose title tail is itself path-shaped
+      // ("API|/v2") — is accepted: it fails safe (same-origin 404 empty
+      // state, never cross-origin).
+      const last = parts.length > 2 ? parts[parts.length - 1].trim() : '';
       const embedSrc = last && isSameOriginEmbedPath(last) ? parts.pop()!.trim() : '';
       const title = parts.slice(1).join('|').trim();
       const titleAttr = title ? ` data-title="${escapeAttr(title)}"` : '';

@@ -155,6 +155,10 @@ export function EmbedViewerFrame({
         <EmbedIframe
           src={src}
           title={title}
+          // 96px = the fullscreen wrapper's own chrome above the iframe:
+          // header row (~40px incl. its gap) + the wrapper's mf padding
+          // (16px × 2) + the mf space-y gap (16px), rounded up so the
+          // frame never forces a scrollbar. Recheck if that chrome changes.
           height={isFullscreen ? 'calc(100vh - 96px)' : height}
           allow={allow}
           allowFullScreen={allowFullScreen}

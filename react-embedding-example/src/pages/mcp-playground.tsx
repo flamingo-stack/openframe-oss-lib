@@ -311,7 +311,7 @@ export function McpPlaygroundPage() {
             {tools.map(t => (
               <li key={t.name} className="rounded-md border border-ods-border p-[var(--spacing-system-sf)]">
                 <p className="text-code">{t.name}</p>
-                <p className="mt-[var(--spacing-system-xxs)] line-clamp-3 text-badge text-ods-text-secondary">{t.description}</p>
+                <p className="mt-[var(--spacing-system-xxs)] line-clamp-3 text-h6 text-ods-text-secondary">{t.description}</p>
                 <p className="mt-[var(--spacing-system-xxs)] text-badge text-ods-text-secondary">
                   {t.annotations?.readOnlyHint
                     ? 'read-only'
@@ -367,7 +367,7 @@ export function McpPlaygroundPage() {
             {searchResults.map((r, i) => (
               <li key={i} className="rounded-md border border-ods-border p-[var(--spacing-system-sf)]">
                 <p className="text-h6">{String(r.title ?? '')}</p>
-                <p className="line-clamp-2 text-badge text-ods-text-secondary">{String(r.preview ?? '')}</p>
+                <p className="line-clamp-2 text-h6 text-ods-text-secondary">{String(r.preview ?? '')}</p>
               </li>
             ))}
           </ul>
@@ -441,7 +441,7 @@ export function McpPlaygroundPage() {
                     onReject={() => decide(p, 'reject')}
                   />
                   {decided && (
-                    <p className="mt-[var(--spacing-system-xxs)] text-badge text-ods-text-secondary">{decided.text}</p>
+                    <p className="mt-[var(--spacing-system-xxs)] text-h6 text-ods-text-secondary">{decided.text}</p>
                   )}
                 </li>
               )

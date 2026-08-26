@@ -77,22 +77,6 @@ export function toFigmaOriginalUrl(url: string): string {
 }
 
 /**
- * The EMBED url for a published Claude artifact, or `null` when the link is not
- * one we can frame — the Claude counterpart of `toFigmaEmbedUrl`.
- *
- * claude.ai serves `frame-ancestors 'self'` on the artifact page itself, but a
- * PUBLISHED artifact also has an `/embed` route whose `frame-ancestors` carries
- * the domains its author allow-listed under "Get embed code → Allowed domains".
- * That is Anthropic's supported way to put an artifact on another site, so that
- * is what the iframe points at.
- *
- * Returns `null` for everything else, including a Claude CODE url
- * (`claude.ai/code/artifact/…`), whose Share dialog exposes no Embed settings
- * and whose `/embed` path answers `frame-ancestors 'self'` (verified against
- * real artifacts, 2026-08). A trailing `/embed` is accepted because that is the
- * url "Get embed code" hands the author.
- */
-/**
  * The ONE rule for a host-provided embed mirror path (`ClaudeEmbed
  * srcOverride`, the claude shortcode's mirror segment): a SAME-ORIGIN
  * absolute path. Checked by BOTH the shortcode parser and the component
@@ -108,6 +92,22 @@ export function isSameOriginEmbedPath(value: string): boolean {
   return /^\/(?![/\\])\S*$/.test(value)
 }
 
+/**
+ * The EMBED url for a published Claude artifact, or `null` when the link is not
+ * one we can frame — the Claude counterpart of `toFigmaEmbedUrl`.
+ *
+ * claude.ai serves `frame-ancestors 'self'` on the artifact page itself, but a
+ * PUBLISHED artifact also has an `/embed` route whose `frame-ancestors` carries
+ * the domains its author allow-listed under "Get embed code → Allowed domains".
+ * That is Anthropic's supported way to put an artifact on another site, so that
+ * is what the iframe points at.
+ *
+ * Returns `null` for everything else, including a Claude CODE url
+ * (`claude.ai/code/artifact/…`), whose Share dialog exposes no Embed settings
+ * and whose `/embed` path answers `frame-ancestors 'self'` (verified against
+ * real artifacts, 2026-08). A trailing `/embed` is accepted because that is the
+ * url "Get embed code" hands the author.
+ */
 export function toClaudeEmbedUrl(url: string | null | undefined): string | null {
   if (!url) return null
   try {

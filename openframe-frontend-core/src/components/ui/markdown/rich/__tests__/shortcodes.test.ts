@@ -142,6 +142,12 @@ describe('processShortcodes design-doc embeds', () => {
     const slashTitle = processShortcodes('{{claude-artifact:https://claude.ai/a|/api redesign}}');
     expect(slashTitle).toContain('data-title="/api redesign"');
     expect(slashTitle).not.toContain('data-embed-src');
+
+    // A TWO-segment form is always `URL|TITLE` — a mirror needs its own
+    // (third) slot, so even a whitespace-free path-shaped title survives.
+    const pathTitle = processShortcodes('{{claude-artifact:https://claude.ai/a|/roadmap}}');
+    expect(pathTitle).toContain('data-title="/roadmap"');
+    expect(pathTitle).not.toContain('data-embed-src');
   });
 
   it('escapes the url attribute so a crafted link cannot break out of the block', () => {

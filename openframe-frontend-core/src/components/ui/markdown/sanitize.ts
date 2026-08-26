@@ -404,6 +404,10 @@ const URL_ATTRS = new Set([
   // the LOWERCASED PROPERTY name (`dataembedsrc`), not the attribute
   // name, or the check silently never runs.
   'dataembedsrc',
+  // The embed shortcodes' primary url (`data-url` → `dataUrl`) — it
+  // becomes an anchor href ("Open in Claude") and a link-preview fetch
+  // target, so a `javascript:`/`data:` scheme there is a live sink too.
+  'dataurl',
 ])
 
 /**
