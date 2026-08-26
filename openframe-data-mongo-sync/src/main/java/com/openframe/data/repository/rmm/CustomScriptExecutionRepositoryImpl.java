@@ -1,7 +1,7 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;

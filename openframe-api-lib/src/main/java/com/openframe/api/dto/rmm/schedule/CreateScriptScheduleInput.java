@@ -1,7 +1,8 @@
 package com.openframe.api.dto.rmm.schedule;
 
-import com.openframe.data.document.rmm.OsType;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -32,7 +33,11 @@ public class CreateScriptScheduleInput {
     private List<ScheduledScriptCustomParamsInput> scriptCustomParams;
 
     @NotNull
-    private ScriptScheduleTrigger trigger;
+    private ScheduleScriptTrigger trigger;
+
+    private ScheduleOfflineBehavior offlineBehavior;
+
+    private Long reconnectWindowSeconds;
 
     /**
      * First scheduled run as an absolute UTC instant (the dashboard converts the
