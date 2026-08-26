@@ -20,9 +20,11 @@ const SelectTrigger = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & {
     invalid?: boolean
     label?: string
+    /** Label scale forwarded to FieldWrapper ("large" = text-h4 for designs with body-scale field titles) */
+    labelVariant?: "default" | "large"
     error?: string
   }
->(({ className, children, invalid, label, error, ...props }, ref) => {
+>(({ className, children, invalid, label, labelVariant, error, ...props }, ref) => {
   const isInvalid = invalid || !!error
 
   const trigger = (
@@ -68,7 +70,7 @@ const SelectTrigger = React.forwardRef<
   )
 
   return (
-    <FieldWrapper label={label} error={error}>
+    <FieldWrapper label={label} labelVariant={labelVariant} error={error}>
       {trigger}
     </FieldWrapper>
   )
