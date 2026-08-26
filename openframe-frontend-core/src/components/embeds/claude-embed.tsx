@@ -19,6 +19,14 @@ export interface ClaudeEmbedProps {
   height?: string
   /** iframe loading strategy. Defaults to `lazy`, as `FigmaEmbed` does. */
   loading?: 'eager' | 'lazy'
+  /** Self-hosted mirror of the artifact to FRAME instead of claude.ai.
+   *  claude.ai frame-locks Claude CODE artifact urls entirely and serves
+   *  public artifacts only to author-allow-listed hosts — when the host
+   *  app keeps its own serving copy (e.g. the hub's design-briefs store),
+   *  it passes that path here. The frame shows the mirror; the "Open in
+   *  Claude" action still targets `url`, so commenting stays on
+   *  claude.ai. Wins over `toClaudeEmbedUrl(url)` when set. */
+  srcOverride?: string | null
 }
 
 const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
@@ -43,8 +51,8 @@ const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
  * (no embed route), an artifact whose author has not allow-listed this host,
  * or an http host (mixed content — it will not paint on `http://localhost`).
  */
-export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy' }: ClaudeEmbedProps) {
-  const embedUrl = toClaudeEmbedUrl(url)
+export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy', srcOverride }: ClaudeEmbedProps) {
+  const embedUrl = srcOverride ?? toClaudeEmbedUrl(url)
   return (
     <EmbedViewerFrame
       className="my-6 space-y-3"
