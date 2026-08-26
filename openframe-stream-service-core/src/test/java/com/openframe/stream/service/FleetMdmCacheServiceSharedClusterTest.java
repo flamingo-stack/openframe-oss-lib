@@ -47,19 +47,41 @@ class FleetMdmCacheServiceSharedClusterTest {
     }
 
     @Test
+    @DisplayName("shared cluster + resolved event tenant -> tool doc looked up tenant-scoped, never by bare key")
+    void resolvedTenantUsesTenantScopedToolLookup() {
+        IntegratedToolService toolService = mock(IntegratedToolService.class);
+        org.mockito.Mockito.when(toolService.getToolByTenantAndKey(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.Optional.empty());
+        ClusterTenantIdResolver resolver = mock(ClusterTenantIdResolver.class);
+        FleetBaseUrlResolver urlResolver = org.mockito.Mockito.mock(FleetBaseUrlResolver.class);
+        org.mockito.Mockito.when(urlResolver.resolveBaseUrl("tenant-a"))
+                .thenReturn("http://tenant-a:8080/v0/fleet/enrichment");
+        FleetMdmCacheService cache = new FleetMdmCacheService(toolService, resolver, urlResolver);
+
+        // Tool doc absent -> no client -> null result; the point is WHICH lookup ran: on a shared
+        // database one doc exists per tenant under the same key, so the bare-key variant is
+        // non-unique and must never be used on this path.
+        assertThat(cache.getQueryById(9L, "tenant-a")).isNull();
+        org.mockito.Mockito.verify(toolService).getToolByTenantAndKey(
+                org.mockito.ArgumentMatchers.eq("tenant-a"), org.mockito.ArgumentMatchers.anyString());
+        org.mockito.Mockito.verify(toolService, org.mockito.Mockito.never())
+                .getToolByKey(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
     @DisplayName("baseUrlFor: resolver present and answering -> per-tenant URL; null/blank answer or no resolver -> static")
     void baseUrlSelection() {
         IntegratedToolService toolService = mock(IntegratedToolService.class);
 
         FleetBaseUrlResolver urlResolver = org.mockito.Mockito.mock(FleetBaseUrlResolver.class);
         org.mockito.Mockito.when(urlResolver.resolveBaseUrl("tenant-a"))
-                .thenReturn("http://tenant-y0-0.internal.openframe.build/fleet-enrichment");
+                .thenReturn("http://tenant-a:8080/v0/fleet/enrichment");
         org.mockito.Mockito.when(urlResolver.resolveBaseUrl("tenant-unknown")).thenReturn(null);
 
         FleetMdmCacheService withResolver = new FleetMdmCacheService(toolService, null, urlResolver);
         org.springframework.test.util.ReflectionTestUtils.setField(withResolver, "baseUrl", "http://static:8080");
         assertThat(withResolver.baseUrlFor("tenant-a"))
-                .isEqualTo("http://tenant-y0-0.internal.openframe.build/fleet-enrichment");
+                .isEqualTo("http://tenant-a:8080/v0/fleet/enrichment");
         assertThat(withResolver.baseUrlFor("tenant-unknown")).isEqualTo("http://static:8080");
 
         FleetMdmCacheService withoutResolver = new FleetMdmCacheService(toolService, null, null);
