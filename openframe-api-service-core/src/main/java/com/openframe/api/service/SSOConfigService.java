@@ -15,10 +15,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Locale;
+import java.util.Objects;
 
 import static com.openframe.data.document.sso.SSOConfig.OPENFRAME_PROVIDER;
 import static java.lang.Boolean.TRUE;
@@ -52,7 +54,7 @@ public class SSOConfigService {
                         .enabled(true)
                         .clientId(config.getClientId())
                         .build())
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public List<SSOProviderInfo> getAvailableProviders() {
@@ -179,28 +181,23 @@ public class SSOConfigService {
 
         request.setAllowedDomains(normalized);
 
-        if (wantsAutoProvision) {
-            if (normalized.isEmpty()) {
-                throw new IllegalArgumentException("allowedDomains must contain at least one domain when autoProvisionUsers is true.");
-            }
+        if (wantsAutoProvision && normalized.isEmpty()) {
+            throw new IllegalArgumentException("allowedDomains must contain at least one domain when autoProvisionUsers is true.");
         }
 
-        if (isMicrosoft && wantsAutoProvision) {
-            String msTenantId = request.getMsTenantId();
-            if (msTenantId == null || msTenantId.isBlank()) {
-                throw new IllegalArgumentException("autoProvisionUsers can be true only for Microsoft single-tenant apps (msTenantId is required).");
-            }
+        if (isMicrosoft && wantsAutoProvision && !StringUtils.hasText(request.getMsTenantId())) {
+            throw new IllegalArgumentException("autoProvisionUsers can be true only for Microsoft single-tenant apps (msTenantId is required).");
         }
     }
 
     private List<String> normalizeDomains(List<String> domains) {
         if (domains == null) return List.of();
         return domains.stream()
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .map(s -> s.toLowerCase(java.util.Locale.ROOT))
+                .filter(StringUtils::hasText)
+                .map(domain -> domain.toLowerCase(Locale.ROOT))
                 .distinct()
-                .collect(java.util.stream.Collectors.toList());
+                .toList();
     }
 } 

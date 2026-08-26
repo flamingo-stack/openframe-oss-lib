@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.*;
 
@@ -38,7 +39,7 @@ public class SSOConfigService {
     public Optional<SSOConfig> getEffectiveSSOConfig(String tenantId, String provider) {
         Optional<SSOPerTenantConfig> perTenant = getSSOConfig(tenantId, provider);
         if (perTenant.isPresent()) {
-            return perTenant.map(cfg -> cfg);
+            return Optional.of(perTenant.get());
         }
         return defaultProviderConfigs.stream()
                 .filter(cfg -> cfg.providerId().equalsIgnoreCase(provider))
@@ -74,17 +75,13 @@ public class SSOConfigService {
      */
     public List<String> getEffectiveProvidersForTenant(String tenantId) {
         Set<String> result = new LinkedHashSet<>();
-
-        for (SSOPerTenantConfig cfg : getActiveForTenant(tenantId)) {
-                result.add(cfg.getProvider().toLowerCase());
-        }
-
-       result.addAll(getDefaultProviders());
+        getActiveForTenant(tenantId).forEach(cfg -> result.add(cfg.getProvider().toLowerCase(Locale.ROOT)));
+        result.addAll(getDefaultProviders());
 
         // The built-in login's toggle document is not an OIDC provider.
         result.remove(SSOConfig.OPENFRAME_PROVIDER);
 
-        return new ArrayList<>(result);
+        return List.copyOf(result);
     }
 
     /**
@@ -100,15 +97,10 @@ public class SSOConfigService {
     }
 
     public List<String> getDefaultProviders() {
-        List<String> result = new ArrayList<>();
-
-        for (DefaultProviderConfig cfg : defaultProviderConfigs) {
-            if (cfg.isConfigured()) {
-                result.add(cfg.providerId().toLowerCase());
-            }
-        }
-
-        return result;
+        return defaultProviderConfigs.stream()
+                .filter(DefaultProviderConfig::isConfigured)
+                .map(cfg -> cfg.providerId().toLowerCase(Locale.ROOT))
+                .toList();
     }
 
 
@@ -116,12 +108,10 @@ public class SSOConfigService {
      * Find enabled, auto-provisioning SSO config by email domain (lowercased).
      */
     public Optional<SSOPerTenantConfig> findAutoProvisionByDomain(String domain) {
-        if (domain == null || domain.isBlank()) {
+        if (!StringUtils.hasText(domain)) {
             return Optional.empty();
         }
-        String d = domain.toLowerCase(Locale.ROOT);
-        List<SSOPerTenantConfig> matches = ssoPerTenantConfigRepository.findByAllowedDomainsIn(List.of(d));
-        return matches.stream()
+        return ssoPerTenantConfigRepository.findByAllowedDomainsIn(List.of(domain.toLowerCase(Locale.ROOT))).stream()
                 .filter(SSOPerTenantConfig::isEnabled)
                 .filter(SSOPerTenantConfig::isAutoProvisionUsers)
                 .findFirst();
