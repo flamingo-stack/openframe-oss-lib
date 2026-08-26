@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react'
 import { Button } from '../ui/button/button'
 import { ClaudeIcon } from '../icons/claude-icon'
 import { EmbedViewerFrame } from './embed-viewer-frame'
+import { useEndpointsRuntime } from '../../contexts/endpoints-runtime-context'
 import { toClaudeEmbedUrl, toClaudeMirrorPath } from '../../utils/embed-url-converters'
 
 export type ClaudeEmbedKind = 'artifact' | 'design'
@@ -52,13 +53,16 @@ const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
  * allow-listed this host, or an http host (mixed content).
  */
 export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy' }: ClaudeEmbedProps) {
-  // Mirror detection is TRANSPARENT: derive the proxy path from the url's
-  // own artifact id and probe it (1-byte ranged GET — the proxy forwards
+  // Mirror detection is TRANSPARENT: derive the mirror url from the
+  // artifact id under the host's configured storage-view proxy base —
+  // `EndpointsRuntime`, the SAME proxy-path mechanism as every other
+  // lib→API call — and probe it (1-byte ranged GET; the proxy forwards
   // Range, so this costs nothing). Exists → frame the mirror; otherwise
-  // the claude.ai fallback below is exactly the pre-mirror behavior. The
-  // derived path is same-origin by construction (constant prefix +
-  // validated uuid), so no further vetting is needed.
-  const mirrorPath = toClaudeMirrorPath(url)
+  // the claude.ai fallback below is exactly the pre-mirror behavior. A
+  // host that mounts no provider (or omits the entry) skips the mirror
+  // leg entirely.
+  const endpoints = useEndpointsRuntime()
+  const mirrorPath = toClaudeMirrorPath(url, endpoints?.storageViewBaseUrl)
   const [mirrorSrc, setMirrorSrc] = useState<string | null>(null)
   useEffect(() => {
     setMirrorSrc(null)

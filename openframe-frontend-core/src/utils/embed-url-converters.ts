@@ -77,21 +77,29 @@ export function toFigmaOriginalUrl(url: string): string {
 }
 
 /**
- * The self-hosted MIRROR path for a claude artifact url — the whole
+ * The self-hosted MIRROR url for a claude artifact url — the whole
  * mirror mechanism is UNDER THE HOOD: the viewer detects a claude url,
- * DERIVES the host's storage-view proxy path from the artifact's own id,
- * and frames the downloaded copy from there. No per-link data, no props,
- * no shortcode changes — 100% transparent to every consumer.
+ * DERIVES the mirror location from the artifact's own id under the
+ * host's configured storage-view proxy base, and frames the downloaded
+ * copy from there. No per-link data, no props, no shortcode changes —
+ * 100% transparent to every consumer.
  *
- * `null` when the url carries no artifact id (nothing to mirror). The
- * derived path is same-origin by construction (a constant prefix + a
- * validated uuid), so it is safe as a frame source without further
- * checks. KEEP THE PATH SHAPE IN SYNC with the hub's
- * `lib/data/design-brief-mirror.cjs` (bucket + `<uuid>.html` naming) —
- * that module owns the ingest/audit half of this contract.
+ * `storageViewBaseUrl` comes from `EndpointsRuntime` — the SAME
+ * host-overridable proxy-path mechanism every other lib→API call uses
+ * (a reverse-proxied embedder remaps it; a host without the proxy omits
+ * it and gets `null` here, i.e. no mirror leg at all).
+ *
+ * `null` when the base is absent or the url carries no artifact id. The
+ * derived url is the configured base + a validated uuid — safe as a
+ * frame source without further checks. KEEP THE OBJECT NAMING IN SYNC
+ * with the hub's `lib/data/design-brief-mirror.cjs` (bucket +
+ * `<uuid>.html`) — that module owns the ingest/audit half.
  */
-export function toClaudeMirrorPath(url: string | null | undefined): string | null {
-  if (!url) return null
+export function toClaudeMirrorPath(
+  url: string | null | undefined,
+  storageViewBaseUrl: string | null | undefined,
+): string | null {
+  if (!url || !storageViewBaseUrl) return null
   try {
     const u = new URL(url)
     const host = u.hostname.toLowerCase()
@@ -105,7 +113,9 @@ export function toClaudeMirrorPath(url: string | null | undefined): string | nul
           u.pathname,
         )?.[1]) ||
       null
-    return id ? `/api/storage/view/design-briefs/${id.toLowerCase()}.html` : null
+    return id
+      ? `${storageViewBaseUrl.replace(/\/$/, '')}/design-briefs/${id.toLowerCase()}.html`
+      : null
   } catch {
     return null
   }

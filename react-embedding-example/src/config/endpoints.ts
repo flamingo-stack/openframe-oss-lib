@@ -82,6 +82,9 @@ export const EP = {
   legal: (docType: string) => `${CONTENT}/legal/${docType}`,
   contact: `${CONTENT}/contact`,
   announcements: `${CONTENT}/announcements/active`,
+  // Private-storage view proxy base — ClaudeEmbed derives artifact
+  // mirror urls under it, through the same /content reverse proxy.
+  storageView: `${CONTENT}/storage/view`,
   accessValidate: `${CONTENT}/validate-access-code`,
   accessConsume: `${CONTENT}/consume-access-code`,
   // Rich-markdown embedded surfaces (reddit/twitter cards + OG link preview).
