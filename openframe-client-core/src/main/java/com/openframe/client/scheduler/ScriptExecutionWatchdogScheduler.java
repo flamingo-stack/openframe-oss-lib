@@ -1,6 +1,5 @@
 package com.openframe.client.scheduler;
 
-import com.openframe.client.service.rmm.watchdog.ScriptDeliveryRetryService;
 import com.openframe.client.service.rmm.watchdog.ScriptExecutionWatchdogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,31 +15,17 @@ import org.springframework.stereotype.Component;
 public class ScriptExecutionWatchdogScheduler {
 
     private final ScriptExecutionWatchdogService watchdogService;
-    private final ScriptDeliveryRetryService deliveryRetryService;
 
-    @Scheduled(fixedDelayString = "${openframe.rmm.execution.watchdog.interval:60000}")
+    @Scheduled(fixedDelayString = "${openframe.rmm.execution.watchdog.interval}")
     @SchedulerLock(name = "scriptExecutionWatchdog",
-            lockAtMostFor = "${openframe.rmm.execution.watchdog.lock-at-most-for:2m}",
-            lockAtLeastFor = "${openframe.rmm.execution.watchdog.lock-at-least-for:10s}")
+            lockAtMostFor = "${openframe.rmm.execution.watchdog.lock-at-most-for}",
+            lockAtLeastFor = "${openframe.rmm.execution.watchdog.lock-at-least-for}")
     public void sweep() {
-        log.debug("Running Execution watchdog sweep");
-        reapStuckExecutions();
-        retryQueuedDeliveries();
-    }
-
-    private void reapStuckExecutions() {
         try {
+            log.debug("Running stale-execution reap sweep");
             watchdogService.markStuckExecutionsAsFailed();
         } catch (Exception e) {
             log.error("Stuck-execution reap sweep failed", e);
-        }
-    }
-
-    private void retryQueuedDeliveries() {
-        try {
-            deliveryRetryService.retryStuckQueuedDeliveries();
-        } catch (Exception e) {
-            log.error("QUEUED delivery retry sweep failed", e);
         }
     }
 }
