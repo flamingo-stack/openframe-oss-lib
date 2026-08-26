@@ -12,6 +12,9 @@ const AGENT_BASE = `${CONTENT}/chat/agent`
 export const EP = {
   // chat
   chatStream: `${CONTENT}/docs/chat`,
+  // MCP server (streamable HTTP JSON-RPC) — the /mcp playground page's
+  // official-SDK transport points here; the proxy injects Bearer + act-as.
+  mcp: `${CONTENT}/mcp`,
   commands: `${CONTENT}/docs/commands`,
   // Guide-mode empty-state config (greeting + enabled RAG tables + quick-action
   // chips WITH icons). The host injects these at SSR; a cross-origin embedder has

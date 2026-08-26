@@ -17,6 +17,7 @@ import { SingleLinkEmbedPage } from './pages/single-link-embed'
 import { AuthorsPage } from './pages/authors'
 import { FaqsPage } from './pages/faqs'
 import { KnowledgeBasePage } from './pages/knowledge-base'
+import { McpPlaygroundPage } from './pages/mcp-playground'
 import { DOCS_BASE_ROUTE } from './config/content'
 
 // react-router patterns are relative (no leading slash); strip it once.
@@ -43,6 +44,7 @@ export function AppRoutes() {
         <Route path="schedule-a-call" element={<ScheduleACallPage />} />
         <Route path="schedule-a-call/*" element={<ScheduleACallPage />} />
         <Route path="single-link-embed" element={<SingleLinkEmbedPage />} />
+        <Route path="mcp" element={<McpPlaygroundPage />} />
         {/* DocsHubPage embed proof — same component the hub mounts at
          *  flamingo.so/knowledge-base and openframe.so/knowledge-base.
          *  Path read from `DOCS_BASE_ROUTE` so `ask-ai.tsx`'s chat baseRoute
