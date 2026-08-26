@@ -73,6 +73,9 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
         </Button>
       }
       src={embedUrl}
+      // The mirror has no internal fullscreen button (unlike Figma's
+      // player), so the shell provides the toggle.
+      fullscreenControl
       loading={loading}
       height={height}
       // Same frame contract Figma gets — an artifact is a real app: it copies

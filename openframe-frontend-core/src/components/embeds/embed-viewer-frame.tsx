@@ -1,7 +1,9 @@
 'use client'
 
-import React from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { Button } from '../ui/button/button'
 import { EmbedIframe } from './embed-iframe'
 
 /**
@@ -47,6 +49,13 @@ export interface EmbedViewerFrameProps {
   sandbox?: string
   /** Wrapper classes; defaults to the sheets/pdf `space-y-4`. */
   className?: string
+  /** Opt-in fullscreen toggle in the header row (rendered after `actions`,
+   *  only when there is a `src`). Fullscreens the WHOLE frame — header
+   *  included — so the exit control stays reachable (Esc works too).
+   *  Exists because some embedded contents ship their own fullscreen
+   *  button (the Figma player) and some cannot (a self-hosted Claude
+   *  artifact mirror) — the shell provides the affordance uniformly. */
+  fullscreenControl?: boolean
 }
 
 export function EmbedViewerFrame({
@@ -63,9 +72,47 @@ export function EmbedViewerFrame({
   loading,
   sandbox,
   className,
+  fullscreenControl,
 }: EmbedViewerFrameProps) {
+  const frameRef = useRef<HTMLDivElement>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  // Track the DOCUMENT's fullscreen element rather than local intent —
+  // Esc, F11, and programmatic exits all land here, so the icon can
+  // never desync from reality.
+  useEffect(() => {
+    if (!fullscreenControl) return
+    const onChange = () => setIsFullscreen(document.fullscreenElement === frameRef.current)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [fullscreenControl])
+
+  const toggleFullscreen = useCallback(() => {
+    const el = frameRef.current
+    if (!el) return
+    try {
+      if (document.fullscreenElement === el) {
+        void document.exitFullscreen()
+      } else {
+        void el.requestFullscreen()
+      }
+    } catch {
+      // Fullscreen API unavailable (permissions policy, old WebKit) —
+      // the button is a convenience; failing silently keeps the page sane.
+    }
+  }, [])
+
   return (
-    <div className={cn('space-y-4', className)}>
+    <div
+      ref={frameRef}
+      className={cn(
+        'space-y-4',
+        className,
+        // Fullscreen paints its own ground (the fullscreened element
+        // otherwise sits on the UA's black backdrop) and scrolls itself.
+        isFullscreen && 'overflow-auto bg-ods-bg p-4',
+      )}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 min-w-0">
           {icon}
@@ -75,13 +122,36 @@ export function EmbedViewerFrame({
             <span className="text-h6 font-semibold text-ods-text-primary truncate">{title}</span>
           )}
         </div>
-        {actions}
+        {/* Same responsive action-row idiom as the PDF viewer's button pair
+            and every viewer's own action: full-width stacked on mobile,
+            inline row from `sm:` up, SAME Button idiom (outline /
+            small-legacy / w-4 icon / w-full sm:w-auto). Without the
+            fullscreen toggle, `actions` renders EXACTLY as before — the
+            wrapper exists only when the toggle joins it, so pre-existing
+            viewers (figma/pdf/sheets) are byte-identical. */}
+        {fullscreenControl && src ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {actions}
+            <Button
+              variant="outline"
+              size="small-legacy"
+              onClick={toggleFullscreen}
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              leftIcon={isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              className="w-full sm:w-auto"
+            >
+              {isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            </Button>
+          </div>
+        ) : (
+          actions
+        )}
       </div>
       {src ? (
         <EmbedIframe
           src={src}
           title={title}
-          height={height}
+          height={isFullscreen ? 'calc(100vh - 96px)' : height}
           allow={allow}
           allowFullScreen={allowFullScreen}
           loading={loading}
