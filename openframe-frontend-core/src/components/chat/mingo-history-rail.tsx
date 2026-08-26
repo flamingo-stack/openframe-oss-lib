@@ -33,6 +33,8 @@ export interface MingoHistoryRailProps {
   onRequestRename?: (dialog: DialogItem) => void;
   /** Request archive — enables the row "Archive chat" action. */
   onRequestArchive?: (dialog: DialogItem) => void;
+  /** Request a shareable link — enables the row "Copy chat link" action. */
+  onRequestCopyLink?: (dialog: DialogItem) => void;
   /** Ownership scope shown as a two-state "My Chats / All Chats" selector
    *  between "Start New Chat" and the list. Rendered only when BOTH `scope`
    *  and `onScopeChange` are provided; the host owns the state and refilters
@@ -85,6 +87,7 @@ export function MingoHistoryRail({
   onNewChat,
   onRequestRename,
   onRequestArchive,
+  onRequestCopyLink,
   scope,
   onScopeChange,
   searchQuery,
@@ -165,6 +168,7 @@ export function MingoHistoryRail({
           onSelectDialog={onSelectDialog}
           onRequestRename={onRequestRename}
           onRequestArchive={onRequestArchive}
+          onRequestCopyLink={onRequestCopyLink}
           searchQuery={searchQuery}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}

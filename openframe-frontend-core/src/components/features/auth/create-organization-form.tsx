@@ -163,11 +163,15 @@ export function CreateOrganizationForm({
         {domainSlot && <div className="pt-[var(--spacing-system-s)]">{domainSlot}</div>}
       </div>
 
-      {/* Terms & Privacy */}
+      {/* Terms & Privacy — deliberately NOT `truncateLabel`. That prop suits a
+          one-line value; this label is a sentence carrying the Terms and Privacy
+          Policy links, and ellipsizing it clipped the row to "Agree to Terms &
+          Privacy Policy by sig…" below ~500px, so on a phone the user could not
+          read what they were agreeing to. Wrapping is the only acceptable
+          overflow behaviour for consent copy. */}
       <CheckboxBlock
         id="create-org-terms"
         label={<TermsAgreementLabel termsUrl={termsUrl} privacyPolicyUrl={privacyPolicyUrl} />}
-        truncateLabel
         checked={agreedToTerms}
         disabled={fieldsDisabled}
         error={errors?.terms}

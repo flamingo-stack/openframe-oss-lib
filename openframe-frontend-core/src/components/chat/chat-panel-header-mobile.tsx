@@ -38,6 +38,7 @@ export function ChatPanelHeaderMobile({
   onRestore,
   onRename,
   onArchive,
+  onCopyLink,
   onOpenArchive,
   className,
 }: ChatPanelHeaderMobileProps) {
@@ -53,6 +54,7 @@ export function ChatPanelHeaderMobile({
         onClick: onOpenArchive,
       },
     isArchivedView && onRestore && { id: 'unarchive', label: 'Unarchive chat', onClick: onRestore },
+    !isArchivedView && onCopyLink && { id: 'copy-link', label: 'Copy chat link', onClick: onCopyLink },
     !isArchivedView && onRename && { id: 'rename', label: 'Rename chat', onClick: onRename },
     !isArchivedView && onArchive && { id: 'archive', label: 'Archive chat', onClick: onArchive },
   ].filter(Boolean) as ActionsMenuItem[];

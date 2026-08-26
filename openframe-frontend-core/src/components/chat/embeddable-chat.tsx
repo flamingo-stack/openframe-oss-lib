@@ -91,7 +91,7 @@ import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { SourceActionButton } from './source-action-button';
-import type { ChatInputRef, SlashCommandActionId } from './types/component.types';
+import type { ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 import type { MessageSegment, Message } from './types/message.types';
 import type { UnifiedChatState } from './types/unified-chat-state.types';
@@ -225,6 +225,11 @@ export interface EmbeddableChatProps {
     unarchiveDialog?: (id: string) => Promise<void>;
     searchQuery?: string;
     onSearchChange?: (query: string) => void;
+    /** Copy a shareable link to a conversation — adds "Copy chat link" to the
+     *  header ⋯ menu and every dialog row menu. The host owns the URL shape and
+     *  the clipboard write; the panel knows neither the app's routes nor whether
+     *  a clipboard is available. Omit to hide the action. */
+    onCopyLink?: (dialog: DialogItem) => void;
   };
 
   /**
@@ -1080,6 +1085,7 @@ function EmbeddableChatInner({
         unarchiveDialog: mingoDialogCapabilities?.unarchiveDialog,
         searchQuery: mingoDialogCapabilities?.searchQuery,
         onSearchChange: mingoDialogCapabilities?.onSearchChange,
+        onCopyLink: mingoDialogCapabilities?.onCopyLink,
       };
     }
     return {
@@ -1089,6 +1095,7 @@ function EmbeddableChatInner({
       unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
       searchQuery: undefined as string | undefined,
       onSearchChange: undefined as ((query: string) => void) | undefined,
+      onCopyLink: undefined as ((dialog: DialogItem) => void) | undefined,
     };
   }, [mingoState, mingoDialogCapabilities, effectiveModes]);
 
@@ -1972,6 +1979,8 @@ function EmbeddableChatInner({
     activeDialogId && activeDialog && mingoCaps.canRename ? () => setRenameTarget(activeDialog) : undefined;
   const headerOnArchive =
     activeDialogId && activeDialog && mingoCaps.canArchive ? () => setArchiveTarget(activeDialog) : undefined;
+  const headerOnCopyLink =
+    activeDialogId && activeDialog && mingoCaps.onCopyLink ? () => mingoCaps.onCopyLink?.(activeDialog) : undefined;
   const headerOnOpenArchive = fetchArchivedDialogs ? openArchive : undefined;
 
   // Header person (sub-line + 32px avatar, Figma 113:63273): the dialog OWNER
@@ -2012,6 +2021,7 @@ function EmbeddableChatInner({
 
   // Desktop split header ⋯ menu (active, non-archived conversation only).
   const splitHeaderMenuItems = [
+    headerOnCopyLink && { id: 'copy-link', label: 'Copy chat link', onClick: headerOnCopyLink },
     headerOnRename && { id: 'rename', label: 'Rename chat', onClick: headerOnRename },
     headerOnArchive && { id: 'archive', label: 'Archive chat', onClick: headerOnArchive },
   ].filter(Boolean) as ActionsMenuItem[];
@@ -2054,6 +2064,7 @@ function EmbeddableChatInner({
         onRestore: headerOnRestore,
         onRename: headerOnRename,
         onArchive: headerOnArchive,
+        onCopyLink: headerOnCopyLink,
         onOpenArchive: headerOnOpenArchive,
       };
 
@@ -2283,6 +2294,7 @@ function EmbeddableChatInner({
                         onNewChat={handleNewChat}
                         onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                         onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
+                        onRequestCopyLink={mingoCaps.onCopyLink}
                         scope={dialogScope}
                         onScopeChange={setDialogScope}
                         searchQuery={mingoCaps.searchQuery}
@@ -2311,6 +2323,7 @@ function EmbeddableChatInner({
                       onNewChat={() => setComposeOpen(true)}
                       onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                       onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
+                      onRequestCopyLink={mingoCaps.onCopyLink}
                       scope={dialogScope}
                       onScopeChange={setDialogScope}
                       searchQuery={mingoCaps.searchQuery}

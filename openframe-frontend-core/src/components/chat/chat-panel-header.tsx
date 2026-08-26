@@ -45,6 +45,9 @@ export interface ChatPanelHeaderProps {
   onRename?: () => void;
   /** Archive — adds the "Archive chat" item to the ⋯ menu. */
   onArchive?: () => void;
+  /** Copy a shareable link to the open conversation — adds the "Copy chat link"
+   *  item to the ⋯ menu. The host owns the URL and the copy. */
+  onCopyLink?: () => void;
   /** Open the Chat Archive page — renders the clock button (list view only). */
   onOpenArchive?: () => void;
   /** Force the COMPACT (`h-14` desktop-style) bar at every width, skipping the
@@ -84,6 +87,7 @@ export function ChatPanelHeader({
   onRestore,
   onRename,
   onArchive,
+  onCopyLink,
   onOpenArchive,
   compact = false,
   onToggleSearch,
@@ -95,6 +99,7 @@ export function ChatPanelHeader({
   const searchInline = searchActive && !!onSearchChange;
   // Desktop ⋯ menu (active, non-archived conversation only) — rename / archive.
   const menuItems = [
+    onCopyLink && { id: 'copy-link', label: 'Copy chat link', onClick: onCopyLink },
     onRename && { id: 'rename', label: 'Rename chat', onClick: onRename },
     onArchive && { id: 'archive', label: 'Archive chat', onClick: onArchive },
   ].filter(Boolean) as ActionsMenuItem[];
@@ -117,6 +122,7 @@ export function ChatPanelHeader({
           onRestore={onRestore}
           onRename={onRename}
           onArchive={onArchive}
+          onCopyLink={onCopyLink}
           onOpenArchive={onOpenArchive}
         />
       )}
