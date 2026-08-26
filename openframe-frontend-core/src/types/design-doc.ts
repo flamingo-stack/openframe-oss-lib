@@ -141,6 +141,13 @@ export interface DesignDocLink {
   title: string | null
   display_order: number | null
   created_at: string
+  /** View-proxy path of THIS link's self-hosted artifact mirror
+   *  (`/api/storage/view/design-briefs/<artifact-uuid>.html`) when one
+   *  exists — resolved per artifact id from the link's url, so two
+   *  claude links on one doc each frame their OWN mirror. Transparent
+   *  frame source for `ClaudeEmbed srcOverride` (claude.ai cannot be
+   *  iframed). Null / absent = no mirror ingested for that artifact. */
+  embed_src?: string | null
   /**
    * A `roadmap_task` link, hydrated from the mirror as the ROADMAP item it is —
    * so it renders with the roadmap card, the same as `/roadmap` and the chat.
