@@ -92,6 +92,22 @@ export function toFigmaOriginalUrl(url: string): string {
  * real artifacts, 2026-08). A trailing `/embed` is accepted because that is the
  * url "Get embed code" hands the author.
  */
+/**
+ * The ONE rule for a host-provided embed mirror path (`ClaudeEmbed
+ * srcOverride`, the claude shortcode's mirror segment): a SAME-ORIGIN
+ * absolute path. Checked by BOTH the shortcode parser and the component
+ * (defense in depth — two call sites, one rule):
+ *   - starts with a single `/` — never `//host` (protocol-relative) and
+ *     never `/\host`: the WHATWG URL parser treats `\` like `/` in the
+ *     relative-slash state, so `/\evil.example` resolves CROSS-origin;
+ *   - no whitespace — real paths carry none, and a pipe-split TITLE
+ *     fragment that merely starts with `/` ("/api redesign") does, so it
+ *     stays a title instead of being swallowed as a bogus frame source.
+ */
+export function isSameOriginEmbedPath(value: string): boolean {
+  return /^\/(?![/\\])\S*$/.test(value)
+}
+
 export function toClaudeEmbedUrl(url: string | null | undefined): string | null {
   if (!url) return null
   try {

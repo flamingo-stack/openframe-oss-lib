@@ -5,6 +5,8 @@
  * is authored-content SSOT; chat surfaces never run this.
  */
 
+import { isSameOriginEmbedPath } from '../../../../utils/embed-url-converters';
+
 export const processShortcodes = (content: string): string => {
   let processedContent = content;
 
@@ -83,7 +85,7 @@ export const processShortcodes = (content: string): string => {
       const parts = String(rest).split('|');
       const url = parts[0];
       const last = parts.length > 1 ? parts[parts.length - 1].trim() : '';
-      const embedSrc = /^\/(?!\/)/.test(last) ? parts.pop()!.trim() : '';
+      const embedSrc = last && isSameOriginEmbedPath(last) ? parts.pop()!.trim() : '';
       const title = parts.slice(1).join('|').trim();
       const titleAttr = title ? ` data-title="${escapeAttr(title)}"` : '';
       const embedSrcAttr = embedSrc ? ` data-embed-src="${escapeAttr(embedSrc)}"` : '';

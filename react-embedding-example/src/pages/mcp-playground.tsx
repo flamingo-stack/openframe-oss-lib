@@ -115,9 +115,13 @@ export function McpPlaygroundPage() {
     // must not leave callTool talking to an already-closed transport.
     clientRef.current?.close().catch(() => {})
     clientRef.current = null
+    // Hoisted out of the try so the catch can close a client whose
+    // connect SUCCEEDED but whose listTools then threw — otherwise that
+    // session leaks (it was never installed in clientRef).
+    let client: Client | null = null
     try {
       const url = new URL(EP.mcp, window.location.origin)
-      const client = new Client({ name: 'react-embedding-example', version: '1.0.0' })
+      client = new Client({ name: 'react-embedding-example', version: '1.0.0' })
       await client.connect(new StreamableHTTPClientTransport(url))
       if (!mountedRef.current || attempt !== attemptRef.current) {
         // Unmounted or superseded mid-connect — don't install a transport
@@ -131,6 +135,7 @@ export function McpPlaygroundPage() {
       setSelectedTool(prev => prev || (listed.tools[0]?.name ?? ''))
       setStatus('ready')
     } catch (err) {
+      client?.close().catch(() => {})
       if (!mountedRef.current || attempt !== attemptRef.current) return
       setStatus('error')
       setStatusDetail(errText(err))
@@ -231,7 +236,11 @@ export function McpPlaygroundPage() {
           action,
           ...(p.conversationId ? { conversationId: p.conversationId } : {}),
         })
-        const s = result.structured as { status?: string; receipt?: string } | null
+        const s = result.structured as {
+          status?: string
+          receipt?: string
+          message?: string
+        } | null
         setDecisions(prev => ({
           ...prev,
           [p.proposalId]: {
@@ -245,7 +254,9 @@ export function McpPlaygroundPage() {
                 : s?.status === 'rejected'
                   ? 'rejected'
                   : 'cancelled',
-            text: s?.receipt ?? s?.status ?? (result.isError ? result.text : action),
+            // Prefer the server's honest copy ("This approval expired —
+            // …") over the bare status token it rides beside.
+            text: s?.receipt ?? s?.message ?? s?.status ?? (result.isError ? result.text : action),
           },
         }))
       } catch (err) {

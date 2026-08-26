@@ -4,7 +4,7 @@ import { ExternalLink } from 'lucide-react'
 import { Button } from '../ui/button/button'
 import { ClaudeIcon } from '../icons/claude-icon'
 import { EmbedViewerFrame } from './embed-viewer-frame'
-import { toClaudeEmbedUrl } from '../../utils/embed-url-converters'
+import { isSameOriginEmbedPath, toClaudeEmbedUrl } from '../../utils/embed-url-converters'
 
 export type ClaudeEmbedKind = 'artifact' | 'design'
 
@@ -52,14 +52,14 @@ const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
  * or an http host (mixed content — it will not paint on `http://localhost`).
  */
 export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy', srcOverride }: ClaudeEmbedProps) {
-  // A mirror is by contract a SAME-ORIGIN absolute path ('/…', never
-  // '//…' or a full url) — anything else is discarded, because whatever
-  // this component frames wears Claude-branded chrome, and every other
-  // frame source here is allow-listed (`toClaudeEmbedUrl` pins
-  // claude.ai/claude.site). Shape-checked again here even though the
-  // shortcode parser applies the same rule: the prop is public API and
-  // callers can pass it directly.
-  const mirrorSrc = srcOverride && /^\/(?!\/)/.test(srcOverride) ? srcOverride : null
+  // A mirror is by contract a SAME-ORIGIN absolute path — anything else
+  // is discarded, because whatever this component frames wears
+  // Claude-branded chrome, and every other frame source here is
+  // allow-listed (`toClaudeEmbedUrl` pins claude.ai/claude.site). The
+  // rule lives ONCE in `isSameOriginEmbedPath` (incl. the `/\host`
+  // WHATWG backslash trap) and is checked BOTH here and in the shortcode
+  // parser: the prop is public API and callers can pass it directly.
+  const mirrorSrc = srcOverride && isSameOriginEmbedPath(srcOverride) ? srcOverride : null
   const embedUrl = mirrorSrc ?? toClaudeEmbedUrl(url)
   return (
     <EmbedViewerFrame

@@ -110,7 +110,7 @@ export function EmbedViewerFrame({
     <div
       ref={frameRef}
       className={cn(
-        'space-y-4',
+        'space-y-[var(--spacing-system-mf)]',
         className,
         // Fullscreen paints its own ground (the fullscreened element
         // otherwise sits on the UA's black backdrop) and scrolls itself.

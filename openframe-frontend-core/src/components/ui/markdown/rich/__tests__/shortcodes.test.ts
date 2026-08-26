@@ -131,6 +131,17 @@ describe('processShortcodes design-doc embeds', () => {
     expect(protoRelative).not.toContain('data-embed-src');
     const scheme = processShortcodes('{{claude-artifact:https://claude.ai/a|T|javascript:alert(1)}}');
     expect(scheme).not.toContain('data-embed-src');
+    // The WHATWG backslash trap: `/\host` parses as an AUTHORITY (like
+    // `//host`), so it must be rejected exactly like protocol-relative.
+    const backslash = processShortcodes(
+      '{{claude-artifact:https://claude.ai/a|T|/\\evil.example/x.html}}',
+    );
+    expect(backslash).not.toContain('data-embed-src');
+    // A TITLE that merely starts with `/` (contains whitespace) stays a
+    // title — it is prose, not a path.
+    const slashTitle = processShortcodes('{{claude-artifact:https://claude.ai/a|/api redesign}}');
+    expect(slashTitle).toContain('data-title="/api redesign"');
+    expect(slashTitle).not.toContain('data-embed-src');
   });
 
   it('escapes the url attribute so a crafted link cannot break out of the block', () => {
