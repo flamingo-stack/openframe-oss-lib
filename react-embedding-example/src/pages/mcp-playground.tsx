@@ -403,7 +403,7 @@ export function McpPlaygroundPage() {
         {selectedSchema != null && (
           <details className="text-badge text-ods-text-secondary">
             <summary className="cursor-pointer">input schema</summary>
-            <pre className="mt-[var(--spacing-system-xxs)] overflow-x-auto rounded-md bg-ods-bg p-[var(--spacing-system-xsf)]">{JSON.stringify(selectedSchema, null, 2)}</pre>
+            <pre className="mt-[var(--spacing-system-xxs)] overflow-x-auto rounded-md bg-ods-bg p-[var(--spacing-system-xsf)] text-code">{JSON.stringify(selectedSchema, null, 2)}</pre>
           </details>
         )}
         {callOutput && (
