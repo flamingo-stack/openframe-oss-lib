@@ -91,63 +91,12 @@ describe('processShortcodes design-doc embeds', () => {
     expect(design).toContain('data-kind="design"');
   });
 
-  it('threads the optional title and mirror segments into data attributes', () => {
+  it('threads the optional pipe title into data-title', () => {
     const titled = processShortcodes('{{claude-artifact:https://claude.ai/a|Brief doc}}');
     expect(titled).toContain('data-title="Brief doc"');
-    expect(titled).not.toContain('data-embed-src');
 
-    const mirrored = processShortcodes(
-      '{{claude-artifact:https://claude.ai/a|Brief doc|/api/storage/view/design-briefs/x.html}}',
-    );
-    expect(mirrored).toContain('data-title="Brief doc"');
-    expect(mirrored).toContain('data-embed-src="/api/storage/view/design-briefs/x.html"');
-
-    // Untitled mirror: the empty title slot is skipped, the mirror still rides.
-    const untitled = processShortcodes(
-      '{{claude-artifact:https://claude.ai/a||/api/storage/view/design-briefs/x.html}}',
-    );
+    const untitled = processShortcodes('{{claude-artifact:https://claude.ai/a}}');
     expect(untitled).not.toContain('data-title');
-    expect(untitled).toContain('data-embed-src="/api/storage/view/design-briefs/x.html"');
-  });
-
-  it('recognizes the mirror segment by path SHAPE, never by pipe position', () => {
-    // A pre-existing title containing `|` stays a title — nothing is framed.
-    const pipeTitle = processShortcodes('{{claude-artifact:https://claude.ai/a|Design | v2}}');
-    expect(pipeTitle).toContain('data-title="Design | v2"');
-    expect(pipeTitle).not.toContain('data-embed-src');
-
-    // Pipe title AND a mirror: the path-shaped tail is the mirror, the rest is the title.
-    const both = processShortcodes(
-      '{{claude-artifact:https://claude.ai/a|Design | v2|/api/storage/view/design-briefs/x.html}}',
-    );
-    expect(both).toContain('data-title="Design | v2"');
-    expect(both).toContain('data-embed-src="/api/storage/view/design-briefs/x.html"');
-
-    // Non-path tails (absolute urls, protocol-relative, schemes) are NEVER a
-    // frame source — they fold into the title as plain text.
-    const evil = processShortcodes('{{claude-artifact:https://claude.ai/a|T|https://evil.example}}');
-    expect(evil).not.toContain('data-embed-src');
-    const protoRelative = processShortcodes('{{claude-artifact:https://claude.ai/a|T|//evil.example}}');
-    expect(protoRelative).not.toContain('data-embed-src');
-    const scheme = processShortcodes('{{claude-artifact:https://claude.ai/a|T|javascript:alert(1)}}');
-    expect(scheme).not.toContain('data-embed-src');
-    // The WHATWG backslash trap: `/\host` parses as an AUTHORITY (like
-    // `//host`), so it must be rejected exactly like protocol-relative.
-    const backslash = processShortcodes(
-      '{{claude-artifact:https://claude.ai/a|T|/\\evil.example/x.html}}',
-    );
-    expect(backslash).not.toContain('data-embed-src');
-    // A TITLE that merely starts with `/` (contains whitespace) stays a
-    // title — it is prose, not a path.
-    const slashTitle = processShortcodes('{{claude-artifact:https://claude.ai/a|/api redesign}}');
-    expect(slashTitle).toContain('data-title="/api redesign"');
-    expect(slashTitle).not.toContain('data-embed-src');
-
-    // A TWO-segment form is always `URL|TITLE` — a mirror needs its own
-    // (third) slot, so even a whitespace-free path-shaped title survives.
-    const pathTitle = processShortcodes('{{claude-artifact:https://claude.ai/a|/roadmap}}');
-    expect(pathTitle).toContain('data-title="/roadmap"');
-    expect(pathTitle).not.toContain('data-embed-src');
   });
 
   it('escapes the url attribute so a crafted link cannot break out of the block', () => {

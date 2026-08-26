@@ -334,6 +334,7 @@ export {
   type ContentRefGridSize,
 } from './content-ref-groups'
 export { extractItems, extractItemId } from './extract-items'
+export { FullscreenSwitchController, type FullscreenSwitchOptions } from './fullscreen-switch'
 export { buildSuggestionUrl, type SuggestionUrlOptions } from './suggestion-url'
 
 // Embedder-configurable content-URL composer for the existing

@@ -5,8 +5,6 @@
  * is authored-content SSOT; chat surfaces never run this.
  */
 
-import { isSameOriginEmbedPath } from '../../../../utils/embed-url-converters';
-
 export const processShortcodes = (content: string): string => {
   let processedContent = content;
 
@@ -70,33 +68,12 @@ export const processShortcodes = (content: string): string => {
     // Claude artifact / Claude Design: {{claude-artifact:URL}} / {{claude-design:URL}}
     // — the same shape as figma, so a Claude link is a markdown BLOCK wherever
     // markdown renders, never a bespoke card one surface hand-assembles.
-    // `{{claude-artifact:URL}}` / `{{claude-artifact:URL|Name}}` /
-    // `{{claude-artifact:URL|Name|EMBED_SRC}}` — the optional name after the
-    // first pipe is the ONLY source of a real title (claude.ai serves one
-    // og:title for every artifact); the optional LAST segment is a
-    // host-provided mirror path framed INSTEAD of claude.ai (`ClaudeEmbed
-    // srcOverride` — claude.ai frame-locks artifacts, so hosts that keep a
-    // serving copy thread it through here and there is ONE Claude mount for
-    // rails and prose alike). The mirror segment is recognized by SHAPE — a
-    // same-origin absolute path (`/…`, not `//…`) — never by position, so a
-    // pre-existing title containing `|` keeps rendering as a title instead of
-    // being silently swallowed as a bogus frame source.
-    .replace(/\{\{claude-(artifact|design):([^}]+)\}\}/g, (match, kind, rest) => {
-      const parts = String(rest).split('|');
-      const url = parts[0];
-      // A mirror needs its OWN slot: emitters always write the title slot
-      // even when empty (`URL||SRC` — see the hub's buildEmbedMarkdown),
-      // so a two-segment form is ALWAYS `URL|TITLE`, and a path-shaped
-      // title there ("/roadmap") stays a title. The residual ambiguity —
-      // a THREE-segment form whose title tail is itself path-shaped
-      // ("API|/v2") — is accepted: it fails safe (same-origin 404 empty
-      // state, never cross-origin).
-      const last = parts.length > 2 ? parts[parts.length - 1].trim() : '';
-      const embedSrc = last && isSameOriginEmbedPath(last) ? parts.pop()!.trim() : '';
-      const title = parts.slice(1).join('|').trim();
-      const titleAttr = title ? ` data-title="${escapeAttr(title)}"` : '';
-      const embedSrcAttr = embedSrc ? ` data-embed-src="${escapeAttr(embedSrc)}"` : '';
-      return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"${titleAttr}${embedSrcAttr}></div>\n\n`;
+    // `{{claude-artifact:URL}}` or `{{claude-artifact:URL|Name}}` — the optional
+    // name after the pipe is the ONLY source of a real title (claude.ai serves
+    // one og:title for every artifact), so the block carries it through.
+    .replace(/\{\{claude-(artifact|design):([^|}]+)(?:\|([^}]*))?\}\}/g, (match, kind, url, title) => {
+      const titleAttr = title && title.trim() ? ` data-title="${escapeAttr(title.trim())}"` : '';
+      return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"${titleAttr}></div>\n\n`;
     })
     // LinkedIn embeds: {{linkedin:POST_URL}}
     .replace(/\{\{linkedin:([^}]+)\}\}/g, (match, url) => {

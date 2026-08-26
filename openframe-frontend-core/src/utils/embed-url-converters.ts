@@ -77,19 +77,38 @@ export function toFigmaOriginalUrl(url: string): string {
 }
 
 /**
- * The ONE rule for a host-provided embed mirror path (`ClaudeEmbed
- * srcOverride`, the claude shortcode's mirror segment): a SAME-ORIGIN
- * absolute path. Checked by BOTH the shortcode parser and the component
- * (defense in depth — two call sites, one rule):
- *   - starts with a single `/` — never `//host` (protocol-relative) and
- *     never `/\host`: the WHATWG URL parser treats `\` like `/` in the
- *     relative-slash state, so `/\evil.example` resolves CROSS-origin;
- *   - no whitespace — real paths carry none, and a pipe-split TITLE
- *     fragment that merely starts with `/` ("/api redesign") does, so it
- *     stays a title instead of being swallowed as a bogus frame source.
+ * The self-hosted MIRROR path for a claude artifact url — the whole
+ * mirror mechanism is UNDER THE HOOD: the viewer detects a claude url,
+ * DERIVES the host's storage-view proxy path from the artifact's own id,
+ * and frames the downloaded copy from there. No per-link data, no props,
+ * no shortcode changes — 100% transparent to every consumer.
+ *
+ * `null` when the url carries no artifact id (nothing to mirror). The
+ * derived path is same-origin by construction (a constant prefix + a
+ * validated uuid), so it is safe as a frame source without further
+ * checks. KEEP THE PATH SHAPE IN SYNC with the hub's
+ * `lib/data/design-brief-mirror.cjs` (bucket + `<uuid>.html` naming) —
+ * that module owns the ingest/audit half of this contract.
  */
-export function isSameOriginEmbedPath(value: string): boolean {
-  return /^\/(?![/\\])\S*$/.test(value)
+export function toClaudeMirrorPath(url: string | null | undefined): string | null {
+  if (!url) return null
+  try {
+    const u = new URL(url)
+    const host = u.hostname.toLowerCase()
+    const id =
+      (host === 'claude.ai' &&
+        /^\/(?:code\/artifact|public\/artifacts)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?#]|$)/i.exec(
+          u.pathname,
+        )?.[1]) ||
+      (host === 'claude.site' &&
+        /^\/artifacts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?#]|$)/i.exec(
+          u.pathname,
+        )?.[1]) ||
+      null
+    return id ? `/api/storage/view/design-briefs/${id.toLowerCase()}.html` : null
+  } catch {
+    return null
+  }
 }
 
 /**

@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { FullscreenSwitchController } from '../../utils/fullscreen-switch'
 import { Button } from '../ui/button/button'
 import { EmbedIframe } from './embed-iframe'
 
@@ -77,34 +78,28 @@ export function EmbedViewerFrame({
   const frameRef = useRef<HTMLDivElement>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
-  // Track the DOCUMENT's fullscreen element rather than local intent —
-  // Esc, F11, and programmatic exits all land here, so the icon can
-  // never desync from reality.
+  // ONE fullscreen implementation across the library and its hosts:
+  // `FullscreenSwitchController` (shared with the hub's deck) owns the
+  // Fullscreen API calls, webkit fallbacks, rejection safety, and the
+  // change-event-driven state — Esc, F11, buttons and browser chrome all
+  // converge on its listener, so the icon can never desync. Here it runs
+  // element-level (`target` = this frame; no mask classes — the frame
+  // styles off its own state).
+  const controllerRef = useRef<FullscreenSwitchController | null>(null)
   useEffect(() => {
     if (!fullscreenControl) return
-    const onChange = () => setIsFullscreen(document.fullscreenElement === frameRef.current)
-    document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
-  }, [fullscreenControl])
-
-  const toggleFullscreen = useCallback(() => {
-    const el = frameRef.current
-    if (!el) return
-    // Denials arrive BOTH ways: `requestFullscreen` throws synchronously
-    // on some engines and returns a REJECTED promise on others (e.g. the
-    // Fullscreen permissions policy when this component is itself inside
-    // an embedder's iframe without `allow="fullscreen"`). Swallow both —
-    // the button is a convenience; an unhandled rejection is not.
-    try {
-      if (document.fullscreenElement === el) {
-        document.exitFullscreen().catch(() => {})
-      } else {
-        el.requestFullscreen().catch(() => {})
-      }
-    } catch {
-      // Fullscreen API unavailable (old WebKit) — fail silently.
+    const controller = new FullscreenSwitchController({
+      target: () => frameRef.current,
+      onFullscreenChange: setIsFullscreen,
+    })
+    controllerRef.current = controller
+    controller.attach()
+    return () => {
+      controllerRef.current = null
+      controller.detach()
     }
-  }, [])
+  }, [fullscreenControl])
+  const toggleFullscreen = () => controllerRef.current?.toggle()
 
   return (
     <div

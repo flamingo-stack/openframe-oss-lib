@@ -395,15 +395,6 @@ const URL_ATTRS = new Set([
   'data',
   'action',
   'background',
-  // The claude shortcode's mirror path — it becomes an <iframe src>
-  // (`ClaudeEmbed srcOverride`), so it gets the same scheme check as
-  // every other URL sink even though the component ALSO shape-validates
-  // it to a same-origin path (defense in depth). KEY SHAPE MATTERS: the
-  // strip pass sees HAST PROPERTY keys, and property-information
-  // camelizes `data-embed-src` to `dataEmbedSrc` — so the entry must be
-  // the LOWERCASED PROPERTY name (`dataembedsrc`), not the attribute
-  // name, or the check silently never runs.
-  'dataembedsrc',
   // The embed shortcodes' primary url (`data-url` → `dataUrl`) — it
   // becomes an anchor href ("Open in Claude") and a link-preview fetch
   // target, so a `javascript:`/`data:` scheme there is a live sink too.

@@ -1,10 +1,11 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { Button } from '../ui/button/button'
 import { ClaudeIcon } from '../icons/claude-icon'
 import { EmbedViewerFrame } from './embed-viewer-frame'
-import { isSameOriginEmbedPath, toClaudeEmbedUrl } from '../../utils/embed-url-converters'
+import { toClaudeEmbedUrl, toClaudeMirrorPath } from '../../utils/embed-url-converters'
 
 export type ClaudeEmbedKind = 'artifact' | 'design'
 
@@ -19,14 +20,6 @@ export interface ClaudeEmbedProps {
   height?: string
   /** iframe loading strategy. Defaults to `lazy`, as `FigmaEmbed` does. */
   loading?: 'eager' | 'lazy'
-  /** Self-hosted mirror of the artifact to FRAME instead of claude.ai.
-   *  claude.ai frame-locks Claude CODE artifact urls entirely and serves
-   *  public artifacts only to author-allow-listed hosts — when the host
-   *  app keeps its own serving copy (e.g. the hub's design-briefs store),
-   *  it passes that path here. The frame shows the mirror; the "Open in
-   *  Claude" action still targets `url`, so commenting stays on
-   *  claude.ai. Wins over `toClaudeEmbedUrl(url)` when set. */
-  srcOverride?: string | null
 }
 
 const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
@@ -41,25 +34,48 @@ const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
  * `{{claude-artifact:URL}}` / `{{claude-design:URL}}` shortcodes, so it looks
  * identical wherever markdown renders — a spec body, a comment, a links rail.
  *
- * A PUBLISHED artifact frames through its `/embed` route (`toClaudeEmbedUrl`).
- * Everything else has no embeddable route at all, and then `src` is null and
- * the shared frame shows its own empty state — the action stays either way, so
- * the artifact is always one click away.
+ * FRAME SOURCE — fully under the hood, in priority order:
+ *   1. The host's SELF-HOSTED MIRROR: the url's artifact id derives the
+ *      storage-view proxy path (`toClaudeMirrorPath`), probed with a
+ *      1-byte ranged fetch. When the host has ingested a copy, the frame
+ *      shows it — claude.ai frame-locks CODE artifacts entirely, so this
+ *      is the only way those ever render inline.
+ *   2. claude.ai's own `/embed` route for a PUBLISHED artifact
+ *      (`toClaudeEmbedUrl`).
+ *   3. Neither → the shared frame's empty state.
+ * The consumer passes only the claude URL; "Open in Claude" always
+ * targets it, so commenting stays on claude.ai.
  *
- * What defeats the frame: a Claude CODE url (no Embed settings exist for it,
- * and its `/embed` path answers `frame-ancestors 'self'`), a Claude Design url
- * (no embed route), an artifact whose author has not allow-listed this host,
- * or an http host (mixed content — it will not paint on `http://localhost`).
+ * What defeats the claude.ai leg: a Claude CODE url (no Embed settings
+ * exist for it, and its `/embed` path answers `frame-ancestors 'self'`),
+ * a Claude Design url (no embed route), an artifact whose author has not
+ * allow-listed this host, or an http host (mixed content).
  */
-export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy', srcOverride }: ClaudeEmbedProps) {
-  // A mirror is by contract a SAME-ORIGIN absolute path — anything else
-  // is discarded, because whatever this component frames wears
-  // Claude-branded chrome, and every other frame source here is
-  // allow-listed (`toClaudeEmbedUrl` pins claude.ai/claude.site). The
-  // rule lives ONCE in `isSameOriginEmbedPath` (incl. the `/\host`
-  // WHATWG backslash trap) and is checked BOTH here and in the shortcode
-  // parser: the prop is public API and callers can pass it directly.
-  const mirrorSrc = srcOverride && isSameOriginEmbedPath(srcOverride) ? srcOverride : null
+export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy' }: ClaudeEmbedProps) {
+  // Mirror detection is TRANSPARENT: derive the proxy path from the url's
+  // own artifact id and probe it (1-byte ranged GET — the proxy forwards
+  // Range, so this costs nothing). Exists → frame the mirror; otherwise
+  // the claude.ai fallback below is exactly the pre-mirror behavior. The
+  // derived path is same-origin by construction (constant prefix +
+  // validated uuid), so no further vetting is needed.
+  const mirrorPath = toClaudeMirrorPath(url)
+  const [mirrorSrc, setMirrorSrc] = useState<string | null>(null)
+  useEffect(() => {
+    setMirrorSrc(null)
+    if (!mirrorPath) return
+    let cancelled = false
+    fetch(mirrorPath, { headers: { Range: 'bytes=0-0' } })
+      .then(res => {
+        if (!cancelled && (res.ok || res.status === 206)) setMirrorSrc(mirrorPath)
+      })
+      .catch(() => {
+        // No proxy on this host / network blip — the claude.ai fallback
+        // stands, same as before mirrors existed.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mirrorPath])
   const embedUrl = mirrorSrc ?? toClaudeEmbedUrl(url)
   return (
     <EmbedViewerFrame
@@ -94,11 +110,11 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
       // sandboxed. Omitting `allow-top-navigation` is the point: an artifact
       // cannot navigate the page it is embedded in. The `allow-same-origin`
       // token is CONDITIONAL on where the frame points:
-      //   - claude.ai `/embed` (no srcOverride): Anthropic's own embed
-      //     snippet uses it, and on a CROSS-ORIGIN frame it grants the
-      //     frame claude.ai's origin — never ours. The artifact runtime
-      //     needs it (storage, postMessage handshake).
-      //   - a `srcOverride` mirror is served from the HOST's OWN origin —
+      //   - claude.ai `/embed` (no mirror): Anthropic's own embed snippet
+      //     uses it, and on a CROSS-ORIGIN frame it grants the frame
+      //     claude.ai's origin — never ours. The artifact runtime needs
+      //     it (storage, postMessage handshake).
+      //   - the derived MIRROR is served from the HOST's OWN origin —
       //     `allow-same-origin` + `allow-scripts` there would be a no-op
       //     sandbox handing the artifact first-party cookies and
       //     `window.parent`. A static mirror renders fine from an opaque
