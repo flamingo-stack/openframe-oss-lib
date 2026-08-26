@@ -20,6 +20,7 @@ import org.springframework.validation.annotation.Validated;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.sso.SSOConfig.OPENFRAME_PROVIDER;
 import static java.lang.Boolean.TRUE;
 
 @Slf4j
@@ -44,6 +45,8 @@ public class SSOConfigService {
         log.debug("Getting enabled SSO providers");
 
         return ssoConfigRepository.findByEnabledTrue().stream()
+                // The built-in login's toggle document is not an external SSO provider.
+                .filter(config -> !OPENFRAME_PROVIDER.equals(config.getProvider()))
                 .map(config -> SSOConfigStatusResponse.builder()
                         .provider(config.getProvider())
                         .enabled(true)
@@ -62,6 +65,9 @@ public class SSOConfigService {
      * Always returns a valid response object, even if configuration doesn't exist
      */
     public SSOConfigResponse getConfig(String provider) {
+        if (OPENFRAME_PROVIDER.equals(provider)) {
+            return openframeLoginConfig();
+        }
         return ssoConfigRepository.findByProvider(provider)
                 .map(config -> ssoConfigMapper.toResponse(
                         config,
@@ -118,6 +124,10 @@ public class SSOConfigService {
     }
 
     public void toggleEnabled(String provider, boolean enabled) {
+        if (OPENFRAME_PROVIDER.equals(provider)) {
+            toggleOpenframeLogin(enabled);
+            return;
+        }
         ssoConfigRepository.findByProvider(provider)
                 .ifPresent(config -> {
                     config.setEnabled(enabled);
@@ -127,6 +137,35 @@ public class SSOConfigService {
 
                     ssoConfigProcessor.postProcessConfigToggled(savedConfig);
                 });
+    }
+
+    /**
+     * The built-in OpenFrame (password) login has no client credentials — its config document
+     * exists purely as the per-tenant on/off switch, so unlike external providers the toggle
+     * creates the document on first use. No document means enabled.
+     */
+    private void toggleOpenframeLogin(boolean enabled) {
+        SSOConfig config = ssoConfigRepository.findByProvider(OPENFRAME_PROVIDER)
+                .orElseGet(() -> {
+                    SSOConfig created = new SSOConfig();
+                    created.setProvider(OPENFRAME_PROVIDER);
+                    return created;
+                });
+        config.setEnabled(enabled);
+        SSOConfig savedConfig = ssoConfigRepository.save(config);
+        log.info("Successfully {} OpenFrame login", enabled ? "enabled" : "disabled");
+
+        ssoConfigProcessor.postProcessConfigToggled(savedConfig);
+    }
+
+    private SSOConfigResponse openframeLoginConfig() {
+        boolean enabled = ssoConfigRepository.findByProvider(OPENFRAME_PROVIDER)
+                .map(SSOConfig::isEnabled)
+                .orElse(true);
+        return SSOConfigResponse.builder()
+                .provider(OPENFRAME_PROVIDER)
+                .enabled(enabled)
+                .build();
     }
 
     private void validateAutoProvision(String provider, SSOConfigRequest request) {

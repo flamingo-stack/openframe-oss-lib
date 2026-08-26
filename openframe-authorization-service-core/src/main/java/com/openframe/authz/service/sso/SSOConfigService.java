@@ -74,14 +74,29 @@ public class SSOConfigService {
      */
     public List<String> getEffectiveProvidersForTenant(String tenantId) {
         Set<String> result = new LinkedHashSet<>();
-        
+
         for (SSOPerTenantConfig cfg : getActiveForTenant(tenantId)) {
                 result.add(cfg.getProvider().toLowerCase());
         }
 
        result.addAll(getDefaultProviders());
 
+        // The built-in login's toggle document is not an OIDC provider.
+        result.remove(SSOConfig.OPENFRAME_PROVIDER);
+
         return new ArrayList<>(result);
+    }
+
+    /**
+     * Whether the built-in OpenFrame (password) login is enabled for the tenant. Controlled by a
+     * pseudo-provider document ({@link SSOConfig#OPENFRAME_PROVIDER}) in {@code sso_configs};
+     * absence means enabled — the toggle only ever opts a tenant out.
+     */
+    public boolean isOpenframeLoginEnabled(String tenantId) {
+        return ssoPerTenantConfigRepository
+                .findFirstByTenantIdAndProvider(localTenant ? null : tenantId, SSOConfig.OPENFRAME_PROVIDER)
+                .map(SSOConfig::isEnabled)
+                .orElse(true);
     }
 
     public List<String> getDefaultProviders() {

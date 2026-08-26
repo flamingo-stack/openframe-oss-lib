@@ -4,6 +4,7 @@ import com.openframe.authz.dto.TenantDiscoveryResponse;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.document.tenant.Tenant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +26,7 @@ import static java.util.Locale.ROOT;
 @RequiredArgsConstructor
 public class TenantDiscoveryService {
 
-    private static final String DEFAULT_PROVIDER = "openframe-sso";
+    private static final String OPENFRAME_PROVIDER = SSOConfig.OPENFRAME_PROVIDER;
     private final UserService userService;
     private final TenantService tenantService;
     private final SSOConfigService ssoConfigService;
@@ -99,7 +100,9 @@ public class TenantDiscoveryService {
         List<String> ssoProviders = ssoConfigService.getEffectiveProvidersForTenant(localTenant ? null : tenant.getId());
 
         List<String> providers = new ArrayList<>(ssoProviders);
-        providers.add(DEFAULT_PROVIDER);
+        if (ssoConfigService.isOpenframeLoginEnabled(tenant.getId())) {
+            providers.add(OPENFRAME_PROVIDER);
+        }
 
         return providers.stream()
                 .filter(p -> p != null && !p.isBlank())
