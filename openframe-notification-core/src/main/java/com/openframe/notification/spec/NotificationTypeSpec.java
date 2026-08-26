@@ -33,6 +33,11 @@ public interface NotificationTypeSpec<S extends NotificationSeed> {
         return Set.of();
     }
 
+    // iOS action-button set, delivered as aps.category; empty = plain banner.
+    default Optional<String> getPushCategory() {
+        return Optional.empty();
+    }
+
     // Transitional — deleted together with the legacy context classes; do not build on it.
     NotificationContext buildLegacyContext(S seed);
 }

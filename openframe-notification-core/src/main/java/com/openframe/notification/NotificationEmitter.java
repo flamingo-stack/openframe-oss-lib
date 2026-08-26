@@ -58,9 +58,11 @@ public class NotificationEmitter {
         NotificationContext legacyContext = spec.buildLegacyContext(typed);
         NotificationSeverity severity = spec.getSeverity();
         NotificationType specType = spec.getType();
+        String pushCategory = spec.getPushCategory().orElse(null);
         return NotificationCommand.builder()
                 .type(specType)
                 .attributes(attributes)
+                .pushCategory(pushCategory)
                 .title(title)
                 .description(description)
                 .severity(severity)
