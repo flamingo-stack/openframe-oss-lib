@@ -6,7 +6,6 @@ import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSeverity;
 
 import java.util.Optional;
-import java.util.Set;
 
 public interface NotificationTypeSpec<S extends NotificationSeed> {
 
@@ -29,9 +28,8 @@ public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     String composeDescription(S seed);
 
-    default Set<AttrKey> getPushActionKeys() {
-        return Set.of();
-    }
+    // iOS action-button set, delivered as aps.category; empty = plain banner.
+    Optional<String> getApplePushCategory();
 
     // Transitional — deleted together with the legacy context classes; do not build on it.
     NotificationContext buildLegacyContext(S seed);

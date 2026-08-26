@@ -20,6 +20,8 @@ enum NotificationSettingGroup {
 
 type NotificationTypeSetting {
     group: NotificationSettingGroup!
+    "Ready-to-render checkbox caption — a new group ships its own label, the client never maps the enum."
+    label: String!
     enabled: Boolean!
 }
 

@@ -1,9 +1,9 @@
 package com.openframe.api.integration.support;
 
-import com.openframe.api.service.DeviceFilterOptionMapper;
-import com.openframe.api.service.DeviceService;
+import com.openframe.api.mapper.DeviceFilterOptionMapper;
+import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
-import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
+import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import org.mockito.Mockito;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.repository.device.MachineRepository;
@@ -47,8 +47,8 @@ public class DeviceServiceIntegrationTestApplication {
     }
 
     @Bean
-    ScriptScheduleDeviceService scriptScheduleDeviceService() {
-        return Mockito.mock(ScriptScheduleDeviceService.class);
+    ScheduleScriptDeviceService scriptScheduleDeviceService() {
+        return Mockito.mock(ScheduleScriptDeviceService.class);
     }
 
     @Bean

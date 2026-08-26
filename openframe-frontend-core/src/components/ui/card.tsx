@@ -11,7 +11,10 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-sm",
+      // `border` with NO color token resolves to `currentColor` — on a dark card
+      // with light text that paints a WHITE outline. Every ODS surface borders
+      // on `--color-border`; say so.
+      "rounded-lg border border-ods-border bg-card text-card-foreground shadow-sm",
       className
     )}
     {...props}

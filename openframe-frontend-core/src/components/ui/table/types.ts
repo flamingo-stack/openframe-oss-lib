@@ -240,6 +240,8 @@ export interface TableCellProps {
 export interface TableCardSkeletonProps {
   columns: TableColumn[]
   rows?: number // Number of skeleton rows to display (default: 10)
+  /** Match a `compact` table's row height, so the first paint does not jump. */
+  compact?: boolean
   hasActions?: boolean
   hasChevron?: boolean
   className?: string
