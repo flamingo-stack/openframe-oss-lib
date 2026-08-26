@@ -79,12 +79,45 @@ class NotificationSettingsServiceTest {
                 .extracting(NotificationTypeSetting::getGroup, NotificationTypeSetting::getLabel)
                 .containsExactly(
                         tuple(NotificationSettingGroup.TICKET_ASSIGNED, "Ticket assigned"),
+                        tuple(NotificationSettingGroup.TICKET_CREATED, "Ticket created"),
                         tuple(NotificationSettingGroup.TICKET_STATUS_CHANGED, "Ticket status changed"),
                         tuple(NotificationSettingGroup.CUSTOMER_REPLIED, "Customer replied"),
                         tuple(NotificationSettingGroup.ADMIN_REPLIED, "Admin replied"),
                         tuple(NotificationSettingGroup.MINGO_MESSAGES, "New messages from Mingo"),
                         tuple(NotificationSettingGroup.APPROVAL_TICKET, "Approval required ticket"),
                         tuple(NotificationSettingGroup.APPROVAL_MINGO, "Approval required Mingo"));
+    }
+
+    @Test
+    @DisplayName("Given the ticket-created checkbox is muted, when settings are read, then only that group comes back disabled — a client opening a ticket is silenceable on its own, without touching the other ticket checkboxes")
+    void ticket_created_group_mutes_independently() {
+        when(repository.findByUserId("user-1")).thenReturn(Optional.of(NotificationSettings.builder()
+                .userId("user-1").enabled(true)
+                .mutedGroups(Set.of(NotificationSettingGroup.TICKET_CREATED))
+                .build()));
+
+        NotificationSettingsView view = service.get("user-1");
+
+        assertThat(view.getTypeSettings())
+                .extracting(NotificationTypeSetting::getGroup, NotificationTypeSetting::isEnabled)
+                .contains(tuple(NotificationSettingGroup.TICKET_CREATED, false),
+                        tuple(NotificationSettingGroup.TICKET_ASSIGNED, true),
+                        tuple(NotificationSettingGroup.TICKET_STATUS_CHANGED, true));
+    }
+
+    @Test
+    @DisplayName("Given the ticket-created checkbox is turned off, when settings are updated, then it is the entry persisted as muted — the new group survives a write round-trip like any other")
+    void ticket_created_group_persists_through_update() {
+        when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
+
+        service.update("user-1", true, List.of(
+                new NotificationTypeSettingInput(NotificationSettingGroup.TICKET_CREATED, false),
+                new NotificationTypeSettingInput(NotificationSettingGroup.TICKET_ASSIGNED, true)));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Set<NotificationSettingGroup>> muted = ArgumentCaptor.forClass(Set.class);
+        verify(repository).saveSettings(eq("user-1"), eq(true), muted.capture());
+        assertThat(muted.getValue()).containsExactly(NotificationSettingGroup.TICKET_CREATED);
     }
 
     @Test
