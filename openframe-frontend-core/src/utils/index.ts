@@ -177,9 +177,8 @@ export {
 // hub-side). Wire headers / storage key are unchanged (`X-Chat-*`,
 // `chat.proxy-auth.v1`) — those are server / deployment contracts. The
 // CLIENT-side rename frees non-chat surfaces from importing a
-// chat-prefixed symbol. Old chat-prefixed aliases are kept as
-// @deprecated re-exports at `components/chat/utils/chat-authed-fetch.ts`
-// + `chat-proxy-auth-storage.ts`.
+// chat-prefixed symbol; the old chat-prefixed aliases are DELETED —
+// these Embed* exports are the only names.
 export {
   embedAuthedFetch,
   setEmbedAuthAdapter,

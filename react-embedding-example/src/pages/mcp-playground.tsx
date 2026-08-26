@@ -14,14 +14,17 @@ import {
   StatusBadge,
   Textarea,
 } from '@flamingo-stack/openframe-frontend-core/components/ui'
+import { getEmbedProxyAuth } from '@flamingo-stack/openframe-frontend-core/utils'
 import { EP } from '../config/endpoints'
 
 /**
  * MCP Playground — drives the hub's MCP server (`/api/mcp`) through the
  * SAME reverse proxy every other surface here uses: the page talks to
- * `/content/api/mcp` same-origin, the proxy injects the platform API key +
- * act-as identity (proxy/inject.mjs), and the OFFICIAL MCP client SDK
- * does the protocol work. Nothing on this page holds a credential.
+ * `/content/api/mcp` same-origin. Credentials come from the `/debug`
+ * page's localStorage store (`getEmbedProxyAuth` — a platform API key +
+ * act-as email), attached client-side as `Authorization: Bearer` +
+ * `X-Chat-Act-As`; the proxy is a credential-free path rewriter and the
+ * OFFICIAL MCP client SDK does the protocol work.
  *
  * What it proves, end to end:
  *   - tools/list (the deployment source's capabilities)
@@ -133,9 +136,26 @@ export function McpPlaygroundPage() {
     // session leaks (it was never installed in clientRef).
     let client: Client | null = null
     try {
+      // Credentials from the /debug page's localStorage store — without
+      // them the hub will 401; say where to go instead of dialing anyway.
+      const auth = getEmbedProxyAuth()
+      if (!auth) {
+        setStatus('error')
+        setStatusDetail('no credentials — paste a platform API key on the /debug page')
+        return
+      }
       const url = new URL(EP.mcp, window.location.origin)
       client = new Client({ name: 'react-embedding-example', version: '1.0.0' })
-      await client.connect(new StreamableHTTPClientTransport(url))
+      await client.connect(
+        new StreamableHTTPClientTransport(url, {
+          requestInit: {
+            headers: {
+              Authorization: `Bearer ${auth.secret}`,
+              'X-Chat-Act-As': auth.email,
+            },
+          },
+        }),
+      )
       if (!mountedRef.current || attempt !== attemptRef.current) {
         // Unmounted or superseded mid-connect — don't install a transport
         // nobody closes.
@@ -300,8 +320,8 @@ export function McpPlaygroundPage() {
       <header className="space-y-[var(--spacing-system-xsf)]">
         <h1 className="text-h2">MCP Playground</h1>
         <p className="text-h6 text-ods-text-secondary">
-          Drives the hub&apos;s MCP server through the /content proxy (API key + act-as injected
-          server-side). Same endpoint, same tools a LangChain4j agent or Claude would see.
+          Drives the hub&apos;s MCP server through the /content proxy with the credentials from
+          the /debug page. Same endpoint, same tools a LangChain4j agent or Claude would see.
         </p>
         <div className="flex flex-wrap items-center gap-[var(--spacing-system-xsf)]">
           <StatusBadge
