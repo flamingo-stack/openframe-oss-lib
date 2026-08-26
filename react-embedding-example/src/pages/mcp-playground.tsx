@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
-import { Button } from '@flamingo-stack/openframe-frontend-core/components/ui'
+import { ApprovalRequestMessage } from '@flamingo-stack/openframe-frontend-core/components/chat'
+import { Button, Input, Textarea } from '@flamingo-stack/openframe-frontend-core/components/ui'
 import { EP } from '../config/endpoints'
 
 /**
@@ -16,6 +17,11 @@ import { EP } from '../config/endpoints'
  *   - search_docs raw retrieval
  *   - ANY write tool generically (create_ticket, create_clickup_task, …)
  *     → pending_approval card → confirm_proposal approve/reject
+ *
+ * The approval card IS the chat's own `ApprovalRequestMessage` — the MCP
+ * `pending_approval` payload is the chat's card payload by construction
+ * (`buildApprovalCardPayload`), and rendering it through the same
+ * component is the parity this page exists to demonstrate.
  *
  * The tool list is the DEPLOYMENT's — each platform's hub serves its own
  * source (point `.env` `HUB_ORIGIN` at a product-hub deployment to see the
@@ -57,10 +63,9 @@ function resultOf(raw: unknown): CallResult {
   }
 }
 
-const panel = 'rounded-lg border border-ods-border bg-ods-card p-4 space-y-3'
+const panel =
+  'rounded-lg border border-ods-border bg-ods-card p-[var(--spacing-system-mf)] space-y-[var(--spacing-system-sf)]'
 const label = 'text-h5 text-ods-text-secondary'
-const input =
-  'w-full rounded-md border border-ods-border bg-ods-bg px-3 py-2 text-sm text-ods-text-primary focus:outline-none focus:border-ods-border-focus'
 
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -68,6 +73,7 @@ function errText(err: unknown): string {
 
 export function McpPlaygroundPage() {
   const clientRef = useRef<Client | null>(null)
+  const mountedRef = useRef(true)
   const [status, setStatus] = useState<'connecting' | 'ready' | 'error'>('connecting')
   const [statusDetail, setStatusDetail] = useState('')
   const [tools, setTools] = useState<ToolInfo[]>([])
@@ -92,32 +98,46 @@ export function McpPlaygroundPage() {
 
   // approvals (from ask_guide AND generic calls)
   const [pending, setPending] = useState<PendingApproval[]>([])
-  const [decisions, setDecisions] = useState<Record<string, string>>({})
+  const [decisions, setDecisions] = useState<
+    Record<string, { status: 'approved' | 'rejected'; text: string }>
+  >({})
 
   const connect = useCallback(async () => {
     setStatus('connecting')
     setStatusDetail('')
     setTools([])
+    // Detach the old client BEFORE the async connect: a failed reconnect
+    // must not leave callTool talking to an already-closed transport.
     clientRef.current?.close().catch(() => {})
+    clientRef.current = null
     try {
       const url = new URL(EP.mcp, window.location.origin)
       const client = new Client({ name: 'react-embedding-example', version: '1.0.0' })
       await client.connect(new StreamableHTTPClientTransport(url))
+      if (!mountedRef.current) {
+        // Unmounted mid-connect — don't install a transport nobody closes.
+        client.close().catch(() => {})
+        return
+      }
       const listed = await client.listTools()
       clientRef.current = client
       setTools(listed.tools as ToolInfo[])
       setSelectedTool(prev => prev || (listed.tools[0]?.name ?? ''))
       setStatus('ready')
     } catch (err) {
+      if (!mountedRef.current) return
       setStatus('error')
       setStatusDetail(errText(err))
     }
   }, [])
 
   useEffect(() => {
+    mountedRef.current = true
     void connect()
     return () => {
+      mountedRef.current = false
       clientRef.current?.close().catch(() => {})
+      clientRef.current = null
     }
   }, [connect])
 
@@ -194,14 +214,11 @@ export function McpPlaygroundPage() {
     }
   }, [argsJson, callTool, selectedTool])
 
-  // Per-proposal in-flight guard: proposals are single-use (CAS-claimed),
-  // so a double-click's second confirm would lose the race and overwrite
-  // a SUCCESSFUL decision with "already handled".
-  const [decidingId, setDecidingId] = useState<string | null>(null)
+  // Per-card serialization is the approval component's own `isProcessing`
+  // (buttons disable while the handler's promise is pending); distinct
+  // proposals may decide concurrently — they race on distinct CAS rows.
   const decide = useCallback(
     async (p: PendingApproval, action: 'approve' | 'reject') => {
-      if (decidingId) return
-      setDecidingId(p.proposalId)
       try {
         const result = await callTool('confirm_proposal', {
           proposalId: p.proposalId,
@@ -211,18 +228,19 @@ export function McpPlaygroundPage() {
         const s = result.structured as { status?: string; receipt?: string } | null
         setDecisions(prev => ({
           ...prev,
-          [p.proposalId]: s?.receipt ?? s?.status ?? (result.isError ? result.text : action),
+          [p.proposalId]: {
+            status: s?.status === 'executed' ? 'approved' : 'rejected',
+            text: s?.receipt ?? s?.status ?? (result.isError ? result.text : action),
+          },
         }))
       } catch (err) {
         setDecisions(prev => ({
           ...prev,
-          [p.proposalId]: `Error: ${errText(err)}`,
+          [p.proposalId]: { status: 'rejected', text: `Error: ${errText(err)}` },
         }))
-      } finally {
-        setDecidingId(null)
       }
     },
-    [callTool, decidingId],
+    [callTool],
   )
 
   const selectedSchema = useMemo(
@@ -231,20 +249,20 @@ export function McpPlaygroundPage() {
   )
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 text-ods-text-primary">
-      <header className="space-y-2">
+    <div className="mx-auto max-w-5xl space-y-[var(--spacing-system-lf)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-xl)] text-ods-text-primary">
+      <header className="space-y-[var(--spacing-system-xsf)]">
         <h1 className="text-h2">MCP Playground</h1>
         <p className="text-sm text-ods-text-secondary">
           Drives the hub&apos;s MCP server through the /content proxy (secret + act-as injected
           server-side). Same endpoint, same tools a LangChain4j agent or Claude would see.
         </p>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-[var(--spacing-system-xsf)]">
           <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
+            className={`rounded-full px-[var(--spacing-system-sf)] py-[var(--spacing-system-xxs)] text-xs font-medium ${
               status === 'ready'
-                ? 'bg-ods-success/20 text-ods-success'
+                ? 'bg-ods-success-secondary text-ods-success'
                 : status === 'error'
-                  ? 'bg-ods-error/20 text-ods-error'
+                  ? 'bg-ods-error-secondary text-ods-error'
                   : 'bg-ods-card text-ods-text-secondary'
             }`}
           >
@@ -263,12 +281,12 @@ export function McpPlaygroundPage() {
       {tools.length > 0 && (
         <section className={panel}>
           <p className={label}>tools/list (this deployment&apos;s capabilities)</p>
-          <ul className="grid gap-2 sm:grid-cols-2">
+          <ul className="grid gap-[var(--spacing-system-xsf)] sm:grid-cols-2">
             {tools.map(t => (
-              <li key={t.name} className="rounded-md border border-ods-border p-3">
-                <p className="font-mono text-sm">{t.name}</p>
-                <p className="mt-1 line-clamp-3 text-xs text-ods-text-secondary">{t.description}</p>
-                <p className="mt-1 text-xs text-ods-text-secondary">
+              <li key={t.name} className="rounded-md border border-ods-border p-[var(--spacing-system-sf)]">
+                <p className="text-code">{t.name}</p>
+                <p className="mt-[var(--spacing-system-xxs)] line-clamp-3 text-xs text-ods-text-secondary">{t.description}</p>
+                <p className="mt-[var(--spacing-system-xxs)] text-xs text-ods-text-secondary">
                   {t.annotations?.readOnlyHint
                     ? 'read-only'
                     : t.annotations?.destructiveHint
@@ -283,8 +301,8 @@ export function McpPlaygroundPage() {
 
       <section className={panel}>
         <p className={label}>ask_guide {conversationId ? `· conversation ${conversationId.slice(0, 8)}…` : ''}</p>
-        <div className="flex gap-2">
-          <input className={input} value={question} onChange={e => setQuestion(e.target.value)} />
+        <div className="flex gap-[var(--spacing-system-xsf)]">
+          <Input value={question} onChange={e => setQuestion(e.target.value)} />
           <Button size="small-legacy" disabled={asking || status !== 'ready'} onClick={() => void ask()}>
             {asking ? 'Asking…' : 'Ask'}
           </Button>
@@ -295,8 +313,8 @@ export function McpPlaygroundPage() {
           )}
         </div>
         {answer !== null && (
-          <div className="space-y-1">
-            <div className="whitespace-pre-wrap rounded-md border border-ods-border bg-ods-bg p-3 text-sm">{answer}</div>
+          <div className="space-y-[var(--spacing-system-xxs)]">
+            <div className="whitespace-pre-wrap rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] text-sm">{answer}</div>
             <p className="text-xs text-ods-text-secondary">{citationCount} citation source(s)</p>
           </div>
         )}
@@ -304,9 +322,8 @@ export function McpPlaygroundPage() {
 
       <section className={panel}>
         <p className={label}>search_docs</p>
-        <div className="flex gap-2">
-          <input
-            className={input}
+        <div className="flex gap-[var(--spacing-system-xsf)]">
+          <Input
             placeholder="Full-text search the knowledge base"
             value={query}
             onChange={e => setQuery(e.target.value)}
@@ -320,9 +337,9 @@ export function McpPlaygroundPage() {
           </Button>
         </div>
         {searchResults.length > 0 && (
-          <ul className="space-y-2">
+          <ul className="space-y-[var(--spacing-system-xsf)]">
             {searchResults.map((r, i) => (
-              <li key={i} className="rounded-md border border-ods-border p-3">
+              <li key={i} className="rounded-md border border-ods-border p-[var(--spacing-system-sf)]">
                 <p className="text-sm font-medium">{String(r.title ?? '')}</p>
                 <p className="line-clamp-2 text-xs text-ods-text-secondary">{String(r.preview ?? '')}</p>
               </li>
@@ -333,8 +350,14 @@ export function McpPlaygroundPage() {
 
       <section className={panel}>
         <p className={label}>call any tool (write tools return pending proposals)</p>
-        <div className="flex flex-wrap gap-2">
-          <select className={`${input} !w-64`} value={selectedTool} onChange={e => setSelectedTool(e.target.value)}>
+        <div className="flex flex-wrap gap-[var(--spacing-system-xsf)]">
+          {/* Raw select on purpose: the kit's Select is the full Radix
+              popover stack — heavier than this single-control demo needs. */}
+          <select
+            className="w-64 rounded-md border border-ods-border bg-ods-bg px-[var(--spacing-system-sf)] py-[var(--spacing-system-xxs)] text-sm text-ods-text-primary focus:outline-none focus:border-ods-border-focus"
+            value={selectedTool}
+            onChange={e => setSelectedTool(e.target.value)}
+          >
             {tools.map(t => (
               <option key={t.name} value={t.name}>
                 {t.name}
@@ -345,8 +368,8 @@ export function McpPlaygroundPage() {
             {calling ? 'Calling…' : 'Call tool'}
           </Button>
         </div>
-        <textarea
-          className={`${input} min-h-24 font-mono text-xs`}
+        <Textarea
+          className="min-h-24 text-code"
           value={argsJson}
           onChange={e => setArgsJson(e.target.value)}
           spellCheck={false}
@@ -354,12 +377,12 @@ export function McpPlaygroundPage() {
         {selectedSchema != null && (
           <details className="text-xs text-ods-text-secondary">
             <summary className="cursor-pointer">input schema</summary>
-            <pre className="mt-1 overflow-x-auto rounded-md bg-ods-bg p-2">{JSON.stringify(selectedSchema, null, 2)}</pre>
+            <pre className="mt-[var(--spacing-system-xxs)] overflow-x-auto rounded-md bg-ods-bg p-[var(--spacing-system-xsf)]">{JSON.stringify(selectedSchema, null, 2)}</pre>
           </details>
         )}
         {callOutput && (
           <pre
-            className={`overflow-x-auto rounded-md border p-3 text-xs ${
+            className={`overflow-x-auto rounded-md border p-[var(--spacing-system-sf)] text-xs ${
               callOutput.isError ? 'border-ods-error text-ods-error' : 'border-ods-border'
             }`}
           >
@@ -371,43 +394,32 @@ export function McpPlaygroundPage() {
       {pending.length > 0 && (
         <section className={panel}>
           <p className={label}>pending approvals</p>
-          <ul className="space-y-3">
-            {pending.map(p => (
-              <li key={p.proposalId} className="rounded-md border border-ods-border p-3">
-                <p className="text-sm font-medium">{p.title ?? p.toolName ?? 'Proposed action'}</p>
-                {p.fields && p.fields.length > 0 && (
-                  <dl className="mt-2 space-y-1 text-xs">
-                    {p.fields.map(f => (
-                      <div key={f.label} className="flex gap-2">
-                        <dt className="w-32 shrink-0 text-ods-text-secondary">{f.label}</dt>
-                        <dd className="break-words">{f.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
-                {decisions[p.proposalId] ? (
-                  <p className="mt-2 text-xs text-ods-text-secondary">{decisions[p.proposalId]}</p>
-                ) : (
-                  <div className="mt-2 flex gap-2">
-                    <Button
-                      size="small-legacy"
-                      disabled={decidingId === p.proposalId}
-                      onClick={() => void decide(p, 'approve')}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="small-legacy"
-                      disabled={decidingId === p.proposalId}
-                      onClick={() => void decide(p, 'reject')}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                )}
-              </li>
-            ))}
+          <ul className="space-y-[var(--spacing-system-sf)]">
+            {pending.map(p => {
+              const decided = decisions[p.proposalId]
+              return (
+                <li key={p.proposalId}>
+                  {/* The chat's OWN approval card — the MCP pending payload is
+                      the chat's card payload by construction, so the same
+                      component renders it (in-flight double-click protection
+                      included). */}
+                  <ApprovalRequestMessage
+                    data={{
+                      requestId: p.proposalId,
+                      command: p.title ?? p.toolName ?? 'Proposed action',
+                      fields: p.fields,
+                      explanation: p.explanation ?? undefined,
+                    }}
+                    status={decided?.status ?? 'pending'}
+                    onApprove={() => decide(p, 'approve')}
+                    onReject={() => decide(p, 'reject')}
+                  />
+                  {decided && (
+                    <p className="mt-[var(--spacing-system-xxs)] text-xs text-ods-text-secondary">{decided.text}</p>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         </section>
       )}

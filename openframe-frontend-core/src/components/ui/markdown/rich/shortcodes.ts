@@ -68,13 +68,24 @@ export const processShortcodes = (content: string): string => {
     // Claude artifact / Claude Design: {{claude-artifact:URL}} / {{claude-design:URL}}
     // — the same shape as figma, so a Claude link is a markdown BLOCK wherever
     // markdown renders, never a bespoke card one surface hand-assembles.
-    // `{{claude-artifact:URL}}` or `{{claude-artifact:URL|Name}}` — the optional
-    // name after the pipe is the ONLY source of a real title (claude.ai serves
-    // one og:title for every artifact), so the block carries it through.
-    .replace(/\{\{claude-(artifact|design):([^|}]+)(?:\|([^}]*))?\}\}/g, (match, kind, url, title) => {
-      const titleAttr = title && title.trim() ? ` data-title="${escapeAttr(title.trim())}"` : '';
-      return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"${titleAttr}></div>\n\n`;
-    })
+    // `{{claude-artifact:URL}}` / `{{claude-artifact:URL|Name}}` /
+    // `{{claude-artifact:URL|Name|EMBED_SRC}}` — the optional name after the
+    // first pipe is the ONLY source of a real title (claude.ai serves one
+    // og:title for every artifact); the optional third segment is a
+    // host-provided mirror path framed INSTEAD of claude.ai (`ClaudeEmbed
+    // srcOverride` — claude.ai frame-locks artifacts, so hosts that keep a
+    // serving copy thread it through here and there is ONE Claude mount for
+    // rails and prose alike). `|` is reserved by this grammar — it cannot
+    // appear inside a title.
+    .replace(
+      /\{\{claude-(artifact|design):([^|}]+)(?:\|([^|}]*))?(?:\|([^}]*))?\}\}/g,
+      (match, kind, url, title, embedSrc) => {
+        const titleAttr = title && title.trim() ? ` data-title="${escapeAttr(title.trim())}"` : '';
+        const embedSrcAttr =
+          embedSrc && embedSrc.trim() ? ` data-embed-src="${escapeAttr(embedSrc.trim())}"` : '';
+        return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"${titleAttr}${embedSrcAttr}></div>\n\n`;
+      },
+    )
     // LinkedIn embeds: {{linkedin:POST_URL}}
     .replace(/\{\{linkedin:([^}]+)\}\}/g, (match, url) => {
       return `\n\n<div class="linkedin-embed" data-post-url="${escapeAttr(url.trim())}"></div>\n\n`;

@@ -91,6 +91,25 @@ describe('processShortcodes design-doc embeds', () => {
     expect(design).toContain('data-kind="design"');
   });
 
+  it('threads the optional title and mirror segments into data attributes', () => {
+    const titled = processShortcodes('{{claude-artifact:https://claude.ai/a|Brief doc}}');
+    expect(titled).toContain('data-title="Brief doc"');
+    expect(titled).not.toContain('data-embed-src');
+
+    const mirrored = processShortcodes(
+      '{{claude-artifact:https://claude.ai/a|Brief doc|/api/storage/view/design-briefs/x.html}}',
+    );
+    expect(mirrored).toContain('data-title="Brief doc"');
+    expect(mirrored).toContain('data-embed-src="/api/storage/view/design-briefs/x.html"');
+
+    // Untitled mirror: the empty title slot is skipped, the mirror still rides.
+    const untitled = processShortcodes(
+      '{{claude-artifact:https://claude.ai/a||/api/storage/view/design-briefs/x.html}}',
+    );
+    expect(untitled).not.toContain('data-title');
+    expect(untitled).toContain('data-embed-src="/api/storage/view/design-briefs/x.html"');
+  });
+
   it('escapes the url attribute so a crafted link cannot break out of the block', () => {
     const output = processShortcodes('{{claude-artifact:https://claude.ai/a"><script>alert(1)</script>}}');
     expect(output).not.toContain('<script>');
