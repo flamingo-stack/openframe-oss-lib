@@ -28,14 +28,43 @@ jobs:
     if: github.event.pull_request.state == 'open' && !github.event.pull_request.draft
 
 
-  scan:
-    name: "Scan"
+  scan_matrix:
+    name: "Scan Matrix"
     runs-on: ubuntu-latest
-    needs: [changes]
+    if: github.event_name == 'pull_request' && github.event.pull_request.state == 'open' && !github.event.pull_request.draft
+    outputs:
+      modules: ${{ steps.modules.outputs.modules }}
+      skip: ${{ steps.modules.outputs.skip }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          sparse-checkout: pom.xml
+          sparse-checkout-cone-mode: false
+
+      - name: Collect Maven modules
+        id: modules
+        run: |
+          modules=$(grep -o '<module>[^<]*</module>' pom.xml | sed 's/<[^>]*>//g')
+          echo "modules=$(printf '%s\n' "$modules" | jq -R '{ name: gsub("/"; "-"), path: . }' | jq -sc .)" >> "$GITHUB_OUTPUT"
+          echo "skip=$(printf '%s\n' "$modules" | paste -sd, -)" >> "$GITHUB_OUTPUT"
+
+  scan:
+    name: "Scan Code: ${{ matrix.target.name }}"
+    runs-on: ubuntu-latest
+    needs: [changes, scan_matrix]
     permissions:
       contents: read
       packages: read
     if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.scan_matrix.outputs.modules) }}
+        include:
+          - target: { name: root, path: "." }
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,6 +76,9 @@ jobs:
         uses: ./.github/steps/trivy
         with:
           scan: code
+          path: ${{ matrix.target.path }}
+          skip-dirs: ${{ matrix.target.name == 'root' && needs.scan_matrix.outputs.skip || '' }}
+          image-name: ${{ matrix.target.name }}
 
   test-java:
     name: Test Java
