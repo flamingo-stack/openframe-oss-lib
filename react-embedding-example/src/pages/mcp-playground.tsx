@@ -19,7 +19,7 @@ import { EP } from '../config/endpoints'
 /**
  * MCP Playground — drives the hub's MCP server (`/api/mcp`) through the
  * SAME reverse proxy every other surface here uses: the page talks to
- * `/content/api/mcp` same-origin, the proxy injects the chat secret +
+ * `/content/api/mcp` same-origin, the proxy injects the platform API key +
  * act-as identity (proxy/inject.mjs), and the OFFICIAL MCP client SDK
  * does the protocol work. Nothing on this page holds a credential.
  *
@@ -300,7 +300,7 @@ export function McpPlaygroundPage() {
       <header className="space-y-[var(--spacing-system-xsf)]">
         <h1 className="text-h2">MCP Playground</h1>
         <p className="text-h6 text-ods-text-secondary">
-          Drives the hub&apos;s MCP server through the /content proxy (secret + act-as injected
+          Drives the hub&apos;s MCP server through the /content proxy (API key + act-as injected
           server-side). Same endpoint, same tools a LangChain4j agent or Claude would see.
         </p>
         <div className="flex flex-wrap items-center gap-[var(--spacing-system-xsf)]">

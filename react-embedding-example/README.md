@@ -5,7 +5,7 @@ page-level content surface from `@flamingo-stack/openframe-frontend-core` (onboa
 guides, roadmap, delivery, product releases, authors, FAQ, legal, contact, tickets,
 announcements), talking to the multi-platform hub through a **`/content` reverse proxy**.
 
-The proxy holds the **chat secret** and injects a **fixed identity** (Michael Assraf), so
+The proxy holds the **platform API key** and injects a **fixed identity** (Michael Assraf), so
 the chat greets that user with no client-side auth — exactly how a real embedder works.
 
 ## How this maps to production
@@ -15,14 +15,14 @@ local proxy here (`proxy/`, or Vite's built-in dev proxy) is a stand-in that doe
 two things Spring Boot already does:
 
 1. Rewrite `/content/api/*` → `${HUB_ORIGIN}/api/*`.
-2. Inject `Authorization: Bearer ${CHAT_PROXY_SECRET}` + `X-Chat-Act-As` / `-First-Name` /
+2. Inject `Authorization: Bearer ${HUB_API_KEY}` (a platform API key) + `X-Chat-Act-As` / `-First-Name` /
    `-Last-Name` / `-Avatar-Url`.
 
 The React client is byte-identical in both — it only ever calls `/content/api/...`. The
-secret + identity live **only** on the proxy (non-`VITE_` env), never in the browser bundle.
+key + identity live **only** on the proxy (non-`VITE_` env), never in the browser bundle.
 
 ```
-Browser SPA ──fetch('/content/api/...')──▶ proxy (rewrite + inject secret/identity) ──▶ hub /api/*
+Browser SPA ──fetch('/content/api/...')──▶ proxy (rewrite + inject key/identity) ──▶ hub /api/*
 ```
 
 ## Prerequisites
@@ -46,16 +46,18 @@ Browser SPA ──fetch('/content/api/...')──▶ proxy (rewrite + inject sec
    ```bash
    unset ANTHROPIC_API_KEY && npm run dev:openframe   # in the hub repo
    ```
-3. **Set the shared secret.** Copy `.env.example` → `.env` and set `CHAT_PROXY_SECRET` to the
-   **same** value the hub uses. If empty, the hub returns `503 CHAT_PROXY_SECRET_NOT_CONFIGURED`
-   and chat errors loudly.
+3. **Mint an API key.** Copy `.env.example` → `.env` and set `HUB_API_KEY` to a key minted
+   in the hub's `/admin/api-keys` (on the platform `HUB_ORIGIN` points at — keys are
+   platform-bound). Use a SERVICE key so the proxy can impersonate the `ACT_AS_*` identity;
+   a personal key works when `ACT_AS_EMAIL` is its owner. If empty or wrong, the hub returns
+   `401 CHAT_PROXY_AUTH_INVALID` and chat errors loudly.
 
 ## Run
 
 ```bash
-cp .env.example .env          # then edit CHAT_PROXY_SECRET (+ HUB_ORIGIN if not :3000)
+cp .env.example .env          # then edit HUB_API_KEY (+ HUB_ORIGIN if not :3000)
 npm install
-npm run dev                   # Vite dev server proxies /content → hub, injecting secret + identity
+npm run dev                   # Vite dev server proxies /content → hub, injecting key + identity
 # → open the printed URL; the floating "Ask AI" chat greets Michael.
 ```
 
@@ -69,7 +71,7 @@ npm run build && npm run preview:proxy
 | Var | Side | Purpose |
 |-----|------|---------|
 | `HUB_ORIGIN` | server only | Where `/content/api/*` is forwarded. Default `http://localhost:3000`. |
-| `CHAT_PROXY_SECRET` | server only | Shared secret — must equal the hub's. |
+| `HUB_API_KEY` | server only | Platform API key minted in the hub's `/admin/api-keys` (service tier for act-as). |
 | `ACT_AS_EMAIL` / `ACT_AS_FIRST_NAME` / `ACT_AS_LAST_NAME` / `ACT_AS_AVATAR_URL` | server only | The impersonated identity (defaults to Michael Assraf). |
 | `VITE_HUB_ORIGIN` | client | Public hub origin for new-tab "open full content" links. |
 
@@ -257,5 +259,5 @@ per-page overridable — nothing is hard-shared:
 - **Doc / roadmap / delivery chips don't navigate** — check `composeContentUrl` /
   `docPlatformTargets` in `content-runtime.ts` (see *Configuring routes & navigation*); an
   unmapped type falls back to Ask-only or the hub origin.
-- **Chat 500s with `CHAT_PROXY_SECRET_NOT_CONFIGURED`** — `.env`'s `CHAT_PROXY_SECRET` must
-  equal the hub's.
+- **Chat 401s with `CHAT_PROXY_AUTH_INVALID`** — `.env`'s `HUB_API_KEY` is empty, revoked, or
+  minted on a different platform than `HUB_ORIGIN` points at.

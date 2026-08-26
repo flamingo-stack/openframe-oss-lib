@@ -5,7 +5,7 @@ import { CONTENT_PREFIX } from './proxy/content-prefix.mjs'
 import { hubTarget, rewrite, injectHeaders } from './proxy/inject.mjs'
 
 // The dev server + `vite preview` both proxy /content (and the two documented bare-/api
-// exceptions) to the hub, injecting the chat secret + fixed identity headers server-side.
+// exceptions) to the hub, injecting the platform API key + fixed identity headers server-side.
 // Secrets come from loadEnv with prefix '' (ALL vars) — these run in Node config, never in the bundle.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
