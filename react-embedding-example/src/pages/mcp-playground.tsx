@@ -10,15 +10,15 @@ import { EP } from '../config/endpoints'
  * does the protocol work. Nothing on this page holds a credential.
  *
  * What it proves, end to end:
- *   - tools/list (capability-filtered by the connection's source scope)
+ *   - tools/list (the deployment source's capabilities)
  *   - ask_guide with conversation continuity (server-minted handle)
  *   - search_docs raw retrieval
  *   - ANY write tool generically (create_ticket, create_clickup_task, …)
  *     → pending_approval card → confirm_proposal approve/reject
  *
- * Scope experiments: type e.g. `sources=product-hub` in the scope box and
- * reconnect — the tool list re-filters per the hub's `MCP_ALLOWED_SOURCES`
- * ceiling, exactly what a LangChain4j consumer would see.
+ * The tool list is the DEPLOYMENT's — each platform's hub serves its own
+ * source (point `.env` `HUB_ORIGIN` at a product-hub deployment to see the
+ * ClickUp tools), exactly what a LangChain4j consumer would see.
  */
 
 interface ToolInfo {
@@ -67,7 +67,6 @@ const primaryButton =
 
 export function McpPlaygroundPage() {
   const clientRef = useRef<Client | null>(null)
-  const [scopeQuery, setScopeQuery] = useState('')
   const [status, setStatus] = useState<'connecting' | 'ready' | 'error'>('connecting')
   const [statusDetail, setStatusDetail] = useState('')
   const [tools, setTools] = useState<ToolInfo[]>([])
@@ -101,10 +100,6 @@ export function McpPlaygroundPage() {
     clientRef.current?.close().catch(() => {})
     try {
       const url = new URL(EP.mcp, window.location.origin)
-      for (const part of scopeQuery.split('&')) {
-        const [k, v] = part.split('=')
-        if (k && v) url.searchParams.set(k.trim(), v.trim())
-      }
       const client = new Client({ name: 'react-embedding-example', version: '1.0.0' })
       await client.connect(new StreamableHTTPClientTransport(url))
       const listed = await client.listTools()
@@ -116,16 +111,14 @@ export function McpPlaygroundPage() {
       setStatus('error')
       setStatusDetail(err instanceof Error ? err.message : String(err))
     }
-  }, [scopeQuery])
+  }, [])
 
   useEffect(() => {
     void connect()
     return () => {
       clientRef.current?.close().catch(() => {})
     }
-    // Connect once on mount; the Reconnect button re-runs with the scope box.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [connect])
 
   const callTool = useCallback(async (name: string, args: Record<string, unknown>) => {
     const client = clientRef.current
@@ -252,12 +245,6 @@ export function McpPlaygroundPage() {
                 ? `Connection failed${statusDetail ? `: ${statusDetail}` : ''}`
                 : 'Connecting…'}
           </span>
-          <input
-            className={`${input} !w-64`}
-            placeholder="scope, e.g. sources=product-hub"
-            value={scopeQuery}
-            onChange={e => setScopeQuery(e.target.value)}
-          />
           <button type="button" className={button} onClick={() => void connect()}>
             Reconnect
           </button>
@@ -266,7 +253,7 @@ export function McpPlaygroundPage() {
 
       {tools.length > 0 && (
         <section className={panel}>
-          <p className={label}>tools/list (scope-filtered)</p>
+          <p className={label}>tools/list (this deployment&apos;s capabilities)</p>
           <ul className="grid gap-2 sm:grid-cols-2">
             {tools.map(t => (
               <li key={t.name} className="rounded-md border border-ods-border p-3">
