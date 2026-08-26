@@ -395,6 +395,11 @@ const URL_ATTRS = new Set([
   'data',
   'action',
   'background',
+  // The claude shortcode's mirror path — it becomes an <iframe src>
+  // (`ClaudeEmbed srcOverride`), so it gets the same scheme check as
+  // every other URL sink even though the component ALSO shape-validates
+  // it to a same-origin path (defense in depth).
+  'data-embed-src',
 ])
 
 /**

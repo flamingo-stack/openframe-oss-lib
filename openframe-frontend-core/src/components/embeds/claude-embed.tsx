@@ -52,7 +52,15 @@ const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
  * or an http host (mixed content — it will not paint on `http://localhost`).
  */
 export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy', srcOverride }: ClaudeEmbedProps) {
-  const embedUrl = srcOverride ?? toClaudeEmbedUrl(url)
+  // A mirror is by contract a SAME-ORIGIN absolute path ('/…', never
+  // '//…' or a full url) — anything else is discarded, because whatever
+  // this component frames wears Claude-branded chrome, and every other
+  // frame source here is allow-listed (`toClaudeEmbedUrl` pins
+  // claude.ai/claude.site). Shape-checked again here even though the
+  // shortcode parser applies the same rule: the prop is public API and
+  // callers can pass it directly.
+  const mirrorSrc = srcOverride && /^\/(?!\/)/.test(srcOverride) ? srcOverride : null
+  const embedUrl = mirrorSrc ?? toClaudeEmbedUrl(url)
   return (
     <EmbedViewerFrame
       className="my-6 space-y-3"
@@ -96,7 +104,7 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
       //     `window.parent`. A static mirror renders fine from an opaque
       //     origin, so the token is dropped.
       sandbox={
-        srcOverride
+        mirrorSrc
           ? 'allow-scripts allow-popups allow-forms'
           : 'allow-scripts allow-same-origin allow-popups allow-forms'
       }

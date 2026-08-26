@@ -110,6 +110,29 @@ describe('processShortcodes design-doc embeds', () => {
     expect(untitled).toContain('data-embed-src="/api/storage/view/design-briefs/x.html"');
   });
 
+  it('recognizes the mirror segment by path SHAPE, never by pipe position', () => {
+    // A pre-existing title containing `|` stays a title — nothing is framed.
+    const pipeTitle = processShortcodes('{{claude-artifact:https://claude.ai/a|Design | v2}}');
+    expect(pipeTitle).toContain('data-title="Design | v2"');
+    expect(pipeTitle).not.toContain('data-embed-src');
+
+    // Pipe title AND a mirror: the path-shaped tail is the mirror, the rest is the title.
+    const both = processShortcodes(
+      '{{claude-artifact:https://claude.ai/a|Design | v2|/api/storage/view/design-briefs/x.html}}',
+    );
+    expect(both).toContain('data-title="Design | v2"');
+    expect(both).toContain('data-embed-src="/api/storage/view/design-briefs/x.html"');
+
+    // Non-path tails (absolute urls, protocol-relative, schemes) are NEVER a
+    // frame source — they fold into the title as plain text.
+    const evil = processShortcodes('{{claude-artifact:https://claude.ai/a|T|https://evil.example}}');
+    expect(evil).not.toContain('data-embed-src');
+    const protoRelative = processShortcodes('{{claude-artifact:https://claude.ai/a|T|//evil.example}}');
+    expect(protoRelative).not.toContain('data-embed-src');
+    const scheme = processShortcodes('{{claude-artifact:https://claude.ai/a|T|javascript:alert(1)}}');
+    expect(scheme).not.toContain('data-embed-src');
+  });
+
   it('escapes the url attribute so a crafted link cannot break out of the block', () => {
     const output = processShortcodes('{{claude-artifact:https://claude.ai/a"><script>alert(1)</script>}}');
     expect(output).not.toContain('<script>');

@@ -99,10 +99,15 @@ export function McpPlaygroundPage() {
   // approvals (from ask_guide AND generic calls)
   const [pending, setPending] = useState<PendingApproval[]>([])
   const [decisions, setDecisions] = useState<
-    Record<string, { status: 'approved' | 'rejected'; text: string }>
+    Record<string, { status: 'approved' | 'rejected' | 'cancelled'; text: string }>
   >({})
 
+  // Attempt token: a stale connect (superseded by a newer click) must close
+  // ITS OWN client and write no state — otherwise two rapid Reconnects leak
+  // the loser's transport and can leave `clientRef` on the older session.
+  const attemptRef = useRef(0)
   const connect = useCallback(async () => {
+    const attempt = ++attemptRef.current
     setStatus('connecting')
     setStatusDetail('')
     setTools([])
@@ -114,8 +119,9 @@ export function McpPlaygroundPage() {
       const url = new URL(EP.mcp, window.location.origin)
       const client = new Client({ name: 'react-embedding-example', version: '1.0.0' })
       await client.connect(new StreamableHTTPClientTransport(url))
-      if (!mountedRef.current) {
-        // Unmounted mid-connect — don't install a transport nobody closes.
+      if (!mountedRef.current || attempt !== attemptRef.current) {
+        // Unmounted or superseded mid-connect — don't install a transport
+        // nobody closes.
         client.close().catch(() => {})
         return
       }
@@ -125,7 +131,7 @@ export function McpPlaygroundPage() {
       setSelectedTool(prev => prev || (listed.tools[0]?.name ?? ''))
       setStatus('ready')
     } catch (err) {
-      if (!mountedRef.current) return
+      if (!mountedRef.current || attempt !== attemptRef.current) return
       setStatus('error')
       setStatusDetail(errText(err))
     }
@@ -229,14 +235,23 @@ export function McpPlaygroundPage() {
         setDecisions(prev => ({
           ...prev,
           [p.proposalId]: {
-            status: s?.status === 'executed' ? 'approved' : 'rejected',
+            // Only the two REAL outcomes wear their tags; everything else
+            // (expired/conflict/invalid_args/error) is 'cancelled' — a
+            // conflict in particular means a RACING approve executed, and
+            // a red "Rejected" tag would assert the opposite.
+            status:
+              s?.status === 'executed'
+                ? 'approved'
+                : s?.status === 'rejected'
+                  ? 'rejected'
+                  : 'cancelled',
             text: s?.receipt ?? s?.status ?? (result.isError ? result.text : action),
           },
         }))
       } catch (err) {
         setDecisions(prev => ({
           ...prev,
-          [p.proposalId]: { status: 'rejected', text: `Error: ${errText(err)}` },
+          [p.proposalId]: { status: 'cancelled', text: `Error: ${errText(err)}` },
         }))
       }
     },
@@ -252,13 +267,13 @@ export function McpPlaygroundPage() {
     <div className="mx-auto max-w-5xl space-y-[var(--spacing-system-lf)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-xl)] text-ods-text-primary">
       <header className="space-y-[var(--spacing-system-xsf)]">
         <h1 className="text-h2">MCP Playground</h1>
-        <p className="text-sm text-ods-text-secondary">
+        <p className="text-h6 text-ods-text-secondary">
           Drives the hub&apos;s MCP server through the /content proxy (secret + act-as injected
           server-side). Same endpoint, same tools a LangChain4j agent or Claude would see.
         </p>
         <div className="flex flex-wrap items-center gap-[var(--spacing-system-xsf)]">
           <span
-            className={`rounded-full px-[var(--spacing-system-sf)] py-[var(--spacing-system-xxs)] text-xs font-medium ${
+            className={`rounded-full px-[var(--spacing-system-sf)] py-[var(--spacing-system-xxs)] text-badge font-medium ${
               status === 'ready'
                 ? 'bg-ods-success-secondary text-ods-success'
                 : status === 'error'
@@ -272,7 +287,7 @@ export function McpPlaygroundPage() {
                 ? `Connection failed${statusDetail ? `: ${statusDetail}` : ''}`
                 : 'Connecting…'}
           </span>
-          <Button variant="outline" size="small-legacy" onClick={() => void connect()}>
+          <Button variant="outline" size="small" disabled={status === 'connecting'} onClick={() => void connect()}>
             Reconnect
           </Button>
         </div>
@@ -285,8 +300,8 @@ export function McpPlaygroundPage() {
             {tools.map(t => (
               <li key={t.name} className="rounded-md border border-ods-border p-[var(--spacing-system-sf)]">
                 <p className="text-code">{t.name}</p>
-                <p className="mt-[var(--spacing-system-xxs)] line-clamp-3 text-xs text-ods-text-secondary">{t.description}</p>
-                <p className="mt-[var(--spacing-system-xxs)] text-xs text-ods-text-secondary">
+                <p className="mt-[var(--spacing-system-xxs)] line-clamp-3 text-badge text-ods-text-secondary">{t.description}</p>
+                <p className="mt-[var(--spacing-system-xxs)] text-badge text-ods-text-secondary">
                   {t.annotations?.readOnlyHint
                     ? 'read-only'
                     : t.annotations?.destructiveHint
@@ -303,19 +318,19 @@ export function McpPlaygroundPage() {
         <p className={label}>ask_guide {conversationId ? `· conversation ${conversationId.slice(0, 8)}…` : ''}</p>
         <div className="flex gap-[var(--spacing-system-xsf)]">
           <Input value={question} onChange={e => setQuestion(e.target.value)} />
-          <Button size="small-legacy" disabled={asking || status !== 'ready'} onClick={() => void ask()}>
+          <Button size="small" disabled={asking || status !== 'ready'} onClick={() => void ask()}>
             {asking ? 'Asking…' : 'Ask'}
           </Button>
           {conversationId && (
-            <Button variant="outline" size="small-legacy" onClick={() => setConversationId(null)}>
+            <Button variant="outline" size="small" onClick={() => setConversationId(null)}>
               New conversation
             </Button>
           )}
         </div>
         {answer !== null && (
           <div className="space-y-[var(--spacing-system-xxs)]">
-            <div className="whitespace-pre-wrap rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] text-sm">{answer}</div>
-            <p className="text-xs text-ods-text-secondary">{citationCount} citation source(s)</p>
+            <div className="whitespace-pre-wrap rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] text-h6">{answer}</div>
+            <p className="text-badge text-ods-text-secondary">{citationCount} citation source(s)</p>
           </div>
         )}
       </section>
@@ -329,7 +344,7 @@ export function McpPlaygroundPage() {
             onChange={e => setQuery(e.target.value)}
           />
           <Button
-            size="small-legacy"
+            size="small"
             disabled={searching || !query.trim() || status !== 'ready'}
             onClick={() => void search()}
           >
@@ -340,8 +355,8 @@ export function McpPlaygroundPage() {
           <ul className="space-y-[var(--spacing-system-xsf)]">
             {searchResults.map((r, i) => (
               <li key={i} className="rounded-md border border-ods-border p-[var(--spacing-system-sf)]">
-                <p className="text-sm font-medium">{String(r.title ?? '')}</p>
-                <p className="line-clamp-2 text-xs text-ods-text-secondary">{String(r.preview ?? '')}</p>
+                <p className="text-h6">{String(r.title ?? '')}</p>
+                <p className="line-clamp-2 text-badge text-ods-text-secondary">{String(r.preview ?? '')}</p>
               </li>
             ))}
           </ul>
@@ -354,7 +369,7 @@ export function McpPlaygroundPage() {
           {/* Raw select on purpose: the kit's Select is the full Radix
               popover stack — heavier than this single-control demo needs. */}
           <select
-            className="w-64 rounded-md border border-ods-border bg-ods-bg px-[var(--spacing-system-sf)] py-[var(--spacing-system-xxs)] text-sm text-ods-text-primary focus:outline-none focus:border-ods-border-focus"
+            className="w-64 rounded-md border border-ods-border bg-ods-bg px-[var(--spacing-system-sf)] py-[var(--spacing-system-xxs)] text-h6 text-ods-text-primary focus:outline-none focus:border-ods-border-focus"
             value={selectedTool}
             onChange={e => setSelectedTool(e.target.value)}
           >
@@ -364,7 +379,7 @@ export function McpPlaygroundPage() {
               </option>
             ))}
           </select>
-          <Button size="small-legacy" disabled={calling || status !== 'ready'} onClick={() => void runGeneric()}>
+          <Button size="small" disabled={calling || status !== 'ready'} onClick={() => void runGeneric()}>
             {calling ? 'Calling…' : 'Call tool'}
           </Button>
         </div>
@@ -375,14 +390,14 @@ export function McpPlaygroundPage() {
           spellCheck={false}
         />
         {selectedSchema != null && (
-          <details className="text-xs text-ods-text-secondary">
+          <details className="text-badge text-ods-text-secondary">
             <summary className="cursor-pointer">input schema</summary>
             <pre className="mt-[var(--spacing-system-xxs)] overflow-x-auto rounded-md bg-ods-bg p-[var(--spacing-system-xsf)]">{JSON.stringify(selectedSchema, null, 2)}</pre>
           </details>
         )}
         {callOutput && (
           <pre
-            className={`overflow-x-auto rounded-md border p-[var(--spacing-system-sf)] text-xs ${
+            className={`overflow-x-auto rounded-md border p-[var(--spacing-system-sf)] text-code ${
               callOutput.isError ? 'border-ods-error text-ods-error' : 'border-ods-border'
             }`}
           >
@@ -415,7 +430,7 @@ export function McpPlaygroundPage() {
                     onReject={() => decide(p, 'reject')}
                   />
                   {decided && (
-                    <p className="mt-[var(--spacing-system-xxs)] text-xs text-ods-text-secondary">{decided.text}</p>
+                    <p className="mt-[var(--spacing-system-xxs)] text-badge text-ods-text-secondary">{decided.text}</p>
                   )}
                 </li>
               )

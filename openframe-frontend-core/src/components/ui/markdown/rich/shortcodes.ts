@@ -71,21 +71,24 @@ export const processShortcodes = (content: string): string => {
     // `{{claude-artifact:URL}}` / `{{claude-artifact:URL|Name}}` /
     // `{{claude-artifact:URL|Name|EMBED_SRC}}` — the optional name after the
     // first pipe is the ONLY source of a real title (claude.ai serves one
-    // og:title for every artifact); the optional third segment is a
+    // og:title for every artifact); the optional LAST segment is a
     // host-provided mirror path framed INSTEAD of claude.ai (`ClaudeEmbed
     // srcOverride` — claude.ai frame-locks artifacts, so hosts that keep a
     // serving copy thread it through here and there is ONE Claude mount for
-    // rails and prose alike). `|` is reserved by this grammar — it cannot
-    // appear inside a title.
-    .replace(
-      /\{\{claude-(artifact|design):([^|}]+)(?:\|([^|}]*))?(?:\|([^}]*))?\}\}/g,
-      (match, kind, url, title, embedSrc) => {
-        const titleAttr = title && title.trim() ? ` data-title="${escapeAttr(title.trim())}"` : '';
-        const embedSrcAttr =
-          embedSrc && embedSrc.trim() ? ` data-embed-src="${escapeAttr(embedSrc.trim())}"` : '';
-        return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"${titleAttr}${embedSrcAttr}></div>\n\n`;
-      },
-    )
+    // rails and prose alike). The mirror segment is recognized by SHAPE — a
+    // same-origin absolute path (`/…`, not `//…`) — never by position, so a
+    // pre-existing title containing `|` keeps rendering as a title instead of
+    // being silently swallowed as a bogus frame source.
+    .replace(/\{\{claude-(artifact|design):([^}]+)\}\}/g, (match, kind, rest) => {
+      const parts = String(rest).split('|');
+      const url = parts[0];
+      const last = parts.length > 1 ? parts[parts.length - 1].trim() : '';
+      const embedSrc = /^\/(?!\/)/.test(last) ? parts.pop()!.trim() : '';
+      const title = parts.slice(1).join('|').trim();
+      const titleAttr = title ? ` data-title="${escapeAttr(title)}"` : '';
+      const embedSrcAttr = embedSrc ? ` data-embed-src="${escapeAttr(embedSrc)}"` : '';
+      return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"${titleAttr}${embedSrcAttr}></div>\n\n`;
+    })
     // LinkedIn embeds: {{linkedin:POST_URL}}
     .replace(/\{\{linkedin:([^}]+)\}\}/g, (match, url) => {
       return `\n\n<div class="linkedin-embed" data-post-url="${escapeAttr(url.trim())}"></div>\n\n`;
