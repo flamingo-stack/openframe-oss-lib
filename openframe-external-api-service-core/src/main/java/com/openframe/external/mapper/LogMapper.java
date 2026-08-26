@@ -31,6 +31,9 @@ public class LogMapper extends BaseRestMapper {
                 .severity(logEvent.getSeverity())
                 .userId(logEvent.getUserId())
                 .deviceId(logEvent.getDeviceId())
+                .hostname(logEvent.getHostname())
+                .organizationId(logEvent.getOrganizationId())
+                .organizationName(logEvent.getOrganizationName())
                 .summary(logEvent.getSummary())
                 .timestamp(logEvent.getTimestamp())
                 .build();
@@ -89,7 +92,11 @@ public class LogMapper extends BaseRestMapper {
                 .severity(logDetails.getSeverity())
                 .userId(logDetails.getUserId())
                 .deviceId(logDetails.getDeviceId())
+                .hostname(logDetails.getHostname())
+                .organizationId(logDetails.getOrganizationId())
+                .organizationName(logDetails.getOrganizationName())
                 .summary(logDetails.getSummary())
+                .message(logDetails.getMessage())
                 .content(logDetails.getDetails())
                 .timestamp(logDetails.getTimestamp())
                 .build();

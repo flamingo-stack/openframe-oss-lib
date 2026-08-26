@@ -16,6 +16,8 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -156,11 +158,46 @@ public class BaseGlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatusCode()).body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR, ex.getReason()));
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMessageNotReadable(HttpMessageNotReadableException ex) {
+        log.warn("Malformed request body: {}", ex.getMostSpecificCause().getMessage());
+        return ErrorResponse.of(ErrorCode.BAD_REQUEST, "Malformed request body");
+    }
+
+    /**
+     * Anything Spring MVC itself classifies (unknown endpoint → {@code NoHandlerFoundException} /
+     * {@code NoResourceFoundException}, missing path variable, unsupported media type, …) carries
+     * its status as an {@link org.springframework.web.ErrorResponse}; honour it instead of
+     * reporting a 500. Everything else is genuinely unexpected.
+     */
     @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ErrorResponse handleException(Exception ex) {
+    public ResponseEntity<ErrorResponse> handleException(Exception ex) {
+        if (ex instanceof org.springframework.web.ErrorResponse springError) {
+            HttpStatusCode status = springError.getStatusCode();
+            ErrorCode code = errorCodeFor(status);
+            String message = status.value() == HttpStatus.NOT_FOUND.value()
+                    ? "Endpoint not found"
+                    : springError.getBody().getDetail();
+            log.warn("{} {}: {}", status.value(), code.getCode(), ex.getMessage());
+            return ResponseEntity.status(status).body(ErrorResponse.of(code, message));
+        }
         log.error("Unexpected error: ", ex);
-        return ErrorResponse.of(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred"));
+    }
+
+    private static ErrorCode errorCodeFor(HttpStatusCode status) {
+        return switch (status.value()) {
+            case 400 -> ErrorCode.BAD_REQUEST;
+            case 401 -> ErrorCode.UNAUTHORIZED;
+            case 403 -> ErrorCode.FORBIDDEN;
+            case 404 -> ErrorCode.NOT_FOUND;
+            case 405 -> ErrorCode.METHOD_NOT_ALLOWED;
+            case 409 -> ErrorCode.CONFLICT;
+            case 415 -> ErrorCode.UNSUPPORTED_MEDIA_TYPE;
+            default -> ErrorCode.INTERNAL_ERROR;
+        };
     }
 
     /**

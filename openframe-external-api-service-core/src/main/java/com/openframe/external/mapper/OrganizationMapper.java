@@ -45,6 +45,7 @@ public class OrganizationMapper extends BaseRestMapper {
         return OrganizationsResponse.builder()
                 .organizations(organizationResponses)
                 .total(organizationResponses.size())
+                .filteredCount(queryResult.getFilteredCount())
                 .pageInfo(queryResult.getPageInfo())
                 .build();
     }
