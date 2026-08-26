@@ -260,12 +260,6 @@ export interface DesignDoc {
   comments: DesignDocComment[]
   completion: DesignDocCompletion
   my_open_work?: DesignDocMyOpenWork
-  /** View-proxy path of the doc's self-hosted brief mirror
-   *  (`/api/storage/view/design-briefs/<slug>.html`) when one exists in
-   *  the hub's design-briefs store — the transparent frame source for the
-   *  claude_artifact Brief-doc link (claude.ai cannot be iframed). Null /
-   *  absent when no mirror was uploaded. */
-  brief_embed_path?: string | null
 }
 
 // ---------------------------------------------------------------------------

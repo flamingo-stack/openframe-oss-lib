@@ -73,8 +73,9 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
         </Button>
       }
       src={embedUrl}
-      // The mirror has no internal fullscreen button (unlike Figma's
-      // player), so the shell provides the toggle.
+      // The framed artifact has no internal fullscreen button of its own
+      // (unlike Figma's player) — the shell provides the toggle for both
+      // the claude.ai `/embed` route and a mirror.
       fullscreenControl
       loading={loading}
       height={height}
@@ -83,11 +84,22 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
       allow="clipboard-write; clipboard-read; fullscreen"
       // …but UNLIKE Figma, an artifact is USER-AUTHORED HTML and JS, so it is
       // sandboxed. Omitting `allow-top-navigation` is the point: an artifact
-      // cannot navigate the page it is embedded in. `allow-same-origin` beside
-      // `allow-scripts` is what Anthropic's own embed snippet uses and is safe
-      // on a CROSS-ORIGIN frame — it grants the frame claude.ai's origin, never
-      // ours.
-      sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+      // cannot navigate the page it is embedded in. The `allow-same-origin`
+      // token is CONDITIONAL on where the frame points:
+      //   - claude.ai `/embed` (no srcOverride): Anthropic's own embed
+      //     snippet uses it, and on a CROSS-ORIGIN frame it grants the
+      //     frame claude.ai's origin — never ours. The artifact runtime
+      //     needs it (storage, postMessage handshake).
+      //   - a `srcOverride` mirror is served from the HOST's OWN origin —
+      //     `allow-same-origin` + `allow-scripts` there would be a no-op
+      //     sandbox handing the artifact first-party cookies and
+      //     `window.parent`. A static mirror renders fine from an opaque
+      //     origin, so the token is dropped.
+      sandbox={
+        srcOverride
+          ? 'allow-scripts allow-popups allow-forms'
+          : 'allow-scripts allow-same-origin allow-popups allow-forms'
+      }
       allowFullScreen
       emptyIcon={<ClaudeIcon className="w-16 h-16 mb-4" />}
       emptyMessage="Open this one in Claude · it has no embeddable view"

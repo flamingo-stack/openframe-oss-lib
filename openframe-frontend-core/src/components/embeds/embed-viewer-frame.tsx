@@ -90,15 +90,19 @@ export function EmbedViewerFrame({
   const toggleFullscreen = useCallback(() => {
     const el = frameRef.current
     if (!el) return
+    // Denials arrive BOTH ways: `requestFullscreen` throws synchronously
+    // on some engines and returns a REJECTED promise on others (e.g. the
+    // Fullscreen permissions policy when this component is itself inside
+    // an embedder's iframe without `allow="fullscreen"`). Swallow both —
+    // the button is a convenience; an unhandled rejection is not.
     try {
       if (document.fullscreenElement === el) {
-        void document.exitFullscreen()
+        document.exitFullscreen().catch(() => {})
       } else {
-        void el.requestFullscreen()
+        el.requestFullscreen().catch(() => {})
       }
     } catch {
-      // Fullscreen API unavailable (permissions policy, old WebKit) —
-      // the button is a convenience; failing silently keeps the page sane.
+      // Fullscreen API unavailable (old WebKit) — fail silently.
     }
   }, [])
 
@@ -110,7 +114,7 @@ export function EmbedViewerFrame({
         className,
         // Fullscreen paints its own ground (the fullscreened element
         // otherwise sits on the UA's black backdrop) and scrolls itself.
-        isFullscreen && 'overflow-auto bg-ods-bg p-4',
+        isFullscreen && 'overflow-auto bg-ods-bg p-[var(--spacing-system-mf)]',
       )}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -130,7 +134,7 @@ export function EmbedViewerFrame({
             wrapper exists only when the toggle joins it, so pre-existing
             viewers (figma/pdf/sheets) are byte-identical. */}
         {fullscreenControl && src ? (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-[var(--spacing-system-xsf)] sm:flex-row sm:items-center">
             {actions}
             <Button
               variant="outline"

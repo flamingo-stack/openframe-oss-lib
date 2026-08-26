@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
+import { Button } from '@flamingo-stack/openframe-frontend-core/components/ui'
 import { EP } from '../config/endpoints'
 
 /**
@@ -57,13 +58,13 @@ function resultOf(raw: unknown): CallResult {
 }
 
 const panel = 'rounded-lg border border-ods-border bg-ods-card p-4 space-y-3'
-const label = 'text-xs font-medium uppercase tracking-wide text-ods-text-secondary'
+const label = 'text-h5 text-ods-text-secondary'
 const input =
-  'w-full rounded-md border border-ods-border bg-ods-bg px-3 py-2 text-sm text-ods-text-primary focus:outline-none focus:border-ods-accent-primary'
-const button =
-  'rounded-md border border-ods-border bg-ods-bg px-3 py-1.5 text-sm text-ods-text-primary hover:border-ods-accent-primary disabled:opacity-40'
-const primaryButton =
-  'rounded-md bg-ods-accent-primary px-3 py-1.5 text-sm font-medium text-black hover:opacity-90 disabled:opacity-40'
+  'w-full rounded-md border border-ods-border bg-ods-bg px-3 py-2 text-sm text-ods-text-primary focus:outline-none focus:border-ods-border-focus'
+
+function errText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
 
 export function McpPlaygroundPage() {
   const clientRef = useRef<Client | null>(null)
@@ -109,7 +110,7 @@ export function McpPlaygroundPage() {
       setStatus('ready')
     } catch (err) {
       setStatus('error')
-      setStatusDetail(err instanceof Error ? err.message : String(err))
+      setStatusDetail(errText(err))
     }
   }, [])
 
@@ -149,7 +150,7 @@ export function McpPlaygroundPage() {
         ])
       }
     } catch (err) {
-      setAnswer(`Error: ${err instanceof Error ? err.message : String(err)}`)
+      setAnswer(`Error: ${errText(err)}`)
     } finally {
       setAsking(false)
     }
@@ -187,14 +188,20 @@ export function McpPlaygroundPage() {
         setPending(prev => [...prev, { ...s, toolName: s.toolName ?? selectedTool }])
       }
     } catch (err) {
-      setCallOutput({ text: err instanceof Error ? err.message : String(err), structured: null, isError: true })
+      setCallOutput({ text: errText(err), structured: null, isError: true })
     } finally {
       setCalling(false)
     }
   }, [argsJson, callTool, selectedTool])
 
+  // Per-proposal in-flight guard: proposals are single-use (CAS-claimed),
+  // so a double-click's second confirm would lose the race and overwrite
+  // a SUCCESSFUL decision with "already handled".
+  const [decidingId, setDecidingId] = useState<string | null>(null)
   const decide = useCallback(
     async (p: PendingApproval, action: 'approve' | 'reject') => {
+      if (decidingId) return
+      setDecidingId(p.proposalId)
       try {
         const result = await callTool('confirm_proposal', {
           proposalId: p.proposalId,
@@ -209,11 +216,13 @@ export function McpPlaygroundPage() {
       } catch (err) {
         setDecisions(prev => ({
           ...prev,
-          [p.proposalId]: `Error: ${err instanceof Error ? err.message : String(err)}`,
+          [p.proposalId]: `Error: ${errText(err)}`,
         }))
+      } finally {
+        setDecidingId(null)
       }
     },
-    [callTool],
+    [callTool, decidingId],
   )
 
   const selectedSchema = useMemo(
@@ -224,7 +233,7 @@ export function McpPlaygroundPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 text-ods-text-primary">
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold">MCP Playground</h1>
+        <h1 className="text-h2">MCP Playground</h1>
         <p className="text-sm text-ods-text-secondary">
           Drives the hub&apos;s MCP server through the /content proxy (secret + act-as injected
           server-side). Same endpoint, same tools a LangChain4j agent or Claude would see.
@@ -245,9 +254,9 @@ export function McpPlaygroundPage() {
                 ? `Connection failed${statusDetail ? `: ${statusDetail}` : ''}`
                 : 'Connecting…'}
           </span>
-          <button type="button" className={button} onClick={() => void connect()}>
+          <Button variant="outline" size="small-legacy" onClick={() => void connect()}>
             Reconnect
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -276,13 +285,13 @@ export function McpPlaygroundPage() {
         <p className={label}>ask_guide {conversationId ? `· conversation ${conversationId.slice(0, 8)}…` : ''}</p>
         <div className="flex gap-2">
           <input className={input} value={question} onChange={e => setQuestion(e.target.value)} />
-          <button type="button" className={primaryButton} disabled={asking || status !== 'ready'} onClick={() => void ask()}>
+          <Button size="small-legacy" disabled={asking || status !== 'ready'} onClick={() => void ask()}>
             {asking ? 'Asking…' : 'Ask'}
-          </button>
+          </Button>
           {conversationId && (
-            <button type="button" className={button} onClick={() => setConversationId(null)}>
+            <Button variant="outline" size="small-legacy" onClick={() => setConversationId(null)}>
               New conversation
-            </button>
+            </Button>
           )}
         </div>
         {answer !== null && (
@@ -302,14 +311,13 @@ export function McpPlaygroundPage() {
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
-          <button
-            type="button"
-            className={primaryButton}
+          <Button
+            size="small-legacy"
             disabled={searching || !query.trim() || status !== 'ready'}
             onClick={() => void search()}
           >
             {searching ? 'Searching…' : 'Search'}
-          </button>
+          </Button>
         </div>
         {searchResults.length > 0 && (
           <ul className="space-y-2">
@@ -333,9 +341,9 @@ export function McpPlaygroundPage() {
               </option>
             ))}
           </select>
-          <button type="button" className={primaryButton} disabled={calling || status !== 'ready'} onClick={() => void runGeneric()}>
+          <Button size="small-legacy" disabled={calling || status !== 'ready'} onClick={() => void runGeneric()}>
             {calling ? 'Calling…' : 'Call tool'}
-          </button>
+          </Button>
         </div>
         <textarea
           className={`${input} min-h-24 font-mono text-xs`}
@@ -381,12 +389,21 @@ export function McpPlaygroundPage() {
                   <p className="mt-2 text-xs text-ods-text-secondary">{decisions[p.proposalId]}</p>
                 ) : (
                   <div className="mt-2 flex gap-2">
-                    <button type="button" className={primaryButton} onClick={() => void decide(p, 'approve')}>
+                    <Button
+                      size="small-legacy"
+                      disabled={decidingId === p.proposalId}
+                      onClick={() => void decide(p, 'approve')}
+                    >
                       Approve
-                    </button>
-                    <button type="button" className={button} onClick={() => void decide(p, 'reject')}>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="small-legacy"
+                      disabled={decidingId === p.proposalId}
+                      onClick={() => void decide(p, 'reject')}
+                    >
                       Reject
-                    </button>
+                    </Button>
                   </div>
                 )}
               </li>
