@@ -1,7 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { ApprovalRequestMessage } from '@flamingo-stack/openframe-frontend-core/components/chat'
-import { Button, Input, Textarea } from '@flamingo-stack/openframe-frontend-core/components/ui'
+import {
+  Button,
+  Card,
+  CardContent,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusBadge,
+  Textarea,
+} from '@flamingo-stack/openframe-frontend-core/components/ui'
 import { EP } from '../config/endpoints'
 
 /**
@@ -63,8 +75,9 @@ function resultOf(raw: unknown): CallResult {
   }
 }
 
-const panel =
-  'rounded-lg border border-ods-border bg-ods-card p-[var(--spacing-system-mf)] space-y-[var(--spacing-system-sf)]'
+// Every panel is the kit `Card` — the shared surface everything else in
+// the product renders sections with; only the inner spacing is local.
+const panelContent = 'space-y-[var(--spacing-system-sf)] p-[var(--spacing-system-mf)]'
 const label = 'text-h5 text-ods-text-secondary'
 
 function errText(err: unknown): string {
@@ -291,21 +304,20 @@ export function McpPlaygroundPage() {
           server-side). Same endpoint, same tools a LangChain4j agent or Claude would see.
         </p>
         <div className="flex flex-wrap items-center gap-[var(--spacing-system-xsf)]">
-          <span
-            className={`rounded-full px-[var(--spacing-system-sf)] py-[var(--spacing-system-xxs)] text-badge font-medium ${
+          <StatusBadge
+            singleLine
+            colorScheme={status === 'ready' ? 'success' : status === 'error' ? 'error' : 'default'}
+            text={
               status === 'ready'
-                ? 'bg-ods-success-secondary text-ods-success'
+                ? `Connected · ${tools.length} tool${tools.length === 1 ? '' : 's'}`
                 : status === 'error'
-                  ? 'bg-ods-error-secondary text-ods-error'
-                  : 'bg-ods-card text-ods-text-secondary'
-            }`}
-          >
-            {status === 'ready'
-              ? `Connected — ${tools.length} tool${tools.length === 1 ? '' : 's'}`
-              : status === 'error'
-                ? `Connection failed${statusDetail ? `: ${statusDetail}` : ''}`
-                : 'Connecting…'}
-          </span>
+                  ? 'Connection failed'
+                  : 'Connecting…'
+            }
+          />
+          {status === 'error' && statusDetail && (
+            <span className="text-h6 text-ods-error">{statusDetail}</span>
+          )}
           <Button variant="outline" size="small" disabled={status === 'connecting'} onClick={() => void connect()}>
             Reconnect
           </Button>
@@ -313,7 +325,7 @@ export function McpPlaygroundPage() {
       </header>
 
       {tools.length > 0 && (
-        <section className={panel}>
+        <Card><CardContent className={panelContent}>
           <p className={label}>tools/list (this deployment&apos;s capabilities)</p>
           <ul className="grid gap-[var(--spacing-system-xsf)] sm:grid-cols-2">
             {tools.map(t => (
@@ -330,10 +342,10 @@ export function McpPlaygroundPage() {
               </li>
             ))}
           </ul>
-        </section>
+        </CardContent></Card>
       )}
 
-      <section className={panel}>
+      <Card><CardContent className={panelContent}>
         <p className={label}>ask_guide {conversationId ? `· conversation ${conversationId.slice(0, 8)}…` : ''}</p>
         <div className="flex gap-[var(--spacing-system-xsf)]">
           <Input value={question} onChange={e => setQuestion(e.target.value)} />
@@ -352,9 +364,9 @@ export function McpPlaygroundPage() {
             <p className="text-badge text-ods-text-secondary">{citationCount} citation source(s)</p>
           </div>
         )}
-      </section>
+      </CardContent></Card>
 
-      <section className={panel}>
+      <Card><CardContent className={panelContent}>
         <p className={label}>search_docs</p>
         <div className="flex gap-[var(--spacing-system-xsf)]">
           <Input
@@ -380,24 +392,23 @@ export function McpPlaygroundPage() {
             ))}
           </ul>
         )}
-      </section>
+      </CardContent></Card>
 
-      <section className={panel}>
+      <Card><CardContent className={panelContent}>
         <p className={label}>call any tool (write tools return pending proposals)</p>
         <div className="flex flex-wrap gap-[var(--spacing-system-xsf)]">
-          {/* Raw select on purpose: the kit's Select is the full Radix
-              popover stack — heavier than this single-control demo needs. */}
-          <select
-            className="w-64 rounded-md border border-ods-border bg-ods-bg px-[var(--spacing-system-sf)] py-[var(--spacing-system-xxs)] text-h6 text-ods-text-primary focus:outline-none focus:border-ods-border-focus"
-            value={selectedTool}
-            onChange={e => setSelectedTool(e.target.value)}
-          >
-            {tools.map(t => (
-              <option key={t.name} value={t.name}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+          <Select value={selectedTool} onValueChange={setSelectedTool}>
+            <SelectTrigger className="w-64" aria-label="Tool to call">
+              <SelectValue placeholder="Select a tool" />
+            </SelectTrigger>
+            <SelectContent>
+              {tools.map(t => (
+                <SelectItem key={t.name} value={t.name}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button size="small" disabled={calling || status !== 'ready'} onClick={() => void runGeneric()}>
             {calling ? 'Calling…' : 'Call tool'}
           </Button>
@@ -423,10 +434,10 @@ export function McpPlaygroundPage() {
             {callOutput.structured ? JSON.stringify(callOutput.structured, null, 2) : callOutput.text}
           </pre>
         )}
-      </section>
+      </CardContent></Card>
 
       {pending.length > 0 && (
-        <section className={panel}>
+        <Card><CardContent className={panelContent}>
           <p className={label}>pending approvals</p>
           <ul className="space-y-[var(--spacing-system-sf)]">
             {pending.map(p => {
@@ -455,7 +466,7 @@ export function McpPlaygroundPage() {
               )
             })}
           </ul>
-        </section>
+        </CardContent></Card>
       )}
     </div>
   )

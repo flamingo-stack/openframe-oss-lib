@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { Button } from '../ui/button/button'
 import { ClaudeIcon } from '../icons/claude-icon'
 import { EmbedViewerFrame } from './embed-viewer-frame'
-import { useEndpointsRuntime } from '../../contexts/endpoints-runtime-context'
-import { toClaudeEmbedUrl, toClaudeMirrorPath } from '../../utils/embed-url-converters'
+import { useClaudeMirrorSrc } from '../../hooks/use-claude-mirror-src'
+import { toClaudeEmbedUrl } from '../../utils/embed-url-converters'
 
 export type ClaudeEmbedKind = 'artifact' | 'design'
 
@@ -53,33 +52,10 @@ const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
  * allow-listed this host, or an http host (mixed content).
  */
 export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy' }: ClaudeEmbedProps) {
-  // Mirror detection is TRANSPARENT: derive the mirror url from the
-  // artifact id under the host's configured storage-view proxy base —
-  // `EndpointsRuntime`, the SAME proxy-path mechanism as every other
-  // lib→API call — and probe it (1-byte ranged GET; the proxy forwards
-  // Range, so this costs nothing). Exists → frame the mirror; otherwise
-  // the claude.ai fallback below is exactly the pre-mirror behavior. A
-  // host that mounts no provider (or omits the entry) skips the mirror
-  // leg entirely.
-  const endpoints = useEndpointsRuntime()
-  const mirrorPath = toClaudeMirrorPath(url, endpoints?.storageViewBaseUrl)
-  const [mirrorSrc, setMirrorSrc] = useState<string | null>(null)
-  useEffect(() => {
-    setMirrorSrc(null)
-    if (!mirrorPath) return
-    let cancelled = false
-    fetch(mirrorPath, { headers: { Range: 'bytes=0-0' } })
-      .then(res => {
-        if (!cancelled && (res.ok || res.status === 206)) setMirrorSrc(mirrorPath)
-      })
-      .catch(() => {
-        // No proxy on this host / network blip — the claude.ai fallback
-        // stands, same as before mirrors existed.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [mirrorPath])
+  // Mirror detection lives in `useClaudeMirrorSrc` (derive from
+  // EndpointsRuntime + 1-byte ranged probe) — this component stays
+  // presentational: mirror when the hook found one, claude.ai otherwise.
+  const mirrorSrc = useClaudeMirrorSrc(url)
   const embedUrl = mirrorSrc ?? toClaudeEmbedUrl(url)
   return (
     <EmbedViewerFrame
