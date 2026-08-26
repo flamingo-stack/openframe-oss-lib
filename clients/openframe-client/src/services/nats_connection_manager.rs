@@ -291,10 +291,7 @@ impl NatsConnectionManager {
             guard.replace(fresh)
         };
 
-        // Consumers rebind on this; the drain below ends their message streams so they re-read
-        // the client from the manager and pick up the replacement.
-        let _ = self.reconnect_tx.send(());
-
+        // Drain is the rebind trigger; reconnect_tx here would wedge listeners on the dead client.
         if let Some(previous) = previous {
             if let Err(e) = previous.drain().await {
                 warn!("Draining the superseded NATS client failed: {}", e);
