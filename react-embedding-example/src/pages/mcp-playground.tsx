@@ -155,7 +155,15 @@ export function McpPlaygroundPage() {
   const callTool = useCallback(async (name: string, args: Record<string, unknown>) => {
     const client = clientRef.current
     if (!client) throw new Error('Not connected')
-    return resultOf(await client.callTool({ name, arguments: args }))
+    // The SDK's default request timeout is 60s and ask_guide runs 10-60s:
+    // subscribe to progress and reset the timeout on each notification so
+    // slow tools survive exactly as long as the server reports work.
+    return resultOf(
+      await client.callTool(
+        { name, arguments: args },
+        { timeout: 180_000, resetTimeoutOnProgress: true, onprogress: () => {} },
+      ),
+    )
   }, [])
 
   const ask = useCallback(async () => {
