@@ -85,7 +85,7 @@ class NotificationEmitterTest {
         assertThat(sent.getAudience()).isSameAs(spec.audience);
         assertThat(sent.getCorrelationId()).isEqualTo("corr-1");
         assertThat(sent.getContext().getType()).isEqualTo("TEST_TYPE");
-        assertThat(sent.getPushCategory()).isEqualTo("TEST_CATEGORY");
+        assertThat(sent.getApplePushCategory()).isEqualTo("TEST_CATEGORY");
     }
 
     @Test
@@ -130,7 +130,7 @@ class NotificationEmitterTest {
             return "Assigned to " + seed.assigneeUserId();
         }
 
-        @Override public Optional<String> getPushCategory() {
+        @Override public Optional<String> getApplePushCategory() {
             return Optional.of("TEST_CATEGORY");
         }
 

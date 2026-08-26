@@ -103,7 +103,7 @@ class NotificationBroadcasterTest {
                 .context(genericContext("TICKET_ASSIGNED"))
                 .type(TestType.TICKET_ASSIGNED)
                 .attributes(java.util.Map.of("ticketId", "t-1", "assigneeUserId", "u-9"))
-                .pushCategory("APPROVAL_REQUEST")
+                .applePushCategory("APPROVAL_REQUEST")
                 .audience(Audience.users("admin-1"))
                 .build();
 
@@ -115,7 +115,7 @@ class NotificationBroadcasterTest {
         assertThat(stored.getValue().getAttributes())
                 .containsEntry("ticketId", "t-1")
                 .containsEntry("assigneeUserId", "u-9");
-        assertThat(stored.getValue().getPushCategory()).isEqualTo("APPROVAL_REQUEST");
+        assertThat(stored.getValue().getApplePushCategory()).isEqualTo("APPROVAL_REQUEST");
         assertThat(stored.getValue().getContext()).isNotNull();
     }
 
