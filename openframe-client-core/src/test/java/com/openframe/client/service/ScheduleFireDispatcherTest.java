@@ -260,6 +260,34 @@ class ScheduleFireDispatcherTest {
     }
 
     @Test
+    @DisplayName("dispatch SKIP: an OFFLINE target is skipped — no leaf persisted, nothing published, no reconnect sentinel; only the online device runs")
+    void dispatch_skip_offlineTargetNotDispatched() {
+        Instant now = Instant.now();
+        ScheduleScript schedule = schedule(List.of("script-a"));
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-online", "m-offline"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m-online", DeviceStatus.ONLINE), machine("m-offline", DeviceStatus.OFFLINE)));
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(script("script-a", ScriptShell.BASH)));
+
+        dispatcher.dispatch(schedule, now);
+
+        // Header counts only the online machine — the offline one is not part of this fire.
+        ArgumentCaptor<ScheduleScriptExecution> headerCaptor = ArgumentCaptor.forClass(ScheduleScriptExecution.class);
+        verify(scheduleScriptExecutionRepository).save(headerCaptor.capture());
+        assertThat(headerCaptor.getValue().getTotalMachineCount()).isEqualTo(1);
+
+        // Exactly one leaf, for the online machine — nothing persisted for the offline one.
+        ArgumentCaptor<List<ScriptExecution>> rowsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(scriptExecutionRepository).saveAll(rowsCaptor.capture());
+        assertThat(rowsCaptor.getValue()).extracting(ScriptExecution::getMachineId).containsExactly("m-online");
+
+        verify(scriptScheduleNatsPublisher).publish(eq("m-online"), any());
+        verify(scriptScheduleNatsPublisher, never()).publish(eq("m-offline"), any());
+        verifyNoInteractions(dispatchRepository);   // SKIP does not arm reconnect sentinels
+    }
+
+    @Test
     @DisplayName("dispatch RETRY_ON_RECONNECT: OFFLINE target is held (sentinel armed NEW + expiresAt), ONLINE target is dispatched")
     void dispatch_retryOnReconnect_armsOfflineDispatchesOnline() {
         Instant now = Instant.now();
