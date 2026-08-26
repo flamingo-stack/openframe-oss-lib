@@ -1,5 +1,6 @@
 package com.openframe.client.scheduler;
 
+import com.openframe.client.service.rmm.watchdog.ScriptDeliveryRetryService;
 import com.openframe.client.service.rmm.watchdog.ScriptExecutionWatchdogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
 public class ScriptExecutionWatchdogScheduler {
 
     private final ScriptExecutionWatchdogService watchdogService;
+    private final ScriptDeliveryRetryService deliveryRetryService;
 
     @Scheduled(fixedDelayString = "${openframe.rmm.execution.watchdog.interval:60000}")
     @SchedulerLock(name = "scriptExecutionWatchdog",
@@ -36,7 +38,7 @@ public class ScriptExecutionWatchdogScheduler {
 
     private void retryQueuedDeliveries() {
         try {
-            watchdogService.retryStuckQueuedDeliveries();
+            deliveryRetryService.retryStuckQueuedDeliveries();
         } catch (Exception e) {
             log.error("QUEUED delivery retry sweep failed", e);
         }
