@@ -4,9 +4,12 @@ import com.openframe.client.metrics.ScriptExecutionWatchdogMetrics;
 import com.openframe.client.service.rmm.ScriptDeliveryRetryStore.RetryState;
 import com.openframe.client.service.rmm.watchdog.ScheduleJobExecutionWatchdogService;
 import com.openframe.client.service.rmm.watchdog.ScriptExecutionWatchdogService;
+import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +28,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -50,16 +54,23 @@ class ScriptExecutionWatchdogServiceTest {
     @Mock
     private com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
 
+    @Mock
+    private MachineRepository machineRepository;
+
     private ScriptExecutionWatchdogService service;
 
     @BeforeEach
     void setUp() {
         service = new ScriptExecutionWatchdogService(repository, headerWatchdogService,
-                new ScriptExecutionWatchdogMetrics(new SimpleMeterRegistry()), retryStore, scriptScheduleNatsPublisher);
+                new ScriptExecutionWatchdogMetrics(new SimpleMeterRegistry()), retryStore, scriptScheduleNatsPublisher,
+                machineRepository);
         ReflectionTestUtils.setField(service, "graceSeconds", GRACE);
         ReflectionTestUtils.setField(service, "fallbackThresholdSeconds", FALLBACK);
         ReflectionTestUtils.setField(service, "retrySize", 3);
         ReflectionTestUtils.setField(service, "queuedThresholdSeconds", 30L);
+        // Default: no target is offline. Individual QUEUED tests override as needed.
+        lenient().when(machineRepository.findByMachineIdInAndStatus(any(), eq(DeviceStatus.OFFLINE)))
+                .thenReturn(List.of());
     }
 
     @Test
@@ -246,6 +257,34 @@ class ScriptExecutionWatchdogServiceTest {
         service.retryStuckQueuedDeliveries();
 
         verify(scriptScheduleNatsPublisher, times(1)).publish(eq("m-1"), eq(msg));
+    }
+
+    @Test
+    @DisplayName("QUEUED retry: an OFFLINE target is failed immediately — no re-send, retry store untouched, header finalized")
+    void queuedRetry_offlineDevice_failsWithoutRetry() {
+        ScriptExecution q = queued("exec-1", "m-1", "s-a", 60);
+        q.setScheduleId("sch-1");
+        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any())).thenReturn(List.of(q));
+        when(machineRepository.findByMachineIdInAndStatus(any(), eq(DeviceStatus.OFFLINE)))
+                .thenReturn(List.of(machine("m-1")));
+
+        service.retryStuckQueuedDeliveries();
+
+        verify(scriptScheduleNatsPublisher, never()).publish(any(), any());
+        verify(retryStore, never()).get(any(), any());
+        verify(retryStore, never()).incrementRetryCount(any(), any(), any());
+        ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
+        verify(repository).saveAll(captor.capture());
+        assertThat(captor.getValue()).allMatch(r -> r.getStatus() == ExecutionStatus.FAILED);
+        assertThat(captor.getValue()).allMatch(r -> r.getError() != null && r.getError().contains("offline"));
+        verify(retryStore).evict("exec-1", "m-1");
+        verify(headerWatchdogService).finalizeIfSettled("t-1", "exec-1");
+    }
+
+    private static Machine machine(String machineId) {
+        Machine machine = new Machine();
+        machine.setMachineId(machineId);
+        return machine;
     }
 
     private static ScriptExecution queued(String executionId, String machineId, String scriptId, long ageSeconds) {
