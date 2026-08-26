@@ -9,7 +9,6 @@ import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.document.tenant.Tenant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -35,9 +34,6 @@ public class TenantDiscoveryService {
     private final TenantService tenantService;
     private final SSOConfigService ssoConfigService;
     private final GlobalDomainPolicyLookup globalDomainPolicyLookup;
-
-    @Value("${openframe.tenancy.local-tenant:false}")
-    private boolean localTenant;
 
     public TenantDiscoveryResponse discoverTenantForEmail(String email) {
         log.debug("Discovering tenants for email: {}", email);
@@ -78,9 +74,7 @@ public class TenantDiscoveryService {
     }
 
     private Optional<Tenant> resolveActiveTenant(String tenantId) {
-        return localTenant
-                ? tenantService.findFirst()
-                : tenantService.findById(tenantId).filter(Tenant::isActive);
+        return tenantService.findById(tenantId).filter(Tenant::isActive);
     }
 
     private TenantDiscoveryResponse tenantFound(String email, Tenant tenant) {
@@ -101,8 +95,7 @@ public class TenantDiscoveryService {
     }
 
     private List<String> availableAuthProviders(Tenant tenant) {
-        List<String> providers = new ArrayList<>(
-                ssoConfigService.getEffectiveProvidersForTenant(localTenant ? null : tenant.getId()));
+        List<String> providers = new ArrayList<>(ssoConfigService.getEffectiveProvidersForTenant(tenant.getId()));
         if (ssoConfigService.isOpenframeLoginEnabled(tenant.getId())) {
             providers.add(OPENFRAME_PROVIDER);
         }

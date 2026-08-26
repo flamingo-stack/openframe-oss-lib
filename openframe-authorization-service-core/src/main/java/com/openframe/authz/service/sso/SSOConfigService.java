@@ -6,7 +6,6 @@ import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import com.openframe.data.repository.tenant.SSOPerTenantConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -22,14 +21,11 @@ public class SSOConfigService {
     private final EncryptionService encryptionService;
     private final List<DefaultProviderConfig> defaultProviderConfigs;
 
-    @Value("${openframe.tenancy.local-tenant:false}")
-    private boolean localTenant;
-
     /**
      * Get ACTIVE SSO configuration by tenant and provider.
      */
     public Optional<SSOPerTenantConfig> getSSOConfig(String tenantId, String provider) {
-        return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(localTenant ? null : tenantId, provider);
+        return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(tenantId, provider);
     }
 
     /**
@@ -91,7 +87,7 @@ public class SSOConfigService {
      */
     public boolean isOpenframeLoginEnabled(String tenantId) {
         return ssoPerTenantConfigRepository
-                .findFirstByTenantIdAndProvider(localTenant ? null : tenantId, SSOConfig.OPENFRAME_PROVIDER)
+                .findFirstByTenantIdAndProvider(tenantId, SSOConfig.OPENFRAME_PROVIDER)
                 .map(SSOConfig::isEnabled)
                 .orElse(true);
     }
