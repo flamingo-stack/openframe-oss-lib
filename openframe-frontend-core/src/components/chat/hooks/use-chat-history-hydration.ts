@@ -19,7 +19,7 @@
 
 import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import type { Message } from './use-chat'
-import { chatAuthedFetch } from '../utils/chat-authed-fetch'
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
 import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../utils/auto-continuation-directive'
 
 export interface UseChatHistoryHydrationArgs {
@@ -79,7 +79,7 @@ export function useChatHistoryHydration({
     setIsHydratingHistory(true)
     ;(async () => {
       try {
-        const res = await chatAuthedFetch(
+        const res = await embedAuthedFetch(
           `${historyUrl}?conversationId=${encodeURIComponent(conversationId)}`,
           { method: 'GET' },
         )

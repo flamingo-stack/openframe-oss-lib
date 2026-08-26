@@ -5,24 +5,28 @@ page-level content surface from `@flamingo-stack/openframe-frontend-core` (onboa
 guides, roadmap, delivery, product releases, authors, FAQ, legal, contact, tickets,
 announcements), talking to the multi-platform hub through a **`/content` reverse proxy**.
 
-The proxy holds the **chat secret** and injects a **fixed identity** (Michael Assraf), so
+Credentials are pasted once on the app's `/debug` page (localStorage), so
 the chat greets that user with no client-side auth — exactly how a real embedder works.
 
 ## How this maps to production
 
 In production the client is React and the proxy is an existing **Spring Boot** service. The
-local proxy here (`proxy/`, or Vite's built-in dev proxy) is a stand-in that does the same
-two things Spring Boot already does:
+local proxy here (`proxy/`, or Vite's built-in dev proxy) is a stand-in that only
+rewrites paths:
 
 1. Rewrite `/content/api/*` → `${HUB_ORIGIN}/api/*`.
-2. Inject `Authorization: Bearer ${CHAT_PROXY_SECRET}` + `X-Chat-Act-As` / `-First-Name` /
-   `-Last-Name` / `-Avatar-Url`.
+2. Forward request headers untouched — credentials are CLIENT-side: the app's
+   `/debug` page stores a platform API key + act-as email in localStorage, and
+   every surface attaches `Authorization: Bearer` + `X-Chat-Act-As` itself.
+   (Production Spring Boot may still inject gateway credentials server-side —
+   its deployment's concern, not this example's.)
 
-The React client is byte-identical in both — it only ever calls `/content/api/...`. The
-secret + identity live **only** on the proxy (non-`VITE_` env), never in the browser bundle.
+The React client is byte-identical in both — it only ever calls `/content/api/...`.
+The proxy holds NO credentials; the key + identity live in the browser's
+localStorage (`chat.proxy-auth.v1`), set once on `/debug`.
 
 ```
-Browser SPA ──fetch('/content/api/...')──▶ proxy (rewrite + inject secret/identity) ──▶ hub /api/*
+Browser SPA ──fetch('/content/api/...')──▶ proxy (path rewrite only) ──▶ hub /api/*
 ```
 
 ## Prerequisites
@@ -46,17 +50,19 @@ Browser SPA ──fetch('/content/api/...')──▶ proxy (rewrite + inject sec
    ```bash
    unset ANTHROPIC_API_KEY && npm run dev:openframe   # in the hub repo
    ```
-3. **Set the shared secret.** Copy `.env.example` → `.env` and set `CHAT_PROXY_SECRET` to the
-   **same** value the hub uses. If empty, the hub returns `503 CHAT_PROXY_SECRET_NOT_CONFIGURED`
-   and chat errors loudly.
+3. **Paste credentials on `/debug`.** Mint a key in the hub's `/admin/api-keys` (on the
+   platform `HUB_ORIGIN` points at — keys are platform-bound), open this app's `/debug`
+   page, and paste the key + the act-as email. They persist in localStorage; every surface
+   attaches them client-side. A missing/wrong key surfaces as
+   `401 CHAT_PROXY_AUTH_INVALID`.
 
 ## Run
 
 ```bash
-cp .env.example .env          # then edit CHAT_PROXY_SECRET (+ HUB_ORIGIN if not :3000)
+cp .env.example .env          # edit HUB_ORIGIN if the hub is not on :3000
 npm install
-npm run dev                   # Vite dev server proxies /content → hub, injecting secret + identity
-# → open the printed URL; the floating "Ask AI" chat greets Michael.
+npm run dev                   # Vite dev server proxies /content → hub (no credential injection)
+# → open the printed URL, paste creds on /debug, and the chat greets that user.
 ```
 
 Built-app path (uses the standalone Node proxy instead of Vite's):
@@ -69,8 +75,6 @@ npm run build && npm run preview:proxy
 | Var | Side | Purpose |
 |-----|------|---------|
 | `HUB_ORIGIN` | server only | Where `/content/api/*` is forwarded. Default `http://localhost:3000`. |
-| `CHAT_PROXY_SECRET` | server only | Shared secret — must equal the hub's. |
-| `ACT_AS_EMAIL` / `ACT_AS_FIRST_NAME` / `ACT_AS_LAST_NAME` / `ACT_AS_AVATAR_URL` | server only | The impersonated identity (defaults to Michael Assraf). |
 | `VITE_HUB_ORIGIN` | client | Public hub origin for new-tab "open full content" links. |
 
 > There is intentionally **no chat-source / platform variable**. The client is platform-agnostic: the chat wire resolves `source` server-side (the hub's `currentPlatform()`), client-side same-tab/new-tab link decisions fall back to an origin comparison, and the chat-history namespace falls back to a lib default. Point `HUB_ORIGIN` at any platform's hub and it just works.
@@ -257,5 +261,5 @@ per-page overridable — nothing is hard-shared:
 - **Doc / roadmap / delivery chips don't navigate** — check `composeContentUrl` /
   `docPlatformTargets` in `content-runtime.ts` (see *Configuring routes & navigation*); an
   unmapped type falls back to Ask-only or the hub origin.
-- **Chat 500s with `CHAT_PROXY_SECRET_NOT_CONFIGURED`** — `.env`'s `CHAT_PROXY_SECRET` must
-  equal the hub's.
+- **Chat 401s with `CHAT_PROXY_AUTH_INVALID`** — no credentials pasted on `/debug`, or the
+  key is revoked / minted on a different platform than `HUB_ORIGIN` points at.
