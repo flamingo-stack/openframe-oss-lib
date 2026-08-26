@@ -1,7 +1,7 @@
 package com.openframe.api.dataloader;
 
 import com.netflix.graphql.dgs.DgsDataLoader;
-import com.openframe.api.service.KnowledgeBaseAttachmentService;
+import com.openframe.api.service.knowledgebase.KnowledgeBaseAttachmentService;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

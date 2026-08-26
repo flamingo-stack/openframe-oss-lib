@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { Label } from './label'
 import { cn } from '../../utils/cn'
 
 export interface TabSelectorItem {
@@ -59,9 +60,12 @@ export function TabSelector({
       aria-disabled={disabled || undefined}
     >
       {label && (
-        <p className="text-ods-text-primary text-h4">
+        // Label for family/color; "large" (text-h4) is this component's
+        // long-standing label scale — neighbours opt into the same scale via
+        // their `labelVariant="large"` when a design puts them side by side.
+        <Label variant="large">
           {label}
-        </p>
+        </Label>
       )}
       <div
         className={cn(

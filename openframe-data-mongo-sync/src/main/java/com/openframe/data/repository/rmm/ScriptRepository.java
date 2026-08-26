@@ -1,7 +1,7 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.Script;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 

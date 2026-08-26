@@ -350,6 +350,7 @@ export type ContentSourceType =
   | 'what_i_shipped'      // What I Shipped employee check-ins (lives on people-hub)
   | 'how_i_work'          // How I Work employee AI-workflow sessions (lives on people-hub)
   | 'faq'                 // FAQ Q&A pair (single-page /faqs index; deep-link by category anchor)
+  | 'design_doc'          // Internal design docs (product-hub admin; preview route only, no public page)
   | 'from_scratch';
 
 export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';

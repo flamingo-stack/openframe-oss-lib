@@ -3,11 +3,11 @@ package com.openframe.data.service.rmm;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
-import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
-import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
-import com.openframe.data.document.rmm.OsType;
-import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptMachineAssigned;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +16,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -25,7 +24,7 @@ import java.util.stream.Collectors;
  * dispatch engine and the DEVICE_ONLINE trigger (client-service) and the read side (api). Two modes:
  *
  * <ul>
- *   <li>{@code SPECIFIC} (or legacy/null) — reads the {@link ScriptScheduleMachineAssigned} join rows.</li>
+ *   <li>{@code SPECIFIC} (or legacy/null) — reads the {@link ScheduleScriptMachineAssigned} join rows.</li>
  *   <li>{@code CRITERIA} — resolves {@link ScheduleDeviceCriteria} against the machines collection at
  *       call time, so devices registered after the schedule was saved are included automatically.
  *       No join rows are consulted.</li>
@@ -44,13 +43,13 @@ public class ScheduleDeviceTargetResolver {
     private final ScriptScheduleMachineAssignedRepository assignedRepository;
 
     /** The schedule's current target machineIds (deduped), resolved per its selection mode. */
-    public List<String> resolveTargetMachineIds(ScriptSchedule schedule) {
+    public List<String> resolveTargetMachineIds(ScheduleScript schedule) {
         if (schedule.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA) {
             return resolveCriteriaMachineIds(schedule);
         }
         return assignedRepository
                 .findByTenantIdAndScriptScheduleId(schedule.getTenantId(), schedule.getId()).stream()
-                .map(ScriptScheduleMachineAssigned::getMachineId)
+                .map(ScheduleScriptMachineAssigned::getMachineId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -61,7 +60,7 @@ public class ScheduleDeviceTargetResolver {
      * SPECIFIC schedule (those target an explicit set, matched via join rows instead). Used by the
      * DEVICE_ONLINE trigger to fire criteria schedules on a device that just came online.
      */
-    public boolean matchesCriteria(ScriptSchedule schedule, Machine machine) {
+    public boolean matchesCriteria(ScheduleScript schedule, Machine machine) {
         if (schedule.getSelectionMode() != ScheduleDeviceSelectionMode.CRITERIA || machine == null) {
             return false;
         }
@@ -91,7 +90,7 @@ public class ScheduleDeviceTargetResolver {
      * in {@link MachineRepository#findMachineIdsByCriteria}. A contradictory OS scope (criteria OS disjoint
      * from the schedule's platforms) matches nothing, short-circuited without a query.
      */
-    private List<String> resolveCriteriaMachineIds(ScriptSchedule schedule) {
+    private List<String> resolveCriteriaMachineIds(ScheduleScript schedule) {
         List<OsType> platformScope = platformScope(schedule);
         if (platformScope != null && platformScope.isEmpty()) {
             return List.of();   // contradictory OS scope → no device can match
@@ -100,7 +99,7 @@ public class ScheduleDeviceTargetResolver {
                 schedule.getTenantId(), buildCriteriaFilter(schedule.getDeviceCriteria()), platformScope);
     }
 
-    public long countCriteriaMachines(ScriptSchedule schedule) {
+    public long countCriteriaMachines(ScheduleScript schedule) {
         List<OsType> platformScope = platformScope(schedule);
         if (platformScope != null && platformScope.isEmpty()) {
             return 0L;
@@ -118,7 +117,7 @@ public class ScheduleDeviceTargetResolver {
         return filter;
     }
 
-    private List<OsType> platformScope(ScriptSchedule schedule) {
+    private List<OsType> platformScope(ScheduleScript schedule) {
         ScheduleDeviceCriteria criteria = schedule.getDeviceCriteria();
         List<OsType> osTypes = criteria == null ? null : criteria.getOsTypes();
         Set<OsType> supported = schedule.getSupportedPlatforms() == null

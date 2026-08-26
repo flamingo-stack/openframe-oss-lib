@@ -2,6 +2,8 @@
  * Types related to users
  */
 
+import type { DepartmentRef } from './department'
+
 /**
  * User profile
  */
@@ -14,7 +16,8 @@ export type UserProfile = {
   company: string | null
   bio: string | null
   employee_id: string | null
-  department: string | null
+  department_id: string | null
+  department: DepartmentRef | null
   role: 'user' | 'super_admin'
   msp_id: string | null
   created_at: string

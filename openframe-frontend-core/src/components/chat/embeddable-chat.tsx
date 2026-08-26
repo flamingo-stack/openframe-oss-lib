@@ -30,7 +30,7 @@
  * host-supplied builders (program configs, product-release prop builder).
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { cn } from '../../utils/cn'
 import { useControllableState } from '@radix-ui/react-use-controllable-state'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
@@ -81,6 +81,7 @@ import {
   type ChatMode,
   type UseUnifiedChatModes,
 } from './hooks/use-unified-chat'
+import type { DialogItem } from './types/component.types'
 import type { UnifiedChatState } from './types/unified-chat-state.types'
 import type { MessageSegment } from './types/message.types'
 import type {
@@ -242,6 +243,11 @@ export interface EmbeddableChatProps {
     unarchiveDialog?: (id: string) => Promise<void>
     searchQuery?: string
     onSearchChange?: (query: string) => void
+    /** Copy a shareable link to a conversation — adds "Copy chat link" to the
+     *  header ⋯ menu and every dialog row menu. The host owns the URL shape and
+     *  the clipboard write; the panel knows neither the app's routes nor whether
+     *  a clipboard is available. Omit to hide the action. */
+    onCopyLink?: (dialog: DialogItem) => void
   }
 
   /**
@@ -904,9 +910,31 @@ function SourceChips({
  * EmbeddableChat — the floating "Ask AI" button + Mingo chat panel.
  * Lib-portable port of the hub's `<GlobalAskAI>`.
  */
-export function EmbeddableChat(props: EmbeddableChatProps) {
-  return <EmbeddableChatInner {...props} />
+/**
+ * Imperative escape hatch for the ONE thing a host can't express as a prop:
+ * "put the panel on a new chat, now". Everything else the host drives is state
+ * it already owns (open, active dialog, mode); this is a command, and it has to
+ * work whether the panel was just mounted or has been open on the chat list for
+ * a while — which a mount-time prop or a `view` prop can't do (re-asserting the
+ * same value is not a change).
+ */
+export interface EmbeddableChatHandle {
+  /**
+   * Same as the panel's own "Start New Chat": clears the open conversation and
+   * its messages, force-closes the archive, and — in the narrow single-column
+   * layout — navigates from the "Current Chats" list to the composer. Wide
+   * layouts already show the new-chat welcome once nothing is open, so there
+   * the compose flag is inert.
+   */
+  startNewChat: () => void
 }
+
+export const EmbeddableChat = React.forwardRef<
+  EmbeddableChatHandle,
+  EmbeddableChatProps
+>(function EmbeddableChat(props, ref) {
+  return <EmbeddableChatInner {...props} handleRef={ref} />
+})
 
 function EmbeddableChatInner({
   baseRoute,
@@ -942,7 +970,8 @@ function EmbeddableChatInner({
   guidePendingPrompt,
   onGuidePromptConsumed,
   contextMemory,
-}: EmbeddableChatProps) {
+  handleRef,
+}: EmbeddableChatProps & { handleRef?: React.Ref<EmbeddableChatHandle> }) {
   // `shell === 'none'` means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
   // concerns are unconditional in this codebase — gate them off here so
@@ -1097,6 +1126,7 @@ function EmbeddableChatInner({
         unarchiveDialog: mingoDialogCapabilities?.unarchiveDialog,
         searchQuery: mingoDialogCapabilities?.searchQuery,
         onSearchChange: mingoDialogCapabilities?.onSearchChange,
+        onCopyLink: mingoDialogCapabilities?.onCopyLink,
       }
     }
     return {
@@ -1106,6 +1136,7 @@ function EmbeddableChatInner({
       unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
       searchQuery: undefined as string | undefined,
       onSearchChange: undefined as ((query: string) => void) | undefined,
+      onCopyLink: undefined as ((dialog: DialogItem) => void) | undefined,
     }
   }, [mingoState, mingoDialogCapabilities, effectiveModes])
 
@@ -1970,6 +2001,10 @@ function EmbeddableChatInner({
     activeDialogId && activeDialog && mingoCaps.canArchive
       ? () => setArchiveTarget(activeDialog)
       : undefined
+  const headerOnCopyLink =
+    activeDialogId && activeDialog && mingoCaps.onCopyLink
+      ? () => mingoCaps.onCopyLink?.(activeDialog)
+      : undefined
   const headerOnOpenArchive = fetchArchivedDialogs ? openArchive : undefined
 
   // Header person (sub-line + 32px avatar, Figma 113:63273): the dialog OWNER
@@ -1994,8 +2029,23 @@ function EmbeddableChatInner({
     resetToNewChat()
   }, [resetToNewChat])
 
+  // Host-driven "Start New Chat" (see EmbeddableChatHandle). Same reset as the
+  // rail button, plus the narrow layout's list→compose navigation that the
+  // in-panel button gets from the list itself — a host has no other way in.
+  useImperativeHandle(
+    handleRef,
+    () => ({
+      startNewChat: () => {
+        resetToNewChat()
+        setComposeOpen(true)
+      },
+    }),
+    [resetToNewChat],
+  )
+
   // Desktop split header ⋯ menu (active, non-archived conversation only).
   const splitHeaderMenuItems = [
+    headerOnCopyLink && { id: 'copy-link', label: 'Copy chat link', onClick: headerOnCopyLink },
     headerOnRename && { id: 'rename', label: 'Rename chat', onClick: headerOnRename },
     headerOnArchive && { id: 'archive', label: 'Archive chat', onClick: headerOnArchive },
   ].filter(Boolean) as ActionsMenuItem[]
@@ -2040,6 +2090,7 @@ function EmbeddableChatInner({
         onRestore: headerOnRestore,
         onRename: headerOnRename,
         onArchive: headerOnArchive,
+        onCopyLink: headerOnCopyLink,
         onOpenArchive: headerOnOpenArchive,
       }
 
@@ -2291,6 +2342,7 @@ function EmbeddableChatInner({
                         onNewChat={handleNewChat}
                         onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                         onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
+                        onRequestCopyLink={mingoCaps.onCopyLink}
                         scope={dialogScope}
                         onScopeChange={setDialogScope}
                         searchQuery={mingoCaps.searchQuery}
@@ -2319,6 +2371,7 @@ function EmbeddableChatInner({
                     onNewChat={() => setComposeOpen(true)}
                     onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                     onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
+                    onRequestCopyLink={mingoCaps.onCopyLink}
                     scope={dialogScope}
                     onScopeChange={setDialogScope}
                     searchQuery={mingoCaps.searchQuery}

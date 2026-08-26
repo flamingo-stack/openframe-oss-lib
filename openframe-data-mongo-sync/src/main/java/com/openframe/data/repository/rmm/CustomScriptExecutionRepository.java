@@ -1,6 +1,6 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
@@ -8,6 +8,7 @@ import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Custom MongoTemplate-backed queries for {@link ScriptExecution}. Owner-scoped —
@@ -20,6 +21,8 @@ import java.util.Map;
  * {@code CustomScriptExecutionRepositoryImpl}.
  */
 public interface CustomScriptExecutionRepository {
+
+    Optional<ScriptExecution> findByMachineIdAndExecutionIdAndScriptId(String machineId, String executionId, String scriptId);
 
     /**
      * Cursor-paginated executions for one owner (script or schedule) within a tenant.
@@ -84,7 +87,7 @@ public interface CustomScriptExecutionRepository {
      * for non-{@code _id} sort fields (empty {@code sortValue} for null Instant), or the plain
      * hex {@code _id} for {@code _id} sort. Consumed by {@link #findPage} on the next request.
      */
-    String encodeCursor(com.openframe.data.document.rmm.ScriptExecution row, String sortField);
+    String encodeCursor(ScriptExecution row, String sortField);
 
     /**
      * Count leaf {@link ScriptExecution} rows for one schedule fire, grouped by status.

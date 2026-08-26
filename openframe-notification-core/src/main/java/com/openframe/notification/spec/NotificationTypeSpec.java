@@ -6,17 +6,15 @@ import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSeverity;
 
 import java.util.Optional;
-import java.util.Set;
 
-public interface NotificationTypeSpec {
+public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     NotificationType getType();
 
-    Set<AttrKey> getRequiredKeys();
+    Class<S> getSeedClass();
 
-    default Set<AttrKey> getOptionalKeys() {
-        return Set.of();
-    }
+    // Pure seed → stored-attributes projection: the only place deciding what clients see.
+    Attrs attrs(S seed);
 
     Optional<NotificationSettingGroup> getSettingsGroup();
 
@@ -24,18 +22,15 @@ public interface NotificationTypeSpec {
 
     NotificationSeverity getSeverity();
 
-    Audience audience(Attrs attrs);
+    Audience audience(S seed);
 
-    NotificationText compose(Attrs attrs);
+    String composeTitle(S seed);
 
-    default NotificationText composeForMachine(Attrs attrs) {
-        return compose(attrs);
-    }
+    String composeDescription(S seed);
 
-    default Set<AttrKey> getPushActionKeys() {
-        return Set.of();
-    }
+    // iOS action-button set, delivered as aps.category; empty = plain banner.
+    Optional<String> getApplePushCategory();
 
-    // Transitional — deleted together with the context classes; do not build on it.
-    NotificationContext buildLegacyContext(Attrs attrs);
+    // Transitional — deleted together with the legacy context classes; do not build on it.
+    NotificationContext buildLegacyContext(S seed);
 }

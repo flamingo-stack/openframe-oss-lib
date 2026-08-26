@@ -61,6 +61,13 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .subjects(List.of("machine.*.installed-agent", "user.*.installed-agent"))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
+                    .build(),
+            // machine hostname change stream
+            StreamConfiguration.builder()
+                    .name("MACHINE_HOSTNAME")
+                    .subjects(List.of("machine.*.hostname"))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
                     .build()
     );
 

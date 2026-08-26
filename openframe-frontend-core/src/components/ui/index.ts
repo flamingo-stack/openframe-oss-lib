@@ -116,11 +116,13 @@ export * from './tag'
 export * from './title-content-block'
 export * from './toggle'
 export * from './tooltip'
+export * from './touch-friendly-tooltip'
 export * from './error-state'
 export * from './content-loader'
 
 // Table components
 export {
+  COMPACT_ROW_MIN_HEIGHT_PX,
   Table, TableCardSkeleton, TableCell,
   TableDescriptionCell, TableEmptyState, TableHeader,
   TableRow, TableTimestampCell

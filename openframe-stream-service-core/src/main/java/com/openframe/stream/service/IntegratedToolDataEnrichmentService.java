@@ -1,6 +1,8 @@
 package com.openframe.stream.service;
 
+import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.model.enums.DataEnrichmentServiceType;
+import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import com.openframe.data.repository.redis.MachineIdCacheService;
@@ -10,6 +12,8 @@ import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Service
 @Slf4j
@@ -34,8 +38,8 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
             return enriched;
         }
 
-        enrichFromMachine(message, enriched);
         enrichFromTenant(message, enriched);
+        enrichFromMachine(message, enriched);
         return enriched;
     }
 
@@ -44,7 +48,7 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
         if (agentId == null) {
             return;
         }
-        CachedMachineInfo machine = machineIdCacheService.getMachine(agentId);
+        CachedMachineInfo machine = findMachine(message, enriched, agentId);
         if (machine == null) {
             log.warn("Machine ID not found for agent: {}", agentId);
             return;
@@ -59,6 +63,34 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
             enriched.setOrganizationId(organization.getOrganizationId());
             enriched.setOrganizationName(organization.getName());
         }
+    }
+
+    // Numeric agent ids (Fleet host ids, Tactical agent ids) are only unique per tenant per tool,
+    // so a shared database needs the scoped lookup; a tenant database is unambiguous without it.
+    private CachedMachineInfo findMachine(DeserializedDebeziumMessage message,
+                                          IntegratedToolEnrichedData enriched, String agentId) {
+        String tenantId = enriched.getTenantId();
+        IntegratedToolType integratedToolType = message.getIntegratedToolType();
+        ToolType toolType = toolTypeOf(integratedToolType);
+        if (canScopeLookupToTenant(tenantId, toolType)) {
+            return machineIdCacheService.getMachine(tenantId, toolType, agentId);
+        }
+        return machineIdCacheService.getMachine(agentId);
+    }
+
+    private boolean canScopeLookupToTenant(String tenantId, ToolType toolType) {
+        return clusterTenantIdResolver != null && !isBlank(tenantId) && toolType != null;
+    }
+
+    private ToolType toolTypeOf(IntegratedToolType integratedToolType) {
+        if (integratedToolType == null) {
+            return null;
+        }
+        return switch (integratedToolType) {
+            case FLEET -> ToolType.FLEET_MDM;
+            case MESHCENTRAL -> ToolType.MESHCENTRAL;
+            case RMM -> ToolType.OPENFRAME_RMM;
+        };
     }
 
     /**

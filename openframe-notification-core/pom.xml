@@ -27,6 +27,19 @@
         <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-nats</artifactId>
+            <!--
+              The NATS Spring Cloud Stream binder must not leak to consumers of this module: with SCS on
+              the classpath, any bean extending java.util.function.* (e.g. MongoConversionsContributor)
+              gets auto-bound as a stream function and boots die without NATS binder config
+              (tenant-stream). Same leak was already killed once in saas-lib #732. Apps that consume via
+              SCS declare data-nats (and its binder) directly.
+            -->
+            <exclusions>
+                <exclusion>
+                    <groupId>io.nats</groupId>
+                    <artifactId>nats-spring-cloud-stream-binder</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>

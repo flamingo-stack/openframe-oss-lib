@@ -5,7 +5,7 @@ import com.openframe.api.dto.organization.OrganizationResponse;
 import com.openframe.api.dto.organization.UpdateOrganizationRequest;
 import com.openframe.api.dto.organization.UpdateOrganizationStatusRequest;
 import com.openframe.api.mapper.OrganizationMapper;
-import com.openframe.api.service.OrganizationCommandService;
+import com.openframe.api.service.organization.OrganizationCommandService;
 import com.openframe.data.service.OrganizationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

@@ -15,4 +15,6 @@ public class SsoInvitationAcceptRequest {
     private String provider;
     private Boolean switchTenant;
     private String redirectTo;
+    /** Mobile-app flow: forwarded to {@code /oauth/continue} — see {@link SsoTenantRegistrationInitRequest#isAuthMobile()}. */
+    private boolean authMobile;
 }

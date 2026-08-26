@@ -1,7 +1,8 @@
 package com.openframe.client.service.rmm.watchdog;
 
-import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.client.metrics.ScriptExecutionWatchdogMetrics;
+import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ public class ScriptExecutionWatchdogService {
 
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleJobExecutionWatchdogService headerWatchdogService;
+    private final ScriptExecutionWatchdogMetrics watchdogMetrics;
 
     @Value("${openframe.rmm.execution.watchdog.grace-seconds:120}")
     private long graceSeconds;
@@ -48,6 +50,7 @@ public class ScriptExecutionWatchdogService {
         log.info("Found {} stuck Execution row(s) — transitioning to FAILED", stuck.size());
         stuck.forEach(row -> markFailing(row, now));
         scriptExecutionRepository.saveAll(stuck);
+        watchdogMetrics.recordScriptReaped(stuck.size());
 
         log.info("Marked {} Execution row(s) as FAILED", stuck.size());
 

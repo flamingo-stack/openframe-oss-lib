@@ -80,10 +80,10 @@ public class OAuthBffService {
         String state = generateState();
 
         String effectiveRedirect = resolveRedirectTarget(redirectTo, request);
-        String absoluteRedirect = isAbsoluteUrl(effectiveRedirect) ? effectiveRedirect : null;
+        String carriedRedirect = isCarriableRedirect(effectiveRedirect) ? effectiveRedirect : null;
 
         String authorizeUrl = buildAuthorizeUrl(tenantId, codeChallenge, state, provider);
-        return Mono.just(new AuthorizeData(authorizeUrl, state, codeVerifier, tenantId, absoluteRedirect, authMobile));
+        return Mono.just(new AuthorizeData(authorizeUrl, state, codeVerifier, tenantId, carriedRedirect, authMobile));
     }
 
     public Mono<OAuthCallbackResult> handleCallback(String code,
@@ -173,7 +173,7 @@ public class OAuthBffService {
             String redirectTo = (String) jwt.getClaims().get("rt");
             boolean authMobile = Boolean.TRUE.equals(jwt.getClaims().get("am"));
             if (codeVerifier == null || tenantId == null) return Optional.empty();
-            return Optional.of(new OAuthSessionData(codeVerifier, tenantId, isAbsoluteUrl(redirectTo) ? redirectTo : null, authMobile));
+            return Optional.of(new OAuthSessionData(codeVerifier, tenantId, isCarriableRedirect(redirectTo) ? redirectTo : null, authMobile));
         } catch (Exception e) {
             log.warn("Failed to decode OAuth state cookie: {}", e.getMessage());
             return Optional.empty();
@@ -306,6 +306,23 @@ public class OAuthBffService {
         return url != null && ABSOLUTE_URI.matcher(url).matches();
     }
 
+    /**
+     * What may travel in the state cookie's {@code rt} claim: an absolute URL, or a same-site
+     * relative path. A path can never redirect off-site, so it needs no allow-listing — but only a
+     * single leading slash counts: {@code //host} (and the {@code /\} variant some browsers accept)
+     * is scheme-relative and would leave the site. The {@link RedirectTargetResolver} decides what
+     * the value ultimately means — the SaaS resolver resolves relative paths against the tenant's
+     * own domain and still allow-lists absolute targets.
+     */
+    private static boolean isCarriableRedirect(String url) {
+        return isAbsoluteUrl(url) || isSafeRelativePath(url);
+    }
+
+    private static boolean isSafeRelativePath(String url) {
+        return url != null && url.startsWith("/")
+                && (url.length() == 1 || (url.charAt(1) != '/' && url.charAt(1) != '\\'));
+    }
+
     private record OAuthSessionData(String codeVerifier, String tenantId, String redirectTo, boolean authMobile) {
     }
 
@@ -381,7 +398,7 @@ public class OAuthBffService {
         }
     }
 
-    public record AuthorizeData(String authorizeUrl, String state, String codeVerifier, String tenantId, String redirectToAbs, boolean authMobile) {}
+    public record AuthorizeData(String authorizeUrl, String state, String codeVerifier, String tenantId, String redirectTo, boolean authMobile) {}
 
     public String buildStateJwt(AuthorizeData data, int ttlSeconds) {
         var builder = JwtClaimsSet.builder()
@@ -391,8 +408,8 @@ public class OAuthBffService {
                 .claim("tid", data.tenantId())
                 .issuedAt(now())
                 .expiresAt(now().plusSeconds(ttlSeconds));
-        if (data.redirectToAbs() != null) {
-            builder.claim("rt", data.redirectToAbs());
+        if (data.redirectTo() != null) {
+            builder.claim("rt", data.redirectTo());
         }
         if (data.authMobile()) {
             builder.claim("am", true);

@@ -21,6 +21,7 @@ function injectSyntheticColumns<T>(
   rowActions?: RowAction<T>[],
   renderRowActions?: (item: T) => ReactNode,
   rowHref?: (item: T) => string | null | undefined,
+  actionsColumnWidth?: string,
 ): TableColumn<T>[] {
   const hasActions = Boolean(rowActions?.length) || Boolean(renderRowActions)
   const result = [...columns]
@@ -29,7 +30,10 @@ function injectSyntheticColumns<T>(
     const actionsColumn: TableColumn<T> = {
       key: '__actions__',
       label: '',
-      width: 'min-w-[100px] w-auto shrink-0 flex-none',
+      // A caller-fixed width keeps the header and every row on ONE grid
+      // (see `actionsColumnWidth` in types.ts); the default stays
+      // content-sized for back-compat.
+      width: actionsColumnWidth ?? 'min-w-[100px] w-auto shrink-0 flex-none',
       align: 'right',
       renderCell: (item: T) => (
         <div className="flex gap-2 items-center justify-end pointer-events-auto" data-no-row-click>
@@ -120,11 +124,12 @@ export function Table<T = any>({
   stickyHeader,
   stickyHeaderOffset,
   animateRowReorder,
+  actionsColumnWidth,
 }: TableProps<T>) {
   // Opt-in row-reorder animation: framer-motion is loaded lazily (its own chunk)
   // ONLY when `animateRowReorder` is set, so the default table stays motion-free.
   const tableMotion = useTableMotion(Boolean(animateRowReorder))
-  const columnsWithActions = injectSyntheticColumns(columns, rowActions, renderRowActions, rowHref)
+  const columnsWithActions = injectSyntheticColumns(columns, rowActions, renderRowActions, rowHref, actionsColumnWidth)
   const getRowHref = (item: T): string | undefined => {
     if (onRowClick || !rowHref) return undefined
     return rowHref(item) ?? undefined
@@ -250,6 +255,7 @@ export function Table<T = any>({
           <TableCardSkeleton
             columns={columns}
             rows={skeletonRows}
+            compact={compact}
             hasActions={Boolean(rowActions) && rowActions!.length > 0}
             hasChevron={Boolean(rowHref)}
           />

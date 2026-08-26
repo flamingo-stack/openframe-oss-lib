@@ -37,6 +37,8 @@ public class Notification implements TenantScoped {
 
     private Map<String, String> attributes;
 
+    private String applePushCategory;
+
     @CreatedDate
     @Indexed(expireAfterSeconds = NotificationRetention.HISTORY_TTL_SECONDS) // 30-day notifications-history retention
     private Instant createdAt;

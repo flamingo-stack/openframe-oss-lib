@@ -12,7 +12,7 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
-import com.openframe.data.document.rmm.OsType;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +25,7 @@ import java.time.Instant;
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
 import static com.openframe.core.exception.ErrorCode.CLIENT_SECRET_INVALID;
 import static java.lang.String.format;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Service
 @RequiredArgsConstructor
@@ -165,6 +166,10 @@ public class AgentRegistrationService {
         machine.setOsType(normalizeOsType(request.getOsType()));
         machine.setAgentVersion(request.getAgentVersion());
         machine.setLastSeen(Instant.now());
+        // Optional; keep the existing value on reinstall when the agent doesn't send it
+        if (isNotBlank(request.getUserId())) {
+            machine.setUserId(request.getUserId());
+        }
     }
 
     private static OsType normalizeOsType(String rawOsType) {
