@@ -70,6 +70,7 @@ public class NotificationBroadcaster {
                 .description(command.getDescription())
                 .type(typeName)
                 .attributes(command.getAttributes())
+                .applePushCategory(command.getApplePushCategory())
                 .context(command.getContext())
                 .correlationId(command.getCorrelationId())
                 .build();
