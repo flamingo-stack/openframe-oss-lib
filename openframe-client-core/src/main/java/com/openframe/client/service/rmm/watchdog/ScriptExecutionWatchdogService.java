@@ -13,10 +13,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static java.util.stream.Collectors.groupingBy;
 
@@ -49,15 +47,7 @@ public class ScriptExecutionWatchdogService {
     public void markStuckExecutionsAsFailed() {
         Instant now = Instant.now();
 
-        // Coarse, index-backed pre-filter: no RUNNING row can be stuck before the
-        // smallest possible per-row threshold elapses. Refine precisely in memory.
-        long coarseFloorSeconds = Math.min(graceSeconds, fallbackThresholdSeconds);
-        List<ScriptExecution> candidates = scriptExecutionRepository.findByStatusAndDispatchedAtBefore(
-                ExecutionStatus.RUNNING, now.minusSeconds(coarseFloorSeconds));
-
-        List<ScriptExecution> stuck = candidates.stream()
-                .filter(row -> isStuck(row, now))
-                .toList();
+        List<ScriptExecution> stuck = findStuckRunning(now);
         if (stuck.isEmpty()) {
             log.debug("No stuck Execution rows found");
             return;
@@ -67,49 +57,76 @@ public class ScriptExecutionWatchdogService {
         stuck.forEach(row -> markFailing(row, now));
         scriptExecutionRepository.saveAll(stuck);
         watchdogMetrics.recordScriptReaped(stuck.size());
-
         log.info("Marked {} Execution row(s) as FAILED", stuck.size());
 
         finalizeAffectedScheduleHeaders(stuck);
     }
 
+    private List<ScriptExecution> findStuckRunning(Instant now) {
+        long coarseFloorSeconds = Math.min(graceSeconds, fallbackThresholdSeconds);
+        return scriptExecutionRepository
+                .findByStatusAndDispatchedAtBefore(ExecutionStatus.RUNNING, now.minusSeconds(coarseFloorSeconds))
+                .stream()
+                .filter(row -> isStuck(row, now))
+                .toList();
+    }
+
+    private void markFailing(ScriptExecution row, Instant now) {
+        long thresholdSeconds = thresholdSecondsFor(row);
+        row.setStatus(ExecutionStatus.FAILED);
+        row.setStatusChangedAt(now);
+        row.setFinishedAt(now);
+        row.setTimedOut(Boolean.TRUE);
+        row.setError(STUCK_ERROR_MESSAGE_FORMAT.formatted(thresholdSeconds));
+        log.info("Reaping stuck Execution: executionId={} machineId={} dispatchedAt={} thresholdSeconds={}",
+                row.getExecutionId(), row.getMachineId(), row.getDispatchedAt(), thresholdSeconds);
+    }
+
     public void retryStuckQueuedDeliveries() {
         Instant now = Instant.now();
-        List<ScriptExecution> queued = scriptExecutionRepository.findByStatusAndDispatchedAtBefore(
-                ExecutionStatus.QUEUED, now.minusSeconds(queuedThresholdSeconds));
-        if (queued.isEmpty()) {
+
+        Map<DeliveryKey, List<ScriptExecution>> deliveries = findStuckQueuedByDelivery(now);
+        if (deliveries.isEmpty()) {
             return;
         }
 
-        Map<DeliveryKey, List<ScriptExecution>> byDelivery = queued.stream()
-                .filter(r -> r.getExecutionId() != null && r.getMachineId() != null)
-                .collect(groupingBy(r -> new DeliveryKey(r.getExecutionId(), r.getMachineId())));
+        List<ScriptExecution> failed = deliveries.entrySet().stream()
+                .flatMap(entry -> retryOrFail(entry.getKey(), entry.getValue(), now).stream())
+                .toList();
 
-        List<ScriptExecution> failed = new ArrayList<>();
-        for (Map.Entry<DeliveryKey, List<ScriptExecution>> e : byDelivery.entrySet()) {
-            DeliveryKey key = e.getKey();
-            Optional<RetryState> state = retryStore.get(key.executionId(), key.machineId());
+        finalizeFailedDeliveries(failed);
+    }
 
-            if (state.isPresent() && state.get().retryCount() < retrySize) {
-                scriptScheduleNatsPublisher.publish(key.machineId(), state.get().message());
-                int attempt = retryStore.incrementRetryCount(key.executionId(), key.machineId(), state.get());
-                watchdogMetrics.recordDeliveryRetried(1);
-                log.info("Retried QUEUED delivery: executionId={} machineId={} attempt={}/{}",
-                        key.executionId(), key.machineId(), attempt, retrySize);
-            } else {
-                e.getValue().forEach(row -> markDeliveryFailed(row, now));
-                failed.addAll(e.getValue());
-                retryStore.evict(key.executionId(), key.machineId());
-                log.warn("QUEUED delivery exhausted: executionId={} machineId={} — {} leaf(s) FAILED (agent never received)",
-                        key.executionId(), key.machineId(), e.getValue().size());
-            }
-        }
+    private List<ScriptExecution> retryOrFail(DeliveryKey delivery, List<ScriptExecution> leaves, Instant now) {
+        return retryStore.get(delivery.executionId(), delivery.machineId())
+                .filter(state -> state.retryCount() < retrySize)
+                .map(state -> retryDelivery(delivery, state))
+                .orElseGet(() -> failDelivery(delivery, leaves, now));
+    }
 
-        if (!failed.isEmpty()) {
-            scriptExecutionRepository.saveAll(failed);
-            watchdogMetrics.recordDeliveryFailed(failed.size());
-            finalizeAffectedScheduleHeaders(failed);
-        }
+    private Map<DeliveryKey, List<ScriptExecution>> findStuckQueuedByDelivery(Instant now) {
+        return scriptExecutionRepository
+                .findByStatusAndDispatchedAtBefore(ExecutionStatus.QUEUED, now.minusSeconds(queuedThresholdSeconds))
+                .stream()
+                .filter(row -> row.getExecutionId() != null && row.getMachineId() != null)
+                .collect(groupingBy(row -> new DeliveryKey(row.getExecutionId(), row.getMachineId())));
+    }
+
+    private List<ScriptExecution> retryDelivery(DeliveryKey delivery, RetryState state) {
+        scriptScheduleNatsPublisher.publish(delivery.machineId(), state.message());
+        int attempt = retryStore.incrementRetryCount(delivery.executionId(), delivery.machineId(), state);
+        watchdogMetrics.recordDeliveryRetried(1);
+        log.info("Retried QUEUED delivery: executionId={} machineId={} attempt={}/{}",
+                delivery.executionId(), delivery.machineId(), attempt, retrySize);
+        return List.of();
+    }
+
+    private List<ScriptExecution> failDelivery(DeliveryKey delivery, List<ScriptExecution> leaves, Instant now) {
+        leaves.forEach(row -> markDeliveryFailed(row, now));
+        retryStore.evict(delivery.executionId(), delivery.machineId());
+        log.warn("QUEUED delivery exhausted: executionId={} machineId={} — {} leaf(s) FAILED (agent never received)",
+                delivery.executionId(), delivery.machineId(), leaves.size());
+        return leaves;
     }
 
     private void markDeliveryFailed(ScriptExecution row, Instant now) {
@@ -119,7 +136,14 @@ public class ScriptExecutionWatchdogService {
         row.setError(DELIVERY_FAILED_ERROR_FORMAT.formatted(retrySize));
     }
 
-    private record DeliveryKey(String executionId, String machineId) {}
+    private void finalizeFailedDeliveries(List<ScriptExecution> failed) {
+        if (failed.isEmpty()) {
+            return;
+        }
+        scriptExecutionRepository.saveAll(failed);
+        watchdogMetrics.recordDeliveryFailed(failed.size());
+        finalizeAffectedScheduleHeaders(failed);
+    }
 
     private void finalizeAffectedScheduleHeaders(List<ScriptExecution> reaped) {
         reaped.stream()
@@ -138,16 +162,5 @@ public class ScriptExecutionWatchdogService {
     private long thresholdSecondsFor(ScriptExecution row) {
         Integer timeout = row.getTimeoutSeconds();
         return timeout != null ? timeout + graceSeconds : fallbackThresholdSeconds;
-    }
-
-    private void markFailing(ScriptExecution row, Instant now) {
-        long thresholdSeconds = thresholdSecondsFor(row);
-        row.setStatus(ExecutionStatus.FAILED);
-        row.setStatusChangedAt(now);
-        row.setFinishedAt(now);
-        row.setTimedOut(Boolean.TRUE);
-        row.setError(STUCK_ERROR_MESSAGE_FORMAT.formatted(thresholdSeconds));
-        log.info("Reaping stuck Execution: executionId={} machineId={} dispatchedAt={} thresholdSeconds={}",
-                row.getExecutionId(), row.getMachineId(), row.getDispatchedAt(), thresholdSeconds);
     }
 }
