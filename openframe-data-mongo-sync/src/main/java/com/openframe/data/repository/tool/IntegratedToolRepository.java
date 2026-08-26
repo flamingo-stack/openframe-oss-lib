@@ -13,4 +13,6 @@ public interface IntegratedToolRepository extends MongoRepository<IntegratedTool
 
     @Override
     Optional<IntegratedTool> findByKey(String key);
+
+    Optional<IntegratedTool> findByTenantIdAndKey(String tenantId, String key);
 } 

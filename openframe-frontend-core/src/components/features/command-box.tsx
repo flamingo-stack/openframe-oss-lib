@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { Button } from '../ui/button'
+import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon'
 import { cn } from '../../utils/cn'
 
 export interface CommandBoxAction {
@@ -34,6 +35,10 @@ export interface CommandBoxProps {
   commandClassName?: string
   /** Maximum lines to show (uses line-clamp, 0 for unlimited) */
   maxLines?: number
+  /** When set, shows a copy icon button in the top-right corner of the box */
+  onCopy?: () => void
+  /** Accessible label for the corner copy button */
+  copyAriaLabel?: string
 }
 
 /**
@@ -86,10 +91,25 @@ export function CommandBox({
   secondaryAction,
   className,
   commandClassName,
-  maxLines = 0
+  maxLines = 0,
+  onCopy,
+  copyAriaLabel = 'Copy command'
 }: CommandBoxProps) {
   // Get static line-clamp class or undefined for unlimited
   const lineClampClass = maxLines > 0 ? lineClampClasses[maxLines] : undefined
+
+  const commandText = (
+    <div
+      className={cn(
+        'text-ods-text-primary text-code break-all',
+        onCopy && 'flex-1 min-w-0',
+        lineClampClass,
+        commandClassName
+      )}
+    >
+      {command}
+    </div>
+  )
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
@@ -99,15 +119,21 @@ export function CommandBox({
         </div>
       )}
       <div className="bg-ods-bg border border-ods-border rounded-[6px] p-4">
-        <div
-          className={cn(
-            'text-ods-text-primary text-code break-all',
-            lineClampClass,
-            commandClassName
-          )}
-        >
-          {command}
-        </div>
+        {onCopy ? (
+          <div className="flex items-start gap-4">
+            {commandText}
+            <button
+              type="button"
+              onClick={onCopy}
+              aria-label={copyAriaLabel}
+              className="shrink-0 rounded-md text-ods-text-secondary transition-colors hover:text-ods-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
+            >
+              <Copy02Icon className="w-5 h-5" />
+            </button>
+          </div>
+        ) : (
+          commandText
+        )}
         {(primaryAction || secondaryAction) && (
           <div className="flex flex-col md:flex-row gap-3 md:justify-end mt-4">
             {secondaryAction && (

@@ -1,6 +1,7 @@
 package com.openframe.data.repository.redis;
 
 import com.openframe.data.document.tool.ToolConnection;
+import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import com.openframe.data.repository.device.MachineRepository;
@@ -8,7 +9,6 @@ import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -51,6 +51,26 @@ public class MachineIdCacheService {
                 .orElse(null);
         } catch (Exception e) {
             log.error("Error fetching machine info for agent: {}", agentId, e);
+            return null;
+        }
+    }
+
+    @Cacheable(value = "tenantMachineCache", key = "#tenantId + ':' + #toolType + ':' + #agentId", unless = "#result == null")
+    public CachedMachineInfo getMachine(String tenantId, ToolType toolType, String agentId) {
+        log.debug("Fetching machine info for agent: {} (tenant: {}, tool: {})", agentId, tenantId, toolType);
+        try {
+            return toolConnectionRepository
+                .findFirstByTenantIdAndToolTypeAndAgentToolIdOrderByConnectedAtDesc(tenantId, toolType, agentId)
+                .map(ToolConnection::getMachineId)
+                .flatMap(machineRepository::findByMachineId)
+                .map(machine -> new CachedMachineInfo(
+                    machine.getMachineId(),
+                    machine.getHostname(),
+                    machine.getOrganizationId()
+                ))
+                .orElse(null);
+        } catch (Exception e) {
+            log.error("Error fetching machine info for agent: {} (tenant: {}, tool: {})", agentId, tenantId, toolType, e);
             return null;
         }
     }
