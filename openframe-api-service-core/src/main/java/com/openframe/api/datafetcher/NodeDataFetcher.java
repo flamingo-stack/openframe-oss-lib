@@ -5,7 +5,6 @@ import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.relay.NodeType;
 import com.openframe.api.service.device.DeviceService;
-import com.openframe.api.service.EventService;
 import com.openframe.api.service.InstalledAgentService;
 import com.openframe.api.service.TagService;
 import com.openframe.api.service.ToolConnectionService;
@@ -32,7 +31,6 @@ public class NodeDataFetcher {
 
     private final DeviceService deviceService;
     private final OrganizationService organizationService;
-    private final EventService eventService;
     private final ToolService toolService;
     private final TagService tagService;
     private final ToolConnectionService toolConnectionService;
@@ -73,7 +71,6 @@ public class NodeDataFetcher {
         return switch (nodeType) {
             case MACHINE -> deviceService.findByMachineId(globalId.getId()).orElse(null);
             case ORGANIZATION -> organizationService.getOrganizationByOrganizationId(globalId.getId()).orElse(null);
-            case EVENT -> eventService.findById(globalId.getId()).orElse(null);
             case INTEGRATED_TOOL -> toolService.findById(globalId.getId()).orElse(null);
             case TAG -> tagService.findById(globalId.getId()).orElse(null);
             case TOOL_CONNECTION -> toolConnectionService.findById(globalId.getId()).orElse(null);
