@@ -48,11 +48,30 @@ import {
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
-import { Button } from '../ui';
+import { Alert, AlertDescription, Button } from '../ui';
 import { BookingForm } from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';
 import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
+
+/**
+ * Visitor-facing copy per booking-error code. Everything except SLOT_TAKEN
+ * renders in a prominent `<Alert>` ABOVE the form the visitor just submitted
+ * (an inline alert is deterministic in every embed context — a toast needs a
+ * host-mounted provider this widget cannot assume). SLOT_TAKEN renders above
+ * the calendar instead: its recovery flow returns the visitor there.
+ * An unrecognized code (newer host than widget) falls back to the VALIDATION
+ * copy — fail-safe, never blank.
+ */
+const BOOKING_ERROR_COPY: Record<Exclude<MeetingBookingErrorCode, 'SLOT_TAKEN'>, string> = {
+  INVALID_EMAIL:
+    'That email address was rejected by our scheduling system — please use a real, reachable address (work email works best).',
+  VALIDATION:
+    'Please double-check your details — especially that the email address is real and reachable — and try again.',
+  TEMPORARILY_UNAVAILABLE: 'Scheduling is briefly unavailable — please try again in a minute.',
+  MEETING_UNAVAILABLE: 'This meeting type has reached its booking limit for today — try another time or contact us.',
+  LINK_GONE: 'This meeting type is no longer available.',
+};
 
 export interface HubSpotMeetingSchedulerProps {
   /** Directory id of the meeting link (from the host's `/api/meetings` payload). */
@@ -507,18 +526,12 @@ export function HubSpotMeetingScheduler({
                 · {formatDurationCompact(durationMs / 1000)}
               </p>
               {bookingError && bookingError !== 'SLOT_TAKEN' && (
-                <div className="flex flex-col items-start gap-[var(--spacing-system-xs)]">
-                  <p className="text-ods-error text-h6">
-                    {bookingError === 'TEMPORARILY_UNAVAILABLE'
-                      ? 'Scheduling is briefly unavailable — please try again in a minute.'
-                      : bookingError === 'MEETING_UNAVAILABLE'
-                        ? 'This meeting type has reached its booking limit for today — try another time or contact us.'
-                        : bookingError === 'LINK_GONE'
-                          ? 'This meeting type is no longer available.'
-                          : 'Please double-check your details and try again.'}
-                  </p>
+                <Alert variant="error" className="flex flex-col items-start gap-[var(--spacing-system-xs)]">
+                  <AlertDescription>
+                    {BOOKING_ERROR_COPY[bookingError] ?? BOOKING_ERROR_COPY.VALIDATION}
+                  </AlertDescription>
                   {escapeHatch}
-                </div>
+                </Alert>
               )}
               <BookingForm
                 availability={availability}
@@ -535,10 +548,15 @@ export function HubSpotMeetingScheduler({
           ) : (
             <div className="flex flex-col gap-[var(--spacing-system-m)] md:min-h-0 md:flex-1">
               {bookingError === 'SLOT_TAKEN' && (
-                <p className="px-[var(--spacing-system-l)] pt-[var(--spacing-system-l)] text-ods-error text-h6 lg:p-0">
-                  That time is no longer available — if you just submitted, check your email for a confirmation before
-                  rebooking.
-                </p>
+                <Alert
+                  variant="warning"
+                  className="mx-[var(--spacing-system-l)] mt-[var(--spacing-system-l)] w-auto lg:m-0 lg:w-full"
+                >
+                  <AlertDescription>
+                    That time was just taken — pick another slot below. (If you already submitted, check your email for
+                    a confirmation before rebooking.)
+                  </AlertDescription>
+                </Alert>
               )}
               {timezone && durationMs != null ? (
                 // The picker owns BOTH the loading and the empty month now —

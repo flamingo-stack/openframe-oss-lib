@@ -13,6 +13,7 @@ const alertVariants = cva(
         default: 'bg-background text-foreground',
         destructive: 'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
         warning: 'border-transparent bg-ods-warning-secondary text-ods-warning [&>svg]:text-ods-warning',
+        error: 'border-transparent bg-ods-error-secondary text-ods-error [&>svg]:text-ods-error',
       },
     },
     defaultVariants: {
