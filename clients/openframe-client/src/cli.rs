@@ -170,14 +170,10 @@ pub fn run() -> Result<()> {
                 process::exit(1);
             }
 
-            // Two-step installs heal WebView2 here instead of at install time — same
-            // checks → heal → act ordering as the parameterized install flow.
-            let webview2 = crate::doctor::checks::check_webview2_runtime()
-                .into_iter()
-                .collect::<Vec<_>>();
-            if !crate::doctor::healing::pending(&webview2).is_empty() {
+            // Same checks → heal → act ordering as the parameterized install flow.
+            if !crate::doctor::healing::pending(&report.results).is_empty() {
                 println!("\nAttempting automatic fixes (this may take a few minutes)...");
-                let heals = rt.block_on(crate::doctor::healing::heal(&webview2));
+                let heals = rt.block_on(crate::doctor::healing::heal(&report.results));
                 print_heal_outcomes(&heals);
             }
 

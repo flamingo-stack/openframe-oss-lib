@@ -258,6 +258,19 @@ pub async fn run_auth(params: &InstallConfigParams) -> DoctorReport {
         };
     }
 
+    // The chat tool arrives right after registration, so its runtime is checked (and
+    // healed) here rather than at install time, where no tools are provisioned yet.
+    if let Some(webview2) = check_webview2_runtime() {
+        results.push(webview2);
+    }
+
+    // Install may lie far in the past (golden image, pre-provisioned package), and tool
+    // provisioning starts as soon as this succeeds.
+    results.push(check_disk_space(
+        DirectoryManager::new().app_support_dir(),
+        200,
+    ));
+
     let server_url = params.server_url.as_deref().unwrap_or_default();
     run_network_checks(&mut results, server_url).await;
 
