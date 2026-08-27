@@ -5,7 +5,7 @@ import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.notification.spec.Audience;
-import com.openframe.notification.spec.NotificationEntityRef;
+import com.openframe.notification.spec.EntityRef;
 import com.openframe.notification.spec.NotificationType;
 import lombok.Builder;
 import lombok.Getter;
@@ -30,7 +30,7 @@ public final class NotificationCommand {
     private final String applePushCategory;
     private final NotificationCategory category;
     private final NotificationSettingGroup settingsGroup;
-    private final NotificationEntityRef entity;
+    private final EntityRef entity;
 
     @Builder
     NotificationCommand(String title,
@@ -44,7 +44,7 @@ public final class NotificationCommand {
                         String applePushCategory,
                         NotificationCategory category,
                         NotificationSettingGroup settingsGroup,
-                        NotificationEntityRef entity) {
+                        EntityRef entity) {
         if (isBlank(title)) {
             throw new IllegalArgumentException("title must not be blank");
         }

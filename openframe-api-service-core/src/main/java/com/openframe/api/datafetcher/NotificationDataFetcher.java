@@ -29,7 +29,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -90,12 +89,10 @@ public class NotificationDataFetcher {
     @DgsQuery
     public List<UnreadCategoryCount> unreadCountsByCategory() {
         Recipient r = currentRecipient();
-        Map<NotificationCategory, Long> counts = readStateService.unreadCountsByCategory(r.id(), r.type());
-        List<UnreadCategoryCount> result = new ArrayList<>(counts.size());
-        for (Map.Entry<NotificationCategory, Long> entry : counts.entrySet()) {
-            result.add(new UnreadCategoryCount(entry.getKey(), entry.getValue()));
-        }
-        return result;
+        String recipientId = r.id();
+        RecipientType recipientType = r.type();
+        Map<NotificationCategory, Long> counts = readStateService.unreadCountsByCategory(recipientId, recipientType);
+        return notificationMapper.toCategoryCounts(counts);
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
@@ -105,13 +102,7 @@ public class NotificationDataFetcher {
         String recipientId = r.id();
         RecipientType recipientType = r.type();
         Map<String, Long> counts = readStateService.unreadCountsByEntity(recipientId, recipientType, entityType);
-        List<UnreadEntityCount> result = new ArrayList<>(counts.size());
-        for (Map.Entry<String, Long> entry : counts.entrySet()) {
-            String entityId = entry.getKey();
-            Long count = entry.getValue();
-            result.add(new UnreadEntityCount(entityId, count));
-        }
-        return result;
+        return notificationMapper.toEntityCounts(counts);
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")

@@ -10,7 +10,7 @@ import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.AttrKey;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
-import com.openframe.notification.spec.NotificationEntityRef;
+import com.openframe.notification.spec.EntityRef;
 import com.openframe.notification.spec.NotificationSeed;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
@@ -119,8 +119,8 @@ class NotificationEmitterTest {
         @Override public NotificationSeverity getSeverity() { return NotificationSeverity.INFO; }
         @Override public Audience audience(TestSeed seed) { return audience; }
 
-        @Override public Optional<NotificationEntityRef> entity(TestSeed seed) {
-            return Optional.of(NotificationEntityRef.ticket(seed.ticketId()));
+        @Override public Optional<EntityRef> entity(TestSeed seed) {
+            return Optional.of(EntityRef.ticket(seed.ticketId()));
         }
 
         @Override public Attrs attrs(TestSeed seed) {

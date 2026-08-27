@@ -11,7 +11,7 @@ import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.notification.spec.AudienceResolver;
-import com.openframe.notification.spec.NotificationEntityRef;
+import com.openframe.notification.spec.EntityRef;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.Recipients;
 import com.openframe.data.repository.notification.NotificationRepository;
@@ -81,7 +81,7 @@ public class NotificationBroadcaster {
 
         String title = command.getTitle();
         try {
-            NotificationEntityRef entity = command.getEntity();
+            EntityRef entity = command.getEntity();
             if (!admins.isEmpty()) {
                 readStateService.createForAudience(
                         saved.getId(), category, title, entity, RecipientType.USER, admins);
