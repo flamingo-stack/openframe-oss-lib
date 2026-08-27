@@ -22,6 +22,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
+import { ticketsListQueryKey } from '../query-keys'
 import type { TicketData } from '../types'
 
 const FIND_TICKET_ENDPOINT = '/api/chat/agent/find-ticket'
@@ -110,7 +111,7 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
   const identityKey = customerEmail || 'anon'
 
   const query = useQuery({
-    queryKey: ['tickets', 'self', identityKey, search, statusFilter, page, pageSize],
+    queryKey: ticketsListQueryKey(identityKey, search, statusFilter, page, pageSize),
     enabled,
     // Caches OFF — every mount + every focus + every navigation triggers
     // a fresh fetch. The ticket data is the customer's own list of
@@ -155,16 +156,6 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
     // windows where the query is enabled-but-fetch-not-yet-fired
     // OR where stale-data exists from a sibling cache slot — both
     // produced the EmptyState flash on /tickets first load. Treating
-    // "no data for THIS query slot yet" as the universal loading
-    // signal can't lie:
-    //   - Initial render after enabled flips: data === undefined → load
-    //   - Background refetch with existing data: data !== undefined → no load
-    //   - Filter-change refetch landing on empty results: data?.tickets===[]
-    //     + isFetching → bridge skeleton (the `||` branch)
-    // Loading-state-truth = `data === undefined`. TanStack v5's
-    // `isPending` / `isLoading` flags can be `false` in transient
-    // windows where the query is enabled-but-fetch-not-yet-fired
-    // OR where stale-data exists from a sibling cache slot. Treating
     // "no data for THIS query slot yet" as the universal loading
     // signal can't lie:
     //   - Initial render after enabled flips: data === undefined → load
