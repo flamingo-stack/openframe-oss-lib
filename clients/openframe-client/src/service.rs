@@ -370,25 +370,28 @@ impl Service {
             info!(
                 "Binary installed successfully. You can now use 'openframe' command from anywhere."
             );
-
-            if let Err(e) = Self::create_alias(&install_path) {
-                warn!("Failed to create 'openframe' alias: {:#}", e);
-            }
-
-            #[cfg(target_os = "windows")]
-            {
-                if let Some(bin_dir) = install_path.parent() {
-                    info!("Adding {} to system PATH", bin_dir.display());
-                    Self::add_to_windows_path(bin_dir).context("Failed to add to PATH")?;
-
-                    info!("⚠️  Please restart your terminal to use 'openframe-client' command");
-                }
-            }
         } else {
             info!(
                 "Binary is already in the standard location: {}",
                 install_path.display()
             );
+        }
+
+        // Outside the copy branch: an install run from the installed location skips the copy,
+        // but the uninstall it launched first has already removed the alias and the PATH entry.
+        // Both operations are idempotent, so running them every time is safe.
+        if let Err(e) = Self::create_alias(&install_path) {
+            warn!("Failed to create 'openframe' alias: {:#}", e);
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(bin_dir) = install_path.parent() {
+                info!("Adding {} to system PATH", bin_dir.display());
+                Self::add_to_windows_path(bin_dir).context("Failed to add to PATH")?;
+
+                info!("⚠️  Please restart your terminal to use 'openframe-client' command");
+            }
         }
 
         // Use the installation path for the service registration
@@ -660,24 +663,30 @@ impl Service {
     /// Restart the service so a freshly written configuration is picked up now.
     /// Needed for more than speed: the configuration is read once, when the client is
     /// constructed, so re-running `auth` on an already-running client would otherwise
-    /// have no effect until the next restart. Best-effort — a failure just leaves the
-    /// awaiting-auth poll to do the work.
-    pub async fn nudge_restart() {
+    /// have no effect until the next restart.
+    ///
+    /// Errors only when the service was stopped and could not be started again — nothing
+    /// restarts an explicitly stopped service, so that case has to reach the operator.
+    pub async fn nudge_restart() -> Result<()> {
         if !Self::is_installed() {
-            return;
+            return Ok(());
         }
 
+        // Only start what we actually stopped: if the stop fails the service is still
+        // running, and the awaiting-auth poll picks the configuration up on its own.
         if let Err(e) =
             crate::platform::system_service::stop_service(FULL_SERVICE_NAME, false).await
         {
-            debug!("Could not stop the service to apply configuration: {:#}", e);
-        }
-        if let Err(e) = crate::platform::system_service::start_service(FULL_SERVICE_NAME).await {
             debug!(
-                "Could not restart the service after saving configuration: {:#}",
+                "Could not stop the service to apply configuration, leaving it running: {:#}",
                 e
             );
+            return Ok(());
         }
+
+        crate::platform::system_service::start_service(FULL_SERVICE_NAME)
+            .await
+            .context("Failed to start the service after saving the configuration")
     }
 
     /// Get the standard installation location for the OpenFrame binary

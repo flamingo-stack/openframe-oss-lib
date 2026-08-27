@@ -193,9 +193,27 @@ pub fn run() -> Result<()> {
                 Ok(()) => {
                     // Restart so the new configuration is picked up now — and so a
                     // re-auth on an already-running client takes effect at all.
-                    rt.block_on(Service::nudge_restart());
-                    println!("Authentication saved. The device will register shortly.");
-                    process::exit(0);
+                    match rt.block_on(Service::nudge_restart()) {
+                        Ok(()) => {
+                            println!("Authentication saved. The device will register shortly.");
+                            process::exit(0);
+                        }
+                        Err(e) => {
+                            error!(
+                                "Failed to restart the service after saving authentication: {:#}",
+                                e
+                            );
+                            println!("\nAuthentication saved, but the OpenFrame service is stopped and could not be started.");
+                            println!(
+                                "The device cannot register until it runs again. Start it with:"
+                            );
+                            #[cfg(target_os = "windows")]
+                            println!("  sc start com.openframe.client");
+                            #[cfg(target_os = "macos")]
+                            println!("  sudo launchctl kickstart -k system/com.openframe.client");
+                            process::exit(1);
+                        }
+                    }
                 }
                 Err(e) => {
                     error!("Failed to save authentication: {:#}", e);

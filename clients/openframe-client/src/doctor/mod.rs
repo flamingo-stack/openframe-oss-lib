@@ -336,12 +336,25 @@ pub async fn run_healthcheck() -> DoctorReport {
                 };
             }
         },
-        Err(_) => {
-            // Not an error: a parameterless install runs unauthenticated until
-            // `openframe auth` writes the config.
+        // Not an error: a parameterless install runs unauthenticated until
+        // `openframe auth` writes the config.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             results.push(CheckResult::info(
                 CheckCategory::Command,
                 "Awaiting authentication — run 'openframe auth' with your tenant parameters to connect this device",
+            ));
+            return DoctorReport {
+                results,
+                title: "health check",
+            };
+        }
+        // Anything else (permission denied, locked file, I/O error) is a real failure:
+        // the config exists but the agent cannot read it.
+        Err(e) => {
+            results.push(CheckResult::fail(
+                CheckCategory::Command,
+                "Config: initial_config.json",
+                format!("Cannot read {}: {}", config_path.display(), e),
             ));
             return DoctorReport {
                 results,
