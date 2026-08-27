@@ -1,7 +1,9 @@
-"use client"
+'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import type React from 'react';
+import { useState, useRef } from 'react';
+import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 
 /**
  * FadePreview — the single shared progressive-disclosure primitive for
@@ -34,18 +36,35 @@ export interface FadePreviewProps {
   children: React.ReactNode;
 }
 
-export function FadePreview({
-  hiddenCount,
-  collapsedHeight = 120,
-  resetKey,
-  children,
-}: FadePreviewProps) {
+export function FadePreview({ hiddenCount, collapsedHeight = 120, resetKey, children }: FadePreviewProps) {
   const [expanded, setExpanded] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  // Collapse when the caller's `resetKey` changes. Adjusted while rendering —
+  // React's documented pattern for a prop-driven reset — rather than from an
+  // effect: the layout effect below sets `max-height` from `expanded` on the
+  // same commit, so resetting a commit late made the panel snap open at the new
+  // list's full height and then collapse again.
+  const [collapsedFor, setCollapsedFor] = useState(resetKey);
+  if (collapsedFor !== resetKey) {
+    setCollapsedFor(resetKey);
     setExpanded(false);
-  }, [resetKey]);
+  }
+
+  // The expanded height is a DOM MEASUREMENT, so it is applied to the node in
+  // a layout effect rather than read during render. Reading `scrollHeight` in
+  // the render body measured whatever the previous commit had laid out and
+  // then never looked again: children that grew after expanding (an image
+  // finishing load, a lazily rendered row) stayed clipped at the old height
+  // with no re-render able to correct it, and the `?? 2000` fallback silently
+  // capped anything taller on the very first expand. Unconditional, so every
+  // commit re-measures, and it runs before paint so the height transition
+  // still animates from the collapsed value.
+  useIsomorphicLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    el.style.maxHeight = expanded ? `${el.scrollHeight}px` : `${collapsedHeight}px`;
+  });
 
   const needsFade = hiddenCount > 0;
 
@@ -61,13 +80,14 @@ export function FadePreview({
         className="overflow-hidden transition-[max-height] duration-500"
         style={{
           transitionTimingFunction: 'cubic-bezier(0.33, 1, 0.68, 1)',
-          maxHeight: expanded
-            ? contentRef.current?.scrollHeight ?? 2000
-            : collapsedHeight,
-          ...(!expanded ? {
-            maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
-          } : {}),
+          // `maxHeight` is intentionally absent — the layout effect above owns
+          // it, because the expanded value is a live DOM measurement.
+          ...(!expanded
+            ? {
+                maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
+              }
+            : {}),
         }}
       >
         {children}
@@ -75,12 +95,10 @@ export function FadePreview({
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="mt-4 flex items-center gap-1.5 text-h6 text-ods-text-secondary hover:text-ods-accent transition-colors duration-200"
+        className="mt-4 flex items-center gap-1.5 text-ods-text-secondary transition-colors duration-200 text-h6 hover:text-ods-accent"
       >
         <span>{expanded ? 'Show less' : `Show ${hiddenCount} more`}</span>
-        <ChevronDown
-          className={`w-3.5 h-3.5 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
-        />
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
       </button>
     </div>
   );

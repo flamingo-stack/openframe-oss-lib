@@ -13,35 +13,35 @@
 export interface ChatRef {
   /** documentType from the host's RAG config (e.g. 'webinar', 'customer_interview').
    *  Treated as opaque by the OSS-lib — the host owns the type vocabulary. */
-  type: string
+  type: string;
   /** RagTableConfig.id (e.g. 'data-room-docs', 'webinars'). Drives the
    *  icon + label lookup in the host's `RAG_SOURCE_DISPLAY` registry —
    *  same direct-keyed lookup the chips + search results use. Optional
    *  for backward-compat with older wire payloads; when absent the host
    *  resolver falls back to reverse-mapping `type → sourceRepo`. */
-  sourceRepo?: string
+  sourceRepo?: string;
   /** Primary-key value. Opaque string downstream. */
-  id: string
+  id: string;
   /** Display title — used for fallback rendering when the host's renderer
    *  returns null (e.g. unknown type). */
-  title: string
+  title: string;
   /** Resolved external URL — null when the entity has no public link. */
-  url: string | null
+  url: string | null;
   /** Platform that owns the destination at `url` — sourced by the host's
    *  RAG mapper from the row's `platforms` junction (or the rag-config's
    *  default). Threaded through to the host's nav hook so the same-app-
    *  vs-cross-app routing decision is deterministic (no origin guess in
    *  dev where every platform shares localhost). Null when `url` is
    *  external/unknown or the mapper didn't supply it (backward-compat). */
-  targetPlatform?: string | null
+  targetPlatform?: string | null;
   /** ISO date for the entity's canonical time. Optional. */
-  date?: string
+  date?: string;
   /** PII-sanitized hover preview text. Optional. */
-  preview?: string
+  preview?: string;
   /** Type-specific extras carried opaquely through the wire — keyed map
    *  the host's renderer can pull from. Used today by `slack_message`
    *  refs to ship `{ channelName, userName }` resolved server-side from
    *  the slack-channels / slack-users tables, so the compact card
    *  surfaces human-readable names instead of opaque Slack IDs. */
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>;
 }

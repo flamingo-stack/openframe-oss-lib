@@ -34,43 +34,32 @@
  * NEVER STORES A RAW URL. See `sanitizeLandingUrl`.
  */
 
-import { createLocalStorageAdapter } from './local-storage-adapter'
+import { createLocalStorageAdapter } from './local-storage-adapter';
 
 /** Attribution parameters worth carrying from the landing URL to the submit body. */
 export interface FirstTouchAttribution {
-  utm_source?: string
-  utm_medium?: string
-  utm_campaign?: string
-  utm_content?: string
-  utm_term?: string
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_content?: string;
+  utm_term?: string;
   /** Reddit Ads click id. */
-  rdt_cid?: string
+  rdt_cid?: string;
   /**
    * The landing PAGE — `origin + pathname` only. Never the query string or fragment.
    * See `sanitizeLandingUrl` for why.
    */
-  landing_url?: string
+  landing_url?: string;
   /** ISO timestamp of first capture, for debugging stale records. */
-  captured_at?: string
+  captured_at?: string;
 }
 
-export const FIRST_TOUCH_ATTRIBUTION_KEY = 'of.first_touch_attribution'
+export const FIRST_TOUCH_ATTRIBUTION_KEY = 'of.first_touch_attribution';
 
-const TRACKED_PARAMS = [
-  'utm_source',
-  'utm_medium',
-  'utm_campaign',
-  'utm_content',
-  'utm_term',
-  'rdt_cid',
-] as const
+const TRACKED_PARAMS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'rdt_cid'] as const;
 
 /** Every key this module is allowed to store or replay. */
-const ALLOWED_KEYS: ReadonlySet<string> = new Set<string>([
-  ...TRACKED_PARAMS,
-  'landing_url',
-  'captured_at',
-])
+const ALLOWED_KEYS: ReadonlySet<string> = new Set<string>([...TRACKED_PARAMS, 'landing_url', 'captured_at']);
 
 /**
  * Reduce a URL to `origin + pathname`.
@@ -89,12 +78,12 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set<string>([
  */
 export function sanitizeLandingUrl(url: string): string | undefined {
   try {
-    const parsed = new URL(url)
+    const parsed = new URL(url);
     // Non-http(s) schemes have no meaningful landing page.
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined
-    return `${parsed.origin}${parsed.pathname}`
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+    return `${parsed.origin}${parsed.pathname}`;
   } catch {
-    return undefined
+    return undefined;
   }
 }
 
@@ -108,27 +97,27 @@ function makeAdapter() {
     // allowlisted keys only, string values only. Without this a malformed or planted record
     // would inject arbitrary keys into an API payload.
     validate: (parsed): parsed is FirstTouchAttribution => {
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return false
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return false;
       return Object.entries(parsed as Record<string, unknown>).every(
         ([key, value]) => ALLOWED_KEYS.has(key) && typeof value === 'string',
-      )
+      );
     },
-  })
+  });
 }
 
 /** Parse the tracked parameters out of a URL. Returns `{}` when none are present. */
 export function parseAttributionFromUrl(url: string): FirstTouchAttribution {
-  const out: FirstTouchAttribution = {}
+  const out: FirstTouchAttribution = {};
   try {
-    const parsed = new URL(url)
+    const parsed = new URL(url);
     for (const param of TRACKED_PARAMS) {
-      const value = parsed.searchParams.get(param)
-      if (value && value.trim()) out[param] = value.trim()
+      const value = parsed.searchParams.get(param);
+      if (value && value.trim()) out[param] = value.trim();
     }
   } catch {
-    return {}
+    return {};
   }
-  return out
+  return out;
 }
 
 /**
@@ -141,23 +130,23 @@ export function parseAttributionFromUrl(url: string): FirstTouchAttribution {
  *   read back from storage, or `{}` when nothing was captured or the write did not stick.
  */
 export function captureFirstTouchAttribution(options: { url?: string } = {}): FirstTouchAttribution {
-  if (typeof window === 'undefined') return {}
+  if (typeof window === 'undefined') return {};
 
-  const adapter = makeAdapter()
-  const existing = adapter.load()
-  if (existing && Object.keys(existing).length > 0) return existing
+  const adapter = makeAdapter();
+  const existing = adapter.load();
+  if (existing && Object.keys(existing).length > 0) return existing;
 
-  const href = options.url ?? window.location.href
-  const parsed = parseAttributionFromUrl(href)
-  if (Object.keys(parsed).length === 0) return {}
+  const href = options.url ?? window.location.href;
+  const parsed = parseAttributionFromUrl(href);
+  if (Object.keys(parsed).length === 0) return {};
 
-  const landingUrl = sanitizeLandingUrl(href)
+  const landingUrl = sanitizeLandingUrl(href);
   const record: FirstTouchAttribution = {
     ...parsed,
     ...(landingUrl ? { landing_url: landingUrl } : {}),
     captured_at: new Date().toISOString(),
-  }
-  adapter.save(record)
+  };
+  adapter.save(record);
 
   // Confirm it PERSISTED before reporting success. `save()` returns void and swallows its
   // errors, so in blocked or quota-exceeded storage (Safari private mode, a full quota) the
@@ -165,13 +154,13 @@ export function captureFirstTouchAttribution(options: { url?: string } = {}): Fi
   // subsequent `getFirstTouchAttribution()` can recover — the caller would replay
   // attribution on this page view and none on the next, which is worse than replaying none
   // at all because it looks like it worked.
-  return adapter.load() ?? {}
+  return adapter.load() ?? {};
 }
 
 /** Read the stored attribution. `{}` when nothing was captured or during SSR. */
 export function getFirstTouchAttribution(): FirstTouchAttribution {
-  if (typeof window === 'undefined') return {}
-  return makeAdapter().load() ?? {}
+  if (typeof window === 'undefined') return {};
+  return makeAdapter().load() ?? {};
 }
 
 /**
@@ -182,19 +171,17 @@ export function getFirstTouchAttribution(): FirstTouchAttribution {
  *
  *   body: JSON.stringify(withFirstTouchAttribution({ email, name }))
  */
-export function withFirstTouchAttribution<T extends Record<string, any>>(
-  body: T,
-): T & FirstTouchAttribution {
-  const stored = getFirstTouchAttribution()
-  const merged: Record<string, any> = { ...stored, ...body }
+export function withFirstTouchAttribution<T extends Record<string, unknown>>(body: T): T & FirstTouchAttribution {
+  const stored = getFirstTouchAttribution();
+  const merged: Record<string, unknown> = { ...stored, ...body };
   for (const [k, v] of Object.entries(merged)) {
-    if (v === undefined || v === null || v === '') delete merged[k]
+    if (v === undefined || v === null || v === '') delete merged[k];
   }
-  return merged as T & FirstTouchAttribution
+  return merged as T & FirstTouchAttribution;
 }
 
 /** Clear the stored record. Exposed for tests and for a consent-withdrawal path. */
 export function clearFirstTouchAttribution(): void {
-  if (typeof window === 'undefined') return
-  makeAdapter().clear()
+  if (typeof window === 'undefined') return;
+  makeAdapter().clear();
 }

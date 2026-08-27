@@ -1,14 +1,14 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
-import { Button } from '../ui/button'
-import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
-import { SquareAvatar } from '../ui/square-avatar'
-import { Ellipsis01Icon, SearchXmarkIcon } from '../icons-v2-generated'
-import { ChatListEmptyState } from './chat-list-empty-state'
-import type { DialogItem } from './types/component.types'
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { cn } from '../../utils/cn';
+import { Ellipsis01Icon, SearchXmarkIcon } from '../icons-v2-generated';
+import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
+import { Button } from '../ui/button';
+import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
+import { SquareAvatar } from '../ui/square-avatar';
+import { ChatListEmptyState } from './chat-list-empty-state';
+import type { DialogItem } from './types/component.types';
 
 // =============================================================================
 // Types
@@ -16,39 +16,39 @@ import type { DialogItem } from './types/component.types'
 
 export interface MingoChatHistoryProps {
   /** Dialogs to list, assumed already sorted newest-first by the host. */
-  dialogs: ReadonlyArray<DialogItem>
+  dialogs: ReadonlyArray<DialogItem>;
   /** Currently-open dialog id (highlighted). */
-  activeDialogId?: string
+  activeDialogId?: string;
   /** Open a dialog. */
-  onSelectDialog?: (id: string) => void
+  onSelectDialog?: (id: string) => void;
   /** Request rename — enables the row "Rename chat" action. The host opens
    *  the Rename modal; the list does no inline editing. */
-  onRequestRename?: (dialog: DialogItem) => void
+  onRequestRename?: (dialog: DialogItem) => void;
   /** Request archive — enables the row "Archive chat" action. The host opens
    *  the Archive confirmation modal. */
-  onRequestArchive?: (dialog: DialogItem) => void
+  onRequestArchive?: (dialog: DialogItem) => void;
   /** Request a shareable link — enables the row "Copy chat link" action. The host
    *  owns the URL shape and the copy itself (the list knows neither the app's
    *  routes nor whether a clipboard is available). */
-  onRequestCopyLink?: (dialog: DialogItem) => void
+  onRequestCopyLink?: (dialog: DialogItem) => void;
   /** Current server-side search term. Drives the "No chats found" empty state;
    *  the search INPUT lives in the panel header, not in this list. The host
    *  owns the term and refetches server-side — the list does no filtering. */
-  searchQuery?: string
+  searchQuery?: string;
   /** Whether more dialogs remain (cursor pagination). */
-  hasMore?: boolean
+  hasMore?: boolean;
   /** True while the next page is loading. */
-  isLoadingMore?: boolean
+  isLoadingMore?: boolean;
   /** Fetch the next page — fired when the bottom sentinel scrolls into view. */
-  onLoadMore?: () => void
+  onLoadMore?: () => void;
   /** Appended to the root element. */
-  className?: string
+  className?: string;
 }
 
 interface DialogGroup {
-  key: string
-  label: string
-  items: DialogItem[]
+  key: string;
+  label: string;
+  items: DialogItem[];
 }
 
 // =============================================================================
@@ -56,38 +56,31 @@ interface DialogGroup {
 // =============================================================================
 
 function dialogTime(d: DialogItem): number | null {
-  if (!d.timestamp) return null
-  const t =
-    typeof d.timestamp === 'string'
-      ? Date.parse(d.timestamp)
-      : d.timestamp.getTime()
-  return Number.isNaN(t) ? null : t
+  if (!d.timestamp) return null;
+  const t = typeof d.timestamp === 'string' ? Date.parse(d.timestamp) : d.timestamp.getTime();
+  return Number.isNaN(t) ? null : t;
 }
 
 function groupDialogs(dialogs: ReadonlyArray<DialogItem>): DialogGroup[] {
-  const now = new Date()
-  const startOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  ).getTime()
-  const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
 
-  const today: DialogItem[] = []
-  const yesterday: DialogItem[] = []
-  const older: DialogItem[] = []
+  const today: DialogItem[] = [];
+  const yesterday: DialogItem[] = [];
+  const older: DialogItem[] = [];
   for (const d of dialogs) {
-    const t = dialogTime(d)
-    if (t !== null && t >= startOfToday) today.push(d)
-    else if (t !== null && t >= startOfYesterday) yesterday.push(d)
-    else older.push(d) // includes timestamp-less dialogs
+    const t = dialogTime(d);
+    if (t !== null && t >= startOfToday) today.push(d);
+    else if (t !== null && t >= startOfYesterday) yesterday.push(d);
+    else older.push(d); // includes timestamp-less dialogs
   }
 
   return [
     { key: 'today', label: 'Today', items: today },
     { key: 'yesterday', label: 'Yesterday', items: yesterday },
     { key: 'older', label: 'Older', items: older },
-  ].filter((g) => g.items.length > 0)
+  ].filter(g => g.items.length > 0);
 }
 
 // =============================================================================
@@ -95,12 +88,12 @@ function groupDialogs(dialogs: ReadonlyArray<DialogItem>): DialogGroup[] {
 // =============================================================================
 
 interface RowProps {
-  dialog: DialogItem
-  isActive: boolean
-  onSelect?: (id: string) => void
-  onRequestRename?: (dialog: DialogItem) => void
-  onRequestCopyLink?: (dialog: DialogItem) => void
-  onRequestArchive?: (dialog: DialogItem) => void
+  dialog: DialogItem;
+  isActive: boolean;
+  onSelect?: (id: string) => void;
+  onRequestRename?: (dialog: DialogItem) => void;
+  onRequestCopyLink?: (dialog: DialogItem) => void;
+  onRequestArchive?: (dialog: DialogItem) => void;
 }
 
 function MingoChatHistoryRow({
@@ -111,14 +104,14 @@ function MingoChatHistoryRow({
   onRequestRename,
   onRequestArchive,
 }: RowProps) {
-  const title = dialog.title || 'Untitled Chat'
-  const unread = dialog.unreadMessagesCount ?? 0
-  const hasMenu = !!onRequestRename || !!onRequestArchive || !!onRequestCopyLink
-  const owner = dialog.owner
-  const hasAvatar = !!(owner?.name || owner?.avatarUrl)
+  const title = dialog.title || 'Untitled Chat';
+  const unread = dialog.unreadMessagesCount ?? 0;
+  const hasMenu = !!onRequestRename || !!onRequestArchive || !!onRequestCopyLink;
+  const owner = dialog.owner;
+  const hasAvatar = !!(owner?.name || owner?.avatarUrl);
   // Keep the `⋯` visible while its menu is open — once Radix moves focus into
   // the portalled content the row loses hover/focus-within.
-  const [menuOpen, setMenuOpen] = React.useState(false)
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const menuItems = [
     onRequestCopyLink && {
@@ -136,7 +129,7 @@ function MingoChatHistoryRow({
       label: 'Archive chat',
       onClick: () => onRequestArchive(dialog),
     },
-  ].filter(Boolean) as ActionsMenuItem[]
+  ].filter(Boolean) as ActionsMenuItem[];
 
   // The item is the full-width row (inside the group's bordered box). Padding
   // lives on the inner content button (badge + title) only — the `⋯` is a
@@ -145,43 +138,35 @@ function MingoChatHistoryRow({
   return (
     <div
       className={cn(
-        'group/row relative flex h-12 items-center border-b border-ods-border last:border-b-0 transition-colors',
+        'group/row relative flex h-12 items-center border-b border-ods-border transition-colors last:border-b-0',
         // Active (selected) dialog — Figma 259:91610: an open-yellow-secondary
         // fill, a 4px open-yellow accent bar down the leading edge, and yellow
         // title text. Inactive rows keep the dark surface with a hover tint.
-        isActive
-          ? 'bg-ods-open-yellow-secondary'
-          : 'bg-ods-bg hover:bg-ods-bg-hover',
+        isActive ? 'bg-ods-open-yellow-secondary' : 'bg-ods-bg hover:bg-ods-bg-hover',
       )}
     >
       {isActive ? (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-ods-open-yellow"
-        />
+        <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-ods-open-yellow" />
       ) : null}
       <div
         role="button"
         tabIndex={0}
         onClick={() => onSelect?.(dialog.id)}
-        onKeyDown={(e) => {
+        onKeyDown={e => {
           if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onSelect?.(dialog.id)
+            e.preventDefault();
+            onSelect?.(dialog.id);
           }
         }}
-        className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-s)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent"
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-s)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent"
       >
         {unread > 0 ? (
-          <span className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)] text-h5 text-ods-text-on-accent">
+          <span className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)] text-ods-text-on-accent text-h5">
             {unread > 99 ? '99+' : unread}
           </span>
         ) : null}
         <span
-          className={cn(
-            'min-w-0 flex-1 truncate text-h4',
-            isActive ? 'text-ods-open-yellow' : 'text-ods-text-primary',
-          )}
+          className={cn('min-w-0 flex-1 truncate text-h4', isActive ? 'text-ods-open-yellow' : 'text-ods-text-primary')}
           title={title}
         >
           {title}
@@ -193,24 +178,17 @@ function MingoChatHistoryRow({
         // `⋯` actions button IN PLACE, so the title never reflows. Without an
         // avatar the cell exists only for the hover menu, so it collapses on
         // mobile exactly like the old hover-only gutter (no hover on touch).
-        <span
-          className={cn(
-            'relative w-12 self-stretch shrink-0',
-            !hasAvatar && 'max-md:hidden',
-          )}
-        >
+        <span className={cn('relative w-12 shrink-0 self-stretch', !hasAvatar && 'max-md:hidden')}>
           {hasMenu ? (
             // Revealed on row hover/its own focus; kept visible while the menu
             // is open. Hidden on mobile — it's a hover affordance. `peer/menu`
             // so the avatar layer (a later sibling) can fade when the trigger
             // holds keyboard focus.
             <span
-              onClick={(e) => e.stopPropagation()}
+              onClick={e => e.stopPropagation()}
               className={cn(
                 'peer/menu absolute inset-0 transition-opacity max-md:hidden',
-                menuOpen
-                  ? 'opacity-100'
-                  : 'opacity-0 group-hover/row:opacity-100 focus-within:opacity-100',
+                menuOpen ? 'opacity-100' : 'opacity-0 focus-within:opacity-100 group-hover/row:opacity-100',
               )}
             >
               <ActionsMenuDropdown
@@ -219,7 +197,7 @@ function MingoChatHistoryRow({
                 open={menuOpen}
                 onOpenChange={setMenuOpen}
                 // Don't return focus (and its ring) to the `⋯` trigger on close.
-                onCloseAutoFocus={(e) => e.preventDefault()}
+                onCloseAutoFocus={e => e.preventDefault()}
                 customTrigger={
                   <Button
                     variant="transparent"
@@ -230,7 +208,7 @@ function MingoChatHistoryRow({
                     // `size="icon"`'s responsive `md:h-12`); `p-0` drops the
                     // icon-size padding. tailwind-merge so these win over
                     // defaults.
-                    className="h-full md:h-full w-full rounded-none p-0 text-ods-text-secondary hover:text-ods-text-primary"
+                    className="h-full w-full rounded-none p-0 text-ods-text-secondary hover:text-ods-text-primary md:h-full"
                   >
                     <Ellipsis01Icon />
                   </Button>
@@ -249,8 +227,8 @@ function MingoChatHistoryRow({
                 'absolute inset-0 flex cursor-pointer items-center justify-center transition-opacity',
                 hasMenu &&
                   (menuOpen
-                    ? 'opacity-0 pointer-events-none'
-                    : 'md:group-hover/row:opacity-0 md:group-hover/row:pointer-events-none md:peer-[:focus-within]/menu:opacity-0 md:peer-[:focus-within]/menu:pointer-events-none'),
+                    ? 'pointer-events-none opacity-0'
+                    : 'md:group-hover/row:pointer-events-none md:group-hover/row:opacity-0 md:peer-[:focus-within]/menu:pointer-events-none md:peer-[:focus-within]/menu:opacity-0'),
               )}
             >
               <SquareAvatar
@@ -266,7 +244,7 @@ function MingoChatHistoryRow({
         </span>
       ) : null}
     </div>
-  )
+  );
 }
 
 // =============================================================================
@@ -280,11 +258,7 @@ function MingoChatHistoryRow({
  * two layouts are mutually exclusive — swapping between them mid-load reads as
  * a flicker). Pure ODS tokens, `animate-pulse`.
  */
-export function MingoChatHistorySkeleton({
-  className,
-}: {
-  className?: string
-}) {
+export function MingoChatHistorySkeleton({ className }: { className?: string }) {
   // Mirror the real grouped list exactly: a small group label, then a bordered
   // rounded container of `h-12` rows, each with a single title bar of varying
   // width (no unread-badge squares — the real rows currently never show one, so
@@ -294,16 +268,13 @@ export function MingoChatHistorySkeleton({
   const groups: ReadonlyArray<ReadonlyArray<string>> = [
     ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4'],
     ['w-1/2', 'w-2/3'],
-  ]
+  ];
   return (
     <div
       aria-hidden
       // `overflow-hidden` clips the placeholder rows to the flex-1 box (the real
       // list scrolls; the skeleton just needs to stay within bounds).
-      className={cn(
-        'flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-hidden',
-        className,
-      )}
+      className={cn('flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)] overflow-hidden', className)}
     >
       {groups.map((widths, g) => (
         <div key={g} className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)]">
@@ -313,7 +284,7 @@ export function MingoChatHistorySkeleton({
             {widths.map((w, i) => (
               <div
                 key={i}
-                className="flex h-12 items-center bg-ods-bg border-b border-ods-border px-[var(--spacing-system-s)] last:border-b-0"
+                className="flex h-12 items-center border-b border-ods-border bg-ods-bg px-[var(--spacing-system-s)] last:border-b-0"
               >
                 <div className={cn('h-4 animate-pulse rounded bg-ods-border', w)} />
               </div>
@@ -322,7 +293,7 @@ export function MingoChatHistorySkeleton({
         </div>
       ))}
     </div>
-  )
+  );
 }
 
 // =============================================================================
@@ -353,36 +324,41 @@ export function MingoChatHistory({
   onLoadMore,
   className,
 }: MingoChatHistoryProps) {
-  const groups = React.useMemo(() => groupDialogs(dialogs), [dialogs])
-  const noSearchResults = groups.length === 0 && !!searchQuery?.trim()
+  const groups = useMemo(() => groupDialogs(dialogs), [dialogs]);
+  const noSearchResults = groups.length === 0 && !!searchQuery?.trim();
 
   // Scroll-fade affordances — shared ui/scroll-fade (re-measures on resize
   // and content mutations, so no manual `dialogs` dependency is needed).
-  const { scrollRef, fadeTop, fadeBottom, update: updateFade } = useScrollFade<HTMLDivElement>()
+  const { scrollRef, fadeTop, fadeBottom, update: updateFade } = useScrollFade<HTMLDivElement>();
 
   // Infinite scroll — load the next page when the sentinel enters the
   // scroll viewport.
-  const sentinelRef = React.useRef<HTMLDivElement>(null)
-  const onLoadMoreRef = React.useRef(onLoadMore)
-  onLoadMoreRef.current = onLoadMore
-  const isLoadingMoreRef = React.useRef(isLoadingMore)
-  isLoadingMoreRef.current = isLoadingMore
-  const dialogCount = dialogs.length
-  React.useEffect(() => {
-    const root = scrollRef.current
-    const sentinel = sentinelRef.current
-    if (!root || !sentinel || !hasMore || typeof IntersectionObserver === 'undefined')
-      return
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  // Refreshed in an unconditional effect, declared before the observer effect
+  // so it wins the same flush. Not in the render body: the only reader is the
+  // IntersectionObserver callback, which cannot fire before a commit, and a
+  // discarded render attempt must not install a loading flag that never was.
+  const onLoadMoreRef = useRef(onLoadMore);
+  const isLoadingMoreRef = useRef(isLoadingMore);
+  useEffect(() => {
+    onLoadMoreRef.current = onLoadMore;
+    isLoadingMoreRef.current = isLoadingMore;
+  });
+  const dialogCount = dialogs.length;
+  useEffect(() => {
+    const root = scrollRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel || !hasMore || typeof IntersectionObserver === 'undefined') return undefined;
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !isLoadingMoreRef.current) {
-          onLoadMoreRef.current?.()
+          onLoadMoreRef.current?.();
         }
       },
       { root, rootMargin: '120px', threshold: 0.1 },
-    )
-    io.observe(sentinel)
-    return () => io.disconnect()
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
     // `dialogCount`/`isLoadingMore` deps re-arm the observer after every page
     // lands: `observe()` re-reports the CURRENT intersection, so a sentinel
     // that stays in view (short host-filtered list — e.g. the "My Chats"
@@ -391,17 +367,17 @@ export function MingoChatHistory({
     // visible sentinel never re-crosses the threshold, so the previous
     // [hasMore]-only observer fired exactly once per mount and the list
     // grew by a single page per drawer open.
-  }, [hasMore, isLoadingMore, dialogCount])
+  }, [hasMore, isLoadingMore, dialogCount, scrollRef]);
 
   return (
-    <div className={cn('relative flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)]', className)}>
+    <div className={cn('relative flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)]', className)}>
       {/* Scroll region — the search INPUT now lives in the panel header
           (Figma 116:51217), so the list is just the grouped rows + fades. */}
-      <div className="relative flex flex-1 min-h-0 flex-col">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scrollRef}
           onScroll={updateFade}
-          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
+          className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
         >
           {noSearchResults ? (
             // No search matches — same centred glyph + title + caption layout as
@@ -412,14 +388,11 @@ export function MingoChatHistory({
               description="Try a different search term"
             />
           ) : (
-            groups.map((group) => (
-              <div
-                key={group.key}
-                className="flex flex-col gap-[var(--spacing-system-xxs)]"
-              >
-                <p className="text-h5 text-ods-text-secondary">{group.label}</p>
+            groups.map(group => (
+              <div key={group.key} className="flex flex-col gap-[var(--spacing-system-xxs)]">
+                <p className="text-ods-text-secondary text-h5">{group.label}</p>
                 <div className="overflow-hidden rounded-md border border-ods-border">
-                  {group.items.map((dialog) => (
+                  {group.items.map(dialog => (
                     <MingoChatHistoryRow
                       key={dialog.id}
                       dialog={dialog}
@@ -442,5 +415,5 @@ export function MingoChatHistory({
         <ScrollFadeOverlay edge="bottom" visible={fadeBottom} color="var(--color-bg-card)" className="h-12" />
       </div>
     </div>
-  )
+  );
 }

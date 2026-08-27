@@ -5,27 +5,20 @@
  * Supports all RMM shell types.
  */
 
-import React from 'react'
-import { PowershellLogoGreyIcon } from '../icons-v2-generated/brand-logos/powershell-logo-grey-icon'
-import { PythonLogoIcon } from '../icons-v2-generated/brand-logos/python-logo-icon'
-
-import { ShellType, ShellTypeValues } from '../../types/shell.types'
-import { getShellLabel } from '../../utils/shell-utils'
-import { cn } from '../../utils/cn'
-import {
-  BashIcon,
-  CmdIcon,
-  DenoIcon,
-  NushellIcon,
-  ShellIcon
-} from '../icons'
+import type React from 'react';
+import { type ShellType, ShellTypeValues } from '../../types/shell.types';
+import { cn } from '../../utils/cn';
+import { getShellLabel } from '../../utils/shell-utils';
+import { BashIcon, CmdIcon, DenoIcon, NushellIcon, ShellIcon } from '../icons';
+import { PowershellLogoGreyIcon } from '../icons-v2-generated/brand-logos/powershell-logo-grey-icon';
+import { PythonLogoIcon } from '../icons-v2-generated/brand-logos/python-logo-icon';
 
 /**
  * Shell icon configuration with typed mapping
  */
 interface ShellIconConfig {
-  icon: React.ComponentType<{ size?: number; color?: string; className?: string }>
-  props: { size: number } & ({ className: string } | { color: string })
+  icon: React.ComponentType<{ size?: number; color?: string; className?: string }>;
+  props: { size: number } & ({ className: string } | { color: string });
 }
 
 /**
@@ -35,61 +28,57 @@ interface ShellIconConfig {
 const shellIconMap: Record<ShellType, ShellIconConfig> = {
   [ShellTypeValues.POWERSHELL]: {
     icon: PowershellLogoGreyIcon,
-    props: { size: 16, className: 'text-ods-text-secondary' }
+    props: { size: 16, className: 'text-ods-text-secondary' },
   },
   [ShellTypeValues.CMD]: {
     icon: CmdIcon,
-    props: { size: 16, color: 'var(--color-text-secondary)' }
+    props: { size: 16, color: 'var(--color-text-secondary)' },
   },
   [ShellTypeValues.BASH]: {
     icon: BashIcon,
-    props: { size: 16, color: 'var(--color-text-secondary)' }
+    props: { size: 16, color: 'var(--color-text-secondary)' },
   },
   [ShellTypeValues.PYTHON]: {
     icon: PythonLogoIcon,
-    props: { size: 16, className: 'text-ods-text-secondary' }
+    props: { size: 16, className: 'text-ods-text-secondary' },
   },
   [ShellTypeValues.NUSHELL]: {
     icon: NushellIcon,
-    props: { size: 16, color: 'var(--color-text-secondary)' }
+    props: { size: 16, color: 'var(--color-text-secondary)' },
   },
   [ShellTypeValues.DENO]: {
     icon: DenoIcon,
-    props: { size: 16, color: 'var(--color-text-secondary)' }
+    props: { size: 16, color: 'var(--color-text-secondary)' },
   },
   [ShellTypeValues.SHELL]: {
     icon: ShellIcon,
-    props: { size: 16, color: 'var(--color-text-secondary)' }
-  }
-} as const
+    props: { size: 16, color: 'var(--color-text-secondary)' },
+  },
+} as const;
 
 const defaultIconConfig: ShellIconConfig = {
   icon: ShellIcon,
-  props: { size: 16, color: 'var(--color-text-secondary)' }
-}
+  props: { size: 16, color: 'var(--color-text-secondary)' },
+};
 
 export interface ShellTypeBadgeProps {
-  shellType: ShellType
-  className?: string
-  iconClassName?: string
+  shellType: ShellType;
+  className?: string;
+  iconClassName?: string;
 }
 
-export const ShellTypeBadge: React.FC<ShellTypeBadgeProps> = ({
-  shellType,
-  className,
-  iconClassName
-}) => {
-  const normalizedType = shellType?.toUpperCase() as ShellType
-  const label = getShellLabel(normalizedType)
-  const { icon: IconComponent, props: iconProps } = shellIconMap[normalizedType] ?? defaultIconConfig
-  const defaultIconClassName = 'className' in iconProps ? iconProps.className : undefined
+export const ShellTypeBadge: React.FC<ShellTypeBadgeProps> = ({ shellType, className, iconClassName }) => {
+  const normalizedType = shellType?.toUpperCase() as ShellType;
+  const label = getShellLabel(normalizedType);
+  const { icon: IconComponent, props: iconProps } = shellIconMap[normalizedType] ?? defaultIconConfig;
+  const defaultIconClassName = 'className' in iconProps ? iconProps.className : undefined;
 
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className={cn('flex items-center gap-1', className)}>
       <IconComponent size={16} className={cn(defaultIconClassName, iconClassName)} />
       <span className="text-ods-text-primary text-h4">{label}</span>
     </div>
-  )
-}
+  );
+};
 
-ShellTypeBadge.displayName = 'ShellTypeBadge'
+ShellTypeBadge.displayName = 'ShellTypeBadge';

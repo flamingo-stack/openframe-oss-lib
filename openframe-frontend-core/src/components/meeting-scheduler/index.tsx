@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<HubSpotMeetingScheduler />` — natively-branded booking flow over the
@@ -35,41 +35,42 @@
  * another" reset, and a `submitting` lock as the double-booking guard.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { cn } from '../../utils/cn'
-import { formatDurationCompact } from '../../utils/format'
-import { Button } from '../ui'
-import { useHumanitySignals } from '../../hooks/use-humanity-signals'
-import { useMeetingBooking } from '../../hooks/use-meeting-booking'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { useHumanitySignals } from '../../hooks/use-humanity-signals';
+import { useMeetingBooking } from '../../hooks/use-meeting-booking';
 import {
   isSupportedFormField,
   type BookingConfirmation,
   type MeetingAvailability,
   type MeetingBookingErrorCode,
   type MeetingHost,
-} from '../../schemas/meeting-booking-schema'
-import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel'
-import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker'
-import { BookingForm } from './booking-form'
-import { Confirmation } from './confirmation'
+} from '../../schemas/meeting-booking-schema';
+import { cn } from '../../utils/cn';
+import { formatDurationCompact } from '../../utils/format';
+import { Button } from '../ui';
+import { BookingForm } from './booking-form';
+import { Confirmation } from './confirmation';
+import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';
+import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
 
 export interface HubSpotMeetingSchedulerProps {
   /** Directory id of the meeting link (from the host's `/api/meetings` payload). */
-  meetingId: string
+  meetingId: string;
   /** Endpoints prefix, default '' (same-origin `/api/meetings/*`) — FaqSection precedent. */
-  apiBaseUrl?: string
+  apiBaseUrl?: string;
   /** SSR-mode seed (host-fetched). Omitted → client mode (self-fetch on mount). */
-  initialAvailability?: MeetingAvailability
+  initialAvailability?: MeetingAvailability;
   /** Meeting title shown in the context panel (host page owns the h1). */
-  title?: string
+  title?: string;
   /** Short description under the title in the context panel. */
-  description?: string | null
+  description?: string | null;
   /** Override the hosts shown (defaults to `availability.hosts`). */
-  hosts?: MeetingHost[]
+  hosts?: MeetingHost[];
   /** Pin the DISPLAY zone (rendering only — never sent upstream, never a cache key). */
-  displayTimezone?: string
+  displayTimezone?: string;
   /** The link's public HubSpot booking URL — the "Open in HubSpot" escape hatch target. */
-  fallbackUrl?: string
+  fallbackUrl?: string;
   /**
    * Host-level exit, rendered as a back edge at the top of the context panel
    * (and in the loading skeleton, so it doesn't pop in). This is "leave the
@@ -77,17 +78,17 @@ export interface HubSpotMeetingSchedulerProps {
    * slot is chosen so only one Back is ever on screen. Omit it and no back
    * affordance renders at all.
    */
-  onBack?: () => void
-  onBooked?: (b: BookingConfirmation) => void
-  className?: string
+  onBack?: () => void;
+  onBooked?: (b: BookingConfirmation) => void;
+  className?: string;
 }
 
-type Step = 'slot' | 'details' | 'confirmed'
+type Step = 'slot' | 'details' | 'confirmed';
 
 /** Context-panel geometry — ONE definition for the loaded card and the
  *  loading skeleton, which is what keeps the two footprint-identical. */
 const CONTEXT_PANEL_CLASS =
-  'p-[var(--spacing-system-l)] shrink-0 lg:w-[280px] border-b lg:border-b-0 lg:border-r border-ods-border lg:min-h-0 lg:overflow-y-auto'
+  'p-[var(--spacing-system-l)] shrink-0 lg:w-[280px] border-b lg:border-b-0 lg:border-r border-ods-border lg:min-h-0 lg:overflow-y-auto';
 
 /**
  * Action panel: the elastic half, scrolling inside the fixed card.
@@ -97,7 +98,7 @@ const CONTEXT_PANEL_CLASS =
  * inset that divider from the card's edges instead of letting it run the full
  * width the way every other rule in this card does.
  */
-const ACTION_PANEL_CLASS = 'flex-1 min-w-0 flex flex-col md:min-h-0 lg:p-[var(--spacing-system-l)]'
+const ACTION_PANEL_CLASS = 'flex-1 min-w-0 flex flex-col md:min-h-0 lg:p-[var(--spacing-system-l)]';
 
 /**
  * The action panel's inset for the steps that are ONE block — details,
@@ -115,7 +116,7 @@ const ACTION_PANEL_CLASS = 'flex-1 min-w-0 flex flex-col md:min-h-0 lg:p-[var(--
  * times column does, so this is where a long form gets to scroll instead of
  * being cut off at the card's edge.
  */
-const PANEL_STEP_CLASS = 'p-[var(--spacing-system-l)] md:min-h-0 md:overflow-y-auto lg:p-0'
+const PANEL_STEP_CLASS = 'p-[var(--spacing-system-l)] md:min-h-0 md:overflow-y-auto lg:p-0';
 
 /**
  * The widget's height on desktop: a FIXED 380px, and the ONLY size the whole
@@ -161,7 +162,7 @@ const PANEL_STEP_CLASS = 'p-[var(--spacing-system-l)] md:min-h-0 md:overflow-y-a
  * video take the leftover space at 16:9; a stand-in that just stacks fixed
  * blocks will overflow the shorter of the two.
  */
-export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]'
+export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]';
 
 /**
  * The two-panel card's box, shared verbatim by the loading skeleton and the
@@ -191,16 +192,16 @@ export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]'
  * content shrink into the height instead of being cut off by it.
  */
 const CARD_CLASS = cn(
-  'rounded-md border border-ods-border bg-ods-card overflow-hidden',
+  'overflow-hidden rounded-md border border-ods-border bg-ods-card',
   'md:flex md:flex-col',
   MEETING_SCHEDULER_H,
-)
+);
 
 /** Context strip over action panel, side by side from `lg`. `md:flex-1
  *  md:min-h-0` is the pair that makes it exactly as tall as the card states —
  *  grow into a stated height that content does not reach, shrink into one it
  *  overruns — so neither a short stage nor a long one changes the box. */
-const CARD_INNER_CLASS = 'flex flex-col md:min-h-0 md:flex-1 lg:h-full lg:flex-row'
+const CARD_INNER_CLASS = 'flex flex-col md:min-h-0 md:flex-1 lg:h-full lg:flex-row';
 
 /** The two-line stages (load failure, "booked on HubSpot") — the SAME box as
  *  the booking card, because these are stages of one widget in one slot and a
@@ -208,10 +209,10 @@ const CARD_INNER_CLASS = 'flex flex-col md:min-h-0 md:flex-1 lg:h-full lg:flex-r
  *  visitor. Their content is centred in it and scrolls if a message ever
  *  outgrows it. */
 const CARD_DEGRADED_CLASS = cn(
-  'rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)] flex flex-col items-start gap-[var(--spacing-system-m)]',
+  'flex flex-col items-start gap-[var(--spacing-system-m)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)]',
   'md:justify-center md:overflow-y-auto',
   MEETING_SCHEDULER_H,
-)
+);
 
 /**
  * Fail-closed gate: a link whose declared questions include an unsupported
@@ -220,13 +221,13 @@ const CARD_DEGRADED_CLASS = cn(
  * is worse than no native form) — the escape hatch takes over.
  */
 function isNativelyBookable(availability: MeetingAvailability): boolean {
-  if (!availability.formFields.every(isSupportedFormField)) return false
-  const consent = availability.legalConsent
+  if (!availability.formFields.every(isSupportedFormField)) return false;
+  const consent = availability.legalConsent;
   if (consent) {
-    if (typeof consent.processingConsentText !== 'string') return false
-    if (!Array.isArray(consent.communicationConsentCheckboxes)) return false
+    if (typeof consent.processingConsentText !== 'string') return false;
+    if (!Array.isArray(consent.communicationConsentCheckboxes)) return false;
   }
-  return true
+  return true;
 }
 
 export function HubSpotMeetingScheduler({
@@ -252,78 +253,106 @@ export function HubSpotMeetingScheduler({
     refetchAvailability,
     book,
     isSubmitting,
-  } = useMeetingBooking({ meetingId, apiBaseUrl, initialAvailability })
+  } = useMeetingBooking({ meetingId, apiBaseUrl, initialAvailability });
 
   // Zone resolution happens POST-mount (Intl) unless the embedder pins one —
   // the initial (server) render stays deterministic; time labels appear once
   // a zone exists.
-  const [timezone, setTimezone] = useState<string | null>(displayTimezone ?? null)
-  useEffect(() => {
-    if (displayTimezone) return
+  //
+  // Priority, unchanged: the visitor's own pick (the panel's zone selector) >
+  // the embedder's `displayTimezone` > the browser's resolved zone. Only the
+  // last of the three is client-only, so `useIsHydrated` is the whole reason
+  // this could not be computed during render — with that gate stated directly,
+  // the zone is DERIVED and the effect that used to publish it (a setState in
+  // an effect body, and a dead render for every mount) is gone.
+  const hydrated = useIsHydrated();
+  const [pickedTimezone, setTimezone] = useState<string | null>(null);
+  const resolvedLocalTimezone = useMemo(() => {
+    if (!hydrated) return null;
     try {
-      setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
     } catch {
-      setTimezone('UTC')
+      return 'UTC';
     }
-  }, [displayTimezone])
+  }, [hydrated]);
+  const timezone = pickedTimezone ?? displayTimezone ?? resolvedLocalTimezone;
 
-  const [step, setStep] = useState<Step>('slot')
-  const [durationMs, setDurationMs] = useState<number | null>(null)
-  const [selectedDay, setSelectedDay] = useState<string | null>(null)
-  const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
-  const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null)
-  const [bookingError, setBookingError] = useState<MeetingBookingErrorCode | null>(null)
+  const [step, setStep] = useState<Step>('slot');
+  const [pickedDurationMs, setDurationMs] = useState<number | null>(null);
+  const [pickedDay, setSelectedDay] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
+  const [bookingError, setBookingError] = useState<MeetingBookingErrorCode | null>(null);
 
-  const { honeypotInputProps, getSignals, resetSignals } = useHumanitySignals()
+  const { honeypotInputProps, getSignals, resetSignals } = useHumanitySignals();
 
-  // Reset the machine when the host switches links.
+  // Reset the machine when the host switches links. Adjusted while rendering —
+  // React's documented pattern for a prop-driven reset — so the swapped-in link
+  // never paints a frame of the previous link's chosen day, slot or
+  // confirmation. The ref counter stays in an effect: a ref must not be written
+  // during render.
+  const autoAdvanceCount = useRef(0);
+  const [machineFor, setMachineFor] = useState(meetingId);
+  if (machineFor !== meetingId) {
+    setMachineFor(meetingId);
+    setStep('slot');
+    setDurationMs(null);
+    setSelectedDay(null);
+    setSelectedSlot(null);
+    setConfirmation(null);
+    setBookingError(null);
+  }
   useEffect(() => {
-    setStep('slot')
-    setDurationMs(null)
-    setSelectedDay(null)
-    setSelectedSlot(null)
-    setConfirmation(null)
-    setBookingError(null)
-    autoAdvanceCount.current = 0
-  }, [meetingId])
+    autoAdvanceCount.current = 0;
+  }, [meetingId]);
 
-  const durations = availability?.durationsMs ?? []
-  const shownHosts = hosts ?? availability?.hosts ?? []
+  // Memoised because the `??` fallback minted a NEW array on every
+  // render, which made the memo below re-run every time — i.e. do nothing.
+  const durations = useMemo(() => availability?.durationsMs ?? [], [availability?.durationsMs]);
+  const shownHosts = hosts ?? availability?.hosts ?? [];
 
   // Default to the first offered duration — the visitor lands straight on
   // the calendar; duration is a context-panel chip, not a wizard step.
-  useEffect(() => {
-    if (durationMs == null && durations.length > 0) setDurationMs(durations[0])
-  }, [durationMs, durations])
+  // Derived, not stored: "no explicit pick yet" already means "the first one
+  // offered", so the effect that used to write that back into state was a
+  // second render pass for a value the first render could name — and the frame
+  // in between was the empty calendar this default exists to avoid.
+  const durationMs = pickedDurationMs ?? durations[0] ?? null;
 
   const slots = useMemo(() => {
-    if (!availability || durationMs == null) return []
-    return availability.slotsByDurationMs[String(durationMs)] ?? []
-  }, [availability, durationMs])
+    if (!availability || durationMs == null) return [];
+    return availability.slotsByDurationMs[String(durationMs)] ?? [];
+  }, [availability, durationMs]);
 
   // Auto-select the first day WITH SLOTS IN THE VISIBLE MONTH (once the zone
   // is known) so the visitor sees concrete times immediately — never a dead
   // "pick a day" state, and NEVER a day from another month than the calendar
   // shows (HubSpot's monthOffset payloads can carry near-term slots outside
   // the requested month — the visible grid is the authority).
-  useEffect(() => {
-    if (step !== 'slot' || !timezone) return
-    const now = new Date()
-    const visible = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
-    const monthPrefix = `${visible.getFullYear()}-${String(visible.getMonth() + 1).padStart(2, '0')}`
-    const inMonth = slots.filter((ms) => dayKeyInZone(ms, timezone).startsWith(monthPrefix))
+  //
+  // Derived, with the visitor's own pick winning for as long as it is still one
+  // of the days on offer. Every input — the slots, the visible month, the zone
+  // — is available while rendering, so publishing this from an effect only
+  // guaranteed that each of those changes committed one dead "pick a day" frame
+  // before the calendar filled itself in.
+  const selectedDay = useMemo(() => {
+    if (step !== 'slot' || !timezone) return pickedDay;
+    const now = new Date();
+    const visible = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+    const monthPrefix = `${visible.getFullYear()}-${String(visible.getMonth() + 1).padStart(2, '0')}`;
+    const inMonth = slots.filter(ms => dayKeyInZone(ms, timezone).startsWith(monthPrefix));
     if (inMonth.length === 0) {
-      if (selectedDay && !selectedDay.startsWith(monthPrefix)) setSelectedDay(null)
-      return
+      // Nothing this month — a pick left over from a different month is not a
+      // selection in the grid the visitor is looking at.
+      return pickedDay && !pickedDay.startsWith(monthPrefix) ? null : pickedDay;
     }
-    const dayKeys = new Set(inMonth.map((ms) => dayKeyInZone(ms, timezone)))
-    if (selectedDay && dayKeys.has(selectedDay)) return
-    setSelectedDay(dayKeyInZone(inMonth[0], timezone))
-  }, [step, timezone, slots, selectedDay, monthOffset])
+    const dayKeys = new Set(inMonth.map(ms => dayKeyInZone(ms, timezone)));
+    if (pickedDay && dayKeys.has(pickedDay)) return pickedDay;
+    return dayKeyInZone(inMonth[0], timezone);
+  }, [step, timezone, slots, pickedDay, monthOffset]);
 
   // Fully-booked month with more ahead → auto-advance (bounded, ≤3 hops)
   // before showing the empty state.
-  const autoAdvanceCount = useRef(0)
   useEffect(() => {
     if (
       step === 'slot' &&
@@ -334,47 +363,47 @@ export function HubSpotMeetingScheduler({
       availability.hasMore &&
       autoAdvanceCount.current < 3
     ) {
-      autoAdvanceCount.current += 1
-      setMonthOffset(monthOffset + 1)
+      autoAdvanceCount.current += 1;
+      setMonthOffset(monthOffset + 1);
     }
-  }, [step, availability, isFetchingAvailability, durationMs, slots, monthOffset, setMonthOffset])
+  }, [step, availability, isFetchingAvailability, durationMs, slots, monthOffset, setMonthOffset]);
 
   /** The back edge's destination from the form: the calendar, with any
    *  submit error cleared so the visitor doesn't carry it back. */
   const backToSlot = useCallback(() => {
-    setStep('slot')
-    setBookingError(null)
-  }, [])
+    setStep('slot');
+    setBookingError(null);
+  }, []);
 
   const handleSubmit = useCallback(
     async (payload: Record<string, unknown>) => {
-      setBookingError(null)
-      const result = await book(payload)
+      setBookingError(null);
+      const result = await book(payload);
       if (result.ok && result.confirmation) {
-        setConfirmation(result.confirmation)
-        setStep('confirmed')
-        onBooked?.(result.confirmation)
-        return
+        setConfirmation(result.confirmation);
+        setStep('confirmed');
+        onBooked?.(result.confirmation);
+        return;
       }
-      const code = result.code ?? 'TEMPORARILY_UNAVAILABLE'
-      setBookingError(code)
+      const code = result.code ?? 'TEMPORARILY_UNAVAILABLE';
+      setBookingError(code);
       if (code === 'SLOT_TAKEN') {
         // Recover: refresh the grid (the slot vanishes) and reset the timing
         // signal so the retry isn't flagged too-fast.
-        setSelectedSlot(null)
-        setStep('slot')
-        resetSignals()
-        void refetchAvailability()
+        setSelectedSlot(null);
+        setStep('slot');
+        resetSignals();
+        void refetchAvailability();
       }
     },
     [book, onBooked, refetchAvailability, resetSignals],
-  )
+  );
 
   const escapeHatch = fallbackUrl ? (
     <Button variant="outline" size="small-legacy" href={fallbackUrl} openInNewTab>
       Open in HubSpot
     </Button>
-  ) : null
+  ) : null;
 
   // ---- terminal / degraded states -----------------------------------------
 
@@ -392,33 +421,29 @@ export function HubSpotMeetingScheduler({
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (availabilityError || !availability) {
     return (
-      <div
-        className={cn(CARD_DEGRADED_CLASS, className)}
-      >
-        <p className="text-h6 text-ods-text-secondary">
+      <div className={cn(CARD_DEGRADED_CLASS, className)}>
+        <p className="text-ods-text-secondary text-h6">
           We couldn&apos;t load available call times. Please try again shortly.
         </p>
         {escapeHatch}
       </div>
-    )
+    );
   }
 
   if (!isNativelyBookable(availability)) {
     // Fail closed — never render a half-working native form on a link with
     // questions or consent we can't faithfully reproduce.
     return (
-      <div
-        className={cn(CARD_DEGRADED_CLASS, className)}
-      >
-        <p className="text-h6 text-ods-text-secondary">This meeting type is booked directly on HubSpot.</p>
+      <div className={cn(CARD_DEGRADED_CLASS, className)}>
+        <p className="text-ods-text-secondary text-h6">This meeting type is booked directly on HubSpot.</p>
         {escapeHatch}
       </div>
-    )
+    );
   }
 
   // ---- the card ------------------------------------------------------------
@@ -432,11 +457,11 @@ export function HubSpotMeetingScheduler({
           description={description}
           durationsMs={durations}
           selectedDurationMs={durationMs}
-          onSelectDuration={(ms) => {
-            setDurationMs(ms)
-            setSelectedDay(null)
-            setSelectedSlot(null)
-            if (step === 'details') setStep('slot')
+          onSelectDuration={ms => {
+            setDurationMs(ms);
+            setSelectedDay(null);
+            setSelectedSlot(null);
+            if (step === 'details') setStep('slot');
           }}
           timezone={timezone}
           onTimezoneChange={setTimezone}
@@ -469,7 +494,7 @@ export function HubSpotMeetingScheduler({
                   lives in the context panel at every step (see `contextBack`),
                   which is where the design puts it and the only spot that
                   stays put while this side swaps between calendar and form. */}
-              <p className="text-h4 text-ods-text-primary">
+              <p className="text-ods-text-primary text-h4">
                 {new Intl.DateTimeFormat(undefined, {
                   timeZone: timezone,
                   weekday: 'long',
@@ -483,7 +508,7 @@ export function HubSpotMeetingScheduler({
               </p>
               {bookingError && bookingError !== 'SLOT_TAKEN' && (
                 <div className="flex flex-col items-start gap-[var(--spacing-system-xs)]">
-                  <p className="text-h6 text-ods-error">
+                  <p className="text-ods-error text-h6">
                     {bookingError === 'TEMPORARILY_UNAVAILABLE'
                       ? 'Scheduling is briefly unavailable — please try again in a minute.'
                       : bookingError === 'MEETING_UNAVAILABLE'
@@ -510,9 +535,9 @@ export function HubSpotMeetingScheduler({
           ) : (
             <div className="flex flex-col gap-[var(--spacing-system-m)] md:min-h-0 md:flex-1">
               {bookingError === 'SLOT_TAKEN' && (
-                <p className="px-[var(--spacing-system-l)] pt-[var(--spacing-system-l)] text-h6 text-ods-error lg:p-0">
-                  That time is no longer available — if you just submitted, check your email for a confirmation
-                  before rebooking.
+                <p className="px-[var(--spacing-system-l)] pt-[var(--spacing-system-l)] text-ods-error text-h6 lg:p-0">
+                  That time is no longer available — if you just submitted, check your email for a confirmation before
+                  rebooking.
                 </p>
               )}
               {timezone && durationMs != null ? (
@@ -523,15 +548,15 @@ export function HubSpotMeetingScheduler({
                   slots={slots}
                   timezone={timezone}
                   monthOffset={monthOffset}
-                  onMonthOffsetChange={(o) => {
-                    setSelectedDay(null)
-                    setSelectedSlot(null)
-                    setMonthOffset(o)
+                  onMonthOffsetChange={o => {
+                    setSelectedDay(null);
+                    setSelectedSlot(null);
+                    setMonthOffset(o);
                   }}
                   selectedSlot={selectedSlot}
-                  onSelectSlot={(ms) => {
-                    setSelectedSlot(ms)
-                    setStep('details')
+                  onSelectSlot={ms => {
+                    setSelectedSlot(ms);
+                    setStep('details');
                   }}
                   selectedDay={selectedDay}
                   onSelectDay={setSelectedDay}
@@ -542,7 +567,7 @@ export function HubSpotMeetingScheduler({
                 // fully-booked month, and the only case the escape hatch is
                 // the right answer to.
                 <div className="flex flex-col items-start gap-[var(--spacing-system-m)]">
-                  <p className="text-h6 text-ods-text-secondary">No call times are published right now.</p>
+                  <p className="text-ods-text-secondary text-h6">No call times are published right now.</p>
                   {escapeHatch}
                 </div>
               ) : (
@@ -556,13 +581,13 @@ export function HubSpotMeetingScheduler({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export {
   MeetingSchedulerDirectory,
   MeetingSchedulerDirectoryRowSkeleton,
   type MeetingSchedulerDirectoryProps,
-} from './directory'
-export type { MeetingAvailability, BookingConfirmation, MeetingBookingErrorCode, MeetingHost }
-export type { SchedulingLink, SchedulingLinksPayload } from '../../schemas/meeting-booking-schema'
+} from './directory';
+export type { MeetingAvailability, BookingConfirmation, MeetingBookingErrorCode, MeetingHost };
+export type { SchedulingLink, SchedulingLinksPayload } from '../../schemas/meeting-booking-schema';

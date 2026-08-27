@@ -8,51 +8,49 @@
  * `save()` returns `void` and swallows its errors, so the only way to know a write stuck is
  * to read it back.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const store: { value: unknown } = { value: null }
+const store: { value: unknown } = { value: null };
 /** When true, `save()` accepts the call and drops the value — a blocked/full quota. */
-let swallowWrites = false
+let swallowWrites = false;
 
 vi.mock('../local-storage-adapter', () => ({
   createLocalStorageAdapter: () => ({
     load: () => store.value,
     save: (value: unknown) => {
-      if (swallowWrites) return
-      store.value = value
+      if (swallowWrites) return;
+      store.value = value;
     },
     clear: () => {
-      store.value = null
+      store.value = null;
     },
   }),
-}))
+}));
 
-const { captureFirstTouchAttribution, getFirstTouchAttribution } = await import(
-  '../first-touch-attribution'
-)
+const { captureFirstTouchAttribution, getFirstTouchAttribution } = await import('../first-touch-attribution');
 
 beforeEach(() => {
-  store.value = null
-  swallowWrites = false
+  store.value = null;
+  swallowWrites = false;
   Object.defineProperty(window, 'location', {
     value: new URL('https://www.openmsp.ai/waitlist?utm_source=reddit'),
     writable: true,
     configurable: true,
-  })
-})
+  });
+});
 
 describe('captureFirstTouchAttribution persistence', () => {
   it('returns the record when the write sticks', () => {
-    expect(captureFirstTouchAttribution().utm_source).toBe('reddit')
-    expect(getFirstTouchAttribution().utm_source).toBe('reddit')
-  })
+    expect(captureFirstTouchAttribution().utm_source).toBe('reddit');
+    expect(getFirstTouchAttribution().utm_source).toBe('reddit');
+  });
 
   it('returns {} — NOT the record — when the write is swallowed', () => {
-    swallowWrites = true
+    swallowWrites = true;
     // Returning the record here would hand the caller attribution that no later read can
     // recover: it would be replayed on this page view and absent on the next, which is worse
     // than never replaying it, because it looks like it worked.
-    expect(captureFirstTouchAttribution()).toEqual({})
-    expect(getFirstTouchAttribution()).toEqual({})
-  })
-})
+    expect(captureFirstTouchAttribution()).toEqual({});
+    expect(getFirstTouchAttribution()).toEqual({});
+  });
+});

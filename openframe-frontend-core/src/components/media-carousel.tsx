@@ -1,23 +1,23 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect, memo, useCallback, type KeyboardEvent, type TouchEvent } from 'react';
-import { cn } from "../utils/cn";
-import { MediaItem } from '../utils/media-carousel-utils-stub';
+import { useState, useRef, memo, useCallback, type KeyboardEvent, type TouchEvent } from 'react';
 import { Image, Link } from '../embed-shims';
-import { Button } from './ui/button';
+import { cn } from '../utils/cn';
+import type { MediaItem } from '../utils/media-carousel-utils-stub';
 import { Video } from './features/video';
 import { ImageOffIcon } from './icons-v2-generated/audio-and-visual/image-off-icon';
+import { Button } from './ui/button';
 
 // Navigation icons
 const ChevronLeftIcon = () => (
   <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <polyline points="15,18 9,12 15,6"/>
+    <polyline points="15,18 9,12 15,6" />
   </svg>
 );
 
 const ChevronRightIcon = () => (
   <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <polyline points="9,18 15,12 9,6"/>
+    <polyline points="9,18 15,12 9,6" />
   </svg>
 );
 
@@ -56,17 +56,17 @@ export interface MediaCarouselProps {
   reserveDotRow?: boolean;
 }
 
-export const MediaCarousel = memo(function MediaCarousel({
+export const MediaCarousel = memo(function MediaCarouselImpl({
   media,
   className,
-  aspectRatio = "16/9",
+  aspectRatio = '16/9',
   showArrows = true,
   objectFit = 'contain',
   posterPriority = false,
   transformImageSrc,
   reserveDotRow = false,
 }: MediaCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [requestedIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   /** Resource URLs that failed to load (e.g. 404, blocked CDN) */
@@ -79,45 +79,50 @@ export const MediaCarousel = memo(function MediaCarousel({
 
   const onImageError = useCallback((originalUrl: string) => {
     const key = originalUrl.trim() || '__missing_src__';
-    setBrokenResourceUrls((b) => (b[key] ? b : { ...b, [key]: true }));
+    setBrokenResourceUrls(b => (b[key] ? b : { ...b, [key]: true }));
   }, []);
 
   // Clamp `currentIndex` whenever `media` shrinks (e.g. an admin removes a
   // slide while the user is on the last one) so the dot active state +
-  // `currentItem` lookup stay in sync.
-  useEffect(() => {
-    if (currentIndex >= media.length && media.length > 0) {
-      setCurrentIndex(media.length - 1);
-    }
-  }, [media.length, currentIndex]);
+  // `currentItem` lookup stay in sync. Derived, not written back into state
+  // from an effect: `media.length` is known in the very render that shrank, so
+  // clamping here means the carousel never paints the out-of-range frame the
+  // effect used to correct on the pass after.
+  const currentIndex = media.length > 0 && requestedIndex >= media.length ? media.length - 1 : requestedIndex;
 
   const currentItem = media[currentIndex] || media[0];
 
-  // Navigation — `<Video>` owns its own play/pause lifecycle.
+  // Navigation — `<Video>` owns its own play/pause lifecycle. Both step from
+  // the CLAMPED index, so an out-of-range request left over from a shrunk
+  // `media` advances from the slide actually on screen rather than from a
+  // position nobody can see.
   const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % media.length);
+    setCurrentIndex(prev => (Math.min(prev, media.length - 1) + 1) % media.length);
   }, [media.length]);
 
   const prevSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev - 1 + media.length) % media.length);
+    setCurrentIndex(prev => (Math.min(prev, media.length - 1) - 1 + media.length) % media.length);
   }, [media.length]);
 
   const selectSlide = useCallback((index: number) => {
-    setCurrentIndex((prev) => (index === prev ? prev : index));
+    setCurrentIndex(prev => (index === prev ? prev : index));
   }, []);
 
   // Keyboard navigation - only when carousel is focused
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (media.length <= 1) return;
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (media.length <= 1) return;
 
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      prevSlide();
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      nextSlide();
-    }
-  }, [nextSlide, prevSlide, media.length]);
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        prevSlide();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        nextSlide();
+      }
+    },
+    [nextSlide, prevSlide, media.length],
+  );
 
   // Early return if no media provided
   if (!media || media.length === 0) {
@@ -158,8 +163,7 @@ export const MediaCarousel = memo(function MediaCarousel({
     }
   };
 
-  const displayImageSrc = (url: string): string =>
-    transformImageSrc ? transformImageSrc(url) : url;
+  const displayImageSrc = (url: string): string => (transformImageSrc ? transformImageSrc(url) : url);
 
   // Render any playable slide via the SSoT `<Video>` — its default `auto`
   // routing owns the youtube-vs-file decision (lite-youtube facade vs
@@ -173,21 +177,19 @@ export const MediaCarousel = memo(function MediaCarousel({
       muted
       layout="fill"
       priority={Boolean(posterPriority && index === 0)}
-      className="w-full h-full bg-black"
+      className="h-full w-full bg-black"
     />
   );
 
   const renderImageUnavailable = (failedUrl: string) => (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ods-card px-6 text-center">
       <ImageOffIcon className="size-8 text-ods-text-secondary" />
-      <p className="text-ods-text-secondary text-h6 max-w-md">
-        This image is no longer available at the original URL.
-      </p>
+      <p className="max-w-md text-ods-text-secondary text-h6">This image is no longer available at the original URL.</p>
       <Link
         href={failedUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-ods-accent text-h6 underline break-all"
+        className="break-all text-ods-accent underline text-h6"
       >
         Open link
       </Link>
@@ -201,7 +203,7 @@ export const MediaCarousel = memo(function MediaCarousel({
     if (!rawSrc) {
       return (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ods-card px-6 text-center">
-          <p className="text-ods-text-secondary text-h6 max-w-md">No image URL for this slide.</p>
+          <p className="max-w-md text-ods-text-secondary text-h6">No image URL for this slide.</p>
         </div>
       );
     }
@@ -212,19 +214,14 @@ export const MediaCarousel = memo(function MediaCarousel({
     const imageLoaded = loadedImageSrc === rawSrc;
     return (
       <div className="absolute inset-0 bg-ods-bg">
-        {!imageLoaded && (
-          <div
-            className="absolute inset-0 z-[1] bg-ods-card/90 animate-pulse"
-            aria-hidden
-          />
-        )}
+        {!imageLoaded && <div className="absolute inset-0 z-[1] animate-pulse bg-ods-card/90" aria-hidden />}
         <Image
           src={displayImageSrc(rawSrc)}
           alt={item.alt || `Media ${index + 1}`}
           className={cn(
-            `w-full h-full object-${objectFit} relative z-[2]`,
+            `h-full w-full object-${objectFit} relative z-[2]`,
             !imageLoaded && 'opacity-0',
-            imageLoaded && 'opacity-100 transition-opacity duration-200'
+            imageLoaded && 'opacity-100 transition-opacity duration-200',
           )}
           priority={mainImagePriority}
           loading={mainImagePriority ? 'eager' : 'lazy'}
@@ -268,23 +265,23 @@ export const MediaCarousel = memo(function MediaCarousel({
   };
 
   return (
-    <div className={cn("flex flex-col items-center gap-[var(--spacing-system-l)]", className)}>
+    <div className={cn('flex flex-col items-center gap-[var(--spacing-system-l)]', className)}>
       {/* Main Display Area with Fixed Aspect Ratio — Figma media frame:
           rounded-md, ods border, semantic elevation token. */}
       <div
         ref={carouselRef}
         className={cn(
-          "relative bg-ods-bg border border-ods-border rounded-md overflow-hidden group w-full",
-          "[box-shadow:var(--shadow-media-frame)]",
-          getAspectRatioClass()
+          'group relative w-full overflow-hidden rounded-md border border-ods-border bg-ods-bg',
+          '[box-shadow:var(--shadow-media-frame)]',
+          getAspectRatioClass(),
         )}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onKeyDown={media.length > 1 ? handleKeyDown : undefined}
         tabIndex={media.length > 1 ? 0 : undefined}
-        role={media.length > 1 ? "region" : undefined}
-        aria-label={media.length > 1 ? "Media carousel, use arrow keys to navigate" : undefined}
+        role={media.length > 1 ? 'region' : undefined}
+        aria-label={media.length > 1 ? 'Media carousel, use arrow keys to navigate' : undefined}
       >
         {/* Media content */}
         {renderMainMedia(currentItem, currentIndex)}
@@ -296,7 +293,7 @@ export const MediaCarousel = memo(function MediaCarousel({
             <Button
               variant="transparent"
               onClick={prevSlide}
-              className="absolute left-3 top-1/2 h-auto md:h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:bg-black/70 z-10"
+              className="absolute left-3 top-1/2 z-10 h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 hover:bg-black/70 group-hover:opacity-100 md:h-auto"
               aria-label="Previous media"
             >
               <ChevronLeftIcon />
@@ -305,7 +302,7 @@ export const MediaCarousel = memo(function MediaCarousel({
             <Button
               variant="transparent"
               onClick={nextSlide}
-              className="absolute right-3 top-1/2 h-auto md:h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:bg-black/70 z-10"
+              className="absolute right-3 top-1/2 z-10 h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 hover:bg-black/70 group-hover:opacity-100 md:h-auto"
               aria-label="Next media"
             >
               <ChevronRightIcon />
@@ -319,28 +316,27 @@ export const MediaCarousel = memo(function MediaCarousel({
           model here — aria-current marks the active slide instead). */}
       {(media.length > 1 || reserveDotRow) && (
         <div className="flex h-6 items-center gap-[var(--spacing-system-xs)]" role="group" aria-label="Choose slide">
-          {media.length > 1 && media.map((item, index) => {
-            const isActive = index === currentIndex;
-            return (
-              <Button
-                key={index}
-                variant="transparent"
-                aria-current={isActive ? 'true' : undefined}
-                aria-label={`Go to slide ${index + 1}`}
-                onClick={() => selectSlide(index)}
-                className="flex h-6 w-6 md:h-6 shrink-0 items-center justify-center rounded-full p-0"
-              >
-                <span
-                  className={cn(
-                    "size-2 rounded-full transition-colors duration-150",
-                    isActive
-                      ? "bg-ods-accent"
-                      : "bg-ods-bg-surface hover:bg-ods-bg-surface-hover"
-                  )}
-                />
-              </Button>
-            );
-          })}
+          {media.length > 1 &&
+            media.map((item, index) => {
+              const isActive = index === currentIndex;
+              return (
+                <Button
+                  key={index}
+                  variant="transparent"
+                  aria-current={isActive ? 'true' : undefined}
+                  aria-label={`Go to slide ${index + 1}`}
+                  onClick={() => selectSlide(index)}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full p-0 md:h-6"
+                >
+                  <span
+                    className={cn(
+                      'size-2 rounded-full transition-colors duration-150',
+                      isActive ? 'bg-ods-accent' : 'bg-ods-bg-surface hover:bg-ods-bg-surface-hover',
+                    )}
+                  />
+                </Button>
+              );
+            })}
         </div>
       )}
     </div>

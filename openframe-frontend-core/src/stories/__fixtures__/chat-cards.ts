@@ -12,42 +12,35 @@
  * of these cards read them at render time, but the wire types require them.
  */
 
-import type { BlogPostSummary } from '../../types/blog'
-import type { CaseStudy } from '../../types/case-study'
-import type { CustomerInterview } from '../../types/customer-interview'
-import type { GitHubActivityItem } from '../../components/chat/types/entities/github-activity'
-import type { SlackMessageItem } from '../../components/chat/types/entities/slack-message'
-import type { HubspotTicketItem } from '../../components/chat/types/entities/hubspot-ticket'
-import type { DataRoomDocCardItem } from '../../components/chat/types/entities/data-room-doc'
-import type { InvestorUpdate } from '../../components/chat/types/entities/investor-update'
-import type { OnboardingGuide } from '../../components/chat/types/entities/onboarding-guide'
-import type { RoadmapItem } from '../../components/chat/types/entities/roadmap-item'
-import type {
-  BaseProgramItem,
-  ProgramHost,
-} from '../../components/chat/types/entities/program-types'
-import type {
-  CampaignCardItem,
-  GenericEntityCardItem,
-} from '../../components/chat/entity-cards'
-import type { WhatIShippedCardData } from '../../components/chat/entity-cards/what-i-shipped-card'
-import type { HowIWorkCardData } from '../../components/chat/entity-cards/how-i-work-card'
+import type { CampaignCardItem, GenericEntityCardItem } from '../../components/chat/entity-cards';
+import type { HowIWorkCardData } from '../../components/chat/entity-cards/how-i-work-card';
+import type { WhatIShippedCardData } from '../../components/chat/entity-cards/what-i-shipped-card';
+import type { DataRoomDocCardItem } from '../../components/chat/types/entities/data-room-doc';
+import type { GitHubActivityItem } from '../../components/chat/types/entities/github-activity';
+import type { HubspotTicketItem } from '../../components/chat/types/entities/hubspot-ticket';
+import type { InvestorUpdate } from '../../components/chat/types/entities/investor-update';
+import type { OnboardingGuide } from '../../components/chat/types/entities/onboarding-guide';
+import type { BaseProgramItem, ProgramHost } from '../../components/chat/types/entities/program-types';
+import type { RoadmapItem } from '../../components/chat/types/entities/roadmap-item';
+import type { SlackMessageItem } from '../../components/chat/types/entities/slack-message';
+import type { BlogPostSummary } from '../../types/blog';
+import type { CaseStudy } from '../../types/case-study';
+import type { CustomerInterview } from '../../types/customer-interview';
 
 // =============================================================================
 // Common
 // =============================================================================
 
-const NOW = Date.parse('2026-05-28T10:00:00Z')
-const DAY = 24 * 60 * 60 * 1000
+const NOW = Date.parse('2026-05-28T10:00:00Z');
+const DAY = 24 * 60 * 60 * 1000;
 
-const isoDaysAgo = (days: number) => new Date(NOW - days * DAY).toISOString()
+const isoDaysAgo = (days: number) => new Date(NOW - days * DAY).toISOString();
 
 const SAMPLE_AUTHOR = {
   full_name: 'Pavlo Shylo',
-  avatar_url:
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop',
+  avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop',
   job_title: 'Frontend Engineer',
-}
+};
 
 // =============================================================================
 // GitHub Activity
@@ -60,7 +53,7 @@ export const githubCommitItem: GitHubActivityItem = {
   dateUpdated: isoDaysAgo(1),
   url: 'https://github.com/flamingo-cx/openframe/commit/a1b2c3d',
   kind: 'commit',
-}
+};
 
 export const githubPullRequestItem: GitHubActivityItem = {
   id: '742',
@@ -69,7 +62,7 @@ export const githubPullRequestItem: GitHubActivityItem = {
   dateUpdated: isoDaysAgo(2),
   url: 'https://github.com/flamingo-cx/openframe/pull/742',
   kind: 'pull_request',
-}
+};
 
 export const githubPrReviewItem: GitHubActivityItem = {
   id: 'rev-9981',
@@ -78,7 +71,7 @@ export const githubPrReviewItem: GitHubActivityItem = {
   dateUpdated: isoDaysAgo(2),
   url: 'https://github.com/flamingo-cx/openframe/pull/742#pullrequestreview-9981',
   kind: 'pr_review',
-}
+};
 
 // =============================================================================
 // Slack
@@ -92,7 +85,7 @@ export const slackMessageItem: SlackMessageItem = {
   channel: 'chat-architecture',
   dateUpdated: isoDaysAgo(1),
   url: 'https://flamingo-cx.slack.com/archives/C012ABC34/p1716895200000300',
-}
+};
 
 // =============================================================================
 // HubSpot Ticket
@@ -110,7 +103,7 @@ export const hubspotTicketItem: HubspotTicketItem = {
   customerEmail: 'ops@acme-msp.com',
   dateUpdated: isoDaysAgo(0),
   url: 'https://app.hubspot.com/contacts/123456/ticket/4429311208',
-}
+};
 
 // =============================================================================
 // Data Room / Knowledge Base
@@ -120,11 +113,10 @@ export const dataRoomDocItem: DataRoomDocCardItem = {
   id: 'dr-doc-2024-q1-board-deck',
   title: 'Q1 2026 Board Deck — Final',
   path: 'investor-relations/board/2026-q1/q1-board-deck',
-  preview:
-    'ARR run-rate update, OpenMSP/OpenFrame split, hiring plan, runway scenarios.',
+  preview: 'ARR run-rate update, OpenMSP/OpenFrame split, hiring plan, runway scenarios.',
   url: '/data-room/investor-relations/board/2026-q1/q1-board-deck',
   sourceRepo: 'data-room-docs',
-}
+};
 
 export const openframeDocsMarkdownItem: DataRoomDocCardItem = {
   id: 'kb-chat-architecture',
@@ -134,7 +126,7 @@ export const openframeDocsMarkdownItem: DataRoomDocCardItem = {
     'Three frontend surfaces share the lib chat. Guide mode uses an SSE adapter; Mingo mode uses NATS via the runtime.',
   url: '/knowledge-base/guides/chat/architecture',
   sourceRepo: 'openframe-docs',
-}
+};
 
 // =============================================================================
 // Generic Entity (financials)
@@ -153,7 +145,7 @@ export const financialKpiItem: GenericEntityCardItem = {
   ],
   dateUpdated: isoDaysAgo(7),
   url: '/data-room/financials/kpi/arr-2026-q1',
-}
+};
 
 export const capTableItem: GenericEntityCardItem = {
   id: 'cap-vertex-vii-safe',
@@ -168,7 +160,7 @@ export const capTableItem: GenericEntityCardItem = {
   ],
   dateUpdated: isoDaysAgo(120),
   url: '/data-room/legal/fundraising/seed/executed/vertex-vii-3.5m-safe',
-}
+};
 
 export const profitLossItem: GenericEntityCardItem = {
   id: 'pnl-2026-q1',
@@ -183,7 +175,7 @@ export const profitLossItem: GenericEntityCardItem = {
   ],
   dateUpdated: isoDaysAgo(30),
   url: '/data-room/financials/profit-loss/2026-q1',
-}
+};
 
 export const balanceSheetItem: GenericEntityCardItem = {
   id: 'bs-2026-03',
@@ -198,7 +190,7 @@ export const balanceSheetItem: GenericEntityCardItem = {
   ],
   dateUpdated: isoDaysAgo(60),
   url: '/data-room/financials/balance-sheet/2026-03',
-}
+};
 
 export const cashFlowItem: GenericEntityCardItem = {
   id: 'cf-2026-q1',
@@ -213,7 +205,7 @@ export const cashFlowItem: GenericEntityCardItem = {
   ],
   dateUpdated: isoDaysAgo(30),
   url: '/data-room/financials/cash-flow/2026-q1',
-}
+};
 
 // =============================================================================
 // Blog
@@ -225,12 +217,10 @@ export const blogPostSummary: BlogPostSummary = {
   slug: 'how-we-built-mingo-chat',
   summary:
     'A deep-dive into the unified chat runtime that powers Guide and Mingo modes, including the SSE adapter, NATS sync and the entity-card dispatch.',
-  featured_image:
-    'https://images.unsplash.com/photo-1551434678-e076c223a692?w=1200&h=675&fit=crop',
+  featured_image: 'https://images.unsplash.com/photo-1551434678-e076c223a692?w=1200&h=675&fit=crop',
   published_at: isoDaysAgo(4),
   author_name: 'Pavlo Shylo',
-  author_avatar:
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop',
+  author_avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop',
   categories: [{ name: 'Engineering', slug: 'engineering' }],
   tags: [
     { name: 'chat', slug: 'chat' },
@@ -238,7 +228,7 @@ export const blogPostSummary: BlogPostSummary = {
   ],
   is_featured: true,
   view_count: 482,
-}
+};
 
 // =============================================================================
 // Case Study
@@ -250,8 +240,7 @@ export const caseStudy: CaseStudy = {
   slug: 'acme-msp-response-time',
   summary:
     'Acme consolidated four ticketing tools into OpenFrame and rebuilt their on-call rotation around the unified inbox.',
-  featured_image:
-    'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&h=675&fit=crop',
+  featured_image: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&h=675&fit=crop',
   user_id: 'user-acme-owner',
   challenge: 'Four ticketing tools, no shared SLA view, on-call burnout.',
   solution: 'Migrated to OpenFrame, wired NinjaOne + HubSpot into one inbox.',
@@ -276,20 +265,18 @@ export const caseStudy: CaseStudy = {
   // Relations (the card reads `user.full_name`, `user.avatar_url`, `msp.name`, `msp.icon_url`)
   user: {
     full_name: 'Jordan Reyes',
-    avatar_url:
-      'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=120&h=120&fit=crop',
+    avatar_url: 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=120&h=120&fit=crop',
     job_title: 'CEO, Acme MSP',
   } as unknown as CaseStudy['user'],
   msp: {
     id: 'msp-acme',
     name: 'Acme Managed Services',
-    icon_url:
-      'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=64&h=64&fit=crop',
+    icon_url: 'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=64&h=64&fit=crop',
     seat_count: 1200,
     created_at: isoDaysAgo(800),
     updated_at: isoDaysAgo(45),
   },
-}
+};
 
 // =============================================================================
 // Customer Interview
@@ -303,22 +290,19 @@ export const customerInterview: CustomerInterview = {
     'Jordan walks through how Acme MSP migrated from four ticketing tools to OpenFrame in 11 weeks, and what the operational impact has been six months later.',
   transcript: null,
   user_id: 'user-acme-owner',
-  main_video_url:
-    'https://customer-bytes.flamingo.cx/interviews/jordan-reyes-acme.mp4',
+  main_video_url: 'https://customer-bytes.flamingo.cx/interviews/jordan-reyes-acme.mp4',
   teasers: [],
   highlight_video_url: null,
   highlight_video_thumbnail: null,
   highlight_video_duration_ms: null,
   highlight_video_source: null,
-  main_video_thumbnail:
-    'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&h=675&fit=crop',
+  main_video_thumbnail: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&h=675&fit=crop',
   case_study_id: 81,
   seo_title: null,
   seo_description: null,
   seo_keywords: null,
   og_image_url: null,
-  featured_image:
-    'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&h=675&fit=crop',
+  featured_image: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&h=675&fit=crop',
   status: 'completed',
   completed_at: isoDaysAgo(50),
   author_id: 'user-pavlo',
@@ -328,20 +312,18 @@ export const customerInterview: CustomerInterview = {
   view_count: 314,
   user: {
     full_name: 'Jordan Reyes',
-    avatar_url:
-      'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=120&h=120&fit=crop',
+    avatar_url: 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=120&h=120&fit=crop',
     job_title: 'CEO, Acme MSP',
   } as unknown as CustomerInterview['user'],
   msp: {
     id: 'msp-acme',
     name: 'Acme Managed Services',
-    icon_url:
-      'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=64&h=64&fit=crop',
+    icon_url: 'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=64&h=64&fit=crop',
     seat_count: 1200,
     created_at: isoDaysAgo(800),
     updated_at: isoDaysAgo(50),
   },
-}
+};
 
 // =============================================================================
 // Product Release — props are flat (no item type), see component signature
@@ -353,10 +335,9 @@ export const productReleaseSmProps = {
     'Embeddable chat with citations, inline cards and slash commands. Now generally available on every product hub surface.',
   version: '2.5.0',
   formattedDate: 'May 21, 2026',
-  coverImage:
-    'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=400&fit=crop',
+  coverImage: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=400&fit=crop',
   hasVideoCover: false,
-} as const
+} as const;
 
 export const productReleaseLgProps = {
   ...productReleaseSmProps,
@@ -371,7 +352,7 @@ export const productReleaseLgProps = {
     improvements: 5,
     breaking: 1,
   },
-}
+};
 
 // =============================================================================
 // Program (Podcast / Webinar / Event)
@@ -381,54 +362,47 @@ const sampleHosts: ProgramHost[] = [
   {
     id: 'host-kirill',
     name: 'Kirill',
-    avatar_url:
-      'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=120&h=120&fit=crop',
+    avatar_url: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=120&h=120&fit=crop',
     role: 'Host',
   },
   {
     id: 'host-pavlo',
     name: 'Pavlo Shylo',
-    avatar_url:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop',
+    avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop',
     role: 'Guest',
   },
-]
+];
 
 export const podcastItem: BaseProgramItem = {
   id: 'pod-ep-042',
   title: 'Episode 42 — Building Embeddable AI chat for MSPs',
   description:
     'Kirill and Pavlo unpack how we wire SSE streaming, NATS sync and per-tenant slash commands into a single embeddable surface.',
-  cover_url:
-    'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=600&h=600&fit=crop',
+  cover_url: 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=600&h=600&fit=crop',
   date: isoDaysAgo(3),
   external_url: 'https://flamingo.cx/podcasts/ep-042',
   hosts: sampleHosts,
-}
+};
 
 export const webinarItem: BaseProgramItem = {
   id: 'web-2026-06-msp-pricing',
   title: 'MSP pricing teardown — live from the Flamingo studio',
-  description:
-    'A live walkthrough of three MSP price books with red-pen annotation and Q&A.',
-  cover_url:
-    'https://images.unsplash.com/photo-1591115765373-5207764f72e4?w=600&h=600&fit=crop',
+  description: 'A live walkthrough of three MSP price books with red-pen annotation and Q&A.',
+  cover_url: 'https://images.unsplash.com/photo-1591115765373-5207764f72e4?w=600&h=600&fit=crop',
   date: isoDaysAgo(-5),
   external_url: 'https://flamingo.cx/webinars/msp-pricing-teardown',
-  hosts: [sampleHosts[0]!],
-}
+  hosts: [sampleHosts[0]],
+};
 
 export const eventItem: BaseProgramItem = {
   id: 'evt-2026-06-msp-conf-austin',
   title: 'MSP Founders Dinner — Austin',
-  description:
-    'Invite-only dinner for MSP founders, hosted by Flamingo and Acme Capital. Limited to 30 seats.',
-  cover_url:
-    'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&h=600&fit=crop',
+  description: 'Invite-only dinner for MSP founders, hosted by Flamingo and Acme Capital. Limited to 30 seats.',
+  cover_url: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&h=600&fit=crop',
   date: isoDaysAgo(-21),
   external_url: 'https://lu.ma/msp-austin-2026',
   hosts: sampleHosts,
-}
+};
 
 // =============================================================================
 // Investor Update
@@ -450,8 +424,7 @@ export const investorUpdate: InvestorUpdate = {
   highlight_video_thumbnail: null,
   main_video_thumbnail: null,
   video_bites: [],
-  featured_image:
-    'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&h=675&fit=crop',
+  featured_image: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&h=675&fit=crop',
   strategic_update:
     'Q1 ARR grew 9.3% QoQ to $4.82M. We onboarded two design-partner MSPs (Acme and Cumulus) ahead of the public GA of Mingo chat.',
   financials: {},
@@ -472,7 +445,7 @@ export const investorUpdate: InvestorUpdate = {
   updated_at: isoDaysAgo(60),
   created_by: 'user-pavlo',
   updated_by: 'user-pavlo',
-}
+};
 
 // =============================================================================
 // Onboarding Guide
@@ -487,23 +460,20 @@ export const onboardingGuide: OnboardingGuide = {
   section_order: 1,
   content:
     'Spin up the OpenFrame deployment on your Kubernetes cluster, point your DNS record at the load balancer, and bootstrap the admin user.',
-  video_summary:
-    'A 6-minute walkthrough of the helm install, DNS + cert wiring and the admin bootstrap flow.',
+  video_summary: 'A 6-minute walkthrough of the helm install, DNS + cert wiring and the admin bootstrap flow.',
   transcript: null,
   transcript_words_data: null,
   srt_content: null,
   ai_transcript_formatted: null,
   main_video_url: null,
-  main_video_thumbnail:
-    'https://images.unsplash.com/photo-1551434678-e076c223a692?w=1200&h=675&fit=crop',
+  main_video_thumbnail: 'https://images.unsplash.com/photo-1551434678-e076c223a692?w=1200&h=675&fit=crop',
   youtube_url: null,
   highlight_video_url: null,
   highlight_video_thumbnail: null,
   highlight_video_duration_ms: 360_000,
   highlight_video_source: null,
   video_bites: [],
-  featured_image:
-    'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&h=675&fit=crop',
+  featured_image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&h=675&fit=crop',
   og_image_url: null,
   seo_title: null,
   seo_description: null,
@@ -524,7 +494,7 @@ export const onboardingGuide: OnboardingGuide = {
   updated_at: isoDaysAgo(20),
   created_by: 'user-pavlo',
   updated_by: 'user-pavlo',
-}
+};
 
 // =============================================================================
 // Roadmap Item (drives 3 cardTypes via the `cardType` prop)
@@ -539,16 +509,14 @@ export const roadmapFeatureItem: RoadmapItem = {
   statusColor: 'cyan',
   icon: null,
   figmaUrl: null,
-  screenshots: [
-    'https://images.unsplash.com/photo-1551434678-e076c223a692?w=1200&h=720&fit=crop',
-  ],
+  screenshots: ['https://images.unsplash.com/photo-1551434678-e076c223a692?w=1200&h=720&fit=crop'],
   targetVersion: 'v2.6',
   upvotes: 42,
   downvotes: 1,
   quarter: 'Q2 2026',
   clickupUrl: 'https://app.clickup.com/t/7g4xyz',
   customItemId: 1010, // Feature
-}
+};
 
 export const roadmapDeliveryItem: RoadmapItem = {
   id: 'CU-8h5abc',
@@ -566,7 +534,7 @@ export const roadmapDeliveryItem: RoadmapItem = {
   quarter: 'Q2 2026',
   clickupUrl: 'https://app.clickup.com/t/8h5abc',
   customItemId: 1010,
-}
+};
 
 export const roadmapInternalTaskItem: RoadmapItem = {
   id: 'CU-9k6def',
@@ -584,7 +552,7 @@ export const roadmapInternalTaskItem: RoadmapItem = {
   quarter: 'Q2 2026',
   clickupUrl: 'https://app.clickup.com/t/9k6def',
   customItemId: 1008, // Bug — but the cardType drives the visual class in the chat sm variant
-}
+};
 
 // =============================================================================
 // Marketing Campaign
@@ -600,12 +568,11 @@ export const campaignItem: CampaignCardItem = {
     { id: 'g1', label: 'Drive 800 signups' },
     { id: 'g2', label: '12 podcast plays' },
   ],
-}
+};
 
 // =============================================================================
 // Employee entries (people-hub) — What I Shipped / How I Work
 // =============================================================================
-
 
 export const whatIShippedEntry: WhatIShippedCardData = {
   title: 'Shipped the new billing flow + cut sync latency 40%',
@@ -613,15 +580,13 @@ export const whatIShippedEntry: WhatIShippedCardData = {
     'Rebuilt the checkout path around the unified billing service, moved webhook fan-out to the outbox drainer, and deleted the legacy cron.',
   status: 'published',
   entry_month: '2026-07-01',
-  featured_image:
-    'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&h=675&fit=crop',
+  featured_image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&h=675&fit=crop',
   main_video_thumbnail: null,
   author: {
     full_name: 'Yevhenii Petrenko',
-    avatar_url:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop',
+    avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop',
   },
-}
+};
 
 export const howIWorkEntry: HowIWorkCardData = {
   title: 'Competitive research in 40 minutes with a standing Claude prompt',
@@ -630,12 +595,10 @@ export const howIWorkEntry: HowIWorkCardData = {
   status: 'published',
   session_date: '2026-08-16',
   discipline: 'marketing',
-  featured_image:
-    'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&h=675&fit=crop',
+  featured_image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&h=675&fit=crop',
   main_video_thumbnail: null,
   author: {
     full_name: 'Semen Kovalenko',
-    avatar_url:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop',
+    avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop',
   },
-}
+};

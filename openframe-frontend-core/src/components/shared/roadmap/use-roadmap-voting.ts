@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useIsHydrated } from '../../../hooks/ui/use-is-hydrated';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 
 export type VoteType = 'up' | 'down' | null;
@@ -37,33 +38,48 @@ export interface UseRoadmapVotingOptions {
 const DEFAULT_VOTE_ENDPOINT = '/api/roadmap/vote';
 const DEFAULT_STORAGE_KEY = 'roadmap_votes_v1';
 
+/** One shared empty map so "no votes" is a stable identity across renders. */
+const NO_VOTES: VoteState = {};
+
+/** Client-only: callers must gate on `useIsHydrated()` before reaching here. */
+function readStoredVotes(storageKey: string): VoteState {
+  try {
+    const stored = localStorage.getItem(storageKey);
+    return stored ? (JSON.parse(stored) as VoteState) : NO_VOTES;
+  } catch (error) {
+    console.error('[Voting] Error loading votes from localStorage:', error);
+    return NO_VOTES;
+  }
+}
+
 export function useRoadmapVoting(options: UseRoadmapVotingOptions = {}) {
   const voteApiEndpoint = options.voteApiEndpoint ?? DEFAULT_VOTE_ENDPOINT;
   const storageKey = options.storageKey ?? DEFAULT_STORAGE_KEY;
 
-  const [votes, setVotes] = useState<VoteState>({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [votes, setVotes] = useState<VoteState>(NO_VOTES);
+  // Which key `votes` was loaded from. `null` until the client has read
+  // storage — that IS the loading flag, so nothing has to be written into a
+  // separate `isLoading` state.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
-  // Load votes from localStorage. Runs on mount AND whenever `storageKey`
-  // changes — when the key changes mid-lifecycle (e.g. an embedder
-  // remounts with a new namespace), we MUST reset state first so the
-  // save-effect below doesn't write the old key's data into the new
-  // key. We also re-enter the loading phase so the load completes
-  // before any save runs.
-  useEffect(() => {
-    setIsLoading(true);
-    setVotes({});
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        setVotes(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.error('[Voting] Error loading votes from localStorage:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [storageKey]);
+  // Load votes from localStorage. Happens on the first render after hydration,
+  // AND whenever `storageKey` changes — when the key changes mid-lifecycle
+  // (e.g. an embedder remounts with a new namespace) the previous key's votes
+  // MUST NOT survive, or the save below writes the old key's data into the new
+  // key. Re-entering the loading phase is implicit: `loadedKey` stops matching,
+  // so `isLoading` is true again until this reload lands.
+  //
+  // Read and applied while rendering, not from an effect. `localStorage` cannot
+  // be touched during SSR or the hydration render, which is what `useIsHydrated`
+  // gates; past that point `getItem` is just a read, and doing it here means the
+  // stored votes are present in the FIRST render that can show them instead of
+  // being published by a second render pass.
+  const hydrated = useIsHydrated();
+  if (hydrated && loadedKey !== storageKey) {
+    setLoadedKey(storageKey);
+    setVotes(readStoredVotes(storageKey));
+  }
+  const isLoading = loadedKey !== storageKey;
 
   // Save votes to localStorage whenever they change
   useEffect(() => {
@@ -80,13 +96,13 @@ export function useRoadmapVoting(options: UseRoadmapVotingOptions = {}) {
     (taskId: string): VoteType => {
       return votes[taskId] || null;
     },
-    [votes]
+    [votes],
   );
 
   const toggleVote = useCallback(
     async (
       taskId: string,
-      voteType: 'up' | 'down'
+      voteType: 'up' | 'down',
     ): Promise<{ success: boolean; newVote: VoteType; action: 'add' | 'remove' }> => {
       const currentVote = votes[taskId];
 
@@ -109,7 +125,7 @@ export function useRoadmapVoting(options: UseRoadmapVotingOptions = {}) {
               voteType: currentVote,
               action: 'remove',
             }),
-          }).catch(err => console.error('[Voting] Error removing opposite vote:', err));
+          }).catch((err: unknown) => console.error('[Voting] Error removing opposite vote:', err));
         }
 
         newVote = voteType;
@@ -146,11 +162,11 @@ export function useRoadmapVoting(options: UseRoadmapVotingOptions = {}) {
         return { success: false, newVote: currentVote, action };
       }
     },
-    [votes, voteApiEndpoint]
+    [votes, voteApiEndpoint],
   );
 
   const clearVotes = useCallback(() => {
-    setVotes({});
+    setVotes(NO_VOTES);
     localStorage.removeItem(storageKey);
   }, [storageKey]);
 

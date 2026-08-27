@@ -1,24 +1,23 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { Skeleton } from '../ui/skeleton'
+import { cn } from '../../utils/cn';
+import { Skeleton } from '../ui/skeleton';
 
 export interface MingoOnboardingCardSkeletonProps {
   /** Title bar width — Tailwind width utility. Defaults to `w-32`. Vary
    *  per row in the list skeleton so the stack doesn't look uniform. */
-  titleWidth?: string
+  titleWidth?: string;
   /** Slash-command bar width — Tailwind width utility. Defaults to `w-20`. */
-  slashWidth?: string
+  slashWidth?: string;
   /** Description lines (1 or 2). Defaults to 2 — matches the typical
    *  card from Figma node `7363:205938`. */
-  descriptionLines?: 1 | 2
+  descriptionLines?: 1 | 2;
   /** Chip widths for the action row. Defaults to mirror the
    *  `Recent / Search / Find` triad from the live cards. Pass an
    *  empty array to hide the chip row entirely (matches `actions: []`). */
-  chipWidths?: ReadonlyArray<string>
+  chipWidths?: ReadonlyArray<string>;
   /** Optional className appended to the root cell. */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -44,34 +43,32 @@ export function MingoOnboardingCardSkeleton({
   chipWidths = ['w-16', 'w-16', 'w-12'],
   className,
 }: MingoOnboardingCardSkeletonProps) {
-  const hasChips = chipWidths.length > 0
+  const hasChips = chipWidths.length > 0;
   return (
     <div
       className={cn(
-        'flex w-full items-start p-[var(--spacing-system-s)] bg-ods-card border-b border-ods-border last:border-b-0',
+        'flex w-full items-start border-b border-ods-border bg-ods-card p-[var(--spacing-system-s)] last:border-b-0',
         className,
       )}
     >
-      <div className="flex flex-col gap-[var(--spacing-system-xxs)] w-full">
+      <div className="flex w-full flex-col gap-[var(--spacing-system-xxs)]">
         {/* Title row — icon + title bar + right-rail slash bar. */}
-        <div className="flex items-center gap-[var(--spacing-system-xxs)] w-full">
+        <div className="flex w-full items-center gap-[var(--spacing-system-xxs)]">
           <Skeleton className="size-4 shrink-0 rounded-sm" />
           <Skeleton className={cn('h-3.5 rounded-sm', titleWidth)} />
           <span className="flex-1" />
-          <Skeleton className={cn('h-3.5 rounded-sm shrink-0', slashWidth)} />
+          <Skeleton className={cn('h-3.5 shrink-0 rounded-sm', slashWidth)} />
         </div>
         {/* Description — 1 or 2 lines; second line is 70% so the
          *  ragged edge mimics natural text wrapping. */}
         <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
           <Skeleton className="h-3.5 w-full rounded-sm" />
-          {descriptionLines === 2 ? (
-            <Skeleton className="h-3.5 w-[70%] rounded-sm" />
-          ) : null}
+          {descriptionLines === 2 ? <Skeleton className="h-3.5 w-[70%] rounded-sm" /> : null}
         </div>
         {/* Action chip row — `h-7` matches the live card's outline
          *  chips so the skeleton sits at exactly the same height. */}
         {hasChips ? (
-          <div className="flex flex-wrap items-center gap-[var(--spacing-system-xxs)] mt-[var(--spacing-system-xs)]">
+          <div className="mt-[var(--spacing-system-xs)] flex flex-wrap items-center gap-[var(--spacing-system-xxs)]">
             {chipWidths.map((w, i) => (
               <Skeleton key={i} className={cn('h-7 rounded-md', w)} />
             ))}
@@ -79,16 +76,16 @@ export function MingoOnboardingCardSkeleton({
         ) : null}
       </div>
     </div>
-  )
+  );
 }
 
 export interface MingoOnboardingListSkeletonProps {
   /** Row count. Defaults to 6 — fills the typical empty-state
    *  viewport so the loader doesn't pop in shorter than the resolved
    *  list. */
-  rows?: number
+  rows?: number;
   /** Optional className appended to the rounded outer container. */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -100,35 +97,6 @@ export interface MingoOnboardingListSkeletonProps {
  * Row widths cycle through a deterministic palette so the stack
  * doesn't look uniform but also doesn't shift between renders.
  */
-export function MingoOnboardingListSkeleton({
-  rows = 6,
-  className,
-}: MingoOnboardingListSkeletonProps) {
-  return (
-    <div
-      role="status"
-      aria-label="Loading slash commands"
-      aria-busy="true"
-      className={cn(
-        'rounded-md border border-ods-border bg-ods-card overflow-hidden',
-        className,
-      )}
-    >
-      {Array.from({ length: rows }).map((_, i) => {
-        const variant = ROW_VARIANTS[i % ROW_VARIANTS.length]
-        return (
-          <MingoOnboardingCardSkeleton
-            key={i}
-            titleWidth={variant.titleWidth}
-            slashWidth={variant.slashWidth}
-            descriptionLines={variant.descriptionLines}
-          />
-        )
-      })}
-    </div>
-  )
-}
-
 /**
  * Deterministic per-row width variation so the skeleton stack feels
  * like a real, irregular list. Cycled by index — same input renders
@@ -140,9 +108,9 @@ export function MingoOnboardingListSkeleton({
  *   - slashes range from `/docs` to `/getting-started`
  */
 const ROW_VARIANTS: ReadonlyArray<{
-  titleWidth: string
-  slashWidth: string
-  descriptionLines: 1 | 2
+  titleWidth: string;
+  slashWidth: string;
+  descriptionLines: 1 | 2;
 }> = [
   { titleWidth: 'w-32', slashWidth: 'w-20', descriptionLines: 2 },
   { titleWidth: 'w-28', slashWidth: 'w-16', descriptionLines: 2 },
@@ -150,4 +118,27 @@ const ROW_VARIANTS: ReadonlyArray<{
   { titleWidth: 'w-44', slashWidth: 'w-28', descriptionLines: 2 },
   { titleWidth: 'w-36', slashWidth: 'w-24', descriptionLines: 1 },
   { titleWidth: 'w-24', slashWidth: 'w-16', descriptionLines: 2 },
-]
+];
+
+export function MingoOnboardingListSkeleton({ rows = 6, className }: MingoOnboardingListSkeletonProps) {
+  return (
+    <div
+      role="status"
+      aria-label="Loading slash commands"
+      aria-busy="true"
+      className={cn('overflow-hidden rounded-md border border-ods-border bg-ods-card', className)}
+    >
+      {Array.from({ length: rows }).map((_, i) => {
+        const variant = ROW_VARIANTS[i % ROW_VARIANTS.length];
+        return (
+          <MingoOnboardingCardSkeleton
+            key={i}
+            titleWidth={variant.titleWidth}
+            slashWidth={variant.slashWidth}
+            descriptionLines={variant.descriptionLines}
+          />
+        );
+      })}
+    </div>
+  );
+}

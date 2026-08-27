@@ -10,8 +10,8 @@
  * dropped — callers that want logging can wrap this helper).
  */
 
-import type { SearchResult } from '../../ui/search-input'
-import type { DocSearchResult } from './types'
+import type { SearchResult } from '../../ui/search-input';
+import type { DocSearchResult } from './types';
 
 /** Source repos that should be collapsed into grouped results in the search bar.
  *  Only financial tables (all rows link to the same admin page).
@@ -22,7 +22,7 @@ const SEARCH_GROUP_REPOS = new Set([
   'financial-pnl',
   'financial-balance-sheet',
   'financial-cash-flow',
-])
+]);
 
 const ENTITY_LABELS: Record<string, string> = {
   'financial-cap-table': 'Cap Table',
@@ -36,36 +36,38 @@ const ENTITY_LABELS: Record<string, string> = {
   webinars: 'Webinars',
   events: 'Events',
   podcasts: 'Podcasts',
-}
+};
 
 export function mapDocSearchResults(docs: DocSearchResult[]): SearchResult[] {
-  const entityGroups = new Map<string, DocSearchResult[]>()
+  const entityGroups = new Map<string, DocSearchResult[]>();
   // Track insertion order — groups appear where the FIRST row of that
   // repo appeared in the response.
-  const order: Array<
-    { type: 'entity'; repo: string } | { type: 'doc'; doc: DocSearchResult }
-  > = []
-  const seenRepos = new Set<string>()
+  const order: Array<{ type: 'entity'; repo: string } | { type: 'doc'; doc: DocSearchResult }> = [];
+  const seenRepos = new Set<string>();
 
   for (const doc of docs) {
     if (doc.sourceRepo && SEARCH_GROUP_REPOS.has(doc.sourceRepo)) {
-      const group = entityGroups.get(doc.sourceRepo) || []
-      group.push(doc)
-      entityGroups.set(doc.sourceRepo, group)
+      const group = entityGroups.get(doc.sourceRepo) || [];
+      group.push(doc);
+      entityGroups.set(doc.sourceRepo, group);
       if (!seenRepos.has(doc.sourceRepo)) {
-        seenRepos.add(doc.sourceRepo)
-        order.push({ type: 'entity', repo: doc.sourceRepo })
+        seenRepos.add(doc.sourceRepo);
+        order.push({ type: 'entity', repo: doc.sourceRepo });
       }
     } else {
-      order.push({ type: 'doc', doc })
+      order.push({ type: 'doc', doc });
     }
   }
 
-  const results: SearchResult[] = []
+  const results: SearchResult[] = [];
   for (const entry of order) {
     if (entry.type === 'entity') {
-      const rows = entityGroups.get(entry.repo)!
-      const label = ENTITY_LABELS[entry.repo] || entry.repo
+      // An 'entity' entry is only pushed AFTER its group lands in the map, so
+      // a miss is unreachable — but dropping one group beats throwing away the
+      // whole search dropdown if that ever stops holding.
+      const rows = entityGroups.get(entry.repo);
+      if (!rows || rows.length === 0) continue;
+      const label = ENTITY_LABELS[entry.repo] || entry.repo;
       results.push({
         id: `group-${entry.repo}`,
         title: `${label} (${rows.length} ${rows.length === 1 ? 'record' : 'records'})`,
@@ -77,7 +79,7 @@ export function mapDocSearchResults(docs: DocSearchResult[]): SearchResult[] {
           sourceRepo: entry.repo,
           id: rows[0].entityId,
           isGroup: true,
-          items: rows.map((r) => ({
+          items: rows.map(r => ({
             name: r.name,
             externalUrl: r.externalUrl,
             id: r.entityId,
@@ -85,10 +87,10 @@ export function mapDocSearchResults(docs: DocSearchResult[]): SearchResult[] {
             documentType: r.documentType,
           })),
         },
-      })
+      });
     } else {
-      const doc = entry.doc
-      const isNonMarkdown = doc.documentType && doc.documentType !== 'markdown'
+      const doc = entry.doc;
+      const isNonMarkdown = doc.documentType && doc.documentType !== 'markdown';
       results.push({
         id: doc.path,
         title: doc.name,
@@ -99,15 +101,13 @@ export function mapDocSearchResults(docs: DocSearchResult[]): SearchResult[] {
           matchType: doc.matchType,
           ...(doc.documentType ? { documentType: doc.documentType } : {}),
           ...(doc.externalUrl ? { externalUrl: doc.externalUrl } : {}),
-          ...(doc.targetPlatform != null
-            ? { targetPlatform: doc.targetPlatform }
-            : {}),
+          ...(doc.targetPlatform != null ? { targetPlatform: doc.targetPlatform } : {}),
           ...(doc.sourceRepo ? { sourceRepo: doc.sourceRepo } : {}),
           ...(doc.entityId ? { id: doc.entityId } : {}),
         },
-      })
+      });
     }
   }
 
-  return results
+  return results;
 }

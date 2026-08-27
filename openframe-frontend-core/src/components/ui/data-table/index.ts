@@ -1,15 +1,14 @@
 // Load ColumnMeta augmentation so consumers get typed `meta`.
-import './types'
-
-import { DataTableRoot } from './data-table'
-import { DataTableHeader } from './data-table-header'
-import { DataTableBody } from './data-table-body'
-import { DataTableRow } from './data-table-row'
-import { DataTableSkeleton } from './data-table-skeleton'
-import { DataTableEmpty } from './data-table-empty'
-import { DataTableInfiniteFooter } from './data-table-infinite-footer'
-import { DataTableCursorFooter } from './data-table-cursor-footer'
-import { DataTableRowCount } from './data-table-row-count'
+import './types';
+import { DataTableRoot } from './data-table';
+import { DataTableBody } from './data-table-body';
+import { DataTableCursorFooter } from './data-table-cursor-footer';
+import { DataTableEmpty } from './data-table-empty';
+import { DataTableHeader } from './data-table-header';
+import { DataTableInfiniteFooter } from './data-table-infinite-footer';
+import { DataTableRow } from './data-table-row';
+import { DataTableRowCount } from './data-table-row-count';
+import { DataTableSkeleton } from './data-table-skeleton';
 
 /**
  * Compound table primitive. Use `useDataTable` to build the table instance,
@@ -33,7 +32,7 @@ export const DataTable = Object.assign(DataTableRoot, {
   InfiniteFooter: DataTableInfiniteFooter,
   CursorFooter: DataTableCursorFooter,
   RowCount: DataTableRowCount,
-})
+});
 
 // Also export each piece by name for consumers that prefer named imports.
 export {
@@ -46,24 +45,24 @@ export {
   DataTableInfiniteFooter,
   DataTableCursorFooter,
   DataTableRowCount,
-}
+};
 
-export { useDataTableContext } from './data-table'
-export { useDataTable } from './use-data-table'
-export { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, ROW_SHELL_CLASSES } from './data-table-skeleton'
-export { alignJustify, getHideClasses, multiSelectFilterFn } from './utils'
+export { useDataTableContext } from './data-table';
+export { useDataTable } from './use-data-table';
+export { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, ROW_SHELL_CLASSES } from './data-table-skeleton';
+export { alignJustify, getHideClasses, multiSelectFilterFn } from './utils';
 
-export type { DataTableFilterOption, TailwindBreakpoint } from './types'
-export type { DataTableProps } from './data-table'
-export type { DataTableHeaderProps, DataTableSortState } from './data-table-header'
-export type { DataTableBodyProps } from './data-table-body'
-export type { DataTableRowProps } from './data-table-row'
-export type { DataTableSkeletonProps } from './data-table-skeleton'
-export type { DataTableEmptyProps } from './data-table-empty'
-export type { DataTableInfiniteFooterProps } from './data-table-infinite-footer'
-export type { DataTableCursorFooterProps } from './data-table-cursor-footer'
-export type { DataTableRowCountProps } from './data-table-row-count'
-export type { UseDataTableOptions } from './use-data-table'
+export type { DataTableFilterOption, TailwindBreakpoint } from './types';
+export type { DataTableProps } from './data-table';
+export type { DataTableHeaderProps, DataTableSortState } from './data-table-header';
+export type { DataTableBodyProps } from './data-table-body';
+export type { DataTableRowProps } from './data-table-row';
+export type { DataTableSkeletonProps } from './data-table-skeleton';
+export type { DataTableEmptyProps } from './data-table-empty';
+export type { DataTableInfiniteFooterProps } from './data-table-infinite-footer';
+export type { DataTableCursorFooterProps } from './data-table-cursor-footer';
+export type { DataTableRowCountProps } from './data-table-row-count';
+export type { UseDataTableOptions } from './use-data-table';
 
 // Re-export commonly needed TanStack Table primitives so consumers don't need
 // a second dependency import line.
@@ -78,7 +77,7 @@ export {
   getGroupedRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-} from '@tanstack/react-table'
+} from '@tanstack/react-table';
 
 export type {
   CellContext,
@@ -95,4 +94,4 @@ export type {
   Table as DataTableInstance,
   TableOptions,
   VisibilityState,
-} from '@tanstack/react-table'
+} from '@tanstack/react-table';

@@ -1,14 +1,15 @@
-'use client'
+'use client';
 
-import { useMemo } from 'react'
-import { useForm, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMemo } from 'react';
+import type { Ref } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import {
   makeBookingSchema,
   isSupportedFormField,
   type MeetingAvailability,
   type MeetingBookingPayload,
-} from '../../schemas/meeting-booking-schema'
+} from '../../schemas/meeting-booking-schema';
 import {
   Button,
   FieldWrapper,
@@ -23,8 +24,8 @@ import {
   Checkbox,
   RadioGroup,
   RadioGroupItem,
-} from '../ui'
-import { HoneypotField } from '../ui/honeypot-field'
+} from '../ui';
+import { HoneypotField } from '../ui/honeypot-field';
 
 /**
  * BookingForm — attendee details + the link's declared custom questions +
@@ -42,17 +43,17 @@ import { HoneypotField } from '../ui/honeypot-field'
  */
 
 export interface BookingFormProps {
-  availability: MeetingAvailability
-  meetingId: string
-  startTimeMs: number
-  durationMs: number
+  availability: MeetingAvailability;
+  meetingId: string;
+  startTimeMs: number;
+  durationMs: number;
   /** IANA zone the confirmation/invite should render in (parent-resolved). */
-  timezone: string
-  isSubmitting: boolean
-  onSubmit: (payload: Record<string, unknown>) => Promise<void>
+  timezone: string;
+  isSubmitting: boolean;
+  onSubmit: (payload: Record<string, unknown>) => Promise<void>;
   /** From useHumanitySignals — parent owns the instance so it can resetSignals(). */
-  honeypotInputProps: { ref: React.Ref<HTMLInputElement>; name: string }
-  getSignals: () => Record<string, string | number>
+  honeypotInputProps: { ref: Ref<HTMLInputElement>; name: string };
+  getSignals: () => Record<string, string | number>;
 }
 
 export function BookingForm({
@@ -66,9 +67,9 @@ export function BookingForm({
   honeypotInputProps,
   getSignals,
 }: BookingFormProps) {
-  const { formFields, legalConsent } = availability
-  const supportedFields = useMemo(() => formFields.filter(isSupportedFormField), [formFields])
-  const schema = useMemo(() => makeBookingSchema(supportedFields, legalConsent), [supportedFields, legalConsent])
+  const { formFields, legalConsent } = availability;
+  const supportedFields = useMemo(() => formFields.filter(isSupportedFormField), [formFields]);
+  const schema = useMemo(() => makeBookingSchema(supportedFields, legalConsent), [supportedFields, legalConsent]);
 
   const {
     register,
@@ -87,32 +88,33 @@ export function BookingForm({
       lastName: '',
       email: '',
       formFields: {},
-      legalConsentResponses: (legalConsent?.communicationConsentCheckboxes ?? []).map((c) => ({
+      legalConsentResponses: (legalConsent?.communicationConsentCheckboxes ?? []).map(c => ({
         communicationTypeId: c.communicationTypeId,
         consented: false,
       })),
     },
-  })
+  });
 
-  const submit = handleSubmit(async (data) => {
-    await onSubmit({ ...data, meetingId, startTimeMs, durationMs, timezone, ...getSignals() })
-  })
+  const submit = handleSubmit(async data => {
+    await onSubmit({ ...data, meetingId, startTimeMs, durationMs, timezone, ...getSignals() });
+  });
 
   const fieldError = (name: string): string | undefined => {
-    const err = (errors.formFields as Record<string, { message?: string }> | undefined)?.[name]
-    return err?.message
-  }
+    const err = (errors.formFields as Record<string, { message?: string }> | undefined)?.[name];
+    return err?.message;
+  };
 
   // Field chrome mirrors ContactForm 1:1 (`contact/contact-form.tsx`) — the
   // booking form must be indistinguishable from every other form in the app.
-  const inputClass = 'bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-11 md:h-12'
+  const inputClass =
+    'bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-11 md:h-12';
   // One step ABOVE the `spacing system/m` the design names (16/24 instead of
   // 12/16), because the field messages hang out of flow: they need ~16px on a
   // phone and ~20 on desktop of clear space under the control, and `m` leaves
   // 12/16 — four pixels short at both ends, so an error would print over the
   // next field's label. The design has no error state drawn; this is the
   // smallest ODS step that houses it.
-  const FORM_STACK = 'flex flex-col gap-[var(--spacing-system-l)]'
+  const FORM_STACK = 'flex flex-col gap-[var(--spacing-system-l)]';
 
   return (
     <form onSubmit={submit} className={FORM_STACK} noValidate>
@@ -168,7 +170,7 @@ export function BookingForm({
         </FieldWrapper>
       </div>
 
-      {supportedFields.map((field) => (
+      {supportedFields.map(field => (
         <FieldWrapper
           key={field.name}
           label={field.label}
@@ -178,14 +180,14 @@ export function BookingForm({
           {field.type === 'textarea' && (
             <Textarea
               id={`ms-q-${field.name}`}
-              className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3"
+              className="border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"
               {...register(`formFields.${field.name}` as never)}
             />
           )}
           {field.type === 'text' && (
             <Input
               id={`ms-q-${field.name}`}
-              className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-11 md:h-12"
+              className="h-11 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary md:h-12"
               {...register(`formFields.${field.name}` as never)}
             />
           )}
@@ -195,12 +197,12 @@ export function BookingForm({
               name={`formFields.${field.name}` as never}
               render={({ field: rhf }) =>
                 field.type === 'select' ? (
-                  <Select value={(rhf.value as string) ?? ''} onValueChange={rhf.onChange}>
+                  <Select value={rhf.value ?? ''} onValueChange={rhf.onChange}>
                     <SelectTrigger id={`ms-q-${field.name}`}>
                       <SelectValue placeholder="Select…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(field.options ?? []).map((opt) => (
+                      {(field.options ?? []).map(opt => (
                         <SelectItem key={opt} value={opt}>
                           {opt}
                         </SelectItem>
@@ -208,8 +210,8 @@ export function BookingForm({
                     </SelectContent>
                   </Select>
                 ) : (
-                  <RadioGroup value={(rhf.value as string) ?? ''} onValueChange={rhf.onChange}>
-                    {(field.options ?? []).map((opt) => (
+                  <RadioGroup value={rhf.value ?? ''} onValueChange={rhf.onChange}>
+                    {(field.options ?? []).map(opt => (
                       <div key={opt} className="flex items-center gap-[var(--spacing-system-xs)]">
                         <RadioGroupItem id={`ms-q-${field.name}-${opt}`} value={opt} />
                         <Label htmlFor={`ms-q-${field.name}-${opt}`}>{opt}</Label>
@@ -232,7 +234,7 @@ export function BookingForm({
                   <Checkbox
                     id={`ms-q-${field.name}`}
                     checked={Boolean(rhf.value)}
-                    onCheckedChange={(v) => rhf.onChange(v === true)}
+                    onCheckedChange={v => rhf.onChange(v === true)}
                   />
                 </div>
               )}
@@ -246,45 +248,45 @@ export function BookingForm({
         // box doesn't shove the submit button down the card. With no error the
         // wrapper is `display:contents` and the panel below is the flex item,
         // exactly as it was.
-        <FieldWrapper error={errors.legalConsentResponses?.message as string | undefined}>
-        <div className="flex flex-col gap-[var(--spacing-system-xs)] border border-ods-border rounded-md p-[var(--spacing-system-m)]">
-          {/* GDPR surface — HubSpot's consent copy rendered VERBATIM, never edited. */}
-          <p className="text-h6 text-ods-text-secondary">{legalConsent.processingConsentText}</p>
-          {legalConsent.communicationConsentText && (
-            <p className="text-h6 text-ods-text-secondary">{legalConsent.communicationConsentText}</p>
-          )}
-          <Controller
-            control={control}
-            name="legalConsentResponses"
-            render={({ field: rhf }) => (
-              <>
-                {legalConsent.communicationConsentCheckboxes.map((box) => {
-                  const responses = (rhf.value ?? []) as Array<{ communicationTypeId: string; consented: boolean }>
-                  const current = responses.find((r) => r.communicationTypeId === box.communicationTypeId)
-                  return (
-                    <div key={box.communicationTypeId} className="flex items-center gap-[var(--spacing-system-xs)]">
-                      <Checkbox
-                        id={`ms-consent-${box.communicationTypeId}`}
-                        checked={current?.consented ?? false}
-                        onCheckedChange={(v) =>
-                          rhf.onChange(
-                            responses.map((r) =>
-                              r.communicationTypeId === box.communicationTypeId ? { ...r, consented: v === true } : r,
-                            ),
-                          )
-                        }
-                      />
-                      <Label htmlFor={`ms-consent-${box.communicationTypeId}`}>{box.label}</Label>
-                    </div>
-                  )
-                })}
-              </>
+        <FieldWrapper error={errors.legalConsentResponses?.message}>
+          <div className="flex flex-col gap-[var(--spacing-system-xs)] rounded-md border border-ods-border p-[var(--spacing-system-m)]">
+            {/* GDPR surface — HubSpot's consent copy rendered VERBATIM, never edited. */}
+            <p className="text-ods-text-secondary text-h6">{legalConsent.processingConsentText}</p>
+            {legalConsent.communicationConsentText && (
+              <p className="text-ods-text-secondary text-h6">{legalConsent.communicationConsentText}</p>
             )}
-          />
-          {legalConsent.privacyPolicyText && (
-            <p className="text-h6 text-ods-text-secondary">{legalConsent.privacyPolicyText}</p>
-          )}
-        </div>
+            <Controller
+              control={control}
+              name="legalConsentResponses"
+              render={({ field: rhf }) => (
+                <>
+                  {legalConsent.communicationConsentCheckboxes.map(box => {
+                    const responses = (rhf.value ?? []) as Array<{ communicationTypeId: string; consented: boolean }>;
+                    const current = responses.find(r => r.communicationTypeId === box.communicationTypeId);
+                    return (
+                      <div key={box.communicationTypeId} className="flex items-center gap-[var(--spacing-system-xs)]">
+                        <Checkbox
+                          id={`ms-consent-${box.communicationTypeId}`}
+                          checked={current?.consented ?? false}
+                          onCheckedChange={v =>
+                            rhf.onChange(
+                              responses.map(r =>
+                                r.communicationTypeId === box.communicationTypeId ? { ...r, consented: v === true } : r,
+                              ),
+                            )
+                          }
+                        />
+                        <Label htmlFor={`ms-consent-${box.communicationTypeId}`}>{box.label}</Label>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            />
+            {legalConsent.privacyPolicyText && (
+              <p className="text-ods-text-secondary text-h6">{legalConsent.privacyPolicyText}</p>
+            )}
+          </div>
         </FieldWrapper>
       )}
 
@@ -297,5 +299,5 @@ export function BookingForm({
         </Button>
       </div>
     </form>
-  )
+  );
 }

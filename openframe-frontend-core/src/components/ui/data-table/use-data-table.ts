@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import {
   getCoreRowModel,
@@ -7,29 +7,31 @@ import {
   useReactTable,
   type Table,
   type TableOptions,
-} from '@tanstack/react-table'
+} from '@tanstack/react-table';
 // Ensure ColumnMeta augmentation is loaded whenever useDataTable is used.
-import './types'
+import './types';
 
 // Row-model factories are pure and safe to instantiate once per module.
 // Calling them inside render creates a new memoized getter on every render
 // whose internal cache is thrown away, causing avoidable row-model recomputes.
-const coreRowModelFactory = getCoreRowModel<any>()
-const sortedRowModelFactory = getSortedRowModel<any>()
-const filteredRowModelFactory = getFilteredRowModel<any>()
+// Instantiated at the erased row type: the factories never touch a row's
+// fields, and each use site re-applies the caller's `T` through the
+// `TableOptions<T>[...]` assertions below.
+const coreRowModelFactory = getCoreRowModel<unknown>();
+const sortedRowModelFactory = getSortedRowModel<unknown>();
+const filteredRowModelFactory = getFilteredRowModel<unknown>();
 
-export interface UseDataTableOptions<T>
-  extends Omit<TableOptions<T>, 'getCoreRowModel'> {
+export interface UseDataTableOptions<T> extends Omit<TableOptions<T>, 'getCoreRowModel'> {
   /**
    * Enable client-side sorting via `getSortedRowModel`.
    * Default `false` — server sorts, TanStack only stores sort state.
    */
-  clientSideSorting?: boolean
+  clientSideSorting?: boolean;
   /**
    * Enable client-side filtering via `getFilteredRowModel`.
    * Default `false` — server filters, TanStack only stores filter state.
    */
-  clientSideFiltering?: boolean
+  clientSideFiltering?: boolean;
 }
 
 /**
@@ -100,14 +102,12 @@ export function useDataTable<T>({
     ...rest,
     getCoreRowModel: coreRowModelFactory as TableOptions<T>['getCoreRowModel'],
     getSortedRowModel: clientSideSorting
-      ? getSortedRowModelOverride ??
-        (sortedRowModelFactory as TableOptions<T>['getSortedRowModel'])
+      ? (getSortedRowModelOverride ?? (sortedRowModelFactory as TableOptions<T>['getSortedRowModel']))
       : getSortedRowModelOverride,
     getFilteredRowModel: clientSideFiltering
-      ? getFilteredRowModelOverride ??
-        (filteredRowModelFactory as TableOptions<T>['getFilteredRowModel'])
+      ? (getFilteredRowModelOverride ?? (filteredRowModelFactory as TableOptions<T>['getFilteredRowModel']))
       : getFilteredRowModelOverride,
     manualSorting: manualSorting ?? !clientSideSorting,
     manualFiltering: manualFiltering ?? !clientSideFiltering,
-  })
+  });
 }

@@ -1,19 +1,16 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { OpenFrameLogo } from '../../icons'
-import { AppleLogoIcon } from '../../icons-v2-generated/brand-logos/apple-logo-icon'
-import { GoogleLogoIcon } from '../../icons-v2-generated/brand-logos/google-logo-icon'
-import { MicrosoftLogoIcon } from '../../icons-v2-generated/brand-logos/microsoft-logo-icon'
-import { Button } from '../../ui/button'
+import type { ComponentType } from 'react';
+import { OpenFrameLogo } from '../../icons';
+import { AppleLogoIcon } from '../../icons-v2-generated/brand-logos/apple-logo-icon';
+import { GoogleLogoIcon } from '../../icons-v2-generated/brand-logos/google-logo-icon';
+import { MicrosoftLogoIcon } from '../../icons-v2-generated/brand-logos/microsoft-logo-icon';
+import { Button } from '../../ui/button';
 
 /** SSO providers offered on the auth forms. */
-export type AuthSsoProvider = 'openframe' | 'google' | 'microsoft' | 'apple'
+export type AuthSsoProvider = 'openframe' | 'google' | 'microsoft' | 'apple';
 
-export const PROVIDER_META: Record<
-  AuthSsoProvider,
-  { name: string; Icon: React.ComponentType<{ className?: string }> }
-> = {
+export const PROVIDER_META: Record<AuthSsoProvider, { name: string; Icon: ComponentType<{ className?: string }> }> = {
   openframe: {
     name: 'OpenFrame SSO',
     Icon: ({ className }) => (
@@ -27,20 +24,20 @@ export const PROVIDER_META: Record<
   google: { name: 'Google', Icon: GoogleLogoIcon },
   microsoft: { name: 'Microsoft', Icon: MicrosoftLogoIcon },
   apple: { name: 'Apple', Icon: AppleLogoIcon },
-}
+};
 
 export interface SsoProviderButtonsProps {
-  providers: AuthSsoProvider[]
-  onSsoClick?: (provider: AuthSsoProvider) => void
+  providers: AuthSsoProvider[];
+  onSsoClick?: (provider: AuthSsoProvider) => void;
   /** Verb prefix for provider buttons, e.g. "Continue with". Ignored for "openframe". */
-  actionLabel?: string
-  disabled?: boolean
+  actionLabel?: string;
+  disabled?: boolean;
   /**
    * When set, only these providers are clickable and the rest render disabled —
    * e.g. unlock just the providers a discovered tenant actually offers.
    * `disabled` still wins over this list.
    */
-  enabledProviders?: AuthSsoProvider[]
+  enabledProviders?: AuthSsoProvider[];
 }
 
 /** Stacked full-width SSO provider buttons shared by the auth forms. */
@@ -53,9 +50,9 @@ export function SsoProviderButtons({
 }: SsoProviderButtonsProps) {
   return (
     <div className="flex flex-col gap-[var(--spacing-system-l)]">
-      {providers.map((provider) => {
-        const meta = PROVIDER_META[provider]
-        const Icon = meta.Icon
+      {providers.map(provider => {
+        const meta = PROVIDER_META[provider];
+        const Icon = meta.Icon;
         return (
           <Button
             key={provider}
@@ -70,8 +67,8 @@ export function SsoProviderButtons({
           >
             {provider === 'openframe' ? meta.name : `${actionLabel} ${meta.name}`}
           </Button>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

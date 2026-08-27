@@ -27,19 +27,19 @@
  *     (cross-platform → new-tab) or the lib's default.
  */
 
-import type { ChatRuntime } from '../../../contexts/chat-runtime-context'
-import { decideNewTab as libDecideNewTab } from './decide-new-tab'
+import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
+import { decideNewTab as libDecideNewTab } from './decide-new-tab';
 
 /** An ABSOLUTE `http(s)` URL on the current page's origin. Relative hrefs return
  *  false (in embed mode they're hub-relative, not in-app), as do cross-origin
  *  and non-http URLs. SSR-safe: no `window` → false. */
 function isSameOriginAbsoluteHref(href: string): boolean {
-  if (typeof window === 'undefined') return false
-  if (!/^https?:\/\//i.test(href)) return false
+  if (typeof window === 'undefined') return false;
+  if (!/^https?:\/\//i.test(href)) return false;
   try {
-    return new URL(href).origin === window.location.origin
+    return new URL(href).origin === window.location.origin;
   } catch {
-    return false
+    return false;
   }
 }
 
@@ -48,8 +48,8 @@ export function computeIsNewTab(
   href: string | null | undefined,
   targetPlatform: string | null,
 ): boolean {
-  if (!href) return false
-  if (runtime.navigation.mode === 'embed') return !isSameOriginAbsoluteHref(href)
+  if (!href) return false;
+  if (runtime.navigation.mode === 'embed') return !isSameOriginAbsoluteHref(href);
   return (
     runtime.navigation.decideNewTab?.({ href, targetPlatform }) ??
     libDecideNewTab({
@@ -57,7 +57,7 @@ export function computeIsNewTab(
       targetPlatform,
       currentSource: runtime.source ?? '',
     })
-  )
+  );
 }
 
 /**
@@ -70,12 +70,10 @@ export function computeIsNewTab(
  * tab-nabbing) and same-tab links don't render either attribute.
  */
 export function newTabAnchorAttrs(isNewTab: boolean): {
-  target?: '_blank'
-  rel?: 'noopener noreferrer'
+  target?: '_blank';
+  rel?: 'noopener noreferrer';
 } {
-  return isNewTab
-    ? { target: '_blank' as const, rel: 'noopener noreferrer' as const }
-    : {}
+  return isNewTab ? { target: '_blank' as const, rel: 'noopener noreferrer' as const } : {};
 }
 
 /**
@@ -92,5 +90,5 @@ export function buildAnchorProps(
   href: string | null | undefined,
   isNewTab: boolean,
 ): { href: string; target?: '_blank'; rel?: 'noopener noreferrer' } | undefined {
-  return href ? { href, ...newTabAnchorAttrs(isNewTab) } : undefined
+  return href ? { href, ...newTabAnchorAttrs(isNewTab) } : undefined;
 }

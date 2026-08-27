@@ -1,61 +1,73 @@
-"use client"
+'use client';
 
-import { useState, useRef, useImperativeHandle, forwardRef, useCallback, useEffect, useMemo, type ReactNode, type KeyboardEvent, type ClipboardEvent } from "react"
-import { renderToStaticMarkup } from "react-dom/server"
-import { cn } from "../../utils/cn"
-import { Send01Icon, StopCircleIcon } from "../icons-v2-generated"
-import { Tag } from "../ui/tag"
-import { ChatTypingIndicator } from "./chat-typing-indicator"
-import { SlashCommandSuggestions } from "./slash-command-suggestions"
-import type { ChatInputProps, ChatInputRef, MentionMeta, SlashCommandSummary } from "./types"
+import {
+  useState,
+  useRef,
+  useImperativeHandle,
+  forwardRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  type ReactNode,
+  type KeyboardEvent,
+  type ClipboardEvent,
+  type MouseEvent,
+} from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { cn } from '../../utils/cn';
+import { Send01Icon, StopCircleIcon } from '../icons-v2-generated';
+import { Tag } from '../ui/tag';
+import { ChatTypingIndicator } from './chat-typing-indicator';
+import { SlashCommandSuggestions } from './slash-command-suggestions';
+import type { ChatInputProps, ChatInputRef, MentionMeta, SlashCommandSummary } from './types';
 
 /** SHARED with `lib/config/slash-commands-config.ts` AND the chat-route slash
  *  dispatch parser. Keep all three in sync. */
-const SLASH_INPUT_TRIGGER = /^\/([a-z][a-z0-9-]*)?$/
+const SLASH_INPUT_TRIGGER = /^\/([a-z][a-z0-9-]*)?$/;
 
 /** A committed `@`-mention serializes into the draft text as `@<marker>:<id>`
  *  (id charset allows `+ / = . -` for base64 Relay global ids). The editor
  *  renders each such token as an inline chip; the serialized string keeps the
  *  literal token so the host's `@type:id` reconciliation + send payload are
  *  unchanged. */
-const MENTION_GLOBAL = /@[A-Za-z0-9_.+/=-]+:[A-Za-z0-9_.+/=-]+/g
+const MENTION_GLOBAL = /@[A-Za-z0-9_.+/=-]+:[A-Za-z0-9_.+/=-]+/g;
 /** The IN-PROGRESS trigger being typed — `@` + search string at the END of the
  *  draft, preceded by start-of-text or whitespace (so emails never fire). */
-const MENTION_TRIGGER_AT_END = /(^|\s)@([\w.-]*)$/
+const MENTION_TRIGGER_AT_END = /(^|\s)@([\w.-]*)$/;
 
-type Segment = { kind: 'text'; text: string } | { kind: 'mention'; token: string; label: string; icon?: ReactNode }
+type Segment = { kind: 'text'; text: string } | { kind: 'mention'; token: string; label: string; icon?: ReactNode };
 
 function parseSegments(value: string, meta: Map<string, MentionMeta>): Segment[] {
-  const segs: Segment[] = []
-  let last = 0
-  MENTION_GLOBAL.lastIndex = 0
-  let m: RegExpExecArray | null
+  const segs: Segment[] = [];
+  let last = 0;
+  MENTION_GLOBAL.lastIndex = 0;
+  let m: RegExpExecArray | null;
   while ((m = MENTION_GLOBAL.exec(value)) !== null) {
-    if (m.index > last) segs.push({ kind: 'text', text: value.slice(last, m.index) })
-    const token = m[0].slice(1)
-    const info = meta.get(token)
-    segs.push({ kind: 'mention', token, label: info?.label ?? token.slice(token.indexOf(':') + 1), icon: info?.icon })
-    last = m.index + m[0].length
+    if (m.index > last) segs.push({ kind: 'text', text: value.slice(last, m.index) });
+    const token = m[0].slice(1);
+    const info = meta.get(token);
+    segs.push({ kind: 'mention', token, label: info?.label ?? token.slice(token.indexOf(':') + 1), icon: info?.icon });
+    last = m.index + m[0].length;
   }
-  if (last < value.length) segs.push({ kind: 'text', text: value.slice(last) })
-  return segs
+  if (last < value.length) segs.push({ kind: 'text', text: value.slice(last) });
+  return segs;
 }
 
-const isChip = (n: Node): n is HTMLElement => n.nodeType === 1 && (n as HTMLElement).dataset?.token !== undefined
+const isChip = (n: Node): n is HTMLElement => n.nodeType === 1 && (n as HTMLElement).dataset?.token !== undefined;
 
 /** Serialize the editor DOM back to the draft string: text nodes verbatim,
  *  mention chips → `@<token>`, browser-inserted `<br>` ignored (newlines live as
  *  literal `\n` text via `white-space: pre-wrap`). Chips are atomic
  *  (`contentEditable=false`) so we never descend into their inner markup. */
 function serialize(el: HTMLElement): string {
-  let out = ''
+  let out = '';
   for (const node of Array.from(el.childNodes)) {
-    if (node.nodeType === Node.TEXT_NODE) out += node.textContent ?? ''
-    else if (isChip(node)) out += `@${(node as HTMLElement).dataset.token}`
-    else if ((node as HTMLElement).tagName === 'BR') continue
-    else out += node.textContent ?? ''
+    if (node.nodeType === Node.TEXT_NODE) out += node.textContent ?? '';
+    else if (isChip(node)) out += `@${node.dataset.token}`;
+    else if ((node as HTMLElement).tagName === 'BR') continue;
+    else out += node.textContent ?? '';
   }
-  return out
+  return out;
 }
 
 /** Build a mention chip as a plain (React-free) DOM node — the editor is an
@@ -66,16 +78,16 @@ function serialize(el: HTMLElement): string {
  *  the close button is wired via a delegated click on the editor (events don't
  *  survive static markup). */
 function buildChipEl(token: string, label: string, icon?: ReactNode): HTMLElement {
-  const span = document.createElement('span')
-  span.dataset.token = token
-  span.setAttribute('contenteditable', 'false')
+  const span = document.createElement('span');
+  span.dataset.token = token;
+  span.setAttribute('contenteditable', 'false');
   // Center the chip in its line box DETERMINISTICALLY (independent of font
   // metrics): `vertical-align: middle` references the text baseline + x-height,
   // not the geometric line-box center, so it leaves the chip ~2px low. Instead
   // make the wrapper exactly one line box tall (`h-9` == editor `leading-9`,
   // 36px) and `align-top` (pure geometric: wrapper top == line-box top, no
   // baseline offset), then center the shorter chip inside via `items-center`.
-  span.className = 'mx-0.5 inline-flex h-9 items-center select-none align-top'
+  span.className = 'mx-0.5 inline-flex h-9 items-center select-none align-top';
   span.innerHTML = renderToStaticMarkup(
     <Tag
       as="span"
@@ -88,71 +100,71 @@ function buildChipEl(token: string, label: string, icon?: ReactNode): HTMLElemen
       // only), and NO accent-yellow border on hover.
       className="max-w-[16rem] hover:border-ods-border [&_svg]:text-ods-text-secondary"
     />,
-  )
-  return span
+  );
+  return span;
 }
 
 /** Replace the editor's content with text nodes + chips parsed from `value`. */
 function rebuildDom(el: HTMLElement, value: string, meta: Map<string, MentionMeta>): void {
-  el.replaceChildren()
+  el.replaceChildren();
   for (const seg of parseSegments(value, meta)) {
-    if (seg.kind === 'text') el.appendChild(document.createTextNode(seg.text))
-    else el.appendChild(buildChipEl(seg.token, seg.label, seg.icon))
+    if (seg.kind === 'text') el.appendChild(document.createTextNode(seg.text));
+    else el.appendChild(buildChipEl(seg.token, seg.label, seg.icon));
   }
 }
 
 function placeCaretAtEnd(el: HTMLElement): void {
-  const sel = typeof window !== 'undefined' ? window.getSelection() : null
-  if (!sel) return
-  const range = document.createRange()
-  range.selectNodeContents(el)
-  range.collapse(false)
-  sel.removeAllRanges()
-  sel.addRange(range)
+  const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+  if (!sel) return;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 /** Place the caret at a character offset in a PLAIN-text editor (no chips) —
  *  used only by `setValueAndCursor` (slash prefill). */
 function placeCaretAtOffset(el: HTMLElement, offset: number): void {
-  const sel = typeof window !== 'undefined' ? window.getSelection() : null
-  if (!sel) return
-  const node = el.firstChild
-  const range = document.createRange()
+  const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+  if (!sel) return;
+  const node = el.firstChild;
+  const range = document.createRange();
   if (node && node.nodeType === Node.TEXT_NODE) {
-    range.setStart(node, Math.max(0, Math.min(offset, node.textContent?.length ?? 0)))
-    range.collapse(true)
+    range.setStart(node, Math.max(0, Math.min(offset, node.textContent?.length ?? 0)));
+    range.collapse(true);
   } else {
-    range.selectNodeContents(el)
-    range.collapse(false)
+    range.selectNodeContents(el);
+    range.collapse(false);
   }
-  sel.removeAllRanges()
-  sel.addRange(range)
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 /** Insert plain text at the caret as a real text node (paste / Shift+Enter), so
  *  no `<br>`/`<div>` ever enters the DOM and serialization stays deterministic. */
 function insertTextAtCaret(text: string): void {
-  const sel = typeof window !== 'undefined' ? window.getSelection() : null
-  if (!sel || sel.rangeCount === 0) return
-  const range = sel.getRangeAt(0)
-  range.deleteContents()
-  const tn = document.createTextNode(text)
-  range.insertNode(tn)
-  range.setStartAfter(tn)
-  range.collapse(true)
-  sel.removeAllRanges()
-  sel.addRange(range)
+  const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const tn = document.createTextNode(text);
+  range.insertNode(tn);
+  range.setStartAfter(tn);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
-  const { slashCommands, ...rest } = allProps
+  const { slashCommands, ...rest } = allProps;
   const {
     className,
     onSend,
     onStop,
     sending = false,
     awaitingResponse = false,
-    placeholder = "Enter your Request...",
+    placeholder = 'Enter your Request...',
     reserveAvatarOffset: _reserveAvatarOffset,
     disabled = false,
     autoFocus = false,
@@ -165,86 +177,93 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     previewText,
     // Remaining textarea-only attrs are intentionally dropped — the editor is a
     // contenteditable div, not a <textarea>, so spreading them would warn.
-  } = rest as typeof rest & { rows?: number }
+  } = rest as typeof rest & { rows?: number };
 
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState('');
   // Whether the editor currently holds at least one committed mention chip —
   // it alone needs the tall line box (see the editor's className). Read from the
   // DOM, NOT by testing the draft against `MENTION_GLOBAL`: that regex also
   // matches ordinary typed text (`meet @3:00`, `@prod:us-east`), which would
   // switch the editor to a 36px line box with no chip on screen. Chips are only
   // ever created by `rebuildDom`, so the two writers below cover every path.
-  const [hasChips, setHasChips] = useState(false)
-  const [focused, setFocused] = useState(false)
-  const [isStopping, setIsStopping] = useState(false)
+  const [hasChips, setHasChips] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   // The ghost preview is dismissed as soon as the user edits the draft (typing
   // into the preview-hidden editor), so their input is never hidden behind a
   // stale preview. Re-armed on the next hover (when `previewText` changes).
-  const [previewDismissed, setPreviewDismissed] = useState(false)
-  const editorRef = useRef<HTMLDivElement>(null)
-  const shouldRefocusRef = useRef(false)
-  const prevSendingRef = useRef(sending)
-  const prevAwaitingResponseRef = useRef(awaitingResponse)
-  const isComposingRef = useRef(false)
+  const [previewDismissed, setPreviewDismissed] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const shouldRefocusRef = useRef(false);
+  const prevSendingRef = useRef(sending);
+  const prevAwaitingResponseRef = useRef(awaitingResponse);
+  const isComposingRef = useRef(false);
   // Live mirror of the value + committed-chip meta for sync reads inside the
   // stable imperative handle (no rebuild of the handle per keystroke).
-  const valueRef = useRef(value)
-  valueRef.current = value
-  const metaRef = useRef<Map<string, MentionMeta>>(new Map())
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const metaRef = useRef<Map<string, MentionMeta>>(new Map());
 
   const focusEditor = useCallback(() => {
-    if (disabled) return
-    editorRef.current?.focus({ preventScroll: true })
-  }, [disabled])
+    if (disabled) return;
+    editorRef.current?.focus({ preventScroll: true });
+  }, [disabled]);
 
   useEffect(() => {
-    if (autoFocus) focusEditor()
-  }, [autoFocus, focusEditor])
+    if (autoFocus) focusEditor();
+  }, [autoFocus, focusEditor]);
 
   // Surface every value change (typed or imperative) so the composer reconciles
   // `@type:id` mention chips with the context items.
   useEffect(() => {
-    onValueChange?.(value)
-  }, [value, onValueChange])
+    onValueChange?.(value);
+  }, [value, onValueChange]);
+
+  // Latest `previewText` for the draft-edit dismissal below, which must fire on
+  // `value` and nothing else.
+  const previewTextRef = useRef(previewText);
+  useEffect(() => {
+    previewTextRef.current = previewText;
+  });
 
   // A fresh hover (new `previewText`) re-arms the preview…
   useEffect(() => {
-    setPreviewDismissed(false)
-  }, [previewText])
+    setPreviewDismissed(false);
+  }, [previewText]);
 
   // …and any draft edit while a preview is showing dismisses it immediately, so
   // keystrokes into the (preview-hidden) editor become visible at once. Keyed on
-  // `value` only — including `previewText` here would re-dismiss on every hover.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // `value` only — depending on `previewText` would re-dismiss on every hover,
+  // hence the ref above.
   useEffect(() => {
-    if (previewText) setPreviewDismissed(true)
-  }, [value])
+    if (previewTextRef.current) setPreviewDismissed(true);
+  }, [value]);
 
   // Apply a NEW draft value to BOTH the DOM (imperative rebuild) and state. Used
   // by every imperative mutation (commit, setValue, clear, remove). Typing does
   // NOT go through here — the browser owns the DOM and we only read it back.
   const applyValue = useCallback((next: string, caret: 'end' | number = 'end') => {
-    const el = editorRef.current
+    const el = editorRef.current;
     if (el) {
-      rebuildDom(el, next, metaRef.current)
+      rebuildDom(el, next, metaRef.current);
       if (document.activeElement === el || caret === 'end') {
-        if (typeof caret === 'number') placeCaretAtOffset(el, caret)
-        else placeCaretAtEnd(el)
+        if (typeof caret === 'number') placeCaretAtOffset(el, caret);
+        else placeCaretAtEnd(el);
       }
-      setHasChips(el.querySelector('[data-token]') !== null)
+      setHasChips(el.querySelector('[data-token]') !== null);
     }
     // Advance the mirror HERE, not only on the next render: `fire` clears the
     // draft and then reads it back within the same tick to decide whether a
     // refused send may restore it.
-    valueRef.current = next
-    setValue(next)
-  }, [])
+    valueRef.current = next;
+    setValue(next);
+  }, []);
 
   // ── send ──────────────────────────────────────────────────────────────────
   const fire = useCallback(
     (message: string) => {
-      const can = (message.length > 0 || allowEmptySend) && !sending && !disabled
-      if (!can || !onSend) return
+      const can = (message.length > 0 || allowEmptySend) && !sending && !disabled;
+      if (!can || !onSend) return;
       // Clear FIRST and put it back only if the host refuses, rather than
       // clearing once the send settles. The editor stays typable while `sending`
       // (see `contentEditable` below), and a host whose `onSend` is async —
@@ -253,31 +272,31 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
       // it. Restoring is guarded on the box still being empty for the same
       // reason. `applyValue` advances `valueRef` synchronously, so the guard
       // reads the cleared draft even when `onSend` refuses in the same tick.
-      const sentMeta = metaRef.current
-      metaRef.current = new Map()
-      applyValue('')
-      shouldRefocusRef.current = true
-      focusEditor()
+      const sentMeta = metaRef.current;
+      metaRef.current = new Map();
+      applyValue('');
+      shouldRefocusRef.current = true;
+      focusEditor();
       const restore = () => {
-        if (valueRef.current.length > 0) return
-        metaRef.current = sentMeta
-        applyValue(message)
-      }
-      const result = onSend(message)
+        if (valueRef.current.length > 0) return;
+        metaRef.current = sentMeta;
+        applyValue(message);
+      };
+      const result = onSend(message);
       if (result instanceof Promise) {
-        void result.then((ok) => {
-          if (ok === false) restore()
-        })
+        void result.then(ok => {
+          if (ok === false) restore();
+        });
       } else if (result === false) {
-        restore()
+        restore();
       }
     },
     [allowEmptySend, sending, disabled, onSend, focusEditor, applyValue],
-  )
+  );
 
   const handleSubmit = useCallback(() => {
-    fire(valueRef.current.trim())
-  }, [fire])
+    fire(valueRef.current.trim());
+  }, [fire]);
 
   useImperativeHandle(
     ref,
@@ -285,219 +304,265 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
       focus: () => focusEditor(),
       blur: () => editorRef.current?.blur(),
       clear: () => {
-        metaRef.current = new Map()
-        applyValue('')
+        metaRef.current = new Map();
+        applyValue('');
       },
       setValue: (next: string) => {
-        applyValue(next)
-        requestAnimationFrame(() => focusEditor())
+        applyValue(next);
+        requestAnimationFrame(() => focusEditor());
       },
       setValueAndCursor: (next: string, cursorOffset: number) => {
-        applyValue(next, Math.max(0, Math.min(cursorOffset, next.length)))
-        requestAnimationFrame(() => focusEditor())
+        applyValue(next, Math.max(0, Math.min(cursorOffset, next.length)));
+        requestAnimationFrame(() => focusEditor());
       },
       submit: (next: string) => fire(next.trim()),
       getValue: () => valueRef.current,
       removeMentionTrigger: () => {
-        applyValue(valueRef.current.replace(MENTION_TRIGGER_AT_END, '$1'))
+        applyValue(valueRef.current.replace(MENTION_TRIGGER_AT_END, '$1'));
       },
       commitMention: (token: string, meta?: MentionMeta) => {
         // Multi-select: replace the trailing `@query` being typed with the
         // committed `@<token> ` (+ trailing space → dismisses the trigger so the
         // picker closes; also gives the caret a text node to land in after the
         // chip). Prior committed mentions stay — several chips coexist.
-        if (meta) metaRef.current = new Map(metaRef.current).set(token, meta)
-        const v = valueRef.current
+        if (meta) metaRef.current = new Map(metaRef.current).set(token, meta);
+        const v = valueRef.current;
         const next = MENTION_TRIGGER_AT_END.test(v)
           ? v.replace(MENTION_TRIGGER_AT_END, `$1@${token} `)
-          : `${v}${v.length > 0 && !v.endsWith(' ') ? ' ' : ''}@${token} `
-        applyValue(next)
-        requestAnimationFrame(() => focusEditor())
+          : `${v}${v.length > 0 && !v.endsWith(' ') ? ' ' : ''}@${token} `;
+        applyValue(next);
+        requestAnimationFrame(() => focusEditor());
       },
     }),
     [focusEditor, fire, applyValue],
-  )
+  );
 
   // ── `@`-mention trigger detection ───────────────────────────────────────────
-  const mentionEnabled = !!onMentionQueryChange
+  const mentionEnabled = !!onMentionQueryChange;
   const mentionQuery = useMemo(() => {
-    if (!mentionEnabled) return null
-    const m = value.match(MENTION_TRIGGER_AT_END)
-    return m ? (m[2] ?? '') : null
-  }, [value, mentionEnabled])
+    if (!mentionEnabled) return null;
+    const m = value.match(MENTION_TRIGGER_AT_END);
+    return m ? (m[2] ?? '') : null;
+  }, [value, mentionEnabled]);
 
   useEffect(() => {
-    if (mentionEnabled) onMentionQueryChange?.(mentionQuery)
-  }, [mentionEnabled, mentionQuery, onMentionQueryChange])
+    if (mentionEnabled) onMentionQueryChange?.(mentionQuery);
+  }, [mentionEnabled, mentionQuery, onMentionQueryChange]);
 
   // ── slash-command autocomplete ──────────────────────────────────────────────
-  const slashMatch = useMemo(() => (slashCommands ? value.match(SLASH_INPUT_TRIGGER) : null), [value, slashCommands])
-  const slashPrefix = slashMatch ? (slashMatch[1] ?? '') : null
-  const [slashSuggestions, setSlashSuggestions] = useState<SlashCommandSummary[]>([])
-  const [highlightedIdx, setHighlightedIdx] = useState(0)
+  const slashMatch = useMemo(() => (slashCommands ? value.match(SLASH_INPUT_TRIGGER) : null), [value, slashCommands]);
+  const slashPrefix = slashMatch ? (slashMatch[1] ?? '') : null;
+  const [slashSuggestions, setSlashSuggestions] = useState<SlashCommandSummary[]>([]);
+  const [highlightedIdx, setHighlightedIdx] = useState(0);
 
   useEffect(() => {
     if (slashPrefix == null || !slashCommands) {
-      setSlashSuggestions([])
-      return
+      setSlashSuggestions([]);
+      return undefined;
     }
-    let cancelled = false
-    const ctrl = new AbortController()
-    const handle = setTimeout(async () => {
+    let cancelled = false;
+    const ctrl = new AbortController();
+    // Named async function rather than an async timer callback: `setTimeout`
+    // discards its callback's return value, so a rejection would escape as an
+    // unhandled one instead of reaching the handler on the call site below.
+    const runFetch = async () => {
       try {
-        const next = await slashCommands.fetchCommands(slashPrefix, ctrl.signal)
+        const next = await slashCommands.fetchCommands(slashPrefix, ctrl.signal);
         if (!cancelled) {
-          setSlashSuggestions(next)
-          setHighlightedIdx(0)
+          setSlashSuggestions(next);
+          setHighlightedIdx(0);
         }
       } catch (err) {
         if (!cancelled && (err as Error)?.name !== 'AbortError') {
-          console.warn('[chat-input] slash-command fetch failed:', err)
+          console.warn('[chat-input] slash-command fetch failed:', err);
         }
       }
-    }, 150)
+    };
+    const handle = setTimeout(() => {
+      runFetch().catch((err: unknown) => {
+        console.warn('[chat-input] slash-command fetch threw unexpectedly:', err);
+      });
+    }, 150);
     return () => {
-      cancelled = true
-      ctrl.abort()
-      clearTimeout(handle)
-    }
-  }, [slashPrefix, slashCommands])
+      cancelled = true;
+      ctrl.abort();
+      clearTimeout(handle);
+    };
+  }, [slashPrefix, slashCommands]);
 
-  const acceptSuggestion = useCallback((cmd: SlashCommandSummary) => {
-    metaRef.current = new Map()
-    const next = `/${cmd.id} `
-    applyValue(next, next.length)
-    setSlashSuggestions([])
-    requestAnimationFrame(() => focusEditor())
-  }, [applyValue, focusEditor])
+  const acceptSuggestion = useCallback(
+    (cmd: SlashCommandSummary) => {
+      metaRef.current = new Map();
+      const next = `/${cmd.id} `;
+      applyValue(next, next.length);
+      setSlashSuggestions([]);
+      requestAnimationFrame(() => focusEditor());
+    },
+    [applyValue, focusEditor],
+  );
 
   // ── editor events ───────────────────────────────────────────────────────────
   const syncFromDom = useCallback(() => {
-    const el = editorRef.current
-    if (!el) return
+    const el = editorRef.current;
+    if (!el) return;
     // Typing can DELETE a chip (they are atomic `contentEditable=false` nodes),
     // so the flag has to be re-read here too, not just where chips are built.
-    setHasChips(el.querySelector('[data-token]') !== null)
-    setValue(serialize(el))
-  }, [])
+    setHasChips(el.querySelector('[data-token]') !== null);
+    setValue(serialize(el));
+  }, []);
 
   const handleInput = useCallback(() => {
-    if (isComposingRef.current) return // mid-IME: the browser owns the DOM
-    syncFromDom()
-  }, [syncFromDom])
+    if (isComposingRef.current) return; // mid-IME: the browser owns the DOM
+    syncFromDom();
+  }, [syncFromDom]);
 
-  const handlePaste = useCallback((e: ClipboardEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    const text = e.clipboardData.getData('text/plain')
-    if (!text) return
-    insertTextAtCaret(text)
-    syncFromDom()
-  }, [syncFromDom])
+  const handlePaste = useCallback(
+    (e: ClipboardEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const text = e.clipboardData.getData('text/plain');
+      if (!text) return;
+      insertTextAtCaret(text);
+      syncFromDom();
+    },
+    [syncFromDom],
+  );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
       if (slashSuggestions.length > 0 && slashPrefix !== null) {
-        if (e.key === 'Escape') { e.preventDefault(); setSlashSuggestions([]); return }
-        if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightedIdx((i) => (i + 1) % slashSuggestions.length); return }
-        if (e.key === 'ArrowUp') { e.preventDefault(); setHighlightedIdx((i) => (i - 1 + slashSuggestions.length) % slashSuggestions.length); return }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setSlashSuggestions([]);
+          return;
+        }
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setHighlightedIdx(i => (i + 1) % slashSuggestions.length);
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setHighlightedIdx(i => (i - 1 + slashSuggestions.length) % slashSuggestions.length);
+          return;
+        }
         if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
-          e.preventDefault()
-          const sel = slashSuggestions[highlightedIdx]
-          if (sel) acceptSuggestion(sel)
-          return
+          e.preventDefault();
+          const sel = slashSuggestions[highlightedIdx];
+          if (sel) acceptSuggestion(sel);
+          return;
         }
       }
 
       if (mentionQuery !== null) {
-        if (e.key === 'Escape') { e.preventDefault(); applyValue(valueRef.current.replace(MENTION_TRIGGER_AT_END, '$1')); return }
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); return }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          applyValue(valueRef.current.replace(MENTION_TRIGGER_AT_END, '$1'));
+          return;
+        }
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          return;
+        }
       }
 
       if (e.key === 'Enter') {
         if (e.shiftKey) {
-          e.preventDefault()
-          insertTextAtCaret('\n')
-          syncFromDom()
+          e.preventDefault();
+          insertTextAtCaret('\n');
+          syncFromDom();
         } else {
-          e.preventDefault()
-          handleSubmit()
+          e.preventDefault();
+          handleSubmit();
         }
       }
     },
-    [slashSuggestions, slashPrefix, highlightedIdx, acceptSuggestion, handleSubmit, mentionQuery, applyValue, syncFromDom],
-  )
+    [
+      slashSuggestions,
+      slashPrefix,
+      highlightedIdx,
+      acceptSuggestion,
+      handleSubmit,
+      mentionQuery,
+      applyValue,
+      syncFromDom,
+    ],
+  );
 
   // Delegated remove: a click on a chip's ⊗ (Tag's `onClose` button, inside a
   // `[data-token]` wrapper). Strip that token from the draft → value change →
   // host drops the matching context item.
-  const handleEditorMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement
-    const chip = target.closest<HTMLElement>('[data-token]')
-    if (!chip || !target.closest('button')) return
-    e.preventDefault() // keep editor focus; don't move the caret into the chip
-    const token = chip.dataset.token ?? ''
-    const next = valueRef.current
-      .replace(`@${token} `, '')
-      .replace(`@${token}`, '')
-      .replace(/[^\S\n]{2,}/g, ' ')
-      .replace(/^[^\S\n]+/, '')
-    applyValue(next)
-    requestAnimationFrame(() => focusEditor())
-  }, [applyValue, focusEditor])
+  const handleEditorMouseDown = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement;
+      const chip = target.closest<HTMLElement>('[data-token]');
+      if (!chip || !target.closest('button')) return;
+      e.preventDefault(); // keep editor focus; don't move the caret into the chip
+      const token = chip.dataset.token ?? '';
+      const next = valueRef.current
+        .replace(`@${token} `, '')
+        .replace(`@${token}`, '')
+        .replace(/[^\S\n]{2,}/g, ' ')
+        .replace(/^[^\S\n]+/, '');
+      applyValue(next);
+      requestAnimationFrame(() => focusEditor());
+    },
+    [applyValue, focusEditor],
+  );
 
   // ── refocus after send/await transitions ────────────────────────────────────
-  useEffect(() => { if (!sending) setIsStopping(false) }, [sending])
   useEffect(() => {
-    const wasSending = prevSendingRef.current
-    prevSendingRef.current = sending
+    if (!sending) setIsStopping(false);
+  }, [sending]);
+  useEffect(() => {
+    const wasSending = prevSendingRef.current;
+    prevSendingRef.current = sending;
     if (wasSending && !sending && shouldRefocusRef.current && !awaitingResponse && !disabled) {
-      shouldRefocusRef.current = false
-      focusEditor()
+      shouldRefocusRef.current = false;
+      focusEditor();
     }
-  }, [sending, awaitingResponse, disabled, focusEditor])
+  }, [sending, awaitingResponse, disabled, focusEditor]);
   useEffect(() => {
-    const wasAwaiting = prevAwaitingResponseRef.current
-    prevAwaitingResponseRef.current = awaitingResponse
-    if (wasAwaiting && !awaitingResponse && shouldRefocusRef.current && !disabled) {
-      shouldRefocusRef.current = false
-      const id = requestAnimationFrame(() => focusEditor())
-      return () => cancelAnimationFrame(id)
-    }
-  }, [awaitingResponse, disabled, focusEditor])
+    const wasAwaiting = prevAwaitingResponseRef.current;
+    prevAwaitingResponseRef.current = awaitingResponse;
+    if (!wasAwaiting || awaitingResponse || !shouldRefocusRef.current || disabled) return undefined;
+    shouldRefocusRef.current = false;
+    const id = requestAnimationFrame(() => focusEditor());
+    return () => cancelAnimationFrame(id);
+  }, [awaitingResponse, disabled, focusEditor]);
 
   const handleStop = useCallback(async () => {
-    if (!onStop || isStopping) return
-    setIsStopping(true)
+    if (!onStop || isStopping) return;
+    setIsStopping(true);
     try {
-      await onStop()
+      await onStop();
     } catch {
-      setIsStopping(false)
+      setIsStopping(false);
     }
-  }, [onStop, isStopping])
+  }, [onStop, isStopping]);
 
-  const isStopMode = sending && !!onStop
-  const hasContent = value.trim().length > 0 || allowEmptySend
-  const sendDisabled = sending || disabled || !hasContent
-  const isEmpty = value.length === 0
+  const isStopMode = sending && !!onStop;
+  const hasContent = value.trim().length > 0 || allowEmptySend;
+  const sendDisabled = sending || disabled || !hasContent;
+  const isEmpty = value.length === 0;
   // Non-destructive ghost preview (e.g. a hovered quick-action's full prompt).
   // Shown whenever a `previewText` is set (even over an existing draft): the
   // editor's real value is NEVER touched — it's just visually hidden behind the
   // ghost while previewing, and reappears verbatim once `previewText` clears.
   // Declarative, no `setValue` / draft save-restore. Suppressed the moment the
   // user edits the draft (`previewDismissed`) so typing is never hidden.
-  const showPreview = !sending && !disabled && !!previewText && !previewDismissed
+  const showPreview = !sending && !disabled && !!previewText && !previewDismissed;
 
   return (
     <div
       className={cn(
-        fullWidth ? "w-full flex-shrink-0" : "mx-auto w-full max-w-ods-content-narrow flex-shrink-0",
+        fullWidth ? 'w-full flex-shrink-0' : 'mx-auto w-full max-w-ods-content-narrow flex-shrink-0',
         className,
       )}
     >
       {awaitingResponse ? (
-        <div className="relative flex items-center justify-center gap-[var(--spacing-system-xs)] rounded-md bg-ods-card border border-ods-border px-[var(--spacing-system-s)] py-[var(--spacing-system-s)] transition-colors">
+        <div className="relative flex items-center justify-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-card px-[var(--spacing-system-s)] py-[var(--spacing-system-s)] transition-colors">
           <ChatTypingIndicator size="sm" dotClassName="bg-ods-text-primary" />
-          <p className="text-h4 text-ods-text-secondary">Waiting for Technician Response</p>
+          <p className="text-ods-text-secondary text-h4">Waiting for Technician Response</p>
         </div>
       ) : (
         <div className="relative">
@@ -509,12 +574,13 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
             resolveSourceIcon={slashCommands?.resolveSourceIcon}
             onAction={slashCommands?.onAction}
           />
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents: focus proxy for the contenteditable; keyboard users focus the editor directly. */}
+          {/* Mouse-only focus proxy for the contenteditable — deliberately has
+              no key handler: keyboard users tab straight into the editor. */}
           <div
-            onMouseDown={(e) => {
+            onMouseDown={e => {
               if (e.target === e.currentTarget) {
-                e.preventDefault()
-                focusEditor()
+                e.preventDefault();
+                focusEditor();
               }
             }}
             className={cn(
@@ -526,22 +592,23 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
               // no slack for the chip to drift in → it reads as centered.
               // A chipless row is shorter than its content box and the `min-h-*`
               // here is what sets its height: 48px from `md` up, 44px below.
-              "flex w-full items-center gap-2 px-3 py-1.5 min-h-11 md:min-h-12 cursor-text group transition-colors duration-200",
-              !hideBorder && "rounded-[6px] border bg-ods-card border-ods-border",
-              !hideBorder && (focused ? "border-ods-accent" : !disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover"),
-              !hideBorder && disabled && "!cursor-not-allowed bg-ods-bg",
-              hideBorder && "bg-transparent",
+              'group flex min-h-11 w-full cursor-text items-center gap-2 px-3 py-1.5 transition-colors duration-200 md:min-h-12',
+              !hideBorder && 'rounded-[6px] border border-ods-border bg-ods-card',
+              !hideBorder &&
+                (focused ? 'border-ods-accent' : !disabled && 'hover:border-ods-border-hover hover:bg-ods-bg-hover'),
+              !hideBorder && disabled && '!cursor-not-allowed bg-ods-bg',
+              hideBorder && 'bg-transparent',
             )}
           >
             {startIcon && <span className="flex h-6 shrink-0 items-center">{startIcon}</span>}
 
-            <div className="relative flex-1 min-w-0">
+            <div className="relative min-w-0 flex-1">
               {/* No chip-line override on the placeholder: it only renders while
                   the draft is EMPTY, so the editor is always on its plain line
                   box here. */}
               {isEmpty && !showPreview && (
-                <span className="pointer-events-none absolute left-0 top-0 select-none text-h4 text-ods-text-secondary">
-                  {disabled ? "Connection lost. Waiting to reconnect..." : placeholder}
+                <span className="pointer-events-none absolute left-0 top-0 select-none text-ods-text-secondary text-h4">
+                  {disabled ? 'Connection lost. Waiting to reconnect...' : placeholder}
                 </span>
               )}
               {/* Ghost preview of a hovered quick-action's prompt. Overlaid like
@@ -555,15 +622,21 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                   text; clearing `previewText` restores the (opacity-hidden)
                   editor. */}
               {showPreview && (
-                <p className={cn("pointer-events-none absolute inset-x-0 top-0 m-0 select-none truncate text-h4 text-ods-text-secondary", hasChips && "!leading-9")}>
+                <p
+                  className={cn(
+                    'pointer-events-none absolute inset-x-0 top-0 m-0 select-none truncate text-ods-text-secondary text-h4',
+                    hasChips && '!leading-9',
+                  )}
+                >
                   {previewText}
                 </p>
               )}
               {/* UNCONTROLLED contenteditable: React renders it WITHOUT children
                   and never reconciles its content — all text/chips are managed
                   imperatively (browser owns typing/delete; we own chip insert). */}
-              {/* biome-ignore lint/a11y/useFocusableInteractive: role=textbox on a contenteditable is focusable. */}
-              {/* biome-ignore lint/a11y/useSemanticElements: contenteditable rich input has no native element. */}
+              {/* `role="textbox"` on a contenteditable div: it IS focusable,
+                  and a rich text input with inline chips has no native
+                  element to use instead. */}
               <div
                 ref={editorRef}
                 data-editor
@@ -591,17 +664,22 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 onMouseDown={handleEditorMouseDown}
-                onCompositionStart={() => { isComposingRef.current = true }}
-                onCompositionEnd={() => { isComposingRef.current = false; syncFromDom() }}
+                onCompositionStart={() => {
+                  isComposingRef.current = true;
+                }}
+                onCompositionEnd={() => {
+                  isComposingRef.current = false;
+                  syncFromDom();
+                }}
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
                 className={cn(
-                  "max-h-[160px] overflow-y-auto overscroll-contain whitespace-pre-wrap break-words outline-none",
+                  'max-h-[160px] overflow-y-auto overscroll-contain whitespace-pre-wrap break-words outline-none',
                   // While a ghost preview shows, the editor stays IN FLOW (it
                   // alone drives the row height, which must NOT change on hover —
                   // see the preview comment above) and is only made transparent;
                   // the absolutely-positioned single-line preview paints over it.
-                  showPreview && "opacity-0",
+                  showPreview && 'opacity-0',
                   // WITH chips, `leading-9` (36px) sits just above the 32px chip's
                   // line-box need (~35.5px incl. vertical-align overhead): the LINE
                   // drives row height (deterministic 48px, no overflow) AND the
@@ -617,10 +695,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                   // would otherwise collapse to 0px, and `items-center` would
                   // re-center the shorter wrapper in the row — dropping the `top-0`
                   // placeholder down.
-                  "text-h4 text-ods-text-primary",
-                  hasChips ? "min-h-9 !leading-9" : "min-h-[var(--font-line-space-h4-body)]",
-                  "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
-                  disabled && "cursor-not-allowed",
+                  'text-ods-text-primary text-h4',
+                  hasChips ? 'min-h-9 !leading-9' : 'min-h-[var(--font-line-space-h4-body)]',
+                  'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30',
+                  disabled && 'cursor-not-allowed',
                 )}
               />
             </div>
@@ -631,16 +709,16 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
               onClick={isStopMode ? handleStop : handleSubmit}
               disabled={isStopMode ? isStopping : sendDisabled}
               className={cn(
-                "flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200",
+                'flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200',
                 // Focus accent applies to the SEND icon only. Stop stays neutral
                 // regardless of where focus sits — otherwise it reads yellow after
                 // an Enter-send (editor keeps focus) but gray after an approve
                 // click (focus moved to the card button).
-                focused && !isStopMode && "text-ods-accent",
-                "[&_svg]:size-4 md:[&_svg]:size-6",
-                "cursor-pointer hover:text-ods-text-primary",
-                "focus-visible:outline-none focus-visible:text-ods-accent",
-                "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ods-text-secondary",
+                focused && !isStopMode && 'text-ods-accent',
+                '[&_svg]:size-4 md:[&_svg]:size-6',
+                'cursor-pointer hover:text-ods-text-primary',
+                'focus-visible:text-ods-accent focus-visible:outline-none',
+                'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ods-text-secondary',
               )}
             >
               {isStopMode ? <StopCircleIcon size={20} /> : <Send01Icon size={20} />}
@@ -649,9 +727,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
         </div>
       )}
     </div>
-  )
-})
+  );
+});
 
-ChatInput.displayName = "ChatInput"
+ChatInput.displayName = 'ChatInput';
 
-export { ChatInput }
+export { ChatInput };

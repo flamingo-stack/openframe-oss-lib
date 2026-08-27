@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from 'react';
+import { useState } from 'react';
 import { Autocomplete } from './autocomplete';
 import { Button } from './button';
 import { ColorSwatch } from './color-swatch';
@@ -70,17 +70,28 @@ export function ReopenTicketModal({
   isPending = false,
   onConfirm,
 }: ReopenTicketModalProps) {
-  const [statusId, setStatusId] = React.useState<string | null>(null);
-  const [assigneeId, setAssigneeId] = React.useState<string | null>(null);
-  const [reason, setReason] = React.useState('');
+  const [statusId, setStatusId] = useState<string | null>(initialStatusId ?? null);
+  const [assigneeId, setAssigneeId] = useState<string | null>(initialAssigneeId ?? null);
+  const [reason, setReason] = useState('');
 
-  // Re-seed the selections every time the modal opens.
-  React.useEffect(() => {
-    if (!isOpen) return;
-    setStatusId(initialStatusId ?? null);
-    setAssigneeId(initialAssigneeId ?? null);
-    setReason('');
-  }, [isOpen, initialStatusId, initialAssigneeId]);
+  // Re-seed the selections every time the modal opens. Adjusted while
+  // rendering, not from an effect: the modal does not unmount when it closes,
+  // so an effect painted the OPENING frame with the previous session's status,
+  // assignee and reason still filled in before replacing them. The mount case
+  // is covered by the initialisers above, exactly as the effect's first run was.
+  const [seededWith, setSeededWith] = useState({ isOpen, initialStatusId, initialAssigneeId });
+  if (
+    seededWith.isOpen !== isOpen ||
+    seededWith.initialStatusId !== initialStatusId ||
+    seededWith.initialAssigneeId !== initialAssigneeId
+  ) {
+    setSeededWith({ isOpen, initialStatusId, initialAssigneeId });
+    if (isOpen) {
+      setStatusId(initialStatusId ?? null);
+      setAssigneeId(initialAssigneeId ?? null);
+      setReason('');
+    }
+  }
 
   const selectedStatusId = statusId ?? statusOptions[0]?.value ?? null;
   const selectedStatus = statusOptions.find(o => o.value === selectedStatusId);
@@ -102,13 +113,13 @@ export function ReopenTicketModal({
         <ModalV2Title>Reopen Ticket</ModalV2Title>
       </ModalV2Header>
 
-      <p className="text-h4 text-ods-text-primary">
+      <p className="text-ods-text-primary text-h4">
         The ticket <span className="text-ods-accent">{ticketRef}</span> will return to the selected status and appear on
         the board. Assigned admins and the user will be notified.
       </p>
 
-      <div className="flex flex-col md:flex-row gap-[var(--spacing-system-l)] w-full">
-        <div className="flex-1 min-w-0">
+      <div className="flex w-full flex-col gap-[var(--spacing-system-l)] md:flex-row">
+        <div className="min-w-0 flex-1">
           <Autocomplete
             label="Status"
             options={statusOptions}
@@ -119,7 +130,7 @@ export function ReopenTicketModal({
             renderOption={renderTicketStatusOption}
           />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <Autocomplete
             label="Assigned"
             options={assigneeOptions}
@@ -158,7 +169,7 @@ export function ReopenTicketModal({
         <Button type="button" variant="outline" onClick={onClose} disabled={isPending} className="flex-1 md:hidden">
           Cancel
         </Button>
-        <div className="hidden md:block flex-1" />
+        <div className="hidden flex-1 md:block" />
         <Button
           type="button"
           variant="accent"

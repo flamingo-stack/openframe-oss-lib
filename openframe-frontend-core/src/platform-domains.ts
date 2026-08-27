@@ -15,56 +15,71 @@
  * preserve byte-identical cookie behavior.
  */
 
-import type { PlatformName } from './types/platform'
+import type { PlatformName } from './types/platform';
 
-export type PlatformDomainKey = PlatformName | 'openframe-dashboard'
+export type PlatformDomainKey = PlatformName | 'openframe-dashboard';
 
 export interface PlatformDomainEntry {
   /** Platform key (matches `PlatformName`, plus the forward-only `openframe-dashboard`). */
-  key: PlatformDomainKey
+  key: PlatformDomainKey;
   /** Canonical production URL — the LOAD-BEARING source of truth (today's hardcoded fallbacks). */
-  defaultUrl: string
+  defaultUrl: string;
   /** `NEXT_PUBLIC_*_URL` per-deploy OVERRIDE. The `defaultUrl` covers it when unset. */
-  envVar: string
+  envVar: string;
   /** Legacy/secondary hosts that REVERSE-map to this key (no env var exists — NOT canonical). */
-  aliasHostnames?: string[]
+  aliasHostnames?: string[];
   /** Forward-only: no DB row, excluded from the reverse index + cookie set (e.g. the product-CTA dashboard). */
-  pseudo?: boolean
+  pseudo?: boolean;
 }
 
 export const PLATFORM_DOMAINS: readonly PlatformDomainEntry[] = [
   { key: 'marketing-hub', defaultUrl: 'https://marketing-hub.flamingo.so', envVar: 'NEXT_PUBLIC_MARKETING_HUB_URL' },
-  { key: 'company-hub',   defaultUrl: 'https://company-hub.flamingo.so',   envVar: 'NEXT_PUBLIC_COMPANY_HUB_URL' },
-  { key: 'product-hub',   defaultUrl: 'https://product-hub.flamingo.so',   envVar: 'NEXT_PUBLIC_PRODUCT_HUB_URL' },
-  { key: 'revenue-hub',   defaultUrl: 'https://revenue-hub.flamingo.so',   envVar: 'NEXT_PUBLIC_REVENUE_HUB_URL' },
-  { key: 'people-hub',    defaultUrl: 'https://people-hub.flamingo.so',    envVar: 'NEXT_PUBLIC_PEOPLE_HUB_URL' },
-  { key: 'openmsp',       defaultUrl: 'https://www.openmsp.ai',            envVar: 'NEXT_PUBLIC_OPENMSP_URL' },
+  { key: 'company-hub', defaultUrl: 'https://company-hub.flamingo.so', envVar: 'NEXT_PUBLIC_COMPANY_HUB_URL' },
+  { key: 'product-hub', defaultUrl: 'https://product-hub.flamingo.so', envVar: 'NEXT_PUBLIC_PRODUCT_HUB_URL' },
+  { key: 'revenue-hub', defaultUrl: 'https://revenue-hub.flamingo.so', envVar: 'NEXT_PUBLIC_REVENUE_HUB_URL' },
+  { key: 'people-hub', defaultUrl: 'https://people-hub.flamingo.so', envVar: 'NEXT_PUBLIC_PEOPLE_HUB_URL' },
+  { key: 'openmsp', defaultUrl: 'https://www.openmsp.ai', envVar: 'NEXT_PUBLIC_OPENMSP_URL' },
   // ORDERING INVARIANT (first-wins, load-bearing): `flamingo` MUST precede `flamingo-teaser` + `universal`.
   // All three resolve to www.flamingo.run; the reverse index is first-wins → flamingo claims the shared host,
   // teaser keeps only its unique flamingo.cx aliases, universal contributes no unique host.
   // ⚠️ DO NOT REORDER — enforced by the module-load self-check at the bottom of this file.
-  { key: 'flamingo',         defaultUrl: 'https://www.flamingo.run',  envVar: 'NEXT_PUBLIC_FLAMINGO_URL' },
-  { key: 'tmcg',             defaultUrl: 'https://www.tmcg.miami',    envVar: 'NEXT_PUBLIC_TMCG_URL' },
-  { key: 'flamingo-teaser',  defaultUrl: 'https://www.flamingo.run',  envVar: 'NEXT_PUBLIC_FLAMINGO_URL', aliasHostnames: ['flamingo.cx', 'www.flamingo.cx'] },
-  { key: 'openframe',        defaultUrl: 'https://openframe.ai',      envVar: 'NEXT_PUBLIC_OPENFRAME_URL', aliasHostnames: ['openframe.ai', 'www.openframe.ai', 'hub.openframe.ai'] },
-  { key: 'openframe-dashboard', defaultUrl: 'https://openframe.ai',   envVar: 'NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL', pseudo: true },
-  { key: 'universal',        defaultUrl: 'https://www.flamingo.run',  envVar: 'NEXT_PUBLIC_FLAMINGO_URL' },
-]
+  { key: 'flamingo', defaultUrl: 'https://www.flamingo.run', envVar: 'NEXT_PUBLIC_FLAMINGO_URL' },
+  { key: 'tmcg', defaultUrl: 'https://www.tmcg.miami', envVar: 'NEXT_PUBLIC_TMCG_URL' },
+  {
+    key: 'flamingo-teaser',
+    defaultUrl: 'https://www.flamingo.run',
+    envVar: 'NEXT_PUBLIC_FLAMINGO_URL',
+    aliasHostnames: ['flamingo.cx', 'www.flamingo.cx'],
+  },
+  {
+    key: 'openframe',
+    defaultUrl: 'https://openframe.ai',
+    envVar: 'NEXT_PUBLIC_OPENFRAME_URL',
+    aliasHostnames: ['openframe.ai', 'www.openframe.ai', 'hub.openframe.ai'],
+  },
+  {
+    key: 'openframe-dashboard',
+    defaultUrl: 'https://openframe.ai',
+    envVar: 'NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL',
+    pseudo: true,
+  },
+  { key: 'universal', defaultUrl: 'https://www.flamingo.run', envVar: 'NEXT_PUBLIC_FLAMINGO_URL' },
+];
 
 // ── Compile-time key guards (anchor the table on PlatformName, both directions) ──
 // (1) Removal/typo guard: every table key must be a valid PlatformDomainKey.
-const _tableSatisfies = PLATFORM_DOMAINS satisfies readonly PlatformDomainEntry[]
-void _tableSatisfies
+const _tableSatisfies = PLATFORM_DOMAINS satisfies readonly PlatformDomainEntry[];
+void _tableSatisfies;
 // (2) Addition guard: a NEW PlatformName member that lacks a table row fails the build.
-type _MissingKey = Exclude<PlatformName, (typeof PLATFORM_DOMAINS)[number]['key']>
-const _exhaustive: [_MissingKey] extends [never] ? true : false = true
-void _exhaustive
+type _MissingKey = Exclude<PlatformName, (typeof PLATFORM_DOMAINS)[number]['key']>;
+const _exhaustive: [_MissingKey] extends [never] ? true : false = true;
+void _exhaustive;
 
 // ── Env overrides (the ONLY place env URLs enter — literal-key inlined + compile-time-guarded) ──
 // `process.env.NEXT_PUBLIC_X` is build-inlined ONLY with a LITERAL key, so the env-var name is the
 // irreducible two-copy (the registry `envVar` column + the literal access below). The `satisfies` makes
 // `tsc`/`next build` FAIL if this map is missing a registry env var OR carries a stale one (bidirectional).
-type EnvVarKey = (typeof PLATFORM_DOMAINS)[number]['envVar']
+type EnvVarKey = (typeof PLATFORM_DOMAINS)[number]['envVar'];
 const ENV_OVERRIDES = {
   NEXT_PUBLIC_MARKETING_HUB_URL: process.env.NEXT_PUBLIC_MARKETING_HUB_URL,
   NEXT_PUBLIC_COMPANY_HUB_URL: process.env.NEXT_PUBLIC_COMPANY_HUB_URL,
@@ -76,18 +91,18 @@ const ENV_OVERRIDES = {
   NEXT_PUBLIC_TMCG_URL: process.env.NEXT_PUBLIC_TMCG_URL,
   NEXT_PUBLIC_OPENFRAME_URL: process.env.NEXT_PUBLIC_OPENFRAME_URL,
   NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL: process.env.NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL,
-} satisfies Record<EnvVarKey, string | undefined>
+} satisfies Record<EnvVarKey, string | undefined>;
 
 /** The registry entry for a key (undefined for an unknown key). */
 export function byKey(key: string): PlatformDomainEntry | undefined {
-  return PLATFORM_DOMAINS.find((e) => e.key === key)
+  return PLATFORM_DOMAINS.find(e => e.key === key);
 }
 
 /** Read a platform's `NEXT_PUBLIC_*_URL` override (or null). */
 function envOverrideFor(key: string): string | null {
-  const envVar = byKey(key)?.envVar
-  if (!envVar) return null
-  return (ENV_OVERRIDES as Record<string, string | undefined>)[envVar] || null
+  const envVar = byKey(key)?.envVar;
+  if (!envVar) return null;
+  return (ENV_OVERRIDES as Record<string, string | undefined>)[envVar] || null;
 }
 
 /**
@@ -106,9 +121,9 @@ function envOverrideFor(key: string): string | null {
  * doesn't become `https:////host` (empty-host → hostOf null → silent platform drop).
  */
 export function ensureScheme(url: string): string {
-  const trimmed = url.trim()
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed // already has a scheme
-  return `https://${trimmed.replace(/^\/+/, '')}` // bare host or protocol-relative `//host`
+  const trimmed = url.trim();
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed; // already has a scheme
+  return `https://${trimmed.replace(/^\/+/, '')}`; // bare host or protocol-relative `//host`
 }
 
 /**
@@ -120,50 +135,47 @@ export function ensureScheme(url: string): string {
  */
 export function getPlatformProductionUrl(platform: string): string {
   const resolved =
-    envOverrideFor(platform) ??
-    byKey(platform)?.defaultUrl ??
-    envOverrideFor('flamingo') ??
-    'https://www.flamingo.run'
-  return ensureScheme(resolved)
+    envOverrideFor(platform) ?? byKey(platform)?.defaultUrl ?? envOverrideFor('flamingo') ?? 'https://www.flamingo.run';
+  return ensureScheme(resolved);
 }
 
 // ── Single-owner host primitives ──
 
 /** Canonical URL→host parser: `.hostname` (PORT-STRIPPED, lowercased), null on parse failure. */
 export function hostOf(value: string | null | undefined): string | null {
-  if (!value) return null
+  if (!value) return null;
   try {
-    return new URL(value).hostname.toLowerCase()
+    return new URL(value).hostname.toLowerCase();
   } catch {
-    return null
+    return null;
   }
 }
 
 /** Expand a host into its `www.`/apex pair. 3+-label and single-label hosts return `[host]`. */
 export function expandWwwApex(host: string): string[] {
-  if (host.startsWith('www.')) return [host, host.slice(4)]
-  if (host.split('.').length === 2) return [host, `www.${host}`]
-  return [host]
+  if (host.startsWith('www.')) return [host, host.slice(4)];
+  if (host.split('.').length === 2) return [host, `www.${host}`];
+  return [host];
 }
 
 /** Registrable base domain (`parts.slice(-2).join('.')`), dotless; undefined for <2-label. */
 export function toRegistrableBaseDomain(host: string): string | undefined {
-  const parts = host.split('.')
-  if (parts.length >= 2) return parts.slice(-2).join('.')
-  return undefined
+  const parts = host.split('.');
+  if (parts.length >= 2) return parts.slice(-2).join('.');
+  return undefined;
 }
 
 /** An entry's alias hosts (single-owner reader). */
 export function aliasHostsOf(key: string): string[] {
-  return byKey(key)?.aliasHostnames ?? []
+  return byKey(key)?.aliasHostnames ?? [];
 }
 
 /** All hosts an entry contributes to the reverse index (resolved host + optional aliases). */
 function hostsForEntry(entry: PlatformDomainEntry, opts: { includeAliases: boolean }): string[] {
-  const resolved = hostOf(getPlatformProductionUrl(entry.key))
-  const hosts = resolved ? expandWwwApex(resolved) : []
-  if (opts.includeAliases) hosts.push(...aliasHostsOf(entry.key))
-  return hosts
+  const resolved = hostOf(getPlatformProductionUrl(entry.key));
+  const hosts = resolved ? expandWwwApex(resolved) : [];
+  if (opts.includeAliases) hosts.push(...aliasHostsOf(entry.key));
+  return hosts;
 }
 
 /**
@@ -172,25 +184,25 @@ function hostsForEntry(entry: PlatformDomainEntry, opts: { includeAliases: boole
  * Replaces the hub `PLATFORM_DOMAIN_MAP`.
  */
 export function getPlatformByHostname(hostname: string): PlatformDomainKey | null {
-  const host = hostname.toLowerCase()
+  const host = hostname.toLowerCase();
   for (const entry of PLATFORM_DOMAINS) {
-    if (entry.pseudo) continue
-    if (hostsForEntry(entry, { includeAliases: true }).includes(host)) return entry.key
+    if (entry.pseudo) continue;
+    if (hostsForEntry(entry, { includeAliases: true }).includes(host)) return entry.key;
   }
-  return null
+  return null;
 }
 
 // ── Preview detection (two distinct predicates — env-form vs host-form) ──
 
 /** Env-form preview predicate (Vercel `VERCEL_ENV`). */
 export function isPreviewEnv(): boolean {
-  return process.env.VERCEL_ENV === 'preview'
+  return process.env.VERCEL_ENV === 'preview';
 }
 
 /** Host-form preview predicate (a `*.vercel.app` host). Dot-bounded suffix so a
  *  malicious `foo.vercel.app.evil.com` is NOT treated as preview. */
 export function isPreviewHost(hostname: string): boolean {
-  return hostname.endsWith('.vercel.app')
+  return hostname.endsWith('.vercel.app');
 }
 
 /**
@@ -208,37 +220,35 @@ export function isPreviewHost(hostname: string): boolean {
  * are ALWAYS present → cross-hub SSO is byte-identical to today.
  */
 export function getAllPlatformBaseDomains(): string[] {
-  if (typeof window === 'undefined') return []
+  if (typeof window === 'undefined') return [];
 
-  const hostname = window.location.hostname
+  const hostname = window.location.hostname;
 
   // Case 1: localhost / private IP — no domains
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('127.')) {
-    return []
+    return [];
   }
 
   // Case 2: Vercel preview — vercel.app domain
   const previewEnv =
-    process.env.VERCEL_ENV === 'preview' ||
-    process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview' ||
-    isPreviewHost(hostname)
+    process.env.VERCEL_ENV === 'preview' || process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview' || isPreviewHost(hostname);
   if (previewEnv) {
-    return ['.vercel.app', 'vercel.app']
+    return ['.vercel.app', 'vercel.app'];
   }
 
   // Case 3: production — registrable base of every non-pseudo platform's resolved host
-  const baseDomains = new Set<string>()
+  const baseDomains = new Set<string>();
   for (const entry of PLATFORM_DOMAINS) {
-    if (entry.pseudo) continue
-    const host = hostOf(getPlatformProductionUrl(entry.key))
-    if (!host) continue
-    const base = toRegistrableBaseDomain(host)
+    if (entry.pseudo) continue;
+    const host = hostOf(getPlatformProductionUrl(entry.key));
+    if (!host) continue;
+    const base = toRegistrableBaseDomain(host);
     if (base) {
-      baseDomains.add(`.${base}`)
-      baseDomains.add(base)
+      baseDomains.add(`.${base}`);
+      baseDomains.add(base);
     }
   }
-  return Array.from(baseDomains)
+  return Array.from(baseDomains);
 }
 
 // ── Cookie-domain guard + match (single owner; shared by the client cookie-domain.ts +
@@ -259,7 +269,7 @@ export function isNonCookieableHost(hostname: string): boolean {
     hostname.startsWith('192.168.') ||
     hostname.startsWith('10.') ||
     hostname.includes('.vercel.app')
-  )
+  );
 }
 
 /**
@@ -269,12 +279,12 @@ export function isNonCookieableHost(hostname: string): boolean {
  */
 export function matchCookieDomain(hostname: string, baseDomains: string[]): string | undefined {
   for (const domain of baseDomains) {
-    const bare = domain.startsWith('.') ? domain.slice(1) : domain
+    const bare = domain.startsWith('.') ? domain.slice(1) : domain;
     if (hostname === bare || hostname.endsWith(`.${bare}`)) {
-      return domain.startsWith('.') ? domain : `.${domain}`
+      return domain.startsWith('.') ? domain : `.${domain}`;
     }
   }
-  return undefined
+  return undefined;
 }
 
 // ── Module-load ordering self-check (NON-fatal — this module is imported by cn.ts → ~everything,
@@ -284,16 +294,15 @@ export function matchCookieDomain(hostname: string, baseDomains: string[]): stri
 // (flamingo's resolved host changes, so `www.flamingo.run` no longer reverse-maps to it though the
 // ordering is fine). The alias checks below ARE env-immune (aliasHostnames are unique per key). The
 // authoritative guard is the reverse-map vitest. ⚠️ keep `flamingo` before `flamingo-teaser`/`universal`.
-const _orderIdx = (k: PlatformDomainKey) => PLATFORM_DOMAINS.findIndex((e) => e.key === k)
+const _orderIdx = (k: PlatformDomainKey) => PLATFORM_DOMAINS.findIndex(e => e.key === k);
 if (
   _orderIdx('flamingo') > _orderIdx('flamingo-teaser') ||
   _orderIdx('flamingo') > _orderIdx('universal') ||
   getPlatformByHostname('flamingo.cx') !== 'flamingo-teaser' ||
   getPlatformByHostname('hub.openframe.ai') !== 'openframe'
 ) {
-  // eslint-disable-next-line no-console
   console.error(
     '[platform-domains] ⚠️ PLATFORM_DOMAINS ordering invariant violated — `flamingo` must precede ' +
       '`flamingo-teaser`/`universal`, and the openframe/teaser aliases must be intact. Do not reorder the table.',
-  )
+  );
 }

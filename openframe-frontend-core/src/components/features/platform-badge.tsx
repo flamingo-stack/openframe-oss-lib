@@ -1,12 +1,11 @@
-"use client"
+'use client';
 
-import React from 'react';
+import { Globe } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { FlamingoLogo } from '../flamingo-logo';
-import { OpenmspLogo } from '../openmsp-logo';
-import { OpenFrameLogo } from '../icons/openframe-logo';
 import { MiamiCyberGangLogoFaceOnly } from '../icons/miami-cyber-gang-logo-face-only';
-import { Globe } from 'lucide-react';
+import { OpenFrameLogo } from '../icons/openframe-logo';
+import { OpenmspLogo } from '../openmsp-logo';
 
 interface PlatformBadgeProps {
   platform?: {
@@ -23,76 +22,76 @@ const sizeClasses = {
   xs: {
     container: 'gap-1 px-1.5 py-0.5',
     icon: 'h-3 w-3',
-    text: 'text-h6'
+    text: 'text-h6',
   },
   sm: {
     container: 'gap-1.5 px-2 py-1',
     icon: 'h-4 w-4',
-    text: 'text-h6'
+    text: 'text-h6',
   },
   md: {
     container: 'gap-2 px-2.5 py-1.5',
     icon: 'h-5 w-5',
-    text: 'text-h6'
-  }
+    text: 'text-h6',
+  },
 };
 
 const platformColors = {
-  'openmsp': {
+  openmsp: {
     bg: 'bg-[#FFC008]/10',
     border: 'border-[#FFC008]/30',
-    text: 'text-[#FFC008]'
+    text: 'text-[#FFC008]',
   },
-  'flamingo': {
+  flamingo: {
     bg: 'bg-[#FF006E]/10',
     border: 'border-[#FF006E]/30',
-    text: 'text-[#FF006E]'
+    text: 'text-[#FF006E]',
   },
   'flamingo-teaser': {
     bg: 'bg-[#FF006E]/10',
     border: 'border-[#FF006E]/30',
-    text: 'text-[#FF006E]'
+    text: 'text-[#FF006E]',
   },
-  'openframe': {
+  openframe: {
     bg: 'bg-[#00D9D9]/10',
     border: 'border-[#00D9D9]/30',
-    text: 'text-[#00D9D9]'
+    text: 'text-[#00D9D9]',
   },
-  'tmcg': {
+  tmcg: {
     bg: 'bg-[#F357BB]/10',
     border: 'border-[#F357BB]/30',
-    text: 'text-[#F357BB]'
+    text: 'text-[#F357BB]',
   },
   'company-hub': {
     bg: 'bg-[#f36666]/10',
     border: 'border-[#f36666]/30',
-    text: 'text-[#f36666]'
+    text: 'text-[#f36666]',
   },
   'marketing-hub': {
     bg: 'bg-[#F357BB]/10',
     border: 'border-[#F357BB]/30',
-    text: 'text-[#F357BB]'
+    text: 'text-[#F357BB]',
   },
   'product-hub': {
     bg: 'bg-[#5EA62E]/10',
     border: 'border-[#5EA62E]/30',
-    text: 'text-[#5EA62E]'
+    text: 'text-[#5EA62E]',
   },
   'revenue-hub': {
     bg: 'bg-[#FFC008]/10',
     border: 'border-[#FFC008]/30',
-    text: 'text-[#FFC008]'
+    text: 'text-[#FFC008]',
   },
   'people-hub': {
     bg: 'bg-[#5EFAF0]/10',
     border: 'border-[#5EFAF0]/30',
-    text: 'text-[#5EFAF0]'
+    text: 'text-[#5EFAF0]',
   },
-  'universal': {
+  universal: {
     bg: 'bg-[#6B7280]/10',
     border: 'border-[#6B7280]/30',
-    text: 'text-[#6B7280]'
-  }
+    text: 'text-[#6B7280]',
+  },
 };
 
 const PlatformIcon = ({ platform, className }: { platform: string; className: string }) => {
@@ -102,7 +101,14 @@ const PlatformIcon = ({ platform, className }: { platform: string; className: st
 
   switch (platform) {
     case 'openmsp':
-      return <OpenmspLogo className={className} frontBubbleColor="currentColor" innerFrontBubbleColor="#000000" backBubbleColor="currentColor" />;
+      return (
+        <OpenmspLogo
+          className={className}
+          frontBubbleColor="currentColor"
+          innerFrontBubbleColor="#000000"
+          backBubbleColor="currentColor"
+        />
+      );
     case 'flamingo':
     case 'flamingo-teaser':
       return <FlamingoLogo className={className} />;
@@ -121,12 +127,7 @@ const PlatformIcon = ({ platform, className }: { platform: string; className: st
   }
 };
 
-export function PlatformBadge({ 
-  platform, 
-  size = 'sm',
-  showLabel = true,
-  className 
-}: PlatformBadgeProps) {
+export function PlatformBadge({ platform, size = 'sm', showLabel = true, className }: PlatformBadgeProps) {
   if (!platform) {
     return null;
   }
@@ -143,15 +144,11 @@ export function PlatformBadge({
         colors.border,
         colors.text,
         'font-body font-medium',
-        className
+        className,
       )}
     >
       <PlatformIcon platform={platform.name} className={sizes.icon} />
-      {showLabel && (
-        <span className={sizes.text}>
-          {platform.display_name || platform.name}
-        </span>
-      )}
+      {showLabel && <span className={sizes.text}>{platform.display_name || platform.name}</span>}
     </div>
   );
 }

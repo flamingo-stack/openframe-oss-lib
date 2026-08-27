@@ -16,55 +16,71 @@
  * Server-safe: no React, no browser APIs.
  */
 
-import { MESSAGE_TYPE } from '../components/chat/types/message.types'
-import type { AskOptionData } from '../components/chat/types/message.types'
-import { ESCALATION_STATE, GUIDE_ORIGIN, escalationResolvedStatus } from './events'
-import type { ApprovalToolCall, ChatStreamEvent } from './events'
-import { escapeThinkingTags, mapLeadingFrame } from './leading-frames'
+import { MESSAGE_TYPE } from '../components/chat/types/message.types';
+import type { AskOptionData } from '../components/chat/types/message.types';
+import { ESCALATION_STATE, GUIDE_ORIGIN, escalationResolvedStatus } from './events';
+import type { ApprovalToolCall, ChatStreamEvent } from './events';
+import { escapeThinkingTags, mapLeadingFrame } from './leading-frames';
 
 /** Minimal structural view of a NATS chunk (see `ChunkData` in
  *  `src/components/chat/types/network.types.ts`). */
-type NatsChunk = Record<string, any>
+type NatsChunk = Record<string, unknown>;
+
+/** Narrow an unknown wire value to something with string-keyed properties. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/** Wire string field, or `undefined` when the backend sent anything else. */
+function str(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+/** Wire string field with a default — replaces the old `data.x || 'y'`, which
+ *  also let non-strings through under an `any` chunk type. */
+function strOr(value: unknown, fallback = ''): string {
+  const s = str(value);
+  return s ? s : fallback;
+}
+
+/** Wire number field with a default. */
+function numOr(value: unknown, fallback = 0): number {
+  return typeof value === 'number' ? value : fallback;
+}
 
 // `GUIDE_ORIGIN` moved to `./events`, beside the `GuideOrigin` type it is the
 // only value of — the SSE half reads it too, so it never belonged to the NATS
 // decoder. Re-exported here because that is the import path consumers know.
-export { GUIDE_ORIGIN } from './events'
+export { GUIDE_ORIGIN } from './events';
 
 /** Coerce the wire's `toolCalls[]` into the batch-approval shape, dropping
  *  non-object entries and defaulting every field. */
 function normalizeToolCalls(raw: unknown): ApprovalToolCall[] {
-  if (!Array.isArray(raw)) return []
-  return raw
-    .filter((item): item is Record<string, any> => !!item && typeof item === 'object')
-    .map((item) => ({
-      toolExecutionRequestId: String(item.toolExecutionRequestId ?? ''),
-      toolName: String(item.toolName ?? ''),
-      toolTitle: typeof item.toolTitle === 'string' ? item.toolTitle : undefined,
-      toolExplanation:
-        typeof item.toolExplanation === 'string' ? item.toolExplanation : undefined,
-      toolType: typeof item.toolType === 'string' ? item.toolType : undefined,
-      requiresApproval: item.requiresApproval === true,
-      approvalType: typeof item.approvalType === 'string' ? item.approvalType : null,
-      toolCallArguments:
-        item.toolCallArguments && typeof item.toolCallArguments === 'object'
-          ? (item.toolCallArguments as Record<string, any>)
-          : null,
-    }))
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isRecord).map(item => ({
+    toolExecutionRequestId: String(item.toolExecutionRequestId ?? ''),
+    toolName: String(item.toolName ?? ''),
+    toolTitle: typeof item.toolTitle === 'string' ? item.toolTitle : undefined,
+    toolExplanation: typeof item.toolExplanation === 'string' ? item.toolExplanation : undefined,
+    toolType: typeof item.toolType === 'string' ? item.toolType : undefined,
+    requiresApproval: item.requiresApproval === true,
+    approvalType: typeof item.approvalType === 'string' ? item.approvalType : null,
+    toolCallArguments: isRecord(item.toolCallArguments) ? item.toolCallArguments : null,
+  }));
 }
 
 /** Coerce the wire's ask `options[]` into the card's row shape. Rows without a
  *  usable `label` are dropped: the label is what gets SENT when the row is
  *  picked, so a blank one would post an empty reply. */
 export function normalizeAskOptions(raw: unknown): AskOptionData[] {
-  if (!Array.isArray(raw)) return []
+  if (!Array.isArray(raw)) return [];
   return raw
-    .filter((item): item is Record<string, any> => !!item && typeof item === 'object')
-    .map((item) => ({
+    .filter(isRecord)
+    .map(item => ({
       label: typeof item.label === 'string' ? item.label.trim() : '',
       description: typeof item.description === 'string' ? item.description : undefined,
     }))
-    .filter((option) => option.label.length > 0)
+    .filter(option => option.label.length > 0);
 }
 
 /**
@@ -86,15 +102,12 @@ const AGENT_OWNED_EVENTS: ReadonlySet<ChatStreamEvent['type']> = new Set([
   'compaction',
   'participant',
   'dialog-closed',
-])
+]);
 
 /** Event types that declare `origin` (see `GuideOrigin`). Data rather than a
  *  branch per type, so a future hub card opts in by adding the field to its
  *  interface and its name here — the pass-through below needs no edit. */
-const ORIGIN_BEARING_EVENTS: ReadonlySet<ChatStreamEvent['type']> = new Set([
-  'approval-request',
-  'approval-resolved',
-])
+const ORIGIN_BEARING_EVENTS: ReadonlySet<ChatStreamEvent['type']> = new Set(['approval-request', 'approval-resolved']);
 
 /**
  * Adapt ONE Product Guide event to the NATS kernel.
@@ -132,18 +145,16 @@ const ORIGIN_BEARING_EVENTS: ReadonlySet<ChatStreamEvent['type']> = new Set([
 export function guideEventForNats(event: ChatStreamEvent): ChatStreamEvent | null {
   switch (event.type) {
     case 'text-delta':
-      return { type: 'guide-delta', text: event.text }
+      return { type: 'guide-delta', text: event.text };
     case 'thinking-delta':
-      return { type: 'thinking-delta', text: escapeThinkingTags(event.text) }
+      return { type: 'thinking-delta', text: escapeThinkingTags(event.text) };
     case 'metadata':
       return typeof event.conversationId === 'string' && event.conversationId
         ? { type: 'metadata', conversationId: event.conversationId, origin: GUIDE_ORIGIN }
-        : null
+        : null;
     default:
-      if (AGENT_OWNED_EVENTS.has(event.type)) return null
-      return ORIGIN_BEARING_EVENTS.has(event.type)
-        ? ({ ...event, origin: GUIDE_ORIGIN } as ChatStreamEvent)
-        : event
+      if (AGENT_OWNED_EVENTS.has(event.type)) return null;
+      return ORIGIN_BEARING_EVENTS.has(event.type) ? ({ ...event, origin: GUIDE_ORIGIN } as ChatStreamEvent) : event;
   }
 }
 
@@ -153,11 +164,11 @@ export function guideEventForNats(event: ChatStreamEvent): ChatStreamEvent | nul
  * second copy here; the kernel reconciliation is `guideEventForNats`.
  */
 export function guideFrameEvent(frame: Record<string, unknown>): ChatStreamEvent | null {
-  const events: ChatStreamEvent[] = []
+  const events: ChatStreamEvent[] = [];
   // Every branch of the table pushes at most one event, so the first is the one.
-  mapLeadingFrame(frame, events)
-  const event = events[0]
-  return event ? guideEventForNats(event) : null
+  mapLeadingFrame(frame, events);
+  const event = events[0];
+  return event ? guideEventForNats(event) : null;
 }
 
 /**
@@ -167,48 +178,46 @@ export function guideFrameEvent(frame: Record<string, unknown>): ChatStreamEvent
  * throwing, so a backend that adds a chunk type can't break the stream.
  */
 export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
-  if (!chunk || typeof chunk !== 'object') return null
+  if (!chunk || typeof chunk !== 'object') return null;
 
-  const data = chunk as NatsChunk
-  const type = String(data.type || '')
+  const data = chunk as NatsChunk;
+  const type = String(data.type || '');
   // JetStream stream sequence → the generic `seq` envelope.
-  const seq: { seq?: number } =
-    typeof data.streamSeq === 'number' ? { seq: data.streamSeq } : {}
+  const seq: { seq?: number } = typeof data.streamSeq === 'number' ? { seq: data.streamSeq } : {};
 
   switch (type) {
     case MESSAGE_TYPE.MESSAGE_START:
-      return { type: 'turn-start', ...seq }
+      return { type: 'turn-start', ...seq };
 
     case MESSAGE_TYPE.MESSAGE_END:
-      return { type: 'turn-end', ...seq }
+      return { type: 'turn-end', ...seq };
 
     case MESSAGE_TYPE.AI_METADATA: {
-      const providerName = data.providerName || data.provider
+      const providerName = data.providerName || data.provider;
       if (typeof data.modelName === 'string' && typeof providerName === 'string') {
         return {
           type: 'metadata',
-          modelLabel: data.modelDisplayName,
+          modelLabel: str(data.modelDisplayName),
           modelName: data.modelName,
           provider: providerName,
-          contextWindowMaxTokens:
-            typeof data.contextWindow === 'number' ? data.contextWindow : 0,
+          contextWindowMaxTokens: typeof data.contextWindow === 'number' ? data.contextWindow : 0,
           ...seq,
-        }
+        };
       }
-      return null
+      return null;
     }
 
     case MESSAGE_TYPE.TEXT:
       if (typeof data.text === 'string') {
-        return { type: 'text-delta', text: data.text, ...seq }
+        return { type: 'text-delta', text: data.text, ...seq };
       }
-      return null
+      return null;
 
     case MESSAGE_TYPE.THINKING:
       if (typeof data.text === 'string') {
-        return { type: 'thinking-delta', text: data.text, ...seq }
+        return { type: 'thinking-delta', text: data.text, ...seq };
       }
-      return null
+      return null;
 
     // Two shapes share this chunk type. `text` is the answer body the agent
     // streams (and persists). `payload` is a Product Guide frame re-streamed
@@ -216,13 +225,13 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
     // narrowing `guideFrameEvent` documents.
     case MESSAGE_TYPE.GUIDE: {
       if (typeof data.text === 'string') {
-        return { type: 'guide-delta', text: data.text, ...seq }
+        return { type: 'guide-delta', text: data.text, ...seq };
       }
-      const frame = data.payload
-      if (!frame || typeof frame !== 'object' || Array.isArray(frame)) return null
-      const event = guideFrameEvent(frame as Record<string, unknown>)
-      if (!event) return null
-      return { ...event, ...seq }
+      const frame = data.payload;
+      if (!frame || typeof frame !== 'object' || Array.isArray(frame)) return null;
+      const event = guideFrameEvent(frame as Record<string, unknown>);
+      if (!event) return null;
+      return { ...event, ...seq };
     }
 
     // An ask card is only an ask card with something to pick: a question and at
@@ -230,16 +239,16 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
     // empty card the user can't answer — the backend already falls back to a
     // complete hardcoded card when the model returns a partial one.
     case MESSAGE_TYPE.ASK: {
-      const question = typeof data.question === 'string' ? data.question.trim() : ''
-      const options = normalizeAskOptions(data.options)
-      if (!question || options.length === 0) return null
+      const question = typeof data.question === 'string' ? data.question.trim() : '';
+      const options = normalizeAskOptions(data.options);
+      if (!question || options.length === 0) return null;
       return {
         type: 'ask',
         ...(typeof data.text === 'string' && data.text ? { text: data.text } : {}),
         question,
         options,
         ...seq,
-      }
+      };
     }
 
     case MESSAGE_TYPE.EXECUTING_TOOL:
@@ -247,8 +256,8 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         type: 'tool-execution',
         data: {
           type: 'EXECUTING_TOOL',
-          integratedToolType: data.integratedToolType || '',
-          toolFunction: data.toolFunction || '',
+          integratedToolType: strOr(data.integratedToolType),
+          toolFunction: strOr(data.toolFunction),
           toolTitle: typeof data.title === 'string' ? data.title : undefined,
           // The human-readable "why this tool is running" line rendered inside
           // the tool card. It rides ONLY the EXECUTING chunk — the EXECUTED one
@@ -256,51 +265,47 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
           // the EXECUTING segment held. Dropping it here therefore blanks the
           // card for the whole lifetime of the run.
           toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
-          parameters: data.parameters,
+          parameters: isRecord(data.parameters) ? data.parameters : undefined,
           toolExecutionRequestId:
-            typeof data.toolExecutionRequestId === 'string'
-              ? data.toolExecutionRequestId
-              : undefined,
+            typeof data.toolExecutionRequestId === 'string' ? data.toolExecutionRequestId : undefined,
         },
         ...seq,
-      }
+      };
 
     case MESSAGE_TYPE.EXECUTED_TOOL:
       return {
         type: 'tool-execution',
         data: {
           type: 'EXECUTED_TOOL',
-          integratedToolType: data.integratedToolType || '',
-          toolFunction: data.toolFunction || '',
+          integratedToolType: strOr(data.integratedToolType),
+          toolFunction: strOr(data.toolFunction),
           toolTitle: typeof data.title === 'string' ? data.title : undefined,
-          parameters: data.parameters,
-          result: data.result,
-          success: data.success,
+          parameters: isRecord(data.parameters) ? data.parameters : undefined,
+          result: str(data.result),
+          success: typeof data.success === 'boolean' ? data.success : undefined,
           toolExecutionRequestId:
-            typeof data.toolExecutionRequestId === 'string'
-              ? data.toolExecutionRequestId
-              : undefined,
+            typeof data.toolExecutionRequestId === 'string' ? data.toolExecutionRequestId : undefined,
         },
         ...seq,
-      }
+      };
 
     case MESSAGE_TYPE.APPROVAL_REQUEST: {
-      const requestId = data.approvalRequestId || data.approval_request_id || ''
-      const approvalType = data.approvalType || 'USER'
-      const toolCalls = normalizeToolCalls(data.toolCalls)
+      const requestId = strOr(data.approvalRequestId) || strOr(data.approval_request_id);
+      const approvalType = strOr(data.approvalType, 'USER');
+      const toolCalls = normalizeToolCalls(data.toolCalls);
 
       if (toolCalls.length > 0) {
-        return { type: 'approval-request', requestId, approvalType, toolCalls, ...seq }
+        return { type: 'approval-request', requestId, approvalType, toolCalls, ...seq };
       }
 
       return {
         type: 'approval-request',
         requestId,
         approvalType,
-        command: data.command || '',
-        explanation: data.explanation,
+        command: strOr(data.command),
+        explanation: str(data.explanation),
         ...seq,
-      }
+      };
     }
 
     case MESSAGE_TYPE.APPROVAL_RESULT: {
@@ -313,20 +318,20 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
           ? data.resolvedByName
           : typeof data.displayName === 'string'
             ? data.displayName
-            : undefined
+            : undefined;
       return {
         type: 'approval-resolved',
-        requestId: data.approvalRequestId || data.approval_request_id || '',
+        requestId: strOr(data.approvalRequestId) || strOr(data.approval_request_id),
         status: data.approved === true ? 'approved' : 'rejected',
-        approvalType: data.approvalType || 'CLIENT',
+        approvalType: strOr(data.approvalType, 'CLIENT'),
         resolvedByName,
         ...seq,
-      }
+      };
     }
 
     case MESSAGE_TYPE.ESCALATION_OFFER: {
-      const offerId = typeof data.offerId === 'string' ? data.offerId : ''
-      if (!offerId) return null
+      const offerId = typeof data.offerId === 'string' ? data.offerId : '';
+      if (!offerId) return null;
       if (data.state === ESCALATION_STATE.PENDING) {
         return {
           type: 'escalation-offer',
@@ -334,10 +339,10 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
           text: typeof data.text === 'string' ? data.text : '',
           origin: typeof data.origin === 'string' ? data.origin : undefined,
           ...seq,
-        }
+        };
       }
-      const status = escalationResolvedStatus(data.state)
-      if (!status) return null
+      const status = escalationResolvedStatus(data.state);
+      if (!status) return null;
       // Same realtime/history field split as APPROVAL_RESULT: the chunk names
       // the resolver `displayName`, the persisted row `resolvedByName`.
       return {
@@ -351,15 +356,15 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
               ? data.displayName
               : undefined,
         ...seq,
-      }
+      };
     }
 
     case MESSAGE_TYPE.TICKET_ESCALATED: {
-      const ticketId = typeof data.ticketId === 'string' ? data.ticketId : ''
-      const reason = typeof data.reason === 'string' ? data.reason : ''
+      const ticketId = typeof data.ticketId === 'string' ? data.ticketId : '';
+      const reason = typeof data.reason === 'string' ? data.reason : '';
       // Both are non-null on the wire; a payload missing either is malformed
       // rather than a variant to render.
-      if (!ticketId || !reason) return null
+      if (!ticketId || !reason) return null;
       return {
         type: 'ticket-escalated',
         ticketId,
@@ -367,47 +372,40 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         ticketNumber: typeof data.ticketNumber === 'number' ? data.ticketNumber : undefined,
         text: typeof data.text === 'string' ? data.text : undefined,
         ...seq,
-      }
+      };
     }
 
     case MESSAGE_TYPE.TICKET_EVENT: {
       // `kind` is the only required field, and deliberately an OPEN string:
       // unknown kinds must render (as a neutral line), not be dropped.
-      const kind = typeof data.kind === 'string' ? data.kind.trim() : ''
-      if (!kind) return null
+      const kind = typeof data.kind === 'string' ? data.kind.trim() : '';
+      if (!kind) return null;
       // This chunk names its own JetStream sequence `sequenceId` in the
       // payload (the persisted row's `lastChunkStreamSeq` equals it — the
       // dedupe key). Prefer the transport-stamped `streamSeq` envelope like
       // every other chunk; fall back to the payload copy when absent.
       const eventSeq: { seq?: number } =
-        seq.seq !== undefined
-          ? seq
-          : typeof data.sequenceId === 'number'
-            ? { seq: data.sequenceId }
-            : {}
+        seq.seq !== undefined ? seq : typeof data.sequenceId === 'number' ? { seq: data.sequenceId } : {};
       return {
         type: 'ticket-event',
         kind,
         actorId: typeof data.actorId === 'string' ? data.actorId : undefined,
         actorName: typeof data.actorName === 'string' ? data.actorName : undefined,
         actorType: typeof data.actorType === 'string' ? data.actorType : undefined,
-        reason:
-          typeof data.reason === 'string' && data.reason.trim() ? data.reason : undefined,
+        reason: typeof data.reason === 'string' && data.reason.trim() ? data.reason : undefined,
         targetStatusKind:
-          typeof data.targetStatusKind === 'string' && data.targetStatusKind.trim()
-            ? data.targetStatusKind
-            : undefined,
+          typeof data.targetStatusKind === 'string' && data.targetStatusKind.trim() ? data.targetStatusKind : undefined,
         ...eventSeq,
-      }
+      };
     }
 
     case MESSAGE_TYPE.ERROR:
       return {
         type: 'error',
-        title: data.error || 'An error occurred',
-        details: data.details,
+        title: strOr(data.error, 'An error occurred'),
+        details: str(data.details),
         ...seq,
-      }
+      };
 
     case MESSAGE_TYPE.MESSAGE_REQUEST:
       return {
@@ -421,28 +419,28 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         // the history path in `process-historical-messages.ts`).
         contextItems: Array.isArray(data.contextItems)
           ? (data.contextItems as Array<{ type?: unknown; id?: unknown }>)
-              .filter((it) => typeof it?.type === 'string' && typeof it?.id === 'string')
-              .map((it) => ({
+              .filter(it => typeof it?.type === 'string' && typeof it?.id === 'string')
+              .map(it => ({
                 type: it.type as string,
                 id: it.id as string,
                 label: it.id as string,
               }))
           : undefined,
         ...seq,
-      }
+      };
 
     case MESSAGE_TYPE.TOKEN_USAGE:
       return {
         type: 'token-usage',
-        inputTokensSize: data.inputTokensSize ?? 0,
-        outputTokensSize: data.outputTokensSize ?? 0,
-        totalTokensSize: data.totalTokensSize ?? 0,
-        contextSize: data.contextSize ?? 0,
+        inputTokensSize: numOr(data.inputTokensSize),
+        outputTokensSize: numOr(data.outputTokensSize),
+        totalTokensSize: numOr(data.totalTokensSize),
+        contextSize: numOr(data.contextSize),
         ...seq,
-      }
+      };
 
     case MESSAGE_TYPE.CONTEXT_COMPACTION_START:
-      return { type: 'compaction', phase: 'start', ...seq }
+      return { type: 'compaction', phase: 'start', ...seq };
 
     case MESSAGE_TYPE.CONTEXT_COMPACTION_END:
       return {
@@ -450,13 +448,13 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         phase: 'end',
         summary: typeof data.text === 'string' ? data.text : undefined,
         ...seq,
-      }
+      };
 
     case MESSAGE_TYPE.SYSTEM:
       if (typeof data.text === 'string') {
-        return { type: 'participant', kind: 'system', text: data.text, ...seq }
+        return { type: 'participant', kind: 'system', text: data.text, ...seq };
       }
-      return null
+      return null;
 
     case MESSAGE_TYPE.DIRECT_MESSAGE:
       if (typeof data.text === 'string') {
@@ -465,18 +463,17 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
           kind: 'direct-message',
           text: data.text,
           ownerType: typeof data.ownerType === 'string' ? data.ownerType : undefined,
-          displayName:
-            typeof data.displayName === 'string' ? data.displayName : undefined,
+          displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
           userId: typeof data.userId === 'string' ? data.userId : undefined,
           ...seq,
-        }
+        };
       }
-      return null
+      return null;
 
     case MESSAGE_TYPE.DIALOG_CLOSED:
-      return { type: 'dialog-closed', ...seq }
+      return { type: 'dialog-closed', ...seq };
 
     default:
-      return null
+      return null;
   }
 }

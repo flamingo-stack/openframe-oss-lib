@@ -27,25 +27,25 @@
  * Slug SHAPE guard (any number of `/`-separated kebab segments) — used only
  * to validate path-deep-link input before lookups. Carries NO semantics.
  */
-export const SCHEDULING_SLUG_SHAPE = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/
+export const SCHEDULING_SLUG_SHAPE = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/;
 
 /** Upper bound for availability month paging (widget nav, route 400, DAL clamp). */
-export const MAX_MONTH_OFFSET = 11
+export const MAX_MONTH_OFFSET = 11;
 
 /** Full-slug shape validity (path-resolution safety only — never semantics). */
 export function isValidSchedulingSlug(slug: string): boolean {
-  return SCHEDULING_SLUG_SHAPE.test(slug.trim().toLowerCase())
+  return SCHEDULING_SLUG_SHAPE.test(slug.trim().toLowerCase());
 }
 
 export interface ParsedSchedulingLinkName {
-  title: string
-  description: string | null
+  title: string;
+  description: string | null;
   /**
    * The third `|` segment: the intended-audience entity ("Prospect
    * Investors", "OpenFrame Users"). Non-null ⇒ the link is LISTED; it is
    * both the display label and (slugified) the grouping key.
    */
-  audienceLabel: string | null
+  audienceLabel: string | null;
 }
 
 /**
@@ -54,21 +54,21 @@ export interface ParsedSchedulingLinkName {
  * the title. Empty segments normalize to null.
  */
 export function parseSchedulingLinkName(name: string): ParsedSchedulingLinkName {
-  const parts = name.split('|')
-  if (parts.length === 1) return { title: name.trim(), description: null, audienceLabel: null }
-  const title = (parts[0] ?? '').trim()
-  const description = (parts[1] ?? '').trim()
-  const audienceLabel = parts.length > 2 ? parts.slice(2).join('|').trim() : ''
+  const parts = name.split('|');
+  if (parts.length === 1) return { title: name.trim(), description: null, audienceLabel: null };
+  const title = (parts[0] ?? '').trim();
+  const description = (parts[1] ?? '').trim();
+  const audienceLabel = parts.length > 2 ? parts.slice(2).join('|').trim() : '';
   return {
     title: title || name.trim(),
     description: description || null,
     audienceLabel: audienceLabel || null,
-  }
+  };
 }
 
 /** Whether a link name opts into the directory (has an Audience segment). */
 export function isListedSchedulingName(name: string): boolean {
-  return parseSchedulingLinkName(name).audienceLabel !== null
+  return parseSchedulingLinkName(name).audienceLabel !== null;
 }
 
 /**
@@ -81,6 +81,6 @@ export function schedulingAudienceKey(label: string): string | null {
   const key = label
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  return key || null
+    .replace(/^-+|-+$/g, '');
+  return key || null;
 }

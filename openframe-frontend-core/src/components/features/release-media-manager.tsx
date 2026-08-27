@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
-import { useState, useRef } from 'react';
-import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '../ui';
 import { Trash2, Plus, Image as ImageIcon, Video as VideoIcon, Upload, Loader2, GripVertical } from 'lucide-react';
+import { useState, useRef } from 'react';
+import type { ChangeEvent, DragEvent } from 'react';
 import Image from '../../embed-shims/next-image';
+import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
 import { Video } from './video';
 
 export interface ReleaseMediaItem {
@@ -23,16 +24,11 @@ interface ReleaseMediaManagerProps {
   className?: string;
 }
 
-export function ReleaseMediaManager({
-  media,
-  onChange,
-  onUpload,
-  className = ''
-}: ReleaseMediaManagerProps) {
+export function ReleaseMediaManager({ media, onChange, onUpload, className = '' }: ReleaseMediaManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -53,7 +49,7 @@ export function ReleaseMediaManager({
       media_url: '',
       title: file.name,
       _file: file,
-      _uploading: true
+      _uploading: true,
     };
 
     onChange([...media, newMedia]);
@@ -66,7 +62,7 @@ export function ReleaseMediaManager({
       // Update with uploaded URL
       const updated = [...media, { ...newMedia, media_url: url, _file: undefined, _uploading: false }];
       onChange(updated);
-    } catch (error) {
+    } catch {
       // Remove failed upload
       onChange(media);
     } finally {
@@ -87,17 +83,19 @@ export function ReleaseMediaManager({
     onChange(updated);
   };
 
-  const handleDragStart = (index: number) => (e: React.DragEvent) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', index.toString());
+  const handleDragStart = (index: number) => (e: DragEvent) => {
+    const transfer = e.dataTransfer;
+    transfer.effectAllowed = 'move';
+    transfer.setData('text/plain', index.toString());
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    const transfer = e.dataTransfer;
+    transfer.dropEffect = 'move';
   };
 
-  const handleDrop = (targetIndex: number) => (e: React.DragEvent) => {
+  const handleDrop = (targetIndex: number) => (e: DragEvent) => {
     e.preventDefault();
     const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'));
 
@@ -114,18 +112,18 @@ export function ReleaseMediaManager({
     switch (type) {
       case 'video':
       case 'demo':
-        return <VideoIcon className="w-5 h-5 text-ods-text-secondary" />;
+        return <VideoIcon className="h-5 w-5 text-ods-text-secondary" />;
       default:
-        return <ImageIcon className="w-5 h-5 text-ods-text-secondary" />;
+        return <ImageIcon className="h-5 w-5 text-ods-text-secondary" />;
     }
   };
 
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Upload Section */}
-      <div className="border-2 border-dashed border-ods-border rounded-lg p-6 text-center hover:border-ods-accent/50 transition-colors">
+      <div className="rounded-lg border-2 border-dashed border-ods-border p-6 text-center transition-colors hover:border-ods-accent/50">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-ods-card flex items-center justify-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-ods-card">
             {uploadingIndex !== null ? (
               <Loader2 className="h-6 w-6 animate-spin text-ods-accent" />
             ) : (
@@ -133,15 +131,11 @@ export function ReleaseMediaManager({
             )}
           </div>
           <div>
-            <h3 className="text-h3 text-ods-text-primary mb-1">
+            <h3 className="mb-1 text-ods-text-primary text-h3">
               {uploadingIndex !== null ? 'Uploading...' : 'Upload Media'}
             </h3>
-            <p className="text-h6 text-ods-text-secondary">
-              Drag and drop or click to select images and videos
-            </p>
-            <p className="text-h6 text-ods-text-secondary mt-1">
-              Maximum file size: 50MB
-            </p>
+            <p className="text-ods-text-secondary text-h6">Drag and drop or click to select images and videos</p>
+            <p className="mt-1 text-ods-text-secondary text-h6">Maximum file size: 50MB</p>
           </div>
           <Button
             type="button"
@@ -149,7 +143,7 @@ export function ReleaseMediaManager({
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadingIndex !== null}
             leftIcon={<Plus className="h-4 w-4" />}
-            className="text-h6 font-bold"
+            className="font-bold text-h6"
           >
             {uploadingIndex !== null ? 'Uploading...' : 'Select Files'}
           </Button>
@@ -168,12 +162,12 @@ export function ReleaseMediaManager({
       {/* Media Grid */}
       {media.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <Label>Media Gallery ({media.length})</Label>
-            <p className="text-h6 text-ods-text-secondary">Drag to reorder</p>
+            <p className="text-ods-text-secondary text-h6">Drag to reorder</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {media.map((item, index) => (
               <div
                 key={index}
@@ -181,22 +175,22 @@ export function ReleaseMediaManager({
                 onDragStart={handleDragStart(index)}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop(index)}
-                className="relative group border border-ods-border rounded-lg overflow-hidden hover:border-ods-accent/30 transition-colors bg-ods-bg-surface"
+                className="group relative overflow-hidden rounded-lg border border-ods-border bg-ods-bg-surface transition-colors hover:border-ods-accent/30"
               >
                 {/* Drag Handle */}
-                <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10">
+                <div className="absolute left-2 top-2 z-10 cursor-move opacity-0 transition-opacity group-hover:opacity-100">
                   <GripVertical className="h-4 w-4 text-ods-text-on-dark drop-shadow" />
                 </div>
 
                 {/* Delete Button */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <div className="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover:opacity-100">
                   <Button
                     type="button"
                     variant="outline"
                     size="small-legacy"
                     onClick={() => removeMedia(index)}
                     disabled={item._uploading}
-                    className="h-8 w-8 p-0 bg-ods-error hover:bg-ods-error-hover border-ods-error"
+                    className="h-8 w-8 border-ods-error bg-ods-error p-0 hover:bg-ods-error-hover"
                   >
                     <Trash2 className="h-4 w-4 text-ods-text-on-dark" />
                   </Button>
@@ -204,11 +198,11 @@ export function ReleaseMediaManager({
 
                 {/* Media Preview */}
                 {item.media_url && (
-                  <div className="aspect-video relative bg-ods-bg">
+                  <div className="relative aspect-video bg-ods-bg">
                     {item.media_type === 'video' || item.media_type === 'demo' ? (
                       // <Video> SSOT (MuxPlayer) — plays Mux HLS + MP4 alike;
                       // fit="cover" crops to the aspect-video cell.
-                      <Video kind="file" url={item.media_url} fit="cover" className="w-full h-full" />
+                      <Video kind="file" url={item.media_url} fit="cover" className="h-full w-full" />
                     ) : (
                       <Image
                         src={item.media_url}
@@ -222,24 +216,24 @@ export function ReleaseMediaManager({
                 )}
 
                 {item._uploading && (
-                  <div className="aspect-video bg-ods-bg flex items-center justify-center">
+                  <div className="flex aspect-video items-center justify-center bg-ods-bg">
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 className="h-8 w-8 animate-spin text-ods-accent" />
-                      <span className="text-h6 text-ods-text-secondary">Uploading...</span>
+                      <span className="text-ods-text-secondary text-h6">Uploading...</span>
                     </div>
                   </div>
                 )}
 
                 {/* Media Info */}
-                <div className="p-3 space-y-2">
+                <div className="space-y-2 p-3">
                   <div className="flex items-center gap-2">
                     {getIcon(item.media_type)}
                     <Select
                       value={item.media_type}
-                      onValueChange={(value: any) => updateMedia(index, 'media_type', value)}
+                      onValueChange={(value: string) => updateMedia(index, 'media_type', value)}
                       disabled={item._uploading}
                     >
-                      <SelectTrigger className="bg-ods-bg h-8 text-h6">
+                      <SelectTrigger className="h-8 bg-ods-bg text-h6">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-ods-card">
@@ -254,9 +248,9 @@ export function ReleaseMediaManager({
                   <Input
                     placeholder="Title (optional)"
                     value={item.title}
-                    onChange={(e) => updateMedia(index, 'title', e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                    className="bg-ods-bg h-8 text-h6"
+                    onChange={e => updateMedia(index, 'title', e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
+                    className="h-8 bg-ods-bg text-h6"
                     disabled={item._uploading}
                   />
                 </div>
@@ -267,14 +261,10 @@ export function ReleaseMediaManager({
       )}
 
       {media.length === 0 && (
-        <div className="text-center py-8 px-4 bg-ods-bg-surface border border-ods-border rounded-lg">
-          <ImageIcon className="h-12 w-12 text-ods-text-secondary mx-auto mb-4" />
-          <h3 className="text-h3 text-ods-text-primary mb-2">
-            No media uploaded yet
-          </h3>
-          <p className="text-h6 text-ods-text-secondary">
-            Upload your first image or video to get started
-          </p>
+        <div className="rounded-lg border border-ods-border bg-ods-bg-surface px-4 py-8 text-center">
+          <ImageIcon className="mx-auto mb-4 h-12 w-12 text-ods-text-secondary" />
+          <h3 className="mb-2 text-ods-text-primary text-h3">No media uploaded yet</h3>
+          <p className="text-ods-text-secondary text-h6">Upload your first image or video to get started</p>
         </div>
       )}
     </div>

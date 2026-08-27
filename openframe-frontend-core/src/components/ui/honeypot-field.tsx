@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { forwardRef } from 'react'
+import { forwardRef } from 'react';
 
 /**
  * HoneypotField — an invisible decoy input for bot detection. Real users never
@@ -16,15 +16,11 @@ import { forwardRef } from 'react'
  * forwardRef so `<HoneypotField {...honeypotInputProps} />` (which carries the
  * ref from useHumanitySignals) works on both React 18 and 19.
  */
-export const HoneypotField = forwardRef<HTMLInputElement, { name: string }>(
-  function HoneypotField({ name }, ref) {
-    return (
-      <div
-        aria-hidden="true"
-        className="absolute w-px h-px p-0 -m-px overflow-hidden pointer-events-none opacity-0"
-      >
-        <input ref={ref} type="text" name={name} tabIndex={-1} autoComplete="off" />
-      </div>
-    )
-  },
-)
+export const HoneypotField = forwardRef<HTMLInputElement, { name: string }>(function HoneypotFieldImpl({ name }, ref) {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute -m-px h-px w-px overflow-hidden p-0 opacity-0">
+      <input ref={ref} type="text" name={name} tabIndex={-1} autoComplete="off" />
+    </div>
+  );
+});
+HoneypotField.displayName = 'HoneypotField';

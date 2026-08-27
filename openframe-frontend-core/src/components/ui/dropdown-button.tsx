@@ -1,49 +1,45 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { Chevron02DownIcon } from '../icons-v2-generated'
-import { Button, type ButtonProps } from './button'
-import {
-  ActionsMenuDropdown,
-  type ActionsMenuGroup,
-  type ActionsMenuItem
-} from './actions-menu'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { Chevron02DownIcon } from '../icons-v2-generated';
+import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu';
+import { Button, type ButtonProps } from './button';
 
 export interface DropdownButtonProps {
   /** Button label rendered next to the chevron. */
-  label: React.ReactNode
+  label: React.ReactNode;
   /** Optional leading icon rendered before the label. */
-  icon?: React.ReactNode
+  icon?: React.ReactNode;
   /**
    * Items shown in the dropdown (single flat group). For grouped menus with
    * separators pass `groups` instead — exactly one of the two is required.
    */
-  items?: ActionsMenuItem[]
+  items?: ActionsMenuItem[];
   /** Grouped items (with optional separators). Takes precedence over `items`. */
-  groups?: ActionsMenuGroup[]
+  groups?: ActionsMenuGroup[];
   /**
    * Render the trigger as a standard `Button` of this variant (`outline`,
    * `accent`, …) instead of the default card-colored seam trigger. Use this
    * when the dropdown sits in a row of ordinary buttons and must match them.
    */
-  variant?: ButtonProps['variant']
+  variant?: ButtonProps['variant'];
   /** Button size for the `variant` trigger. Ignored without `variant`. */
-  size?: ButtonProps['size']
+  size?: ButtonProps['size'];
   /** Spinner state for the trigger (either look). */
-  loading?: boolean
-  disabled?: boolean
-  className?: string
-  ariaLabel?: string
-  align?: 'start' | 'center' | 'end'
-  side?: 'top' | 'right' | 'bottom' | 'left'
+  loading?: boolean;
+  disabled?: boolean;
+  className?: string;
+  ariaLabel?: string;
+  align?: 'start' | 'center' | 'end';
+  side?: 'top' | 'right' | 'bottom' | 'left';
   /**
    * Forwarded to the dropdown content. The standard Radix dropdown→dialog
    * recipe: pass `(e) => e.preventDefault()` when a menu item opens a modal,
    * otherwise closing the menu refocuses its trigger AFTER the dialog has
    * taken focus, yanking focus back OUT of the modal the action just opened.
    */
-  onCloseAutoFocus?: (event: Event) => void
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 /**
@@ -77,27 +73,30 @@ export function DropdownButton({
   ariaLabel,
   align = 'end',
   side = 'bottom',
-  onCloseAutoFocus
+  onCloseAutoFocus,
 }: DropdownButtonProps) {
-  const [open, setOpen] = React.useState(false)
+  const [open, setOpen] = React.useState(false);
 
   // If the trigger becomes disabled/loading WHILE the menu is open, close it —
   // and only ever block OPEN transitions below, so Escape/outside-click can
   // still dismiss an already-open menu.
-  React.useEffect(() => {
-    if (disabled || loading) setOpen(false)
-  }, [disabled, loading])
+  //
+  // Closed while rendering, not from an effect: the disabling render would
+  // otherwise commit with the menu still hanging off a control the user can no
+  // longer interact with, and only take it away on the pass after. Guarded on
+  // `open`, so the second render pass this triggers takes the early exit —
+  // and unlike a mask, an unrelated later re-enable cannot pop the menu back up.
+  if (open && (disabled || loading)) setOpen(false);
 
   const handleOpenChange = React.useCallback(
     (next: boolean) => {
-      if (next && (disabled || loading)) return
-      setOpen(next)
+      if (next && (disabled || loading)) return;
+      setOpen(next);
     },
-    [disabled, loading]
-  )
+    [disabled, loading],
+  );
 
-  const resolvedAriaLabel =
-    ariaLabel || (typeof label === 'string' ? label : undefined)
+  const resolvedAriaLabel = ariaLabel || (typeof label === 'string' ? label : undefined);
 
   const trigger = variant ? (
     <Button
@@ -108,9 +107,7 @@ export function DropdownButton({
       aria-label={resolvedAriaLabel}
       leftIcon={icon}
       rightIcon={
-        <Chevron02DownIcon
-          className={cn('h-4 w-4 transition-transform duration-fast', open && 'rotate-180')}
-        />
+        <Chevron02DownIcon className={cn('h-4 w-4 transition-transform duration-fast', open && 'rotate-180')} />
       }
       className={className}
     >
@@ -127,16 +124,12 @@ export function DropdownButton({
       loading={loading}
       aria-label={resolvedAriaLabel}
       leftIcon={icon}
-      splitIcon={
-        <Chevron02DownIcon
-          className={cn('transition-transform duration-fast', open && 'rotate-180')}
-        />
-      }
+      splitIcon={<Chevron02DownIcon className={cn('transition-transform duration-fast', open && 'rotate-180')} />}
       className={cn(open && 'bg-ods-bg-hover', className)}
     >
       {label}
     </Button>
-  )
+  );
 
   return (
     <ActionsMenuDropdown
@@ -149,5 +142,5 @@ export function DropdownButton({
       triggerAriaLabel={resolvedAriaLabel}
       customTrigger={trigger}
     />
-  )
+  );
 }

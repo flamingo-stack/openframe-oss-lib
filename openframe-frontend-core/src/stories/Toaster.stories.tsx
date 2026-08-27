@@ -83,11 +83,7 @@ export const AllVariants: Story = {
         title="Update available"
         description="A new version of the agent is ready to install on 3 devices."
       />
-      <ToastCard
-        id="v-title-only"
-        variant="default"
-        title="Title only — no description"
-      />
+      <ToastCard id="v-title-only" variant="default" title="Title only — no description" />
       <ToastCard
         id="v-description-only"
         variant="info"
@@ -115,7 +111,7 @@ export const AllVariants: Story = {
  * Interactive playground — tweak args to change the preview card.
  */
 export const Playground: Story = {
-  render: (args) => <ToastCard {...args} />,
+  render: args => <ToastCard {...args} />,
 };
 
 /**
@@ -176,7 +172,7 @@ export const CommandApprovalPerTool: Story = {
 
     return (
       <div className="flex flex-col gap-3">
-        {tools.map((t) => (
+        {tools.map(t => (
           <CommandApprovalToast
             key={t.toolType}
             id={`cmd-${t.toolType}`}
@@ -281,8 +277,7 @@ export const LiveTriggers: Story = {
             toast({
               variant: 'warning',
               title: 'Device Package limit',
-              description:
-                'Extra devices will be billed at pay-as-you-go rates, charged separately from your plan.',
+              description: 'Extra devices will be billed at pay-as-you-go rates, charged separately from your plan.',
             })
           }
         >
@@ -315,10 +310,7 @@ export const LiveTriggers: Story = {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button
-          variant="outline"
-          onClick={() => showToast({ title: 'Title only — no description' })}
-        >
+        <Button variant="outline" onClick={() => showToast({ title: 'Title only — no description' })}>
           Title only
         </Button>
         <Button

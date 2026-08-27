@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Click router for chat-rendered nav links — chip block, `<ChatCardNavWrap>`,
@@ -13,13 +13,13 @@
  * window.location) lives ONCE in `executeNavigation` now.
  */
 
-import { executeNavigation, type NavClickEvent } from './execute-navigation'
-import type { ChatRuntime } from '../../../contexts/chat-runtime-context'
+import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
+import { executeNavigation, type NavClickEvent } from './execute-navigation';
 
 export interface ChatNavClickInput {
-  href: string
-  path?: string | null
-  targetPlatform?: string | null
+  href: string;
+  path?: string | null;
+  targetPlatform?: string | null;
 }
 
 export function handleChatNavClick(
@@ -30,5 +30,5 @@ export function handleChatNavClick(
    *  wire `navigation.navigate` (pass `useRouter().push`). */
   fallbackNavigate?: (path: string) => void,
 ): boolean {
-  return executeNavigation({ event: e, runtime, href, path, targetPlatform, fallbackNavigate })
+  return executeNavigation({ event: e, runtime, href, path, targetPlatform, fallbackNavigate });
 }
