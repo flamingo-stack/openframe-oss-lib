@@ -154,23 +154,19 @@ public class NotificationReadStateService {
         List<EntityCount> rows = repository.unreadCountsByEntity(recipientId, recipientType, entityType, tenantId);
         Map<String, Long> counts = new HashMap<>(rows.size());
         for (EntityCount row : rows) {
-            String entityId = row.getEntityId();
+            String entityId = row.entityId();
             if (entityId != null) {
-                counts.put(entityId, row.getCount());
+                counts.put(entityId, row.count());
             }
         }
         return counts;
     }
 
-    // UNREAD only: READ must stay put so reopening the entity flips nothing and fires no event, and
-    // DELETED must stay put so a card the recipient discarded cannot come back.
     public long markEntityAsRead(@NotBlank String recipientId,
                                  @NotNull RecipientType recipientType,
                                  @NotNull NotificationEntityType entityType,
                                  @NotBlank String entityId) {
         String tenantId = tenantIdProvider.getTenantId();
-        // Snapshot before the flip, same caveat as markAllAsRead: under concurrency the ids drift
-        // either way, so listeners have to be idempotent.
         List<NotificationReadState> unreadRows = repository.findByRecipientIdAndRecipientTypeAndEntity(
                 recipientId, recipientType, entityType, entityId, ReadStatus.UNREAD, tenantId);
         List<String> unreadIds = notificationIds(unreadRows);

@@ -26,9 +26,7 @@ import java.time.Instant;
         @CompoundIndex(
                 name = "recipient_category_status",
                 def = "{'recipientId': 1, 'recipientType': 1, 'category': 1, 'status': 1}"),
-        // Equality fields first, entityId last as the grouping key, so the unread-per-entity
-        // aggregation is answered from the index alone. A new name, never an edit of the one above:
-        // changing a live @CompoundIndex def fails startup with IndexOptionsConflict.
+        // Never edit a live index def in place — startup dies with IndexOptionsConflict.
         @CompoundIndex(
                 name = "tenant_recipient_entity_status",
                 def = "{'tenantId': 1, 'recipientId': 1, 'recipientType': 1, 'entityType': 1, 'status': 1, 'entityId': 1}")
@@ -52,8 +50,6 @@ public class NotificationReadState implements TenantScoped {
 
     private NotificationCategory category;
 
-    // Copied here for the same reason category is: unread is per recipient, so the grouping runs over
-    // these rows. Null on pre-existing rows and on notifications about no entity — both mean no badge.
     private NotificationEntityType entityType;
 
     private String entityId;

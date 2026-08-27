@@ -28,7 +28,6 @@ public final class NotificationCommand {
     private final NotificationType type;
     private final Map<String, String> attributes;
     private final String applePushCategory;
-    // Left null, category and settings group fall back to the context descriptor registry.
     private final NotificationCategory category;
     private final NotificationSettingGroup settingsGroup;
     private final NotificationEntityRef entity;

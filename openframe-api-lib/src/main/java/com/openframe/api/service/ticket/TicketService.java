@@ -565,8 +565,7 @@ public class TicketService {
         return ticketRepository.buildTicketQuery(queryFilter, search, restrictToTicketIds, ownerMachineId);
     }
 
-    // Same recipient rule the notification resolvers use: an AGENT's rows are keyed by machine id, and
-    // reading it wrong hands a client app an empty board instead of its own tickets, silently.
+    // An AGENT's read-state rows are keyed by machine id, not user id.
     private List<String> unreadTicketIds(AuthPrincipal principal) {
         boolean agent = isAgent(principal);
         String recipientId = agent ? principal.getMachineId() : principal.getId();
@@ -574,11 +573,9 @@ public class TicketService {
         String tenantId = tenantIdProvider.getTenantId();
         List<EntityCount> rows = notificationReadStateRepository.unreadCountsByEntity(
                 recipientId, recipientType, NotificationEntityType.TICKET, tenantId);
-        return rows.stream().map(EntityCount::getEntityId).filter(Objects::nonNull).toList();
+        return rows.stream().map(EntityCount::entityId).filter(Objects::nonNull).toList();
     }
 
-    // An empty intersection must stay an empty list — null reads as "no restriction" downstream and
-    // would hand back the whole board.
     private List<String> intersect(List<String> left, List<String> right) {
         if (left == null) {
             return right;

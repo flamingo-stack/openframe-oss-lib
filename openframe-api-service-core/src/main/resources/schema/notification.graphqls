@@ -2,11 +2,7 @@ extend type Query {
     notifications(filter: NotificationFilterInput, search: String, first: Int, after: String, last: Int, before: String, sort: SortInput): NotificationConnection!
     hasUnreadNotifications: Boolean!
     unreadCountsByCategory: [UnreadCategoryCount!]!
-    """
-    Twin of unreadCountsByCategory, bucketed by the entity a notification is about rather than by the
-    sidebar section it belongs to. Entities with nothing unread are absent from the result: a missing
-    id means zero, not "not loaded".
-    """
+    "Entities with nothing unread are absent — a missing id means zero, not \"not loaded\"."
     unreadCountsByEntity(entityType: NotificationEntityType!): [UnreadEntityCount!]!
 }
 
@@ -15,12 +11,7 @@ extend type Mutation {
     markAllNotificationsAsRead: Int!
     deleteNotification(notificationId: ID!): Boolean!
     deleteAllReadNotifications: Int!
-    """
-    Clears the caller's unread notifications for one entity — what opening a ticket has to call, since
-    its cards were never clicked. Cards stay in the list as read, exactly as markNotificationAsRead
-    leaves them; only the counts drop. The returned number is diagnostic: it spans categories, so a
-    client must refetch the counts rather than subtract it.
-    """
+    "Cards stay in the list as read; only the counts drop. The returned number spans categories — refetch, do not subtract it."
     markNotificationsReadForEntity(entityType: NotificationEntityType!, entityId: ID!): Int!
 }
 

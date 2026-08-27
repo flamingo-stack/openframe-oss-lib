@@ -172,9 +172,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         return mongoTemplate.find(pageQuery, Ticket.class);
     }
 
-    // Under $and, not Query.addCriteria: the filter query can already hold a criterion under the very
-    // same key — '_id' when filtering by tag, '$or' when searching — and a second one per key throws
-    // InvalidMongoDbApiUsageException, which is no IllegalArgumentException and escapes every catch.
+    // Not addCriteria: a second criterion per key ('_id' from tags, '$or' from search) throws.
     private Query withCursorBound(Query base, Criteria cursorCriteria) {
         Document baseQuery = base.getQueryObject();
         Document merged = new Document(baseQuery);

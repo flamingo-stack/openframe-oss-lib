@@ -119,8 +119,6 @@ public class NotificationBroadcaster {
         return saved;
     }
 
-    // The spec decides; the descriptor registry is the fallback for legacy dispatchers that build a
-    // command by hand. A silent divergence between the two changes who receives what.
     private NotificationCategory categoryOf(NotificationCommand command) {
         NotificationCategory category = command.getCategory();
         return category != null ? category : descriptorRegistry.categoryOf(command.getContext());
