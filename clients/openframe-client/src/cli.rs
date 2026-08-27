@@ -82,31 +82,29 @@ pub fn run() -> Result<()> {
             let params = args.to_params();
             let parameterless = params.is_parameterless();
 
-            // Parameterless (package-manager) install skips the preinstall diagnostics:
-            // there are no tenant params to validate and no server to probe yet — those
-            // move to `auth`, along with the WebView2 heal. Only the admin guard remains
-            // (the install operations inherently need elevation).
-            let heal_candidates = if parameterless {
-                crate::platform::permissions::PermissionUtils::require_admin();
-                Vec::new()
+            // A parameterless (package-manager) install validates only what this step
+            // does — admin and the environment. Argument, network and WebView2 checks
+            // move to `auth`, where the tenant parameters finally exist.
+            let report = if parameterless {
+                crate::doctor::run_preinstall_parameterless()
             } else {
-                let report = rt.block_on(crate::doctor::run_preinstall(&params));
-                report.print();
-
-                if report.has_failures() {
-                    println!(
-                        "\n{} check(s) failed. Please fix the issues above and try again.",
-                        report.failure_count()
-                    );
-                    process::exit(1);
-                }
-
-                let warns = report.warn_count();
-                if warns > 0 {
-                    println!("\n{} warning(s). Installation will proceed, but the agent may have connectivity issues.", warns);
-                }
-                report.results
+                rt.block_on(crate::doctor::run_preinstall(&params))
             };
+            report.print();
+
+            if report.has_failures() {
+                println!(
+                    "\n{} check(s) failed. Please fix the issues above and try again.",
+                    report.failure_count()
+                );
+                process::exit(1);
+            }
+
+            let warns = report.warn_count();
+            if warns > 0 {
+                println!("\n{} warning(s). Installation will proceed, but the agent may have connectivity issues.", warns);
+            }
+            let heal_candidates = report.results;
 
             if let Err(e) = crate::logging::init_file_only(None, None) {
                 eprintln!("Failed to initialize logging: {}", e);
@@ -129,7 +127,9 @@ pub fn run() -> Result<()> {
                     Ok(_) => {
                         println!("OpenFrame agent installed successfully.");
                         if parameterless {
-                            println!("\nNot authenticated yet — get your auth command at https://{{your-tenant}}.openframe.ai/devices/new");
+                            println!("\nNot authenticated yet. Get your auth command from your OpenFrame dashboard → Devices → Add device.");
+                            #[cfg(target_os = "windows")]
+                            println!("Open a new terminal first so the 'openframe' command is on PATH.");
                             println!("Updates are managed by the OpenFrame platform.");
                         }
                         process::exit(0);
@@ -195,7 +195,10 @@ pub fn run() -> Result<()> {
 
             match config_service.build_and_save(params) {
                 Ok(()) => {
-                    println!("Authentication saved. The device will register within a minute.");
+                    // Restart so the new configuration is picked up now — and so a
+                    // re-auth on an already-running client takes effect at all.
+                    rt.block_on(Service::nudge_restart());
+                    println!("Authentication saved. The device will register shortly.");
                     process::exit(0);
                 }
                 Err(e) => {
@@ -252,6 +255,18 @@ pub fn run() -> Result<()> {
             init_logging();
             info!("Running in direct mode (without service wrapper)");
             PermissionUtils::warn_missing_capabilities();
+
+            // Direct mode is interactive, so it reports the missing configuration and
+            // exits instead of idling like the service does.
+            if !crate::services::InitialConfigurationService::new(
+                crate::platform::DirectoryManager::new(),
+            )
+            .map(|service| service.is_configured())
+            .unwrap_or(false)
+            {
+                println!("Not authenticated yet. Run 'openframe auth' with your tenant parameters first.");
+                process::exit(1);
+            }
 
             // Run directly without service wrapper
             match Client::new() {

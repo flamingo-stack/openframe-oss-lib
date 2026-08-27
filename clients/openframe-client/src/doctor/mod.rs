@@ -189,6 +189,54 @@ pub async fn run_preinstall(params: &InstallConfigParams) -> DoctorReport {
     }
 }
 
+/// Pre-install diagnostics for a parameterless (package-manager) install: only what
+/// this step is about to do. No argument or network checks — there are no tenant
+/// parameters yet — and no WebView2, which moves to `auth` along with them.
+pub fn run_preinstall_parameterless() -> DoctorReport {
+    let mut results = Vec::new();
+
+    results.push(check_admin_privileges());
+    if results.last().unwrap().status == CheckStatus::Fail {
+        return DoctorReport {
+            results,
+            title: "pre-install diagnostics",
+        };
+    }
+
+    let dir_manager = DirectoryManager::new();
+    let install_path = Service::get_install_location();
+    let bin_dir = install_path.parent().unwrap_or(&install_path);
+    results.push(check_dir_writable(bin_dir, &bin_dir.display().to_string()));
+    results.push(check_disk_space(dir_manager.app_support_dir(), 200));
+
+    for (path, label) in [
+        (
+            dir_manager.app_support_dir(),
+            dir_manager
+                .app_support_dir()
+                .to_str()
+                .unwrap_or("app support"),
+        ),
+        (
+            dir_manager.secured_dir(),
+            dir_manager.secured_dir().to_str().unwrap_or("secured"),
+        ),
+        (
+            dir_manager.logs_dir(),
+            dir_manager.logs_dir().to_str().unwrap_or("logs"),
+        ),
+    ] {
+        results.push(check_dir_writable(path, label));
+    }
+
+    results.push(check_service_config_writable());
+
+    DoctorReport {
+        results,
+        title: "pre-install diagnostics",
+    }
+}
+
 /// Pre-auth validation: the params and the network they point at, checked while
 /// the user is at the keyboard — nothing is written unless this passes.
 pub async fn run_auth(params: &InstallConfigParams) -> DoctorReport {

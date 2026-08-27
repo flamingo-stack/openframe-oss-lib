@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use tokio::runtime::Runtime;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::installation_initial_config_service::{
     InstallConfigParams, InstallationInitialConfigService,
@@ -610,7 +610,7 @@ impl Service {
     fn alias_path(install_path: &Path) -> PathBuf {
         #[cfg(target_os = "windows")]
         {
-            install_path.with_file_name("openframe.exe")
+            install_path.with_file_name("openframe.cmd")
         }
         #[cfg(not(target_os = "windows"))]
         {
@@ -625,17 +625,21 @@ impl Service {
                 .with_context(|| format!("Failed to remove existing alias {}", alias.display()))?;
         }
 
-        // Windows has no reliable symlink without extra privileges; a hard link
-        // shares the same file, with a plain copy as the fallback.
+        // A shim, not a link: the updater swaps the binary by replacing its directory
+        // entry, so a hard link (or copy) would keep serving the pre-update binary
+        // forever. `%~dp0` resolves at run time, so the shim always execs the current exe.
         #[cfg(target_os = "windows")]
         {
-            if std::fs::hard_link(install_path, &alias).is_err() {
-                std::fs::copy(install_path, &alias)
-                    .with_context(|| format!("Failed to copy alias to {}", alias.display()))?;
-            }
+            let target = install_path
+                .file_name()
+                .map(|name| name.to_string_lossy().to_string())
+                .unwrap_or_else(|| "openframe-client.exe".to_string());
+            std::fs::write(&alias, format!("@\"%~dp0{}\" %*\r\n", target))
+                .with_context(|| format!("Failed to write alias shim at {}", alias.display()))?;
         }
         #[cfg(not(target_os = "windows"))]
         {
+            // A symlink stores the path and resolves at exec time, so it survives updates.
             std::os::unix::fs::symlink(install_path, &alias)
                 .with_context(|| format!("Failed to symlink alias at {}", alias.display()))?;
         }
@@ -650,6 +654,29 @@ impl Service {
             if let Err(e) = std::fs::remove_file(&alias) {
                 warn!("Failed to remove alias {}: {:#}", alias.display(), e);
             }
+        }
+    }
+
+    /// Restart the service so a freshly written configuration is picked up now.
+    /// Needed for more than speed: the configuration is read once, when the client is
+    /// constructed, so re-running `auth` on an already-running client would otherwise
+    /// have no effect until the next restart. Best-effort — a failure just leaves the
+    /// awaiting-auth poll to do the work.
+    pub async fn nudge_restart() {
+        if !Self::is_installed() {
+            return;
+        }
+
+        if let Err(e) =
+            crate::platform::system_service::stop_service(FULL_SERVICE_NAME, false).await
+        {
+            debug!("Could not stop the service to apply configuration: {:#}", e);
+        }
+        if let Err(e) = crate::platform::system_service::start_service(FULL_SERVICE_NAME).await {
+            debug!(
+                "Could not restart the service after saving configuration: {:#}",
+                e
+            );
         }
     }
 

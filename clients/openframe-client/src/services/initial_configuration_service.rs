@@ -116,3 +116,7 @@ impl InitialConfigurationService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "initial_configuration_service_tests.rs"]
+mod tests;
