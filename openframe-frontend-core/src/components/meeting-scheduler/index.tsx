@@ -57,12 +57,12 @@ import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
 
 /**
  * Visitor-facing copy per booking-error code. Everything except SLOT_TAKEN
- * surfaces PRIMARILY as an error TOAST at submit time (every hub platform
- * mounts the lib Toaster globally), with a compact inline line above the form
- * as the fallback for embedders without a Toaster — that line also carries
- * the escape hatch. SLOT_TAKEN renders above the calendar instead: its
- * recovery flow returns the visitor there. An unrecognized code (newer host
- * than widget) falls back to the VALIDATION copy — fail-safe, never blank.
+ * surfaces as an error TOAST at submit time, and ONLY as a toast (owner
+ * decision 2026-08-27 — no inline duplicate; hosts must mount the lib
+ * Toaster, as every hub platform does globally). SLOT_TAKEN renders above
+ * the calendar instead: its recovery flow returns the visitor there. An
+ * unrecognized code (newer host than widget) falls back to the VALIDATION
+ * copy — fail-safe, never blank.
  */
 const BOOKING_ERROR_COPY: Record<Exclude<MeetingBookingErrorCode, 'SLOT_TAKEN'>, string> = {
   INVALID_EMAIL:
@@ -416,10 +416,8 @@ export function HubSpotMeetingScheduler({
         resetSignals();
         void refetchAvailability();
       } else {
-        // Primary error surface is a TOAST (host-mounted Toaster — every hub
-        // platform mounts it globally). The compact inline line below the
-        // date heading stays as the fallback for embedders without a Toaster,
-        // and carries the escape hatch.
+        // The error surface is the TOAST, full stop (host-mounted Toaster —
+        // every hub platform mounts it globally; embedders must too).
         toast({
           variant: 'error',
           title: 'Booking failed',
@@ -537,14 +535,6 @@ export function HubSpotMeetingScheduler({
                 }).format(new Date(selectedSlot))}{' '}
                 · {formatDurationCompact(durationMs / 1000)}
               </p>
-              {bookingError && bookingError !== 'SLOT_TAKEN' && (
-                <div className="flex flex-col items-start gap-[var(--spacing-system-xs)]">
-                  <p className="text-ods-error text-h6" role="alert">
-                    {BOOKING_ERROR_COPY[bookingError] ?? BOOKING_ERROR_COPY.VALIDATION}
-                  </p>
-                  {escapeHatch}
-                </div>
-              )}
               <BookingForm
                 availability={availability}
                 meetingId={meetingId}
