@@ -7,7 +7,6 @@ import {
   extractHumanitySignals,
   findHoneypotCopySource,
   HONEYPOT_FIELD,
-  LEGACY_HONEYPOT_FIELD,
 } from '../humanity-signals';
 
 const opts = { minFillMs: DEFAULT_MIN_FILL_MS };
@@ -26,22 +25,9 @@ describe('evaluateHumanitySignals', () => {
     });
   });
 
-  it('blocks the legacy honeypot field name too (stale-lib embedder clients stay protected)', () => {
-    expect(evaluateHumanitySignals({ email: 'a@b.co', [LEGACY_HONEYPOT_FIELD]: 'filled' }, opts)).toMatchObject({
-      ok: false,
-      reason: 'honeypot',
-    });
-  });
-
   it('forgives a honeypot value copied from another field (browser autofill signature)', () => {
     expect(
       evaluateHumanitySignals({ email: 'a@b.co', [HONEYPOT_FIELD]: 'a@b.co', [ELAPSED_MS_FIELD]: 5000 }, opts),
-    ).toMatchObject({ ok: true, note: 'honeypot_autofill', sourceField: 'email' });
-  });
-
-  it('forgives autofill on the LEGACY field name (stale-lib client, current incident shape)', () => {
-    expect(
-      evaluateHumanitySignals({ email: 'a@b.co', [LEGACY_HONEYPOT_FIELD]: 'a@b.co', [ELAPSED_MS_FIELD]: 5000 }, opts),
     ).toMatchObject({ ok: true, note: 'honeypot_autofill', sourceField: 'email' });
   });
 
@@ -60,13 +46,6 @@ describe('evaluateHumanitySignals', () => {
     ).toMatchObject({ ok: false, reason: 'too_fast' });
   });
 
-  it('a honeypot value matching only another SIGNAL key is not forgiven', () => {
-    expect(evaluateHumanitySignals({ [HONEYPOT_FIELD]: 'xy', [LEGACY_HONEYPOT_FIELD]: 'xy' }, opts)).toMatchObject({
-      ok: false,
-      reason: 'honeypot',
-    });
-  });
-
   it('blocks sub-minimum fill time; missing timing never blocks', () => {
     expect(evaluateHumanitySignals({ [ELAPSED_MS_FIELD]: 100 }, opts)).toMatchObject({ ok: false, reason: 'too_fast' });
     expect(evaluateHumanitySignals({}, opts)).toMatchObject({ ok: true });
@@ -74,27 +53,16 @@ describe('evaluateHumanitySignals', () => {
 
   it('every verdict carries log-safe diagnostics; timingAffirmed requires PRESENT elapsed at/above floor', () => {
     // Missing timing never blocks — but it also never AFFIRMS (the BotID
-    // form-downgrade keys on this asymmetry; a regression that affirms
+    // humanity downgrade keys on this asymmetry; a regression that affirms
     // missing timing would silently widen the downgrade).
-    expect(evaluateHumanitySignals({}, opts)).toMatchObject({
-      ok: true,
-      timingAffirmed: false,
-      honeypotField: null,
-      honeypotLength: 0,
-    });
+    expect(evaluateHumanitySignals({}, opts)).toMatchObject({ ok: true, timingAffirmed: false, honeypotLength: 0 });
     expect(evaluateHumanitySignals({ [ELAPSED_MS_FIELD]: DEFAULT_MIN_FILL_MS }, opts)).toMatchObject({
       ok: true,
       timingAffirmed: true,
     });
     expect(
-      evaluateHumanitySignals({ email: 'a@b.co', [LEGACY_HONEYPOT_FIELD]: 'spam!!', [ELAPSED_MS_FIELD]: 5000 }, opts),
-    ).toMatchObject({
-      ok: false,
-      reason: 'honeypot',
-      honeypotField: 'legacy',
-      honeypotLength: 6,
-      timingAffirmed: true,
-    });
+      evaluateHumanitySignals({ email: 'a@b.co', [HONEYPOT_FIELD]: 'spam!!', [ELAPSED_MS_FIELD]: 5000 }, opts),
+    ).toMatchObject({ ok: false, reason: 'honeypot', honeypotLength: 6, timingAffirmed: true });
   });
 });
 
@@ -113,6 +81,10 @@ describe('findHoneypotCopySource (autofill copy-match rules)', () => {
     expect(findHoneypotCopySource({ formFields: { picks: ['alpha'] } }, 'alpha')).toBe('formFields.picks[]');
   });
 
+  it('never matches the honeypot wire field itself (signal keys are excluded from the scan)', () => {
+    expect(findHoneypotCopySource({ [HONEYPOT_FIELD]: 'xy' }, 'xy')).toBeNull();
+  });
+
   it('never matches a sub-minimum-length echo (1-char coincidence is not autofill)', () => {
     expect(findHoneypotCopySource({ initial: 'x' }, 'x')).toBeNull();
   });
@@ -128,17 +100,6 @@ describe('extractHumanitySignals', () => {
     expect(extractHumanitySignals({ [HONEYPOT_FIELD]: 123 }).honeypot).toBe('123');
     expect(extractHumanitySignals({ [HONEYPOT_FIELD]: [] }).honeypot).toBe('[]');
     expect(extractHumanitySignals({ [HONEYPOT_FIELD]: {} }).honeypot).toBe('{}');
-  });
-
-  it('prefers the current field name and reports provenance for monitoring', () => {
-    expect(extractHumanitySignals({ [HONEYPOT_FIELD]: '', [LEGACY_HONEYPOT_FIELD]: 'old' })).toMatchObject({
-      honeypot: '',
-      honeypotField: 'current',
-    });
-    expect(extractHumanitySignals({ [LEGACY_HONEYPOT_FIELD]: 'old' })).toMatchObject({
-      honeypot: 'old',
-      honeypotField: 'legacy',
-    });
-    expect(extractHumanitySignals({}).honeypotField).toBeNull();
+    expect(extractHumanitySignals({}).honeypot).toBe('');
   });
 });

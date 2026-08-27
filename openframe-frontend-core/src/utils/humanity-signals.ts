@@ -36,13 +36,6 @@
 
 /** Hidden honeypot field name. Deliberately free of autofill-heuristic tokens (see module doc). */
 export const HONEYPOT_FIELD = 'form_extra_note';
-/**
- * Prior honeypot field name — still EVALUATED (a stale-lib embedder's client
- * keeps its bot protection) and still STRIPPED before upstream forwarding.
- * Remove once the hub gate's `field=legacy` log lines stop appearing (every
- * deployed embedder ships a lib newer than the rename).
- */
-export const LEGACY_HONEYPOT_FIELD = 'contact_url_confirm';
 /** Client-measured ms between form mount and submit. */
 export const ELAPSED_MS_FIELD = 'form_elapsed_ms';
 /** Default minimum fill time (ms). A submit faster than this is treated as a bot. */
@@ -55,7 +48,7 @@ export const DEFAULT_MIN_FILL_MS = 700;
  * field rename here propagates everywhere and the honeypot value can never
  * silently leak into an upstream record.
  */
-export const HUMANITY_SIGNAL_KEYS = [HONEYPOT_FIELD, LEGACY_HONEYPOT_FIELD, ELAPSED_MS_FIELD] as const;
+export const HUMANITY_SIGNAL_KEYS = [HONEYPOT_FIELD, ELAPSED_MS_FIELD] as const;
 
 /** Is this body key one of the humanity-signal wire fields? */
 export const isHumanitySignalKey = (key: string): boolean => (HUMANITY_SIGNAL_KEYS as readonly string[]).includes(key);
@@ -67,15 +60,14 @@ export type HumanitySignals = Record<string, string | number>;
  * Diagnostics every verdict carries so callers LOG what this module already
  * computed instead of re-deriving it (a re-derived predicate silently diverges
  * the day the rules here change):
- * - `honeypotLength`/`honeypotField`: decoy length + which wire field carried
- *   it — never the typed value (log-safe by construction).
+ * - `honeypotLength`: decoy length — never the typed value (log-safe by
+ *   construction).
  * - `timingAffirmed`: the submission POSITIVELY proved human timing (a PRESENT
  *   elapsed-ms at/above the floor — merely-missing timing does not affirm).
  *   The hub gate keys its BotID form-downgrade on this.
  */
 export type HumanityVerdictDiagnostics = {
   honeypotLength: number;
-  honeypotField: HoneypotFieldProvenance;
   timingAffirmed: boolean;
 };
 
@@ -91,20 +83,10 @@ export type HumanityVerdict = HumanityVerdictDiagnostics &
     | { ok: false; reason: 'honeypot' | 'too_fast' }
   );
 
-/** Which wire field the honeypot value was read from (log/monitoring only — see LEGACY_HONEYPOT_FIELD). */
-export type HoneypotFieldProvenance = 'current' | 'legacy' | null;
-
 /** Tolerant reader — never throws; missing/garbage timing → null. */
-export function extractHumanitySignals(body: unknown): {
-  honeypot: string;
-  elapsedMs: number | null;
-  honeypotField: HoneypotFieldProvenance;
-} {
+export function extractHumanitySignals(body: unknown): { honeypot: string; elapsedMs: number | null } {
   const b = (body ?? {}) as Record<string, unknown>;
-  // Current field name first; a stale-lib client still posts the legacy name.
-  const honeypotField: HoneypotFieldProvenance =
-    b[HONEYPOT_FIELD] != null ? 'current' : b[LEGACY_HONEYPOT_FIELD] != null ? 'legacy' : null;
-  const rawHp = honeypotField === 'legacy' ? b[LEGACY_HONEYPOT_FIELD] : b[HONEYPOT_FIELD];
+  const rawHp = b[HONEYPOT_FIELD];
   // A legit client always sends a STRING here (getSignals → ref.value ?? ''),
   // so ANY present non-string value is a bot dodging the empty-check — coerce
   // to a NON-EMPTY string so it still trips (JSON.stringify keeps `[]`/`{}`
@@ -113,7 +95,7 @@ export function extractHumanitySignals(body: unknown): {
   const honeypot = rawHp == null ? '' : typeof rawHp === 'string' ? rawHp : (JSON.stringify(rawHp) ?? String(rawHp));
   const rawMs = b[ELAPSED_MS_FIELD];
   const elapsedMs = typeof rawMs === 'number' && Number.isFinite(rawMs) ? rawMs : null;
-  return { honeypot, elapsedMs, honeypotField };
+  return { honeypot, elapsedMs };
 }
 
 /**
@@ -191,10 +173,9 @@ export function findHoneypotCopySource(body: unknown, honeypot: string): string 
  *   blocks — and the too-fast check still applies to autofill-forgiven submissions)
  */
 export function evaluateHumanitySignals(body: unknown, opts: { minFillMs: number }): HumanityVerdict {
-  const { honeypot, elapsedMs, honeypotField } = extractHumanitySignals(body);
+  const { honeypot, elapsedMs } = extractHumanitySignals(body);
   const diagnostics: HumanityVerdictDiagnostics = {
     honeypotLength: honeypot.length,
-    honeypotField,
     timingAffirmed: elapsedMs !== null && elapsedMs >= opts.minFillMs,
   };
   const filled = honeypot.trim() !== '';
