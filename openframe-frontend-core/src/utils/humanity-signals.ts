@@ -24,7 +24,14 @@
  *      ignore attributes — autofill skips read-only inputs.
  *   3. `evaluateHumanitySignals` forgives a filled decoy whose value was
  *      COPIED from another field in the same body (the autofill signature —
- *      a human, not a bot).
+ *      a human, not a bot). See `findHoneypotCopySource` for the match rules.
+ *
+ * ACCEPTED TRADEOFF of layer 3 (do not "fix" by removing the forgiveness): a
+ * bot that fills EVERY field with one identical value now passes the honeypot
+ * check. That bot class always had a strictly easier evasion — send the decoy
+ * empty — so no new attacker capability is admitted; it remains covered by the
+ * timing check, per-IP rate limits, route Zod validation, and first-party
+ * BotID. Every forgiven allow is warn-logged by the hub gate for monitoring.
  */
 
 /** Hidden honeypot field name. Deliberately free of autofill-heuristic tokens (see module doc). */
@@ -32,7 +39,8 @@ export const HONEYPOT_FIELD = 'form_extra_note';
 /**
  * Prior honeypot field name — still EVALUATED (a stale-lib embedder's client
  * keeps its bot protection) and still STRIPPED before upstream forwarding.
- * Remove once no deployed embedder ships a lib older than the rename.
+ * Remove once the hub gate's `field=legacy` log lines stop appearing (every
+ * deployed embedder ships a lib newer than the rename).
  */
 export const LEGACY_HONEYPOT_FIELD = 'contact_url_confirm';
 /** Client-measured ms between form mount and submit. */
@@ -49,64 +57,126 @@ export const DEFAULT_MIN_FILL_MS = 700;
  */
 export const HUMANITY_SIGNAL_KEYS = [HONEYPOT_FIELD, LEGACY_HONEYPOT_FIELD, ELAPSED_MS_FIELD] as const;
 
+/** Is this body key one of the humanity-signal wire fields? */
+export const isHumanitySignalKey = (key: string): boolean => (HUMANITY_SIGNAL_KEYS as readonly string[]).includes(key);
+
 /** Keyed wire object produced by `useHumanitySignals().getSignals()` and spread into the POST body. */
 export type HumanitySignals = Record<string, string | number>;
 
 /** Result of {@link evaluateHumanitySignals}. */
-export type HumanityVerdict = { ok: true; note?: 'honeypot_autofill' } | { ok: false; reason: 'honeypot' | 'too_fast' };
+export type HumanityVerdict =
+  | {
+      ok: true;
+      /** Present when a filled decoy was forgiven as autofill; `sourceField` names the body field it was copied from. */
+      note?: 'honeypot_autofill';
+      sourceField?: string;
+    }
+  | { ok: false; reason: 'honeypot' | 'too_fast' };
+
+/** Which wire field the honeypot value was read from (log/monitoring only — see LEGACY_HONEYPOT_FIELD). */
+export type HoneypotFieldProvenance = 'current' | 'legacy' | null;
 
 /** Tolerant reader — never throws; missing/garbage timing → null. */
-export function extractHumanitySignals(body: unknown): { honeypot: string; elapsedMs: number | null } {
+export function extractHumanitySignals(body: unknown): {
+  honeypot: string;
+  elapsedMs: number | null;
+  honeypotField: HoneypotFieldProvenance;
+} {
   const b = (body ?? {}) as Record<string, unknown>;
   // Current field name first; a stale-lib client still posts the legacy name.
-  const rawHp = b[HONEYPOT_FIELD] ?? b[LEGACY_HONEYPOT_FIELD];
+  const honeypotField: HoneypotFieldProvenance =
+    b[HONEYPOT_FIELD] != null ? 'current' : b[LEGACY_HONEYPOT_FIELD] != null ? 'legacy' : null;
+  const rawHp = honeypotField === 'legacy' ? b[LEGACY_HONEYPOT_FIELD] : b[HONEYPOT_FIELD];
   // A legit client always sends a STRING here (getSignals → ref.value ?? ''),
-  // so ANY present non-string value is a bot filling the decoy with a non-string
-  // to dodge the empty-check — coerce to a (non-empty) string so it still trips.
+  // so ANY present non-string value is a bot dodging the empty-check — coerce
+  // to a NON-EMPTY string so it still trips (JSON.stringify keeps `[]`/`{}`
+  // non-empty where String() would collapse them to '').
   // null/undefined → '' = the correct "field absent / unfilled" allow case.
-  const honeypot = rawHp == null ? '' : String(rawHp);
+  const honeypot = rawHp == null ? '' : typeof rawHp === 'string' ? rawHp : (JSON.stringify(rawHp) ?? String(rawHp));
   const rawMs = b[ELAPSED_MS_FIELD];
   const elapsedMs = typeof rawMs === 'number' && Number.isFinite(rawMs) ? rawMs : null;
-  return { honeypot, elapsedMs };
+  return { honeypot, elapsedMs, honeypotField };
 }
 
 /**
- * Was the decoy value COPIED from a real field in the same body? That is the
- * autofill signature: browsers and password-manager extensions fill the hidden
- * input with the same value they put in a visible field (email, phone, …) —
- * a human with autofill, not a bot. Scans top-level string values plus one
- * nested level (the booking form's custom `formFields` object).
+ * Comparison normalization for the copy-match: autofill may fill the decoy
+ * with a differently-FORMATTED rendition of the value the client posts (the
+ * waitlist normalizes phones to E.164 before POST while a manager fills the
+ * stored "(555) 123-4567"), so exact equality misses real humans. Normalized
+ * equality still requires the decoy to mirror a real field's CONTENT, which a
+ * bot gains nothing from — it could always send the decoy empty instead.
  */
-function honeypotCopiedFromAnotherField(body: unknown, honeypot: string): boolean {
+const normalizeForCopyMatch = (s: string): string => s.normalize('NFKC').trim().toLowerCase();
+const digitsOf = (s: string): string => s.replace(/\D/g, '');
+
+/** Minimum normalized length for a copy-match — a 1-char echo is coincidence, not autofill. */
+const MIN_COPY_MATCH_LENGTH = 2;
+/** Digits-only phone matching needs a real phone-sized run to be meaningful. */
+const MIN_PHONE_DIGITS = 7;
+
+/**
+ * Phone-sized digit runs match when one ENDS WITH the other: a manager fills
+ * the stored national format ("(555) 123-4567") while the client posts E.164
+ * ("+15551234567") — same phone, differing only by the country-code prefix.
+ */
+const phoneDigitsMatch = (a: string, b: string): boolean =>
+  a.length >= MIN_PHONE_DIGITS && b.length >= MIN_PHONE_DIGITS && (a.endsWith(b) || b.endsWith(a));
+
+/**
+ * Find the body field the decoy value was COPIED from — the autofill
+ * signature: browsers and password-manager extensions fill the hidden input
+ * with the same datum they put in a visible field (email, phone, …) — a human
+ * with autofill, not a bot. Scans top-level string values, string arrays, and
+ * one nested level (the booking form's custom `formFields` object). Matches
+ * normalized equality, plus digits-only equality for phone-sized values.
+ *
+ * Returns the matched field's path (`email`, `formFields.phone`, `tags[]`) —
+ * the SSOT for both the verdict and the hub gate's `sameAs` log diagnostic —
+ * or `null` when nothing matches.
+ */
+export function findHoneypotCopySource(body: unknown, honeypot: string): string | null {
+  const hpNorm = normalizeForCopyMatch(honeypot);
+  const hpDigits = digitsOf(honeypot);
+  const phoneCandidate = hpDigits.length >= MIN_PHONE_DIGITS;
+  if (hpNorm.length < MIN_COPY_MATCH_LENGTH && !phoneCandidate) return null;
+
+  const matches = (value: unknown): boolean => {
+    if (typeof value !== 'string' || value.trim() === '') return false;
+    if (normalizeForCopyMatch(value) === hpNorm && hpNorm.length >= MIN_COPY_MATCH_LENGTH) return true;
+    return phoneCandidate && phoneDigitsMatch(digitsOf(value), hpDigits);
+  };
+  const matchInArray = (value: unknown): boolean => Array.isArray(value) && value.some(matches);
+
   const b = (body ?? {}) as Record<string, unknown>;
-  const signalKeys: readonly string[] = HUMANITY_SIGNAL_KEYS;
   for (const [key, value] of Object.entries(b)) {
-    if (signalKeys.includes(key)) continue;
-    if (typeof value === 'string' && value === honeypot) return true;
+    if (isHumanitySignalKey(key)) continue;
+    if (matches(value)) return key;
+    if (matchInArray(value)) return `${key}[]`;
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      for (const nested of Object.values(value as Record<string, unknown>)) {
-        if (typeof nested === 'string' && nested === honeypot) return true;
+      for (const [nestedKey, nested] of Object.entries(value as Record<string, unknown>)) {
+        if (matches(nested)) return `${key}.${nestedKey}`;
+        if (matchInArray(nested)) return `${key}.${nestedKey}[]`;
       }
     }
   }
-  return false;
+  return null;
 }
 
 /**
  * SINGLE decision fn for honeypot + timing (the hub's `verifyHuman` imports + calls this):
  * - honeypot non-empty → bot (real users never fill the off-screen field) — UNLESS the
  *   value was copied from another field in the body (autofill reached the decoy → human;
- *   the verdict carries `note: 'honeypot_autofill'` so the caller can log it)
- * - elapsed below `minFillMs` → bot (humans take time; a MISSING timing value never blocks)
+ *   the verdict carries `note: 'honeypot_autofill'` + the `sourceField` so callers log it)
+ * - elapsed below `minFillMs` → bot (humans take time; a MISSING timing value never
+ *   blocks — and the too-fast check still applies to autofill-forgiven submissions)
  */
 export function evaluateHumanitySignals(body: unknown, opts: { minFillMs: number }): HumanityVerdict {
   const { honeypot, elapsedMs } = extractHumanitySignals(body);
   const filled = honeypot.trim() !== '';
-  if (filled && !honeypotCopiedFromAnotherField(body, honeypot)) {
-    return { ok: false, reason: 'honeypot' };
-  }
+  const sourceField = filled ? findHoneypotCopySource(body, honeypot) : null;
+  if (filled && sourceField === null) return { ok: false, reason: 'honeypot' };
   if (elapsedMs !== null && elapsedMs < opts.minFillMs) return { ok: false, reason: 'too_fast' };
-  return filled ? { ok: true, note: 'honeypot_autofill' } : { ok: true };
+  return sourceField !== null ? { ok: true, note: 'honeypot_autofill', sourceField } : { ok: true };
 }
 
 /** Parse a comma-separated env string → trimmed, non-empty entries (undefined → []). */

@@ -14,7 +14,7 @@ import {
   parseSchedulingLinkName,
   schedulingAudienceKey,
 } from '../hubspot-meetings-convention';
-import { HUMANITY_SIGNAL_KEYS } from '../humanity-signals';
+import { ELAPSED_MS_FIELD, HUMANITY_SIGNAL_KEYS } from '../humanity-signals';
 
 describe('slug shape validator', () => {
   it('allows N segments and rejects invalid characters', () => {
@@ -151,7 +151,7 @@ describe('makeBookingSchema × SUPPORTED_FORM_FIELD_TYPES', () => {
 
   it('strips unknown keys (humanity signals ride alongside, read raw pre-parse)', () => {
     const schema = makeBookingSchema([], null);
-    const signals = Object.fromEntries(HUMANITY_SIGNAL_KEYS.map(key => [key, key === 'form_elapsed_ms' ? 4200 : '']));
+    const signals = Object.fromEntries(HUMANITY_SIGNAL_KEYS.map(key => [key, key === ELAPSED_MS_FIELD ? 4200 : '']));
     const parsed = schema.safeParse({ ...base, ...signals });
     // Throw rather than `if (parsed.success)`: the guard has to narrow the
     // discriminated union AND fail the test, and a conditional `expect` would

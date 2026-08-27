@@ -5,6 +5,7 @@ import {
   ELAPSED_MS_FIELD,
   evaluateHumanitySignals,
   extractHumanitySignals,
+  findHoneypotCopySource,
   HONEYPOT_FIELD,
   LEGACY_HONEYPOT_FIELD,
 } from '../humanity-signals';
@@ -35,16 +36,22 @@ describe('evaluateHumanitySignals', () => {
   it('forgives a honeypot value copied from another field (browser autofill signature)', () => {
     expect(
       evaluateHumanitySignals({ email: 'a@b.co', [HONEYPOT_FIELD]: 'a@b.co', [ELAPSED_MS_FIELD]: 5000 }, opts),
-    ).toEqual({ ok: true, note: 'honeypot_autofill' });
+    ).toEqual({ ok: true, note: 'honeypot_autofill', sourceField: 'email' });
+  });
+
+  it('forgives autofill on the LEGACY field name (stale-lib client, current incident shape)', () => {
+    expect(
+      evaluateHumanitySignals({ email: 'a@b.co', [LEGACY_HONEYPOT_FIELD]: 'a@b.co', [ELAPSED_MS_FIELD]: 5000 }, opts),
+    ).toEqual({ ok: true, note: 'honeypot_autofill', sourceField: 'email' });
   });
 
   it('forgives autofill copied from a nested field (booking formFields)', () => {
     expect(
       evaluateHumanitySignals(
-        { email: 'a@b.co', formFields: { phone: '+1 555 0100' }, [HONEYPOT_FIELD]: '+1 555 0100' },
+        { email: 'a@b.co', formFields: { phone: '+1 555 010 0000' }, [HONEYPOT_FIELD]: '+1 555 010 0000' },
         opts,
       ),
-    ).toEqual({ ok: true, note: 'honeypot_autofill' });
+    ).toEqual({ ok: true, note: 'honeypot_autofill', sourceField: 'formFields.phone' });
   });
 
   it('still applies the timing check when the honeypot is autofill-forgiven', () => {
@@ -54,7 +61,7 @@ describe('evaluateHumanitySignals', () => {
   });
 
   it('a honeypot value matching only another SIGNAL key is not forgiven', () => {
-    expect(evaluateHumanitySignals({ [HONEYPOT_FIELD]: 'x', [LEGACY_HONEYPOT_FIELD]: 'x' }, opts)).toEqual({
+    expect(evaluateHumanitySignals({ [HONEYPOT_FIELD]: 'xy', [LEGACY_HONEYPOT_FIELD]: 'xy' }, opts)).toEqual({
       ok: false,
       reason: 'honeypot',
     });
@@ -66,10 +73,47 @@ describe('evaluateHumanitySignals', () => {
   });
 });
 
+describe('findHoneypotCopySource (autofill copy-match rules)', () => {
+  it('matches with whitespace/case/unicode-width differences (normalized equality)', () => {
+    expect(findHoneypotCopySource({ email: 'A@B.co ' }, 'a@b.co')).toBe('email');
+    expect(findHoneypotCopySource({ name: 'Ｊｏ' }, 'jo')).toBe('name');
+  });
+
+  it('matches a differently-formatted phone via digits-only equality (waitlist E.164 case)', () => {
+    expect(findHoneypotCopySource({ phone: '+15551234567' }, '(555) 123-4567')).toBe('phone');
+  });
+
+  it('matches string-array elements at top level and nested, reporting the path', () => {
+    expect(findHoneypotCopySource({ tags: ['msp', 'security'] }, 'security')).toBe('tags[]');
+    expect(findHoneypotCopySource({ formFields: { picks: ['alpha'] } }, 'alpha')).toBe('formFields.picks[]');
+  });
+
+  it('never matches a sub-minimum-length echo (1-char coincidence is not autofill)', () => {
+    expect(findHoneypotCopySource({ initial: 'x' }, 'x')).toBeNull();
+  });
+
+  it('never matches empty fields or short digit runs', () => {
+    expect(findHoneypotCopySource({ note: '  ' }, '  ')).toBeNull();
+    expect(findHoneypotCopySource({ qty: '12' }, 'x12x')).toBeNull();
+  });
+});
+
 describe('extractHumanitySignals', () => {
-  it('coerces a non-string honeypot to a tripping string; prefers the current field name', () => {
+  it('coerces a non-string honeypot to a tripping non-empty string (objects/arrays included)', () => {
     expect(extractHumanitySignals({ [HONEYPOT_FIELD]: 123 }).honeypot).toBe('123');
-    expect(extractHumanitySignals({ [HONEYPOT_FIELD]: '', [LEGACY_HONEYPOT_FIELD]: 'old' }).honeypot).toBe('');
-    expect(extractHumanitySignals({ [LEGACY_HONEYPOT_FIELD]: 'old' }).honeypot).toBe('old');
+    expect(extractHumanitySignals({ [HONEYPOT_FIELD]: [] }).honeypot).toBe('[]');
+    expect(extractHumanitySignals({ [HONEYPOT_FIELD]: {} }).honeypot).toBe('{}');
+  });
+
+  it('prefers the current field name and reports provenance for monitoring', () => {
+    expect(extractHumanitySignals({ [HONEYPOT_FIELD]: '', [LEGACY_HONEYPOT_FIELD]: 'old' })).toMatchObject({
+      honeypot: '',
+      honeypotField: 'current',
+    });
+    expect(extractHumanitySignals({ [LEGACY_HONEYPOT_FIELD]: 'old' })).toMatchObject({
+      honeypot: 'old',
+      honeypotField: 'legacy',
+    });
+    expect(extractHumanitySignals({}).honeypotField).toBeNull();
   });
 });
