@@ -70,6 +70,49 @@ export function toFigmaOriginalUrl(url: string): string {
 }
 
 /**
+ * The self-hosted MIRROR url for a claude artifact url — the whole
+ * mirror mechanism is UNDER THE HOOD: the viewer detects a claude url,
+ * DERIVES the mirror location from the artifact's own id under the
+ * host's configured storage-view proxy base, and frames the downloaded
+ * copy from there. No per-link data, no props, no shortcode changes —
+ * 100% transparent to every consumer.
+ *
+ * `storageViewBaseUrl` comes from `EndpointsRuntime` — the SAME
+ * host-overridable proxy-path mechanism every other lib→API call uses
+ * (a reverse-proxied embedder remaps it; a host without the proxy omits
+ * it and gets `null` here, i.e. no mirror leg at all).
+ *
+ * `null` when the base is absent or the url carries no artifact id. The
+ * derived url is the configured base + a validated uuid — safe as a
+ * frame source without further checks. KEEP THE OBJECT NAMING IN SYNC
+ * with the hub's `lib/data/design-brief-mirror.cjs` (bucket +
+ * `<uuid>.html`) — that module owns the ingest/audit half.
+ */
+export function toClaudeMirrorPath(
+  url: string | null | undefined,
+  storageViewBaseUrl: string | null | undefined,
+): string | null {
+  if (!url || !storageViewBaseUrl) return null;
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    const id =
+      (host === 'claude.ai' &&
+        /^\/(?:code\/artifact|public\/artifacts)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?#]|$)/i.exec(
+          u.pathname,
+        )?.[1]) ||
+      (host === 'claude.site' &&
+        /^\/artifacts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?#]|$)/i.exec(
+          u.pathname,
+        )?.[1]) ||
+      null;
+    return id ? `${storageViewBaseUrl.replace(/\/$/, '')}/design-briefs/${id.toLowerCase()}.html` : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The EMBED url for a published Claude artifact, or `null` when the link is not
  * one we can frame — the Claude counterpart of `toFigmaEmbedUrl`.
  *

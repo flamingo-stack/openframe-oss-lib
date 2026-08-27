@@ -143,6 +143,14 @@ describe('processShortcodes design-doc embeds', () => {
     expect(design).toContain('data-kind="design"');
   });
 
+  it('threads the optional pipe title into data-title', () => {
+    const titled = processShortcodes('{{claude-artifact:https://claude.ai/a|Brief doc}}');
+    expect(titled).toContain('data-title="Brief doc"');
+
+    const untitled = processShortcodes('{{claude-artifact:https://claude.ai/a}}');
+    expect(untitled).not.toContain('data-title');
+  });
+
   it('escapes the url attribute so a crafted link cannot break out of the block', () => {
     const output = processShortcodes('{{claude-artifact:https://claude.ai/a"><script>alert(1)</script>}}');
     expect(output).not.toContain('<script>');

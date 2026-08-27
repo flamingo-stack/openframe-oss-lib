@@ -74,16 +74,9 @@ export { computeIsNewTab, newTabAnchorAttrs, buildAnchorProps } from './nav-anch
 export { isCrossOriginUrl } from './is-cross-origin-url';
 export { decideNewTab, type DecideNewTabInput, type NavSurface, type RuntimeMode } from './decide-new-tab';
 
-// Chat-proxy auth (localStorage adapter + fetch wrapper)
-export {
-  getChatProxyAuth,
-  getPersistedProxyEmail,
-  setChatProxyAuth,
-  clearChatProxyAuth,
-  applyProxyAuth,
-  type ChatProxyAuth,
-} from './chat-proxy-auth-storage';
-export { chatAuthedFetch } from './chat-authed-fetch';
+// Embed-surface auth moved to `utils/` (embed-proxy-auth-storage /
+// embed-authed-fetch) — import the Embed* names from
+// `@flamingo-stack/openframe-frontend-core/utils`.
 
 // Pure content helpers
 export { flattenAssistantContent } from './flatten-assistant-content';

@@ -29,6 +29,10 @@ export * from './use-access-code-integration';
 // THE og-placeholder URL hook (endpoints-driven; no injected builder)
 export * from './use-og-placeholder-url';
 
+// Claude artifact mirror detection (endpoints-driven; ClaudeEmbed's
+// transparent mirror leg)
+export * from './use-claude-mirror-src';
+
 // Deep-link "scroll to URL hash" after data loads. Pairs with URL
 // composers that emit `?<filter>=<id>#<prefix>-<id>` — the filter
 // narrows the list, the hash scrolls the matching DOM id.

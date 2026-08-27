@@ -34,6 +34,12 @@ export interface EndpointsRuntime {
   };
   /** POST contact-form submission. */
   contactUrl: string;
+  /** GET base of the host's private-storage view proxy
+   *  (`<base>/<bucket>/<object>`). `ClaudeEmbed` derives artifact mirror
+   *  urls under it (`<base>/design-briefs/<uuid>.html`). OPTIONAL: a host
+   *  without the proxy simply omits it and claude embeds fall back to
+   *  claude.ai — no probing happens. */
+  storageViewBaseUrl?: string;
 }
 
 export const EndpointsRuntimeContext = createContext<EndpointsRuntime | null>(null);

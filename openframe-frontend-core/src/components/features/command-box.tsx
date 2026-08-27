@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
 import { Button } from '../ui/button';
 
 export interface CommandBoxAction {
@@ -34,6 +35,10 @@ export interface CommandBoxProps {
   commandClassName?: string;
   /** Maximum lines to show (uses line-clamp, 0 for unlimited) */
   maxLines?: number;
+  /** When set, shows a copy icon button in the top-right corner of the box */
+  onCopy?: () => void;
+  /** Accessible label for the corner copy button */
+  copyAriaLabel?: string;
 }
 
 /**
@@ -87,17 +92,44 @@ export function CommandBox({
   className,
   commandClassName,
   maxLines = 0,
+  onCopy,
+  copyAriaLabel = 'Copy command',
 }: CommandBoxProps) {
   // Get static line-clamp class or undefined for unlimited
   const lineClampClass = maxLines > 0 ? lineClampClasses[maxLines] : undefined;
+
+  const commandText = (
+    <div
+      className={cn(
+        'break-all text-ods-text-primary text-code',
+        onCopy && 'min-w-0 flex-1',
+        lineClampClass,
+        commandClassName,
+      )}
+    >
+      {command}
+    </div>
+  );
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       {title && <div className="text-ods-text-primary text-h4">{title}</div>}
       <div className="rounded-[6px] border border-ods-border bg-ods-bg p-4">
-        <div className={cn('break-all text-ods-text-primary text-code', lineClampClass, commandClassName)}>
-          {command}
-        </div>
+        {onCopy ? (
+          <div className="flex items-start gap-4">
+            {commandText}
+            <button
+              type="button"
+              onClick={onCopy}
+              aria-label={copyAriaLabel}
+              className="shrink-0 rounded-md text-ods-text-secondary transition-colors hover:text-ods-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
+            >
+              <Copy02Icon className="h-5 w-5" />
+            </button>
+          </div>
+        ) : (
+          commandText
+        )}
         {(primaryAction || secondaryAction) && (
           <div className="mt-4 flex flex-col gap-3 md:flex-row md:justify-end">
             {secondaryAction && (

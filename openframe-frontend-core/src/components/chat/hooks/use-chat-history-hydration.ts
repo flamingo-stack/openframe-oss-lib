@@ -18,8 +18,8 @@
  */
 
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../utils/auto-continuation-directive';
-import { chatAuthedFetch } from '../utils/chat-authed-fetch';
 import type { Message } from './use-chat';
 
 /** Narrow one hop of an untrusted JSON body to something with readable keys.
@@ -87,7 +87,7 @@ export function useChatHistoryHydration({
     // on `cancelled` so a superseded effect can't hydrate the new conversation.
     void (async () => {
       try {
-        const res = await chatAuthedFetch(`${historyUrl}?conversationId=${encodeURIComponent(conversationId)}`, {
+        const res = await embedAuthedFetch(`${historyUrl}?conversationId=${encodeURIComponent(conversationId)}`, {
           method: 'GET',
         });
         if (!res.ok) return;

@@ -27,6 +27,13 @@ export interface FieldWrapperProps {
   error?: string;
   /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey) */
   errorVariant?: 'error' | 'warning' | 'success' | 'muted';
+  /**
+   * Label scale. Default is the standard form-label scale (text-h6).
+   * 'large' (text-h4) is for screens whose design specifies body-scale field
+   * titles (e.g. the devices New Device page) — opt in per call site, the
+   * default stays the converged small scale.
+   */
+  labelVariant?: 'default' | 'large';
   /** Additional className for the outer wrapper */
   className?: string;
   children: ReactNode;
@@ -40,18 +47,18 @@ const errorVariantClasses = {
 } as const;
 
 const FieldWrapper = forwardRef<HTMLDivElement, FieldWrapperProps>(
-  ({ label, htmlFor, error, errorVariant = 'error', className, children }, ref) => {
+  ({ label, htmlFor, error, errorVariant = 'error', labelVariant = 'default', className, children }, ref) => {
     const hasChrome = label != null || error != null;
 
     return (
       <div ref={ref} className={cn(hasChrome ? 'relative flex w-full flex-col' : 'contents', className)}>
         {label && (
-          // text-h6, NOT text-h4: `Field` (ui/field.tsx) renders its label via
+          // Default is text-h6, NOT text-h4: `Field` (ui/field.tsx) renders its label via
           // `Label variant="small"` = text-h6, and every form that mixes
           // Field-wrapped controls with `label=`-prop controls showed two label
           // sizes side by side — the exact inconsistency the admin editors kept
           // reporting. One label scale, owned here and in Field together.
-          <Label className="mb-1" htmlFor={htmlFor}>
+          <Label className="mb-1" htmlFor={htmlFor} variant={labelVariant}>
             {label}
           </Label>
         )}

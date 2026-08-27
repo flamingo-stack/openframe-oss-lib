@@ -15,8 +15,8 @@
  * Key shape: `mingo-chat-<source>[-u-<email>].conversation`
  */
 
+import { getEmbedProxyAuth } from '../../../utils/embed-proxy-auth-storage';
 import { createLocalStorageAdapter, type LocalStorageAdapter } from '../../../utils/local-storage-adapter';
-import { getChatProxyAuth } from './chat-proxy-auth-storage';
 
 export interface PersistedChatConversation {
   conversationId: string;
@@ -26,7 +26,7 @@ const STORAGE_KEY = 'conversation';
 
 const namespaceFor = (source: string): string => {
   const base = `mingo-chat-${source}`;
-  const auth = getChatProxyAuth();
+  const auth = getEmbedProxyAuth();
   return auth?.email ? `${base}-u-${encodeURIComponent(auth.email.toLowerCase())}` : base;
 };
 

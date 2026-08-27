@@ -16,6 +16,7 @@ import {
   buildEffectiveTagSet,
   buildSanitizeSchema,
   escapeUnknownHtmlTags,
+  rehypeStripUnsafe,
   SAFE_HTML_TAGS,
   SVG_TAGS,
 } from '../sanitize';
@@ -344,5 +345,35 @@ describe('link-definition shelters blank in every shape (round 21)', () => {
     expect(masked).not.toContain('</textarea>');
     // The haystack is case-folded; the heading past the bound is untouched.
     expect(masked).toContain('## after heading');
+  });
+});
+
+describe('URL_ATTRS covers hast PROPERTY keys, not attribute names', () => {
+  it('strips a javascript: data-url via its camelized hast key', () => {
+    // property-information camelizes `data-url` to `dataUrl` BEFORE the
+    // strip pass runs - the URL_ATTRS entry must match the lowercased
+    // PROPERTY key or the scheme check silently never fires.
+    const tree = {
+      type: 'root',
+      children: [
+        {
+          type: 'element',
+          tagName: 'div',
+          properties: {
+            className: ['claude-embed'],
+            dataUrl: 'javascript:alert(1)',
+            dataKind: 'artifact',
+          },
+          children: [],
+        },
+      ],
+    };
+    // `rehypeStripUnsafe` REBUILDS rather than mutating (see its docblock: it
+    // matches the non-mutating transformers either side of it in engine.tsx),
+    // so the assertion reads the RETURNED tree, not the input.
+    const out = (rehypeStripUnsafe() as (t: unknown) => { children: { properties: Record<string, unknown> }[] })(tree);
+    const props = out.children[0].properties;
+    expect(props.dataUrl).toBeUndefined();
+    expect(props.dataKind).toBe('artifact');
   });
 });

@@ -56,6 +56,7 @@ import { buildConfirmToolBody, readServerErrorMessage } from '../../../chat-prot
 import { createSseFrameDecoder } from '../../../chat-protocol/decode';
 import type { ChatStreamEvent } from '../../../chat-protocol/events';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import type { ChatRef } from '../chat-ref.types';
 import { createChatDialogStore } from '../stream/chat-dialog-store';
 import type { ChatDialogStore } from '../stream/chat-dialog-store';
@@ -68,7 +69,6 @@ import type {
   UnifiedChatMessage,
   UnifiedSendMessageOptions,
 } from '../types/unified-chat-state.types';
-import { chatAuthedFetch } from '../utils/chat-authed-fetch';
 import { createChatConversationStorage, pruneStaleChatConversationStorage } from '../utils/chat-conversation-storage';
 import { buildDiscussPrompt } from '../utils/discuss-ref-prompt';
 import type { ScrollAnchor } from '../utils/scroll-anchor';
@@ -483,10 +483,10 @@ export function useSseChatAdapter(
       abortControllerRef.current = ctrl;
 
       try {
-        // `chatAuthedFetch` carries the bearer-act-as headers (+ Supabase
+        // `embedAuthedFetch` carries the bearer-act-as headers (+ Supabase
         // session cookies) — same wrapper `use-chat-attachments` and
         // `use-chat-identity` use.
-        const response = await chatAuthedFetch(targetPath, {
+        const response = await embedAuthedFetch(targetPath, {
           method: 'POST',
           body: JSON.stringify(requestBody),
           signal: ctrl.signal,

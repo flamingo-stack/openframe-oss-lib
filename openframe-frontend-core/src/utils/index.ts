@@ -175,12 +175,13 @@ export { SOURCE_ICON_NAMES, getSourceIconName, SOURCE_LABELS_BY_TABLE, getSource
 
 // Embed-surface auth — generic across chat AND ticket center (and any
 // future embedded React component that needs to identify as the proxied
-// customer). Wire headers / env vars / storage key are unchanged
-// (`X-Chat-*`, `CHAT_PROXY_SECRET`, `chat.proxy-auth.v1`) — those are
-// server / deployment contracts. The CLIENT-side rename frees non-chat
-// surfaces from importing a chat-prefixed symbol. Old chat-prefixed
-// aliases are kept as @deprecated re-exports at
-// `components/chat/utils/chat-authed-fetch.ts` + `chat-proxy-auth-storage.ts`.
+// customer). The bearer is a PLATFORM API KEY (minted in the hub's
+// /admin/api-keys; the old shared CHAT_PROXY_SECRET env is removed
+// hub-side). Wire headers / storage key are unchanged (`X-Chat-*`,
+// `chat.proxy-auth.v1`) — those are server / deployment contracts. The
+// CLIENT-side rename frees non-chat surfaces from importing a
+// chat-prefixed symbol; the old chat-prefixed aliases are DELETED —
+// these Embed* exports are the only names.
 export { embedAuthedFetch, setEmbedAuthAdapter, type EmbedAuthAdapter } from './embed-authed-fetch';
 // THE common SSE client (fetch-based, standard `event:`/`data:` frames,
 // silence-based liveness, never-terminating capped backoff). Consumed by
@@ -327,6 +328,7 @@ export {
   type ContentRefGridSize,
 } from './content-ref-groups';
 export { extractItems, extractItemId } from './extract-items';
+export { FullscreenSwitchController, type FullscreenSwitchOptions } from './fullscreen-switch';
 export { buildSuggestionUrl, type SuggestionUrlOptions } from './suggestion-url';
 
 // Embedder-configurable content-URL composer for the existing

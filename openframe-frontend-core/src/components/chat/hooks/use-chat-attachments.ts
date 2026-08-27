@@ -9,7 +9,7 @@
  * `AbortController` for clean remove-mid-upload.
  *
  * Auth propagation:
- *   - `chatAuthedFetch` carries bearer-act-as headers + Supabase
+ *   - `embedAuthedFetch` carries bearer-act-as headers + Supabase
  *     session cookies — used both for minting the upload URL and as
  *     the auth path before falling through to the signed PUT.
  *   - The byte-PUT to the signed URL uses an inline `uploadWithProgress`
@@ -26,9 +26,9 @@
 import { fileTypeFromBlob } from 'file-type';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import { CHAT_ATTACHMENT_MIME_TYPES, CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER } from '../chat-attachment-bar';
 import type { ChatAttachment } from '../utils/chat-attachment-markdown';
-import { chatAuthedFetch } from '../utils/chat-authed-fetch';
 
 // ---------------------------------------------------------------------------
 // Inlined hub-side constants (single source of truth — `lib/config/
@@ -235,7 +235,7 @@ export function useChatAttachments(): UseChatAttachmentsApi {
         //    bearer-act-as headers (if present).
         updateOne(att.id, { status: 'uploading', progress: 5 });
 
-        const urlResp = await chatAuthedFetch(uploadUrlEndpoint, {
+        const urlResp = await embedAuthedFetch(uploadUrlEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: ctrl?.signal,

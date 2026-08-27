@@ -14,11 +14,14 @@ import { PdfViewer } from '../pdf-viewer';
  * `actions` slot.
  */
 describe('EmbedViewerFrame parity', () => {
-  it('GoogleSheetsViewer: h2.text-h3 title, space-y-4 wrapper, one action button, iframe src', () => {
+  it('GoogleSheetsViewer: h2.text-h3 title, ODS-spaced wrapper, one action button, iframe src', () => {
     const { container } = render(
       <GoogleSheetsViewer externalUrl="https://docs.google.com/spreadsheets/d/ABC123/edit" fileName="Budget" />,
     );
-    expect(container.firstElementChild?.className).toContain('space-y-4');
+    // The wrapper is `space-y-[var(--spacing-system-mf)]` (16px, the ODS token
+    // for the old raw `space-y-4`) — see ODS_TOKEN_RULES.md; the FigmaEmbed
+    // case below still asserts caller spacing wins over it via tailwind-merge.
+    expect(container.firstElementChild?.className).toContain('space-y-[var(--spacing-system-mf)]');
     const title = container.querySelector('h2');
     expect(title?.className).toContain('text-h3');
     expect(title?.textContent).toBe('Budget');

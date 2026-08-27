@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { Label } from './label';
 
 export interface TabSelectorItem {
   /** Unique identifier for the tab */
@@ -58,7 +59,12 @@ export function TabSelector({
       className={cn('flex flex-col gap-[var(--spacing-system-xxs)]', disabled && 'opacity-50', className)}
       aria-disabled={disabled || undefined}
     >
-      {label && <p className="text-ods-text-primary text-h4">{label}</p>}
+      {label && (
+        // Label for family/color; 'large' (text-h4) is this component's
+        // long-standing label scale — neighbours opt into the same scale via
+        // their `labelVariant="large"` when a design puts them side by side.
+        <Label variant="large">{label}</Label>
+      )}
       <div
         className={cn(
           'flex h-11 gap-[var(--spacing-system-xxs)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] md:h-12',

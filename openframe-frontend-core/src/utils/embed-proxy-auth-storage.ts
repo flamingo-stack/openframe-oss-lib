@@ -1,24 +1,28 @@
 'use client';
 
 /**
- * Client-side persistence for embed-surface proxy credentials
- * (`CHAT_PROXY_SECRET` + impersonation email). Used by every embedded
+ * Client-side persistence for embed-surface proxy credentials (a
+ * PLATFORM API KEY + impersonation email). Used by every embedded
  * surface — the chat widget AND the ticket center AND any future
  * embedded React component that needs to identify itself as the
  * impersonated customer.
  *
  * When set, the surface attaches the creds as
- *   `Authorization: Bearer <secret>` + `X-Chat-Act-As: <email>`
+ *   `Authorization: Bearer <platform API key>` + `X-Chat-Act-As: <email>`
  * on every call to `/api/docs/chat`, `/api/chat/*`, and any other route
  * gated by `requireChatAuth` — proving to the server that this session
- * is acting on behalf of <email>.
+ * is acting on behalf of <email>. The key is minted in the hub's
+ * `/admin/api-keys` and is platform-bound (`fpk_<platform>_…`): a
+ * SERVICE key may act as any email; a PERSONAL key only as its owner.
  *
- * **Naming history:** the wire-side header names are still `X-Chat-*`
- * and the env var is `CHAT_PROXY_SECRET`. Those are server contracts;
- * renaming them would require a coordinated deploy + customer-side
- * env-var migration. The CLIENT-side helpers were renamed `Embed*` so
- * non-chat surfaces (e.g. ticket center) don't have to import a
- * chat-prefixed symbol just to send the same headers.
+ * **Naming history:** the stored field is still named `secret` and the
+ * wire-side header names are `X-Chat-*`. Those are client/server
+ * contracts predating the per-platform key migration (the old shared
+ * `CHAT_PROXY_SECRET` env is removed hub-side); renaming them would
+ * break persisted state + the wire shape for zero behavior change. The
+ * CLIENT-side helpers were renamed `Embed*` so non-chat surfaces (e.g.
+ * ticket center) don't have to import a chat-prefixed symbol just to
+ * send the same headers.
  *
  * Persists to **`localStorage`** so the bearer token + act-as identity
  * survive tab close, new-tab opens, and browser restarts — the
@@ -26,10 +30,11 @@
  * cycle was rejected as a dev-experience tradeoff that wasn't worth
  * the security gain. An XSS sink on this origin can read the value
  * indefinitely (vs only-this-tab with sessionStorage), but `/debug`
- * is admin-gated behind the platform's `askAI.enabled` flag and the
- * impersonation header it sets is server-validated against
- * `CHAT_PROXY_SECRET` anyway. Explicit "Clear" button on the creds
- * bar is the supported logout path; closing the tab is no longer.
+ * is admin-gated behind the platform's `askAI.enabled` flag, the key
+ * is server-verified (hash-at-rest, platform-bound, revocable in
+ * `/admin/api-keys`), and the act-as reach is bounded by the key's
+ * tier. Explicit "Clear" button on the creds bar is the supported
+ * logout path; closing the tab is no longer.
  *
  * Namespaced under `<platform>.chat.proxy-auth.v1` (the storage key is
  * unchanged from the old chat-prefixed helper — that's a storage

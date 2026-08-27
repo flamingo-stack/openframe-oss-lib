@@ -118,6 +118,15 @@ export interface TableProps<T = TableRowData> {
   rowActions?: RowAction<T>[];
   // Custom renderer for the actions area (e.g., kebab/dots menu)
   renderRowActions?: (item: T) => ReactNode;
+  /**
+   * Width class(es) for the synthetic actions column. The default is
+   * content-sized (`w-auto`), which mis-aligns every OTHER column between
+   * the header and the rows whenever the row actions are wider than the
+   * header's "Showing N results" counter (each side sizes to its own
+   * content). Pass a FIXED width (e.g. `w-60`) when the actions are wide
+   * text buttons so the header and rows share one grid.
+   */
+  actionsColumnWidth?: string;
 
   /**
    * When provided, renders a right-pointing chevron link at the end of every row

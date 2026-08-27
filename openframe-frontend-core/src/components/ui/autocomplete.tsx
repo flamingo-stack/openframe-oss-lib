@@ -55,6 +55,8 @@ interface AutocompleteBaseProps<T = string> {
   freeSolo?: boolean;
   /** Label for the input */
   label?: string;
+  /** Label scale forwarded to FieldWrapper ('large' = text-h4 for designs with body-scale field titles) */
+  labelVariant?: 'default' | 'large';
   /** Error message displayed below the field */
   error?: string;
   /** Custom filter function */
@@ -137,6 +139,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
     dropdownClassName,
     freeSolo = false,
     label,
+    labelVariant,
     error,
     filterOptions,
     renderOption,
@@ -690,7 +693,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
   );
 
   return (
-    <FieldWrapper label={label} error={error} className={className}>
+    <FieldWrapper label={label} labelVariant={labelVariant} error={error} className={className}>
       <div className="relative" ref={containerRef}>
         {popover}
 
