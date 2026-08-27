@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(name = "openframe.rmm.execution.watchdog.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.rmm.execution.retry.enabled", havingValue = "true")
 public class ScriptDeliveryRetryScheduler {
 
     private final ScriptDeliveryRetryService deliveryRetryService;
