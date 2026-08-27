@@ -62,11 +62,8 @@ public interface NotificationReadStateRepository
                                                @Param("recipientType") RecipientType recipientType,
                                                @Param("tenantId") String tenantId);
 
-    /**
-     * tenantId is matched explicitly here and in every method below: aggregations and @Update queries
-     * both bypass the tenant-scoping wrapper, so dropping it leaks one tenant's rows into another's
-     * counts with nothing else in the stack to catch it.
-     */
+    // tenantId is matched explicitly here and below: aggregations and @Update both bypass the
+    // tenant-scoping wrapper, so dropping it leaks rows across tenants with nothing left to catch it.
     @Aggregation(pipeline = {
             "{ '$match': { 'tenantId': ?3, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, "
                     + "'status': 'UNREAD', 'entityId': { '$exists': true, '$ne': null } } }",

@@ -28,11 +28,7 @@ public final class NotificationCommand {
     private final NotificationType type;
     private final Map<String, String> attributes;
     private final String applePushCategory;
-    /**
-     * Nullable on both paths: the emitter fills them from the spec, legacy dispatchers may set them
-     * by hand. Left null, category and settings group fall back to the context descriptor registry,
-     * and the notification simply has no entity to hang unread counts on.
-     */
+    // Left null, category and settings group fall back to the context descriptor registry.
     private final NotificationCategory category;
     private final NotificationSettingGroup settingsGroup;
     private final NotificationEntityRef entity;

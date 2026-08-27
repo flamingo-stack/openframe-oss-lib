@@ -1,29 +1,30 @@
 package com.openframe.notification.spec;
 
 import com.openframe.data.document.notification.NotificationEntityType;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-/**
- * The entity a notification is about — the one its own click-through opens. Unread counts and the
- * "mark everything on this entity as read" mutation are grouped by it.
- */
-public record NotificationEntityRef(NotificationEntityType type, String id) {
+@Getter
+@AllArgsConstructor
+public class NotificationEntityRef {
 
-    public NotificationEntityRef {
-        if (type == null) {
-            throw new IllegalArgumentException("entity type must not be null");
-        }
-        if (isBlank(id)) {
-            throw new IllegalArgumentException("entity id must not be blank");
-        }
-    }
+    private final NotificationEntityType type;
+    private final String id;
 
     public static NotificationEntityRef ticket(String ticketId) {
-        return new NotificationEntityRef(NotificationEntityType.TICKET, ticketId);
+        return of(NotificationEntityType.TICKET, ticketId);
     }
 
     public static NotificationEntityRef dialog(String dialogId) {
-        return new NotificationEntityRef(NotificationEntityType.DIALOG, dialogId);
+        return of(NotificationEntityType.DIALOG, dialogId);
+    }
+
+    private static NotificationEntityRef of(NotificationEntityType type, String id) {
+        if (isBlank(id)) {
+            throw new IllegalArgumentException("entity id must not be blank for type " + type);
+        }
+        return new NotificationEntityRef(type, id);
     }
 }

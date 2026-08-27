@@ -52,11 +52,8 @@ public class NotificationReadState implements TenantScoped {
 
     private NotificationCategory category;
 
-    /**
-     * The entity this notification is about, copied here for the same reason category is: unread is
-     * per recipient, so grouping has to run over these rows. Null on rows written before the field
-     * existed and on notifications about no entity — both simply produce no badge.
-     */
+    // Copied here for the same reason category is: unread is per recipient, so the grouping runs over
+    // these rows. Null on pre-existing rows and on notifications about no entity — both mean no badge.
     private NotificationEntityType entityType;
 
     private String entityId;

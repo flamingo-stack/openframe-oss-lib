@@ -565,18 +565,20 @@ public class TicketService {
         return ticketRepository.buildTicketQuery(queryFilter, search, restrictToTicketIds, ownerMachineId);
     }
 
+    // Same recipient rule the notification resolvers use: an AGENT's rows are keyed by machine id, and
+    // reading it wrong hands a client app an empty board instead of its own tickets, silently.
     private List<String> unreadTicketIds(AuthPrincipal principal) {
-        // Same recipient rule the notification resolvers use: an AGENT's rows are keyed by machine id.
-        // Read it wrong and a client app silently gets an empty board instead of its own tickets.
-        String recipientId = isAgent(principal) ? principal.getMachineId() : principal.getId();
-        RecipientType recipientType = isAgent(principal) ? RecipientType.MACHINE : RecipientType.USER;
+        boolean agent = isAgent(principal);
+        String recipientId = agent ? principal.getMachineId() : principal.getId();
+        RecipientType recipientType = agent ? RecipientType.MACHINE : RecipientType.USER;
+        String tenantId = tenantIdProvider.getTenantId();
         List<EntityCount> rows = notificationReadStateRepository.unreadCountsByEntity(
-                recipientId, recipientType, NotificationEntityType.TICKET, tenantIdProvider.getTenantId());
-        return rows.stream().map(EntityCount::entityId).filter(Objects::nonNull).toList();
+                recipientId, recipientType, NotificationEntityType.TICKET, tenantId);
+        return rows.stream().map(EntityCount::getEntityId).filter(Objects::nonNull).toList();
     }
 
-    /** Both sides restrict the same slot, so they have to meet. An empty result must stay an empty
-     *  list — null would read as "no restriction" and hand back the whole board. */
+    // An empty intersection must stay an empty list — null reads as "no restriction" downstream and
+    // would hand back the whole board.
     private List<String> intersect(List<String> left, List<String> right) {
         if (left == null) {
             return right;

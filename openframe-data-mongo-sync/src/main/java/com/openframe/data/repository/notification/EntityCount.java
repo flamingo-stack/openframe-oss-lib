@@ -1,8 +1,14 @@
 package com.openframe.data.repository.notification;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-public record EntityCount(
-        @Field("_id") String entityId,
-        long count) {
+@Getter
+@AllArgsConstructor
+public class EntityCount {
+
+    @Field("_id")
+    private final String entityId;
+    private final long count;
 }

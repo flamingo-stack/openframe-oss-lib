@@ -152,7 +152,8 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         if (cursor != null && !cursor.trim().isEmpty()) {
             try {
                 ObjectId cursorId = new ObjectId(cursor);
-                pageQuery = withCursorBound(query, buildCursorCriteria(cursorId, sortField, isDesc));
+                Criteria cursorCriteria = buildCursorCriteria(cursorId, sortField, isDesc);
+                pageQuery = withCursorBound(query, cursorCriteria);
             } catch (IllegalArgumentException ex) {
                 log.warn("Invalid ObjectId cursor format: {}", cursor);
             }
@@ -171,22 +172,22 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         return mongoTemplate.find(pageQuery, Ticket.class);
     }
 
-    /**
-     * The cursor bound goes under $and instead of Query.addCriteria: the filter query can already
-     * hold a criterion under the very same key — '_id' when filtering by tag, '$or' when searching —
-     * and Query rejects a second criterion per key with InvalidMongoDbApiUsageException, which is not
-     * an IllegalArgumentException and so escapes the callers' catch blocks.
-     */
+    // Under $and, not Query.addCriteria: the filter query can already hold a criterion under the very
+    // same key — '_id' when filtering by tag, '$or' when searching — and a second one per key throws
+    // InvalidMongoDbApiUsageException, which is no IllegalArgumentException and escapes every catch.
     private Query withCursorBound(Query base, Criteria cursorCriteria) {
-        Document merged = new Document(base.getQueryObject());
+        Document baseQuery = base.getQueryObject();
+        Document merged = new Document(baseQuery);
         List<Object> conjuncts = new ArrayList<>();
         Object existing = merged.get(AND_OPERATOR);
         if (existing instanceof List<?> existingConjuncts) {
             conjuncts.addAll(existingConjuncts);
         }
-        conjuncts.add(cursorCriteria.getCriteriaObject());
+        Document cursorBound = cursorCriteria.getCriteriaObject();
+        conjuncts.add(cursorBound);
         merged.put(AND_OPERATOR, conjuncts);
-        return new BasicQuery(merged, base.getFieldsObject());
+        Document fields = base.getFieldsObject();
+        return new BasicQuery(merged, fields);
     }
 
     private Criteria buildCursorCriteria(ObjectId cursorId, String sortField, boolean isDesc) {

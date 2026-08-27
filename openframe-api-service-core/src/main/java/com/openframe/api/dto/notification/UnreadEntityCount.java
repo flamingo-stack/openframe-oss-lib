@@ -1,4 +1,12 @@
 package com.openframe.api.dto.notification;
 
-public record UnreadEntityCount(String entityId, long count) {
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
+public class UnreadEntityCount {
+
+    private final String entityId;
+    private final long count;
 }

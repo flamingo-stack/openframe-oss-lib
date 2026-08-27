@@ -119,11 +119,8 @@ public class NotificationBroadcaster {
         return saved;
     }
 
-    /**
-     * The spec decides; the context descriptor is only the fallback for legacy dispatchers that build
-     * a command by hand. Both must agree while the two paths coexist — a parity test in the tenant
-     * catalog pins that, because a silent divergence here changes who receives what.
-     */
+    // The spec decides; the descriptor registry is the fallback for legacy dispatchers that build a
+    // command by hand. A silent divergence between the two changes who receives what.
     private NotificationCategory categoryOf(NotificationCommand command) {
         NotificationCategory category = command.getCategory();
         return category != null ? category : descriptorRegistry.categoryOf(command.getContext());

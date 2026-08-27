@@ -102,10 +102,14 @@ public class NotificationDataFetcher {
     @DgsQuery
     public List<UnreadEntityCount> unreadCountsByEntity(@InputArgument NotificationEntityType entityType) {
         Recipient r = currentRecipient();
-        Map<String, Long> counts = readStateService.unreadCountsByEntity(r.id(), r.type(), entityType);
+        String recipientId = r.id();
+        RecipientType recipientType = r.type();
+        Map<String, Long> counts = readStateService.unreadCountsByEntity(recipientId, recipientType, entityType);
         List<UnreadEntityCount> result = new ArrayList<>(counts.size());
         for (Map.Entry<String, Long> entry : counts.entrySet()) {
-            result.add(new UnreadEntityCount(entry.getKey(), entry.getValue()));
+            String entityId = entry.getKey();
+            Long count = entry.getValue();
+            result.add(new UnreadEntityCount(entityId, count));
         }
         return result;
     }
