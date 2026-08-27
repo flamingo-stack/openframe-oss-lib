@@ -97,6 +97,9 @@ public interface CustomScriptExecutionRepository {
      */
     LeafStatusCounts countLeavesByStatus(String tenantId, String executionId);
 
-    /** Running/failed counts for the leaves of one schedule fire; other terminal statuses are irrelevant to the decision. */
-    record LeafStatusCounts(long running, long failed) {}
+    /**
+     * Leaf counts for one schedule fire. {@code inProgress} is the not-yet-terminal count — leaves that
+     * are QUEUED (awaiting agent ack) or RUNNING; the header stays open while it is &gt; 0.
+     */
+    record LeafStatusCounts(long inProgress, long failed) {}
 }

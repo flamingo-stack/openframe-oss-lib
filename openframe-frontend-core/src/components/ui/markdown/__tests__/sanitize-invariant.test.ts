@@ -16,6 +16,7 @@ import {
   buildEffectiveTagSet,
   buildSanitizeSchema,
   escapeUnknownHtmlTags,
+  rehypeStripUnsafe,
   SAFE_HTML_TAGS,
   SVG_TAGS,
 } from '../sanitize'
@@ -350,5 +351,34 @@ describe('link-definition shelters blank in every shape (round 21)', () => {
     expect(masked).not.toContain('</textarea>')
     // The haystack is case-folded; the heading past the bound is untouched.
     expect(masked).toContain('## after heading')
+  })
+})
+
+describe('URL_ATTRS covers hast PROPERTY keys, not attribute names', () => {
+  it('strips a javascript: data-url via its camelized hast key', () => {
+    // property-information camelizes `data-url` to `dataUrl` BEFORE the
+    // strip pass runs - the URL_ATTRS entry must match the lowercased
+    // PROPERTY key or the scheme check silently never fires.
+    const tree = {
+      type: 'root',
+      children: [
+        {
+          type: 'element',
+          tagName: 'div',
+          properties: {
+            className: ['claude-embed'],
+            dataUrl: 'javascript:alert(1)',
+            dataKind: 'artifact',
+          },
+          children: [],
+        },
+      ],
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(rehypeStripUnsafe() as (t: unknown) => void)(tree as any)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const props = (tree.children[0] as any).properties
+    expect(props.dataUrl).toBeUndefined()
+    expect(props.dataKind).toBe('artifact')
   })
 })
