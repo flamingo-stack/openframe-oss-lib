@@ -120,7 +120,7 @@ class NotificationEmitterTest {
         @Override public Audience audience(TestSeed seed) { return audience; }
 
         @Override public Optional<NotificationEntityRef> entity(TestSeed seed) {
-            return Optional.of(NotificationEntityRef.ticket(seed.ticketId()));
+            return NotificationEntityRef.ticket(seed.ticketId());
         }
 
         @Override public Attrs attrs(TestSeed seed) {

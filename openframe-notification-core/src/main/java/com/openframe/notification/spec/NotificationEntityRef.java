@@ -4,6 +4,8 @@ import com.openframe.data.document.notification.NotificationEntityType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.util.Optional;
+
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Getter
@@ -13,18 +15,21 @@ public class NotificationEntityRef {
     private final NotificationEntityType type;
     private final String id;
 
-    public static NotificationEntityRef ticket(String ticketId) {
+    // Empty, never an exception: the emitter swallows what a spec throws, so a blank id here would
+    // cost the whole notification instead of just its badge.
+    public static Optional<NotificationEntityRef> ticket(String ticketId) {
         return of(NotificationEntityType.TICKET, ticketId);
     }
 
-    public static NotificationEntityRef dialog(String dialogId) {
+    public static Optional<NotificationEntityRef> dialog(String dialogId) {
         return of(NotificationEntityType.DIALOG, dialogId);
     }
 
-    private static NotificationEntityRef of(NotificationEntityType type, String id) {
+    private static Optional<NotificationEntityRef> of(NotificationEntityType type, String id) {
         if (isBlank(id)) {
-            throw new IllegalArgumentException("entity id must not be blank for type " + type);
+            return Optional.empty();
         }
-        return new NotificationEntityRef(type, id);
+        NotificationEntityRef ref = new NotificationEntityRef(type, id);
+        return Optional.of(ref);
     }
 }
