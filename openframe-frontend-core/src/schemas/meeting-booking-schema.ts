@@ -134,8 +134,24 @@ export interface BookingConfirmation {
  * mailboxes), so the widget tells the visitor to fix the email instead of
  * blaming the slot or their other details.
  */
-export type MeetingBookingErrorCode =
-  'SLOT_TAKEN' | 'VALIDATION' | 'INVALID_EMAIL' | 'LINK_GONE' | 'TEMPORARILY_UNAVAILABLE' | 'MEETING_UNAVAILABLE';
+export const MEETING_BOOKING_ERROR_CODES = [
+  'SLOT_TAKEN',
+  'VALIDATION',
+  'INVALID_EMAIL',
+  'LINK_GONE',
+  'TEMPORARILY_UNAVAILABLE',
+  'MEETING_UNAVAILABLE',
+] as const;
+
+/**
+ * Derived from the runtime array ABOVE — the array is the single source of
+ * truth. The booking hook validates server codes against it at runtime, so a
+ * code added only to a hand-written type would be silently coerced to
+ * TEMPORARILY_UNAVAILABLE by every deployed widget (exactly how the
+ * INVALID_EMAIL rollout mis-rendered on 2026-08-27: type extended, runtime
+ * allowlist stale — an array annotation is not exhaustiveness-checked).
+ */
+export type MeetingBookingErrorCode = (typeof MEETING_BOOKING_ERROR_CODES)[number];
 
 // ---------------------------------------------------------------------------
 // Field-type vocabulary — ONE set drives the renderer AND the validator
