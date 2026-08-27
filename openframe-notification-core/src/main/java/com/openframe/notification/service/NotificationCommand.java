@@ -1,8 +1,11 @@
 package com.openframe.notification.service;
 
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationContext;
+import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.notification.spec.Audience;
+import com.openframe.notification.spec.NotificationEntityRef;
 import com.openframe.notification.spec.NotificationType;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,6 +28,14 @@ public final class NotificationCommand {
     private final NotificationType type;
     private final Map<String, String> attributes;
     private final String applePushCategory;
+    /**
+     * Nullable on both paths: the emitter fills them from the spec, legacy dispatchers may set them
+     * by hand. Left null, category and settings group fall back to the context descriptor registry,
+     * and the notification simply has no entity to hang unread counts on.
+     */
+    private final NotificationCategory category;
+    private final NotificationSettingGroup settingsGroup;
+    private final NotificationEntityRef entity;
 
     @Builder
     NotificationCommand(String title,
@@ -35,7 +46,10 @@ public final class NotificationCommand {
                         Audience audience,
                         NotificationType type,
                         Map<String, String> attributes,
-                        String applePushCategory) {
+                        String applePushCategory,
+                        NotificationCategory category,
+                        NotificationSettingGroup settingsGroup,
+                        NotificationEntityRef entity) {
         if (isBlank(title)) {
             throw new IllegalArgumentException("title must not be blank");
         }
@@ -54,5 +68,8 @@ public final class NotificationCommand {
         this.type = type;
         this.attributes = attributes == null ? null : Map.copyOf(attributes);
         this.applePushCategory = applePushCategory;
+        this.category = category;
+        this.settingsGroup = settingsGroup;
+        this.entity = entity;
     }
 }

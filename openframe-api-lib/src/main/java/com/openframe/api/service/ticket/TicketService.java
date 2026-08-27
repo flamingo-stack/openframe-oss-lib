@@ -28,6 +28,11 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.user.UserRepository;
+import com.openframe.data.document.notification.NotificationEntityType;
+import com.openframe.data.document.notification.RecipientType;
+import com.openframe.data.repository.notification.EntityCount;
+import com.openframe.data.repository.notification.NotificationReadStateRepository;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -38,8 +43,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.openframe.api.util.AuthPrincipalUtils.*;
 import static org.springframework.util.StringUtils.hasText;
@@ -62,6 +70,8 @@ public class TicketService {
     private final TicketRepository ticketRepository;
     private final TicketNumberService ticketNumberService;
     private final TicketTagService ticketTagService;
+    private final NotificationReadStateRepository notificationReadStateRepository;
+    private final TenantIdProvider tenantIdProvider;
     private final MachineRepository machineRepository;
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
@@ -86,7 +96,7 @@ public class TicketService {
                 principal.getActorType(), filter, pagination, search, sort);
 
         CursorPaginationCriteria paging = (pagination != null ? pagination : new CursorPaginationCriteria()).normalize();
-        Query query = buildTicketQuery(filter, search, ownerMachineId);
+        Query query = buildTicketQuery(principal, filter, search, ownerMachineId);
         long filteredCount = ticketRepository.countTickets(query);
 
         String sortField = validateSortField(sort);
@@ -540,15 +550,39 @@ public class TicketService {
         };
     }
 
-    private Query buildTicketQuery(TicketFilterInput filter, String search, String ownerMachineId) {
+    private Query buildTicketQuery(AuthPrincipal principal, TicketFilterInput filter,
+                                   String search, String ownerMachineId) {
         TicketQueryFilter queryFilter = toQueryFilter(filter);
 
         List<String> restrictToTicketIds = null;
         if (filter != null && filter.getTagIds() != null && !filter.getTagIds().isEmpty()) {
             restrictToTicketIds = ticketTagService.getTicketIdsByTagIds(filter.getTagIds());
         }
+        if (filter != null && Boolean.TRUE.equals(filter.getHasUnreadNotifications())) {
+            restrictToTicketIds = intersect(restrictToTicketIds, unreadTicketIds(principal));
+        }
 
         return ticketRepository.buildTicketQuery(queryFilter, search, restrictToTicketIds, ownerMachineId);
+    }
+
+    private List<String> unreadTicketIds(AuthPrincipal principal) {
+        // Same recipient rule the notification resolvers use: an AGENT's rows are keyed by machine id.
+        // Read it wrong and a client app silently gets an empty board instead of its own tickets.
+        String recipientId = isAgent(principal) ? principal.getMachineId() : principal.getId();
+        RecipientType recipientType = isAgent(principal) ? RecipientType.MACHINE : RecipientType.USER;
+        List<EntityCount> rows = notificationReadStateRepository.unreadCountsByEntity(
+                recipientId, recipientType, NotificationEntityType.TICKET, tenantIdProvider.getTenantId());
+        return rows.stream().map(EntityCount::entityId).filter(Objects::nonNull).toList();
+    }
+
+    /** Both sides restrict the same slot, so they have to meet. An empty result must stay an empty
+     *  list — null would read as "no restriction" and hand back the whole board. */
+    private List<String> intersect(List<String> left, List<String> right) {
+        if (left == null) {
+            return right;
+        }
+        Set<String> retained = new HashSet<>(right);
+        return left.stream().filter(retained::contains).toList();
     }
 
     private TicketQueryFilter toQueryFilter(TicketFilterInput filter) {

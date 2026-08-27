@@ -1,11 +1,14 @@
 package com.openframe.notification.readstate;
 
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.CategoryCount;
+import com.openframe.data.repository.notification.EntityCount;
 import com.openframe.data.repository.notification.NotificationReadStateRepository;
+import com.openframe.notification.spec.NotificationEntityRef;
 import com.openframe.data.service.TenantIdProvider;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -18,6 +21,7 @@ import org.springframework.validation.annotation.Validated;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +40,17 @@ public class NotificationReadStateService {
                                   String title,
                                   @NotNull RecipientType recipientType,
                                   @NotEmpty Collection<String> recipientIds) {
+        createForAudience(notificationId, category, title, null, recipientType, recipientIds);
+    }
+
+    public void createForAudience(@NotBlank String notificationId,
+                                  @NotNull NotificationCategory category,
+                                  String title,
+                                  NotificationEntityRef entity,
+                                  @NotNull RecipientType recipientType,
+                                  @NotEmpty Collection<String> recipientIds) {
+        NotificationEntityType entityType = entity == null ? null : entity.type();
+        String entityId = entity == null ? null : entity.id();
         List<NotificationReadState> rows = new ArrayList<>(recipientIds.size());
         for (String recipientId : recipientIds) {
             rows.add(NotificationReadState.builder()
@@ -44,6 +59,8 @@ public class NotificationReadStateService {
                     .notificationId(notificationId)
                     .status(ReadStatus.UNREAD)
                     .category(category)
+                    .entityType(entityType)
+                    .entityId(entityId)
                     .title(title)
                     .build());
         }
@@ -128,6 +145,44 @@ public class NotificationReadStateService {
             }
         }
         return counts;
+    }
+
+    /**
+     * Unread count per entity of one kind for this recipient. Rows carrying no entity are excluded in
+     * the pipeline: a null bucket would surface as a null id in a non-null GraphQL field and take the
+     * whole list down with it.
+     */
+    public Map<String, Long> unreadCountsByEntity(@NotBlank String recipientId,
+                                                  @NotNull RecipientType recipientType,
+                                                  @NotNull NotificationEntityType entityType) {
+        List<EntityCount> rows = repository.unreadCountsByEntity(
+                recipientId, recipientType, entityType, tenantIdProvider.getTenantId());
+        Map<String, Long> counts = new HashMap<>(rows.size());
+        for (EntityCount row : rows) {
+            if (row.entityId() != null) {
+                counts.put(row.entityId(), row.count());
+            }
+        }
+        return counts;
+    }
+
+    /**
+     * Clears this recipient's unread rows for one entity — what opening the ticket has to do, since
+     * the cards themselves were never clicked. UNREAD only: READ stays put so reopening flips nothing
+     * and fires no event, and DELETED stays put so a discarded card cannot come back.
+     */
+    public long markEntityAsRead(@NotBlank String recipientId,
+                                 @NotNull RecipientType recipientType,
+                                 @NotNull NotificationEntityType entityType,
+                                 @NotBlank String entityId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        // Snapshot before the flip, with the same caveat markAllAsRead documents: under concurrency the
+        // ids can drift either way, and read-event listeners are expected to be idempotent.
+        List<String> unreadIds = notificationIds(repository.findByRecipientIdAndRecipientTypeAndEntity(
+                recipientId, recipientType, entityType, entityId, ReadStatus.UNREAD, tenantId));
+        long flipped = repository.markEntityAsRead(tenantId, recipientId, recipientType, entityType, entityId);
+        publish(recipientId, recipientType, unreadIds, NotificationReadEvent.Transition.READ);
+        return flipped;
     }
 
     private void publish(String recipientId, RecipientType recipientType,

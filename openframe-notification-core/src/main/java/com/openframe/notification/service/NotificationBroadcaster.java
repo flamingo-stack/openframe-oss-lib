@@ -11,6 +11,7 @@ import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.notification.spec.AudienceResolver;
+import com.openframe.notification.spec.NotificationEntityRef;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.Recipients;
 import com.openframe.data.repository.notification.NotificationRepository;
@@ -50,11 +51,11 @@ public class NotificationBroadcaster {
             return null;
         }
 
-        NotificationCategory category = descriptorRegistry.categoryOf(command.getContext());
+        NotificationCategory category = categoryOf(command);
         Recipients recipients = audienceResolver.resolve(command.getAudience());
         Set<String> adminAudience = recipients.getUsers();
         NotificationContext context = command.getContext();
-        Set<String> admins = withoutOptedOut(adminAudience, context);
+        Set<String> admins = withoutOptedOut(adminAudience, command);
         Set<String> machines = recipients.getMachines();
         if (admins.isEmpty() && machines.isEmpty()) {
             log.info("No recipients left after settings filtering — nothing persisted for '{}'", command.getTitle());
@@ -80,13 +81,14 @@ public class NotificationBroadcaster {
 
         String title = command.getTitle();
         try {
+            NotificationEntityRef entity = command.getEntity();
             if (!admins.isEmpty()) {
                 readStateService.createForAudience(
-                        saved.getId(), category, title, RecipientType.USER, admins);
+                        saved.getId(), category, title, entity, RecipientType.USER, admins);
             }
             if (!machines.isEmpty()) {
                 readStateService.createForAudience(
-                        saved.getId(), category, title, RecipientType.MACHINE, machines);
+                        saved.getId(), category, title, entity, RecipientType.MACHINE, machines);
             }
         } catch (RuntimeException ex) {
             log.error("createForAudience failed for notification {} (admins={}, machines={}); "
@@ -117,13 +119,28 @@ public class NotificationBroadcaster {
         return saved;
     }
 
+    /**
+     * The spec decides; the context descriptor is only the fallback for legacy dispatchers that build
+     * a command by hand. Both must agree while the two paths coexist — a parity test in the tenant
+     * catalog pins that, because a silent divergence here changes who receives what.
+     */
+    private NotificationCategory categoryOf(NotificationCommand command) {
+        NotificationCategory category = command.getCategory();
+        return category != null ? category : descriptorRegistry.categoryOf(command.getContext());
+    }
+
+    private NotificationSettingGroup settingsGroupOf(NotificationCommand command) {
+        NotificationSettingGroup group = command.getSettingsGroup();
+        return group != null ? group : descriptorRegistry.settingsGroupOf(command.getContext()).orElse(null);
+    }
+
     /** Settings bite at the audience: an opted-out admin gets no row/card/NATS/push and nothing arrives retroactively. Absent settings deliver; a failed lookup drops every admin — like every other Mongo failure in broadcast, it must not deliver against unknown preferences. */
-    private Set<String> withoutOptedOut(Set<String> admins, NotificationContext context) {
+    private Set<String> withoutOptedOut(Set<String> admins, NotificationCommand command) {
         if (admins.isEmpty()) {
             return admins;
         }
         try {
-            NotificationSettingGroup group = descriptorRegistry.settingsGroupOf(context).orElse(null);
+            NotificationSettingGroup group = settingsGroupOf(command);
             List<NotificationSettings> rows = settingsRepository.findByUserIdIn(admins);
             if (rows.isEmpty()) {
                 return admins;

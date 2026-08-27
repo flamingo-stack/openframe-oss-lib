@@ -20,6 +20,13 @@ public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     NotificationCategory getCategory();
 
+    /**
+     * The entity this notification is about, or empty when it is about none. Deliberately abstract:
+     * a default would let a spec ship without deciding, and the miss would surface much later as
+     * "the badge on the ticket never lights up".
+     */
+    Optional<NotificationEntityRef> entity(S seed);
+
     NotificationSeverity getSeverity();
 
     Audience audience(S seed);

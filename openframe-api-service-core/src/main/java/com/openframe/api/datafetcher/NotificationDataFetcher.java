@@ -8,6 +8,7 @@ import com.openframe.api.dto.notification.NotificationFilter;
 import com.openframe.api.dto.notification.NotificationFilterInput;
 import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.notification.UnreadCategoryCount;
+import com.openframe.api.dto.notification.UnreadEntityCount;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -15,6 +16,7 @@ import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
 import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.notification.readstate.NotificationReadStateService;
 import com.openframe.security.authentication.ActorType;
@@ -94,6 +96,26 @@ public class NotificationDataFetcher {
             result.add(new UnreadCategoryCount(entry.getKey(), entry.getValue()));
         }
         return result;
+    }
+
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
+    @DgsQuery
+    public List<UnreadEntityCount> unreadCountsByEntity(@InputArgument NotificationEntityType entityType) {
+        Recipient r = currentRecipient();
+        Map<String, Long> counts = readStateService.unreadCountsByEntity(r.id(), r.type(), entityType);
+        List<UnreadEntityCount> result = new ArrayList<>(counts.size());
+        for (Map.Entry<String, Long> entry : counts.entrySet()) {
+            result.add(new UnreadEntityCount(entry.getKey(), entry.getValue()));
+        }
+        return result;
+    }
+
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
+    @DgsMutation
+    public long markNotificationsReadForEntity(@InputArgument NotificationEntityType entityType,
+                                               @InputArgument String entityId) {
+        Recipient r = currentRecipient();
+        return readStateService.markEntityAsRead(r.id(), r.type(), entityType, entityId);
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")

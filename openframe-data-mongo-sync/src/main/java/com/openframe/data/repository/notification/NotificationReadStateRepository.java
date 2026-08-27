@@ -1,5 +1,6 @@
 package com.openframe.data.repository.notification;
 
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
@@ -60,4 +61,35 @@ public interface NotificationReadStateRepository
     List<CategoryCount> unreadCountsByCategory(@Param("recipientId") String recipientId,
                                                @Param("recipientType") RecipientType recipientType,
                                                @Param("tenantId") String tenantId);
+
+    /**
+     * tenantId is matched explicitly here and in every method below: aggregations and @Update queries
+     * both bypass the tenant-scoping wrapper, so dropping it leaks one tenant's rows into another's
+     * counts with nothing else in the stack to catch it.
+     */
+    @Aggregation(pipeline = {
+            "{ '$match': { 'tenantId': ?3, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, "
+                    + "'status': 'UNREAD', 'entityId': { '$exists': true, '$ne': null } } }",
+            "{ '$group': { '_id': '$entityId', 'count': { '$sum': 1 } } }"
+    })
+    List<EntityCount> unreadCountsByEntity(@Param("recipientId") String recipientId,
+                                           @Param("recipientType") RecipientType recipientType,
+                                           @Param("entityType") NotificationEntityType entityType,
+                                           @Param("tenantId") String tenantId);
+
+    @Query("{ 'tenantId': ?5, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, 'entityId': ?3, 'status': ?4 }")
+    List<NotificationReadState> findByRecipientIdAndRecipientTypeAndEntity(String recipientId,
+                                                                          RecipientType recipientType,
+                                                                          NotificationEntityType entityType,
+                                                                          String entityId,
+                                                                          ReadStatus status,
+                                                                          String tenantId);
+
+    @Query("{ 'tenantId': ?0, 'recipientId': ?1, 'recipientType': ?2, 'entityType': ?3, 'entityId': ?4, 'status': 'UNREAD' }")
+    @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
+    long markEntityAsRead(String tenantId,
+                          String recipientId,
+                          RecipientType recipientType,
+                          NotificationEntityType entityType,
+                          String entityId);
 }
