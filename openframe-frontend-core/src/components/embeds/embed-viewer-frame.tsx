@@ -1,8 +1,11 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from '../../utils/cn'
-import { EmbedIframe } from './embed-iframe'
+import { FullscreenSwitchController } from '../../utils/fullscreen-switch'
+import { Button } from '../ui/button/button'
+import { EmbedIframe, EmbedLoadingSkeleton } from './embed-iframe'
 
 /**
  * EmbedViewerFrame — the ONE viewer shell shared by every embed viewer
@@ -34,8 +37,15 @@ export interface EmbedViewerFrameProps {
   titleVariant?: 'h3' | 'h6'
   /** Rendered verbatim in the header row — the caller owns its own container/state. */
   actions?: React.ReactNode
-  /** Iframe source; falsy renders the inline empty state under the header. */
+  /** Iframe source; falsy renders the inline empty state (or the loading
+   *  state when `isLoading`) under the header. */
   src: string | null | undefined
+  /** While true AND there is no `src` yet, the body shows the shared embed
+   *  loading skeleton (`EmbedLoadingSkeleton`) instead of the empty state —
+   *  for a viewer that is still resolving where its frame points (e.g.
+   *  ClaudeEmbed probing for a self-hosted mirror), so a cold first view
+   *  reads as "loading" (identical to every other embed), not "nothing here". */
+  isLoading?: boolean
   /** Large icon for the inline empty state (the viewers pass `w-16 h-16`). */
   emptyIcon?: React.ReactNode
   emptyMessage?: string
@@ -47,6 +57,13 @@ export interface EmbedViewerFrameProps {
   sandbox?: string
   /** Wrapper classes; defaults to the sheets/pdf `space-y-4`. */
   className?: string
+  /** Opt-in fullscreen toggle in the header row (rendered after `actions`,
+   *  only when there is a `src`). Fullscreens the WHOLE frame — header
+   *  included — so the exit control stays reachable (Esc works too).
+   *  Exists because some embedded contents ship their own fullscreen
+   *  button (the Figma player) and some cannot (a self-hosted Claude
+   *  artifact mirror) — the shell provides the affordance uniformly. */
+  fullscreenControl?: boolean
 }
 
 export function EmbedViewerFrame({
@@ -55,6 +72,7 @@ export function EmbedViewerFrame({
   titleVariant = 'h3',
   actions,
   src,
+  isLoading,
   emptyIcon,
   emptyMessage = 'Content not available',
   height,
@@ -63,9 +81,45 @@ export function EmbedViewerFrame({
   loading,
   sandbox,
   className,
+  fullscreenControl,
 }: EmbedViewerFrameProps) {
+  const frameRef = useRef<HTMLDivElement>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  // ONE fullscreen implementation across the library and its hosts:
+  // `FullscreenSwitchController` (shared with the hub's deck) owns the
+  // Fullscreen API calls, webkit fallbacks, rejection safety, and the
+  // change-event-driven state — Esc, F11, buttons and browser chrome all
+  // converge on its listener, so the icon can never desync. Here it runs
+  // element-level (`target` = this frame; no mask classes — the frame
+  // styles off its own state).
+  const controllerRef = useRef<FullscreenSwitchController | null>(null)
+  useEffect(() => {
+    if (!fullscreenControl) return
+    const controller = new FullscreenSwitchController({
+      target: () => frameRef.current,
+      onFullscreenChange: setIsFullscreen,
+    })
+    controllerRef.current = controller
+    controller.attach()
+    return () => {
+      controllerRef.current = null
+      controller.detach()
+    }
+  }, [fullscreenControl])
+  const toggleFullscreen = () => controllerRef.current?.toggle()
+
   return (
-    <div className={cn('space-y-4', className)}>
+    <div
+      ref={frameRef}
+      className={cn(
+        'space-y-[var(--spacing-system-mf)]',
+        className,
+        // Fullscreen paints its own ground (the fullscreened element
+        // otherwise sits on the UA's black backdrop) and scrolls itself.
+        isFullscreen && 'overflow-auto bg-ods-bg p-[var(--spacing-system-mf)]',
+      )}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 min-w-0">
           {icon}
@@ -75,18 +129,52 @@ export function EmbedViewerFrame({
             <span className="text-h6 font-semibold text-ods-text-primary truncate">{title}</span>
           )}
         </div>
-        {actions}
+        {/* Same responsive action-row idiom as the PDF viewer's button pair
+            and every viewer's own action: full-width stacked on mobile,
+            inline row from `sm:` up, SAME Button idiom (outline /
+            small-legacy / w-4 icon / w-full sm:w-auto). Without the
+            fullscreen toggle, `actions` renders EXACTLY as before — the
+            wrapper exists only when the toggle joins it, so pre-existing
+            viewers (figma/pdf/sheets) are byte-identical. */}
+        {fullscreenControl && src ? (
+          <div className="flex flex-col gap-[var(--spacing-system-xsf)] sm:flex-row sm:items-center">
+            {actions}
+            <Button
+              variant="outline"
+              size="small-legacy"
+              onClick={toggleFullscreen}
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              leftIcon={isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              className="w-full sm:w-auto"
+            >
+              {isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            </Button>
+          </div>
+        ) : (
+          actions
+        )}
       </div>
       {src ? (
         <EmbedIframe
           src={src}
           title={title}
-          height={height}
+          // 96px = the fullscreen wrapper's own chrome above the iframe:
+          // header row (~40px incl. its gap) + the wrapper's mf padding
+          // (16px × 2) + the mf space-y gap (16px), rounded up so the
+          // frame never forces a scrollbar. Recheck if that chrome changes.
+          height={isFullscreen ? 'calc(100vh - 96px)' : height}
           allow={allow}
           allowFullScreen={allowFullScreen}
           loading={loading}
           sandbox={sandbox}
         />
+      ) : isLoading ? (
+        // The EXACT skeleton every embed shows while its iframe loads
+        // (`EmbedIframe`'s `EmbedLoadingSkeleton`) — so a viewer still
+        // RESOLVING where its frame points (ClaudeEmbed probing for a mirror,
+        // before it has a `src`) reads 1:1 with the Figma/Sheets/PDF loading
+        // state, then settles into the iframe in place.
+        <EmbedLoadingSkeleton height={height} />
       ) : (
         // The SAME box the iframe would have filled: same height, same rounded
         // border. A viewer whose content is missing must not collapse the page

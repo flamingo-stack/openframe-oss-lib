@@ -36,6 +36,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -52,14 +53,22 @@ public class ScheduleFireDispatcher {
     private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
     private final MachineRepository machineRepository;
     private final DeviceOnlineDispatchRepository dispatchRepository;
+    private final ScriptDeliveryRetryStore retryStore;
 
     public void dispatch(ScheduleScript schedule, Instant now) {
         List<String> targets = targetResolver.resolveTargetMachineIds(schedule);
-        if (isRetryOnReconnect(schedule)) {
-            dispatchWithReconnectRetry(schedule, targets, now);
-        } else {
+        if (targets == null || targets.isEmpty()) {
             dispatch(schedule, targets, now);
+            return;
         }
+
+        Set<String> offline = offlineTargets(schedule.getTenantId(), targets);
+        if (!offline.isEmpty()) {
+            handleOfflineTargets(schedule, offline, now);
+        }
+
+        List<String> online = targets.stream().filter(id -> !offline.contains(id)).toList();
+        dispatch(schedule, online, now);
     }
 
     private boolean isRetryOnReconnect(ScheduleScript schedule) {
@@ -69,30 +78,20 @@ public class ScheduleFireDispatcher {
                 && schedule.getReconnectWindowSeconds() > 0;
     }
 
-    private void dispatchWithReconnectRetry(ScheduleScript schedule, List<String> targets, Instant now) {
-        if (targets == null || targets.isEmpty()) {
-            dispatch(schedule, targets, now);
-            return;
-        }
-        Map<String, Machine> byId = machineRepository
-                .findByTenantIdAndMachineIdIn(schedule.getTenantId(), new HashSet<>(targets)).stream()
-                .collect(Collectors.toMap(Machine::getMachineId, Function.identity(), (a, b) -> a));
+    private Set<String> offlineTargets(String tenantId, List<String> targets) {
+        return machineRepository.findByTenantIdAndMachineIdIn(tenantId, new HashSet<>(targets)).stream()
+                .filter(machine -> machine.getStatus() == DeviceStatus.OFFLINE)
+                .map(Machine::getMachineId)
+                .collect(Collectors.toSet());
+    }
 
-        List<String> toDispatch = new ArrayList<>();
-        List<String> toHold = new ArrayList<>();
-        for (String machineId : targets) {
-            Machine machine = byId.get(machineId);
-            if (machine != null && machine.getStatus() == DeviceStatus.OFFLINE) {
-                toHold.add(machineId);      // genuinely offline → wait for reconnect
-            } else {
-                toDispatch.add(machineId);  // online / any non-OFFLINE state → dispatch as today
-            }
+    private void handleOfflineTargets(ScheduleScript schedule, Set<String> offline, Instant now) {
+        if (isRetryOnReconnect(schedule)) {
+            armReconnectRetry(schedule, new ArrayList<>(offline), now);
+        } else {
+            log.info("Skipping {} offline device(s) for schedule scheduleId={} tenantId={} (offlineBehavior=SKIP)",
+                    offline.size(), schedule.getId(), schedule.getTenantId());
         }
-
-        if (!toHold.isEmpty()) {
-            armReconnectRetry(schedule, toHold, now);
-        }
-        dispatch(schedule, toDispatch, now);
     }
 
     /**
@@ -202,7 +201,7 @@ public class ScheduleFireDispatcher {
                         .timeoutSeconds(script.getDefaultTimeoutSeconds())
                         .initiatedBy(fire.initiatedBy())
                         .source(ExecutionSource.SCHEDULED)
-                        .status(ExecutionStatus.RUNNING)
+                        .status(ExecutionStatus.QUEUED)
                         .dispatchedAt(fire.now())
                         .statusChangedAt(fire.now())
                         .build()))
@@ -231,14 +230,17 @@ public class ScheduleFireDispatcher {
                 })
                 .toList();
 
-        fire.machineIds().forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
-                ScriptScheduleExecutionMessage.builder()
-                        .executionId(fire.executionId())
-                        .scheduleId(fire.scheduleId())
-                        .machineId(machineId)
-                        .initiatedBy(fire.initiatedBy())
-                        .scripts(items)
-                        .build()));
+        fire.machineIds().forEach(machineId -> {
+            ScriptScheduleExecutionMessage message = ScriptScheduleExecutionMessage.builder()
+                    .executionId(fire.executionId())
+                    .scheduleId(fire.scheduleId())
+                    .machineId(machineId)
+                    .initiatedBy(fire.initiatedBy())
+                    .scripts(items)
+                    .build();
+            scriptScheduleNatsPublisher.publish(machineId, message);
+            retryStore.store(fire.executionId(), machineId, message);
+        });
     }
 
     /** Everything one fire needs, bundled so the persist/publish steps take a single arg. */

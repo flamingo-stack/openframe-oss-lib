@@ -57,7 +57,7 @@ import type { ChatRef } from '../chat-ref.types'
 import type { Message } from '../types/message.types'
 import type { MessageSegment } from '../types/message.types'
 import { useSlashCommandRegistry, type SlashCommandSummary } from './use-slash-commands'
-import { chatAuthedFetch } from '../utils/chat-authed-fetch'
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
 import type { ScrollAnchor } from '../utils/scroll-anchor'
 import { buildConfirmToolBody, readServerErrorMessage } from '../../../chat-protocol/confirm-tool'
 import { createSseFrameDecoder } from '../../../chat-protocol/decode'
@@ -458,10 +458,10 @@ export function useSseChatAdapter(
       abortControllerRef.current = ctrl
 
       try {
-        // `chatAuthedFetch` carries the bearer-act-as headers (+ Supabase
+        // `embedAuthedFetch` carries the bearer-act-as headers (+ Supabase
         // session cookies) — same wrapper `use-chat-attachments` and
         // `use-chat-identity` use.
-        const response = await chatAuthedFetch(targetPath, {
+        const response = await embedAuthedFetch(targetPath, {
           method: 'POST',
           body: JSON.stringify(requestBody),
           signal: ctrl.signal,

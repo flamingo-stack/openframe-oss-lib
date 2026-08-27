@@ -15,11 +15,14 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Locale;
+import java.util.Objects;
 
+import static com.openframe.data.document.sso.SSOConfig.OPENFRAME_PROVIDER;
 import static java.lang.Boolean.TRUE;
 
 @Slf4j
@@ -44,12 +47,14 @@ public class SSOConfigService {
         log.debug("Getting enabled SSO providers");
 
         return ssoConfigRepository.findByEnabledTrue().stream()
+                // The built-in login's toggle document is not an external SSO provider.
+                .filter(config -> !OPENFRAME_PROVIDER.equals(config.getProvider()))
                 .map(config -> SSOConfigStatusResponse.builder()
                         .provider(config.getProvider())
                         .enabled(true)
                         .clientId(config.getClientId())
                         .build())
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public List<SSOProviderInfo> getAvailableProviders() {
@@ -62,6 +67,9 @@ public class SSOConfigService {
      * Always returns a valid response object, even if configuration doesn't exist
      */
     public SSOConfigResponse getConfig(String provider) {
+        if (OPENFRAME_PROVIDER.equals(provider)) {
+            return openframeLoginConfig();
+        }
         return ssoConfigRepository.findByProvider(provider)
                 .map(config -> ssoConfigMapper.toResponse(
                         config,
@@ -118,6 +126,10 @@ public class SSOConfigService {
     }
 
     public void toggleEnabled(String provider, boolean enabled) {
+        if (OPENFRAME_PROVIDER.equals(provider)) {
+            toggleOpenframeLogin(enabled);
+            return;
+        }
         ssoConfigRepository.findByProvider(provider)
                 .ifPresent(config -> {
                     config.setEnabled(enabled);
@@ -127,6 +139,35 @@ public class SSOConfigService {
 
                     ssoConfigProcessor.postProcessConfigToggled(savedConfig);
                 });
+    }
+
+    /**
+     * The built-in OpenFrame (password) login has no client credentials — its config document
+     * exists purely as the per-tenant on/off switch, so unlike external providers the toggle
+     * creates the document on first use. No document means enabled.
+     */
+    private void toggleOpenframeLogin(boolean enabled) {
+        SSOConfig config = ssoConfigRepository.findByProvider(OPENFRAME_PROVIDER)
+                .orElseGet(() -> {
+                    SSOConfig created = new SSOConfig();
+                    created.setProvider(OPENFRAME_PROVIDER);
+                    return created;
+                });
+        config.setEnabled(enabled);
+        SSOConfig savedConfig = ssoConfigRepository.save(config);
+        log.info("Successfully {} OpenFrame login", enabled ? "enabled" : "disabled");
+
+        ssoConfigProcessor.postProcessConfigToggled(savedConfig);
+    }
+
+    private SSOConfigResponse openframeLoginConfig() {
+        boolean enabled = ssoConfigRepository.findByProvider(OPENFRAME_PROVIDER)
+                .map(SSOConfig::isEnabled)
+                .orElse(true);
+        return SSOConfigResponse.builder()
+                .provider(OPENFRAME_PROVIDER)
+                .enabled(enabled)
+                .build();
     }
 
     private void validateAutoProvision(String provider, SSOConfigRequest request) {
@@ -140,28 +181,23 @@ public class SSOConfigService {
 
         request.setAllowedDomains(normalized);
 
-        if (wantsAutoProvision) {
-            if (normalized.isEmpty()) {
-                throw new IllegalArgumentException("allowedDomains must contain at least one domain when autoProvisionUsers is true.");
-            }
+        if (wantsAutoProvision && normalized.isEmpty()) {
+            throw new IllegalArgumentException("allowedDomains must contain at least one domain when autoProvisionUsers is true.");
         }
 
-        if (isMicrosoft && wantsAutoProvision) {
-            String msTenantId = request.getMsTenantId();
-            if (msTenantId == null || msTenantId.isBlank()) {
-                throw new IllegalArgumentException("autoProvisionUsers can be true only for Microsoft single-tenant apps (msTenantId is required).");
-            }
+        if (isMicrosoft && wantsAutoProvision && !StringUtils.hasText(request.getMsTenantId())) {
+            throw new IllegalArgumentException("autoProvisionUsers can be true only for Microsoft single-tenant apps (msTenantId is required).");
         }
     }
 
     private List<String> normalizeDomains(List<String> domains) {
         if (domains == null) return List.of();
         return domains.stream()
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .map(s -> s.toLowerCase(java.util.Locale.ROOT))
+                .filter(StringUtils::hasText)
+                .map(domain -> domain.toLowerCase(Locale.ROOT))
                 .distinct()
-                .collect(java.util.stream.Collectors.toList());
+                .toList();
     }
 } 
