@@ -126,13 +126,13 @@ export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height =
       {imageUrl ? (
         <div className="relative group w-full aspect-square md:aspect-auto h-auto md:h-full flex items-center justify-center overflow-hidden" style={{ height: heightStyle }}>
           <img src={imageUrl} className={`absolute inset-0 w-full h-full object-${objectFit}`} alt="Cover" />
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-4 transition-opacity rounded-lg">
+          <div className="absolute inset-0 bg-ods-overlay opacity-0 group-hover:opacity-100 flex items-center justify-center gap-4 transition-opacity rounded-lg">
             {showReplaceButton && (
               <Button
                 variant="outline"
                 size="icon"
                 onClick={openDialog}
-                className="bg-white text-black hover:bg-gray-100 rounded-full w-12 h-12"
+                className="bg-ods-card text-ods-text-primary hover:bg-ods-bg rounded-full w-12 h-12"
               >
                 <Upload className="h-5 w-5" />
               </Button>
@@ -141,7 +141,7 @@ export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height =
               variant="outline"
               size="icon"
               onClick={() => handleRemove()}
-              className="bg-white text-black hover:bg-gray-100 rounded-full w-12 h-12"
+              className="bg-ods-card text-ods-text-primary hover:bg-ods-bg rounded-full w-12 h-12"
             >
               <X className="h-5 w-5" />
             </Button>
