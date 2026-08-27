@@ -32,8 +32,7 @@ import java.time.Instant;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class CommandExecutionStatusUpdateHandler
-        implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
+public class CommandExecutionHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     private static final String FIELD_EXECUTION_ID = "executionId";
     private static final String FIELD_MACHINE_ID = "machineId";

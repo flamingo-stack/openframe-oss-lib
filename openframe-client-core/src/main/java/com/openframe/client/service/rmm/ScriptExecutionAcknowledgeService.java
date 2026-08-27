@@ -1,0 +1,48 @@
+package com.openframe.client.service.rmm;
+
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.nats.rmm.model.ScriptExecutionAcknowledgeMessage;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class ScriptExecutionAcknowledgeService {
+
+    private final ScriptExecutionRepository scriptExecutionRepository;
+
+    public void acknowledge(ScriptExecutionAcknowledgeMessage ack) {
+        if (ack.getExecutionId() == null || ack.getMachineId() == null || ack.getScriptId() == null) {
+            log.warn("Execution ack missing ids: executionId={} machineId={} scriptId={} — ignoring",
+                    ack.getExecutionId(), ack.getMachineId(), ack.getScriptId());
+            return;
+        }
+        scriptExecutionRepository
+                .findByMachineIdAndExecutionIdAndScriptId(ack.getMachineId(), ack.getExecutionId(), ack.getScriptId())
+                .ifPresentOrElse(row -> flipToRunning(row, ack), () -> logMissingLeaf(ack));
+    }
+
+    private void flipToRunning(ScriptExecution row, ScriptExecutionAcknowledgeMessage ack) {
+        if (row.getStatus() != ExecutionStatus.QUEUED) {
+            log.debug("Execution ack: leaf not QUEUED (status={}) — no flip executionId={} scriptId={} machineId={}",
+                    row.getStatus(), ack.getExecutionId(), ack.getScriptId(), ack.getMachineId());
+            return;
+        }
+        row.setStatus(ExecutionStatus.RUNNING);
+        row.setStatusChangedAt(Instant.now());
+        scriptExecutionRepository.save(row);
+        log.info("Execution ack: QUEUED→RUNNING executionId={} scriptId={} machineId={}",
+                ack.getExecutionId(), ack.getScriptId(), ack.getMachineId());
+    }
+
+    private void logMissingLeaf(ScriptExecutionAcknowledgeMessage ack) {
+        log.warn("Execution ack: no leaf for executionId={} machineId={} scriptId={}",
+                ack.getExecutionId(), ack.getMachineId(), ack.getScriptId());
+    }
+}

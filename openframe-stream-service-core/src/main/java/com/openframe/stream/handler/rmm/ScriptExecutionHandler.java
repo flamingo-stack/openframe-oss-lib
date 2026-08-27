@@ -20,32 +20,10 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
-/**
- * Transitions the persisted {@link ScriptExecution} row from {@code RUNNING} to
- * {@code SUCCESS} / {@code FAILED} based on an RMM result event consumed
- * from the {@code logs.events} Kafka topic.
- *
- * <p>Lives downstream of the Kafka publish (in {@code stream-service-core})
- * rather than inside {@code RmmResultService} on the producer side — Kafka is
- * the source of truth, this handler is the projection onto the History row.
- * Decoupling client-core from the Execution domain + opening the door to
- * replay-from-Kafka were the drivers.
- *
- * <p>Registered for the {@link Destination#MONGO_HISTORY} destination, which is
- * currently only added to {@code MessageType.SCRIPT_EXECUTED} — Command
- * results have no persisted History row (yet) and so do not route here.
- *
- * <p>Reads typed result fields straight from {@code payload.after} on the
- * underlying Debezium envelope: those fields (exitCode, timedOut, stdout,
- * stderr, error, executionTimeMs) are not surfaced on
- * {@link DeserializedDebeziumMessage} and re-parsing the stringified
- * {@code getDetails()} / {@code getError()} would be wasteful.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class ScriptExecutionStatusUpdateHandler
-        implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
+public class ScriptExecutionHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     private static final String FIELD_EXECUTION_ID = "executionId";
     private static final String FIELD_MACHINE_ID = "machineId";
@@ -140,10 +118,9 @@ public class ScriptExecutionStatusUpdateHandler
     }
 
     private void applyResult(ScriptExecution row, JsonNode after) {
-        if (row.getStatus() != ExecutionStatus.RUNNING) {
-            // Watchdog beat us to it — refuse to overwrite a terminal status.
-            log.warn("Execution executionId={} is already in terminal status={} — refusing to overwrite",
-                    row.getExecutionId(), row.getStatus());
+        ExecutionStatus previous = row.getStatus();
+        if (isTerminal(previous)) {
+            log.warn("Execution executionId={} is already in terminal status={} — refusing to overwrite", row.getExecutionId(), previous);
             return;
         }
 
@@ -173,8 +150,12 @@ public class ScriptExecutionStatusUpdateHandler
 
         scriptExecutionRepository.save(row);
         executionMetrics.recordCompleted(RmmExecutionMetrics.KIND_SCRIPT, newStatus, row.getDispatchedAt(), now);
-        log.info("Transitioned Execution row: executionId={} status=RUNNING→{} exitCode={} timedOut={}",
-                row.getExecutionId(), newStatus, exitCode, timedOut);
+        log.info("Transitioned Execution row: executionId={} status={}→{} exitCode={} timedOut={}",
+                row.getExecutionId(), previous, newStatus, exitCode, timedOut);
+    }
+
+    private static boolean isTerminal(ExecutionStatus status) {
+        return status == ExecutionStatus.SUCCESS || status == ExecutionStatus.FAILED;
     }
 
     private static ExecutionStatus decideStatus(Integer exitCode, Boolean timedOut, String error) {

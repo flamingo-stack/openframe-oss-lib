@@ -145,9 +145,10 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         if (tenantId == null || executionId == null) {
             return new LeafStatusCounts(0, 0);
         }
-        long running = countLeavesInStatus(tenantId, executionId, ExecutionStatus.RUNNING);
+        long inProgress = countLeavesInStatus(tenantId, executionId, ExecutionStatus.QUEUED)
+                + countLeavesInStatus(tenantId, executionId, ExecutionStatus.RUNNING);
         long failed = countLeavesInStatus(tenantId, executionId, ExecutionStatus.FAILED);
-        return new LeafStatusCounts(running, failed);
+        return new LeafStatusCounts(inProgress, failed);
     }
 
     private long countLeavesInStatus(String tenantId, String executionId, ExecutionStatus status) {

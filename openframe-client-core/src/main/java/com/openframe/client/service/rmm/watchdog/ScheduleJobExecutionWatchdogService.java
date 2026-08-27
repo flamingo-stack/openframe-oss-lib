@@ -1,6 +1,7 @@
 package com.openframe.client.service.rmm.watchdog;
 
 import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
 import com.openframe.data.repository.rmm.CustomScriptExecutionRepository.LeafStatusCounts;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -29,7 +31,7 @@ public class ScheduleJobExecutionWatchdogService {
             return false;
         }
         LeafStatusCounts counts = scriptExecutionRepository.countLeavesByStatus(tenantId, executionId);
-        if (counts.running() > 0) {
+        if (counts.inProgress() > 0) {
             return false;// still in flight → header stays RUNNING
         }
         ExecutionStatus finalStatus;
@@ -46,6 +48,16 @@ public class ScheduleJobExecutionWatchdogService {
         }
 
         return modified > 0;
+    }
+
+    public void finalizeAffectedHeaders(List<ScriptExecution> leaves) {
+        leaves.stream()
+                .filter(row -> row.getScheduleId() != null
+                        && row.getTenantId() != null
+                        && row.getExecutionId() != null)
+                .map(row -> Map.entry(row.getTenantId(), row.getExecutionId()))
+                .distinct()
+                .forEach(e -> finalizeIfSettled(e.getKey(), e.getValue()));
     }
 
     public void markStuckScheduleJobsAsFailed() {
