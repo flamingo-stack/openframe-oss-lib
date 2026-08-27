@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 
 interface EmptyVendorIconProps {
   className?: string;
@@ -6,6 +6,9 @@ interface EmptyVendorIconProps {
 
 /** @deprecated Use icons from icons-v2-generated instead. */
 export function EmptyVendorIcon({ className }: EmptyVendorIconProps) {
+  const uid = useId();
+  const patternId = `pattern0_1643_33816_${uid}`;
+  const imageId = `image0_1643_33816_${uid}`;
   return (
     <svg 
       width="24" 
@@ -18,22 +21,22 @@ export function EmptyVendorIcon({ className }: EmptyVendorIconProps) {
     >
       <path 
         d="M0 4C0 1.79086 1.79086 0 4 0H20C22.2091 0 24 1.79086 24 4V20C24 22.2091 22.2091 24 20 24H4C1.79086 24 0 22.2091 0 20V4Z" 
-        fill="url(#pattern0_1643_33816)"
+        fill={`url(#${patternId})`}
       />
       <defs>
         <pattern 
-          id="pattern0_1643_33816" 
+          id={patternId} 
           patternContentUnits="objectBoundingBox" 
           width="1" 
           height="1"
         >
           <use 
-            xlinkHref="#image0_1643_33816" 
+            xlinkHref={`#${imageId}`} 
             transform="scale(0.0104167)"
           />
         </pattern>
         <image 
-          id="image0_1643_33816" 
+          id={imageId} 
           width="96" 
           height="96" 
           preserveAspectRatio="none" 
