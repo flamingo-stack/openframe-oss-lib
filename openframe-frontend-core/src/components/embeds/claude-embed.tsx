@@ -53,16 +53,25 @@ const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
  */
 export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy' }: ClaudeEmbedProps) {
   // Mirror detection lives in `useClaudeMirrorSrc` (derive from
-  // EndpointsRuntime + 1-byte ranged probe) — this component stays
-  // presentational: mirror when the hook found one, claude.ai otherwise.
-  const mirrorSrc = useClaudeMirrorSrc(url)
-  const embedUrl = mirrorSrc ?? toClaudeEmbedUrl(url)
+  // EndpointsRuntime + 1-byte ranged probe + background revalidation) — this
+  // component stays presentational.
+  const { src: mirrorSrc, status } = useClaudeMirrorSrc(url)
+  // While the probe is in flight (on a cold view that IS the ~1-2s
+  // self-heal), show the shell's loading state rather than the claude.ai
+  // fallback — a code artifact's fallback is the empty "no embeddable view"
+  // box, and flashing it before the mirror resolves reads as broken.
+  const isProbing = status === 'probing'
+  // Found → the mirror; otherwise the claude.ai embed (or its empty state).
+  // Suppressed while probing so nothing renders under the spinner.
+  const embedUrl = isProbing ? null : (mirrorSrc ?? toClaudeEmbedUrl(url))
   return (
     <EmbedViewerFrame
       className="my-6 space-y-3"
       icon={<ClaudeIcon className="w-5 h-5 shrink-0" />}
       title={title?.trim() || KIND_HEADING[kind]}
       titleVariant="h6"
+      isLoading={isProbing}
+      loadingMessage="Loading artifact…"
       actions={
         <Button
           variant="outline"
