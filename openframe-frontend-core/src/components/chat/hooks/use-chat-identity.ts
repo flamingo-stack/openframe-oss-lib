@@ -43,8 +43,8 @@
 
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
-import { chatAuthedFetch } from '../utils/chat-authed-fetch'
-import { getChatProxyAuth } from '../utils/chat-proxy-auth-storage'
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
+import { getEmbedProxyAuth } from '../../../utils/embed-proxy-auth-storage'
 
 /**
  * Wire-shape for the identity route response. Mirrors the hub's
@@ -109,10 +109,10 @@ const ANON_DEFAULTS: ChatIdentityResponse = {
 function useResolveChatIdentity(enabled: boolean): ChatIdentitySurface {
   const runtime = useRequiredChatRuntime()
   const url = runtime.endpoints.identityUrl
-  // `getChatProxyAuth()` reads localStorage every render. If the user
+  // `getEmbedProxyAuth()` reads localStorage every render. If the user
   // pastes bearer creds mid-session (via the `/debug` creds bar),
   // their email arrives here and the effect's dep changes → refetch.
-  const proxyEmail = getChatProxyAuth()?.email ?? null
+  const proxyEmail = getEmbedProxyAuth()?.email ?? null
 
   const [data, setData] = useState<ChatIdentityResponse>(ANON_DEFAULTS)
   // Only "loading" if THIS instance will actually fetch. A disabled
@@ -126,7 +126,7 @@ function useResolveChatIdentity(enabled: boolean): ChatIdentitySurface {
     const ctrl = new AbortController()
 
     setIsLoading(true)
-    chatAuthedFetch(url, { signal: ctrl.signal })
+    embedAuthedFetch(url, { signal: ctrl.signal })
       .then(async (resp) => {
         if (!resp.ok) return ANON_DEFAULTS
         return (await resp.json()) as ChatIdentityResponse

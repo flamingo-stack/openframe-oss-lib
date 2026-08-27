@@ -6,8 +6,13 @@ import React, { useState, useCallback, useRef, useEffect } from 'react'
  *  Uses `bg-ods-card` (visible token) rather than `bg-ods-skeleton`
  *  which resolves to transparent in this build (the same gotcha
  *  documented in `chat-message-row.tsx`'s skeleton). No fake inner
- *  placeholder cruft — a real loading iframe shows a blank rectangle. */
-function EmbedLoadingSkeleton({ height }: { height?: string }) {
+ *  placeholder cruft — a real loading iframe shows a blank rectangle.
+ *
+ *  Exported so a viewer that is still RESOLVING where its frame points
+ *  (ClaudeEmbed probing for a self-hosted mirror, before it has a `src`)
+ *  can render the IDENTICAL skeleton through `EmbedViewerFrame`, keeping
+ *  every embed's loading state 1:1 with the Figma/Sheets/PDF viewers. */
+export function EmbedLoadingSkeleton({ height }: { height?: string }) {
   return (
     <div
       className="w-full rounded-lg border border-ods-border overflow-hidden bg-ods-card animate-pulse"
