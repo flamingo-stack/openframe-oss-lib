@@ -8,7 +8,7 @@ import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
-import com.openframe.notification.spec.EntityRef;
+import com.openframe.notification.spec.NotificationEntityRef;
 import com.openframe.notification.spec.NotificationSeed;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
@@ -64,7 +64,7 @@ public class NotificationEmitter {
         String applePushCategory = spec.getApplePushCategory().orElse(null);
         NotificationCategory category = spec.getCategory();
         NotificationSettingGroup settingsGroup = spec.getSettingsGroup().orElse(null);
-        EntityRef entity = spec.entity(typed).orElse(null);
+        NotificationEntityRef entity = spec.entity(typed).orElse(null);
         return NotificationCommand.builder()
                 .type(specType)
                 .attributes(attributes)

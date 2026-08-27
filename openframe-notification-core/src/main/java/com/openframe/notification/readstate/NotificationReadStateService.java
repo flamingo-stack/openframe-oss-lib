@@ -8,7 +8,7 @@ import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.CategoryCount;
 import com.openframe.data.repository.notification.EntityCount;
 import com.openframe.data.repository.notification.NotificationReadStateRepository;
-import com.openframe.notification.spec.EntityRef;
+import com.openframe.notification.spec.NotificationEntityRef;
 import com.openframe.data.service.TenantIdProvider;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -46,7 +46,7 @@ public class NotificationReadStateService {
     public void createForAudience(@NotBlank String notificationId,
                                   @NotNull NotificationCategory category,
                                   String title,
-                                  EntityRef entity,
+                                  NotificationEntityRef entity,
                                   @NotNull RecipientType recipientType,
                                   @NotEmpty Collection<String> recipientIds) {
         NotificationEntityType entityType = entity == null ? null : entity.getType();
