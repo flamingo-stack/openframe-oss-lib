@@ -62,7 +62,7 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
   // box, and flashing it before the mirror resolves reads as broken.
   const isProbing = status === 'probing'
   // Found → the mirror; otherwise the claude.ai embed (or its empty state).
-  // Suppressed while probing so nothing renders under the spinner.
+  // Suppressed while probing so the loading skeleton owns the body.
   const embedUrl = isProbing ? null : (mirrorSrc ?? toClaudeEmbedUrl(url))
   return (
     <EmbedViewerFrame
@@ -71,7 +71,6 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
       title={title?.trim() || KIND_HEADING[kind]}
       titleVariant="h6"
       isLoading={isProbing}
-      loadingMessage="Loading artifact…"
       actions={
         <Button
           variant="outline"

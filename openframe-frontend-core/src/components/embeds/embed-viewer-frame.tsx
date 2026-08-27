@@ -1,11 +1,11 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Loader2, Maximize2, Minimize2 } from 'lucide-react'
+import { Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { FullscreenSwitchController } from '../../utils/fullscreen-switch'
 import { Button } from '../ui/button/button'
-import { EmbedIframe } from './embed-iframe'
+import { EmbedIframe, EmbedLoadingSkeleton } from './embed-iframe'
 
 /**
  * EmbedViewerFrame — the ONE viewer shell shared by every embed viewer
@@ -40,16 +40,15 @@ export interface EmbedViewerFrameProps {
   /** Iframe source; falsy renders the inline empty state (or the loading
    *  state when `isLoading`) under the header. */
   src: string | null | undefined
-  /** While true AND there is no `src` yet, the body shows a loading skeleton
-   *  instead of the empty state — for a viewer that is still resolving where
-   *  its frame points (e.g. ClaudeEmbed probing for a self-hosted mirror),
-   *  so a cold first view reads as "loading", not "nothing here". */
+  /** While true AND there is no `src` yet, the body shows the shared embed
+   *  loading skeleton (`EmbedLoadingSkeleton`) instead of the empty state —
+   *  for a viewer that is still resolving where its frame points (e.g.
+   *  ClaudeEmbed probing for a self-hosted mirror), so a cold first view
+   *  reads as "loading" (identical to every other embed), not "nothing here". */
   isLoading?: boolean
   /** Large icon for the inline empty state (the viewers pass `w-16 h-16`). */
   emptyIcon?: React.ReactNode
   emptyMessage?: string
-  /** Copy under the spinner in the loading state. */
-  loadingMessage?: string
   height?: string
   allow?: string
   allowFullScreen?: boolean
@@ -76,7 +75,6 @@ export function EmbedViewerFrame({
   isLoading,
   emptyIcon,
   emptyMessage = 'Content not available',
-  loadingMessage = 'Loading…',
   height,
   allow,
   allowFullScreen,
@@ -171,20 +169,12 @@ export function EmbedViewerFrame({
           sandbox={sandbox}
         />
       ) : isLoading ? (
-        // SAME box as the empty/iframe state (height + border), so a viewer
-        // resolving its frame doesn't collapse then jump — it reads as
-        // "loading" and settles into the iframe in place.
-        <div
-          className="flex flex-col items-center justify-center gap-3 rounded-lg border border-ods-border px-4 py-16 text-center"
-          style={height ? { height } : undefined}
-        >
-          {/* The library's canonical section spinner — `Loader2` +
-              `animate-spin` is the only spinner idiom in the codebase (17
-              lib call sites, 67 in the hub), and `h-8 w-8 … text-ods-accent`
-              is its most-used full-size variant. */}
-          <Loader2 className="h-8 w-8 animate-spin text-ods-accent" />
-          <p className="text-ods-text-secondary">{loadingMessage}</p>
-        </div>
+        // The EXACT skeleton every embed shows while its iframe loads
+        // (`EmbedIframe`'s `EmbedLoadingSkeleton`) — so a viewer still
+        // RESOLVING where its frame points (ClaudeEmbed probing for a mirror,
+        // before it has a `src`) reads 1:1 with the Figma/Sheets/PDF loading
+        // state, then settles into the iframe in place.
+        <EmbedLoadingSkeleton height={height} />
       ) : (
         // The SAME box the iframe would have filled: same height, same rounded
         // border. A viewer whose content is missing must not collapse the page
