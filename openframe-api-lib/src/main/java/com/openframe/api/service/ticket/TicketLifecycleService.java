@@ -51,6 +51,7 @@ public class TicketLifecycleService {
     private final TicketTransitionPolicyValidator transitionPolicy;
     private final TenantIdProvider tenantIdProvider;
     private final TicketTagService ticketTagService;
+    private final TicketIdRestrictionResolver ticketIdRestrictionResolver;
     private final TicketResolverStamp ticketResolverStamp;
     private final TicketStatusHistoryService historyService;
     private final List<TicketEventListener> listeners;
@@ -210,16 +211,13 @@ public class TicketLifecycleService {
     }
 
     @Transactional
-    public List<String> archiveResolvedTickets(TicketFilterInput filterInput) {
+    public List<String> archiveResolvedTickets(AuthPrincipal principal, TicketFilterInput filterInput) {
         TicketStatusDefinition resolved = requireByKind(TicketStatusKind.RESOLVED);
         TicketStatusDefinition archived = requireByKind(TicketStatusKind.ARCHIVED);
 
-        TicketQueryFilter queryFilter = buildArchiveFilter(resolved.getId(), filterInput);
-
-        List<String> restrictToTicketIds = null;
-        if (filterInput != null && filterInput.getTagIds() != null && !filterInput.getTagIds().isEmpty()) {
-            restrictToTicketIds = ticketTagService.getTicketIdsByTagIds(filterInput.getTagIds());
-        }
+        String resolvedId = resolved.getId();
+        TicketQueryFilter queryFilter = buildArchiveFilter(resolvedId, filterInput);
+        List<String> restrictToTicketIds = ticketIdRestrictionResolver.resolve(principal, filterInput);
 
         Query idsQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
         List<String> resolvedIds = ticketRepository.findTicketsWithCursor(idsQuery, null, 0, "order", "ASC")

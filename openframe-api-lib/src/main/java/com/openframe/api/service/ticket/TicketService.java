@@ -28,11 +28,6 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.user.UserRepository;
-import com.openframe.data.document.notification.NotificationEntityType;
-import com.openframe.data.document.notification.RecipientType;
-import com.openframe.data.repository.notification.EntityCount;
-import com.openframe.data.repository.notification.NotificationReadStateRepository;
-import com.openframe.data.service.TenantIdProvider;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -70,8 +65,7 @@ public class TicketService {
     private final TicketRepository ticketRepository;
     private final TicketNumberService ticketNumberService;
     private final TicketTagService ticketTagService;
-    private final NotificationReadStateRepository notificationReadStateRepository;
-    private final TenantIdProvider tenantIdProvider;
+    private final TicketIdRestrictionResolver ticketIdRestrictionResolver;
     private final MachineRepository machineRepository;
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
@@ -481,7 +475,7 @@ public class TicketService {
         validateAdminAccess(principal);
         log.info("Archiving resolved tickets by: {}, filter: {}", principal.getDisplayName(), filter);
 
-        List<String> archivedIds = ticketLifecycleService.archiveResolvedTickets(filter);
+        List<String> archivedIds = ticketLifecycleService.archiveResolvedTickets(principal, filter);
         listeners.forEach(listener -> listener.onTicketsArchived(archivedIds, principal));
         log.info("Archived {} resolved tickets", archivedIds.size());
         return archivedIds.size();
@@ -553,35 +547,8 @@ public class TicketService {
     private Query buildTicketQuery(AuthPrincipal principal, TicketFilterInput filter,
                                    String search, String ownerMachineId) {
         TicketQueryFilter queryFilter = toQueryFilter(filter);
-
-        List<String> restrictToTicketIds = null;
-        if (filter != null && filter.getTagIds() != null && !filter.getTagIds().isEmpty()) {
-            restrictToTicketIds = ticketTagService.getTicketIdsByTagIds(filter.getTagIds());
-        }
-        if (filter != null && Boolean.TRUE.equals(filter.getHasUnreadNotifications())) {
-            restrictToTicketIds = intersect(restrictToTicketIds, unreadTicketIds(principal));
-        }
-
+        List<String> restrictToTicketIds = ticketIdRestrictionResolver.resolve(principal, filter);
         return ticketRepository.buildTicketQuery(queryFilter, search, restrictToTicketIds, ownerMachineId);
-    }
-
-    // An AGENT's read-state rows are keyed by machine id, not user id.
-    private List<String> unreadTicketIds(AuthPrincipal principal) {
-        boolean agent = isAgent(principal);
-        String recipientId = agent ? principal.getMachineId() : principal.getId();
-        RecipientType recipientType = agent ? RecipientType.MACHINE : RecipientType.USER;
-        String tenantId = tenantIdProvider.getTenantId();
-        List<EntityCount> rows = notificationReadStateRepository.unreadCountsByEntity(
-                recipientId, recipientType, NotificationEntityType.TICKET, tenantId);
-        return rows.stream().map(EntityCount::entityId).filter(Objects::nonNull).toList();
-    }
-
-    private List<String> intersect(List<String> left, List<String> right) {
-        if (left == null) {
-            return right;
-        }
-        Set<String> retained = new HashSet<>(right);
-        return left.stream().filter(retained::contains).toList();
     }
 
     private TicketQueryFilter toQueryFilter(TicketFilterInput filter) {
