@@ -148,19 +148,20 @@ class ScriptExecutionWatchdogServiceTest {
     }
 
     @Test
-    @DisplayName("reaping SCHEDULE leaves finalizes each distinct fire header once; ad-hoc (scheduleId=null) leaves trigger no header finalize")
-    void reapedScheduleLeaves_finalizeHeaderOncePerFire() {
+    @DisplayName("reaped rows are handed to the header finalizer once, as a batch (dedup/finalize is the header service's job)")
+    void reapedRows_delegatedToHeaderFinalizer() {
         ScriptExecution fireLeafA = scheduleLeaf("t-1", "sch-1", "exec-1", "m-1", 200);
-        ScriptExecution fireLeafB = scheduleLeaf("t-1", "sch-1", "exec-1", "m-2", 200);  // same fire, other machine
-        ScriptExecution adhoc = running(60, 200);                                        // scheduleId == null
+        ScriptExecution fireLeafB = scheduleLeaf("t-1", "sch-1", "exec-1", "m-2", 200);
+        ScriptExecution adhoc = running(60, 200);
         when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
                 .thenReturn(List.of(fireLeafA, fireLeafB, adhoc));
 
         service.markStuckExecutionsAsFailed();
 
         verify(repository).saveAll(any());
-        // (t-1, exec-1) collapses to a single finalize; the ad-hoc leaf produces none.
-        verify(headerWatchdogService).finalizeIfSettled("t-1", "exec-1");
+        ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
+        verify(headerWatchdogService).finalizeAffectedHeaders(captor.capture());
+        assertThat(captor.getValue()).containsExactlyInAnyOrder(fireLeafA, fireLeafB, adhoc);
         verifyNoMoreInteractions(headerWatchdogService);
     }
 

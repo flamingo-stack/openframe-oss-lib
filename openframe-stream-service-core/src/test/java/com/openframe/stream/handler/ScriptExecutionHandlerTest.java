@@ -13,7 +13,7 @@ import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
-import com.openframe.stream.handler.rmm.ScriptExecutionStatusUpdateHandler;
+import com.openframe.stream.handler.rmm.ScriptExecutionHandler;
 import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -39,7 +39,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ScriptExecutionStatusUpdateHandlerTest {
+class ScriptExecutionHandlerTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String EXECUTION_ID = "exec-1";
@@ -55,13 +55,13 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @Mock
     private DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
 
-    private ScriptExecutionStatusUpdateHandler handler;
+    private ScriptExecutionHandler handler;
     private final ObjectMapper mapper = new ObjectMapper();
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() {
-        handler = new ScriptExecutionStatusUpdateHandler(
+        handler = new ScriptExecutionHandler(
                 scriptExecutionRepository, scheduleScriptExecutionAggregator, deviceOnlineDispatchRepository, new RmmExecutionMetrics(meterRegistry));
     }
 
@@ -93,6 +93,21 @@ class ScriptExecutionStatusUpdateHandlerTest {
         assertThat(saved.getFinishedAt()).isNotNull();
         assertThat(saved.getStatusChangedAt()).isNotNull();
         assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("kind", "script", "status", "SUCCESS").counter().count()).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("handle: result applies to a still-QUEUED row (agent's started-ack was lost) → transitions to SUCCESS")
+    void handle_queuedRow_appliesResult() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setStatus(ExecutionStatus.QUEUED);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
+
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
     }
 
     @Test

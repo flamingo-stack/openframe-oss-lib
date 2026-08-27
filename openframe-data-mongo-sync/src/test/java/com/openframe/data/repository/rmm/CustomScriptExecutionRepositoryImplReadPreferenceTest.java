@@ -43,21 +43,22 @@ class CustomScriptExecutionRepositoryImplReadPreferenceTest {
     }
 
     @Test
-    @DisplayName("header aggregation (countLeavesByStatus) counts RUNNING then FAILED from PRIMARY, scoped to (tenant, execution)")
+    @DisplayName("header aggregation (countLeavesByStatus) counts QUEUED + RUNNING (in-progress) then FAILED from PRIMARY, scoped to (tenant, execution)")
     void countLeavesByStatus_countsFromPrimary() {
-        when(mongoTemplate.count(any(Query.class), eq(ScriptExecution.class))).thenReturn(2L, 1L);
+        when(mongoTemplate.count(any(Query.class), eq(ScriptExecution.class))).thenReturn(2L, 3L, 1L);   // QUEUED, RUNNING, FAILED
 
         CustomScriptExecutionRepository.LeafStatusCounts counts = repo.countLeavesByStatus("tenant-1", "exec-1");
 
-        assertThat(counts.running()).isEqualTo(2L);
+        assertThat(counts.inProgress()).isEqualTo(5L);   // in-progress = QUEUED(2) + RUNNING(3)
         assertThat(counts.failed()).isEqualTo(1L);
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
-        verify(mongoTemplate, times(2)).count(captor.capture(), eq(ScriptExecution.class));
+        verify(mongoTemplate, times(3)).count(captor.capture(), eq(ScriptExecution.class));
         List<Query> queries = captor.getAllValues();
         assertThat(queries).allSatisfy(q -> assertThat(q.getReadPreference()).isEqualTo(ReadPreference.primary()));
-        assertThat(queries.get(0).getQueryObject().get("status")).isEqualTo(ExecutionStatus.RUNNING);
-        assertThat(queries.get(1).getQueryObject().get("status")).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(queries.get(0).getQueryObject().get("status")).isEqualTo(ExecutionStatus.QUEUED);
+        assertThat(queries.get(1).getQueryObject().get("status")).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(queries.get(2).getQueryObject().get("status")).isEqualTo(ExecutionStatus.FAILED);
         assertThat(queries.get(0).getQueryObject().get("tenantId")).isEqualTo("tenant-1");
         assertThat(queries.get(0).getQueryObject().get("executionId")).isEqualTo("exec-1");
     }
