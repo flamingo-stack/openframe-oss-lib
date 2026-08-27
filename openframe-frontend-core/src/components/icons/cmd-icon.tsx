@@ -31,10 +31,11 @@ export const CmdIcon: React.FC<CmdIconProps> = ({ size = 16, className = '', col
         fontFamily="monospace"
         fontWeight="bold"
       >
-        \&gt;
+        &gt;
       </text>
     </svg>
   )
 }
 
 CmdIcon.displayName = 'CmdIcon'
+
