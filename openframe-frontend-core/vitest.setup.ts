@@ -11,6 +11,31 @@ import { registerNavigation, type NavigationImpl } from './src/embed-shims/next-
  */
 type MockRouter = ReturnType<NavigationImpl['useRouter']>;
 
+// --- matchMedia -----------------------------------------------------------
+//
+// jsdom does not implement it, and reading it THROWS rather than returning
+// undefined — so a component that merely asks about a breakpoint takes its
+// whole test file down. Nothing depended on the absence (every existing test
+// passed without it), so a global inert stub is a no-op for them and stops the
+// next responsive component from needing a per-file copy of this.
+//
+// `matches: false` = the narrow/default branch. A test that needs the other
+// branch should override `window.matchMedia` for its own case rather than
+// change this default.
+if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
+  window.matchMedia = (query: string): MediaQueryList =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}
+
 // --- Web Storage on Node >= 22 -------------------------------------------
 //
 // Node ships its OWN `localStorage` global (experimental Web Storage). It is
