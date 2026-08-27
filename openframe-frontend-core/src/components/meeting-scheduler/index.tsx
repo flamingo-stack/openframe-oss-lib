@@ -39,6 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { useMeetingBooking } from '../../hooks/use-meeting-booking';
+import { useToast } from '../../hooks/use-toast';
 import {
   isSupportedFormField,
   type BookingConfirmation,
@@ -56,12 +57,12 @@ import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
 
 /**
  * Visitor-facing copy per booking-error code. Everything except SLOT_TAKEN
- * renders in a prominent `<Alert>` ABOVE the form the visitor just submitted
- * (an inline alert is deterministic in every embed context — a toast needs a
- * host-mounted provider this widget cannot assume). SLOT_TAKEN renders above
- * the calendar instead: its recovery flow returns the visitor there.
- * An unrecognized code (newer host than widget) falls back to the VALIDATION
- * copy — fail-safe, never blank.
+ * surfaces PRIMARILY as an error TOAST at submit time (every hub platform
+ * mounts the lib Toaster globally), with a compact inline line above the form
+ * as the fallback for embedders without a Toaster — that line also carries
+ * the escape hatch. SLOT_TAKEN renders above the calendar instead: its
+ * recovery flow returns the visitor there. An unrecognized code (newer host
+ * than widget) falls back to the VALIDATION copy — fail-safe, never blank.
  */
 const BOOKING_ERROR_COPY: Record<Exclude<MeetingBookingErrorCode, 'SLOT_TAKEN'>, string> = {
   INVALID_EMAIL:
@@ -304,6 +305,7 @@ export function HubSpotMeetingScheduler({
   const [bookingError, setBookingError] = useState<MeetingBookingErrorCode | null>(null);
 
   const { honeypotInputProps, getSignals, resetSignals } = useHumanitySignals();
+  const { toast } = useToast();
 
   // Reset the machine when the host switches links. Adjusted while rendering —
   // React's documented pattern for a prop-driven reset — so the swapped-in link
@@ -413,9 +415,19 @@ export function HubSpotMeetingScheduler({
         setStep('slot');
         resetSignals();
         void refetchAvailability();
+      } else {
+        // Primary error surface is a TOAST (host-mounted Toaster — every hub
+        // platform mounts it globally). The compact inline line below the
+        // date heading stays as the fallback for embedders without a Toaster,
+        // and carries the escape hatch.
+        toast({
+          variant: 'error',
+          title: 'Booking failed',
+          description: BOOKING_ERROR_COPY[code] ?? BOOKING_ERROR_COPY.VALIDATION,
+        });
       }
     },
-    [book, onBooked, refetchAvailability, resetSignals],
+    [book, onBooked, refetchAvailability, resetSignals, toast],
   );
 
   const escapeHatch = fallbackUrl ? (
@@ -526,12 +538,12 @@ export function HubSpotMeetingScheduler({
                 · {formatDurationCompact(durationMs / 1000)}
               </p>
               {bookingError && bookingError !== 'SLOT_TAKEN' && (
-                <Alert variant="error" className="flex flex-col items-start gap-[var(--spacing-system-xs)]">
-                  <AlertDescription>
+                <div className="flex flex-col items-start gap-[var(--spacing-system-xs)]">
+                  <p className="text-ods-error text-h6" role="alert">
                     {BOOKING_ERROR_COPY[bookingError] ?? BOOKING_ERROR_COPY.VALIDATION}
-                  </AlertDescription>
+                  </p>
                   {escapeHatch}
-                </Alert>
+                </div>
               )}
               <BookingForm
                 availability={availability}
