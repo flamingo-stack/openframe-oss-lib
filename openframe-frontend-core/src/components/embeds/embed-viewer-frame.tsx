@@ -178,7 +178,11 @@ export function EmbedViewerFrame({
           className="flex flex-col items-center justify-center gap-3 rounded-lg border border-ods-border px-4 py-16 text-center"
           style={height ? { height } : undefined}
         >
-          <Loader2 className="h-8 w-8 animate-spin text-ods-text-secondary" />
+          {/* The library's canonical section spinner — `Loader2` +
+              `animate-spin` is the only spinner idiom in the codebase (17
+              lib call sites, 67 in the hub), and `h-8 w-8 … text-ods-accent`
+              is its most-used full-size variant. */}
+          <Loader2 className="h-8 w-8 animate-spin text-ods-accent" />
           <p className="text-ods-text-secondary">{loadingMessage}</p>
         </div>
       ) : (
