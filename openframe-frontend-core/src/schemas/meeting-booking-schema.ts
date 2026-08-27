@@ -128,10 +128,14 @@ export interface BookingConfirmation {
  * Typed domain errors the booking route emits; the widget keys its recovery
  * UI off these. `SLOT_TAKEN` → refetch-and-recover; `TEMPORARILY_UNAVAILABLE`
  * → retry affordance; `MEETING_UNAVAILABLE` → daily ceiling exhausted
- * (escape hatch, not a retry timer); `LINK_GONE` → link deleted upstream.
+ * (escape hatch, not a retry timer); `LINK_GONE` → link deleted upstream;
+ * `INVALID_EMAIL` → HubSpot rejected the attendee address (its
+ * MeetingsBookingCreatedError.INVALID_EMAIL class — fake/unreachable
+ * mailboxes), so the widget tells the visitor to fix the email instead of
+ * blaming the slot or their other details.
  */
 export type MeetingBookingErrorCode =
-  'SLOT_TAKEN' | 'VALIDATION' | 'LINK_GONE' | 'TEMPORARILY_UNAVAILABLE' | 'MEETING_UNAVAILABLE';
+  'SLOT_TAKEN' | 'VALIDATION' | 'INVALID_EMAIL' | 'LINK_GONE' | 'TEMPORARILY_UNAVAILABLE' | 'MEETING_UNAVAILABLE';
 
 // ---------------------------------------------------------------------------
 // Field-type vocabulary — ONE set drives the renderer AND the validator
