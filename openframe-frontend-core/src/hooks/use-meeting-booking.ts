@@ -31,9 +31,9 @@ import { MAX_MONTH_OFFSET } from '../utils/hubspot-meetings-convention';
  * it keeps rendering (with nothing selectable yet) while only the times column
  * — the part that genuinely has no answer — shows a placeholder.
  *
- * `staleTime` is deliberately short: HubSpot slots go stale in about a minute,
- * and a slot that is gone by the time it is clicked costs a booking. Fresh
- * enough to trust, cached enough not to blink.
+ * `staleTime` is ZERO: the host serves availability live (no-store), and a
+ * cached month re-shown while paging back is organizer-visible staleness. A
+ * slot gone by the time it is clicked costs a booking — always refetch.
  *
  * Booking: a mutation, guarded so a second submit can't start while one is in
  * flight (the transport never retries POST — this is the only double-booking
@@ -60,8 +60,10 @@ const KNOWN_CODES: MeetingBookingErrorCode[] = [
   'MEETING_UNAVAILABLE',
 ];
 
-/** ~half HubSpot's own slot volatility window — see the docblock. */
-const AVAILABILITY_STALE_MS = 30_000;
+/** Always refetch — availability is served live (no-store) by the host; a
+ *  cached month shown while paging back is exactly the staleness the server
+ *  layers were stripped to kill (2026-08-27). */
+const AVAILABILITY_STALE_MS = 0;
 
 /** Query key for one month of one link. Exported so a host can prefetch or
  *  invalidate a month it knows changed (e.g. after booking elsewhere). */
