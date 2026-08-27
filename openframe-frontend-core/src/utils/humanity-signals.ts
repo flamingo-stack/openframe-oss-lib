@@ -63,15 +63,33 @@ export const isHumanitySignalKey = (key: string): boolean => (HUMANITY_SIGNAL_KE
 /** Keyed wire object produced by `useHumanitySignals().getSignals()` and spread into the POST body. */
 export type HumanitySignals = Record<string, string | number>;
 
+/**
+ * Diagnostics every verdict carries so callers LOG what this module already
+ * computed instead of re-deriving it (a re-derived predicate silently diverges
+ * the day the rules here change):
+ * - `honeypotLength`/`honeypotField`: decoy length + which wire field carried
+ *   it — never the typed value (log-safe by construction).
+ * - `timingAffirmed`: the submission POSITIVELY proved human timing (a PRESENT
+ *   elapsed-ms at/above the floor — merely-missing timing does not affirm).
+ *   The hub gate keys its BotID form-downgrade on this.
+ */
+export type HumanityVerdictDiagnostics = {
+  honeypotLength: number;
+  honeypotField: HoneypotFieldProvenance;
+  timingAffirmed: boolean;
+};
+
 /** Result of {@link evaluateHumanitySignals}. */
-export type HumanityVerdict =
-  | {
-      ok: true;
-      /** Present when a filled decoy was forgiven as autofill; `sourceField` names the body field it was copied from. */
-      note?: 'honeypot_autofill';
-      sourceField?: string;
-    }
-  | { ok: false; reason: 'honeypot' | 'too_fast' };
+export type HumanityVerdict = HumanityVerdictDiagnostics &
+  (
+    | {
+        ok: true;
+        /** Present when a filled decoy was forgiven as autofill; `sourceField` names the body field it was copied from. */
+        note?: 'honeypot_autofill';
+        sourceField?: string;
+      }
+    | { ok: false; reason: 'honeypot' | 'too_fast' }
+  );
 
 /** Which wire field the honeypot value was read from (log/monitoring only — see LEGACY_HONEYPOT_FIELD). */
 export type HoneypotFieldProvenance = 'current' | 'legacy' | null;
@@ -142,7 +160,9 @@ export function findHoneypotCopySource(body: unknown, honeypot: string): string 
 
   const matches = (value: unknown): boolean => {
     if (typeof value !== 'string' || value.trim() === '') return false;
-    if (normalizeForCopyMatch(value) === hpNorm && hpNorm.length >= MIN_COPY_MATCH_LENGTH) return true;
+    // No length re-check: the top guard already rejected sub-minimum values
+    // (phoneCandidate implies ≥7 chars survive normalization — digits do).
+    if (normalizeForCopyMatch(value) === hpNorm) return true;
     return phoneCandidate && phoneDigitsMatch(digitsOf(value), hpDigits);
   };
   const matchInArray = (value: unknown): boolean => Array.isArray(value) && value.some(matches);
@@ -171,12 +191,19 @@ export function findHoneypotCopySource(body: unknown, honeypot: string): string 
  *   blocks — and the too-fast check still applies to autofill-forgiven submissions)
  */
 export function evaluateHumanitySignals(body: unknown, opts: { minFillMs: number }): HumanityVerdict {
-  const { honeypot, elapsedMs } = extractHumanitySignals(body);
+  const { honeypot, elapsedMs, honeypotField } = extractHumanitySignals(body);
+  const diagnostics: HumanityVerdictDiagnostics = {
+    honeypotLength: honeypot.length,
+    honeypotField,
+    timingAffirmed: elapsedMs !== null && elapsedMs >= opts.minFillMs,
+  };
   const filled = honeypot.trim() !== '';
   const sourceField = filled ? findHoneypotCopySource(body, honeypot) : null;
-  if (filled && sourceField === null) return { ok: false, reason: 'honeypot' };
-  if (elapsedMs !== null && elapsedMs < opts.minFillMs) return { ok: false, reason: 'too_fast' };
-  return sourceField !== null ? { ok: true, note: 'honeypot_autofill', sourceField } : { ok: true };
+  if (filled && sourceField === null) return { ...diagnostics, ok: false, reason: 'honeypot' };
+  if (elapsedMs !== null && elapsedMs < opts.minFillMs) return { ...diagnostics, ok: false, reason: 'too_fast' };
+  return sourceField !== null
+    ? { ...diagnostics, ok: true, note: 'honeypot_autofill', sourceField }
+    : { ...diagnostics, ok: true };
 }
 
 /** Parse a comma-separated env string → trimmed, non-empty entries (undefined → []). */

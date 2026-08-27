@@ -14,20 +14,20 @@ const opts = { minFillMs: DEFAULT_MIN_FILL_MS };
 
 describe('evaluateHumanitySignals', () => {
   it('allows a clean human submission', () => {
-    expect(evaluateHumanitySignals({ email: 'a@b.co', [HONEYPOT_FIELD]: '', [ELAPSED_MS_FIELD]: 5000 }, opts)).toEqual({
-      ok: true,
-    });
+    expect(
+      evaluateHumanitySignals({ email: 'a@b.co', [HONEYPOT_FIELD]: '', [ELAPSED_MS_FIELD]: 5000 }, opts),
+    ).toMatchObject({ ok: true });
   });
 
   it('blocks a filled honeypot with a value matching no other field', () => {
-    expect(evaluateHumanitySignals({ email: 'a@b.co', [HONEYPOT_FIELD]: 'https://spam.example' }, opts)).toEqual({
+    expect(evaluateHumanitySignals({ email: 'a@b.co', [HONEYPOT_FIELD]: 'https://spam.example' }, opts)).toMatchObject({
       ok: false,
       reason: 'honeypot',
     });
   });
 
   it('blocks the legacy honeypot field name too (stale-lib embedder clients stay protected)', () => {
-    expect(evaluateHumanitySignals({ email: 'a@b.co', [LEGACY_HONEYPOT_FIELD]: 'filled' }, opts)).toEqual({
+    expect(evaluateHumanitySignals({ email: 'a@b.co', [LEGACY_HONEYPOT_FIELD]: 'filled' }, opts)).toMatchObject({
       ok: false,
       reason: 'honeypot',
     });
@@ -36,13 +36,13 @@ describe('evaluateHumanitySignals', () => {
   it('forgives a honeypot value copied from another field (browser autofill signature)', () => {
     expect(
       evaluateHumanitySignals({ email: 'a@b.co', [HONEYPOT_FIELD]: 'a@b.co', [ELAPSED_MS_FIELD]: 5000 }, opts),
-    ).toEqual({ ok: true, note: 'honeypot_autofill', sourceField: 'email' });
+    ).toMatchObject({ ok: true, note: 'honeypot_autofill', sourceField: 'email' });
   });
 
   it('forgives autofill on the LEGACY field name (stale-lib client, current incident shape)', () => {
     expect(
       evaluateHumanitySignals({ email: 'a@b.co', [LEGACY_HONEYPOT_FIELD]: 'a@b.co', [ELAPSED_MS_FIELD]: 5000 }, opts),
-    ).toEqual({ ok: true, note: 'honeypot_autofill', sourceField: 'email' });
+    ).toMatchObject({ ok: true, note: 'honeypot_autofill', sourceField: 'email' });
   });
 
   it('forgives autofill copied from a nested field (booking formFields)', () => {
@@ -51,25 +51,50 @@ describe('evaluateHumanitySignals', () => {
         { email: 'a@b.co', formFields: { phone: '+1 555 010 0000' }, [HONEYPOT_FIELD]: '+1 555 010 0000' },
         opts,
       ),
-    ).toEqual({ ok: true, note: 'honeypot_autofill', sourceField: 'formFields.phone' });
+    ).toMatchObject({ ok: true, note: 'honeypot_autofill', sourceField: 'formFields.phone' });
   });
 
   it('still applies the timing check when the honeypot is autofill-forgiven', () => {
     expect(
       evaluateHumanitySignals({ email: 'a@b.co', [HONEYPOT_FIELD]: 'a@b.co', [ELAPSED_MS_FIELD]: 50 }, opts),
-    ).toEqual({ ok: false, reason: 'too_fast' });
+    ).toMatchObject({ ok: false, reason: 'too_fast' });
   });
 
   it('a honeypot value matching only another SIGNAL key is not forgiven', () => {
-    expect(evaluateHumanitySignals({ [HONEYPOT_FIELD]: 'xy', [LEGACY_HONEYPOT_FIELD]: 'xy' }, opts)).toEqual({
+    expect(evaluateHumanitySignals({ [HONEYPOT_FIELD]: 'xy', [LEGACY_HONEYPOT_FIELD]: 'xy' }, opts)).toMatchObject({
       ok: false,
       reason: 'honeypot',
     });
   });
 
   it('blocks sub-minimum fill time; missing timing never blocks', () => {
-    expect(evaluateHumanitySignals({ [ELAPSED_MS_FIELD]: 100 }, opts)).toEqual({ ok: false, reason: 'too_fast' });
-    expect(evaluateHumanitySignals({}, opts)).toEqual({ ok: true });
+    expect(evaluateHumanitySignals({ [ELAPSED_MS_FIELD]: 100 }, opts)).toMatchObject({ ok: false, reason: 'too_fast' });
+    expect(evaluateHumanitySignals({}, opts)).toMatchObject({ ok: true });
+  });
+
+  it('every verdict carries log-safe diagnostics; timingAffirmed requires PRESENT elapsed at/above floor', () => {
+    // Missing timing never blocks — but it also never AFFIRMS (the BotID
+    // form-downgrade keys on this asymmetry; a regression that affirms
+    // missing timing would silently widen the downgrade).
+    expect(evaluateHumanitySignals({}, opts)).toMatchObject({
+      ok: true,
+      timingAffirmed: false,
+      honeypotField: null,
+      honeypotLength: 0,
+    });
+    expect(evaluateHumanitySignals({ [ELAPSED_MS_FIELD]: DEFAULT_MIN_FILL_MS }, opts)).toMatchObject({
+      ok: true,
+      timingAffirmed: true,
+    });
+    expect(
+      evaluateHumanitySignals({ email: 'a@b.co', [LEGACY_HONEYPOT_FIELD]: 'spam!!', [ELAPSED_MS_FIELD]: 5000 }, opts),
+    ).toMatchObject({
+      ok: false,
+      reason: 'honeypot',
+      honeypotField: 'legacy',
+      honeypotLength: 6,
+      timingAffirmed: true,
+    });
   });
 });
 
@@ -79,7 +104,7 @@ describe('findHoneypotCopySource (autofill copy-match rules)', () => {
     expect(findHoneypotCopySource({ name: 'Ｊｏ' }, 'jo')).toBe('name');
   });
 
-  it('matches a differently-formatted phone via digits-only equality (waitlist E.164 case)', () => {
+  it('matches a differently-formatted phone via suffix-tolerant digits equality (waitlist E.164 case)', () => {
     expect(findHoneypotCopySource({ phone: '+15551234567' }, '(555) 123-4567')).toBe('phone');
   });
 
