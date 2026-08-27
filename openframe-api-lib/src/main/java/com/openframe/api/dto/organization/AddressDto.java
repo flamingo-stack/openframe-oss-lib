@@ -1,17 +1,22 @@
 package com.openframe.api.dto.organization;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * DTO for address information.
  */
+@Data
 @Builder
-public record AddressDto(
-        String street1,
-        String street2,
-        String city,
-        String state,
-        String postalCode,
-        String country
-) {
+@NoArgsConstructor
+@AllArgsConstructor
+public class AddressDto {
+    private String street1;
+    private String street2;
+    private String city;
+    private String state;
+    private String postalCode;
+    private String country;
 }
