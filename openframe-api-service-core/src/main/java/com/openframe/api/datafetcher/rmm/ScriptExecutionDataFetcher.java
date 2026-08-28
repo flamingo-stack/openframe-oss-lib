@@ -67,7 +67,6 @@ public class ScriptExecutionDataFetcher {
         return RELAY.toGlobalId("ScriptExecution", execution.getId());
     }
 
-    /** Single execution by its (Relay-encoded) id — the typed alternative to a {@code node(id)} refetch. */
     @DgsQuery
     public ScriptExecutionResponse scriptExecution(@InputArgument @NotBlank String id) {
         return scriptExecutionService.get(decodeId(id));
