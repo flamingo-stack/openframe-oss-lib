@@ -24,6 +24,10 @@ public class SSOConfig implements TenantScoped {
      * The id is {@code openframe-sso} for backward compatibility: deployed frontends match this
      * exact string in the {@code /tenant/discover} provider list to decide whether to render the
      * password form.
+     * <p>
+     * TODO: switch this to "openframe" once the new mobile app version (which accepts the
+     * "openframe" id) is released and old versions are out of circulation — and drop the
+     * "openframe" alias handling in the api-side SSOConfigService at the same time.
      */
     public static final String OPENFRAME_PROVIDER = "openframe-sso";
 

@@ -175,6 +175,9 @@ public class SSOConfigService {
      * reports and what the toggle document stores) and the {@code openframe} alias some frontends
      * use. Without the alias, {@code GET /sso/openframe} fell through to the generic "no config"
      * fallback and misreported the enabled-by-default login as disabled.
+     * <p>
+     * TODO: once the new mobile app version is released and "openframe" becomes the canonical id
+     * (see {@link SSOConfig#OPENFRAME_PROVIDER}), remove this alias handling.
      */
     private static boolean isOpenframeLogin(String provider) {
         return OPENFRAME_PROVIDER.equals(provider) || "openframe".equals(provider);
