@@ -2,6 +2,7 @@
 
 import { useId, type ReactNode } from 'react';
 import { Button } from './button';
+import { UnsavedChangesChip, useGuardedClose } from './modal-guarded-close';
 import {
   ModalV2,
   ModalV2Content,
@@ -12,7 +13,6 @@ import {
   type ModalV2Size,
 } from './modal-v2';
 import { Skeleton } from './skeleton';
-import { UnsavedChangesChip, useGuardedClose } from './modal-guarded-close';
 
 /**
  * Label widths for the loading placeholder. Uneven on purpose — a column of
@@ -139,9 +139,7 @@ export function AdminFormModal({
             inside <p>. The browser then re-parents it during hydration and React
             throws a mismatch (seen on role-baselines, whose subtitle carries a
             weight Badge). Typography is unchanged. */}
-        {subtitle && (
-          <div className="text-h6 text-ods-text-secondary">{subtitle}</div>
-        )}
+        {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
       </ModalV2Header>
 
       {/* A real <form>: Enter in a text input previously did nothing in every
@@ -153,18 +151,15 @@ export function AdminFormModal({
         // the Cancel/Save footer past 90vh.
         className="flex min-h-0 flex-1 flex-col"
 
-        onSubmit={(e) => {
+        onSubmit={e => {
           e.preventDefault();
           if (canSave && !saving) onSave();
         }}
         // Some modals contain a FILTER input, not a form field. Enter there must
         // not ship the save — in the bindings modal that would commit an
         // absolute-state rule-set replacement mid-search.
-        onKeyDown={(e) => {
-          if (
-            e.key === 'Enter' &&
-            (e.target as HTMLElement)?.dataset?.noSubmitOnEnter === 'true'
-          ) {
+        onKeyDown={e => {
+          if (e.key === 'Enter' && (e.target as HTMLElement)?.dataset?.noSubmitOnEnter === 'true') {
             e.preventDefault();
           }
         }}
@@ -179,31 +174,31 @@ export function AdminFormModal({
             {loadingContent ? (
               <div aria-busy="true">{loadingContent}</div>
             ) : (
-            <div
-              aria-busy="true"
-              className={
-                // Mirrors the PANEL WIDTH, not the slot API. `wide` covers the
-                // master-detail modals too (seo-redirect, managed-repo,
-                // exclusions) — they pass `children`, so keying on `twoColumn`
-                // drew one column of full-width bars across 1400px, which reads
-                // as a broken form rather than a loading one.
-                skeletonColumns === 2
-                  ? 'grid grid-cols-1 gap-[var(--spacing-system-xl)] lg:grid-cols-2'
-                  : 'grid grid-cols-1 gap-[var(--spacing-system-xl)]'
-              }
-            >
-              <span className="sr-only">Loading…</span>
-              {Array.from({ length: skeletonColumns }, (_, col) => (
-                <div key={col} className="space-y-[var(--spacing-system-lf)]" aria-hidden="true">
-                  {SKELETON_FIELD_WIDTHS.map((labelWidth, i) => (
-                    <div key={i} className="space-y-[var(--spacing-system-xsf)]">
-                      <Skeleton className={`h-4 ${labelWidth}`} />
-                      <Skeleton className="h-10 w-full" />
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
+              <div
+                aria-busy="true"
+                className={
+                  // Mirrors the PANEL WIDTH, not the slot API. `wide` covers the
+                  // master-detail modals too (seo-redirect, managed-repo,
+                  // exclusions) — they pass `children`, so keying on `twoColumn`
+                  // drew one column of full-width bars across 1400px, which reads
+                  // as a broken form rather than a loading one.
+                  skeletonColumns === 2
+                    ? 'grid grid-cols-1 gap-[var(--spacing-system-xl)] lg:grid-cols-2'
+                    : 'grid grid-cols-1 gap-[var(--spacing-system-xl)]'
+                }
+              >
+                <span className="sr-only">Loading…</span>
+                {Array.from({ length: skeletonColumns }, (_, col) => (
+                  <div key={col} className="space-y-[var(--spacing-system-lf)]" aria-hidden="true">
+                    {SKELETON_FIELD_WIDTHS.map((labelWidth, i) => (
+                      <div key={i} className="space-y-[var(--spacing-system-xsf)]">
+                        <Skeleton className={`h-4 ${labelWidth}`} />
+                        <Skeleton className="h-10 w-full" />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             )}
           </ModalV2Content>
         ) : twoColumn ? (
@@ -215,7 +210,7 @@ export function AdminFormModal({
             belongs to the save, not to either column, and must stay visible
             wherever each column happens to be scrolled to. */}
         {error && (
-          <p role="alert" className="text-h6 text-ods-error shrink-0">
+          <p role="alert" className="shrink-0 text-ods-error text-h6">
             {error}
           </p>
         )}

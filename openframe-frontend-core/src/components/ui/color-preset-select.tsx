@@ -1,20 +1,20 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { HexColorPicker } from 'react-colorful'
-import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon'
-import { Popover, PopoverContent, PopoverTrigger } from '../popover'
-import { cn } from '../../utils/cn'
-import { HEX_PATTERN, hexToRgb, hslToRgb, rgbToHex, rgbToHsl } from '../../utils/ods-color-utils'
-import { ActionsMenuDropdown, type ActionsMenuGroup } from './actions-menu'
-import { ColorSwatch } from './color-swatch'
-import { Input } from './input'
-import { InputTrigger } from './input-trigger'
+import { useState } from 'react';
+import { HexColorPicker } from 'react-colorful';
+import { cn } from '../../utils/cn';
+import { HEX_PATTERN, hexToRgb, hslToRgb, rgbToHex, rgbToHsl } from '../../utils/ods-color-utils';
+import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
+import { Popover, PopoverContent, PopoverTrigger } from '../popover';
+import { ActionsMenuDropdown, type ActionsMenuGroup } from './actions-menu';
+import { ColorSwatch } from './color-swatch';
+import { Input } from './input';
+import { InputTrigger } from './input-trigger';
 
 export interface ColorPreset {
-  key: string
-  label: string
-  color: string
+  key: string;
+  label: string;
+  color: string;
 }
 
 // Ticket-status palette.
@@ -31,27 +31,24 @@ export const TICKET_STATUS_COLOR_PRESETS: readonly ColorPreset[] = [
   { key: 'red', label: 'Red', color: '#f36666' },
   { key: 'pink', label: 'Pink', color: '#e988a8' },
   { key: 'neutral', label: 'Neutral', color: '#b0b0b0' },
-]
+];
 
-export const CUSTOM_PRESET_KEY = 'custom'
-export const DEFAULT_CUSTOM_STATUS_COLOR = '#888888'
+export const CUSTOM_PRESET_KEY = 'custom';
+export const DEFAULT_CUSTOM_STATUS_COLOR = '#888888';
 
 function TriggerChevron() {
   return (
-    <Chevron02DownIcon
-      size={24}
-      className="transition-transform duration-200 group-data-[state=open]:rotate-180"
-    />
-  )
+    <Chevron02DownIcon size={24} className="transition-transform duration-200 group-data-[state=open]:rotate-180" />
+  );
 }
 
 export interface ColorPresetSelectProps {
-  value: string
-  presetKey?: string
-  onChange: (next: { color: string; preset?: string }) => void
-  presets?: readonly ColorPreset[]
-  disabled?: boolean
-  className?: string
+  value: string;
+  presetKey?: string;
+  onChange: (next: { color: string; preset?: string }) => void;
+  presets?: readonly ColorPreset[];
+  disabled?: boolean;
+  className?: string;
 }
 
 export function ColorPresetSelect({
@@ -62,10 +59,10 @@ export function ColorPresetSelect({
   disabled,
   className,
 }: ColorPresetSelectProps) {
-  const selectedPreset = presets.find(p => p.key === presetKey)
-  const isCustom = !selectedPreset
-  const displayLabel = selectedPreset?.label ?? 'Custom'
-  const displayColor = selectedPreset?.color ?? value
+  const selectedPreset = presets.find(p => p.key === presetKey);
+  const isCustom = !selectedPreset;
+  const displayLabel = selectedPreset?.label ?? 'Custom';
+  const displayColor = selectedPreset?.color ?? value;
 
   const groups: ActionsMenuGroup[] = [
     {
@@ -84,7 +81,7 @@ export function ColorPresetSelect({
         },
       ],
     },
-  ]
+  ];
 
   return (
     <ActionsMenuDropdown
@@ -102,7 +99,7 @@ export function ColorPresetSelect({
         />
       }
     />
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -111,25 +108,33 @@ export function ColorPresetSelect({
 // Conversion helpers live in `utils/ods-color-utils`.
 // ---------------------------------------------------------------------------
 
-const FORMATS = ['HEX', 'RGB', 'HSL'] as const
-type ColorFormat = (typeof FORMATS)[number]
+const FORMATS = ['HEX', 'RGB', 'HSL'] as const;
+type ColorFormat = (typeof FORMATS)[number];
 
 // Channel inputs are number-shaped and centered; HEX is text-shaped and left-aligned.
 // Both target the Input component's inner <input> via the descendant selector.
 // `flex-1 min-w-0` lets each input share the row width and shrink below content;
 // without it, Input's `w-full` outer makes siblings overflow the popover.
-const channelInputClass = 'flex-1 min-w-0 [&_input]:text-center [&_input]:tabular-nums'
-const hexInputClass = 'flex-1 min-w-0 [&_input]:uppercase'
+const channelInputClass = 'flex-1 min-w-0 [&_input]:text-center [&_input]:tabular-nums';
+const hexInputClass = 'flex-1 min-w-0 [&_input]:uppercase';
 
 function HexInputs({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
-  const [draft, setDraft] = React.useState(value)
-  React.useEffect(() => setDraft(value), [value])
+  // Adopt an externally-changed colour (the picker's canvas / hue slider drive
+  // this input too). Adjusted while rendering — React's documented prop-sync
+  // pattern — not from an effect: the input's `value` IS `draft`, so an effect
+  // painted one frame of the previous hex while dragging the canvas.
+  const [draft, setDraft] = useState(value);
+  const [syncedValue, setSyncedValue] = useState(value);
+  if (syncedValue !== value) {
+    setSyncedValue(value);
+    setDraft(value);
+  }
 
   const commit = () => {
-    const candidate = (draft.startsWith('#') ? draft : `#${draft}`).toLowerCase()
-    if (HEX_PATTERN.test(candidate)) onChange(candidate)
-    else setDraft(value)
-  }
+    const candidate = (draft.startsWith('#') ? draft : `#${draft}`).toLowerCase();
+    if (HEX_PATTERN.test(candidate)) onChange(candidate);
+    else setDraft(value);
+  };
 
   return (
     <Input
@@ -139,15 +144,15 @@ function HexInputs({ value, onChange }: { value: string; onChange: (hex: string)
       onBlur={commit}
       onKeyDown={e => {
         if (e.key === 'Enter') {
-          e.preventDefault()
-          commit()
+          e.preventDefault();
+          commit();
         }
       }}
       spellCheck={false}
       aria-label="Hex color value"
       className={hexInputClass}
     />
-  )
+  );
 }
 
 function ChannelInput({
@@ -157,23 +162,28 @@ function ChannelInput({
   ariaLabel,
   onCommit,
 }: {
-  value: number
-  min: number
-  max: number
-  ariaLabel: string
-  onCommit: (next: number) => void
+  value: number;
+  min: number;
+  max: number;
+  ariaLabel: string;
+  onCommit: (next: number) => void;
 }) {
-  const [draft, setDraft] = React.useState(String(value))
-  React.useEffect(() => setDraft(String(value)), [value])
+  // Same prop-sync as HexInputs above, and for the same reason.
+  const [draft, setDraft] = useState(String(value));
+  const [syncedValue, setSyncedValue] = useState(value);
+  if (syncedValue !== value) {
+    setSyncedValue(value);
+    setDraft(String(value));
+  }
 
   const commit = () => {
-    const parsed = Number.parseInt(draft, 10)
+    const parsed = Number.parseInt(draft, 10);
     if (!Number.isFinite(parsed)) {
-      setDraft(String(value))
-      return
+      setDraft(String(value));
+      return;
     }
-    onCommit(Math.max(min, Math.min(max, parsed)))
-  }
+    onCommit(Math.max(min, Math.min(max, parsed)));
+  };
 
   return (
     <Input
@@ -185,62 +195,62 @@ function ChannelInput({
       onBlur={commit}
       onKeyDown={e => {
         if (e.key === 'Enter') {
-          e.preventDefault()
-          commit()
+          e.preventDefault();
+          commit();
         }
       }}
       aria-label={ariaLabel}
       className={channelInputClass}
     />
-  )
+  );
 }
 
 function RgbInputs({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
-  const rgb = hexToRgb(value) ?? { r: 0, g: 0, b: 0 }
+  const rgb = hexToRgb(value) ?? { r: 0, g: 0, b: 0 };
   const update = (next: { r?: number; g?: number; b?: number }) => {
-    const r = next.r ?? rgb.r
-    const g = next.g ?? rgb.g
-    const b = next.b ?? rgb.b
-    onChange(rgbToHex(r, g, b))
-  }
+    const r = next.r ?? rgb.r;
+    const g = next.g ?? rgb.g;
+    const b = next.b ?? rgb.b;
+    onChange(rgbToHex(r, g, b));
+  };
   return (
     <>
       <ChannelInput value={rgb.r} min={0} max={255} ariaLabel="Red" onCommit={r => update({ r })} />
       <ChannelInput value={rgb.g} min={0} max={255} ariaLabel="Green" onCommit={g => update({ g })} />
       <ChannelInput value={rgb.b} min={0} max={255} ariaLabel="Blue" onCommit={b => update({ b })} />
     </>
-  )
+  );
 }
 
 function HslInputs({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
-  const rgb = hexToRgb(value) ?? { r: 0, g: 0, b: 0 }
-  const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b)
+  const rgb = hexToRgb(value) ?? { r: 0, g: 0, b: 0 };
+  const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
   const update = (next: { h?: number; s?: number; l?: number }) => {
-    const h = next.h ?? hsl.h
-    const s = next.s ?? hsl.s
-    const l = next.l ?? hsl.l
-    const out = hslToRgb(h, s, l)
-    onChange(rgbToHex(out.r, out.g, out.b))
-  }
+    const h = next.h ?? hsl.h;
+    const s = next.s ?? hsl.s;
+    const l = next.l ?? hsl.l;
+    const out = hslToRgb(h, s, l);
+    onChange(rgbToHex(out.r, out.g, out.b));
+  };
   return (
     <>
       <ChannelInput value={hsl.h} min={0} max={360} ariaLabel="Hue" onCommit={h => update({ h })} />
       <ChannelInput value={hsl.s} min={0} max={100} ariaLabel="Saturation" onCommit={s => update({ s })} />
       <ChannelInput value={hsl.l} min={0} max={100} ariaLabel="Lightness" onCommit={l => update({ l })} />
     </>
-  )
+  );
 }
 
 export interface ColorPickerInputProps {
-  value: string
-  onChange: (color: string) => void
-  disabled?: boolean
-  className?: string
+  value: string;
+  onChange: (color: string) => void;
+  disabled?: boolean;
+  className?: string;
 }
 
 export function ColorPickerInput({ value, onChange, disabled, className }: ColorPickerInputProps) {
-  const [open, setOpen] = React.useState(false)
-  const [format, setFormat] = React.useState<ColorFormat>('HEX')
+  const [open, setOpen] = useState(false);
+  const [format, setFormat] = useState<ColorFormat>('HEX');
 
   const formatGroups: ActionsMenuGroup[] = [
     {
@@ -250,7 +260,7 @@ export function ColorPickerInput({ value, onChange, disabled, className }: Color
         onClick: () => setFormat(f),
       })),
     },
-  ]
+  ];
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -267,7 +277,7 @@ export function ColorPickerInput({ value, onChange, disabled, className }: Color
       <PopoverContent
         align="start"
         sideOffset={4}
-        className="z-[1400] w-[320px] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)] text-ods-text-primary shadow-md [&_.react-colorful]:!w-full [&_.react-colorful]:!h-[190px] [&_.react-colorful\\_\\_saturation]:!rounded-sm [&_.react-colorful\\_\\_last-control]:!rounded-lg [&_.react-colorful\\_\\_hue]:!h-4 [&_.react-colorful\\_\\_hue]:!mt-[var(--spacing-system-m)]"
+        className="z-[1400] w-[320px] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)] text-ods-text-primary shadow-md [&_.react-colorful\\_\\_hue]:!mt-[var(--spacing-system-m)] [&_.react-colorful\\_\\_hue]:!h-4 [&_.react-colorful\\_\\_last-control]:!rounded-lg [&_.react-colorful\\_\\_saturation]:!rounded-sm [&_.react-colorful]:!h-[190px] [&_.react-colorful]:!w-full"
       >
         <div className="flex flex-col gap-[var(--spacing-system-m)]">
           <HexColorPicker color={value} onChange={onChange} />
@@ -286,7 +296,7 @@ export function ColorPickerInput({ value, onChange, disabled, className }: Color
                 />
               }
             />
-            <div className="flex flex-1 min-w-0 items-center gap-[var(--spacing-system-xs)]">
+            <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xs)]">
               {format === 'HEX' && <HexInputs value={value} onChange={onChange} />}
               {format === 'RGB' && <RgbInputs value={value} onChange={onChange} />}
               {format === 'HSL' && <HslInputs value={value} onChange={onChange} />}
@@ -295,6 +305,5 @@ export function ColorPickerInput({ value, onChange, disabled, className }: Color
         </div>
       </PopoverContent>
     </Popover>
-  )
+  );
 }
-

@@ -1,5 +1,3 @@
-import type { DepartmentRef } from './department';
-
 export interface TeamMember {
   id: string;
   employee_id: string;
@@ -62,4 +60,4 @@ export interface TeamData {
 export interface GetTeamOptions {
   includeInactive?: boolean;
   departmentId?: string;
-} 
+}

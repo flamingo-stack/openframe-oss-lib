@@ -1,25 +1,20 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import React, { useState } from 'react'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 
-import {
-  ChatContainer,
-  ChatContent,
-  ChatFooter,
-  ChatHeader,
-} from '../components/chat/chat-container'
-import { ChatInput } from '../components/chat/chat-input'
-import { ChatMessageList } from '../components/chat/chat-message-list'
-import { QuickActionWall } from '../components/chat/quick-action-wall'
-import type { QuickActionChip } from '../components/chat/quick-action-chip'
-import { ModelDisplay, ModelDisplaySkeleton } from '../components/chat/model-display'
-import type { Message } from '../components/chat/types/message.types'
-import { cn } from '../utils/cn'
+import { ChatContainer, ChatContent, ChatFooter, ChatHeader } from '../components/chat/chat-container';
+import { ChatInput } from '../components/chat/chat-input';
+import { ChatMessageList } from '../components/chat/chat-message-list';
+import { ModelDisplay, ModelDisplaySkeleton } from '../components/chat/model-display';
+import type { QuickActionChip } from '../components/chat/quick-action-chip';
+import { QuickActionWall } from '../components/chat/quick-action-wall';
+import type { Message } from '../components/chat/types/message.types';
+import { cn } from '../utils/cn';
 
 const SAMPLE_QUICK_ACTIONS: QuickActionChip[] = [
   { id: 'slow', label: 'Computer slow' },
   { id: 'updates', label: 'Check updates' },
   { id: 'internet', label: 'Internet problems' },
-]
+];
 
 // =============================================================================
 // Mock messages — sample client-facing Fae conversation
@@ -38,7 +33,7 @@ const FAE_MESSAGES: Message[] = [
     id: '2',
     role: 'user',
     name: 'You',
-    content: "My printer stopped working this morning — can you open a ticket?",
+    content: 'My printer stopped working this morning — can you open a ticket?',
     timestamp: new Date('2026-05-28T10:00:30Z'),
   },
   {
@@ -57,7 +52,7 @@ const FAE_MESSAGES: Message[] = [
     content: "It's the HP LaserJet by the front desk. It blinks orange and nothing prints.",
     timestamp: new Date('2026-05-28T10:01:10Z'),
   },
-]
+];
 
 // =============================================================================
 // StoryShell — wires up controlled `ChatInput` and `ChatMessageList` so the
@@ -73,18 +68,18 @@ function FaeChatShell({
   fullWidth = false,
   modelLoading = false,
 }: {
-  withTicketInfo?: boolean
-  withMspOrganization?: boolean
-  mspLoading?: boolean
-  bare?: boolean
-  fullWidth?: boolean
-  modelLoading?: boolean
+  withTicketInfo?: boolean;
+  withMspOrganization?: boolean;
+  mspLoading?: boolean;
+  bare?: boolean;
+  fullWidth?: boolean;
+  modelLoading?: boolean;
 }) {
-  const [messages, setMessages] = useState<Message[]>(FAE_MESSAGES)
+  const [messages, setMessages] = useState<Message[]>(FAE_MESSAGES);
 
   const handleSend = (text: string) => {
-    if (!text.trim()) return
-    setMessages((prev) => [
+    if (!text.trim()) return;
+    setMessages(prev => [
       ...prev,
       {
         id: `local-${prev.length + 1}`,
@@ -93,10 +88,10 @@ function FaeChatShell({
         content: text,
         timestamp: new Date(),
       },
-    ])
-  }
+    ]);
+  };
 
-  const handleNewChat = () => setMessages([FAE_MESSAGES[0]])
+  const handleNewChat = () => setMessages([FAE_MESSAGES[0]]);
 
   return (
     <ChatContainer>
@@ -108,8 +103,7 @@ function FaeChatShell({
         showNewChat
         onNewChat={handleNewChat}
         onClose={() => {
-          // eslint-disable-next-line no-console
-          console.log('[story] close clicked')
+          console.log('[story] close clicked');
         }}
         fullWidth={fullWidth}
         bare={bare}
@@ -134,12 +128,7 @@ function FaeChatShell({
         isMspLoading={mspLoading}
       />
       <ChatContent>
-        <ChatMessageList
-          messages={messages}
-          assistantType="fae"
-          fullWidth={fullWidth}
-          className="flex-1"
-        />
+        <ChatMessageList messages={messages} assistantType="fae" fullWidth={fullWidth} className="flex-1" />
       </ChatContent>
       <ChatFooter fullWidth={fullWidth}>
         {/* Quick actions above the composer — the shared `QuickActionWall`
@@ -155,11 +144,7 @@ function FaeChatShell({
           fadeColor="var(--color-bg)"
           copyGap="var(--spacing-system-xxs)"
         />
-        <ChatInput
-          onSend={handleSend}
-          placeholder="Message Fae..."
-          fullWidth={fullWidth}
-        />
+        <ChatInput onSend={handleSend} placeholder="Message Fae..." fullWidth={fullWidth} />
         {/* Model row below the composer — its width tracks the composer's, so
             in `fullWidth` it spans the footer instead of the centered column.
             Loaded state shows the real `ModelDisplay`; `modelLoading` swaps in
@@ -178,7 +163,7 @@ function FaeChatShell({
         </div>
       </ChatFooter>
     </ChatContainer>
-  )
+  );
 }
 
 // =============================================================================
@@ -191,10 +176,10 @@ const meta = {
   parameters: {
     layout: 'fullscreen',
   },
-} satisfies Meta<typeof ChatContainer>
+} satisfies Meta<typeof ChatContainer>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 // =============================================================================
 // Fae — client-facing chat shell
@@ -209,7 +194,7 @@ type Story = StoryObj<typeof meta>
  */
 export const Fae: Story = {
   render: () => <FaeChatShell />,
-}
+};
 
 /**
  * Same Fae shell with `ticketInfo` populated on the header — adds a
@@ -219,7 +204,7 @@ export const Fae: Story = {
  */
 export const FaeWithTicket: Story = {
   render: () => <FaeChatShell withTicketInfo />,
-}
+};
 
 /**
  * Client chat home-screen header with the MSP organization branding bar —
@@ -232,7 +217,7 @@ export const FaeWithTicket: Story = {
  */
 export const ClientChatWithMspOrganization: Story = {
   render: () => <FaeChatShell withMspOrganization />,
-}
+};
 
 /**
  * Client chat MSP organization slot in its loading state —
@@ -241,7 +226,7 @@ export const ClientChatWithMspOrganization: Story = {
  */
 export const ClientChatMspOrganizationLoading: Story = {
   render: () => <FaeChatShell mspLoading />,
-}
+};
 
 /**
  * Full-width variant — drops the centered 600px content column on header,
@@ -251,7 +236,7 @@ export const ClientChatMspOrganizationLoading: Story = {
  */
 export const FaeFullWidth: Story = {
   render: () => <FaeChatShell fullWidth />,
-}
+};
 
 /**
  * Bare header — drops the card chrome (background, border, shadow, ring)
@@ -260,7 +245,7 @@ export const FaeFullWidth: Story = {
  */
 export const FaeBareHeader: Story = {
   render: () => <FaeChatShell bare fullWidth />,
-}
+};
 
 /**
  * Model row in its loading state — `ModelDisplaySkeleton` stands in for the
@@ -270,4 +255,4 @@ export const FaeBareHeader: Story = {
  */
 export const FaeModelLoading: Story = {
   render: () => <FaeChatShell modelLoading />,
-}
+};

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Rich-composition component overrides: the embed layer (Video SSOT,
@@ -9,33 +9,47 @@
  * embed code (a runtime `variant` prop could not be tree-shaken; a
  * separate composition module can).
  */
-import React from 'react';
+import type { ElementContent } from 'hast';
 import type { Components } from 'react-markdown';
+import { ClaudeEmbed } from '../../../embeds/claude-embed';
+import { FigmaEmbed } from '../../../embeds/figma-embed';
+import { LinkedInEmbedClient } from '../../../embeds/linkedin-embed-client';
+import { MarkdownImage } from '../../../embeds/markdown-image';
+import { OGLinkPreview, OGLinkErrorBoundary } from '../../../embeds/og-link-preview';
 import { RedditEmbedClient } from '../../../embeds/reddit-embed-client';
 import { TwitterEmbedClient } from '../../../embeds/twitter-embed-client';
-import { LinkedInEmbedClient } from '../../../embeds/linkedin-embed-client';
 import { Video } from '../../../features/video';
-import { OGLinkPreview, OGLinkErrorBoundary } from '../../../embeds/og-link-preview';
-import { FigmaEmbed } from '../../../embeds/figma-embed';
-import { ClaudeEmbed } from '../../../embeds/claude-embed';
-import { MarkdownImage } from '../../../embeds/markdown-image';
-import { buildStandardLeafRenderers, hasRenderableSrc } from '../base-components';
+import { buildStandardLeafRenderers, hasRenderableSrc, type MdRenderProps } from '../base-components';
 import type { TextSizeElement } from '../text-size';
 
 /** Depth-first search of a hast node for the first `<a href>` matching `hostRe`. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function findFirstHref(node: any, hostRe: RegExp): string | null {
-  if (!node) return null;
+function findFirstHref(node: ElementContent | undefined, hostRe: RegExp): string | null {
+  if (!node || node.type !== 'element') return null;
   if (node.tagName === 'a') {
-    const href = node.properties?.href;
+    const href = node.properties.href;
     if (typeof href === 'string' && hostRe.test(href)) return href;
   }
-  for (const child of node.children ?? []) {
+  for (const child of node.children) {
     const found = findFirstHref(child, hostRe);
     if (found) return found;
   }
   return null;
 }
+
+/**
+ * Shortcode-expanded embed `<div>`s carry their payload on `data-*`
+ * attributes (`processShortcodes` emits them). React's `div` prop type does
+ * not model `data-*`, so the ones this renderer reads are declared here.
+ */
+type EmbedDivProps = MdRenderProps<'div'> & {
+  'data-video-id'?: string;
+  'data-post-url'?: string;
+  'data-tweet-url'?: string;
+  'data-url'?: string;
+  'data-figma-url'?: string;
+  'data-kind'?: string;
+  'data-title'?: string;
+};
 
 export interface BuildRichEmbedOverridesOptions {
   ogApiBaseUrl: string;
@@ -69,23 +83,22 @@ export function buildRichEmbedOverrides({
   return {
     // Fence-language embeds (```youtube-embed etc.); everything else
     // (mermaid, highlighted blocks, inline code) falls through to `standard`.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    code: (codeProps: any) => {
-      const { inline, className: codeClassName, children } = codeProps;
+    code: (codeProps: MdRenderProps<'code'>) => {
+      const { className: codeClassName, children } = codeProps;
       const match = /language-(\w+)/.exec(codeClassName || '');
       const language = match ? match[1] : '';
       const fenceText = () => String(children).replace(/\n$/, '').trim();
 
-      if (!inline && language === 'youtube-embed') {
+      if (language === 'youtube-embed') {
         return <Video kind="youtube" url={fenceText()} />;
       }
-      if (!inline && language === 'reddit-embed') {
+      if (language === 'reddit-embed') {
         return <RedditEmbedClient url={fenceText()} />;
       }
-      if (!inline && language === 'tweet-embed') {
+      if (language === 'tweet-embed') {
         return <TwitterEmbedClient url={fenceText()} />;
       }
-      if (!inline && language === 'link-preview') {
+      if (language === 'link-preview') {
         return (
           <OGLinkPreview
             url={fenceText()}
@@ -96,40 +109,53 @@ export function buildRichEmbedOverrides({
           />
         );
       }
-      if (!inline && language === 'figma-embed') {
+      if (language === 'figma-embed') {
         return <FigmaEmbed url={fenceText()} height="70vh" />;
       }
-      if (!inline && language === 'linkedin-embed') {
+      if (language === 'linkedin-embed') {
         return <LinkedInEmbedClient url={fenceText()} />;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (standard.code as any)(codeProps);
+      return standard.code(codeProps);
     },
 
     // Shortcode-expanded embeds: <div class="youtube-embed" data-video-id>…
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    div: (divProps: any) => {
-      const { className, ...props } = divProps;
-      if (className === 'youtube-embed') {
-        return <Video kind="youtube" url={props['data-video-id']} />;
+    div: (divProps: EmbedDivProps) => {
+      const {
+        className,
+        'data-video-id': videoId,
+        'data-post-url': postUrl,
+        'data-tweet-url': tweetUrl,
+        'data-url': dataUrl,
+        'data-kind': claudeKind,
+        'data-title': claudeTitle,
+        'data-figma-url': figmaUrl,
+      } = divProps;
+      // Each branch requires its payload attribute: a shortcode div that
+      // lost it used to hand the embed component `url={undefined}` and
+      // render a permanently broken player. Falling through to the plain
+      // `div` keeps the surrounding content intact instead.
+      if (className === 'youtube-embed' && videoId) {
+        return <Video kind="youtube" url={videoId} />;
       }
-      if (className === 'reddit-embed') {
-        return <RedditEmbedClient url={props['data-post-url']} />;
+      if (className === 'reddit-embed' && postUrl) {
+        return <RedditEmbedClient url={postUrl} />;
       }
-      if (className === 'tweet-embed') {
-        return <TwitterEmbedClient url={props['data-tweet-url']} />;
+      if (className === 'tweet-embed' && tweetUrl) {
+        return <TwitterEmbedClient url={tweetUrl} />;
       }
       if (className === 'link-preview') {
-        const url = props['data-url'];
-        if (!url || typeof url !== 'string') {
+        const url = dataUrl;
+        if (!url) {
           console.warn('Invalid URL for link preview:', url);
-          return <div className="text-ods-text-secondary text-sm">Invalid link</div>;
+          return <div className="text-sm text-ods-text-secondary">Invalid link</div>;
         }
         try {
           new URL(url);
           return (
-            <OGLinkErrorBoundary fallback={<div className="text-ods-text-secondary text-sm">Link preview unavailable</div>}>
+            <OGLinkErrorBoundary
+              fallback={<div className="text-sm text-ods-text-secondary">Link preview unavailable</div>}
+            >
               <OGLinkPreview
                 url={url}
                 variant="compact"
@@ -141,27 +167,26 @@ export function buildRichEmbedOverrides({
           );
         } catch (e) {
           console.warn('Malformed URL for link preview:', url, e);
-          return <div className="text-ods-text-secondary text-sm">Malformed URL: {url}</div>;
+          return <div className="text-sm text-ods-text-secondary">Malformed URL: {url}</div>;
         }
       }
-      if (className === 'figma-embed') {
-        return <FigmaEmbed url={props['data-figma-url']} height="70vh" />;
+      if (className === 'figma-embed' && figmaUrl) {
+        return <FigmaEmbed url={figmaUrl} height="70vh" />;
       }
-      if (className === 'claude-embed') {
+      if (className === 'claude-embed' && dataUrl) {
         return (
           <ClaudeEmbed
-            url={props['data-url']}
-            kind={props['data-kind'] === 'design' ? 'design' : 'artifact'}
-            title={props['data-title']}
+            url={dataUrl}
+            kind={claudeKind === 'design' ? 'design' : 'artifact'}
+            title={claudeTitle}
             height="70vh"
           />
         );
       }
-      if (className === 'linkedin-embed') {
-        return <LinkedInEmbedClient url={props['data-post-url']} />;
+      if (className === 'linkedin-embed' && postUrl) {
+        return <LinkedInEmbedClient url={postUrl} />;
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (standard.div as any)(divProps);
+      return standard.div(divProps);
     },
 
     // Pasted-from-the-platform embed markup lives in published blog posts as
@@ -173,8 +198,7 @@ export function buildRichEmbedOverrides({
     // blockquote itself: extract the post URL from the first matching link
     // and render the platform's embed-client SSOT. Other blockquotes fall
     // through to the engine's base blockquote.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    blockquote: (bqProps: any) => {
+    blockquote: (bqProps: MdRenderProps<'blockquote'>) => {
       const { node, className } = bqProps;
       const classNames: string = Array.isArray(className) ? className.join(' ') : (className ?? '');
       if (classNames.includes('reddit-embed-bq')) {
@@ -185,15 +209,13 @@ export function buildRichEmbedOverrides({
         const tweetUrl = findFirstHref(node, /(?:twitter\.com|x\.com)\/[^/]+\/status\//);
         if (tweetUrl) return <TwitterEmbedClient url={tweetUrl} />;
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (standard.blockquote as any)(bqProps);
+      return standard.blockquote(bqProps);
     },
 
     // In-article images: MarkdownImage reads `transformImageSrc` from the
     // rich-markdown runtime (Supabase optimization on the hub, identity
     // elsewhere). Guard against empty `![]()`.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    img: ({ src, alt }: any) => {
+    img: ({ src, alt }: MdRenderProps<'img'>) => {
       // Empty-`![]()` guard shared with the base `img` renderer.
       if (!hasRenderableSrc(src)) return null;
       return <MarkdownImage src={src.trim()} alt={alt} />;
@@ -201,12 +223,11 @@ export function buildRichEmbedOverrides({
 
     // Raw <video> tags in stored content (blog publisher injection) route
     // to the <Video> SSOT (MuxPlayer) so HLS manifests play everywhere.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    video: ({ src, poster, className }: any) => {
+    video: ({ src, poster, className }: MdRenderProps<'video'>) => {
       if (!hasRenderableSrc(src)) return null;
       return (
-        <div className={`overflow-hidden ${className || 'w-full my-8 rounded-lg'}`}>
-          <div className="w-full aspect-video">
+        <div className={`overflow-hidden ${className || 'my-8 w-full rounded-lg'}`}>
+          <div className="aspect-video w-full">
             <Video kind="file" url={src.trim()} poster={typeof poster === 'string' ? poster : undefined} />
           </div>
         </div>

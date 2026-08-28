@@ -24,8 +24,8 @@ public record CreateTicketRequest(
         @Schema(description = "machineId of the device to link")
         String deviceId,
 
-        @Schema(description = "organizationId to link. Derived from the device when omitted; must match the device's organization when both are given.")
-        String organizationId,
+        @Schema(description = "Customer id to link. Derived from the device when omitted; must match the device's customer when both are given.")
+        String customerId,
 
         @Schema(description = "User ID to assign the ticket to")
         String assigneeId,

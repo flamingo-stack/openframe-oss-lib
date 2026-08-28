@@ -11,45 +11,32 @@
  * ```
  */
 
-import React from 'react'
-import { cn } from '../../utils/cn'
+import type React from 'react';
+import { cn } from '../../utils/cn';
 
 export interface SoftwareInfoProps {
   /** Software name (required) */
-  name: string
+  name: string;
   /** Software vendor (optional) */
-  vendor?: string
+  vendor?: string;
   /** Software version (optional) */
-  version?: string
+  version?: string;
   /** Additional CSS classes */
-  className?: string
+  className?: string;
 }
 
-export const SoftwareInfo: React.FC<SoftwareInfoProps> = ({
-  name,
-  vendor,
-  version,
-  className
-}) => {
+export const SoftwareInfo: React.FC<SoftwareInfoProps> = ({ name, vendor, version, className }) => {
   return (
     <div className={cn('flex flex-col gap-1', className)}>
       <div className="flex items-center gap-2">
-        <div className="text-h4 text-ods-text-primary">
-          {name}
-        </div>
+        <div className="text-ods-text-primary text-h4">{name}</div>
         {version && (
-          <div className="px-2 py-1 bg-ods-bg-surface rounded text-ods-text-secondary text-h6">
-            {version}
-          </div>
+          <div className="rounded bg-ods-bg-surface px-2 py-1 text-ods-text-secondary text-h6">{version}</div>
         )}
       </div>
-      {vendor && (
-        <div className="text-h6 text-ods-text-secondary">
-          {vendor}
-        </div>
-      )}
+      {vendor && <div className="text-ods-text-secondary text-h6">{vendor}</div>}
     </div>
-  )
-}
+  );
+};
 
-SoftwareInfo.displayName = 'SoftwareInfo'
+SoftwareInfo.displayName = 'SoftwareInfo';

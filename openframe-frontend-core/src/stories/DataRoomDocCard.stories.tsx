@@ -1,13 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { DataRoomDocCard } from '../components/chat/entity-cards'
-import {
-  ChatColumnDecorator,
-  makeAnchorProps,
-} from './__fixtures__/chat-card-decorator'
-import {
-  dataRoomDocItem,
-  openframeDocsMarkdownItem,
-} from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { DataRoomDocCard } from '../components/chat/entity-cards';
+import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator';
+import { dataRoomDocItem, openframeDocsMarkdownItem } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof DataRoomDocCard> = {
   title: 'Chat/EntityCards/DataRoomDocCard',
@@ -21,11 +15,17 @@ const meta: Meta<typeof DataRoomDocCard> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const DataRoom: Story = {
   args: {
@@ -33,7 +33,7 @@ export const DataRoom: Story = {
     badgeText: 'Data room',
     anchorProps: makeAnchorProps(dataRoomDocItem.url ?? '#'),
   },
-}
+};
 
 export const KnowledgeBaseMarkdown: Story = {
   args: {
@@ -49,4 +49,4 @@ export const KnowledgeBaseMarkdown: Story = {
       },
     },
   },
-}
+};

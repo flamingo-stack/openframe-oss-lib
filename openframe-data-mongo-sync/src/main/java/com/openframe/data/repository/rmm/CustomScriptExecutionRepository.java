@@ -6,6 +6,7 @@ import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import org.springframework.data.domain.Sort;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,6 +24,8 @@ import java.util.Optional;
 public interface CustomScriptExecutionRepository {
 
     Optional<ScriptExecution> findByMachineIdAndExecutionIdAndScriptId(String machineId, String executionId, String scriptId);
+
+    List<ScriptExecution> findByMachineIdAndExecutionIdAndScriptIdIn(String machineId, String executionId, Collection<String> scriptIds);
 
     /**
      * Cursor-paginated executions for one owner (script or schedule) within a tenant.
@@ -97,6 +100,9 @@ public interface CustomScriptExecutionRepository {
      */
     LeafStatusCounts countLeavesByStatus(String tenantId, String executionId);
 
-    /** Running/failed counts for the leaves of one schedule fire; other terminal statuses are irrelevant to the decision. */
-    record LeafStatusCounts(long running, long failed) {}
+    /**
+     * Leaf counts for one schedule fire. {@code inProgress} is the not-yet-terminal count — leaves that
+     * are QUEUED (awaiting agent ack) or RUNNING; the header stays open while it is &gt; 0.
+     */
+    record LeafStatusCounts(long inProgress, long failed) {}
 }

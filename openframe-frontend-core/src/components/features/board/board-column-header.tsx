@@ -1,17 +1,17 @@
-'use client'
+'use client';
 
-import { Button } from '../../ui/button/button'
-import { TicketStatusTag, resolveTicketStatus } from '../../ui/ticket-status-tag'
-import { TouchFriendlyTooltip } from '../../ui/touch-friendly-tooltip'
-import { Arrow02LeftIcon, Arrow02RightIcon, BoxArchiveIcon, InfoCircleIcon, PlusIcon } from '../../icons-v2-generated'
-import type { BoardColumnDef } from './types'
+import { Arrow02LeftIcon, Arrow02RightIcon, BoxArchiveIcon, InfoCircleIcon, PlusIcon } from '../../icons-v2-generated';
+import { Button } from '../../ui/button/button';
+import { TicketStatusTag, resolveTicketStatus } from '../../ui/ticket-status-tag';
+import { TouchFriendlyTooltip } from '../../ui/touch-friendly-tooltip';
+import type { BoardColumnDef } from './types';
 
 export interface BoardColumnHeaderProps {
-  column: BoardColumnDef
-  collapsed?: boolean
-  onToggleCollapse: () => void
-  onAddTicket?: () => void
-  onArchive?: () => void
+  column: BoardColumnDef;
+  collapsed?: boolean;
+  onToggleCollapse: () => void;
+  onAddTicket?: () => void;
+  onArchive?: () => void;
 }
 
 export function BoardColumnHeader({
@@ -21,11 +21,11 @@ export function BoardColumnHeader({
   onAddTicket,
   onArchive,
 }: BoardColumnHeaderProps) {
-  const count = column.total ?? column.tickets.length
-  const tagStatus = column.statusKey ?? column.id
+  const count = column.total ?? column.tickets.length;
+  const tagStatus = column.statusKey ?? column.id;
   // Known statuses (ACTIVE, RESOLVED, …) render with their canonical Tag
   // variant/icon; only unrecognized ids (custom-status UUIDs) fall back to `color`.
-  const useStatusVariant = resolveTicketStatus(tagStatus) !== null
+  const useStatusVariant = resolveTicketStatus(tagStatus) !== null;
 
   if (collapsed) {
     return (
@@ -33,7 +33,7 @@ export function BoardColumnHeader({
         <Button
           variant="transparent"
           size="icon"
-          className="h-8 w-8 md:h-8 md:w-8 p-0"
+          className="h-8 w-8 p-0 md:h-8 md:w-8"
           onClick={onToggleCollapse}
           aria-label="Expand column"
         >
@@ -49,7 +49,7 @@ export function BoardColumnHeader({
           {count}
         </span>
       </div>
-    )
+    );
   }
 
   return (
@@ -63,12 +63,7 @@ export function BoardColumnHeader({
       <div className="flex shrink-0 items-center gap-[var(--spacing-system-xxs)]">
         {column.tooltip && (
           <TouchFriendlyTooltip content={column.tooltip} side="bottom">
-            <Button
-              variant="transparent"
-              size="icon"
-              className="h-8 w-8 md:h-8 md:w-8 p-0"
-              aria-label={column.tooltip}
-            >
+            <Button variant="transparent" size="icon" className="h-8 w-8 p-0 md:h-8 md:w-8" aria-label={column.tooltip}>
               <InfoCircleIcon className="h-6 w-6 text-ods-text-secondary" />
             </Button>
           </TouchFriendlyTooltip>
@@ -76,7 +71,7 @@ export function BoardColumnHeader({
         <Button
           variant="transparent"
           size="icon"
-          className="h-8 w-8 md:h-8 md:w-8 p-0"
+          className="h-8 w-8 p-0 md:h-8 md:w-8"
           onClick={onToggleCollapse}
           aria-label="Collapse column"
         >
@@ -86,7 +81,7 @@ export function BoardColumnHeader({
           <Button
             variant="transparent"
             size="icon"
-            className="h-8 w-8 md:h-8 md:w-8 p-0"
+            className="h-8 w-8 p-0 md:h-8 md:w-8"
             onClick={onArchive}
             aria-label="Archive resolved tickets"
           >
@@ -97,7 +92,7 @@ export function BoardColumnHeader({
           <Button
             variant="transparent"
             size="icon"
-            className="h-8 w-8 md:h-8 md:w-8 p-0"
+            className="h-8 w-8 p-0 md:h-8 md:w-8"
             onClick={onAddTicket}
             aria-label="Add ticket"
           >
@@ -106,5 +101,5 @@ export function BoardColumnHeader({
         )}
       </div>
     </div>
-  )
+  );
 }

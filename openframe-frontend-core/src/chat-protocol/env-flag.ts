@@ -32,8 +32,8 @@
  * module-eval time.
  */
 export function envFlagEnabled(name: string): boolean {
-  const raw = process.env[name]
-  if (!raw) return false
-  const v = raw.trim().toLowerCase()
-  return v !== '' && v !== '0' && v !== 'false' && v !== 'off'
+  const raw = process.env[name];
+  if (!raw) return false;
+  const v = raw.trim().toLowerCase();
+  return v !== '' && v !== '0' && v !== 'false' && v !== 'off';
 }

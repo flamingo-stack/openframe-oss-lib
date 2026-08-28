@@ -10,6 +10,7 @@ extend type Mutation {
 "The 'Notify about' checkboxes. A notification type outside every group cannot be muted."
 enum NotificationSettingGroup {
     TICKET_ASSIGNED
+    TICKET_CREATED
     TICKET_STATUS_CHANGED
     CUSTOMER_REPLIED
     ADMIN_REPLIED

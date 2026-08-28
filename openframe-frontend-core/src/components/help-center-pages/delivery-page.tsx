@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<DeliveryPage>` — the full bug-fixes & enhancements (`delivery`) page:
@@ -7,24 +7,24 @@
  * only the two bucket api routes.
  */
 
-import type { ReactNode } from 'react'
-import { DevSectionPage } from '../shared/dev-section'
-import { DeliveryLists } from '../shared/delivery'
+import type { ReactNode } from 'react';
+import { DeliveryLists } from '../shared/delivery';
+import { DevSectionPage } from '../shared/dev-section';
 
 export interface DeliveryPageProps {
   /** GET endpoint for the "Recently Completed" bucket. Default `/api/delivery/completed`. */
-  completedEndpoint?: string
+  completedEndpoint?: string;
   /** GET endpoint for the "Active Tasks" bucket. Default `/api/delivery/in-progress`. */
-  inProgressEndpoint?: string
+  inProgressEndpoint?: string;
   /** Back-button config. Pass `false` to hide. Default `{ href: '/' }`. */
-  backButton?: { label?: string; href?: string } | false
-  title?: string
-  subtitle?: string
+  backButton?: { label?: string; href?: string } | false;
+  title?: string;
+  subtitle?: string;
   /** Optional slot rendered below the lists, inside the page chrome. */
-  belowContent?: ReactNode
+  belowContent?: ReactNode;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container (forwarded to `DevSectionPage`). */
-  shell?: boolean
+  shell?: boolean;
 }
 
 export function DeliveryPage({
@@ -41,5 +41,5 @@ export function DeliveryPage({
       <DeliveryLists completedApiEndpoint={completedEndpoint} inProgressApiEndpoint={inProgressEndpoint} />
       {belowContent}
     </DevSectionPage>
-  )
+  );
 }

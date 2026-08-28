@@ -19,8 +19,9 @@
  */
 export function holdMoveDragEffect(element: HTMLElement): () => void {
   const onDragStart = (event: DragEvent) => {
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
-  }
-  element.addEventListener('dragstart', onDragStart)
-  return () => element.removeEventListener('dragstart', onDragStart)
+    const transfer = event.dataTransfer;
+    if (transfer) transfer.effectAllowed = 'move';
+  };
+  element.addEventListener('dragstart', onDragStart);
+  return () => element.removeEventListener('dragstart', onDragStart);
 }

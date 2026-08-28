@@ -8,23 +8,19 @@
  * Server-safe: no React, no browser APIs.
  */
 
-// The wire-frame shapes these events carry through are defined ONCE in
-// `./frames.ts` — reuse them here rather than restating their fields.
-import type {
-  ApprovalRequestField,
-  DecisionResolvedFrame,
-  UsageTelemetry,
-} from './frames'
 // The ask card's option shape is the SEGMENT's shape — the decoder hands the
 // rows straight to the accumulator, so restating them here would be two
 // declarations of one wire contract. Type-only import from a React-free
 // module; `nats-decoder.ts` already depends on the same file for MESSAGE_TYPE.
-import type { AskOptionData } from '../components/chat/types/message.types'
+import type { AskOptionData } from '../components/chat/types/message.types';
+// The wire-frame shapes these events carry through are defined ONCE in
+// `./frames.ts` — reuse them here rather than restating their fields.
+import type { ApprovalRequestField, DecisionResolvedFrame, UsageTelemetry } from './frames';
 
 /** Optional envelope on every event. `seq` carries the transport's
  *  stream sequence (JetStream `streamSeq` on NATS; unused on SSE). */
 interface ChatStreamEventBase {
-  seq?: number
+  seq?: number;
 }
 
 /** Stream entered answer-text mode (SSE: the `\x1E` sentinel or the
@@ -35,27 +31,27 @@ interface ChatStreamEventBase {
  *  implicit starts (legacy adapter parity: the fallback path never
  *  flushed pending thinking before the text). */
 export interface TurnStartEvent extends ChatStreamEventBase {
-  type: 'turn-start'
-  implicit?: boolean
+  type: 'turn-start';
+  implicit?: boolean;
 }
 
 export interface TurnEndEvent extends ChatStreamEventBase {
-  type: 'turn-end'
+  type: 'turn-end';
 }
 
 /** Answer text delta. `leading: true` marks SSE `text-leading` frames
  *  (model preamble prose emitted BEFORE the tool approval card). */
 export interface TextDeltaEvent extends ChatStreamEventBase {
-  type: 'text-delta'
-  text: string
-  leading?: boolean
+  type: 'text-delta';
+  text: string;
+  leading?: boolean;
 }
 
 /** Thinking delta — APPEND-ONLY contract: each event carries the next
  *  verbatim slice; consumers accumulate. Decoders never diff. */
 export interface ThinkingDeltaEvent extends ChatStreamEventBase {
-  type: 'thinking-delta'
-  text: string
+  type: 'thinking-delta';
+  text: string;
 }
 
 /** Guide-body delta (NATS `GUIDE` chunk) — the assistant's how-to /
@@ -66,8 +62,8 @@ export interface ThinkingDeltaEvent extends ChatStreamEventBase {
  *  frame grammar has no guide frame — but it lives in the shared union
  *  because the reducer is transport-agnostic. */
 export interface GuideDeltaEvent extends ChatStreamEventBase {
-  type: 'guide-delta'
-  text: string
+  type: 'guide-delta';
+  text: string;
 }
 
 /** Clarification card (NATS `ASK` chunk) — the assistant asking which reading
@@ -78,25 +74,25 @@ export interface GuideDeltaEvent extends ChatStreamEventBase {
  *  no ask frame — but it lives in the shared union because the reducer is
  *  transport-agnostic. */
 export interface AskEvent extends ChatStreamEventBase {
-  type: 'ask'
-  text?: string
-  question: string
-  options: AskOptionData[]
+  type: 'ask';
+  text?: string;
+  question: string;
+  options: AskOptionData[];
 }
 
 export interface StatusEvent extends ChatStreamEventBase {
-  type: 'status'
-  phase: 'thinking'
+  type: 'status';
+  phase: 'thinking';
 }
 
 /** NATS tool execution progress (EXECUTING_TOOL / EXECUTED_TOOL). */
 export interface ToolExecutionEvent extends ChatStreamEventBase {
-  type: 'tool-execution'
+  type: 'tool-execution';
   data: {
-    type: 'EXECUTING_TOOL' | 'EXECUTED_TOOL'
-    integratedToolType: string
-    toolFunction: string
-    toolTitle?: string
+    type: 'EXECUTING_TOOL' | 'EXECUTED_TOOL';
+    integratedToolType: string;
+    toolFunction: string;
+    toolTitle?: string;
     /**
      * Human-readable "why this tool is running" line, rendered as the body of
      * the tool card. Carried by the EXECUTING chunk ONLY — the EXECUTED one
@@ -105,41 +101,41 @@ export interface ToolExecutionEvent extends ChatStreamEventBase {
      * it from this contract blanks the card for the whole run, live and on
      * replay, which is exactly what happened while it was missing here.
      */
-    toolExplanation?: string
-    parameters?: Record<string, unknown>
-    result?: string
-    success?: boolean
-    toolExecutionRequestId?: string
-  }
+    toolExplanation?: string;
+    parameters?: Record<string, unknown>;
+    result?: string;
+    success?: boolean;
+    toolExecutionRequestId?: string;
+  };
 }
 
 /** Single tool call inside a batch approval request (NATS). */
 export interface ApprovalToolCall {
-  toolExecutionRequestId: string
-  toolName: string
-  toolTitle?: string
-  toolExplanation?: string
-  toolType?: string
-  requiresApproval: boolean
-  approvalType?: string | null
-  toolCallArguments?: Record<string, unknown> | null
+  toolExecutionRequestId: string;
+  toolName: string;
+  toolTitle?: string;
+  toolExplanation?: string;
+  toolType?: string;
+  requiresApproval: boolean;
+  approvalType?: string | null;
+  toolCallArguments?: Record<string, unknown> | null;
 }
 
 /** A tool call awaits user approval. SSE fills `command`/`fields`
  *  (card-ready payload); NATS fills `command`/`explanation` or
  *  `toolCalls` (batch form). */
 export interface ApprovalRequestEvent extends ChatStreamEventBase {
-  type: 'approval-request'
-  requestId: string
+  type: 'approval-request';
+  requestId: string;
   /** SSE: the write tool's name. NATS: approval tier (USER/ADMIN/…). */
-  approvalType?: string
-  command?: string
-  explanation?: string
-  fields?: ApprovalRequestField[]
-  toolCalls?: ApprovalToolCall[]
-  status?: 'pending'
+  approvalType?: string;
+  command?: string;
+  explanation?: string;
+  fields?: ApprovalRequestField[];
+  toolCalls?: ApprovalToolCall[];
+  status?: 'pending';
   /** Set when the card came from a Product Guide frame — see {@link GuideOrigin}. */
-  origin?: GuideOrigin
+  origin?: GuideOrigin;
 }
 
 /**
@@ -155,37 +151,35 @@ export interface ApprovalRequestEvent extends ChatStreamEventBase {
  * would have to guess from `approvalType`, and every tool the hub adds would
  * silently fall into the escalation path.
  */
-export type GuideOrigin = 'guide'
+export type GuideOrigin = 'guide';
 
 /** The only value of {@link GuideOrigin}. Lives beside the type, and beside the
  *  predicate below, because both decoders and every consumer that branches on
  *  provenance must compare against the same token — a bare `'guide'` literal
  *  typo silently disables the branch instead of failing to compile. */
-export const GUIDE_ORIGIN: GuideOrigin = 'guide'
+export const GUIDE_ORIGIN: GuideOrigin = 'guide';
 
 /** True for anything stamped as coming from the Product Guide — a stream event
  *  or the `data` of a segment built from one. */
-export function isGuideOrigin(
-  source: { origin?: GuideOrigin | string } | null | undefined,
-): boolean {
-  return source?.origin === GUIDE_ORIGIN
+export function isGuideOrigin(source: { origin?: GuideOrigin | string } | null | undefined): boolean {
+  return source?.origin === GUIDE_ORIGIN;
 }
 
 /** An approval request was resolved (SSE `decision_resolved` frame /
  *  NATS APPROVAL_RESULT chunk). */
 export interface ApprovalResolvedEvent extends ChatStreamEventBase {
-  type: 'approval-resolved'
-  requestId?: string
-  status: 'approved' | 'rejected'
-  ok?: boolean
-  toolName?: string
-  approvalType?: string
-  resolvedByName?: string | null
-  receiptText?: string
-  result?: DecisionResolvedFrame['result']
-  willAutoContinue?: boolean
+  type: 'approval-resolved';
+  requestId?: string;
+  status: 'approved' | 'rejected';
+  ok?: boolean;
+  toolName?: string;
+  approvalType?: string;
+  resolvedByName?: string | null;
+  receiptText?: string;
+  result?: DecisionResolvedFrame['result'];
+  willAutoContinue?: boolean;
   /** Set when the resolution came from a Product Guide frame — see {@link GuideOrigin}. */
-  origin?: GuideOrigin
+  origin?: GuideOrigin;
 }
 
 /** The client is offered a handoff of this ticket to a human technician
@@ -195,10 +189,10 @@ export interface ApprovalResolvedEvent extends ChatStreamEventBase {
  *  (Fae's own tool call, the client's header button, a deterministic
  *  trigger, or a deferred surfacing at turn end) that all render alike. */
 export interface EscalationOfferEvent extends ChatStreamEventBase {
-  type: 'escalation-offer'
-  offerId: string
-  text: string
-  origin?: string
+  type: 'escalation-offer';
+  offerId: string;
+  text: string;
+  origin?: string;
 }
 
 /** Wire vocabulary of `EscalationOfferData.state`. */
@@ -207,23 +201,21 @@ export const ESCALATION_STATE = {
   APPROVED: 'APPROVED',
   DECLINED: 'DECLINED',
   SUPERSEDED: 'SUPERSEDED',
-} as const
+} as const;
 
 /** Terminal wire state → the shared `ChatApprovalStatus` vocabulary; `null`
  *  for PENDING or anything unrecognized. Shared by BOTH decoders (live
  *  chunks and persisted rows) so a state can never mean two things. */
-export function escalationResolvedStatus(
-  state: unknown,
-): EscalationOfferResolvedEvent['status'] | null {
+export function escalationResolvedStatus(state: unknown): EscalationOfferResolvedEvent['status'] | null {
   switch (state) {
     case ESCALATION_STATE.APPROVED:
-      return 'approved'
+      return 'approved';
     case ESCALATION_STATE.DECLINED:
-      return 'rejected'
+      return 'rejected';
     case ESCALATION_STATE.SUPERSEDED:
-      return 'cancelled'
+      return 'cancelled';
     default:
-      return null
+      return null;
   }
 }
 
@@ -232,10 +224,10 @@ export function escalationResolvedStatus(
  *  whole stack keeps ONE status vocabulary (`ChatApprovalStatus`). The
  *  resolved chunk carries no text — consumers flip the existing block. */
 export interface EscalationOfferResolvedEvent extends ChatStreamEventBase {
-  type: 'escalation-offer-resolved'
-  offerId: string
-  status: 'approved' | 'rejected' | 'cancelled'
-  resolvedByName?: string | null
+  type: 'escalation-offer-resolved';
+  offerId: string;
+  status: 'approved' | 'rejected' | 'cancelled';
+  resolvedByName?: string | null;
 }
 
 /** The conversation was handed off to a human technician (`TICKET_ESCALATED`).
@@ -244,11 +236,11 @@ export interface EscalationOfferResolvedEvent extends ChatStreamEventBase {
  *  produce a receipt. `text` is nullable on the wire; consumers supply the
  *  fallback copy. */
 export interface TicketEscalatedEvent extends ChatStreamEventBase {
-  type: 'ticket-escalated'
-  ticketId: string
-  ticketNumber?: number
-  reason: string
-  text?: string
+  type: 'ticket-escalated';
+  ticketId: string;
+  ticketNumber?: number;
+  reason: string;
+  text?: string;
 }
 
 /** Ticket lifecycle receipt (`TICKET_EVENT`) — the ticket was resolved,
@@ -257,85 +249,122 @@ export interface TicketEscalatedEvent extends ChatStreamEventBase {
  *  being dropped, so the backend can add kinds without a client release.
  *  Arrives standalone (outside MESSAGE_START/END), like `ticket-escalated`. */
 export interface TicketEventEvent extends ChatStreamEventBase {
-  type: 'ticket-event'
-  kind: string
-  actorId?: string
-  actorName?: string
+  type: 'ticket-event';
+  kind: string;
+  actorId?: string;
+  actorName?: string;
   /** Who acted — e.g. an AI agent vs a human technician. Open string. */
-  actorType?: string
-  reason?: string
+  actorType?: string;
+  reason?: string;
   /** Kind-token the ticket reopened INTO (AI_ASSISTANCE / TECH_REQUIRED / ...). */
-  targetStatusKind?: string
+  targetStatusKind?: string;
 }
 
 /** Per-turn metadata. Raw wire values pass through UNVALIDATED — the
  *  consumer replicates the legacy truthiness/typeof gates (so a
  *  malformed frame degrades identically to the pre-SSOT parser). */
 export interface ChatMetadataEvent extends ChatStreamEventBase {
-  type: 'metadata'
-  provider?: string | null
-  modelLabel?: string | null
+  type: 'metadata';
+  provider?: string | null;
+  modelLabel?: string | null;
   /** Raw model id (SSE `meta.model`; NATS `modelName`). */
-  modelName?: string | null
-  contextWindowMaxTokens?: number | null
-  sources?: unknown
-  scrollAnchor?: unknown
+  modelName?: string | null;
+  contextWindowMaxTokens?: number | null;
+  sources?: unknown;
+  scrollAnchor?: unknown;
   /** Server-minted conversation id (`ChatMetadataFrame.conversationId`),
    *  passed through raw like every other catch-all field — the consumer
    *  applies the `typeof === 'string' && truthy` gate. */
-  conversationId?: string | null
+  conversationId?: string | null;
   routing?: {
-    routedComplexity: string
-    routedModel?: string
-    routedThinkingBudget: number | null
-  }
+    routedComplexity: string;
+    routedModel?: string;
+    routedThinkingBudget: number | null;
+  };
   /**
    * Set when the metadata came from a Product Guide frame — see
    * {@link GuideOrigin}. Such an event carries ONLY `conversationId`: it exists
    * to record the hub's conversation id (every confirm-tool call must quote it
    * back), NOT to describe the dialog's model, which stays the agent's.
    */
-  origin?: GuideOrigin
+  origin?: GuideOrigin;
 }
 
 /** SSE usage frames — raw wire keys (snake_case) preserved. */
 export interface UsageEvent extends ChatStreamEventBase {
-  type: 'usage'
-  stage: 'start' | 'end'
-  input_tokens?: number
-  output_tokens?: number
-  cache_read_input_tokens?: number
-  cache_creation_input_tokens?: number
-  hit_rate_pct?: number
-  telemetry?: UsageTelemetry
+  type: 'usage';
+  stage: 'start' | 'end';
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+  hit_rate_pct?: number;
+  telemetry?: UsageTelemetry;
   /** Left OPAQUE on purpose: the consumer (`chat-stream-reducer`'s
    *  `applySseUsage`) re-validates every nested field with the legacy
    *  truthiness/typeof gates, so a malformed frame degrades identically
    *  to the pre-SSOT parser. Typing it would imply guarantees the wire
    *  does not make. */
-  breakdown?: unknown
-  debug?: unknown
+  breakdown?: unknown;
+  debug?: unknown;
 }
 
 /** NATS TOKEN_USAGE chunk (camelCase backend shape). */
 export interface TokenUsageEvent extends ChatStreamEventBase {
-  type: 'token-usage'
-  inputTokensSize: number
-  outputTokensSize: number
-  totalTokensSize: number
-  contextSize: number
+  type: 'token-usage';
+  inputTokensSize: number;
+  outputTokensSize: number;
+  totalTokensSize: number;
+  contextSize: number;
 }
 
 export interface CompactionEvent extends ChatStreamEventBase {
-  type: 'compaction'
-  phase: 'start' | 'end'
-  summary?: string
+  type: 'compaction';
+  phase: 'start' | 'end';
+  summary?: string;
 }
 
 export interface ErrorEvent extends ChatStreamEventBase {
-  type: 'error'
-  title: string
-  details?: string
+  type: 'error';
+  title: string;
+  details?: string;
+}
+
+/**
+ * Decode {@link ErrorEvent.details} into the sub-line an error card renders.
+ *
+ * `details` is EITHER a JSON envelope (`{ error: { message } }`) or an already-
+ * human string, and both the live reducer and the history replay have to agree
+ * on which — a card that reads one way live and another on refresh is the whole
+ * class of bug this module's shared decoders exist to prevent. Lives here,
+ * beside the event it decodes, because it is the wire contract, not a rendering
+ * choice.
+ *
+ * Gates:
+ *   - not JSON            → the raw string (it was already human-readable)
+ *   - JSON, string message → that message
+ *   - JSON, anything else  → `undefined`, so the card shows its title alone
+ *
+ * That last gate is the fix for a real defect: the message was previously
+ * copied out of the envelope UNCHECKED, so a server that nested an object
+ * under `error.message` put that object into a `string` field and the card
+ * rendered the literal text "[object Object]" under the title. Valid JSON that
+ * simply lacks `error.message` still yields `undefined` (unchanged) rather than
+ * dumping the raw envelope at the user.
+ */
+export function errorDetailsMessage(details: string | undefined): string | undefined {
+  if (!details) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(details);
+  } catch {
+    return details;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return undefined;
+  const error: unknown = (parsed as { error?: unknown }).error;
+  if (typeof error !== 'object' || error === null) return undefined;
+  const message: unknown = (error as { message?: unknown }).message;
+  return typeof message === 'string' ? message : undefined;
 }
 
 /** Non-assistant message on the stream (NATS): the user's own message
@@ -349,23 +378,23 @@ export interface ErrorEvent extends ChatStreamEventBase {
  * never a bare `'ADMIN'` literal — a typo in a literal silently disables
  * dedup instead of failing to compile.
  */
-export type ChatOwnerType = 'ADMIN' | 'CLIENT' | (string & {})
+export type ChatOwnerType = 'ADMIN' | 'CLIENT' | (string & {});
 
 /** Canonical ADMIN owner-type token (see `ChatOwnerType`). */
-export const CHAT_OWNER_ADMIN = 'ADMIN'
+export const CHAT_OWNER_ADMIN = 'ADMIN';
 
 export interface ParticipantEvent extends ChatStreamEventBase {
-  type: 'participant'
-  kind: 'message-request' | 'direct-message' | 'system'
-  text: string
-  ownerType?: ChatOwnerType
-  displayName?: string
-  userId?: string
-  contextItems?: Array<{ type: string; id: string; label: string }>
+  type: 'participant';
+  kind: 'message-request' | 'direct-message' | 'system';
+  text: string;
+  ownerType?: ChatOwnerType;
+  displayName?: string;
+  userId?: string;
+  contextItems?: Array<{ type: string; id: string; label: string }>;
 }
 
 export interface DialogClosedEvent extends ChatStreamEventBase {
-  type: 'dialog-closed'
+  type: 'dialog-closed';
 }
 
 export type ChatStreamEvent =
@@ -389,4 +418,4 @@ export type ChatStreamEvent =
   | CompactionEvent
   | ErrorEvent
   | ParticipantEvent
-  | DialogClosedEvent
+  | DialogClosedEvent;

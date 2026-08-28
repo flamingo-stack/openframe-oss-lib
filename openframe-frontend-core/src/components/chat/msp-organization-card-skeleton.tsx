@@ -1,11 +1,11 @@
-'use client'
+'use client';
 
-import { cn } from '../../utils/cn'
-import { Skeleton } from '../ui/skeleton'
+import { cn } from '../../utils/cn';
+import { Skeleton } from '../ui/skeleton';
 
 export interface MspOrganizationCardSkeletonProps {
   /** Appended to the root element. */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -29,5 +29,5 @@ export function MspOrganizationCardSkeleton({ className }: MspOrganizationCardSk
       </div>
       <Skeleton className="size-12 shrink-0 rounded-md" />
     </div>
-  )
+  );
 }

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Modal, Button } from './index';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from '../../embed-shims/next-image';
+import { Button } from './button';
+import { Modal } from './modal';
 
 interface ImageGalleryModalProps {
   images: string[];
@@ -17,32 +18,37 @@ interface ImageGalleryModalProps {
  * Reusable component extracted from TMCG event detail page
  * Features: Keyboard navigation, prev/next buttons, image counter
  */
-export function ImageGalleryModal({
-  images,
-  isOpen,
-  onClose,
-  initialIndex = 0,
-}: ImageGalleryModalProps) {
+export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }: ImageGalleryModalProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(initialIndex);
 
-  // Reset to initial index when modal opens
+  // Reset to initial index when the modal opens. Adjusted while rendering
+  // rather than from an effect: opening otherwise paints one frame of whatever
+  // image the user was last on before jumping to the requested one.
+  const [openedWith, setOpenedWith] = useState({ isOpen, initialIndex });
+  if (openedWith.isOpen !== isOpen || openedWith.initialIndex !== initialIndex) {
+    setOpenedWith({ isOpen, initialIndex });
+    if (isOpen) setSelectedImageIndex(initialIndex);
+  }
+
+  // Functional updaters, so neither callback closes over the current index and
+  // both stay stable — the keydown listener below then re-subscribes only when
+  // the modal opens/closes or the gallery length changes, instead of on every
+  // arrow press.
+  const imageCount = images.length;
+  const goToPreviousImage = useCallback(() => {
+    setSelectedImageIndex(i => (i > 0 ? i - 1 : i));
+  }, []);
+
+  const goToNextImage = useCallback(() => {
+    setSelectedImageIndex(i => (i < imageCount - 1 ? i + 1 : i));
+  }, [imageCount]);
+
+  // `onClose` is a prop and is almost always written inline; through a ref the
+  // listener does not re-subscribe on every parent render.
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    if (isOpen) {
-      setSelectedImageIndex(initialIndex);
-    }
-  }, [isOpen, initialIndex]);
-
-  const goToPreviousImage = () => {
-    if (selectedImageIndex > 0) {
-      setSelectedImageIndex(selectedImageIndex - 1);
-    }
-  };
-
-  const goToNextImage = () => {
-    if (selectedImageIndex < images.length - 1) {
-      setSelectedImageIndex(selectedImageIndex + 1);
-    }
-  };
+    onCloseRef.current = onClose;
+  });
 
   // Keyboard navigation
   useEffect(() => {
@@ -60,50 +66,45 @@ export function ImageGalleryModal({
           break;
         case 'Escape':
           event.preventDefault();
-          onClose();
+          onCloseRef.current();
           break;
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyPress);
-      return () => {
-        document.removeEventListener('keydown', handleKeyPress);
-      };
-    }
-  }, [isOpen, selectedImageIndex, images.length]);
+    if (!isOpen) return undefined;
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [isOpen, goToPreviousImage, goToNextImage]);
 
   if (!isOpen || images.length === 0) return null;
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      className="max-w-[95vw]"
-    >
-      <div className="relative flex items-center justify-center bg-black rounded-lg">
+    <Modal isOpen={isOpen} onClose={onClose} className="max-w-[95vw]">
+      <div className="relative flex items-center justify-center rounded-lg bg-black">
         {/* Navigation Buttons */}
         {images.length > 1 && (
           <>
             {selectedImageIndex > 0 && (
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-[10000]">
+              <div className="absolute left-4 top-1/2 z-[10000] -translate-y-1/2">
                 <Button
                   variant="transparent"
                   size="small-legacy"
                   onClick={goToPreviousImage}
-                  className="rounded-full bg-black/50 text-white hover:bg-black/70 p-2"
-                  leftIcon={<ChevronLeft className="w-6 h-6" />}
+                  className="rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                  leftIcon={<ChevronLeft className="h-6 w-6" />}
                 />
               </div>
             )}
             {selectedImageIndex < images.length - 1 && (
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-[10000]">
+              <div className="absolute right-4 top-1/2 z-[10000] -translate-y-1/2">
                 <Button
                   variant="transparent"
                   size="small-legacy"
                   onClick={goToNextImage}
-                  className="rounded-full bg-black/50 text-white hover:bg-black/70 p-2"
-                  leftIcon={<ChevronRight className="w-6 h-6" />}
+                  className="rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                  leftIcon={<ChevronRight className="h-6 w-6" />}
                 />
               </div>
             )}
@@ -112,7 +113,7 @@ export function ImageGalleryModal({
 
         {/* Current Image */}
         {images[selectedImageIndex] && (
-          <div className="relative w-[90vw] h-[90vh] max-w-none flex items-center justify-center">
+          <div className="relative flex h-[90vh] w-[90vw] max-w-none items-center justify-center">
             <Image
               src={images[selectedImageIndex]}
               alt={`Screenshot ${selectedImageIndex + 1}`}
@@ -121,7 +122,7 @@ export function ImageGalleryModal({
               sizes="90vw"
               priority={true}
               unoptimized
-              onError={(e) => {
+              onError={e => {
                 // Handle HEIC and other unsupported formats
                 const target = e.target as HTMLImageElement;
                 const imageUrl = images[selectedImageIndex];
@@ -131,7 +132,8 @@ export function ImageGalleryModal({
                 const parent = target.parentElement;
                 if (parent && !parent.querySelector('.image-error')) {
                   const errorDiv = document.createElement('div');
-                  errorDiv.className = 'image-error flex flex-col items-center justify-center text-white text-center px-8';
+                  errorDiv.className =
+                    'image-error flex flex-col items-center justify-center text-white text-center px-8';
                   errorDiv.innerHTML = `
                     <p class="text-xl mb-4">${isHeic ? 'HEIC format not supported in browser' : 'Failed to load image'}</p>
                     <a href="${imageUrl}" download class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded border border-white/20 transition-colors">
@@ -147,7 +149,7 @@ export function ImageGalleryModal({
 
         {/* Image Counter */}
         {images.length > 1 && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[10000] px-4 py-2 rounded-full bg-black/50 text-white text-h6">
+          <div className="absolute bottom-4 left-1/2 z-[10000] -translate-x-1/2 rounded-full bg-black/50 px-4 py-2 text-white text-h6">
             {selectedImageIndex + 1} / {images.length}
           </div>
         )}

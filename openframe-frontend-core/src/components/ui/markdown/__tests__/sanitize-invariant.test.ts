@@ -1,3 +1,4 @@
+import { defaultSchema } from 'rehype-sanitize';
 /**
  * Coupled-allowlist invariant (unification plan §D1), BOTH DIRECTIONS:
  * the effective pre-pass tag set and the effective sanitizer tag set are
@@ -9,8 +10,7 @@
  *     sanitizer would keep (the direction that regressed `<strike>` and
  *     every other `defaultSchema`-only tag into visible source text).
  */
-import { describe, it, expect } from 'vitest'
-import { defaultSchema } from 'rehype-sanitize'
+import { describe, it, expect } from 'vitest';
 import {
   __buildCloserHaystackForTest,
   buildEffectiveTagSet,
@@ -19,73 +19,66 @@ import {
   rehypeStripUnsafe,
   SAFE_HTML_TAGS,
   SVG_TAGS,
-} from '../sanitize'
+} from '../sanitize';
 
 function assertEqualSets(pre: Set<string>, schemaTags: string[]) {
-  const sanitizerTags = new Set(schemaTags.map((t) => t.toLowerCase()))
-  const escapedButKept = [...sanitizerTags].filter((t) => !pre.has(t))
-  const admittedButDropped = [...pre].filter((t) => !sanitizerTags.has(t))
-  expect(
-    admittedButDropped,
-    `pre-pass admits tags the sanitizer would drop: ${admittedButDropped.join(', ')}`,
-  ).toEqual([])
-  expect(
-    escapedButKept,
-    `pre-pass escapes tags the sanitizer would keep: ${escapedButKept.join(', ')}`,
-  ).toEqual([])
+  const sanitizerTags = new Set(schemaTags.map(t => t.toLowerCase()));
+  const escapedButKept = [...sanitizerTags].filter(t => !pre.has(t));
+  const admittedButDropped = [...pre].filter(t => !sanitizerTags.has(t));
+  expect(admittedButDropped, `pre-pass admits tags the sanitizer would drop: ${admittedButDropped.join(', ')}`).toEqual(
+    [],
+  );
+  expect(escapedButKept, `pre-pass escapes tags the sanitizer would keep: ${escapedButKept.join(', ')}`).toEqual([]);
 }
 
 describe('coupled-allowlist invariant', () => {
   it('baseline: pre-pass set === sanitizer tagNames (both directions)', () => {
-    assertEqualSets(buildEffectiveTagSet(), buildSanitizeSchema().tagNames)
-  })
+    assertEqualSets(buildEffectiveTagSet(), buildSanitizeSchema().tagNames);
+  });
 
   it('with extraAllowedHtmlTags merged into BOTH lists (rich: video/source)', () => {
-    const extra = ['video', 'source']
-    assertEqualSets(
-      buildEffectiveTagSet(extra),
-      buildSanitizeSchema({ extraAllowedHtmlTags: extra }).tagNames,
-    )
-  })
+    const extra = ['video', 'source'];
+    assertEqualSets(buildEffectiveTagSet(extra), buildSanitizeSchema({ extraAllowedHtmlTags: extra }).tagNames);
+  });
 
   it('every defaultSchema tag survives the pre-pass (strike regression)', () => {
-    const pre = buildEffectiveTagSet()
+    const pre = buildEffectiveTagSet();
     for (const tag of defaultSchema.tagNames ?? []) {
-      expect(pre.has(tag.toLowerCase()), `pre-pass must not escape <${tag}>`).toBe(true)
+      expect(pre.has(tag.toLowerCase()), `pre-pass must not escape <${tag}>`).toBe(true);
     }
-    expect(pre.has('strike')).toBe(true)
-  })
+    expect(pre.has('strike')).toBe(true);
+  });
 
   it('SVG elements are admitted by BOTH the pre-pass and the schema', () => {
-    const pre = buildEffectiveTagSet()
-    const schema = buildSanitizeSchema()
+    const pre = buildEffectiveTagSet();
+    const schema = buildSanitizeSchema();
     for (const tag of SVG_TAGS) {
-      expect(pre.has(tag.toLowerCase()), `pre-pass must admit <${tag}>`).toBe(true)
-      expect(schema.tagNames, `schema must keep <${tag}>`).toContain(tag)
+      expect(pre.has(tag.toLowerCase()), `pre-pass must admit <${tag}>`).toBe(true);
+      expect(schema.tagNames, `schema must keep <${tag}>`).toContain(tag);
     }
-  })
+  });
 
   it('SVG geometry/presentation attributes survive the schema', () => {
-    const schema = buildSanitizeSchema()
-    const svgAttrs = (schema.attributes?.svg ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    const schema = buildSanitizeSchema();
+    const svgAttrs = (schema.attributes?.svg ?? []).map(a => (Array.isArray(a) ? a[0] : a));
     for (const required of ['viewBox', 'xmlns', 'fill']) {
-      expect(svgAttrs, `svg must keep '${required}'`).toContain(required)
+      expect(svgAttrs, `svg must keep '${required}'`).toContain(required);
     }
-    const circleAttrs = (schema.attributes?.circle ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    const circleAttrs = (schema.attributes?.circle ?? []).map(a => (Array.isArray(a) ? a[0] : a));
     // Only the camelCase names are load-bearing: property-information
     // normalizes `stroke-width` → `strokeWidth` BEFORE the sanitizer runs, so
     // the dashed spellings never matched anything and are gone.
     for (const required of ['cx', 'cy', 'r', 'strokeWidth']) {
-      expect(circleAttrs, `circle must keep '${required}'`).toContain(required)
+      expect(circleAttrs, `circle must keep '${required}'`).toContain(required);
     }
-    expect(circleAttrs, 'dashed spellings are dead weight').not.toContain('stroke-width')
+    expect(circleAttrs, 'dashed spellings are dead weight').not.toContain('stroke-width');
     // The exact hast spellings — a near-miss (`strokeDasharray`) fails
     // silently, so pin the ones real authored SVG uses.
-    const textAttrs = (schema.attributes?.text ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    const textAttrs = (schema.attributes?.text ?? []).map(a => (Array.isArray(a) ? a[0] : a));
     for (const required of ['fontSize', 'textAnchor', 'dominantBaseline', 'style']) {
-      expect(textAttrs, `text must keep '${required}'`).toContain(required)
+      expect(textAttrs, `text must keep '${required}'`).toContain(required);
     }
-    const rectAttrs = (schema.attributes?.rect ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    const rectAttrs = (schema.attributes?.rect ?? []).map(a => (Array.isArray(a) ? a[0] : a));
     // `strokeDashArray` — capital A — is CORRECT and verified against the
     // installed `property-information`, which capitalizes the segment AFTER
     // `stroke-`:
@@ -96,41 +89,41 @@ describe('coupled-allowlist invariant', () => {
     // (human and bot) keep "fixing" this to `strokeDasharray`, which would
     // INTRODUCE the silent near-miss this assertion exists to catch.
     for (const required of ['strokeDashArray', 'fillOpacity', 'style']) {
-      expect(rectAttrs, `rect must keep '${required}'`).toContain(required)
+      expect(rectAttrs, `rect must keep '${required}'`).toContain(required);
     }
-  })
+  });
 
   it('SVG-only tags are pinned to an svg ancestor (bare <title> cannot hijack)', () => {
-    const schema = buildSanitizeSchema()
+    const schema = buildSanitizeSchema();
     // `title`/`desc`/`text`/`g`/… are ALSO HTML element names. Unconstrained,
     // a bare `<title>` in a post or a chat message is hoisted into <head> by
     // React 19 (tab + SEO title hijack) and swallows the rest of the document
     // via its RAWTEXT content model.
     for (const tag of ['title', 'desc', 'text', 'g', 'line', 'use', 'symbol', 'marker', 'mask', 'pattern']) {
-      expect(schema.ancestors?.[tag], `<${tag}> must require an svg ancestor`).toEqual(['svg'])
+      expect(schema.ancestors?.[tag], `<${tag}> must require an svg ancestor`).toEqual(['svg']);
     }
-    expect(schema.ancestors?.tspan).toEqual(['svg', 'text'])
+    expect(schema.ancestors?.tspan).toEqual(['svg', 'text']);
     // defaultSchema's own table constraints must survive the merge.
-    expect(schema.ancestors?.tbody).toEqual(defaultSchema.ancestors?.tbody)
-  })
+    expect(schema.ancestors?.tbody).toEqual(defaultSchema.ancestors?.tbody);
+  });
 
   it('input carries the GFM tasklist contract WITHOUT coercing authored inputs', () => {
-    const schema = buildSanitizeSchema()
-    const inputAttrs = schema.attributes?.input ?? []
-    const names = inputAttrs.map((a) => (Array.isArray(a) ? a[0] : a))
+    const schema = buildSanitizeSchema();
+    const inputAttrs = schema.attributes?.input ?? [];
+    const names = inputAttrs.map(a => (Array.isArray(a) ? a[0] : a));
     // `required.input` is cleared: defaultSchema force-ADDS
     // `type=checkbox disabled` to EVERY input regardless of its attributes,
     // so an authored `<input type="text">` came out a disabled checkbox.
-    expect(schema.required?.input).toBeUndefined()
+    expect(schema.required?.input).toBeUndefined();
     // The contract now lives in the attribute allowlist: `type` is pinned to
     // the literal `checkbox`, so a text input degrades to a bare `<input>`.
-    expect(inputAttrs).toContainEqual(['type', 'checkbox'])
-    expect(names).toContain('checked')
-    expect(names).toContain('disabled')
+    expect(inputAttrs).toContainEqual(['type', 'checkbox']);
+    expect(names).toContain('checked');
+    expect(names).toContain('disabled');
     for (const forbidden of ['name', 'value', 'placeholder', 'readOnly']) {
-      expect(names, `input must NOT widen '${forbidden}'`).not.toContain(forbidden)
+      expect(names, `input must NOT widen '${forbidden}'`).not.toContain(forbidden);
     }
-  })
+  });
 
   /**
    * THE TEST ABOVE IS NOT SUFFICIENT ON ITS OWN, and that gap was live:
@@ -146,80 +139,81 @@ describe('coupled-allowlist invariant', () => {
    * the fallback again.
    */
   it('form attributes are narrowed EFFECTIVELY, not just tag-locally', () => {
-    const schema = buildSanitizeSchema()
-    const star = (schema.attributes?.['*'] ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    const schema = buildSanitizeSchema();
+    const star = (schema.attributes?.['*'] ?? []).map(a => (Array.isArray(a) ? a[0] : a));
     // These are what turn `form` + `input` into a working credential harvester.
     // `form` has no per-tag entry, so `*` is its ONLY source of attributes.
     for (const forbidden of [
-      'action', 'method', 'encType', 'name', 'value',
-      'size', 'maxLength', 'readOnly', 'accept', 'multiple',
+      'action',
+      'method',
+      'encType',
+      'name',
+      'value',
+      'size',
+      'maxLength',
+      'readOnly',
+      'accept',
+      'multiple',
     ]) {
-      expect(star, `'${forbidden}' must not be allowed on EVERY tag`).not.toContain(forbidden)
+      expect(star, `'${forbidden}' must not be allowed on EVERY tag`).not.toContain(forbidden);
     }
     // defaultSchema really did carry them — otherwise this test is vacuous.
-    const defaultStar = (defaultSchema.attributes?.['*'] ?? []).map((a) =>
-      Array.isArray(a) ? a[0] : a,
-    )
-    expect(defaultStar).toContain('action')
-    expect(defaultStar).toContain('name')
-  })
+    const defaultStar = (defaultSchema.attributes?.['*'] ?? []).map(a => (Array.isArray(a) ? a[0] : a));
+    expect(defaultStar).toContain('action');
+    expect(defaultStar).toContain('name');
+  });
 
   it('leaves the form controls that legitimately declare name/value intact', () => {
-    const schema = buildSanitizeSchema()
-    const attrs = (tag: string) =>
-      (schema.attributes?.[tag] ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    const schema = buildSanitizeSchema();
+    const attrs = (tag: string) => (schema.attributes?.[tag] ?? []).map(a => (Array.isArray(a) ? a[0] : a));
     // Narrowing `*` must not reach the per-tag declarations: these tags ask for
     // `name`/`value` explicitly, which is exactly why the narrowing is safe.
-    expect(attrs('button')).toContain('name')
-    expect(attrs('button')).toContain('value')
-    expect(attrs('option')).toContain('value')
-    expect(attrs('textarea')).toContain('name')
-    expect(attrs('select')).toContain('name')
-  })
+    expect(attrs('button')).toContain('name');
+    expect(attrs('button')).toContain('value');
+    expect(attrs('option')).toContain('value');
+    expect(attrs('textarea')).toContain('name');
+    expect(attrs('select')).toContain('name');
+  });
 
   it('legacy presentational tags survive (center/font/big regression)', () => {
-    const pre = buildEffectiveTagSet()
-    const schema = buildSanitizeSchema()
+    const pre = buildEffectiveTagSet();
+    const schema = buildSanitizeSchema();
     for (const tag of ['center', 'font', 'big', 'strike', 'tt']) {
-      expect(pre.has(tag), `pre-pass must not escape <${tag}>`).toBe(true)
-      expect(schema.tagNames, `schema must keep <${tag}>`).toContain(tag)
+      expect(pre.has(tag), `pre-pass must not escape <${tag}>`).toBe(true);
+      expect(schema.tagNames, `schema must keep <${tag}>`).toContain(tag);
     }
-    const fontAttrs = (schema.attributes?.font ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    const fontAttrs = (schema.attributes?.font ?? []).map(a => (Array.isArray(a) ? a[0] : a));
     for (const required of ['color', 'size', 'face']) {
-      expect(fontAttrs, `font must keep '${required}'`).toContain(required)
+      expect(fontAttrs, `font must keep '${required}'`).toContain(required);
     }
-  })
+  });
 
   it('video keeps its source attributes through the schema (attribute survival)', () => {
-    const schema = buildSanitizeSchema({ extraAllowedHtmlTags: ['video', 'source'] })
-    const videoAttrs = (schema.attributes?.video ?? []).map((a) =>
-      Array.isArray(a) ? a[0] : a,
-    )
+    const schema = buildSanitizeSchema({ extraAllowedHtmlTags: ['video', 'source'] });
+    const videoAttrs = (schema.attributes?.video ?? []).map(a => (Array.isArray(a) ? a[0] : a));
     for (const required of ['src', 'poster', 'controls']) {
-      expect(videoAttrs, `video must keep '${required}'`).toContain(required)
+      expect(videoAttrs, `video must keep '${required}'`).toContain(required);
     }
-    const sourceAttrs = (schema.attributes?.source ?? []).map((a) =>
-      Array.isArray(a) ? a[0] : a,
-    )
-    expect(sourceAttrs).toContain('src')
-  })
+    const sourceAttrs = (schema.attributes?.source ?? []).map(a => (Array.isArray(a) ? a[0] : a));
+    expect(sourceAttrs).toContain('src');
+  });
 
   it('id clobbering is disabled (raw-HTML #anchor deep-links survive)', () => {
-    const schema = buildSanitizeSchema()
-    expect(schema.clobber).toEqual([])
-    expect(schema.clobberPrefix).toBe('')
-  })
+    const schema = buildSanitizeSchema();
+    expect(schema.clobber).toEqual([]);
+    expect(schema.clobberPrefix).toBe('');
+  });
 
   it('card/mention protocols are registered for href', () => {
-    const schema = buildSanitizeSchema()
-    expect(schema.protocols?.href).toContain('card')
-    expect(schema.protocols?.href).toContain('mention')
-  })
+    const schema = buildSanitizeSchema();
+    expect(schema.protocols?.href).toContain('card');
+    expect(schema.protocols?.href).toContain('mention');
+  });
 
   it('SAFE_HTML_TAGS still excludes video (chat baseline)', () => {
-    expect(SAFE_HTML_TAGS.has('video')).toBe(false)
-  })
-})
+    expect(SAFE_HTML_TAGS.has('video')).toBe(false);
+  });
+});
 
 /**
  * ROUND-21 — the LINK REFERENCE DEFINITION spellings, pinned HERE rather than
@@ -244,15 +238,15 @@ describe('coupled-allowlist invariant', () => {
  * the pass rather than at a rendered snapshot.
  */
 describe('link-definition shelters blank in every shape (round 21)', () => {
-  const PRE = 'The <textarea> element explained.\n\n'
-  const TAIL = '\n\n## After heading\n\nsecret tail\n'
+  const PRE = 'The <textarea> element explained.\n\n';
+  const TAIL = '\n\n## After heading\n\nsecret tail\n';
 
   it.each([
     // The unescaped CONTROL — already correct before round 21, which is what
     // makes the ESCAPE (not the shape) the cause of the rows below it.
     ['control: unescaped title', '[a]: /x "</textarea>"'],
     ['escaped double quote in title', '[a]: /x "a\\"</textarea>"'],
-    ["escaped apostrophe in title", "[a]: /x 'it\\'s </textarea>'"],
+    ['escaped apostrophe in title', "[a]: /x 'it\\'s </textarea>'"],
     ['escaped paren in title', '[a]: /x (a\\)</textarea>)'],
     ['escaped bracket in label, title shelter', '[a\\]b]: /x "</textarea>"'],
     ['escaped bracket in label, destination shelter', '[a\\]b]: </textarea>'],
@@ -262,14 +256,14 @@ describe('link-definition shelters blank in every shape (round 21)', () => {
     ['blockquoted multi-line label', '> [foo\n> </textarea>]: /x'],
     ['multi-line title', '[a]: /x "line1\n</textarea>"'],
   ])('blanks the sheltered closer: %s', (_label, body) => {
-    const md = PRE + body + TAIL
-    const masked = __buildCloserHaystackForTest(md)
+    const md = PRE + body + TAIL;
+    const masked = __buildCloserHaystackForTest(md);
     // The mask is LENGTH-PRESERVING, and the fake closer is gone from it…
-    expect(masked.length).toBe(md.length)
-    expect(masked).not.toContain('</textarea>')
+    expect(masked.length).toBe(md.length);
+    expect(masked).not.toContain('</textarea>');
     // …so the prose opener above it is escaped rather than left live.
-    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;')
-  })
+    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;');
+  });
 
   /**
    * THE RECOGNITION BOUNDARY, the complement that keeps the widened parser from
@@ -285,10 +279,10 @@ describe('link-definition shelters blank in every shape (round 21)', () => {
     ['continuation line that is not a title', 'The <textarea> element.\n\n[a]: /x\n</textarea> is real\n'],
     ['GFM footnote definition (block-parsed body)', 'Body[^a].\n\n[^a]: <textarea>hi</textarea>\n'],
   ])('leaves a NON-definition visible: %s', (_label, md) => {
-    const masked = __buildCloserHaystackForTest(md)
-    expect(masked.length).toBe(md.length)
-    expect(masked).toContain('</textarea>')
-  })
+    const masked = __buildCloserHaystackForTest(md);
+    expect(masked.length).toBe(md.length);
+    expect(masked).toContain('</textarea>');
+  });
 
   /**
    * THE CONSUMPTION SIDE: a title that opens and never closes is BLANKED to the
@@ -304,7 +298,7 @@ describe('link-definition shelters blank in every shape (round 21)', () => {
    * definition — and the `</textarea>` in it — stayed visible and the opener
    * above stayed LIVE. References now come from a separate, more-blanked copy.
    */
-  const FOOT_TAIL = '\n\n[^f]: b </textarea>\n\n## After heading\n'
+  const FOOT_TAIL = '\n\n[^f]: b </textarea>\n\n## After heading\n';
   it.each([
     ['image alt', 'v ![[^f]](/i.png) t'],
     ['full-reference label', 'v [txt][[^f]] t'],
@@ -317,12 +311,12 @@ describe('link-definition shelters blank in every shape (round 21)', () => {
     ['angle autolink', 'v <https://e.example/[^f]> t'],
     ['literal autolink', 'v https://e.example/x[^f]y t'],
   ])('blanks a definition whose only "reference" is a PHANTOM: %s', (_label, body) => {
-    const md = PRE + body + FOOT_TAIL
-    const masked = __buildCloserHaystackForTest(md)
-    expect(masked.length).toBe(md.length)
-    expect(masked).not.toContain('</textarea>')
-    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;')
-  })
+    const md = PRE + body + FOOT_TAIL;
+    const masked = __buildCloserHaystackForTest(md);
+    expect(masked.length).toBe(md.length);
+    expect(masked).not.toContain('</textarea>');
+    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;');
+  });
 
   /**
    * The complement: where remark really DOES resolve the reference, the
@@ -337,22 +331,22 @@ describe('link-definition shelters blank in every shape (round 21)', () => {
     ['after an autolink', 'v https://e.example/x [^f] t'],
     ['email autolink (the `[` voids it)', 'v <a[^f]b@e.example> t'],
   ])('keeps a GENUINELY referenced definition visible: %s', (_label, body) => {
-    const md = PRE + body + FOOT_TAIL
-    const masked = __buildCloserHaystackForTest(md)
-    expect(masked.length).toBe(md.length)
-    expect(masked).toContain('</textarea>')
-  })
+    const md = PRE + body + FOOT_TAIL;
+    const masked = __buildCloserHaystackForTest(md);
+    expect(masked.length).toBe(md.length);
+    expect(masked).toContain('</textarea>');
+  });
 
   it('blanks an unterminated title to the paragraph bound, and no further', () => {
     const md =
-      'The <textarea> element explained.\n\n[a]: /x "never closes\n</textarea>\nstill inside\n\n## After heading\n'
-    const masked = __buildCloserHaystackForTest(md)
-    expect(masked.length).toBe(md.length)
-    expect(masked).not.toContain('</textarea>')
+      'The <textarea> element explained.\n\n[a]: /x "never closes\n</textarea>\nstill inside\n\n## After heading\n';
+    const masked = __buildCloserHaystackForTest(md);
+    expect(masked.length).toBe(md.length);
+    expect(masked).not.toContain('</textarea>');
     // The haystack is case-folded; the heading past the bound is untouched.
-    expect(masked).toContain('## after heading')
-  })
-})
+    expect(masked).toContain('## after heading');
+  });
+});
 
 describe('URL_ATTRS covers hast PROPERTY keys, not attribute names', () => {
   it('strips a javascript: data-url via its camelized hast key', () => {
@@ -373,12 +367,13 @@ describe('URL_ATTRS covers hast PROPERTY keys, not attribute names', () => {
           children: [],
         },
       ],
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(rehypeStripUnsafe() as (t: unknown) => void)(tree as any)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const props = (tree.children[0] as any).properties
-    expect(props.dataUrl).toBeUndefined()
-    expect(props.dataKind).toBe('artifact')
-  })
-})
+    };
+    // `rehypeStripUnsafe` REBUILDS rather than mutating (see its docblock: it
+    // matches the non-mutating transformers either side of it in engine.tsx),
+    // so the assertion reads the RETURNED tree, not the input.
+    const out = (rehypeStripUnsafe() as (t: unknown) => { children: { properties: Record<string, unknown> }[] })(tree);
+    const props = out.children[0].properties;
+    expect(props.dataUrl).toBeUndefined();
+    expect(props.dataKind).toBe('artifact');
+  });
+});

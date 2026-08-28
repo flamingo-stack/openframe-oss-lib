@@ -50,16 +50,16 @@
  * approval segments.
  */
 
+import { escapeThinkingTags } from '../../../chat-protocol/decode';
+import { errorDetailsMessage, isGuideOrigin } from '../../../chat-protocol/events';
 import {
-  MessageSegmentAccumulator,
-  createMessageSegmentAccumulator,
-  type AccumulatorCallbacks,
-} from '../utils/message-segment-accumulator'
-import { getCommandText } from '../utils/tool-call-helpers'
-import { parseScrollAnchor, type ScrollAnchor } from '../utils/scroll-anchor'
-import { escapeThinkingTags } from '../../../chat-protocol/decode'
-import { isGuideOrigin } from '../../../chat-protocol/events'
-import { approvalDisplaysInline, guideApprovalOrigin } from '../utils/approval-display'
+  CHAT_OWNER_ADMIN,
+  type ChatStreamEvent,
+  type ApprovalResolvedEvent,
+  type ChatMetadataEvent,
+  type ParticipantEvent,
+  type UsageEvent,
+} from '../../../chat-protocol/events';
 import type {
   ApprovalBatchSegment,
   ApprovalRequestSegment,
@@ -69,22 +69,22 @@ import type {
   SegmentsUpdateMetadata,
   ToolExecutionSegment,
   ExecutingToolState,
-} from '../types'
-import type { PendingApproval } from '../types/processing.types'
+} from '../types';
+import type { PendingApproval } from '../types/processing.types';
 import type {
   DialogTokenUsage,
   StreamingPhase,
   UnifiedChatMessage,
   UnifiedUsageBreakdown,
-} from '../types/unified-chat-state.types'
+} from '../types/unified-chat-state.types';
+import { approvalDisplaysInline, guideApprovalOrigin } from '../utils/approval-display';
 import {
-  CHAT_OWNER_ADMIN,
-  type ChatStreamEvent,
-  type ApprovalResolvedEvent,
-  type ChatMetadataEvent,
-  type ParticipantEvent,
-  type UsageEvent,
-} from '../../../chat-protocol/events'
+  type MessageSegmentAccumulator,
+  createMessageSegmentAccumulator,
+  type AccumulatorCallbacks,
+} from '../utils/message-segment-accumulator';
+import { parseScrollAnchor, type ScrollAnchor } from '../utils/scroll-anchor';
+import { getCommandText } from '../utils/tool-call-helpers';
 import {
   CONTENT_DEDUP_WINDOW,
   SYSTEM_DEDUP_WINDOW,
@@ -98,7 +98,7 @@ import {
   projectBatchStatusToMessages,
   updateTrailingAssistant,
   upsertTrailingCompaction,
-} from './message-mutations'
+} from './message-mutations';
 
 // =============================================================================
 // Public types
@@ -107,21 +107,21 @@ import {
 /** Per-turn metadata extracted from the streamed metadata/usage frames
  *  (SSE transport). Canonical home — `use-sse-chat-adapter` re-exports it. */
 export interface ChatTurnMeta {
-  provider: string | null
-  modelLabel: string | null
-  contextWindowMaxTokens: number | null
+  provider: string | null;
+  modelLabel: string | null;
+  contextWindowMaxTokens: number | null;
   /** Input tokens (from usage:start). Includes cached tokens. */
-  inputTokens: number | null
+  inputTokens: number | null;
   /** Output tokens (from the trailing usage frame). */
-  outputTokens: number | null
+  outputTokens: number | null;
   /** Cache hit % (read / total-input × 100). Only known after stream end. */
-  cacheHitRatePct: number | null
+  cacheHitRatePct: number | null;
   /** Cross-call usage breakdown extracted from the trailing usage frame. */
-  breakdown: UnifiedUsageBreakdown | null
+  breakdown: UnifiedUsageBreakdown | null;
   /** Per-message viewport-positioning hint. */
-  scrollAnchor: ScrollAnchor | null
-  routedComplexity: string | null
-  routedThinkingBudget: number | null
+  scrollAnchor: ScrollAnchor | null;
+  routedComplexity: string | null;
+  routedThinkingBudget: number | null;
 }
 
 /** Single source of truth for a fresh `ChatTurnMeta` row. */
@@ -137,7 +137,7 @@ export function createEmptyTurnMeta(): ChatTurnMeta {
     scrollAnchor: null,
     routedComplexity: null,
     routedThinkingBudget: null,
-  }
+  };
 }
 
 /** SSE per-send maps, keyed by the send counter (`sendIdx`). Each user send
@@ -145,22 +145,22 @@ export function createEmptyTurnMeta(): ChatTurnMeta {
  *  assistant messages client-side — the adapter maps every following
  *  assistant message back to its send's entry. */
 export interface ChatTurnMetaState {
-  meta: Map<number, ChatTurnMeta>
-  sources: Map<number, unknown[]>
-  sendCount: number
+  meta: Map<number, ChatTurnMeta>;
+  sources: Map<number, unknown[]>;
+  sendCount: number;
 }
 
 export interface ChatReducerState {
-  messages: UnifiedChatMessage[]
-  streamingPhase: StreamingPhase
-  turnMeta: ChatTurnMetaState
-  dialogTokenUsage?: DialogTokenUsage | null
+  messages: UnifiedChatMessage[];
+  streamingPhase: StreamingPhase;
+  turnMeta: ChatTurnMetaState;
+  dialogTokenUsage?: DialogTokenUsage | null;
   liveModel?: {
-    provider: string | null
-    modelLabel: string | null
-    contextWindowMaxTokens: number | null
-  } | null
-  approvalStatuses: Record<string, ChatApprovalStatus>
+    provider: string | null;
+    modelLabel: string | null;
+    contextWindowMaxTokens: number | null;
+  } | null;
+  approvalStatuses: Record<string, ChatApprovalStatus>;
   /**
    * Hub conversation id for the Product Guide half of this dialog, learned from
    * a guide metadata frame. The hub mints it and requires it back on every
@@ -169,15 +169,15 @@ export interface ChatReducerState {
    * history (after a reload) has no live frame to learn it from, which is why
    * the agent should also expose it per dialog.
    */
-  guideConversationId: string | null
+  guideConversationId: string | null;
 }
 
 /** Escalated-approval bookkeeping entry (mirrors the legacy processor). */
 export interface EscalatedApprovalData {
-  command: string
-  explanation?: string
-  approvalType: string
-  toolCalls?: PendingToolCallData[]
+  command: string;
+  explanation?: string;
+  approvalType: string;
+  toolCalls?: PendingToolCallData[];
 }
 
 /**
@@ -210,23 +210,23 @@ export interface ChatReducerEffect {
     | 'onAgentBusy'
     | 'onDialogClosed'
     | 'onTicketEvent'
-    | 'segments-after-approval-result'
-  args: unknown[]
+    | 'segments-after-approval-result';
+  args: unknown[];
 }
 
 export interface ChatStreamReducerOptions {
   /** Which transport's turn kernel drives `apply()`. Default `'nats'`. */
-  transport?: 'sse' | 'nats'
+  transport?: 'sse' | 'nats';
   /** Seed for the approval-status map (request-id → status). */
-  approvalStatuses?: Record<string, ChatApprovalStatus>
+  approvalStatuses?: Record<string, ChatApprovalStatus>;
   /** Batch APPROVAL_REQUESTs render as one card (default true) or unfold. */
-  batchApprovalsEnabled?: boolean
+  batchApprovalsEnabled?: boolean;
   /** Approval types displayed inline; others escalate. Default ['CLIENT']. */
-  displayApprovalTypes?: string[]
+  displayApprovalTypes?: string[];
   /** Opaque approve/reject handlers stamped onto approval segments. */
-  callbacks?: AccumulatorCallbacks
+  callbacks?: AccumulatorCallbacks;
   /** Engage the direct-mode barrier optimistically (host-known takeover). */
-  isDirectMode?: boolean
+  isDirectMode?: boolean;
   /**
    * Legacy-processor parity knob: post-MESSAGE_END tool chunks route
    * cross-message (`onToolExecuted` effect + `applyToolExecutionToMessages`)
@@ -234,11 +234,11 @@ export interface ChatStreamReducerOptions {
    * fall through the accumulator like the pre-callback code path. Default
    * true (both first-party adapters wire it).
    */
-  crossMessageToolRouting?: boolean
+  crossMessageToolRouting?: boolean;
   /** Effect sink for callback-contract consumers (compat wrapper). */
-  onEffect?: (effect: ChatReducerEffect) => void
+  onEffect?: (effect: ChatReducerEffect) => void;
   /** Notified after every state mutation (the dialog store wires this). */
-  onChange?: () => void
+  onChange?: () => void;
   /**
    * Whether an ADMIN-authored `MESSAGE_REQUEST` may be consumed as OUR OWN
    * optimistic echo (see `pushOptimisticSend`). Default `false`.
@@ -256,7 +256,7 @@ export interface ChatStreamReducerOptions {
    * `pushOptimisticSend`, so enabling it cannot drop a message the host
    * did not just send.
    */
-  ownEchoIncludesAdmin?: boolean
+  ownEchoIncludesAdmin?: boolean;
   /**
    * The LOCAL user's id, either as a value or as a GETTER resolved at event
    * time. When it resolves to a value, an inbound `MESSAGE_REQUEST` that
@@ -281,7 +281,7 @@ export interface ChatStreamReducerOptions {
    * are retained for the store's lifetime, so a value captured at creation
    * time can go stale and silently disable the guard.
    */
-  selfUserId?: string | (() => string | undefined)
+  selfUserId?: string | (() => string | undefined);
 }
 
 /**
@@ -293,7 +293,7 @@ export interface ChatStreamReducerOptions {
  * A row that is DECLARED ours (`selfUserId` set and `event.userId ===
  * selfUserId`) gets the LONGER `OWN_ECHO_AUTHOR_TTL_MS` instead — see there.
  */
-export const OWN_ECHO_TTL_MS = 30_000
+export const OWN_ECHO_TTL_MS = 30_000;
 
 /**
  * How long an un-consumed entry stays armed on the AUTHOR-MATCHED path
@@ -320,25 +320,25 @@ export const OWN_ECHO_TTL_MS = 30_000
  * sooner (see `purgeEchoesAtTurnEnd`). The ten minutes only ever apply to a
  * dialog that never reports a turn boundary at all.
  */
-export const OWN_ECHO_AUTHOR_TTL_MS = 10 * 60_000
+export const OWN_ECHO_AUTHOR_TTL_MS = 10 * 60_000;
 
 /** Cap on simultaneously-armed echo entries (a backend that never echoes must
  *  not grow the list without bound). */
-const MAX_PENDING_ECHOES = 5
+const MAX_PENDING_ECHOES = 5;
 
 /** One armed optimistic-echo entry: the sent text and the wall-clock ms it was
  *  armed at. Exported because the LRU-eviction round trip PARKS these (see
  *  `getPendingEchoes` / `InitializeExtras.pendingEchoes`). */
 export interface PendingEcho {
-  text: string
-  at: number
+  text: string;
+  at: number;
 }
 
 export interface InitializeExtras {
-  existingSegments?: MessageSegment[]
-  pendingApprovals?: Map<string, PendingApproval>
-  executingTools?: Map<string, ExecutingToolState>
-  escalatedApprovals?: Map<string, EscalatedApprovalData>
+  existingSegments?: MessageSegment[];
+  pendingApprovals?: Map<string, PendingApproval>;
+  executingTools?: Map<string, ExecutingToolState>;
+  escalatedApprovals?: Map<string, EscalatedApprovalData>;
   /**
    * Approval statuses PARKED from a previous instance of this key (LRU
    * eviction hands them to `onEvict`). Merged with the same state-monotonic
@@ -346,7 +346,7 @@ export interface InitializeExtras {
    * back as actionable, which is exactly why `resetForDialogSwitch` preserves
    * this map rather than clearing it.
    */
-  approvalStatuses?: Record<string, ChatApprovalStatus>
+  approvalStatuses?: Record<string, ChatApprovalStatus>;
   /**
    * Seq cursor PARKED from a previous instance of this key. A recreated
    * reducer starts at `-Infinity`, so a host that replays from its own cursor
@@ -354,7 +354,7 @@ export interface InitializeExtras {
    * `apply()`'s idempotency gate intact across an eviction. Only ever moves
    * the gate FORWARD (a lower value is ignored).
    */
-  lastAppliedSeq?: number
+  lastAppliedSeq?: number;
   /**
    * Armed optimistic-echo entries PARKED from a previous instance of this key.
    * Without them, a key LRU-evicted between `pushOptimisticSend` and its
@@ -364,7 +364,7 @@ export interface InitializeExtras {
    * only swallow an unrelated identical message), and the list is capped at
    * `MAX_PENDING_ECHOES` exactly as the live path is.
    */
-  pendingEchoes?: readonly PendingEcho[]
+  pendingEchoes?: readonly PendingEcho[];
   /**
    * Whether the restored thread is a RESUMED dialog (a `MESSAGE_START` already
    * fired server-side), which makes post-stream continuation chunks append
@@ -374,7 +374,7 @@ export interface InitializeExtras {
    * no preceding `turn-start` appends into a bubble that was never spawned.
    * Pass explicitly only to override that derivation.
    */
-  resumed?: boolean
+  resumed?: boolean;
   /**
    * Whether the restored tail means the AGENT IS STILL WORKING — as opposed to
    * blocked on the user. Raises an `idle` reducer to `thinking` on restore
@@ -387,15 +387,15 @@ export interface InitializeExtras {
    * `extractIncompleteMessageState` so every host agrees on the distinction —
    * a PENDING approval is the opposite state and must NOT spin.
    */
-  agentBusy?: boolean
+  agentBusy?: boolean;
 }
 
 export interface BeginSseSendOptions {
-  text: string
-  hidden?: boolean
-  userName?: string
-  assistantName?: string
-  assistantAvatar?: string
+  text: string;
+  hidden?: boolean;
+  userName?: string;
+  assistantName?: string;
+  assistantAvatar?: string;
 }
 
 // =============================================================================
@@ -404,11 +404,11 @@ export interface BeginSseSendOptions {
 
 export interface ChatStreamReducer {
   /** Apply one normalized stream event. */
-  apply(event: ChatStreamEvent): void
+  apply(event: ChatStreamEvent): void;
   /** Current immutable state snapshot (stable identity between mutations). */
-  readonly state: ChatReducerState
+  readonly state: ChatReducerState;
   /** Full reset — thread, per-turn kernel, dedup sets, seq gate, maps. */
-  reset(): void
+  reset(): void;
   /**
    * Seed the thread (history hydration / persisted-state rehydration) and
    * optionally the per-turn kernel + escalated approvals (resume of an
@@ -416,30 +416,27 @@ export interface ChatStreamReducer {
    * entries are re-surfaced via `onEscalatedApproval` effects. Marks the
    * instance as having streamed so continuation chunks append.
    */
-  initializeWithState(messages: UnifiedChatMessage[] | null, extras?: InitializeExtras): void
+  initializeWithState(messages: UnifiedChatMessage[] | null, extras?: InitializeExtras): void;
 
   // ── Thread commands (adapter-driven, not wire events) ──────────────────
-  setMessages(messages: UnifiedChatMessage[]): void
-  prependMessages(messages: UnifiedChatMessage[]): void
+  setMessages(messages: UnifiedChatMessage[]): void;
+  prependMessages(messages: UnifiedChatMessage[]): void;
   /** Optimistic local send: user bubble (+ echo record) + assistant placeholder. */
-  pushOptimisticSend(text: string, hidden?: boolean): void
+  pushOptimisticSend(text: string, hidden?: boolean): void;
   /** Wipe thread + per-turn kernel, keep approval statuses (legacy clear). */
-  clearThread(): void
+  clearThread(): void;
   /** Per-dialog reset (keeps approval statuses — request-ids are global). */
-  resetForDialogSwitch(): void
+  resetForDialogSwitch(): void;
 
   // ── SSE turn commands ───────────────────────────────────────────────────
-  beginSseSend(options: BeginSseSendOptions): void
-  endSseTurn(): void
-  failSseTurn(errorMessage: string): void
-  seedSseMaps(seed: {
-    sources?: Array<[number, unknown[]]>
-    sendCount?: number
-  }): void
+  beginSseSend(options: BeginSseSendOptions): void;
+  endSseTurn(): void;
+  failSseTurn(errorMessage: string): void;
+  seedSseMaps(seed: { sources?: Array<[number, unknown[]]>; sendCount?: number }): void;
 
   // ── Phase / status commands ─────────────────────────────────────────────
-  setPhase(phase: StreamingPhase): void
-  setApprovalStatus(requestId: string, status: ChatApprovalStatus | null): void
+  setPhase(phase: StreamingPhase): void;
+  setApprovalStatus(requestId: string, status: ChatApprovalStatus | null): void;
   /**
    * CANONICAL merge of a PERSISTED status map (host-side store, history
    * hydration, dialog-switch top-up) into this reducer's map.
@@ -460,20 +457,16 @@ export interface ChatStreamReducer {
    * keep ours otherwise. Persisted entries still fill in every request-id the
    * stream hasn't seen (other dialogs, pre-session history).
    */
-  mergeApprovalStatuses(persisted: Record<string, ChatApprovalStatus>): void
-  setDirectMode(isDirectMode: boolean): void
-  setDialogTokenUsage(usage: DialogTokenUsage | null): void
+  mergeApprovalStatuses(persisted: Record<string, ChatApprovalStatus>): void;
+  setDirectMode(isDirectMode: boolean): void;
+  setDialogTokenUsage(usage: DialogTokenUsage | null): void;
   /** +1/-1 windows during catchup replay (suppresses agent-busy locks). */
-  adjustAgentBusySuppression(delta: number): void
-  armAdoptTrailingAssistant(value: boolean): void
+  adjustAgentBusySuppression(delta: number): void;
+  armAdoptTrailingAssistant(value: boolean): void;
 
   // ── Cross-side projections (dialog-store fan-out) ───────────────────────
-  projectApprovalResolution(
-    requestId: string,
-    status: ChatApprovalStatus,
-    resolvedByName?: string | null,
-  ): void
-  projectToolExecution(segment: ToolExecutionSegment): void
+  projectApprovalResolution(requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null): void;
+  projectToolExecution(segment: ToolExecutionSegment): void;
 
   /**
    * The seq gate's current value (`-Infinity` before anything seq-carrying was
@@ -482,7 +475,7 @@ export interface ChatStreamReducer {
    * restore idempotency on the recreated instance via
    * `initializeWithState(messages, { lastAppliedSeq })`.
    */
-  getLastAppliedSeq(): number
+  getLastAppliedSeq(): number;
 
   /**
    * Currently-armed optimistic-echo entries. Same rationale as
@@ -491,28 +484,46 @@ export interface ChatStreamReducer {
    * `initializeWithState(messages, { pendingEchoes })` — otherwise an echo
    * in flight across the eviction renders a duplicate user bubble.
    */
-  getPendingEchoes(): readonly PendingEcho[]
+  getPendingEchoes(): readonly PendingEcho[];
 
   // ── Legacy processor surface (compat wrapper) ───────────────────────────
-  getSegments(): MessageSegment[]
-  updateApprovalStatus(
-    requestId: string,
-    status: ChatApprovalStatus,
-    resolvedByName?: string | null,
-  ): MessageSegment[]
-  getPendingEscalated(): Map<string, EscalatedApprovalData>
+  getSegments(): MessageSegment[];
+  updateApprovalStatus(requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null): MessageSegment[];
+  getPendingEscalated(): Map<string, EscalatedApprovalData>;
 }
 
 // Actions allowed through once the dialog is in direct mode. Everything else
 // is an AI-assistant event and gets dropped — an allowlist so any future
 // assistant event is blocked by default.
 function isDirectModeAllowed(event: ChatStreamEvent): boolean {
-  return event.type === 'participant' || event.type === 'dialog-closed'
+  return event.type === 'participant' || event.type === 'dialog-closed';
 }
 
-export function createChatStreamReducer(
-  options: ChatStreamReducerOptions = {},
-): ChatStreamReducer {
+/** The trailing usage frame's `breakdown` is an OPAQUE wire blob (see
+ *  `UsageEvent.telemetry`); these three readers apply the same
+ *  truthiness/typeof gates the legacy parser did, but hand back values that
+ *  actually match `UnifiedUsageBreakdown`. */
+function isWireRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function readTokenPair(value: unknown): { input: number; output: number } | undefined {
+  if (!isWireRecord(value) || typeof value.input !== 'number') return undefined;
+  // `output` was previously copied through unchecked — a frame that omitted it
+  // put `undefined` into a `number` field and NaN'd any downstream sum.
+  return { input: value.input, output: typeof value.output === 'number' ? value.output : 0 };
+}
+
+function readRoutedAnswer(value: unknown): { model: string; complexity: string; thinkingBudget: number } | undefined {
+  if (!isWireRecord(value) || typeof value.model !== 'string') return undefined;
+  return {
+    model: value.model,
+    complexity: typeof value.complexity === 'string' ? value.complexity : '',
+    thinkingBudget: typeof value.thinkingBudget === 'number' ? value.thinkingBudget : 0,
+  };
+}
+
+export function createChatStreamReducer(options: ChatStreamReducerOptions = {}): ChatStreamReducer {
   const {
     transport = 'nats',
     batchApprovalsEnabled = true,
@@ -521,41 +532,41 @@ export function createChatStreamReducer(
     crossMessageToolRouting = true,
     onEffect,
     onChange,
-  } = options
+  } = options;
 
   // ── Mutable internals ──────────────────────────────────────────────────
-  let messages: UnifiedChatMessage[] = []
-  let streamingPhase: StreamingPhase = 'idle'
-  let dialogTokenUsage: DialogTokenUsage | null = null
-  let liveModel: ChatReducerState['liveModel'] = null
-  let guideConversationId: string | null = null
+  let messages: UnifiedChatMessage[] = [];
+  let streamingPhase: StreamingPhase = 'idle';
+  let dialogTokenUsage: DialogTokenUsage | null = null;
+  let liveModel: ChatReducerState['liveModel'] = null;
+  let guideConversationId: string | null = null;
   let approvalStatuses: Record<string, ChatApprovalStatus> = {
     ...(options.approvalStatuses ?? {}),
-  }
+  };
 
-  const accumulator: MessageSegmentAccumulator = createMessageSegmentAccumulator(callbacks)
+  const accumulator: MessageSegmentAccumulator = createMessageSegmentAccumulator(callbacks);
 
   // Stream-window flags (chunk-processor parity).
-  let isInStream = false
-  let hasEverStreamed = false
+  let isInStream = false;
+  let hasEverStreamed = false;
 
   // Direct-mode barrier.
-  let directModeFlag = options.isDirectMode ?? false
-  let sawDirectMessage = false
-  let directTeardownFired = false
+  let directModeFlag = options.isDirectMode ?? false;
+  let sawDirectMessage = false;
+  let directTeardownFired = false;
 
   // Escalated approvals (single or batch).
-  const pendingEscalated = new Map<string, EscalatedApprovalData>()
+  const pendingEscalated = new Map<string, EscalatedApprovalData>();
 
   // Idempotency. The per-participant seen-seq set that used to live here was
   // REMOVED as redundant: `apply()`'s global gate already drops any event
   // whose seq was applied before, so a seq-carrying participant row can never
   // reach the handlers twice.
-  let lastAppliedSeq = Number.NEGATIVE_INFINITY
-  let pendingEchoTexts: PendingEcho[] = []
+  let lastAppliedSeq = Number.NEGATIVE_INFINITY;
+  let pendingEchoTexts: PendingEcho[] = [];
   /** `Date.now()` of the last observed `turn-start`; 0 = none seen yet.
    *  Bounds `purgeEchoesAtTurnEnd` — see there. */
-  let turnStartedAt = 0
+  let turnStartedAt = 0;
 
   /** Consume a one-shot optimistic-echo entry for `text`. Returns true when
    *  this inbound row IS our own echo and must not render.
@@ -566,17 +577,17 @@ export function createChatStreamReducer(
    *  echo never landed must still age out or it eventually swallows a real
    *  message. `MAX_PENDING_ECHOES` bounds growth on both paths. */
   function consumeOwnEcho(text: string, authorMatched = false): boolean {
-    if (pendingEchoTexts.length === 0) return false
-    const now = Date.now()
+    if (pendingEchoTexts.length === 0) return false;
+    const now = Date.now();
     // Purge at the WIDEST bound only: a short-TTL (unattributed) lookup must
     // not evict an entry that a later author-matched row is still entitled to
     // consume. The per-path window is applied at match time instead.
-    pendingEchoTexts = pendingEchoTexts.filter((e) => now - e.at < OWN_ECHO_AUTHOR_TTL_MS)
-    const ttl = authorMatched ? OWN_ECHO_AUTHOR_TTL_MS : OWN_ECHO_TTL_MS
-    const idx = pendingEchoTexts.findIndex((e) => e.text === text && now - e.at < ttl)
-    if (idx === -1) return false
-    pendingEchoTexts.splice(idx, 1)
-    return true
+    pendingEchoTexts = pendingEchoTexts.filter(e => now - e.at < OWN_ECHO_AUTHOR_TTL_MS);
+    const ttl = authorMatched ? OWN_ECHO_AUTHOR_TTL_MS : OWN_ECHO_TTL_MS;
+    const idx = pendingEchoTexts.findIndex(e => e.text === text && now - e.at < ttl);
+    if (idx === -1) return false;
+    pendingEchoTexts.splice(idx, 1);
+    return true;
   }
 
   /** Disarm every echo entry that was armed BEFORE the turn this `turn-end`
@@ -639,47 +650,47 @@ export function createChatStreamReducer(
    *  one. A send made DURING a turn is a human action a turn-start later, so
    *  it never ties in practice. */
   function purgeEchoesAtTurnEnd(): void {
-    if (pendingEchoTexts.length === 0) return
-    if (turnStartedAt === 0) return
-    pendingEchoTexts = pendingEchoTexts.filter((e) => e.at > turnStartedAt)
+    if (pendingEchoTexts.length === 0) return;
+    if (turnStartedAt === 0) return;
+    pendingEchoTexts = pendingEchoTexts.filter(e => e.at > turnStartedAt);
   }
 
   /** Resolve `selfUserId` AT EVENT TIME — a getter lets the host track auth
    *  rehydration / user switches on a reducer that outlives both. */
   function resolveSelfUserId(): string | undefined {
-    const self = options.selfUserId
-    return typeof self === 'function' ? self() : self
+    const self = options.selfUserId;
+    return typeof self === 'function' ? self() : self;
   }
 
   /** One-shot: the host configured `selfUserId` but inbound rows carry none,
    *  so the author guard is inert and dedup silently degrades to text+TTL. */
-  let warnedIdLessAuthor = false
+  let warnedIdLessAuthor = false;
   function warnIdLessAuthor(): void {
-    if (warnedIdLessAuthor) return
-    warnedIdLessAuthor = true
+    if (warnedIdLessAuthor) return;
+    warnedIdLessAuthor = true;
     console.warn(
       '[chat] selfUserId is configured but an inbound MESSAGE_REQUEST carries no userId — ' +
         'the author echo guard is inert and dedup falls back to text + TTL matching. ' +
         'Check the transport decoder surfaces the author id (the ticket wire model ' +
         'declares it at `owner.userId`) and that it is in the SAME id space as selfUserId.',
-    )
+    );
   }
 
   // Adapter-armed flags.
-  let suppressAgentBusy = 0
-  let adoptTrailingAssistant = false
+  let suppressAgentBusy = 0;
+  let adoptTrailingAssistant = false;
 
   // SSE per-send maps + per-turn kernel.
-  const metaMap = new Map<number, ChatTurnMeta>()
-  const sourcesMap = new Map<number, unknown[]>()
-  let sendCount = 0
-  let sseCurrentText = ''
+  const metaMap = new Map<number, ChatTurnMeta>();
+  const sourcesMap = new Map<number, unknown[]>();
+  let sendCount = 0;
+  let sseCurrentText = '';
 
   // ── Snapshot cache ─────────────────────────────────────────────────────
-  let stateCache: ChatReducerState | null = null
+  let stateCache: ChatReducerState | null = null;
   function invalidate(): void {
-    stateCache = null
-    onChange?.()
+    stateCache = null;
+    onChange?.();
   }
   function getState(): ChatReducerState {
     if (!stateCache) {
@@ -691,40 +702,40 @@ export function createChatStreamReducer(
         liveModel,
         approvalStatuses,
         guideConversationId,
-      }
+      };
     }
-    return stateCache
+    return stateCache;
   }
 
   function emit(name: ChatReducerEffect['name'], ...args: unknown[]): void {
-    onEffect?.({ name, args })
+    onEffect?.({ name, args });
   }
 
   function setMessagesInternal(next: UnifiedChatMessage[]): void {
     if (next !== messages) {
-      messages = next
-      invalidate()
+      messages = next;
+      invalidate();
     }
   }
 
   function setPhaseInternal(phase: StreamingPhase): void {
     if (streamingPhase !== phase) {
-      streamingPhase = phase
-      invalidate()
+      streamingPhase = phase;
+      invalidate();
     }
   }
 
   /** onAgentBusy state semantics: only 'idle' upgrades to 'thinking'; an
    *  open stream keeps ownership. Suppressed during catchup replay. */
   function agentBusyState(): void {
-    if (suppressAgentBusy > 0) return
-    if (streamingPhase === 'idle') setPhaseInternal('thinking')
+    if (suppressAgentBusy > 0) return;
+    if (streamingPhase === 'idle') setPhaseInternal('thinking');
   }
 
   function mirrorApprovalStatus(requestId: string, status: ChatApprovalStatus): void {
-    if (approvalStatuses[requestId] === status) return
-    approvalStatuses = { ...approvalStatuses, [requestId]: status }
-    invalidate()
+    if (approvalStatuses[requestId] === status) return;
+    approvalStatuses = { ...approvalStatuses, [requestId]: status };
+    invalidate();
   }
 
   // ===========================================================================
@@ -747,66 +758,59 @@ export function createChatStreamReducer(
    * Monotonic: replay can re-apply an older seq, and coverage must never go
    * backwards.
    */
-  function stampTrailingAssistantSeq(
-    next: UnifiedChatMessage[],
-    seq: number | undefined,
-  ): UnifiedChatMessage[] {
-    if (typeof seq !== 'number') return next
-    const last = next[next.length - 1]
-    if (!last || last.role !== 'assistant') return next
-    if (typeof last.streamSeq === 'number' && last.streamSeq >= seq) return next
-    return [...next.slice(0, -1), { ...last, streamSeq: seq }]
+  function stampTrailingAssistantSeq(next: UnifiedChatMessage[], seq: number | undefined): UnifiedChatMessage[] {
+    if (typeof seq !== 'number') return next;
+    const last = next[next.length - 1];
+    if (!last || last.role !== 'assistant') return next;
+    if (typeof last.streamSeq === 'number' && last.streamSeq >= seq) return next;
+    return [...next.slice(0, -1), { ...last, streamSeq: seq }];
   }
 
   function applySegmentsToState(segments: MessageSegment[], meta?: SegmentsUpdateMetadata): void {
-    const seq = meta?.streamSeq
+    const seq = meta?.streamSeq;
     // Standalone compaction updates carry the accumulator's cumulative
     // array — apply only the compaction segment (upsert) or interleaved
     // continuation text would duplicate.
     if (meta?.append && meta.isCompacting) {
-      setMessagesInternal(stampTrailingAssistantSeq(upsertTrailingCompaction(messages, segments), seq))
-      return
+      setMessagesInternal(stampTrailingAssistantSeq(upsertTrailingCompaction(messages, segments), seq));
+      return;
     }
     // Post-MESSAGE_END continuation fragments append into the existing
     // bubble; replacing would wipe the completed reply.
     if (meta?.append) {
-      setMessagesInternal(stampTrailingAssistantSeq(appendToTrailingAssistant(messages, segments), seq))
-      return
+      setMessagesInternal(stampTrailingAssistantSeq(appendToTrailingAssistant(messages, segments), seq));
+      return;
     }
-    setMessagesInternal(stampTrailingAssistantSeq(updateTrailingAssistant(messages, segments), seq))
+    setMessagesInternal(stampTrailingAssistantSeq(updateTrailingAssistant(messages, segments), seq));
   }
 
   function applyStreamStartToState(): void {
-    setPhaseInternal('streaming')
+    setPhaseInternal('streaming');
     // A new stream must never overwrite a COMPLETED trailing assistant
     // bubble (observer tab / second device / post-approval continuation
     // turn). Open a fresh bubble unless the trailing assistant is empty
     // (our own optimistic placeholder) or is the incomplete history tail
     // the catchup replay is legitimately re-streaming (adopt-once flag).
-    const adoptTail = adoptTrailingAssistant
-    adoptTrailingAssistant = false
-    const last = messages[messages.length - 1]
-    if (!last || last.role !== 'assistant' || adoptTail) return
-    const hasContent = (last.segments?.length ?? 0) > 0 || last.content !== ''
-    if (!hasContent) return
-    setMessagesInternal([
-      ...messages,
-      { id: nextId('assistant'), role: 'assistant', content: '', segments: [] },
-    ])
+    const adoptTail = adoptTrailingAssistant;
+    adoptTrailingAssistant = false;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant' || adoptTail) return;
+    const hasContent = (last.segments?.length ?? 0) > 0 || last.content !== '';
+    if (!hasContent) return;
+    setMessagesInternal([...messages, { id: nextId('assistant'), role: 'assistant', content: '', segments: [] }]);
   }
 
   /** MESSAGE_REQUEST echo — a user message from THIS or another session.
    *  Dedup layers in priority order: seq identity → one-shot optimistic-echo
    *  consumption → same-author content window (seq-less transports only). */
   function applyUserMessageToState(ev: ParticipantEvent): void {
-    const text = ev.text
-    if (!text) return
-    const seq = ev.seq
+    const text = ev.text;
+    if (!text) return;
+    const seq = ev.seq;
     // ADMIN rows are only echo-consumable when the host declares that its
     // operator IS the admin (see `ownEchoIncludesAdmin`). Otherwise an
     // ADMIN row is someone else's message and must always render.
-    const adminEchoAllowed =
-      ev.ownerType !== CHAT_OWNER_ADMIN || options.ownEchoIncludesAdmin === true
+    const adminEchoAllowed = ev.ownerType !== CHAT_OWNER_ADMIN || options.ownEchoIncludesAdmin === true;
     // AUTHOR guard: with `selfUserId` configured, a row that DECLARES a
     // DIFFERENT author may not consume an echo entry. Two technicians on the
     // same ADMIN side both author ADMIN rows, so text alone cannot tell "my
@@ -819,22 +823,22 @@ export function createChatStreamReducer(
     // strictly worse than the bug the guard fixes. Unattributed rows fall back
     // to the text + TTL behaviour, with a one-shot warning so the
     // misconfiguration is observable.
-    const selfUserId = resolveSelfUserId()
-    const authorDeclared = typeof ev.userId === 'string' && ev.userId !== ''
-    if (selfUserId !== undefined && !authorDeclared) warnIdLessAuthor()
-    const authorMatched = selfUserId !== undefined && authorDeclared && ev.userId === selfUserId
-    const authorEchoAllowed = selfUserId === undefined || !authorDeclared || authorMatched
-    if (adminEchoAllowed && authorEchoAllowed && consumeOwnEcho(text, authorMatched)) return
-    const authorType = ev.ownerType === CHAT_OWNER_ADMIN ? ('admin' as const) : ('user' as const)
+    const selfUserId = resolveSelfUserId();
+    const authorDeclared = typeof ev.userId === 'string' && ev.userId !== '';
+    if (selfUserId !== undefined && !authorDeclared) warnIdLessAuthor();
+    const authorMatched = selfUserId !== undefined && authorDeclared && ev.userId === selfUserId;
+    const authorEchoAllowed = selfUserId === undefined || !authorDeclared || authorMatched;
+    if (adminEchoAllowed && authorEchoAllowed && consumeOwnEcho(text, authorMatched)) return;
+    const authorType = ev.ownerType === CHAT_OWNER_ADMIN ? ('admin' as const) : ('user' as const);
     if (
       typeof seq !== 'number' &&
       hasRecentMessage(
         messages,
-        (m) => m.role === 'user' && (m.authorType ?? 'user') === authorType && m.content === text,
+        m => m.role === 'user' && (m.authorType ?? 'user') === authorType && m.content === text,
         CONTENT_DEDUP_WINDOW,
       )
     ) {
-      return
+      return;
     }
     setMessagesInternal([
       ...messages,
@@ -849,29 +853,27 @@ export function createChatStreamReducer(
         ...(typeof seq === 'number' ? { streamSeq: seq } : {}),
         ...(ev.displayName ? { name: ev.displayName } : {}),
         authorType,
-        ...(ev.contextItems && ev.contextItems.length > 0
-          ? { contextItems: ev.contextItems }
-          : {}),
+        ...(ev.contextItems && ev.contextItems.length > 0 ? { contextItems: ev.contextItems } : {}),
       },
-    ])
+    ]);
   }
 
   /** Technician / admin direct message into the dialog. */
   function applyDirectMessageToState(ev: ParticipantEvent): void {
-    const text = ev.text
-    if (!text) return
-    const seq = ev.seq
+    const text = ev.text;
+    if (!text) return;
+    const seq = ev.seq;
     // Seq-less fallback matches only prior ADMIN-authored twins — a client's
     // identical text must never suppress the technician's.
     if (
       typeof seq !== 'number' &&
       hasRecentMessage(
         messages,
-        (m) => m.role === 'user' && m.authorType === 'admin' && m.content === text,
+        m => m.role === 'user' && m.authorType === 'admin' && m.content === text,
         CONTENT_DEDUP_WINDOW,
       )
     ) {
-      return
+      return;
     }
     setMessagesInternal([
       ...messages,
@@ -883,24 +885,20 @@ export function createChatStreamReducer(
         name: ev.displayName ?? 'Admin',
         authorType: 'admin',
       },
-    ])
+    ]);
   }
 
   /** System notice — rendered as a name-only row (same shape the history
    *  processor produces via its standalone-SYSTEM path). */
   function applySystemMessageToState(ev: ParticipantEvent): void {
-    const text = ev.text
-    if (!text) return
-    const seq = ev.seq
+    const text = ev.text;
+    if (!text) return;
+    const seq = ev.seq;
     if (
       typeof seq !== 'number' &&
-      hasRecentMessage(
-        messages,
-        (m) => m.authorType === 'system' && m.name === text,
-        SYSTEM_DEDUP_WINDOW,
-      )
+      hasRecentMessage(messages, m => m.authorType === 'system' && m.name === text, SYSTEM_DEDUP_WINDOW)
     ) {
-      return
+      return;
     }
     setMessagesInternal([
       ...messages,
@@ -912,15 +910,15 @@ export function createChatStreamReducer(
         name: text,
         authorType: 'system',
       },
-    ])
+    ]);
   }
 
   function applyNats(event: ChatStreamEvent): void {
-    const seq = event.seq
+    const seq = event.seq;
     const withSeqMeta = (meta?: SegmentsUpdateMetadata): SegmentsUpdateMetadata | undefined =>
-      seq != null ? { ...meta, streamSeq: seq } : meta
+      seq != null ? { ...meta, streamSeq: seq } : meta;
     const emitSegments = (segments: MessageSegment[], meta?: SegmentsUpdateMetadata) =>
-      emit('onSegmentsUpdate', segments, withSeqMeta(meta))
+      emit('onSegmentsUpdate', segments, withSeqMeta(meta));
 
     /**
      * Emit + apply an accumulator result, choosing REPLACE vs APPEND the same
@@ -947,18 +945,18 @@ export function createChatStreamReducer(
      */
     const applyAccumulated = (before: number, segments: MessageSegment[]): void => {
       if (isInStream || !hasEverStreamed) {
-        emitSegments(segments)
-        applySegmentsToState(segments, withSeqMeta(undefined))
-        return
+        emitSegments(segments);
+        applySegmentsToState(segments, withSeqMeta(undefined));
+        return;
       }
-      const added = segments.slice(before)
-      if (added.length === 0) return
-      emitSegments(added, { append: true })
-      applySegmentsToState(added, withSeqMeta({ append: true }))
-    }
+      const added = segments.slice(before);
+      if (added.length === 0) return;
+      emitSegments(added, { append: true });
+      applySegmentsToState(added, withSeqMeta({ append: true }));
+    };
 
     if (event.type === 'participant' && event.kind === 'direct-message') {
-      sawDirectMessage = true
+      sawDirectMessage = true;
     }
 
     if ((directModeFlag || sawDirectMessage) && !isDirectModeAllowed(event)) {
@@ -968,33 +966,33 @@ export function createChatStreamReducer(
       // (approved commands executing post-MESSAGE_END) has no other release
       // once the barrier starts dropping the continuation chunks.
       if (isInStream || !directTeardownFired) {
-        isInStream = false
-        directTeardownFired = true
-        emit('onStreamEnd')
-        setPhaseInternal('idle')
-        accumulator.resetSegments()
+        isInStream = false;
+        directTeardownFired = true;
+        emit('onStreamEnd');
+        setPhaseInternal('idle');
+        accumulator.resetSegments();
       }
-      return
+      return;
     }
 
     switch (event.type) {
       case 'turn-start': {
-        isInStream = true
-        hasEverStreamed = true
-        turnStartedAt = Date.now()
-        emit('onStreamStart')
-        applyStreamStartToState()
-        accumulator.resetSegments()
-        break
+        isInStream = true;
+        hasEverStreamed = true;
+        turnStartedAt = Date.now();
+        emit('onStreamStart');
+        applyStreamStartToState();
+        accumulator.resetSegments();
+        break;
       }
 
       case 'turn-end': {
-        isInStream = false
-        purgeEchoesAtTurnEnd()
-        emit('onStreamEnd')
-        setPhaseInternal('idle')
-        accumulator.resetSegments()
-        break
+        isInStream = false;
+        purgeEchoesAtTurnEnd();
+        emit('onStreamEnd');
+        setPhaseInternal('idle');
+        accumulator.resetSegments();
+        break;
       }
 
       case 'metadata': {
@@ -1004,10 +1002,10 @@ export function createChatStreamReducer(
         // dialog's model badge mid-answer.
         if (isGuideOrigin(event)) {
           if (typeof event.conversationId === 'string' && event.conversationId) {
-            guideConversationId = event.conversationId
-            invalidate()
+            guideConversationId = event.conversationId;
+            invalidate();
           }
-          break
+          break;
         }
         // Legacy `parseChunkToAction` action shape, reconstructed for the
         // callback contract.
@@ -1017,14 +1015,14 @@ export function createChatStreamReducer(
           modelName: event.modelName,
           providerName: event.provider,
           contextWindow: event.contextWindowMaxTokens,
-        })
+        });
         liveModel = {
           provider: event.provider || null,
           modelLabel: event.modelLabel || event.modelName || null,
           contextWindowMaxTokens: event.contextWindowMaxTokens || null,
-        }
-        invalidate()
-        break
+        };
+        invalidate();
+        break;
       }
 
       // The three APPEND-ONLY body streams share one shape: accumulate the
@@ -1035,31 +1033,26 @@ export function createChatStreamReducer(
       case 'text-delta':
       case 'thinking-delta':
       case 'guide-delta': {
-        const kind =
-          event.type === 'text-delta'
-            ? 'text'
-            : event.type === 'thinking-delta'
-              ? 'thinking'
-              : 'guide'
+        const kind = event.type === 'text-delta' ? 'text' : event.type === 'thinking-delta' ? 'thinking' : 'guide';
         const segments =
           kind === 'text'
             ? accumulator.appendText(event.text)
             : kind === 'thinking'
               ? accumulator.appendThinking(event.text)
-              : accumulator.appendGuide(event.text)
+              : accumulator.appendGuide(event.text);
         // Append-mode only for *true* post-stream continuation (after a
         // MESSAGE_END we actually saw). Cold-start chunks (no prior
         // MESSAGE_START) emit cumulative segments so the consumer can spawn
         // the first assistant bubble.
         if (isInStream || !hasEverStreamed) {
-          emitSegments(segments)
-          applySegmentsToState(segments, withSeqMeta(undefined))
+          emitSegments(segments);
+          applySegmentsToState(segments, withSeqMeta(undefined));
         } else {
-          const delta: MessageSegment[] = [{ type: kind, text: event.text }]
-          emitSegments(delta, { append: true })
-          applySegmentsToState(delta, withSeqMeta({ append: true }))
+          const delta: MessageSegment[] = [{ type: kind, text: event.text }];
+          emitSegments(delta, { append: true });
+          applySegmentsToState(delta, withSeqMeta({ append: true }));
         }
-        break
+        break;
       }
 
       // A clarification card arrives whole, not as deltas. The intro sentence
@@ -1068,12 +1061,12 @@ export function createChatStreamReducer(
       // turn already streamed); the card follows as its own segment. Both land
       // in one emit, so the bubble never shows the card ahead of its lead-in.
       case 'ask': {
-        if (event.text) accumulator.appendText(event.text)
-        const segments = accumulator.addAsk(event.question, event.options)
+        if (event.text) accumulator.appendText(event.text);
+        const segments = accumulator.addAsk(event.question, event.options);
         if (isInStream || !hasEverStreamed) {
-          emitSegments(segments)
-          applySegmentsToState(segments, withSeqMeta(undefined))
-          break
+          emitSegments(segments);
+          applySegmentsToState(segments, withSeqMeta(undefined));
+          break;
         }
         // Post-MESSAGE_END: the delta is spelled out rather than sliced off the
         // accumulator. `appendText` COALESCES into a trailing text segment, so a
@@ -1083,76 +1076,73 @@ export function createChatStreamReducer(
         const delta: MessageSegment[] = [
           ...(event.text ? [{ type: 'text' as const, text: event.text }] : []),
           { type: 'ask' as const, question: event.question, options: event.options },
-        ]
-        emitSegments(delta, { append: true })
-        applySegmentsToState(delta, withSeqMeta({ append: true }))
-        break
+        ];
+        emitSegments(delta, { append: true });
+        applySegmentsToState(delta, withSeqMeta({ append: true }));
+        break;
       }
 
       case 'tool-execution': {
-        const segment: ToolExecutionSegment = { type: 'tool_execution', data: event.data }
+        const segment: ToolExecutionSegment = { type: 'tool_execution', data: event.data };
         // A starting tool run means the agent's turn is in progress even
         // when this lands after MESSAGE_END (approved commands execute
         // between the approval bubble and the continuation stream).
         if (event.data.type === 'EXECUTING_TOOL') {
-          emit('onAgentBusy')
-          agentBusyState()
+          emit('onAgentBusy');
+          agentBusyState();
         }
         // Post-MESSAGE_END tool chunks (cancellations / async batch results
         // for a batch in a prior bubble) flow only through the cross-message
         // updater. Skipping the accumulator avoids pushing a standalone
         // segment that the next text chunk would replay into a new bubble.
         if (!isInStream && crossMessageToolRouting) {
-          emit('onToolExecuted', segment)
-          setMessagesInternal(applyToolExecutionToMessages(messages, segment))
-          break
+          emit('onToolExecuted', segment);
+          setMessagesInternal(applyToolExecutionToMessages(messages, segment));
+          break;
         }
         // In-stream: accumulator-driven update of the streaming bubble is
         // the source of truth. The cross-message scan is first-match-wins
         // and could touch a same-execId segment in a prior bubble (agent
         // retry case), so it is NOT run here.
-        const segments = accumulator.addToolExecution(segment)
-        emitSegments(segments)
-        applySegmentsToState(segments, withSeqMeta(undefined))
-        break
+        const segments = accumulator.addToolExecution(segment);
+        emitSegments(segments);
+        applySegmentsToState(segments, withSeqMeta(undefined));
+        break;
       }
 
       case 'approval-request': {
-        const requestId = event.requestId
-        const approvalType = event.approvalType ?? 'USER'
-        const toolCalls = event.toolCalls
+        const requestId = event.requestId;
+        const approvalType = event.approvalType ?? 'USER';
+        const toolCalls = event.toolCalls;
         // Where this card renders is ONE rule, shared with the SSE kernel and
         // the history replay (`approval-display`) — a Product Guide proposal
         // that renders inline live must not move on the next page load.
-        const guideOrigin = guideApprovalOrigin(event)
-        const displayInline = (type: string) =>
-          approvalDisplaysInline(event, type, displayApprovalTypes)
+        const guideOrigin = guideApprovalOrigin(event);
+        const displayInline = (type: string) => approvalDisplaysInline(event, type, displayApprovalTypes);
 
         if (toolCalls && toolCalls.length > 0) {
           // ── Batch form ──
-          const status = (approvalStatuses[requestId] || 'pending') as ChatApprovalStatus
+          const status = approvalStatuses[requestId] || 'pending';
           if (!displayInline(approvalType)) {
             // Escalated: keep batch context locally for replay on result;
             // surface a summary command via the legacy escalation callback.
-            const required = toolCalls.find((c) => c.requiresApproval) ?? toolCalls[0]
-            const summary = required
-              ? getCommandText(required)
-              : `Batch of ${toolCalls.length} tool calls`
+            const required = toolCalls.find(c => c.requiresApproval) ?? toolCalls[0];
+            const summary = required ? getCommandText(required) : `Batch of ${toolCalls.length} tool calls`;
             pendingEscalated.set(requestId, {
               command: summary,
               explanation: required?.toolExplanation,
               approvalType,
               toolCalls,
-            })
+            });
             emit('onEscalatedApproval', requestId, {
               command: summary,
               explanation: required?.toolExplanation,
               approvalType,
-            })
-            break
+            });
+            break;
           }
           if (batchApprovalsEnabled) {
-            const before = accumulator.getSegments().length
+            const before = accumulator.getSegments().length;
             const segments = accumulator.addApprovalBatch(
               requestId,
               approvalType,
@@ -1161,18 +1151,18 @@ export function createChatStreamReducer(
               undefined,
               undefined,
               guideOrigin,
-            )
-            applyAccumulated(before, segments)
-            break
+            );
+            applyAccumulated(before, segments);
+            break;
           }
           // Flag OFF — unfold batch into N legacy approval cards. They share
           // `requestId`, so a click on any will approve the whole batch via a
           // single backend call, and the resulting APPROVAL_RESULT event will
           // flip status on every matching segment.
-          let segments = accumulator.getSegments()
-          const before = segments.length
+          let segments = accumulator.getSegments();
+          const before = segments.length;
           for (const call of toolCalls) {
-            if (!call.requiresApproval) continue
+            if (!call.requiresApproval) continue;
             segments = accumulator.addApprovalRequest(
               requestId,
               getCommandText(call),
@@ -1181,18 +1171,18 @@ export function createChatStreamReducer(
               status,
               undefined,
               guideOrigin,
-            )
+            );
           }
-          applyAccumulated(before, segments)
-          break
+          applyAccumulated(before, segments);
+          break;
         }
 
         // ── Single form ──
-        const command = event.command ?? ''
-        const explanation = event.explanation
+        const command = event.command ?? '';
+        const explanation = event.explanation;
         if (displayInline(approvalType)) {
-          const status = (approvalStatuses[requestId] || 'pending') as ChatApprovalStatus
-          const before = accumulator.getSegments().length
+          const status = approvalStatuses[requestId] || 'pending';
+          const before = accumulator.getSegments().length;
           const segments = accumulator.addApprovalRequest(
             requestId,
             command,
@@ -1203,38 +1193,38 @@ export function createChatStreamReducer(
             // their body as structured rows rather than prose.
             event.fields,
             guideOrigin,
-          )
-          applyAccumulated(before, segments)
+          );
+          applyAccumulated(before, segments);
         } else {
-          pendingEscalated.set(requestId, { command, explanation, approvalType })
-          emit('onEscalatedApproval', requestId, { command, explanation, approvalType })
+          pendingEscalated.set(requestId, { command, explanation, approvalType });
+          emit('onEscalatedApproval', requestId, { command, explanation, approvalType });
         }
-        break
+        break;
       }
 
       case 'approval-resolved': {
-        const requestId = event.requestId ?? ''
-        const status = event.status
-        const approved = status === 'approved'
-        const approvalType = event.approvalType ?? 'CLIENT'
-        const resolvedByName = event.resolvedByName
+        const requestId = event.requestId ?? '';
+        const status = event.status;
+        const approved = status === 'approved';
+        const approvalType = event.approvalType ?? 'CLIENT';
+        const resolvedByName = event.resolvedByName;
         // Approved → the agent resumes to execute the command(s); surface
         // busy immediately so the composer locks before EXECUTING_TOOL
         // lands. Rejection keeps the input free — the user may want to type
         // a correction right away.
         if (approved) {
-          emit('onAgentBusy')
-          agentBusyState()
+          emit('onAgentBusy');
+          agentBusyState();
         }
-        const escalatedData = pendingEscalated.get(requestId)
+        const escalatedData = pendingEscalated.get(requestId);
 
         if (escalatedData) {
-          pendingEscalated.delete(requestId)
+          pendingEscalated.delete(requestId);
           emit('onEscalatedApprovalResult', requestId, approved, {
             command: escalatedData.command,
             explanation: escalatedData.explanation,
             approvalType: escalatedData.approvalType,
-          })
+          });
 
           // The escalated card was never displayed inline, so this emit is
           // what surfaces it after resolution. In-stream the cumulative
@@ -1245,18 +1235,18 @@ export function createChatStreamReducer(
           // append stays idempotent.
           const emitResolved = (segments: MessageSegment[]) => {
             if (isInStream) {
-              emitSegments(segments)
-              applySegmentsToState(segments, withSeqMeta(undefined))
-              return
+              emitSegments(segments);
+              applySegmentsToState(segments, withSeqMeta(undefined));
+              return;
             }
             const delta = segments.filter(
-              (s) =>
+              s =>
                 (s.type === 'approval_request' && s.data.requestId === requestId) ||
                 (s.type === 'approval_batch' && s.data.approvalRequestId === requestId),
-            )
-            emitSegments(delta, { append: true })
-            applySegmentsToState(delta, withSeqMeta({ append: true }))
-          }
+            );
+            emitSegments(delta, { append: true });
+            applySegmentsToState(delta, withSeqMeta({ append: true }));
+          };
 
           if (escalatedData.toolCalls && escalatedData.toolCalls.length > 0) {
             if (batchApprovalsEnabled) {
@@ -1269,20 +1259,20 @@ export function createChatStreamReducer(
                   undefined,
                   resolvedByName,
                 ),
-              )
+              );
             } else {
-              let segments = accumulator.getSegments()
+              let segments = accumulator.getSegments();
               for (const call of escalatedData.toolCalls) {
-                if (!call.requiresApproval) continue
+                if (!call.requiresApproval) continue;
                 segments = accumulator.addApprovalRequest(
                   requestId,
                   getCommandText(call),
                   call.toolExplanation,
                   escalatedData.approvalType,
                   status,
-                )
+                );
               }
-              emitResolved(segments)
+              emitResolved(segments);
             }
           } else {
             emitResolved(
@@ -1293,27 +1283,25 @@ export function createChatStreamReducer(
                 escalatedData.approvalType,
                 status,
               ),
-            )
+            );
           }
         } else {
           // Always keep the in-memory accumulator in sync so a following
           // text/tool event replays the resolved status into the message.
-          accumulator.updateApprovalStatus(requestId, status, resolvedByName)
+          accumulator.updateApprovalStatus(requestId, status, resolvedByName);
           // Conditional legacy emission — forwarded as onSegmentsUpdate only
           // when the consumer did NOT wire onApprovalResolved (the wrapper
           // resolves the condition at dispatch time).
-          emit('segments-after-approval-result', accumulator.getSegments(), withSeqMeta(undefined))
+          emit('segments-after-approval-result', accumulator.getSegments(), withSeqMeta(undefined));
         }
 
         // Cross-message status flip + status-map mirror (absorbed adapter
         // handler) — runs for both branches, matching the legacy adapter
         // whose onApprovalResolved callback fired unconditionally.
-        setMessagesInternal(
-          projectApprovalResolutionToMessages(messages, requestId, status, resolvedByName),
-        )
-        mirrorApprovalStatus(requestId, status)
-        emit('onApprovalResolved', requestId, status, approvalType, resolvedByName)
-        break
+        setMessagesInternal(projectApprovalResolutionToMessages(messages, requestId, status, resolvedByName));
+        mirrorApprovalStatus(requestId, status);
+        emit('onApprovalResolved', requestId, status, approvalType, resolvedByName);
+        break;
       }
 
       case 'escalation-offer': {
@@ -1323,30 +1311,23 @@ export function createChatStreamReducer(
         // offer at turn end or honours the header button while idle. In the
         // latter shapes a cumulative emit would replace the trailing bubble's
         // segments with the lone card, wiping the reply the user is reading.
-        const status = (approvalStatuses[event.offerId] || 'pending') as ChatApprovalStatus
-        const before = accumulator.getSegments().length
-        const segments = accumulator.addEscalationOffer(
-          event.offerId,
-          event.text,
-          event.origin,
-          status,
-        )
-        applyAccumulated(before, segments)
-        break
+        const status = approvalStatuses[event.offerId] || 'pending';
+        const before = accumulator.getSegments().length;
+        const segments = accumulator.addEscalationOffer(event.offerId, event.text, event.origin, status);
+        applyAccumulated(before, segments);
+        break;
       }
 
       case 'escalation-offer-resolved': {
-        const { offerId, status, resolvedByName: offerResolvedBy } = event
+        const { offerId, status, resolvedByName: offerResolvedBy } = event;
         // Approving hands the ticket to a human; Fae goes silent rather than
         // resuming, so — unlike an approved command — there is no work to
         // signal and the busy lock stays untouched.
-        accumulator.updateApprovalStatus(offerId, status, offerResolvedBy)
-        setMessagesInternal(
-          projectApprovalResolutionToMessages(messages, offerId, status, offerResolvedBy),
-        )
-        mirrorApprovalStatus(offerId, status)
-        emit('onEscalationOfferResolved', offerId, status, offerResolvedBy)
-        break
+        accumulator.updateApprovalStatus(offerId, status, offerResolvedBy);
+        setMessagesInternal(projectApprovalResolutionToMessages(messages, offerId, status, offerResolvedBy));
+        mirrorApprovalStatus(offerId, status);
+        emit('onEscalationOfferResolved', offerId, status, offerResolvedBy);
+        break;
       }
 
       case 'ticket-escalated': {
@@ -1354,22 +1335,22 @@ export function createChatStreamReducer(
         // reason: the inactivity auto-escalation fires from a scheduler with
         // no turn open at all, so this block routinely arrives with no
         // preceding MESSAGE_START.
-        const before = accumulator.getSegments().length
+        const before = accumulator.getSegments().length;
         const segments = accumulator.addTicketEscalated({
           ticketId: event.ticketId,
           ticketNumber: event.ticketNumber,
           reason: event.reason,
           text: event.text,
-        })
-        applyAccumulated(before, segments)
-        break
+        });
+        applyAccumulated(before, segments);
+        break;
       }
 
       case 'ticket-event': {
         // Standalone chunk outside MESSAGE_START/END — same routing as
         // `ticket-escalated`. `seq` rides onto the segment: it is the event's
         // dedupe identity (see `addTicketEvent`).
-        const before = accumulator.getSegments().length
+        const before = accumulator.getSegments().length;
         const data = {
           kind: event.kind,
           actorId: event.actorId,
@@ -1377,40 +1358,35 @@ export function createChatStreamReducer(
           actorType: event.actorType,
           reason: event.reason,
           targetStatusKind: event.targetStatusKind,
-        }
+        };
         // The chunk carries no event time, so stamp arrival — for a genuinely
         // live event that IS the event time. Without it the card falls back to
         // the enclosing bubble's timestamp: the turn's FIRST row, minutes
         // stale by the time a resolve/reopen lands. A catch-up redelivery of
         // an already-hydrated event does NOT regress to arrival time —
         // `addTicketEvent` keeps the first-known `occurredAt` on upsert.
-        const segments = accumulator.addTicketEvent(data, seq, new Date())
-        applyAccumulated(before, segments)
+        const segments = accumulator.addTicketEvent(data, seq, new Date());
+        applyAccumulated(before, segments);
         // The card alone is not enough for a host that also tracks the
         // ticket's state: a RESOLVED/REOPENED arriving live must move the
         // composer lock/status chip on the same render as the card, not on
         // the next status poll. Hosts that don't wire it lose nothing.
-        emit('onTicketEvent', data)
-        break
+        emit('onTicketEvent', data);
+        break;
       }
 
       case 'error': {
-        let message: string | undefined
-        if (event.details) {
-          try {
-            message = JSON.parse(event.details)?.error?.message
-          } catch {
-            message = event.details
-          }
-        }
-        const before = accumulator.getSegments().length
-        const segments = accumulator.addError(event.title, message)
-        applyAccumulated(before, segments)
-        emit('onError', event.title, message)
+        // Shared with the history replay in `process-historical-messages` —
+        // one decoder so a card cannot read one way live and another on refresh.
+        const message = errorDetailsMessage(event.details);
+        const before = accumulator.getSegments().length;
+        const segments = accumulator.addError(event.title, message);
+        applyAccumulated(before, segments);
+        emit('onError', event.title, message);
         // Terminal turn failures can arrive without a MESSAGE_END; unlock
         // the composer unless an open stream still owns the phase.
-        if (streamingPhase !== 'streaming') setPhaseInternal('idle')
-        break
+        if (streamingPhase !== 'streaming') setPhaseInternal('idle');
+        break;
       }
 
       case 'participant': {
@@ -1421,21 +1397,21 @@ export function createChatStreamReducer(
             userId: event.userId,
             streamSeq: seq,
             contextItems: event.contextItems,
-          })
-          applyUserMessageToState(event)
+          });
+          applyUserMessageToState(event);
         } else if (event.kind === 'direct-message') {
           emit('onDirectMessage', event.text, {
             ownerType: event.ownerType,
             displayName: event.displayName,
             userId: event.userId,
             streamSeq: seq,
-          })
-          applyDirectMessageToState(event)
+          });
+          applyDirectMessageToState(event);
         } else {
-          emit('onSystemMessage', event.text, { streamSeq: seq })
-          applySystemMessageToState(event)
+          emit('onSystemMessage', event.text, { streamSeq: seq });
+          applySystemMessageToState(event);
         }
-        break
+        break;
       }
 
       case 'token-usage': {
@@ -1444,33 +1420,33 @@ export function createChatStreamReducer(
           outputTokensSize: event.outputTokensSize,
           totalTokensSize: event.totalTokensSize,
           contextSize: event.contextSize,
-        }
-        emit('onTokenUsage', data)
-        dialogTokenUsage = data
-        invalidate()
-        break
+        };
+        emit('onTokenUsage', data);
+        dialogTokenUsage = data;
+        invalidate();
+        break;
       }
 
       case 'compaction': {
-        const standalone = !isInStream
+        const standalone = !isInStream;
         const segments =
           event.phase === 'start'
             ? accumulator.addContextCompaction()
-            : accumulator.completeContextCompaction(event.summary)
-        const meta = standalone ? ({ append: true, isCompacting: true } as const) : undefined
-        emitSegments(segments, meta)
-        applySegmentsToState(segments, withSeqMeta(meta))
-        break
+            : accumulator.completeContextCompaction(event.summary);
+        const meta = standalone ? ({ append: true, isCompacting: true } as const) : undefined;
+        emitSegments(segments, meta);
+        applySegmentsToState(segments, withSeqMeta(meta));
+        break;
       }
 
       case 'dialog-closed': {
-        emit('onDialogClosed')
-        break
+        emit('onDialogClosed');
+        break;
       }
 
       default:
         // Unknown / SSE-only event on the NATS kernel — ignore.
-        break
+        break;
     }
   }
 
@@ -1482,66 +1458,64 @@ export function createChatStreamReducer(
    *  the cumulative turn text (or push one). Mirrors `useChat`'s
    *  currentTextSegment handling byte-for-byte. */
   function sseWriteTrailingText(text: string): void {
-    const last = messages[messages.length - 1]
-    if (!last || last.role !== 'assistant') return
-    const segments = [...(last.segments ?? [])]
-    const tail = segments[segments.length - 1]
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant') return;
+    const segments = [...(last.segments ?? [])];
+    const tail = segments[segments.length - 1];
     if (tail && tail.type === 'text') {
-      segments[segments.length - 1] = { type: 'text', text }
+      segments[segments.length - 1] = { type: 'text', text };
     } else {
-      segments.push({ type: 'text', text })
+      segments.push({ type: 'text', text });
     }
-    setMessagesInternal([...messages.slice(0, -1), { ...last, segments }])
+    setMessagesInternal([...messages.slice(0, -1), { ...last, segments }]);
   }
 
   function sseAppendText(text: string): void {
-    sseCurrentText += text
-    sseWriteTrailingText(sseCurrentText)
+    sseCurrentText += text;
+    sseWriteTrailingText(sseCurrentText);
   }
 
   /** Single thinking segment per message, ALWAYS before the answer text:
    *  replaced in place when present, inserted at the FRONT otherwise. */
   function sseAppendThinking(escapedDelta: string): void {
-    const last = messages[messages.length - 1]
-    if (!last || last.role !== 'assistant') return
-    const segments = [...(last.segments ?? [])]
-    const idx = segments.findIndex((s) => s.type === 'thinking')
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant') return;
+    const segments = [...(last.segments ?? [])];
+    const idx = segments.findIndex(s => s.type === 'thinking');
     if (idx !== -1) {
-      const existing = segments[idx] as { type: 'thinking'; text: string }
-      segments[idx] = { type: 'thinking', text: existing.text + escapedDelta }
+      const existing = segments[idx] as { type: 'thinking'; text: string };
+      segments[idx] = { type: 'thinking', text: existing.text + escapedDelta };
     } else {
-      segments.unshift({ type: 'thinking', text: escapedDelta })
+      segments.unshift({ type: 'thinking', text: escapedDelta });
     }
-    setMessagesInternal([...messages.slice(0, -1), { ...last, segments }])
+    setMessagesInternal([...messages.slice(0, -1), { ...last, segments }]);
   }
 
   function mergeTurnMeta(sendIdx: number, partial: Partial<ChatTurnMeta>): void {
-    const prev = metaMap.get(sendIdx) ?? createEmptyTurnMeta()
+    const prev = metaMap.get(sendIdx) ?? createEmptyTurnMeta();
     const filtered = Object.fromEntries(
       Object.entries(partial).filter(([, v]) => v !== undefined && v !== null),
-    ) as Partial<ChatTurnMeta>
-    metaMap.set(sendIdx, { ...prev, ...filtered })
-    invalidate()
+    ) as Partial<ChatTurnMeta>;
+    metaMap.set(sendIdx, { ...prev, ...filtered });
+    invalidate();
   }
 
   function applySseApprovalResolved(event: ApprovalResolvedEvent): void {
-    const proposalId = event.requestId
-    if (!proposalId) return
+    const proposalId = event.requestId;
+    if (!proposalId) return;
 
     // Step 1 — flip the SOURCE card's status (the approval card lives in an
     // EARLIER assistant message than the one being streamed into).
-    setMessagesInternal(
-      projectApprovalResolutionToMessages(messages, proposalId, event.status),
-    )
+    setMessagesInternal(projectApprovalResolutionToMessages(messages, proposalId, event.status));
 
     // Step 2 — server-rendered receipt into the CURRENT message. No
     // server-provided copy → don't fabricate a fallback. The receipt's
     // `[card://…]` marker hydrates via the card fetch path on its own —
     // no ref stamping needed.
-    const receipt = typeof event.receiptText === 'string' ? event.receiptText : null
-    if (receipt === null) return
-    sseCurrentText = receipt + '\n\n'
-    sseWriteTrailingText(sseCurrentText)
+    const receipt = typeof event.receiptText === 'string' ? event.receiptText : null;
+    if (receipt === null) return;
+    sseCurrentText = receipt + '\n\n';
+    sseWriteTrailingText(sseCurrentText);
   }
 
   function applySseMetadata(event: ChatMetadataEvent, sendIdx: number): void {
@@ -1549,89 +1523,76 @@ export function createChatStreamReducer(
       mergeTurnMeta(sendIdx, {
         routedComplexity: event.routing.routedComplexity,
         routedThinkingBudget: event.routing.routedThinkingBudget,
-      })
-      return
+      });
+      return;
     }
     if (event.sources) {
-      sourcesMap.set(sendIdx, event.sources as unknown[])
-      invalidate()
+      sourcesMap.set(sendIdx, event.sources as unknown[]);
+      invalidate();
     }
     if (event.modelLabel || event.contextWindowMaxTokens || event.provider || event.modelName) {
       mergeTurnMeta(sendIdx, {
         provider: event.provider ?? null,
         modelLabel: event.modelLabel ?? null,
         contextWindowMaxTokens: event.contextWindowMaxTokens ?? null,
-      })
+      });
     }
-    const parsedAnchor = parseScrollAnchor(event.scrollAnchor)
+    const parsedAnchor = parseScrollAnchor(event.scrollAnchor);
     if (parsedAnchor !== null) {
-      mergeTurnMeta(sendIdx, { scrollAnchor: parsedAnchor })
+      mergeTurnMeta(sendIdx, { scrollAnchor: parsedAnchor });
     }
   }
 
   function applySseUsage(event: UsageEvent, sendIdx: number): void {
     if (event.stage === 'start') {
-      mergeTurnMeta(sendIdx, { inputTokens: event.input_tokens ?? null })
-      return
+      mergeTurnMeta(sendIdx, { inputTokens: event.input_tokens ?? null });
+      return;
     }
     // stage === 'end' — the trailing usage frame. Raw wire values pass the
     // legacy truthiness/typeof gates so a malformed frame degrades
     // identically to the pre-SSOT parser.
-    const rawBreakdown = event.breakdown as Record<string, any> | null | undefined
-    const breakdown: UnifiedUsageBreakdown | null =
-      rawBreakdown && typeof rawBreakdown === 'object'
-        ? {
-            haikuRewriter:
-              rawBreakdown.haikuRewriter && typeof rawBreakdown.haikuRewriter.input === 'number'
-                ? rawBreakdown.haikuRewriter
-                : undefined,
-            haikuClassifier:
-              rawBreakdown.haikuClassifier && typeof rawBreakdown.haikuClassifier.input === 'number'
-                ? rawBreakdown.haikuClassifier
-                : undefined,
-            haikuSummarizer:
-              rawBreakdown.haikuSummarizer && typeof rawBreakdown.haikuSummarizer.input === 'number'
-                ? rawBreakdown.haikuSummarizer
-                : undefined,
-            routedAnswer:
-              rawBreakdown.routedAnswer && typeof rawBreakdown.routedAnswer.model === 'string'
-                ? rawBreakdown.routedAnswer
-                : undefined,
-          }
-        : null
+    const rawBreakdown: unknown = event.breakdown;
+    const breakdown: UnifiedUsageBreakdown | null = isWireRecord(rawBreakdown)
+      ? {
+          haikuRewriter: readTokenPair(rawBreakdown.haikuRewriter),
+          haikuClassifier: readTokenPair(rawBreakdown.haikuClassifier),
+          haikuSummarizer: readTokenPair(rawBreakdown.haikuSummarizer),
+          routedAnswer: readRoutedAnswer(rawBreakdown.routedAnswer),
+        }
+      : null;
     mergeTurnMeta(sendIdx, {
       inputTokens: event.input_tokens ?? null,
       outputTokens: event.output_tokens ?? null,
       cacheHitRatePct: typeof event.hit_rate_pct === 'number' ? event.hit_rate_pct : null,
       ...(breakdown ? { breakdown } : {}),
-    })
+    });
   }
 
   function applySse(event: ChatStreamEvent): void {
-    const sendIdx = sendCount - 1
+    const sendIdx = sendCount - 1;
     switch (event.type) {
       case 'status':
-        setPhaseInternal('thinking')
-        break
+        setPhaseInternal('thinking');
+        break;
       case 'thinking-delta':
-        sseAppendThinking(escapeThinkingTags(event.text))
-        break
+        sseAppendThinking(escapeThinkingTags(event.text));
+        break;
       case 'turn-start':
-        setPhaseInternal('streaming')
-        break
+        setPhaseInternal('streaming');
+        break;
       case 'text-delta':
-        if (!event.leading) setPhaseInternal('streaming')
-        sseAppendText(event.text)
-        break
+        if (!event.leading) setPhaseInternal('streaming');
+        sseAppendText(event.text);
+        break;
       case 'error':
         // Legacy parity: SSE tool errors surface as answer text.
-        sseAppendText(`⚠️ ${event.title}`)
-        break
+        sseAppendText(`⚠️ ${event.title}`);
+        break;
       case 'approval-request': {
         // Flush any accumulated preamble text so the card lands after it.
         if (sseCurrentText) {
-          sseWriteTrailingText(sseCurrentText)
-          sseCurrentText = ''
+          sseWriteTrailingText(sseCurrentText);
+          sseCurrentText = '';
         }
         const segment: ApprovalRequestSegment = {
           type: 'approval_request',
@@ -1644,9 +1605,9 @@ export function createChatStreamReducer(
           status: 'pending',
           onApprove: callbacks.onApprove,
           onReject: callbacks.onReject,
-        }
-        const last = messages[messages.length - 1]
-        if (!last || last.role !== 'assistant') break
+        };
+        const last = messages[messages.length - 1];
+        if (!last || last.role !== 'assistant') break;
         // ── WIRE-NATIVE BATCH ─────────────────────────────────────────
         // The SERVER groups a multi-proposal turn into ONE
         // `approval_batch` frame (decoded to `event.toolCalls`) — the
@@ -1657,9 +1618,9 @@ export function createChatStreamReducer(
         // (see `projectApprovalResolutionToMessages`). Single-proposal
         // turns keep the classic editable per-card flow below.
         if (event.toolCalls && event.toolCalls.length > 0) {
-          const rows = event.toolCalls
-          const anchorId = event.requestId
-          const ids = rows.map((c) => c.toolExecutionRequestId)
+          const rows = event.toolCalls;
+          const anchorId = event.requestId;
+          const ids = rows.map(c => c.toolExecutionRequestId);
           const batchSegment: ApprovalBatchSegment = {
             type: 'approval_batch',
             status: 'pending',
@@ -1678,53 +1639,49 @@ export function createChatStreamReducer(
             // remaining rows still get their attempt.
             ...(() => {
               const resolveBatch =
-                (status: 'approved' | 'rejected', confirm: typeof callbacks.onApprove) =>
-                async () => {
+                (status: 'approved' | 'rejected', confirm: typeof callbacks.onApprove) => async () => {
                   // STATUS-ONLY projection (defense-in-depth): even a
                   // batchId colliding with a row id cannot pre-tick an
                   // execution here — rows resolve exclusively via their
                   // own confirm results / approval-resolved events.
-                  setMessagesInternal(projectBatchStatusToMessages(messages, anchorId, status))
+                  setMessagesInternal(projectBatchStatusToMessages(messages, anchorId, status));
                   for (const id of ids) {
-                    const ok = await confirm?.(id)
+                    const ok = await confirm?.(id);
                     if (ok === false) {
-                      setMessagesInternal(projectBatchRowFailureToMessages(messages, id))
+                      setMessagesInternal(projectBatchRowFailureToMessages(messages, id));
                     }
                   }
-                }
+                };
               return {
                 onApprove: resolveBatch('approved', callbacks.onApprove),
                 onReject: resolveBatch('rejected', callbacks.onReject),
-              }
+              };
             })(),
-          }
+          };
           setMessagesInternal([
             ...messages.slice(0, -1),
             { ...last, segments: [...(last.segments ?? []), batchSegment] },
-          ])
-          break
+          ]);
+          break;
         }
-        setMessagesInternal([
-          ...messages.slice(0, -1),
-          { ...last, segments: [...(last.segments ?? []), segment] },
-        ])
-        break
+        setMessagesInternal([...messages.slice(0, -1), { ...last, segments: [...(last.segments ?? []), segment] }]);
+        break;
       }
       case 'approval-resolved':
-        applySseApprovalResolved(event)
-        break
+        applySseApprovalResolved(event);
+        break;
       case 'metadata':
-        applySseMetadata(event, sendIdx)
-        break
+        applySseMetadata(event, sendIdx);
+        break;
       case 'usage':
-        applySseUsage(event, sendIdx)
-        break
+        applySseUsage(event, sendIdx);
+        break;
       // NOTE: 'tool-execution' is intentionally NOT handled on the SSE
       // kernel — the SSE wire never carries it, and routing it through the
       // accumulator would invoke resolvePendingApprovalForExecution, which
       // is a NATS-only semantic (observer streams without APPROVAL_RESULT).
       default:
-        break
+        break;
     }
   }
 
@@ -1735,35 +1692,35 @@ export function createChatStreamReducer(
   function apply(event: ChatStreamEvent): void {
     // seq-based idempotency: drop redelivered / out-of-order events.
     if (typeof event.seq === 'number') {
-      if (event.seq <= lastAppliedSeq) return
-      lastAppliedSeq = event.seq
+      if (event.seq <= lastAppliedSeq) return;
+      lastAppliedSeq = event.seq;
     }
-    if (transport === 'sse') applySse(event)
-    else applyNats(event)
+    if (transport === 'sse') applySse(event);
+    else applyNats(event);
   }
 
   function reset(): void {
-    messages = []
-    streamingPhase = 'idle'
-    dialogTokenUsage = null
-    liveModel = null
-    guideConversationId = null
-    approvalStatuses = {}
-    accumulator.reset()
-    pendingEscalated.clear()
-    isInStream = false
-    hasEverStreamed = false
-    sawDirectMessage = false
-    directTeardownFired = false
-    lastAppliedSeq = Number.NEGATIVE_INFINITY
-    pendingEchoTexts = []
-    turnStartedAt = 0
-    adoptTrailingAssistant = false
-    metaMap.clear()
-    sourcesMap.clear()
-    sendCount = 0
-    sseCurrentText = ''
-    invalidate()
+    messages = [];
+    streamingPhase = 'idle';
+    dialogTokenUsage = null;
+    liveModel = null;
+    guideConversationId = null;
+    approvalStatuses = {};
+    accumulator.reset();
+    pendingEscalated.clear();
+    isInStream = false;
+    hasEverStreamed = false;
+    sawDirectMessage = false;
+    directTeardownFired = false;
+    lastAppliedSeq = Number.NEGATIVE_INFINITY;
+    pendingEchoTexts = [];
+    turnStartedAt = 0;
+    adoptTrailingAssistant = false;
+    metaMap.clear();
+    sourcesMap.clear();
+    sendCount = 0;
+    sseCurrentText = '';
+    invalidate();
   }
 
   /**
@@ -1791,21 +1748,21 @@ export function createChatStreamReducer(
    * "agent-busy suppression survives a dialog switch" test.
    */
   function resetForDialogSwitch(): void {
-    messages = []
-    streamingPhase = 'idle'
-    dialogTokenUsage = null
-    liveModel = null
-    guideConversationId = null
-    accumulator.reset()
-    pendingEscalated.clear()
-    isInStream = false
-    hasEverStreamed = false
-    sawDirectMessage = false
-    directTeardownFired = false
-    lastAppliedSeq = Number.NEGATIVE_INFINITY
-    pendingEchoTexts = []
-    turnStartedAt = 0
-    adoptTrailingAssistant = false
+    messages = [];
+    streamingPhase = 'idle';
+    dialogTokenUsage = null;
+    liveModel = null;
+    guideConversationId = null;
+    accumulator.reset();
+    pendingEscalated.clear();
+    isInStream = false;
+    hasEverStreamed = false;
+    sawDirectMessage = false;
+    directTeardownFired = false;
+    lastAppliedSeq = Number.NEGATIVE_INFINITY;
+    pendingEchoTexts = [];
+    turnStartedAt = 0;
+    adoptTrailingAssistant = false;
     // SSE per-turn kernel. `sseCurrentText` is the CUMULATIVE answer text of
     // the turn being streamed, and `sseAppendText` only ever appends to it —
     // so leaving it behind prepends the previous dialog's whole answer to the
@@ -1813,72 +1770,65 @@ export function createChatStreamReducer(
     // (the resumed-mid-turn shape: restore history, then live deltas flow).
     // The per-send maps are keyed by `sendCount`, which is likewise per-dialog;
     // a host that needs them restored has `seedSseMaps`.
-    sseCurrentText = ''
-    metaMap.clear()
-    sourcesMap.clear()
-    sendCount = 0
-    invalidate()
+    sseCurrentText = '';
+    metaMap.clear();
+    sourcesMap.clear();
+    sendCount = 0;
+    invalidate();
   }
 
   /** Canonical state-monotonic merge of a persisted / parked status map.
    *  "resolved beats pending" in BOTH directions — see the interface doc on
    *  `mergeApprovalStatuses`, which is this function. */
-  function mergeApprovalStatusesInternal(
-    persisted: Record<string, ChatApprovalStatus>,
-  ): void {
-    const keys = Object.keys(persisted)
-    if (keys.length === 0) return
-    let next: Record<string, ChatApprovalStatus> | null = null
+  function mergeApprovalStatusesInternal(persisted: Record<string, ChatApprovalStatus>): void {
+    const keys = Object.keys(persisted);
+    if (keys.length === 0) return;
+    let next: Record<string, ChatApprovalStatus> | null = null;
     for (const key of keys) {
-      const mine = approvalStatuses[key]
-      const theirs = persisted[key]
+      const mine = approvalStatuses[key];
+      const theirs = persisted[key];
       // Unknown here → adopt. Known → adopt only to upgrade pending →
       // resolved; never downgrade a resolution back to pending.
-      const adopt = mine === undefined || (mine === 'pending' && theirs !== 'pending')
-      if (!adopt || mine === theirs) continue
-      next ??= { ...approvalStatuses }
-      next[key] = theirs
+      const adopt = mine === undefined || (mine === 'pending' && theirs !== 'pending');
+      if (!adopt || mine === theirs) continue;
+      next ??= { ...approvalStatuses };
+      next[key] = theirs;
     }
-    if (next === null) return
-    approvalStatuses = next
-    invalidate()
+    if (next === null) return;
+    approvalStatuses = next;
+    invalidate();
   }
 
-  function initializeWithState(
-    nextMessages: UnifiedChatMessage[] | null,
-    extras?: InitializeExtras,
-  ): void {
+  function initializeWithState(nextMessages: UnifiedChatMessage[] | null, extras?: InitializeExtras): void {
     if (nextMessages !== null) {
-      messages = nextMessages
+      messages = nextMessages;
     }
     if (extras) {
       accumulator.initializeWithState({
         existingSegments: extras.existingSegments,
         pendingApprovals: extras.pendingApprovals,
         executingTools: extras.executingTools,
-      })
+      });
       if (extras.escalatedApprovals) {
         for (const [requestId, data] of extras.escalatedApprovals) {
-          pendingEscalated.set(requestId, data)
-          emit('onEscalatedApproval', requestId, data)
+          pendingEscalated.set(requestId, data);
+          emit('onEscalatedApproval', requestId, data);
         }
       }
       // Parked state from a previous instance of this key (see the fields'
       // docs). Both are restore-only: statuses merge monotonically, the seq
       // gate only moves forward.
-      if (extras.approvalStatuses) mergeApprovalStatusesInternal(extras.approvalStatuses)
+      if (extras.approvalStatuses) mergeApprovalStatusesInternal(extras.approvalStatuses);
       if (typeof extras.lastAppliedSeq === 'number' && extras.lastAppliedSeq > lastAppliedSeq) {
-        lastAppliedSeq = extras.lastAppliedSeq
+        lastAppliedSeq = extras.lastAppliedSeq;
       }
       if (extras.pendingEchoes && extras.pendingEchoes.length > 0) {
-        const now = Date.now()
-        const restored = extras.pendingEchoes.filter(
-          (e) => now - e.at < OWN_ECHO_AUTHOR_TTL_MS,
-        )
+        const now = Date.now();
+        const restored = extras.pendingEchoes.filter(e => now - e.at < OWN_ECHO_AUTHOR_TTL_MS);
         if (restored.length > 0) {
-          pendingEchoTexts = [...pendingEchoTexts, ...restored.map((e) => ({ ...e }))]
+          pendingEchoTexts = [...pendingEchoTexts, ...restored.map(e => ({ ...e }))];
           if (pendingEchoTexts.length > MAX_PENDING_ECHOES) {
-            pendingEchoTexts = pendingEchoTexts.slice(-MAX_PENDING_ECHOES)
+            pendingEchoTexts = pendingEchoTexts.slice(-MAX_PENDING_ECHOES);
           }
         }
       }
@@ -1896,36 +1846,36 @@ export function createChatStreamReducer(
     // bubble never spawns.
     // Never DOWNGRADES an instance that already streamed — this only decides
     // whether the restore itself counts as evidence of a prior stream.
-    hasEverStreamed = hasEverStreamed || (extras?.resumed ?? messages.length > 0)
+    hasEverStreamed = hasEverStreamed || (extras?.resumed ?? messages.length > 0);
     // A tail the extractor judged agent-busy restores the activity indicator.
     // Routed through `agentBusyState` so the restore obeys the SAME rule a live
     // busy signal does — only 'idle' upgrades, an open stream keeps ownership.
-    if (extras?.agentBusy) agentBusyState()
-    invalidate()
+    if (extras?.agentBusy) agentBusyState();
+    invalidate();
   }
 
   return {
     apply,
     get state() {
-      return getState()
+      return getState();
     },
     reset,
     initializeWithState,
 
     setMessages(next) {
-      messages = next
-      invalidate()
+      messages = next;
+      invalidate();
     },
     prependMessages(older) {
-      messages = [...older, ...messages]
-      invalidate()
+      messages = [...older, ...messages];
+      invalidate();
     },
     pushOptimisticSend(text, hidden = false) {
       // Record the text so the backend's MESSAGE_REQUEST echo consumes this
       // send instead of rendering a duplicate row (cap keeps the list from
       // growing if a backend never echoes).
-      pendingEchoTexts.push({ text, at: Date.now() })
-      if (pendingEchoTexts.length > MAX_PENDING_ECHOES) pendingEchoTexts.shift()
+      pendingEchoTexts.push({ text, at: Date.now() });
+      if (pendingEchoTexts.length > MAX_PENDING_ECHOES) pendingEchoTexts.shift();
       messages = [
         ...messages,
         // An EMPTY-text send is out-of-band metadata (an approval decision),
@@ -1942,20 +1892,20 @@ export function createChatStreamReducer(
             ] satisfies UnifiedChatMessage[])
           : []),
         { id: nextId('assistant'), role: 'assistant', content: '', segments: [] },
-      ]
-      streamingPhase = 'thinking'
-      invalidate()
+      ];
+      streamingPhase = 'thinking';
+      invalidate();
     },
     clearThread() {
-      messages = []
-      accumulator.reset()
-      streamingPhase = 'idle'
-      invalidate()
+      messages = [];
+      accumulator.reset();
+      streamingPhase = 'idle';
+      invalidate();
     },
     resetForDialogSwitch,
 
     beginSseSend({ text, hidden, userName = 'You', assistantName, assistantAvatar }) {
-      const now = Date.now()
+      const now = Date.now();
       messages = [
         ...messages,
         // Approve / Reject send `('', { hidden: true, approvalAction })`: the
@@ -1987,29 +1937,24 @@ export function createChatStreamReducer(
           timestamp: new Date(now),
           ...(assistantAvatar !== undefined ? { avatar: assistantAvatar } : {}),
         },
-      ]
-      sendCount += 1
-      sseCurrentText = ''
-      streamingPhase = 'thinking'
-      invalidate()
+      ];
+      sendCount += 1;
+      sseCurrentText = '';
+      streamingPhase = 'thinking';
+      invalidate();
     },
     endSseTurn() {
       // Reject-path on confirm-tool emits ONLY a `decision_resolved` leading
       // frame and closes — no text segments stream in, so the placeholder
       // assistant message would render as a blank bubble. Remove the
       // trailing assistant message if it still has no content.
-      const last = messages[messages.length - 1]
-      if (
-        last &&
-        last.role === 'assistant' &&
-        (last.segments?.length ?? 0) === 0 &&
-        last.content === ''
-      ) {
-        messages = messages.slice(0, -1)
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'assistant' && (last.segments?.length ?? 0) === 0 && last.content === '') {
+        messages = messages.slice(0, -1);
       }
-      sseCurrentText = ''
-      streamingPhase = 'idle'
-      invalidate()
+      sseCurrentText = '';
+      streamingPhase = 'idle';
+      invalidate();
     },
     failSseTurn(errorMessage) {
       // Legacy `useChat` catch parity: the trailing (placeholder) message is
@@ -2022,88 +1967,84 @@ export function createChatStreamReducer(
           content: errorMessage,
           timestamp: new Date(),
         } as unknown as UnifiedChatMessage,
-      ]
-      sseCurrentText = ''
-      streamingPhase = 'idle'
-      invalidate()
+      ];
+      sseCurrentText = '';
+      streamingPhase = 'idle';
+      invalidate();
     },
     seedSseMaps({ sources, sendCount: seedSendCount }) {
-      if (sources) for (const [k, v] of sources) sourcesMap.set(k, v)
-      if (typeof seedSendCount === 'number') sendCount = seedSendCount
-      invalidate()
+      if (sources) for (const [k, v] of sources) sourcesMap.set(k, v);
+      if (typeof seedSendCount === 'number') sendCount = seedSendCount;
+      invalidate();
     },
 
     setPhase(phase) {
-      setPhaseInternal(phase)
+      setPhaseInternal(phase);
     },
     setApprovalStatus(requestId, status) {
       if (status === null) {
-        if (!(requestId in approvalStatuses)) return
-        const next = { ...approvalStatuses }
-        delete next[requestId]
-        approvalStatuses = next
+        if (!(requestId in approvalStatuses)) return;
+        const next = { ...approvalStatuses };
+        delete next[requestId];
+        approvalStatuses = next;
       } else {
-        if (approvalStatuses[requestId] === status) return
-        approvalStatuses = { ...approvalStatuses, [requestId]: status }
+        if (approvalStatuses[requestId] === status) return;
+        approvalStatuses = { ...approvalStatuses, [requestId]: status };
       }
-      invalidate()
+      invalidate();
     },
     mergeApprovalStatuses: mergeApprovalStatusesInternal,
     setDirectMode(isDirectMode) {
-      directModeFlag = isDirectMode
+      directModeFlag = isDirectMode;
     },
     setDialogTokenUsage(usage) {
-      dialogTokenUsage = usage
-      invalidate()
+      dialogTokenUsage = usage;
+      invalidate();
     },
     adjustAgentBusySuppression(delta) {
-      suppressAgentBusy = Math.max(0, suppressAgentBusy + delta)
+      suppressAgentBusy = Math.max(0, suppressAgentBusy + delta);
     },
     armAdoptTrailingAssistant(value) {
-      adoptTrailingAssistant = value
+      adoptTrailingAssistant = value;
     },
 
     projectApprovalResolution(requestId, status, resolvedByName) {
-      setMessagesInternal(
-        projectApprovalResolutionToMessages(messages, requestId, status, resolvedByName),
-      )
-      mirrorApprovalStatus(requestId, status)
+      setMessagesInternal(projectApprovalResolutionToMessages(messages, requestId, status, resolvedByName));
+      mirrorApprovalStatus(requestId, status);
     },
     projectToolExecution(segment) {
       // Merge-only: a projection must never grow a card on a side the tool
       // doesn't belong to, and must never re-enter the seq stream.
-      const merged = mergeToolExecutionIfPresent(messages, segment)
-      if (merged !== null) setMessagesInternal(merged)
+      const merged = mergeToolExecutionIfPresent(messages, segment);
+      if (merged !== null) setMessagesInternal(merged);
     },
 
     getLastAppliedSeq() {
-      return lastAppliedSeq
+      return lastAppliedSeq;
     },
     getPendingEchoes() {
       // SNAPSHOT, not the live array: `pushOptimisticSend` pushes into and
       // `consumeOwnEcho` splices the same object, so handing it out would make
       // the `readonly` return type a lie and let a parked copy mutate under
       // its holder.
-      return pendingEchoTexts.slice()
+      return pendingEchoTexts.slice();
     },
     getSegments() {
-      return accumulator.getSegments()
+      return accumulator.getSegments();
     },
     updateApprovalStatus(requestId, status, resolvedByName) {
-      const segments = accumulator.updateApprovalStatus(requestId, status, resolvedByName)
-      setMessagesInternal(
-        projectApprovalResolutionToMessages(messages, requestId, status, resolvedByName),
-      )
+      const segments = accumulator.updateApprovalStatus(requestId, status, resolvedByName);
+      setMessagesInternal(projectApprovalResolutionToMessages(messages, requestId, status, resolvedByName));
       // Status-map mirror — kept in lockstep with the other two flip
       // paths (SSE approval-resolved at ~1240, NATS at ~1950): the map
       // restores status when a replayed approval-request event
       // re-renders the card, and a flip applied through THIS path must
       // survive that replay the same way.
-      mirrorApprovalStatus(requestId, status)
-      return segments
+      mirrorApprovalStatus(requestId, status);
+      return segments;
     },
     getPendingEscalated() {
-      return new Map(pendingEscalated)
+      return new Map(pendingEscalated);
     },
-  }
+  };
 }

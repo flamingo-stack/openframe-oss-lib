@@ -1,11 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { RoadmapCard } from '../components/chat/entity-cards'
-import { ChatColumnDecorator } from './__fixtures__/chat-card-decorator'
-import {
-  roadmapFeatureItem,
-  roadmapDeliveryItem,
-  roadmapInternalTaskItem,
-} from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { RoadmapCard } from '../components/chat/entity-cards';
+import { ChatColumnDecorator } from './__fixtures__/chat-card-decorator';
+import { roadmapFeatureItem, roadmapDeliveryItem, roadmapInternalTaskItem } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof RoadmapCard> = {
   title: 'Chat/EntityCards/RoadmapCard',
@@ -19,11 +15,17 @@ const meta: Meta<typeof RoadmapCard> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const RoadmapItemSm: Story = {
   args: {
@@ -34,7 +36,7 @@ export const RoadmapItemSm: Story = {
     target: '_blank',
     rel: 'noopener noreferrer',
   },
-}
+};
 
 export const DeliveryItemSm: Story = {
   args: {
@@ -45,7 +47,7 @@ export const DeliveryItemSm: Story = {
     target: '_blank',
     rel: 'noopener noreferrer',
   },
-}
+};
 
 export const InternalTaskSm: Story = {
   args: {
@@ -56,7 +58,7 @@ export const InternalTaskSm: Story = {
     target: '_blank',
     rel: 'noopener noreferrer',
   },
-}
+};
 
 export const RoadmapItemDefault: Story = {
   args: {
@@ -72,4 +74,4 @@ export const RoadmapItemDefault: Story = {
       },
     },
   },
-}
+};

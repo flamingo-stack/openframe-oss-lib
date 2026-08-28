@@ -1,18 +1,18 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
+import type { ReactNode } from 'react';
+import { cn } from '../../utils/cn';
 
 export interface ChatListEmptyStateProps {
   /** Centred 24px glyph — rendered muted (`ods-text-secondary`). Pass the icon
    *  already sized (e.g. `<ChatsIcon size={24} />`). */
-  icon: React.ReactNode
+  icon: ReactNode;
   /** Title line (`h4`). */
-  title: React.ReactNode
+  title: ReactNode;
   /** Caption line under the title (`h6`). Omitted → title alone. */
-  description?: React.ReactNode
+  description?: ReactNode;
   /** Appended to the root element. */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -21,16 +21,11 @@ export interface ChatListEmptyStateProps {
  * a title (`h4`) + caption (`h6`), both in `ods-text-secondary`. Kept in one
  * place so the two lists can't drift apart.
  */
-export function ChatListEmptyState({
-  icon,
-  title,
-  description,
-  className,
-}: ChatListEmptyStateProps) {
+export function ChatListEmptyState({ icon, title, description, className }: ChatListEmptyStateProps) {
   return (
     <div
       className={cn(
-        'flex flex-1 min-h-0 flex-col items-center justify-center gap-[var(--spacing-system-l)] p-[var(--spacing-system-l)] text-center text-ods-text-secondary',
+        'flex min-h-0 flex-1 flex-col items-center justify-center gap-[var(--spacing-system-l)] p-[var(--spacing-system-l)] text-center text-ods-text-secondary',
         className,
       )}
     >
@@ -40,5 +35,5 @@ export function ChatListEmptyState({
         {description && <p className="text-h6">{description}</p>}
       </div>
     </div>
-  )
+  );
 }

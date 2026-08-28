@@ -1,6 +1,6 @@
+import type { EntityPlatformAssoc } from './entity-platform';
 // Announcement system TypeScript types
 import type { LegacyPlatform, PlatformFilter } from './platform';
-import type { EntityPlatformAssoc } from './entity-platform';
 
 // Database Models
 export interface Announcement {
@@ -11,7 +11,7 @@ export interface Announcement {
   icon_name?: string;
   icon_url?: string;
   /** Extra props for the main bar/icon */
-  icon_props?: Record<string, any>;
+  icon_props?: Record<string, unknown>;
   /** Hydrated entity_platforms associations (featured-first) — what the hub
    *  DAL's attachPlatformsToRow(s) emits. No singular platform/platform_id. */
   announcement_platforms?: EntityPlatformAssoc[];
@@ -27,7 +27,7 @@ export interface Announcement {
   cta_button_background_color?: string | null;
   cta_button_text_color?: string | null;
   /** Additional props to spread onto the CTA icon component */
-  cta_icon_props?: Record<string, any>;
+  cta_icon_props?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
   created_by?: string;
@@ -58,8 +58,8 @@ export interface CreateAnnouncementData {
   icon_name?: string;
   icon_url?: string;
   /** Extra props for the main bar/icon */
-  icon_props?: Record<string, any>;
-  platforms?: string[];  // entity_platforms set (multi-select)
+  icon_props?: Record<string, unknown>;
+  platforms?: string[]; // entity_platforms set (multi-select)
   is_active?: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
@@ -70,7 +70,7 @@ export interface CreateAnnouncementData {
   cta_target?: '_self' | '_blank';
   cta_button_background_color?: string;
   cta_button_text_color?: string;
-  cta_icon_props?: Record<string, any>;
+  cta_icon_props?: Record<string, unknown>;
   created_by: string;
 }
 
@@ -81,8 +81,8 @@ export interface UpdateAnnouncementData {
   icon_name?: string;
   icon_url?: string;
   /** Extra props for the main bar/icon */
-  icon_props?: Record<string, any>;
-  platforms?: string[];  // entity_platforms set (multi-select)
+  icon_props?: Record<string, unknown>;
+  platforms?: string[]; // entity_platforms set (multi-select)
   is_active?: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
@@ -93,7 +93,7 @@ export interface UpdateAnnouncementData {
   cta_target?: '_self' | '_blank';
   cta_button_background_color?: string;
   cta_button_text_color?: string;
-  cta_icon_props?: Record<string, any>;
+  cta_icon_props?: Record<string, unknown>;
 }
 
 export interface AnnouncementListResponse {
@@ -136,7 +136,7 @@ export interface AnnouncementFormData {
   background_color: string;
   icon_name: string;
   icon_url?: string;
-  platforms: string[];  // entity_platforms set (multi-select; no single platform_id)
+  platforms: string[]; // entity_platforms set (multi-select; no single platform_id)
   is_active: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled: boolean;
@@ -155,7 +155,7 @@ export interface AnnouncementFormData {
 
 // API Query Parameters
 export interface GetAnnouncementsOptions {
-  platform?: PlatformFilter;  // Changed from Platform to PlatformFilter to include 'all'
+  platform?: PlatformFilter; // Changed from Platform to PlatformFilter to include 'all'
   is_active?: boolean;
   page?: number;
   pageSize?: number;
@@ -279,7 +279,10 @@ export interface AnnouncementSortOptions {
 export interface SvgIcon {
   name: string;
   label: string;
-  component: any;
+  /** Optional pre-resolved glyph component. Every registry below (and every
+   *  known consumer) passes `null` and renders by `name` through the shared
+   *  icon resolver — the slot is kept for callers that carry a component. */
+  component: React.ComponentType<React.SVGProps<SVGSVGElement>> | null;
 }
 
 // Platform display configuration
@@ -288,17 +291,17 @@ export interface SvgIcon {
 // Available SVG icons configuration
 export const AVAILABLE_SVG_ICONS: SvgIcon[] = [
   // OpenFrame Logo Options
-  { name: 'openframe-logo', label: 'OpenFrame Logo', component: null as any },
-  
+  { name: 'openframe-logo', label: 'OpenFrame Logo', component: null },
+
   // Platform Logos
-  { name: 'openmsp-logo', label: 'OpenMSP Logo', component: null as any },
-  { name: 'flamingo-logo', label: 'Flamingo Logo', component: null as any },
-  
+  { name: 'openmsp-logo', label: 'OpenMSP Logo', component: null },
+  { name: 'flamingo-logo', label: 'Flamingo Logo', component: null },
+
   // Lucide Icons
-  { name: 'megaphone', label: 'Megaphone', component: null as any },
-  { name: 'bell', label: 'Bell', component: null as any },
-  { name: 'info', label: 'Information', component: null as any },
-  { name: 'star', label: 'Star', component: null as any },
-  { name: 'rocket', label: 'Rocket', component: null as any },
-  { name: 'package', label: 'Package', component: null as any }
-]; 
+  { name: 'megaphone', label: 'Megaphone', component: null },
+  { name: 'bell', label: 'Bell', component: null },
+  { name: 'info', label: 'Information', component: null },
+  { name: 'star', label: 'Star', component: null },
+  { name: 'rocket', label: 'Rocket', component: null },
+  { name: 'package', label: 'Package', component: null },
+];

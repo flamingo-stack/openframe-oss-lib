@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { WhatIShippedCard, WhatIShippedCardSkeleton } from '../components/chat/entity-cards/what-i-shipped-card'
-import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator'
-import { whatIShippedEntry } from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { WhatIShippedCard, WhatIShippedCardSkeleton } from '../components/chat/entity-cards/what-i-shipped-card';
+import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator';
+import { whatIShippedEntry } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof WhatIShippedCard> = {
   title: 'Chat/EntityCards/WhatIShippedCard',
@@ -15,17 +15,23 @@ const meta: Meta<typeof WhatIShippedCard> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
     entry: whatIShippedEntry,
   },
-}
+};
 
 /** Related-rail click-through — the whole card is one anchor. */
 export const AsAnchor: Story = {
@@ -33,8 +39,8 @@ export const AsAnchor: Story = {
     entry: whatIShippedEntry,
     anchorProps: makeAnchorProps('/what-i-shipped/billing-flow'),
   },
-}
+};
 
 export const Skeleton: StoryObj = {
   render: () => <WhatIShippedCardSkeleton />,
-}
+};

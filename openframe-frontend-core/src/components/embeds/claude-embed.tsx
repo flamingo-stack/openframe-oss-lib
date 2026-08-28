@@ -1,31 +1,31 @@
-'use client'
+'use client';
 
-import { ExternalLink } from 'lucide-react'
-import { Button } from '../ui/button/button'
-import { ClaudeIcon } from '../icons/claude-icon'
-import { EmbedViewerFrame } from './embed-viewer-frame'
-import { useClaudeMirrorSrc } from '../../hooks/use-claude-mirror-src'
-import { toClaudeEmbedUrl } from '../../utils/embed-url-converters'
+import { ExternalLink } from 'lucide-react';
+import { useClaudeMirrorSrc } from '../../hooks/use-claude-mirror-src';
+import { toClaudeEmbedUrl } from '../../utils/embed-url-converters';
+import { ClaudeIcon } from '../icons/claude-icon';
+import { Button } from '../ui/button/button';
+import { EmbedViewerFrame } from './embed-viewer-frame';
 
-export type ClaudeEmbedKind = 'artifact' | 'design'
+export type ClaudeEmbedKind = 'artifact' | 'design';
 
 export interface ClaudeEmbedProps {
   /** Any claude.ai / claude.site url. */
-  url: string
+  url: string;
   /** Which surface the link points at — only the heading differs. */
-  kind?: ClaudeEmbedKind
+  kind?: ClaudeEmbedKind;
   /** The author's name for this link, when they gave one. */
-  title?: string
+  title?: string;
   /** iframe height (CSS value), matching `FigmaEmbed`'s prop. */
-  height?: string
+  height?: string;
   /** iframe loading strategy. Defaults to `lazy`, as `FigmaEmbed` does. */
-  loading?: 'eager' | 'lazy'
+  loading?: 'eager' | 'lazy';
 }
 
 const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
   artifact: 'Claude Artifact',
   design: 'Claude Design',
-}
+};
 
 /**
  * A Claude artifact, in the SAME chrome as every other embed viewer
@@ -53,24 +53,32 @@ const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
  */
 export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy' }: ClaudeEmbedProps) {
   // Mirror detection lives in `useClaudeMirrorSrc` (derive from
-  // EndpointsRuntime + 1-byte ranged probe) — this component stays
-  // presentational: mirror when the hook found one, claude.ai otherwise.
-  const mirrorSrc = useClaudeMirrorSrc(url)
-  const embedUrl = mirrorSrc ?? toClaudeEmbedUrl(url)
+  // EndpointsRuntime + 1-byte ranged probe + background revalidation) — this
+  // component stays presentational.
+  const { src: mirrorSrc, status } = useClaudeMirrorSrc(url);
+  // While the probe is in flight (on a cold view that IS the ~1-2s
+  // self-heal), show the shell's loading state rather than the claude.ai
+  // fallback — a code artifact's fallback is the empty "no embeddable view"
+  // box, and flashing it before the mirror resolves reads as broken.
+  const isProbing = status === 'probing';
+  // Found → the mirror; otherwise the claude.ai embed (or its empty state).
+  // Suppressed while probing so the loading skeleton owns the body.
+  const embedUrl = isProbing ? null : (mirrorSrc ?? toClaudeEmbedUrl(url));
   return (
     <EmbedViewerFrame
       className="my-6 space-y-3"
-      icon={<ClaudeIcon className="w-5 h-5 shrink-0" />}
+      icon={<ClaudeIcon className="h-5 w-5 shrink-0" />}
       title={title?.trim() || KIND_HEADING[kind]}
       titleVariant="h6"
+      isLoading={isProbing}
       actions={
         <Button
           variant="outline"
           size="small-legacy"
           href={url}
           openInNewTab
-          leftIcon={<ClaudeIcon className="w-4 h-4" />}
-          rightIcon={<ExternalLink className="w-4 h-4" />}
+          leftIcon={<ClaudeIcon className="h-4 w-4" />}
+          rightIcon={<ExternalLink className="h-4 w-4" />}
           className="w-full sm:w-auto"
         >
           Open in Claude
@@ -105,8 +113,8 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
           : 'allow-scripts allow-same-origin allow-popups allow-forms'
       }
       allowFullScreen
-      emptyIcon={<ClaudeIcon className="w-16 h-16 mb-4" />}
+      emptyIcon={<ClaudeIcon className="mb-4 h-16 w-16" />}
       emptyMessage="Open this one in Claude · it has no embeddable view"
     />
-  )
+  );
 }

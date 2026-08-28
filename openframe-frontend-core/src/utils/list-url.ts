@@ -35,7 +35,7 @@
  * hub's own `LEGACY_TYPE_ALIASES` (`lib/utils/entity-list-api.ts`); both
  * entry points un-alias to the canonical `documentType` before lookup.
  */
-const ALIASES: Record<string, string> = { blog_post_existing: 'blog_post' }
+const ALIASES: Record<string, string> = { blog_post_existing: 'blog_post' };
 
 /** Resolve a ContentRef rail-vocab type to its canonical `documentType`
  *  (registry vocabulary) — `blog_post_existing` → `blog_post`, everything
@@ -46,9 +46,7 @@ export function canonicalContentRefType(contentRefType: string): string {
   // `hasOwnProperty` guard, same as `buildListUrl` below: a bare index read
   // resolves prototype keys, so `canonicalContentRefType('constructor')`
   // returned `Object` itself — which then got interpolated into a URL path.
-  return Object.prototype.hasOwnProperty.call(ALIASES, contentRefType)
-    ? ALIASES[contentRefType]
-    : contentRefType
+  return Object.prototype.hasOwnProperty.call(ALIASES, contentRefType) ? ALIASES[contentRefType] : contentRefType;
 }
 
 /**
@@ -106,7 +104,7 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   profit_loss: (ids, b) => `${b}/api/financials/profit-loss?ids=${ids.join(',')}`,
   balance_sheet: (ids, b) => `${b}/api/financials/balance-sheet?ids=${ids.join(',')}`,
   cash_flow: (ids, b) => `${b}/api/financials/cash-flow?ids=${ids.join(',')}`,
-}
+};
 
 /**
  * Build a list-API URL that returns full rows for the given ids, or `null`
@@ -124,16 +122,16 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
  * can't hit `/api/admin` through their proxy anyway.
  */
 export function buildListUrl(contentRefType: string, ids: string[], base = ''): string | null {
-  if (ids.length === 0) return null
-  const key = ALIASES[contentRefType] ?? contentRefType
+  if (ids.length === 0) return null;
+  const key = ALIASES[contentRefType] ?? contentRefType;
   if (key === 'marketing_campaign') {
     // Keep this URL in sync with the hub's `entity-list-api.ts` buildNonRagListUrl
     // — an intentional dual literal (a static branch in each) so CodeQL can prove
     // no user-controlled dynamic dispatch reaches `/api/admin`.
-    return `${base}/api/admin/marketing/campaigns?ids=${ids.join(',')}&pageSize=${ids.length}`
+    return `${base}/api/admin/marketing/campaigns?ids=${ids.join(',')}&pageSize=${ids.length}`;
   }
   // `hasOwnProperty` guard so a prototype key (`constructor`, `__proto__`)
   // can't dispatch to a non-builder — absent key ⇒ null.
-  const fn = Object.prototype.hasOwnProperty.call(BUILDERS, key) ? BUILDERS[key] : undefined
-  return fn ? fn(ids, base) : null
+  const fn = Object.prototype.hasOwnProperty.call(BUILDERS, key) ? BUILDERS[key] : undefined;
+  return fn ? fn(ids, base) : null;
 }

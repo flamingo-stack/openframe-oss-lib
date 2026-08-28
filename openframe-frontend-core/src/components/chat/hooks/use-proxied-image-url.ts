@@ -1,7 +1,7 @@
-'use client'
+'use client';
 
-import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
-import { getProxiedImageUrl } from '../../../utils/image-proxy'
+import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
+import { getProxiedImageUrl } from '../../../utils/image-proxy';
 
 /**
  * Hook-version of `getProxiedImageUrl` that reads `proxyPrefix` and
@@ -20,12 +20,12 @@ import { getProxiedImageUrl } from '../../../utils/image-proxy'
  * non-React-tree caller pattern.
  */
 export function useProxiedImageUrl(url: string | null | undefined): string {
-  const r = useRequiredChatRuntime()
+  const r = useRequiredChatRuntime();
   return (
     getProxiedImageUrl(url ?? '', {
       proxyPrefix: r.endpoints.imageProxyUrlPrefix,
       skipDomains: r.endpoints.imageProxySkipDomains,
       directHttps: true,
     }) ?? ''
-  )
+  );
 }

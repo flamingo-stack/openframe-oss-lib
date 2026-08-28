@@ -26,8 +26,8 @@
  *   })
  */
 
-import { canonicalContentRefType } from './list-url'
-import { byKey, getPlatformProductionUrl } from '../platform-domains'
+import { byKey, getPlatformProductionUrl } from '../platform-domains';
+import { canonicalContentRefType } from './list-url';
 
 /**
  * Type → in-app route suffix. The public-hostable subset of the hub's
@@ -52,7 +52,7 @@ export const DEFAULT_CONTENT_SUFFIXES: Record<string, string> = {
   // `AUTHORS_PATH` in the hub's `lib/utils/breadcrumbs.ts` (the hub-side
   // SSOT for the segment).
   author: 'authors',
-}
+};
 
 /** Input to the unified content-href seam. ONE object covers both callers:
  *  page views pass `type` + `identifier` (the slug); chat rows pass `type` +
@@ -69,55 +69,53 @@ export interface ComposeContentUrlInput {
    *  through to the default `<contentOrigin>/<type>/<id>` branch — which is how
    *  the same blog post reached `/blog/<slug>` from one path and
    *  `/blog_post_existing/<slug>` from another. */
-  type: string
+  type: string;
   /** Content identifier. Page views pass the slug; chat rows pass the
    *  primary-key id (the slug is recovered from `externalUrl` when hosted). */
-  identifier: string
+  identifier: string;
   /** Preferred path segment for HOSTED types when there is no `externalUrl`
    *  to recover the slug from — the Mingo/NATS transport ships bare
    *  `[card://type:id]` markers with no ref metadata, so a fetch-mode card
    *  knows the row's slug only AFTER it loads the row. `identifier` must stay
    *  the primary key (that is what `overrides` deep-link on), hence a separate
    *  field rather than overloading it. Ignored for non-hosted types. */
-  slug?: string | null
+  slug?: string | null;
   /** Hydrated platform junction from the list APIs. `hostedTypes` membership
    *  still decides in-app vs out; this decides WHICH origin an out-link points
    *  at — an OpenMSP-owned row resolves to openmsp.ai, not to the embedder's
    *  `contentOrigin`. Read only when `targetPlatform` is absent. Accepts the
    *  three junction shapes the DALs produce (see `primaryPlatformOf`). */
-  platforms?: Array<{ name?: string }>
+  platforms?: Array<{ name?: string }>;
   /** The canonical hub URL when the caller already has it (chat entity rows
    *  carry it from the RAG mapper). Hosted types relativize it to an in-app
    *  path; non-hosted types use it verbatim (authoritative). Absent for pages. */
-  externalUrl?: string | null
+  externalUrl?: string | null;
   /** Platform that owns `externalUrl` (chat rows). Passed through on the
    *  non-hosted branch. */
-  targetPlatform?: string | null
+  targetPlatform?: string | null;
 }
 
 export interface ContentHrefOptions {
   /** Types THIS host serves in-app → relative href (soft-nav). Everything
    *  else resolves to the row's `externalUrl` / `contentOrigin` (opens out). */
-  hostedTypes: ReadonlySet<string>
+  hostedTypes: ReadonlySet<string>;
   /** Fallback origin for non-hosted types with no `externalUrl` AND no
    *  resolvable owning platform (e.g. `https://openframe.app`). When the row
    *  DOES name its platform, that platform's canonical origin wins — otherwise
    *  cross-platform content (an OpenMSP blog post) would be linked to the
    *  wrong site. */
-  contentOrigin: string
+  contentOrigin: string;
   /** Per-type route suffix. Defaults to {@link DEFAULT_CONTENT_SUFFIXES}. */
-  suffixes?: Record<string, string>
+  suffixes?: Record<string, string>;
   /** Per-type full override — wins over the suffix logic. Receives the same
    *  `identifier` the seam was called with. */
-  overrides?: Record<string, (identifier: string) => { href: string; targetPlatform: string | null }>
+  overrides?: Record<string, (identifier: string) => { href: string; targetPlatform: string | null }>;
 }
 
 /** The unified `composeContentUrl` seam shape on `ChatRuntime`. ALWAYS returns
  *  a tuple (never null) — the seam type is non-nullable and callers read
  *  `.href` unconditionally. */
-export type ComposeContentUrl = (
-  input: ComposeContentUrlInput,
-) => { href: string; targetPlatform: string | null }
+export type ComposeContentUrl = (input: ComposeContentUrlInput) => { href: string; targetPlatform: string | null };
 
 /**
  * Owning platform of a content row, from the hydrated junction the list APIs
@@ -132,20 +130,18 @@ export type ComposeContentUrl = (
  * Returns the FIRST resolvable name; `null` when the junction is absent or
  * carries no usable platform (caller then falls back to `contentOrigin`).
  */
-function primaryPlatformOf(
-  platforms: ComposeContentUrlInput['platforms'],
-): string | null {
-  if (!Array.isArray(platforms)) return null
+function primaryPlatformOf(platforms: ComposeContentUrlInput['platforms']): string | null {
+  if (!Array.isArray(platforms)) return null;
   for (const entry of platforms) {
     const row = entry as {
-      name?: unknown
-      platform_name?: unknown
-      platforms?: { name?: unknown }
-    }
-    const name = row?.platforms?.name ?? row?.platform_name ?? row?.name
-    if (typeof name === 'string' && name.trim()) return name.trim()
+      name?: unknown;
+      platform_name?: unknown;
+      platforms?: { name?: unknown };
+    };
+    const name = row?.platforms?.name ?? row?.platform_name ?? row?.name;
+    if (typeof name === 'string' && name.trim()) return name.trim();
   }
-  return null
+  return null;
 }
 
 /** Last non-empty path segment of a URL (relative or absolute) — the content
@@ -154,11 +150,11 @@ function primaryPlatformOf(
 function lastPathSegment(url: string): string | null {
   try {
     // Resolve against a dummy base so relative inputs parse too.
-    const pathname = new URL(url, 'https://_.local').pathname
-    const segs = pathname.split('/').filter(Boolean)
-    return segs.length > 0 ? segs[segs.length - 1] : null
+    const pathname = new URL(url, 'https://_.local').pathname;
+    const segs = pathname.split('/').filter(Boolean);
+    return segs.length > 0 ? segs[segs.length - 1] : null;
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -179,28 +175,18 @@ function lastPathSegment(url: string): string | null {
  * seam signature but unused here.
  */
 export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentUrl {
-  const suffixes = opts.suffixes ?? DEFAULT_CONTENT_SUFFIXES
-  return ({
-    type: rawType,
-    identifier,
-    slug: slugHint,
-    externalUrl,
-    targetPlatform,
-    platforms,
-  }) => {
+  const suffixes = opts.suffixes ?? DEFAULT_CONTENT_SUFFIXES;
+  return ({ type: rawType, identifier, slug: slugHint, externalUrl, targetPlatform, platforms }) => {
     // Defence in depth: callers are expected to hand over a canonical
     // documentType (see `ComposeContentUrlInput.type`), but a stray alias must
     // not silently produce a `<origin>/blog_post_existing/<slug>` URL. Same
     // canonicalizer `buildListUrl` uses — one alias table, both paths.
-    const type = canonicalContentRefType(rawType)
+    const type = canonicalContentRefType(rawType);
     const override =
-      opts.overrides && Object.prototype.hasOwnProperty.call(opts.overrides, type)
-        ? opts.overrides[type]
-        : undefined
-    if (override) return override(identifier)
+      opts.overrides && Object.prototype.hasOwnProperty.call(opts.overrides, type) ? opts.overrides[type] : undefined;
+    if (override) return override(identifier);
 
-    const seg =
-      (Object.prototype.hasOwnProperty.call(suffixes, type) ? suffixes[type] : undefined) ?? type
+    const seg = (Object.prototype.hasOwnProperty.call(suffixes, type) ? suffixes[type] : undefined) ?? type;
 
     if (opts.hostedTypes.has(type)) {
       // In-app (soft-nav). Recover the slug from the hub URL for chat rows;
@@ -213,13 +199,12 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
       // has NO externalUrl to recover from but DOES know the row's slug once it
       // loads, and its `identifier` must stay the primary key so `overrides`
       // still deep-link correctly.
-      const recovered = externalUrl ? lastPathSegment(externalUrl) : null
-      const slug =
-        recovered && recovered !== seg ? recovered : (slugHint?.trim() || identifier)
-      return { href: `/${seg}/${slug}`, targetPlatform: null }
+      const recovered = externalUrl ? lastPathSegment(externalUrl) : null;
+      const slug = recovered && recovered !== seg ? recovered : slugHint?.trim() || identifier;
+      return { href: `/${seg}/${slug}`, targetPlatform: null };
     }
     // Not hosted → opens out. Prefer the RAG-authoritative `externalUrl` (chat).
-    if (externalUrl) return { href: externalUrl, targetPlatform: targetPlatform ?? null }
+    if (externalUrl) return { href: externalUrl, targetPlatform: targetPlatform ?? null };
 
     // No externalUrl → compose it. The destination is the origin of the
     // platform that OWNS the row, not a fixed hub: an OpenMSP blog post lives
@@ -238,9 +223,9 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
     // reporting it as the `targetPlatform` anyway made the two disagree:
     // `decideNewTab` prefers `targetPlatform` over its origin check, so a link
     // pointing at the CURRENT host opened in a new tab.
-    const claimedOwner = targetPlatform ?? primaryPlatformOf(platforms)
-    const owner = claimedOwner && byKey(claimedOwner) ? claimedOwner : null
-    const origin = owner ? getPlatformProductionUrl(owner) : opts.contentOrigin
+    const claimedOwner = targetPlatform ?? primaryPlatformOf(platforms);
+    const owner = claimedOwner && byKey(claimedOwner) ? claimedOwner : null;
+    const origin = owner ? getPlatformProductionUrl(owner) : opts.contentOrigin;
     // The hub's public detail routes are SLUG-based, so the `slug` hint wins
     // over `identifier` here too — a Mingo fetch-mode card knows the row's slug
     // but its `identifier` is the marker's primary key, which would 404.
@@ -251,8 +236,8 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
       // dev, where every platform shares localhost). `null` whenever the href
       // came from `contentOrigin`, so the two never disagree.
       targetPlatform: owner,
-    }
-  }
+    };
+  };
 }
 
 /**
@@ -262,11 +247,8 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
  * product releases, …) so the no-composer fallback has ONE source — both
  * views pass their `basePath`-derived shape through here.
  */
-export function buildDefaultHref(
-  basePath: string,
-  slug: string,
-): { href: string; targetPlatform: string | null } {
-  return { href: `${basePath}/${slug}`, targetPlatform: null }
+export function buildDefaultHref(basePath: string, slug: string): { href: string; targetPlatform: string | null } {
+  return { href: `${basePath}/${slug}`, targetPlatform: null };
 }
 
 /**
@@ -281,5 +263,5 @@ export function resolveContentHref(
 ): { href: string; targetPlatform: string | null } {
   return composeContentUrl
     ? composeContentUrl({ type: args.type, identifier: args.slug, platforms: args.platforms })
-    : buildDefaultHref(args.basePath, args.slug)
+    : buildDefaultHref(args.basePath, args.slug);
 }

@@ -4,12 +4,7 @@
  * semantics as the announcement bar, from the same implementation.
  */
 
-import {
-  isDismissedCookieValue,
-  readDismissCookie,
-  writeDismissCookie,
-  clearDismissCookie,
-} from './dismiss-cookie';
+import { isDismissedCookieValue, readDismissCookie, writeDismissCookie, clearDismissCookie } from './dismiss-cookie';
 
 /** Cookie-name stem. */
 export const WALKTHROUGH_VIDEO_DISMISS_KEY = 'walkthrough-video-dismissed';
