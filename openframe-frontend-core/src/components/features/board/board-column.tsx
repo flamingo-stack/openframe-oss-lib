@@ -1,41 +1,41 @@
-'use client'
+'use client';
 
-import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter'
-import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon'
-import { cn } from '../../../utils/cn'
-import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
-import { autoScrollColumn } from '../../../utils/auto-scroll-ancestors'
-import { BoardColumnHeader } from './board-column-header'
-import { useDropAim } from './drop-aim'
-import { DROP_LINE_ATTRIBUTE, nearestCardIn } from './lane-geometry'
-import { tintOnDark } from './color-utils'
-import { TicketCard } from './ticket-card'
-import { TicketCardSkeleton } from './ticket-card-skeleton'
-import { TICKET_ID_ATTRIBUTE, useLaneScrollAnchor } from './use-lane-scroll-anchor'
-import type { BoardColumnDef, BoardTicket } from './types'
+import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { autoScrollColumn } from '../../../utils/auto-scroll-ancestors';
+import { cn } from '../../../utils/cn';
+import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon';
+import { BoardColumnHeader } from './board-column-header';
+import { tintOnDark } from './color-utils';
+import { useDropAim } from './drop-aim';
+import { DROP_LINE_ATTRIBUTE, nearestCardIn } from './lane-geometry';
+import { TicketCard } from './ticket-card';
+import { TicketCardSkeleton } from './ticket-card-skeleton';
+import type { BoardColumnDef, BoardTicket } from './types';
+import { useLaneScrollAnchor } from './use-lane-scroll-anchor';
 
 export interface BoardColumnProps {
-  column: BoardColumnDef
-  collapsed?: boolean
+  column: BoardColumnDef;
+  collapsed?: boolean;
   /** Takes the id so the board can pass one stable handler to every lane. */
-  onToggleCollapse: (columnId: string) => void
-  onAddTicket?: (columnId: string) => void
-  onArchive?: (columnId: string) => void
-  getTicketHref?: (ticketId: string) => string
-  renderAssignSlot?: (ticket: BoardTicket) => ReactNode
-  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
-  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
-  onLoadMore?: (columnId: string) => void
-  loadMoreRootMargin?: string
-  joinLeft?: boolean
-  joinRight?: boolean
+  onToggleCollapse: (columnId: string) => void;
+  onAddTicket?: (columnId: string) => void;
+  onArchive?: (columnId: string) => void;
+  getTicketHref?: (ticketId: string) => string;
+  renderAssignSlot?: (ticket: BoardTicket) => ReactNode;
+  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>;
+  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>;
+  onLoadMore?: (columnId: string) => void;
+  loadMoreRootMargin?: string;
+  joinLeft?: boolean;
+  joinRight?: boolean;
 }
 
 /** Memoized: `Board` rebuilds only the two columns a drag touches, so the
  *  untouched ones keep their object identity and can skip the render entirely.
  *  Without this, every pointer move that shifts a card re-renders all lanes. */
-export const BoardColumn = memo(function BoardColumn({
+export const BoardColumn = memo(function BoardColumnImpl({
   column,
   collapsed = false,
   onToggleCollapse,
@@ -58,20 +58,20 @@ export const BoardColumn = memo(function BoardColumn({
   // A card sitting inside this lane is a drop target too, and Pragmatic reports
   // the innermost one first — so the lane only ever answers for the gaps, and
   // "which card" never has to be guessed from rect overlap.
-  const laneRef = useRef<HTMLDivElement>(null)
-  const [isOver, setIsOver] = useState(false)
+  const laneRef = useRef<HTMLDivElement>(null);
+  const [isOver, setIsOver] = useState(false);
 
   useEffect(() => {
-    const element = laneRef.current
-    if (!element || collapsed || column.dropDisabled) return
+    const element = laneRef.current;
+    if (!element || collapsed || column.dropDisabled) return undefined;
 
     return dropTargetForElements({
       element,
       canDrop: ({ source }) => {
-        if (source.data.type !== 'ticket') return false
-        const from = source.data.columnId
-        if (from === column.id) return true
-        return !column.allowedFromColumns || column.allowedFromColumns.includes(String(from))
+        if (source.data.type !== 'ticket') return false;
+        const from = source.data.columnId;
+        if (from === column.id) return true;
+        return !column.allowedFromColumns || column.allowedFromColumns.includes(String(from));
       },
       // A drop that lands between cards — most of the lane, once a hovered card
       // has opened the room the preview is drawn in — answers with the nearest
@@ -80,25 +80,25 @@ export const BoardColumn = memo(function BoardColumn({
       // column, which is what made small moves look like they had not worked and
       // large ones like the only thing that did.
       getData: ({ input, element: lane, source }) => {
-        const nearest = nearestCardIn(lane, input.clientY, String(source.data.ticketId))
-        const ticketId = nearest?.dataset.ticketId
+        const nearest = nearestCardIn(lane, input.clientY, String(source.data.ticketId));
+        const ticketId = nearest?.dataset.ticketId;
         // An empty lane, or one whose only card is the one being dragged: the
         // drop appends, which is the only place it could go.
-        if (!nearest || !ticketId) return { type: 'column', columnId: column.id }
+        if (!nearest || !ticketId) return { type: 'column', columnId: column.id };
         return attachClosestEdge(
           { type: 'ticket', ticketId, columnId: column.id },
           { input, element: nearest, allowedEdges: ['top', 'bottom'] },
-        )
+        );
       },
       onDragEnter: () => setIsOver(true),
       onDragLeave: () => setIsOver(false),
       onDrop: () => setIsOver(false),
-    })
-  }, [column.id, column.dropDisabled, column.allowedFromColumns, collapsed])
+    });
+  }, [column.id, column.dropDisabled, column.allowedFromColumns, collapsed]);
 
   // The header's own prop stays zero-arg; the id is bound here, where it is
   // already known, rather than by the board building one closure per lane.
-  const handleToggleCollapse = useCallback(() => onToggleCollapse(column.id), [onToggleCollapse, column.id])
+  const handleToggleCollapse = useCallback(() => onToggleCollapse(column.id), [onToggleCollapse, column.id]);
 
   return (
     <div
@@ -136,17 +136,17 @@ export const BoardColumn = memo(function BoardColumn({
         </>
       )}
     </div>
-  )
-})
+  );
+});
 
 interface ColumnBodyProps {
-  column: BoardColumnDef
-  getTicketHref?: (ticketId: string) => string
-  renderAssignSlot?: (ticket: BoardTicket) => ReactNode
-  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
-  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
-  onLoadMore?: (columnId: string) => void
-  loadMoreRootMargin: string
+  column: BoardColumnDef;
+  getTicketHref?: (ticketId: string) => string;
+  renderAssignSlot?: (ticket: BoardTicket) => ReactNode;
+  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>;
+  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>;
+  onLoadMore?: (columnId: string) => void;
+  loadMoreRootMargin: string;
 }
 
 function ColumnBody({
@@ -158,10 +158,10 @@ function ColumnBody({
   onLoadMore,
   loadMoreRootMargin,
 }: ColumnBodyProps) {
-  const scrollRef = useRef<HTMLDivElement | null>(null)
-  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  useLaneScrollAnchor(scrollRef, column.tickets)
+  useLaneScrollAnchor(scrollRef, column.tickets);
 
   // Dragging near the top or bottom of a long lane scrolls THIS lane, and only
   // this one — the reach past the lane's edges is vertical, so a pointer below
@@ -169,33 +169,38 @@ function ColumnBody({
   // registered once by the board, not once per lane: registering them here gave
   // `<main>` one auto-scroller per column, all pulling at the same time.
   useEffect(() => {
-    const element = scrollRef.current
-    if (!element) return
-    return autoScrollColumn(element)
-  }, [])
+    const element = scrollRef.current;
+    if (!element) return undefined;
+    return autoScrollColumn(element);
+  }, []);
 
-  const loadMoreRef = useRef(onLoadMore)
-  loadMoreRef.current = onLoadMore
-  const columnIdRef = useRef(column.id)
-  columnIdRef.current = column.id
+  // Refreshed in an unconditional effect, declared before the observer effect
+  // so it wins the same flush. Not in the render body: a render attempt React
+  // discards must not install a loader for a column that never committed.
+  const loadMoreRef = useRef(onLoadMore);
+  const columnIdRef = useRef(column.id);
+  useEffect(() => {
+    loadMoreRef.current = onLoadMore;
+    columnIdRef.current = column.id;
+  });
 
   useEffect(() => {
-    if (!column.hasMore || column.isLoadingMore) return
-    const sentinel = sentinelRef.current
-    const root = scrollRef.current
-    if (!sentinel || !root || !loadMoreRef.current) return
+    if (!column.hasMore || column.isLoadingMore) return undefined;
+    const sentinel = sentinelRef.current;
+    const root = scrollRef.current;
+    if (!sentinel || !root || !loadMoreRef.current) return undefined;
 
     const observer = new IntersectionObserver(
       entries => {
         if (entries.some(e => e.isIntersecting)) {
-          loadMoreRef.current?.(columnIdRef.current)
+          loadMoreRef.current?.(columnIdRef.current);
         }
       },
       { root, rootMargin: loadMoreRootMargin },
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [column.hasMore, column.isLoadingMore, loadMoreRootMargin])
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [column.hasMore, column.isLoadingMore, loadMoreRootMargin]);
 
   return (
     // `overflow-anchor:none` hands scroll anchoring to `useLaneScrollAnchor`
@@ -234,7 +239,7 @@ function ColumnBody({
       {column.isLoadingMore && !column.isLoading && <TicketCardSkeleton />}
       {column.hasMore && <div ref={sentinelRef} aria-hidden className="h-1 shrink-0" />}
     </div>
-  )
+  );
 }
 
 function SkeletonStack({ count = 4 }: { count?: number }) {
@@ -247,15 +252,15 @@ function SkeletonStack({ count = 4 }: { count?: number }) {
         <TicketCardSkeleton key={`skeleton-${i}`} />
       ))}
     </>
-  )
+  );
 }
 
 /** Also carries the insertion line when a drop is aimed here, since the lane has
  *  no card to hang it off. */
 function EmptyState({ columnId }: { columnId: string }) {
-  const aim = useDropAim()
+  const aim = useDropAim();
   if (aim && aim.columnId === columnId) {
-    return <div aria-hidden {...{ [DROP_LINE_ATTRIBUTE]: '' }} className="h-0.5 shrink-0 rounded-full bg-ods-accent" />
+    return <div aria-hidden {...{ [DROP_LINE_ATTRIBUTE]: '' }} className="h-0.5 shrink-0 rounded-full bg-ods-accent" />;
   }
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-lf)] p-[var(--spacing-system-lf)] text-center text-ods-text-secondary">
@@ -265,5 +270,5 @@ function EmptyState({ columnId }: { columnId: string }) {
         <p className="text-h6">Drag a ticket here or change its status to move it to this column</p>
       </div>
     </div>
-  )
+  );
 }

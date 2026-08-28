@@ -1,6 +1,5 @@
-"use client";
+'use client';
 
-import React from 'react';
 import { Filter } from 'lucide-react';
 import { Button } from '../ui/button';
 
@@ -54,40 +53,40 @@ export function StatusFilterComponent({
   className = '',
   disabledValues = [],
   label = 'Status',
-  showAll = true
+  showAll = true,
 }: StatusFilterComponentProps) {
   // Filter out 'all' from options since we render it separately
   const filteredOptions = statusOptions.filter(option => option.value !== 'all');
 
   return (
-    <div className={`flex flex-wrap items-center gap-3 p-4 bg-ods-card border border-ods-border rounded-lg ${className}`}>
+    <div
+      className={`flex flex-wrap items-center gap-3 rounded-lg border border-ods-border bg-ods-card p-4 ${className}`}
+    >
       <div className="flex items-center gap-2">
         <Filter className="h-4 w-4 text-ods-accent" />
-        <span className="text-h5 text-ods-text-secondary">
-          {label}
-        </span>
+        <span className="text-ods-text-secondary text-h5">{label}</span>
       </div>
 
       {/* All button */}
       {showAll && (
-      <Button
-        type="button"
-        variant={selectedStatus === 'all' ? "accent" : "outline"}
-        size="small-legacy"
-        onClick={() => onStatusChange('all')}
-        disabled={disabledValues.includes('all')}
-        className="text-h3"
-      >
-        All
-      </Button>
+        <Button
+          type="button"
+          variant={selectedStatus === 'all' ? 'accent' : 'outline'}
+          size="small-legacy"
+          onClick={() => onStatusChange('all')}
+          disabled={disabledValues.includes('all')}
+          className="text-h3"
+        >
+          All
+        </Button>
       )}
 
       {/* Status option buttons */}
-      {filteredOptions.map((option) => (
+      {filteredOptions.map(option => (
         <Button
           key={option.value}
           type="button"
-          variant={selectedStatus === option.value ? "accent" : "outline"}
+          variant={selectedStatus === option.value ? 'accent' : 'outline'}
           size="small-legacy"
           onClick={() => onStatusChange(option.value)}
           disabled={disabledValues.includes(option.value)}
@@ -98,11 +97,7 @@ export function StatusFilterComponent({
       ))}
 
       {/* Optional count display */}
-      {showCount && (
-        <div className="ml-auto text-h6 text-ods-text-secondary shrink-0">
-          {count} items
-        </div>
-      )}
+      {showCount && <div className="ml-auto shrink-0 text-ods-text-secondary text-h6">{count} items</div>}
     </div>
   );
 }

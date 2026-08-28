@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * UnifiedChatState — the return shape that BOTH transport hooks must satisfy.
@@ -16,14 +16,13 @@
  * `sources`). In the off-mode they're null/undefined.
  */
 
-import type { MessageSegment } from './message.types'
-import type { ScrollAnchor } from './message.types'
-import type { AuthorType } from './chat.types'
-import type { ChatRef } from '../chat-ref.types'
-import type { ChatSource } from '../hooks/use-sse-chat-adapter'
-import type { ChatAttachment } from '../utils/chat-attachment-markdown'
-import type { ChatContextItem } from './context-item.types'
-import type { DialogItem } from './component.types'
+import type { ChatRef } from '../chat-ref.types';
+import type { ChatSource } from '../hooks/use-sse-chat-adapter';
+import type { ChatAttachment } from '../utils/chat-attachment-markdown';
+import type { AuthorType } from './chat.types';
+import type { DialogItem } from './component.types';
+import type { ChatContextItem } from './context-item.types';
+import type { MessageSegment, ScrollAnchor } from './message.types';
 
 // ─── Per-dialog token usage (Mingo backend telemetry) ────────────────────────
 
@@ -39,17 +38,17 @@ import type { DialogItem } from './component.types'
  */
 export interface DialogTokenUsage {
   /** Backend chat-type discriminator, e.g. `ADMIN_AI_CHAT`. Free-form. */
-  chatType?: string
+  chatType?: string;
   /** Total input tokens consumed so far in this dialog. */
-  inputTokensSize: number
+  inputTokensSize: number;
   /** Total output tokens emitted so far in this dialog. */
-  outputTokensSize: number
+  outputTokensSize: number;
   /** Sum of input + output. May be > input + output when the backend
    *  counts cache reads in a separate bucket — trust the backend value. */
-  totalTokensSize: number
+  totalTokensSize: number;
   /** Current LLM context-window occupancy in tokens — what the model
    *  has loaded right now, not the cumulative dialog sum. */
-  contextSize?: number
+  contextSize?: number;
 }
 
 // ─── Connection state (transport-level) ──────────────────────────────────────
@@ -60,7 +59,7 @@ export interface DialogTokenUsage {
  * adapter currently reports `'connected'` whenever a turn isn't streaming
  * — the SSE side is request-response and has no long-lived socket.
  */
-export type ChatConnectionState = 'connected' | 'connecting' | 'disconnected'
+export type ChatConnectionState = 'connected' | 'connecting' | 'disconnected';
 
 // ─── Streaming phase (unified across transports) ─────────────────────────────
 
@@ -76,7 +75,7 @@ export type ChatConnectionState = 'connected' | 'connecting' | 'disconnected'
  * machine fires identically in either transport, just driven by
  * different chunk boundaries.
  */
-export type StreamingPhase = 'idle' | 'thinking' | 'streaming'
+export type StreamingPhase = 'idle' | 'thinking' | 'streaming';
 
 // ─── Usage breakdown (SSE-only telemetry) ────────────────────────────────────
 
@@ -90,10 +89,10 @@ export type StreamingPhase = 'idle' | 'thinking' | 'streaming'
  * agent doesn't surface this telemetry.
  */
 export interface UnifiedUsageBreakdown {
-  haikuRewriter?: { input: number; output: number }
-  haikuClassifier?: { input: number; output: number }
-  haikuSummarizer?: { input: number; output: number }
-  routedAnswer?: { model: string; complexity: string; thinkingBudget: number }
+  haikuRewriter?: { input: number; output: number };
+  haikuClassifier?: { input: number; output: number };
+  haikuSummarizer?: { input: number; output: number };
+  routedAnswer?: { model: string; complexity: string; thinkingBudget: number };
 }
 
 // ─── Message ─────────────────────────────────────────────────────────────────
@@ -106,8 +105,8 @@ export interface UnifiedUsageBreakdown {
  * events ride inside `segments` and are common to both modes.
  */
 export interface UnifiedChatMessage {
-  id: string
-  role: 'user' | 'assistant'
+  id: string;
+  role: 'user' | 'assistant';
 
   /**
    * Optional host-supplied display name for the message author. When set, the
@@ -115,7 +114,7 @@ export interface UnifiedChatMessage {
    * `user` bubble, or a per-message admin name from history); when omitted the
    * UI falls back to the role default (`'Mingo'` / `'You'`).
    */
-  name?: string
+  name?: string;
 
   /**
    * Optional host-supplied avatar URL for the message author. Used by the
@@ -124,7 +123,7 @@ export interface UnifiedChatMessage {
    * bubbles the avatar only renders when this is set, so consumers that don't
    * supply one keep the name-only layout.
    */
-  avatar?: string | null
+  avatar?: string | null;
 
   /**
    * Optional host-supplied author type — drives the name-row accent color in
@@ -133,15 +132,15 @@ export interface UnifiedChatMessage {
    * falls back to the role default (`'user'` for user bubbles, the assistant
    * type otherwise).
    */
-  authorType?: AuthorType
+  authorType?: AuthorType;
 
   /**
    * Flat string form for legacy/simple callers. The structured `segments`
    * form is preferred — it carries thinking blocks, tool calls, approval
    * cards, etc., which `<ChatMessageEnhanced>` renders.
    */
-  content: string
-  segments?: MessageSegment[]
+  content: string;
+  segments?: MessageSegment[];
 
   /**
    * Highest chunk `streamSeq` consumed into THIS row. Not render input — it is
@@ -157,7 +156,7 @@ export interface UnifiedChatMessage {
    * The reducer stamps it on the rows it owns; hosts stamp the persisted value
    * on history rows.
    */
-  streamSeq?: number
+  streamSeq?: number;
 
   /**
    * Optional host-supplied message timestamp (creation/send time). Rendered
@@ -168,10 +167,10 @@ export interface UnifiedChatMessage {
    * moving clock defeats memoization and re-renders every message (collapsing
    * open menus/cards) on each realtime chunk.
    */
-  timestamp?: Date | string | number
+  timestamp?: Date | string | number;
 
   /** Guide/SSE-only: document citations. Undefined in Mingo mode. */
-  sources?: ChatSource[]
+  sources?: ChatSource[];
 
   /**
    * Per-message viewport-positioning hint. Common to both modes; the
@@ -179,7 +178,7 @@ export interface UnifiedChatMessage {
    * for a single message (e.g. long display-action answers anchor to
    * the top so the reader starts at the lede).
    */
-  scrollAnchor?: ScrollAnchor
+  scrollAnchor?: ScrollAnchor;
 
   /**
    * When true the message is part of the conversation history but is
@@ -187,7 +186,7 @@ export interface UnifiedChatMessage {
    * turns where we don't want synthetic prompts polluting the visible
    * thread.
    */
-  hidden?: boolean
+  hidden?: boolean;
 
   /**
    * Entity-context items attached to THIS message (user bubbles only). The
@@ -195,7 +194,7 @@ export interface UnifiedChatMessage {
    * context chips beneath the message text (Figma node 31:28709). Undefined
    * for messages with no attached context.
    */
-  contextItems?: ChatContextItem[]
+  contextItems?: ChatContextItem[];
 }
 
 // ─── sendMessage options ─────────────────────────────────────────────────────
@@ -212,7 +211,7 @@ export interface UnifiedSendMessageOptions {
    * to fire post-approval auto-continuation turns. The assistant response
    * still renders normally.
    */
-  hidden?: boolean
+  hidden?: boolean;
 
   /**
    * Image attachments uploaded via `useChatAttachments` to ride alongside
@@ -224,7 +223,7 @@ export interface UnifiedSendMessageOptions {
    * Mingo/NATS mode: ignored (agent backend does not currently accept
    * image attachments — adapter will silently drop).
    */
-  attachments?: ChatAttachment[]
+  attachments?: ChatAttachment[];
 
   /**
    * Entity-context items the user attached via the composer's context picker
@@ -233,7 +232,7 @@ export interface UnifiedSendMessageOptions {
    * into its outgoing request payload (e.g. `contextItems: [{ type, id }]`).
    * Empty/undefined when the picker isn't configured or nothing is selected.
    */
-  contextItems?: ChatContextItem[]
+  contextItems?: ChatContextItem[];
 }
 
 // ─── Return shape ────────────────────────────────────────────────────────────
@@ -248,51 +247,48 @@ export interface UnifiedSendMessageOptions {
  */
 export interface UnifiedChatState {
   // ─── Message thread ───────────────────────────────────────────────────────
-  messages: UnifiedChatMessage[]
+  messages: UnifiedChatMessage[];
 
   /**
    * True while a user turn is in progress — server-side thinking, streaming,
    * or both. Driven by `streamingPhase` under the hood; exposed as a flat
    * boolean for the chat-input "submit disabled" affordance.
    */
-  isLoading: boolean
+  isLoading: boolean;
 
   /** Granular phase for the "Thinking..."/"Streaming..." status row above input. */
-  streamingPhase: StreamingPhase
+  streamingPhase: StreamingPhase;
 
   /** True while the adapter is rebuilding the message list from the
    *  server-side transcript store (SSE/Guide mount-time hydration). Optional —
    *  transports without server hydration (NATS manages its own dialog
    *  loading) never set it. */
-  isHydratingHistory?: boolean
+  isHydratingHistory?: boolean;
 
   // ─── Actions ──────────────────────────────────────────────────────────────
   /** Resolution MAY carry a boolean success flag (`false` = the request
    *  failed) — consumed by batch approve-all loops to mark failed rows.
    *  Callers that only await it are unaffected (`void` = success). */
-  sendMessage: (
-    text: string,
-    options?: UnifiedSendMessageOptions,
-  ) => Promise<void | boolean>
+  sendMessage: (text: string, options?: UnifiedSendMessageOptions) => Promise<void | boolean>;
 
   /** Abort the in-flight stream. No-op when idle. */
-  stopMessage: () => void
+  stopMessage: () => void;
 
   /** Wipe the local message buffer. Does not touch server-side history. */
-  clearMessages: () => void
+  clearMessages: () => void;
 
   /**
    * Trigger the chat's "Discuss this row" affordance — opens a focused
    * thread scoped to a specific RAG entity. Guide-mode only; in Mingo mode
    * this is a no-op (the agent has no entity-id-filtered retrieval).
    */
-  discussRef: (ref: ChatRef) => void
+  discussRef: (ref: ChatRef) => void;
 
   /**
    * Trigger the chat's "Display this row" affordance — same as `discussRef`
    * but for read-only card display rather than a question. Guide-mode only.
    */
-  displayRef: (ref: ChatRef) => void
+  displayRef: (ref: ChatRef) => void;
 
   // ─── Per-turn LLM metadata (Guide/SSE only) ───────────────────────────────
   /**
@@ -301,29 +297,29 @@ export interface UnifiedChatState {
    * Null in Mingo mode and during the brief window before the server's
    * `message_start` frame arrives.
    */
-  currentProvider: string | null
+  currentProvider: string | null;
 
   /** Display label for the active model, e.g. "Sonnet 4.6". Null in Mingo. */
-  currentModelLabel: string | null
+  currentModelLabel: string | null;
 
   /** Model's context-window cap in tokens. Null in Mingo. */
-  currentContextWindowMaxTokens: number | null
+  currentContextWindowMaxTokens: number | null;
 
   /** Input tokens for the current turn (from `message_start`). Null in Mingo. */
-  currentInputTokens: number | null
+  currentInputTokens: number | null;
 
   /** Output tokens for the current turn (only known after stream end). */
-  currentOutputTokens: number | null
+  currentOutputTokens: number | null;
 
   /** Cache-hit % (read / total-input × 100). Only known after stream end. */
-  currentCacheHitRatePct: number | null
+  currentCacheHitRatePct: number | null;
 
   /**
    * Cross-call token-usage breakdown (Haiku rewriter/classifier/summarizer
    * + routed-answer telemetry). Null until the SSE trailing usage frame
    * arrives. Always null in Mingo mode.
    */
-  currentUsageBreakdown: UnifiedUsageBreakdown | null
+  currentUsageBreakdown: UnifiedUsageBreakdown | null;
 
   // ─── Dialog management (Mingo: backend; Guide: localStorage) ──────────────
   //
@@ -339,78 +335,78 @@ export interface UnifiedChatState {
    * localStorage. Empty when the active adapter doesn't expose dialog
    * management.
    */
-  dialogs: DialogItem[]
+  dialogs: DialogItem[];
 
   /** Currently-selected dialog id, or `null` when no dialog is active
    *  (draft state — "start a new conversation"). */
-  activeDialogId: string | null
+  activeDialogId: string | null;
 
   /** Switch the panel to an existing dialog. Idempotent — selecting the
    *  active id is a no-op. Pass `null` to drop back to draft state. */
-  selectDialog: (id: string | null) => void
+  selectDialog: (id: string | null) => void;
 
   /** Allocate a fresh dialog on the backend (Mingo) or in localStorage
    *  (Guide) and switch to it. Returns the new dialog id. When the
    *  adapter doesn't support creation, resolves to `null`. */
-  startNewDialog: () => Promise<string | null>
+  startNewDialog: () => Promise<string | null>;
 
   /** Delete a dialog from history. No-op when the adapter doesn't
    *  expose `deleteDialog` (Guide localStorage always supports it;
    *  Mingo gates on the host-provided callback). */
-  deleteDialog: (id: string) => Promise<void>
+  deleteDialog: (id: string) => Promise<void>;
 
   /** Rename a dialog. Optimistically updates the title in the local list.
    *  No-op when the adapter doesn't expose a rename callback. */
-  renameDialog: (id: string, title: string) => Promise<void>
+  renameDialog: (id: string, title: string) => Promise<void>;
 
   /** Archive a dialog (removes it from the active list). No-op when the
    *  adapter doesn't expose an archive callback. */
-  archiveDialog: (id: string) => Promise<void>
+  archiveDialog: (id: string) => Promise<void>;
 
   /** True while the dialog list is being fetched for the first time. */
-  isDialogsLoading: boolean
+  isDialogsLoading: boolean;
 
   /** True when the initial dialog-list load FAILED (e.g. backend down).
    *  Lets the UI distinguish a load error from a genuinely empty list and
    *  show a retry affordance instead of the new-user empty state. */
-  dialogsError: boolean
+  dialogsError: boolean;
 
   /** Re-run the initial dialog-list load — retry after `dialogsError`. */
-  reloadDialogs: () => void
+  reloadDialogs: () => void;
 
   /** True while message history for the active dialog is being fetched. */
-  isMessagesLoading: boolean
+  isMessagesLoading: boolean;
 
   /** Whether more dialogs remain on the server (Mingo cursor pagination). */
-  hasMoreDialogs: boolean
+  hasMoreDialogs: boolean;
 
   /** Fetch the next page of dialogs. No-op when `hasMoreDialogs` is false. */
-  loadMoreDialogs: () => Promise<void>
+  loadMoreDialogs: () => Promise<void>;
 
   /** Ownership scope of `dialogs` — `'my'` (current user's chats) or `'all'`
    *  (every admin's). Optional: adapters without ownership data omit it and
    *  the "My Chats / All Chats" selector stays hidden. The HOST owns the
    *  filtering — `dialogs` must already reflect this scope. */
-  dialogScope?: 'my' | 'all'
+  dialogScope?: 'my' | 'all';
 
   /** Switch the ownership scope — see `dialogScope`. */
-  setDialogScope?: (scope: 'my' | 'all') => void
+  setDialogScope?: (scope: 'my' | 'all') => void;
 
   /** Whether more historical messages remain in the active dialog. */
-  hasMoreMessages: boolean
+  hasMoreMessages: boolean;
 
   /** Fetch the next page of historical messages for the active dialog. */
-  loadMoreMessages: () => Promise<void>
+  loadMoreMessages: () => Promise<void>;
 
   // ─── Approval mutations (Mingo agent tool-call workflow) ──────────────────
 
   /** Approve an in-flight tool-call request. Errors surface via the
    *  host-supplied toast in the callback config (lib does not own UI). */
-  approveRequest: (requestId: string) => Promise<void>
+  approveRequest: (requestId: string) => Promise<void>;
 
   /** Reject an in-flight tool-call request. Optional `reason` is
    *  forwarded to the backend when supported. */
-  rejectRequest: (requestId: string, reason?: string) => Promise<void>
+  rejectRequest: (requestId: string, reason?: string) => Promise<void>;
 
   // ─── Per-dialog token usage (Mingo only) ──────────────────────────────────
 
@@ -419,12 +415,12 @@ export interface UnifiedChatState {
    *  metadata (`currentInputTokens` etc.) is orthogonal — that fires on
    *  every SSE `message_start`, while this hydrates from the dialog
    *  fetch + live `TOKEN_USAGE` events. */
-  dialogTokenUsage: DialogTokenUsage | null
+  dialogTokenUsage: DialogTokenUsage | null;
 
   // ─── Connection state ─────────────────────────────────────────────────────
 
   /** High-level transport connection state. Drives reconnect UI in
    *  Mingo mode; always `'connected'` in Guide mode (SSE is request-
    *  response and has no persistent socket to monitor). */
-  connectionState: ChatConnectionState
+  connectionState: ChatConnectionState;
 }

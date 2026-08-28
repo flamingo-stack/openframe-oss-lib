@@ -8,11 +8,15 @@
  * would post into someone else's dialog).
  */
 
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
-import { AskDisplay } from '../ask-display'
-import type { AskSegment } from '../types/message.types'
+import { AskDisplay } from '../ask-display';
+import type { AskSegment } from '../types/message.types';
+
+/** Mirrors `LOCKED_HINT` in ../ask-display — the veil's tooltip and the
+ *  group's screen-reader description are the same string by design. */
+const LOCKED_HINT = 'This question was already answered';
 
 const card = (question: string): AskSegment => ({
   type: 'ask',
@@ -21,81 +25,80 @@ const card = (question: string): AskSegment => ({
     { label: 'Find documentation', description: 'How the feature works and how to set it up' },
     { label: 'Work with workspace data' },
   ],
-})
+});
 
 describe('AskDisplay', () => {
   it('renders the question, numbered options and their descriptions', () => {
-    render(<AskDisplay cards={[card('What do you want to work on?')]} />)
+    render(<AskDisplay cards={[card('What do you want to work on?')]} />);
 
-    expect(screen.getByText('What do you want to work on?')).toBeInTheDocument()
-    expect(screen.getByText('1.')).toBeInTheDocument()
-    expect(screen.getByText('Find documentation')).toBeInTheDocument()
-    expect(screen.getByText('How the feature works and how to set it up')).toBeInTheDocument()
-    expect(screen.getByText('2.')).toBeInTheDocument()
-    expect(screen.getByText('Work with workspace data')).toBeInTheDocument()
-  })
+    expect(screen.getByText('What do you want to work on?')).toBeInTheDocument();
+    expect(screen.getByText('1.')).toBeInTheDocument();
+    expect(screen.getByText('Find documentation')).toBeInTheDocument();
+    expect(screen.getByText('How the feature works and how to set it up')).toBeInTheDocument();
+    expect(screen.getByText('2.')).toBeInTheDocument();
+    expect(screen.getByText('Work with workspace data')).toBeInTheDocument();
+  });
 
   it('sends the picked option label verbatim', () => {
-    const onSelect = vi.fn()
-    render(<AskDisplay cards={[card('Which one?')]} onSelect={onSelect} />)
+    const onSelect = vi.fn();
+    render(<AskDisplay cards={[card('Which one?')]} onSelect={onSelect} />);
 
-    fireEvent.click(screen.getByText('Find documentation'))
+    fireEvent.click(screen.getByText('Find documentation'));
 
-    expect(onSelect).toHaveBeenCalledWith('Find documentation')
-  })
+    expect(onSelect).toHaveBeenCalledWith('Find documentation');
+  });
 
   it('renders locked without a handler: options disabled and veiled', () => {
-    const { container } = render(<AskDisplay cards={[card('Which one?')]} />)
+    render(<AskDisplay cards={[card('Which one?')]} />);
 
     // Kept as buttons on purpose — assistive tech should hear "dimmed button",
     // not read the options as prose that was never actionable.
-    const options = screen.getAllByRole('button')
-    expect(options).toHaveLength(2)
-    for (const option of options) expect(option).toBeDisabled()
+    const options = screen.getAllByRole('button');
+    expect(options).toHaveLength(2);
+    for (const option of options) expect(option).toBeDisabled();
 
     // The veil carries the visible lock: it dims the block, owns the pointer
     // (not-allowed cursor anywhere over it) and explains itself on hover.
-    const veil = container.querySelector('[title]')
-    expect(veil).toBeTruthy()
-    expect(veil?.className).toContain('cursor-not-allowed')
-  })
+    // Found by its tooltip — that string IS the affordance under test.
+    expect(screen.getByTitle(LOCKED_HINT)).toHaveClass('cursor-not-allowed');
+  });
 
   it('tells assistive tech WHY the options are disabled', () => {
-    const { container, rerender } = render(<AskDisplay cards={[card('Which one?')]} />)
+    const { rerender } = render(<AskDisplay cards={[card('Which one?')]} />);
 
     // The veil is decorative (aria-hidden), so its `title` never reaches a
-    // screen reader — the group's description is what does.
-    const describedBy = screen.getByRole('group').getAttribute('aria-describedby')
-    expect(describedBy).toBeTruthy()
-    expect(container.querySelector(`#${CSS.escape(describedBy!)}`)?.textContent).toBe(
-      'This question was already answered',
-    )
+    // screen reader — the group's description is what does. Asserted from the
+    // description's side: the sr-only text exists, and `aria-describedby`
+    // points AT it.
+    const describedBy = screen.getByRole('group').getAttribute('aria-describedby');
+    expect(describedBy).toBeTruthy();
+    expect(screen.getByText(LOCKED_HINT, { selector: '.sr-only' })).toHaveAttribute('id', describedBy);
 
     // An answerable card describes nothing — there is no lock to explain.
-    rerender(<AskDisplay cards={[card('Which one?')]} onSelect={vi.fn()} />)
-    expect(screen.getByRole('group')).not.toHaveAttribute('aria-describedby')
-  })
+    rerender(<AskDisplay cards={[card('Which one?')]} onSelect={vi.fn()} />);
+    expect(screen.getByRole('group')).not.toHaveAttribute('aria-describedby');
+  });
 
   it('hides the pager for a single card', () => {
-    render(<AskDisplay cards={[card('Which one?')]} onSelect={vi.fn()} />)
+    render(<AskDisplay cards={[card('Which one?')]} onSelect={vi.fn()} />);
 
-    expect(screen.queryByText(/of 1/)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Next question')).not.toBeInTheDocument()
-  })
+    expect(screen.queryByText(/of 1/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Next question')).not.toBeInTheDocument();
+  });
 
   it('pages through a run of cards, one question at a time', () => {
-    render(<AskDisplay cards={[card('First?'), card('Second?')]} onSelect={vi.fn()} />)
+    render(<AskDisplay cards={[card('First?'), card('Second?')]} onSelect={vi.fn()} />);
 
-    expect(screen.getByText('1 of 2')).toBeInTheDocument()
-    expect(screen.getByText('First?')).toBeInTheDocument()
-    expect(screen.queryByText('Second?')).not.toBeInTheDocument()
+    expect(screen.getByText('1 of 2')).toBeInTheDocument();
+    expect(screen.getByText('First?')).toBeInTheDocument();
+    expect(screen.queryByText('Second?')).not.toBeInTheDocument();
     // At the first page there is nowhere back to go.
-    expect(screen.getByLabelText('Previous question')).toBeDisabled()
+    expect(screen.getByLabelText('Previous question')).toBeDisabled();
 
-    fireEvent.click(screen.getByLabelText('Next question'))
+    fireEvent.click(screen.getByLabelText('Next question'));
 
-    expect(screen.getByText('2 of 2')).toBeInTheDocument()
-    expect(screen.getByText('Second?')).toBeInTheDocument()
-    expect(screen.getByLabelText('Next question')).toBeDisabled()
-  })
-})
+    expect(screen.getByText('2 of 2')).toBeInTheDocument();
+    expect(screen.getByText('Second?')).toBeInTheDocument();
+    expect(screen.getByLabelText('Next question')).toBeDisabled();
+  });
+});

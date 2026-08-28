@@ -72,9 +72,9 @@ function nativeVideoElement(player: EventTarget): NativeFullscreenVideo | null {
 
 export function useIosNativeVideoFullscreen(playerRef: { current: unknown }): void {
   useEffect(() => {
-    if (!isIosAppShell()) return;
+    if (!isIosAppShell()) return undefined;
     const player = playerRef.current;
-    if (!(player instanceof EventTarget)) return;
+    if (!(player instanceof EventTarget)) return undefined;
 
     const takeOver = (event: Event) => {
       const video = nativeVideoElement(player);

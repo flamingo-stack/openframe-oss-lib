@@ -4,76 +4,69 @@
  */
 
 export function toGoogleSheetsEmbedUrl(url: string): string {
-  if (url.includes('/htmlembed')) return url
+  if (url.includes('/htmlembed')) return url;
 
-  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)
-  if (!match) return url
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!match) return url;
 
-  const gidMatch = url.match(/[#?&]gid=(\d+)/)
-  const gid = gidMatch ? gidMatch[1] : '0'
+  const gidMatch = url.match(/[#?&]gid=(\d+)/);
+  const gid = gidMatch ? gidMatch[1] : '0';
 
-  return `https://docs.google.com/spreadsheets/d/${match[1]}/htmlembed?widget=true&chrome=false&headers=false&gid=${gid}`
+  return `https://docs.google.com/spreadsheets/d/${match[1]}/htmlembed?widget=true&chrome=false&headers=false&gid=${gid}`;
 }
 
 export function toGoogleSheetsOriginalUrl(url: string): string {
-  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)
-  if (!match) return url
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!match) return url;
 
-  const gidMatch = url.match(/[#?&]gid=(\d+)/)
-  const gid = gidMatch ? gidMatch[1] : '0'
+  const gidMatch = url.match(/[#?&]gid=(\d+)/);
+  const gid = gidMatch ? gidMatch[1] : '0';
 
-  return `https://docs.google.com/spreadsheets/d/${match[1]}/edit#gid=${gid}`
+  return `https://docs.google.com/spreadsheets/d/${match[1]}/edit#gid=${gid}`;
 }
 
 /**
  * Convert a Figma URL to an embeddable URL.
  * Slides/deck URLs map to `deck` (present) by default; `slidesView: 'browse'` switches to `slides` (browse).
  */
-export function toFigmaEmbedUrl(
-  url: string,
-  opts?: { slidesView?: 'present' | 'browse' }
-): string {
-  if (url.includes('embed.figma.com')) return url
-  if (url.includes('figma.com/embed')) return url
+export function toFigmaEmbedUrl(url: string, opts?: { slidesView?: 'present' | 'browse' }): string {
+  if (url.includes('embed.figma.com')) return url;
+  if (url.includes('figma.com/embed')) return url;
 
-  const match = url.match(
-    /figma\.com\/(design|file|proto|board|slides|deck)\/([a-zA-Z0-9]+)(?:\/([^?]*))?(\?.*)?$/
-  )
+  const match = url.match(/figma\.com\/(design|file|proto|board|slides|deck)\/([a-zA-Z0-9]+)(?:\/([^?]*))?(\?.*)?$/);
 
   if (match) {
-    const [, urlType, fileKey, titleSlug, queryString] = match
-    const isSlides = urlType === 'slides' || urlType === 'deck'
+    const [, urlType, fileKey, titleSlug, queryString] = match;
+    const isSlides = urlType === 'slides' || urlType === 'deck';
     const embedType =
-      urlType === 'proto' ? 'proto'
-      : isSlides ? (opts?.slidesView === 'browse' ? 'slides' : 'deck')
-      : 'design'
-    const pathSuffix = titleSlug ? `/${titleSlug}` : ''
+      urlType === 'proto' ? 'proto' : isSlides ? (opts?.slidesView === 'browse' ? 'slides' : 'deck') : 'design';
+    const pathSuffix = titleSlug ? `/${titleSlug}` : '';
 
-    const params = new URLSearchParams(queryString?.replace(/^\?/, '') || '')
+    const params = new URLSearchParams(queryString?.replace(/^\?/, '') || '');
     if (!params.has('embed-host')) {
-      params.set('embed-host', 'flamingo')
+      params.set('embed-host', 'flamingo');
     }
-    const clientId = process.env.NEXT_PUBLIC_FIGMA_CLIENT_ID
+    const clientId = process.env.NEXT_PUBLIC_FIGMA_CLIENT_ID;
     if (clientId && !params.has('client-id')) {
-      params.set('client-id', clientId)
+      params.set('client-id', clientId);
     }
 
-    return `https://embed.figma.com/${embedType}/${fileKey}${pathSuffix}?${params.toString()}`
+    return `https://embed.figma.com/${embedType}/${fileKey}${pathSuffix}?${params.toString()}`;
   }
 
-  return `https://www.figma.com/embed?embed-host=flamingo&url=${encodeURIComponent(url)}`
+  return `https://www.figma.com/embed?embed-host=flamingo&url=${encodeURIComponent(url)}`;
 }
 
 export function isFigmaSlidesUrl(url: string): boolean {
-  if (!url) return false
-  return /(?:www\.|embed\.)?figma\.com\/(?:slides|deck)\/[a-zA-Z0-9]+/.test(url)
+  if (!url) return false;
+  return /(?:www\.|embed\.)?figma\.com\/(?:slides|deck)\/[a-zA-Z0-9]+/.test(url);
 }
 
 export function toFigmaOriginalUrl(url: string): string {
   if (url.includes('embed.figma.com')) {
-    return url.replace('embed.figma.com', 'www.figma.com').replace(/\?.*$/, '')
+    return url.replace('embed.figma.com', 'www.figma.com').replace(/\?.*$/, '');
   }
-  return url.replace(/\?.*$/, '')
+  return url.replace(/\?.*$/, '');
 }
 
 /**
@@ -99,10 +92,10 @@ export function toClaudeMirrorPath(
   url: string | null | undefined,
   storageViewBaseUrl: string | null | undefined,
 ): string | null {
-  if (!url || !storageViewBaseUrl) return null
+  if (!url || !storageViewBaseUrl) return null;
   try {
-    const u = new URL(url)
-    const host = u.hostname.toLowerCase()
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
     const id =
       (host === 'claude.ai' &&
         /^\/(?:code\/artifact|public\/artifacts)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?#]|$)/i.exec(
@@ -112,12 +105,10 @@ export function toClaudeMirrorPath(
         /^\/artifacts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?#]|$)/i.exec(
           u.pathname,
         )?.[1]) ||
-      null
-    return id
-      ? `${storageViewBaseUrl.replace(/\/$/, '')}/design-briefs/${id.toLowerCase()}.html`
-      : null
+      null;
+    return id ? `${storageViewBaseUrl.replace(/\/$/, '')}/design-briefs/${id.toLowerCase()}.html` : null;
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -138,17 +129,17 @@ export function toClaudeMirrorPath(
  * url "Get embed code" hands the author.
  */
 export function toClaudeEmbedUrl(url: string | null | undefined): string | null {
-  if (!url) return null
+  if (!url) return null;
   try {
-    const u = new URL(url)
-    const host = u.hostname.toLowerCase()
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
     // `claude.site/artifacts/<id>` 308-redirects to the claude.ai public url.
     const publicId =
       (host === 'claude.ai' && /^\/public\/artifacts\/([\w-]+)(?:\/embed)?\/?$/.exec(u.pathname)?.[1]) ||
       (host === 'claude.site' && /^\/artifacts\/([\w-]+)(?:\/embed)?\/?$/.exec(u.pathname)?.[1]) ||
-      null
-    return publicId ? `https://claude.ai/public/artifacts/${publicId}/embed` : null
+      null;
+    return publicId ? `https://claude.ai/public/artifacts/${publicId}/embed` : null;
   } catch {
-    return null
+    return null;
   }
 }

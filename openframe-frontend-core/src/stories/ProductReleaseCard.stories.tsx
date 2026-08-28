@@ -1,13 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { ProductReleaseCard } from '../components/chat/entity-cards'
-import {
-  ChatColumnDecorator,
-  makeAnchorProps,
-} from './__fixtures__/chat-card-decorator'
-import {
-  productReleaseSmProps,
-  productReleaseLgProps,
-} from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { ProductReleaseCard } from '../components/chat/entity-cards';
+import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator';
+import { productReleaseSmProps, productReleaseLgProps } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof ProductReleaseCard> = {
   title: 'Chat/EntityCards/ProductReleaseCard',
@@ -21,11 +15,17 @@ const meta: Meta<typeof ProductReleaseCard> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const ChatInlineSm: Story = {
   args: {
@@ -33,7 +33,7 @@ export const ChatInlineSm: Story = {
     size: 'sm',
     anchorProps: makeAnchorProps('/releases/2-5-0'),
   },
-}
+};
 
 export const ChatInlineSmWithVideoCover: Story = {
   args: {
@@ -42,7 +42,7 @@ export const ChatInlineSmWithVideoCover: Story = {
     size: 'sm',
     anchorProps: makeAnchorProps('/releases/2-5-0'),
   },
-}
+};
 
 export const Large: Story = {
   args: {
@@ -58,4 +58,4 @@ export const Large: Story = {
       },
     },
   },
-}
+};

@@ -10,9 +10,9 @@
  * Do NOT "fix" behaviors captured here — they are the recorded baseline.
  */
 
-import { describe, it, expect } from 'vitest'
-import type { ChatStreamEvent } from '../events'
-import { decodeNatsChunk, guideEventForNats } from '../nats-decoder'
+import { describe, it, expect } from 'vitest';
+import type { ChatStreamEvent } from '../events';
+import { decodeNatsChunk, guideEventForNats } from '../nats-decoder';
 
 /** Recorded corpus of realistic NATS chunk shapes, keyed by scenario name. */
 const CORPUS: Record<string, unknown> = {
@@ -210,11 +210,7 @@ const CORPUS: Record<string, unknown> = {
   approval_request_batch_malformed_entries: {
     type: 'APPROVAL_REQUEST',
     approvalRequestId: 'batch-2',
-    toolCalls: [
-      null,
-      'not-an-object',
-      { toolName: 42, requiresApproval: 'yes', toolCallArguments: 'nope' },
-    ],
+    toolCalls: [null, 'not-an-object', { toolName: 42, requiresApproval: 'yes', toolCallArguments: 'nope' }],
   },
   // CHARACTERIZATION: an empty toolCalls array falls back to the SINGLE
   // approval-request shape (batch requires length > 0).
@@ -382,16 +378,14 @@ const CORPUS: Record<string, unknown> = {
   string_chunk: 'TEXT',
   number_chunk: 42,
   empty_object: {},
-}
+};
 
 describe('decodeNatsChunk — golden corpus', () => {
   it('maps the full recorded corpus to normalized events (snapshot)', () => {
-    const results = Object.fromEntries(
-      Object.entries(CORPUS).map(([name, chunk]) => [name, decodeNatsChunk(chunk)]),
-    )
-    expect(results).toMatchSnapshot()
-  })
-})
+    const results = Object.fromEntries(Object.entries(CORPUS).map(([name, chunk]) => [name, decodeNatsChunk(chunk)]));
+    expect(results).toMatchSnapshot();
+  });
+});
 
 describe('guideEventForNats — the two kernels reconciled', () => {
   // The property that matters for maintenance: `leading-frames` is the ONE
@@ -404,37 +398,43 @@ describe('guideEventForNats — the two kernels reconciled', () => {
       type: 'ask',
       question: 'Which workspace?',
       options: [{ label: 'Acme' }],
-    }
-    expect(guideEventForNats(ask)).toEqual(ask)
-  })
+    };
+    expect(guideEventForNats(ask)).toEqual(ask);
+  });
 
   it('stamps origin on the events that carry it, so the card routes to the hub', () => {
     expect(
       guideEventForNats({ type: 'approval-request', requestId: 'prop-1', approvalType: 'create_ticket' }),
-    ).toMatchObject({ approvalType: 'create_ticket', origin: 'guide' })
+    ).toMatchObject({ approvalType: 'create_ticket', origin: 'guide' });
     expect(guideEventForNats({ type: 'approval-resolved', requestId: 'prop-1', status: 'approved' })).toMatchObject({
       origin: 'guide',
-    })
-  })
+    });
+  });
 
   it('stops the events the agent owns for this dialog', () => {
-    expect(guideEventForNats({ type: 'usage', stage: 'start', input_tokens: 10 })).toBeNull()
-    expect(guideEventForNats({ type: 'status', phase: 'thinking' })).toBeNull()
+    expect(guideEventForNats({ type: 'usage', stage: 'start', input_tokens: 10 })).toBeNull();
+    expect(guideEventForNats({ type: 'status', phase: 'thinking' })).toBeNull();
     expect(
-      guideEventForNats({ type: 'token-usage', inputTokensSize: 1, outputTokensSize: 2, totalTokensSize: 3, contextSize: 4 }),
-    ).toBeNull()
-    expect(guideEventForNats({ type: 'dialog-closed' })).toBeNull()
-  })
+      guideEventForNats({
+        type: 'token-usage',
+        inputTokensSize: 1,
+        outputTokensSize: 2,
+        totalTokensSize: 3,
+        contextSize: 4,
+      }),
+    ).toBeNull();
+    expect(guideEventForNats({ type: 'dialog-closed' })).toBeNull();
+  });
 
   it('keeps metadata only for the hub conversation id every confirm must quote back', () => {
     expect(guideEventForNats({ type: 'metadata', conversationId: 'conv-1', modelName: 'hub-model' })).toEqual({
       type: 'metadata',
       conversationId: 'conv-1',
       origin: 'guide',
-    })
-    expect(guideEventForNats({ type: 'metadata', modelName: 'hub-model' })).toBeNull()
-  })
-})
+    });
+    expect(guideEventForNats({ type: 'metadata', modelName: 'hub-model' })).toBeNull();
+  });
+});
 
 describe('decodeNatsChunk — seq envelope', () => {
   it('lifts a numeric JetStream `streamSeq` into `seq`, and omits it otherwise (snapshot)', () => {
@@ -443,6 +443,6 @@ describe('decodeNatsChunk — seq envelope', () => {
       absent: decodeNatsChunk({ type: 'TEXT', text: 'hi' }),
       non_numeric: decodeNatsChunk({ type: 'TEXT', text: 'hi', streamSeq: '42' }),
       zero: decodeNatsChunk({ type: 'MESSAGE_START', streamSeq: 0 }),
-    }).toMatchSnapshot()
-  })
-})
+    }).toMatchSnapshot();
+  });
+});

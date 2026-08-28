@@ -6,7 +6,7 @@
  * the full hook path; these pin the protocol module in isolation.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vitest';
 import {
   createSseFrameDecoder,
   escapeThinkingTags,
@@ -21,19 +21,19 @@ import {
   FRAME_TERMINATOR,
   type ChatStreamEvent,
   type SseTrailingUsageFrame,
-} from '../index'
+} from '../index';
 
-const enc = new TextEncoder()
+const enc = new TextEncoder();
 
 /** Run a full stream through a fresh decoder: push each chunk, then end(). */
 function decodeAll(chunks: Array<string | Uint8Array>): ChatStreamEvent[] {
-  const decoder = createSseFrameDecoder()
-  const out: ChatStreamEvent[] = []
+  const decoder = createSseFrameDecoder();
+  const out: ChatStreamEvent[] = [];
   for (const c of chunks) {
-    out.push(...decoder.push(typeof c === 'string' ? enc.encode(c) : c))
+    out.push(...decoder.push(typeof c === 'string' ? enc.encode(c) : c));
   }
-  out.push(...decoder.end())
-  return out
+  out.push(...decoder.end());
+  return out;
 }
 
 const TRAILER: SseTrailingUsageFrame = {
@@ -46,7 +46,7 @@ const TRAILER: SseTrailingUsageFrame = {
     haikuRewriter: { input: 10, output: 4 },
     routedAnswer: { model: 'claude-sonnet-x', complexity: 'default', thinkingBudget: 0 },
   },
-}
+};
 
 describe('createSseFrameDecoder', () => {
   it('decodes everything arriving in ONE chunk (frames + sentinel + text + trailer)', () => {
@@ -58,8 +58,8 @@ describe('createSseFrameDecoder', () => {
       END_OF_LEADING +
       'One-chunk answer.' +
       TRAILER_SENTINEL +
-      JSON.stringify(TRAILER)
-    const events = decodeAll([wire])
+      JSON.stringify(TRAILER);
+    const events = decodeAll([wire]);
     expect(events).toEqual([
       { type: 'status', phase: 'thinking' },
       { type: 'thinking-delta', text: 'hmm ' },
@@ -94,34 +94,32 @@ describe('createSseFrameDecoder', () => {
         breakdown: TRAILER.breakdown,
         debug: undefined,
       },
-    ])
-  })
+    ]);
+  });
 
   it('parses a trailer split across pushes only at end()', () => {
-    const decoder = createSseFrameDecoder()
-    const events: ChatStreamEvent[] = []
-    events.push(...decoder.push(enc.encode(END_OF_LEADING + 'answer')))
-    events.push(
-      ...decoder.push(enc.encode(TRAILER_SENTINEL + '{"kind":"usage","stage":"end","input_to')),
-    )
-    events.push(...decoder.push(enc.encode('kens":42,"output_tokens":9}')))
+    const decoder = createSseFrameDecoder();
+    const events: ChatStreamEvent[] = [];
+    events.push(...decoder.push(enc.encode(END_OF_LEADING + 'answer')));
+    events.push(...decoder.push(enc.encode(TRAILER_SENTINEL + '{"kind":"usage","stage":"end","input_to')));
+    events.push(...decoder.push(enc.encode('kens":42,"output_tokens":9}')));
     // No usage event until end() — trailer runs to stream end.
-    expect(events.map((e) => e.type)).toEqual(['turn-start', 'text-delta'])
-    const endEvents = decoder.end()
-    expect(endEvents).toHaveLength(1)
+    expect(events.map(e => e.type)).toEqual(['turn-start', 'text-delta']);
+    const endEvents = decoder.end();
+    expect(endEvents).toHaveLength(1);
     expect(endEvents[0]).toMatchObject({
       type: 'usage',
       stage: 'end',
       input_tokens: 42,
       output_tokens: 9,
-    })
-  })
+    });
+  });
 
   it('end() is IDEMPOTENT: a second call emits the usage frame zero more times', () => {
     // Adapters routinely call end() from BOTH their completion path and a
     // `finally`; a re-emitted usage event would double the displayed token
     // cost.
-    const decoder = createSseFrameDecoder()
+    const decoder = createSseFrameDecoder();
     decoder.push(
       enc.encode(
         END_OF_LEADING +
@@ -129,71 +127,57 @@ describe('createSseFrameDecoder', () => {
           TRAILER_SENTINEL +
           '{"kind":"usage","stage":"end","input_tokens":42,"output_tokens":9}',
       ),
-    )
-    const first = decoder.end()
-    expect(first).toHaveLength(1)
-    expect(first[0]).toMatchObject({ type: 'usage', stage: 'end', input_tokens: 42 })
-    expect(decoder.end()).toEqual([])
-    expect(decoder.end()).toEqual([])
-  })
+    );
+    const first = decoder.end();
+    expect(first).toHaveLength(1);
+    expect(first[0]).toMatchObject({ type: 'usage', stage: 'end', input_tokens: 42 });
+    expect(decoder.end()).toEqual([]);
+    expect(decoder.end()).toEqual([]);
+  });
 
   it('silently ignores a malformed trailer at end()', () => {
-    const decoder = createSseFrameDecoder()
-    decoder.push(enc.encode(END_OF_LEADING + 'x' + TRAILER_SENTINEL + 'not json'))
-    expect(decoder.end()).toEqual([])
-  })
+    const decoder = createSseFrameDecoder();
+    decoder.push(enc.encode(END_OF_LEADING + 'x' + TRAILER_SENTINEL + 'not json'));
+    expect(decoder.end()).toEqual([]);
+  });
 
   it('decodes a multi-byte UTF-8 character split across pushes intact', () => {
-    const flamingo = enc.encode('🦩') // F0 9F A6 A9
-    const events = decodeAll([
-      END_OF_LEADING + 'A wild ',
-      flamingo.slice(0, 2),
-      flamingo.slice(2),
-      ' appears',
-    ])
+    const flamingo = enc.encode('🦩'); // F0 9F A6 A9
+    const events = decodeAll([END_OF_LEADING + 'A wild ', flamingo.slice(0, 2), flamingo.slice(2), ' appears']);
     const text = events
       .filter((e): e is Extract<ChatStreamEvent, { type: 'text-delta' }> => e.type === 'text-delta')
-      .map((e) => e.text)
-      .join('')
-    expect(text).toBe('A wild 🦩 appears')
+      .map(e => e.text)
+      .join('');
+    expect(text).toBe('A wild 🦩 appears');
     // The partial code point decodes to an EMPTY delta first (legacy
     // parity: text-mode chunks are emitted unconditionally).
-    expect(events.map((e) => e.type)).toEqual([
-      'turn-start',
-      'text-delta',
-      'text-delta',
-      'text-delta',
-      'text-delta',
-    ])
-  })
+    expect(events.map(e => e.type)).toEqual(['turn-start', 'text-delta', 'text-delta', 'text-delta', 'text-delta']);
+  });
 
   it('emits thinking deltas VERBATIM (append-only) — escape(concat) === concat(escape), even with a tag split across deltas', () => {
     const events = decodeAll([
       '{"kind":"thinking-delta","text":"use <scr"}\0',
       '{"kind":"thinking-delta","text":"ipt> carefully"}\0',
-    ])
+    ]);
     const deltas = events.filter(
-      (e): e is Extract<ChatStreamEvent, { type: 'thinking-delta' }> =>
-        e.type === 'thinking-delta',
-    )
-    expect(deltas.map((d) => d.text)).toEqual(['use <scr', 'ipt> carefully'])
-    const raw = deltas.map((d) => d.text).join('')
-    expect(raw).toBe('use <script> carefully')
+      (e): e is Extract<ChatStreamEvent, { type: 'thinking-delta' }> => e.type === 'thinking-delta',
+    );
+    expect(deltas.map(d => d.text)).toEqual(['use <scr', 'ipt> carefully']);
+    const raw = deltas.map(d => d.text).join('');
+    expect(raw).toBe('use <script> carefully');
     // escapeThinkingTags is per-character, so it distributes over
     // concatenation — accumulate-then-escape and escape-per-delta agree.
-    expect(escapeThinkingTags(raw)).toBe('use &lt;script> carefully')
-    expect(deltas.map((d) => escapeThinkingTags(d.text)).join('')).toBe(
-      escapeThinkingTags(raw),
-    )
-  })
+    expect(escapeThinkingTags(raw)).toBe('use &lt;script> carefully');
+    expect(deltas.map(d => escapeThinkingTags(d.text)).join('')).toBe(escapeThinkingTags(raw));
+  });
 
   it('falls back to answer-text mode when a leading block is not JSON (implicit turn-start, whole buffer emitted)', () => {
-    const events = decodeAll(['plain text answer with no frames\0and more after the nul'])
+    const events = decodeAll(['plain text answer with no frames\0and more after the nul']);
     expect(events).toEqual([
       { type: 'turn-start', implicit: true },
       { type: 'text-delta', text: 'plain text answer with no frames\0and more after the nul' },
-    ])
-  })
+    ]);
+  });
 
   it('handles sentinel + text + trailer inside the post-sentinel slice of one chunk', () => {
     const events = decodeAll([
@@ -202,15 +186,15 @@ describe('createSseFrameDecoder', () => {
         'short' +
         TRAILER_SENTINEL +
         '{"kind":"usage","stage":"end","input_tokens":1}',
-    ])
-    expect(events.map((e) => e.type)).toEqual(['status', 'turn-start', 'text-delta', 'usage'])
-  })
+    ]);
+    expect(events.map(e => e.type)).toEqual(['status', 'turn-start', 'text-delta', 'usage']);
+  });
 
   it('drops an un-terminated leading buffer at end() (legacy parity)', () => {
-    const decoder = createSseFrameDecoder()
-    expect(decoder.push(enc.encode('{"kind":"thinking-de'))).toEqual([])
-    expect(decoder.end()).toEqual([])
-  })
+    const decoder = createSseFrameDecoder();
+    expect(decoder.push(enc.encode('{"kind":"thinking-de'))).toEqual([]);
+    expect(decoder.end()).toEqual([]);
+  });
 
   it('maps tool frames: text-leading, tool_error, approval_request, decision_resolved', () => {
     const events = decodeAll([
@@ -218,7 +202,7 @@ describe('createSseFrameDecoder', () => {
       '{"kind":"tool_error","toolName":"create_ticket","message":""}\0',
       '{"kind":"approval_request","proposalId":"prop-1","toolName":"create_ticket","title":"Create ticket","fields":[{"label":"Subject","value":"Printer down"},{"bad":"row"}]}\0',
       '{"kind":"decision_resolved","proposalId":"prop-1","ok":true,"action":"approved","willAutoContinue":true,"tool_name":"create_ticket","result":{"ticket_id":"T-1"},"receiptText":"Done."}\0',
-    ])
+    ]);
     expect(events).toEqual([
       { type: 'text-delta', text: "I'll open a ticket.", leading: true },
       // Empty message falls back to the canned copy (legacy parity).
@@ -241,61 +225,59 @@ describe('createSseFrameDecoder', () => {
         receiptText: 'Done.',
         requestId: 'prop-1',
       },
-    ])
-  })
+    ]);
+  });
 
   it('routing frame → metadata.routing; non-string routedComplexity emits nothing', () => {
     const events = decodeAll([
       '{"kind":"routing","routedComplexity":"simple","routedThinkingBudget":0}\0',
       '{"kind":"routing","routedComplexity":42}\0',
-    ])
+    ]);
     expect(events).toEqual([
       {
         type: 'metadata',
         routing: { routedComplexity: 'simple', routedThinkingBudget: 0 },
       },
-    ])
-  })
-})
+    ]);
+  });
+});
 
 describe('stripSentinelBytes', () => {
   it('removes every framing sentinel and nothing else', () => {
-    expect(
-      stripSentinelBytes(`a${FRAME_TERMINATOR}b${END_OF_LEADING}c${TRAILER_SENTINEL}d`),
-    ).toBe('abcd')
-    expect(stripSentinelBytes('plain 🦩 text\nwith\tws')).toBe('plain 🦩 text\nwith\tws')
-  })
+    expect(stripSentinelBytes(`a${FRAME_TERMINATOR}b${END_OF_LEADING}c${TRAILER_SENTINEL}d`)).toBe('abcd');
+    expect(stripSentinelBytes('plain 🦩 text\nwith\tws')).toBe('plain 🦩 text\nwith\tws');
+  });
 
   it('is idempotent and distributes over concatenation (safe per-delta OR on an accumulator)', () => {
-    const a = `head${TRAILER_SENTINEL}`
-    const b = `${FRAME_TERMINATOR}tail`
-    expect(stripSentinelBytes(stripSentinelBytes(a))).toBe(stripSentinelBytes(a))
-    expect(stripSentinelBytes(a + b)).toBe(stripSentinelBytes(a) + stripSentinelBytes(b))
-  })
+    const a = `head${TRAILER_SENTINEL}`;
+    const b = `${FRAME_TERMINATOR}tail`;
+    expect(stripSentinelBytes(stripSentinelBytes(a))).toBe(stripSentinelBytes(a));
+    expect(stripSentinelBytes(a + b)).toBe(stripSentinelBytes(a) + stripSentinelBytes(b));
+  });
 
   it('is the SAME strip `encodeTextDelta` applies (one regex, two call sites)', () => {
-    const hostile = `x${FRAME_TERMINATOR}y${END_OF_LEADING}z${TRAILER_SENTINEL}!`
-    expect(new TextDecoder().decode(encodeTextDelta(hostile))).toBe(stripSentinelBytes(hostile))
-  })
-})
+    const hostile = `x${FRAME_TERMINATOR}y${END_OF_LEADING}z${TRAILER_SENTINEL}!`;
+    expect(new TextDecoder().decode(encodeTextDelta(hostile))).toBe(stripSentinelBytes(hostile));
+  });
+});
 
 describe('encoders', () => {
   it('encodeTextDelta strips ALL sentinel bytes so hostile answer text round-trips clean', () => {
-    const hostile = `has-nul[${FRAME_TERMINATOR}]rs[${END_OF_LEADING}]us[${TRAILER_SENTINEL}]end`
+    const hostile = `has-nul[${FRAME_TERMINATOR}]rs[${END_OF_LEADING}]us[${TRAILER_SENTINEL}]end`;
     const events = decodeAll([
       encodeLeadingFrame({ status: 'thinking' }),
       encodeEndOfLeading(),
       encodeTextDelta(hostile),
       encodeTrailingUsageFrame(TRAILER),
-    ])
+    ]);
     const text = events
       .filter((e): e is Extract<ChatStreamEvent, { type: 'text-delta' }> => e.type === 'text-delta')
-      .map((e) => e.text)
-      .join('')
+      .map(e => e.text)
+      .join('');
     // Sentinels removed — no mis-framing, trailer still parsed.
-    expect(text).toBe('has-nul[]rs[]us[]end')
-    expect(events.map((e) => e.type)).toEqual(['status', 'turn-start', 'text-delta', 'usage'])
-  })
+    expect(text).toBe('has-nul[]rs[]us[]end');
+    expect(events.map(e => e.type)).toEqual(['status', 'turn-start', 'text-delta', 'usage']);
+  });
 
   it('round-trips every leading frame type through encode → decode', () => {
     const cases: Array<{ frame: Parameters<typeof encodeLeadingFrame>[0]; expected: ChatStreamEvent }> = [
@@ -383,28 +365,24 @@ describe('encoders', () => {
           scrollAnchor: undefined,
         },
       },
-    ]
+    ];
     for (const { frame, expected } of cases) {
-      const events = decodeAll([encodeLeadingFrame(frame)])
-      expect(events, JSON.stringify(frame)).toEqual([expected])
+      const events = decodeAll([encodeLeadingFrame(frame)]);
+      expect(events, JSON.stringify(frame)).toEqual([expected]);
     }
-  })
+  });
 
   it('round-trips the trailing usage frame', () => {
-    const events = decodeAll([
-      encodeEndOfLeading(),
-      encodeTextDelta('body'),
-      encodeTrailingUsageFrame(TRAILER),
-    ])
+    const events = decodeAll([encodeEndOfLeading(), encodeTextDelta('body'), encodeTrailingUsageFrame(TRAILER)]);
     expect(events[events.length - 1]).toMatchObject({
       type: 'usage',
       stage: 'end',
       input_tokens: 1234,
       output_tokens: 56,
       hit_rate_pct: 81.5,
-    })
-  })
-})
+    });
+  });
+});
 
 describe('decodeNatsChunk', () => {
   it('lifts streamSeq into the seq envelope', () => {
@@ -412,13 +390,13 @@ describe('decodeNatsChunk', () => {
       type: 'text-delta',
       text: 'hi',
       seq: 42,
-    })
-    expect(decodeNatsChunk({ type: 'MESSAGE_START' })).toEqual({ type: 'turn-start' })
+    });
+    expect(decodeNatsChunk({ type: 'MESSAGE_START' })).toEqual({ type: 'turn-start' });
     expect(decodeNatsChunk({ type: 'MESSAGE_END', streamSeq: 9 })).toEqual({
       type: 'turn-end',
       seq: 9,
-    })
-  })
+    });
+  });
 
   it('maps metadata, approval batch, approval result, token usage, compaction', () => {
     expect(
@@ -435,17 +413,14 @@ describe('decodeNatsChunk', () => {
       modelName: 'gpt-x',
       provider: 'openai',
       contextWindowMaxTokens: 128000,
-    })
+    });
 
     expect(
       decodeNatsChunk({
         type: 'APPROVAL_REQUEST',
         approvalRequestId: 'req-1',
         approvalType: 'ADMIN',
-        toolCalls: [
-          { toolExecutionRequestId: 'e1', toolName: 'run', requiresApproval: true },
-          'garbage-row',
-        ],
+        toolCalls: [{ toolExecutionRequestId: 'e1', toolName: 'run', requiresApproval: true }, 'garbage-row'],
       }),
     ).toEqual({
       type: 'approval-request',
@@ -463,7 +438,7 @@ describe('decodeNatsChunk', () => {
           toolCallArguments: null,
         },
       ],
-    })
+    });
 
     expect(
       decodeNatsChunk({
@@ -478,34 +453,32 @@ describe('decodeNatsChunk', () => {
       status: 'approved',
       approvalType: 'CLIENT',
       resolvedByName: 'Michael',
-    })
+    });
 
-    expect(
-      decodeNatsChunk({ type: 'TOKEN_USAGE', inputTokensSize: 1, outputTokensSize: 2 }),
-    ).toEqual({
+    expect(decodeNatsChunk({ type: 'TOKEN_USAGE', inputTokensSize: 1, outputTokensSize: 2 })).toEqual({
       type: 'token-usage',
       inputTokensSize: 1,
       outputTokensSize: 2,
       totalTokensSize: 0,
       contextSize: 0,
-    })
+    });
 
     expect(decodeNatsChunk({ type: 'CONTEXT_COMPACTION_START' })).toEqual({
       type: 'compaction',
       phase: 'start',
-    })
+    });
     expect(decodeNatsChunk({ type: 'CONTEXT_COMPACTION_END', text: 'sum' })).toEqual({
       type: 'compaction',
       phase: 'end',
       summary: 'sum',
-    })
-  })
+    });
+  });
 
   it('returns null for unknown or malformed chunks', () => {
-    expect(decodeNatsChunk(null)).toBeNull()
-    expect(decodeNatsChunk('nope')).toBeNull()
-    expect(decodeNatsChunk({ type: 'SOMETHING_ELSE' })).toBeNull()
-    expect(decodeNatsChunk({ type: 'TEXT' })).toBeNull()
-    expect(decodeNatsChunk({ type: 'AI_METADATA', modelName: 'x' })).toBeNull()
-  })
-})
+    expect(decodeNatsChunk(null)).toBeNull();
+    expect(decodeNatsChunk('nope')).toBeNull();
+    expect(decodeNatsChunk({ type: 'SOMETHING_ELSE' })).toBeNull();
+    expect(decodeNatsChunk({ type: 'TEXT' })).toBeNull();
+    expect(decodeNatsChunk({ type: 'AI_METADATA', modelName: 'x' })).toBeNull();
+  });
+});

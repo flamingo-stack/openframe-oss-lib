@@ -13,26 +13,26 @@
  */
 
 export interface Department {
-  id: string
-  name: string
-  slug: string
-  description?: string | null
-  parent_department_id?: string | null
-  display_order: number
-  is_active: boolean
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  parent_department_id?: string | null;
+  display_order: number;
+  is_active: boolean;
 }
 
 /** The embedded shape a reader gets through the `department:departments(…)` PostgREST embed. */
 export type DepartmentRef = Pick<Department, 'id' | 'name' | 'slug'> & {
-  display_order?: number
-}
+  display_order?: number;
+};
 
 /** `GET /api/admin/departments?counts=…` row — a department plus how many profiles carry it. */
 export interface DepartmentSummary {
-  id: string
-  name: string
-  slug: string
-  count: number
+  id: string;
+  name: string;
+  slug: string;
+  count: number;
 }
 
 /** Population a department count is taken over. */
@@ -41,4 +41,4 @@ export interface DepartmentSummary {
  * allowlist (`DEPARTMENT_COUNT_POPULATIONS` in lib/data/department-constants.ts)
  * is the value form of this union — keep the two in step.
  */
-export type DepartmentCountPopulation = 'directory' | 'scored'
+export type DepartmentCountPopulation = 'directory' | 'scored';

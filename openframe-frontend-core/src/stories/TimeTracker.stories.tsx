@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import * as React from 'react'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState, useRef } from 'react';
 import {
   TimeTrackerHeaderButton,
   TimeTrackerPanel,
@@ -7,7 +7,7 @@ import {
   type TimeTrackerData,
   type TimeTrackerEntry,
   type TimeTrackerStatus,
-} from '../components/features/time-tracker'
+} from '../components/features/time-tracker';
 
 // ---------------------------------------------------------------------------
 // Mock data + a stand-in "host" that simulates the openframe-frontend backend
@@ -22,7 +22,7 @@ const ALL_TICKETS = [
   { id: 'TICK-105', label: '#105 · Wi-Fi dropping intermittently' },
   { id: 'TICK-106', label: '#106 · New employee laptop setup' },
   { id: 'TICK-107', label: '#107 · Two-factor authentication locked out' },
-]
+];
 
 const SEED_ENTRIES: TimeTrackerEntry[] = [
   {
@@ -46,19 +46,19 @@ const SEED_ENTRIES: TimeTrackerEntry[] = [
     title: 'New employee laptop setup',
     description: 'Imaged device, joined domain, installed standard software bundle',
   },
-]
+];
 
 function pad(n: number) {
-  return String(n).padStart(2, '0')
+  return String(n).padStart(2, '0');
 }
 
 function formatDuration(ms: number) {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
 }
 
 function formatDate(d: Date) {
-  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${String(d.getFullYear()).slice(-2)}`
+  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${String(d.getFullYear()).slice(-2)}`;
 }
 
 const meta = {
@@ -90,48 +90,48 @@ const meta = {
     onSubmit: () => {},
     onClose: () => {},
   },
-} satisfies Meta<typeof TimeTrackerPanel>
+} satisfies Meta<typeof TimeTrackerPanel>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 interface HostInit {
-  status?: TimeTrackerStatus
-  runningSince?: number | null
-  accumulatedMs?: number
-  selectedTicketId?: string | null
-  notes?: string
-  lastEntries?: TimeTrackerEntry[]
+  status?: TimeTrackerStatus;
+  runningSince?: number | null;
+  accumulatedMs?: number;
+  selectedTicketId?: string | null;
+  notes?: string;
+  lastEntries?: TimeTrackerEntry[];
   /** When true, ticket options are filtered asynchronously (server-search simulation). */
-  serverSearch?: boolean
+  serverSearch?: boolean;
 }
 
 function useTimeTrackerHost(initial: HostInit = {}): TimeTrackerData {
-  const [status, setStatus] = React.useState<TimeTrackerStatus>(initial.status ?? 'ready')
-  const [runningSince, setRunningSince] = React.useState<number | null>(initial.runningSince ?? null)
-  const [accumulatedMs, setAccumulatedMs] = React.useState(initial.accumulatedMs ?? 0)
-  const [selectedTicketId, setSelectedTicketId] = React.useState<string | null>(initial.selectedTicketId ?? null)
-  const [notes, setNotes] = React.useState(initial.notes ?? '')
-  const [lastEntries, setLastEntries] = React.useState<TimeTrackerEntry[]>(initial.lastEntries ?? SEED_ENTRIES)
+  const [status, setStatus] = useState<TimeTrackerStatus>(initial.status ?? 'ready');
+  const [runningSince, setRunningSince] = useState<number | null>(initial.runningSince ?? null);
+  const [accumulatedMs, setAccumulatedMs] = useState(initial.accumulatedMs ?? 0);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(initial.selectedTicketId ?? null);
+  const [notes, setNotes] = useState(initial.notes ?? '');
+  const [lastEntries, setLastEntries] = useState<TimeTrackerEntry[]>(initial.lastEntries ?? SEED_ENTRIES);
 
-  const [ticketOptions, setTicketOptions] = React.useState(ALL_TICKETS)
-  const [ticketsLoading, setTicketsLoading] = React.useState(false)
-  const searchRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const [ticketOptions, setTicketOptions] = useState(ALL_TICKETS);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const searchRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const currentElapsedMs = () =>
-    accumulatedMs + (status === 'tracking' && runningSince ? Date.now() - runningSince : 0)
+    accumulatedMs + (status === 'tracking' && runningSince ? Date.now() - runningSince : 0);
 
   const onTicketSearch = initial.serverSearch
     ? (query: string) => {
-        setTicketsLoading(true)
-        clearTimeout(searchRef.current)
+        setTicketsLoading(true);
+        clearTimeout(searchRef.current);
         searchRef.current = setTimeout(() => {
-          const q = query.toLowerCase()
-          setTicketOptions(ALL_TICKETS.filter((t) => t.label.toLowerCase().includes(q)))
-          setTicketsLoading(false)
-        }, 350)
+          const q = query.toLowerCase();
+          setTicketOptions(ALL_TICKETS.filter(t => t.label.toLowerCase().includes(q)));
+          setTicketsLoading(false);
+        }, 350);
       }
-    : undefined
+    : undefined;
 
   return {
     status,
@@ -146,59 +146,57 @@ function useTimeTrackerHost(initial: HostInit = {}): TimeTrackerData {
     onNotesChange: setNotes,
     lastEntries,
     onStart: () => {
-      setAccumulatedMs(0)
-      setRunningSince(Date.now())
-      setStatus('tracking')
+      setAccumulatedMs(0);
+      setRunningSince(Date.now());
+      setStatus('tracking');
     },
     onPause: () => {
-      setAccumulatedMs(currentElapsedMs())
-      setRunningSince(null)
-      setStatus('paused')
+      setAccumulatedMs(currentElapsedMs());
+      setRunningSince(null);
+      setStatus('paused');
     },
     onResume: () => {
-      setRunningSince(Date.now())
-      setStatus('tracking')
+      setRunningSince(Date.now());
+      setStatus('tracking');
     },
     onCancel: () => {
-      setStatus('ready')
-      setRunningSince(null)
-      setAccumulatedMs(0)
-      setSelectedTicketId(null)
-      setNotes('')
+      setStatus('ready');
+      setRunningSince(null);
+      setAccumulatedMs(0);
+      setSelectedTicketId(null);
+      setNotes('');
     },
     onSubmit: () => {
-      const ms = currentElapsedMs()
-      const ticketId = selectedTicketId
+      const ms = currentElapsedMs();
+      const ticketId = selectedTicketId;
       const entry: TimeTrackerEntry = {
         id: `entry-${Date.now()}`,
         durationLabel: formatDuration(ms),
         dateLabel: formatDate(new Date()),
-        title: ticketId
-          ? ALL_TICKETS.find((t) => t.id === ticketId)?.label ?? ticketId
-          : 'Manual time entry',
+        title: ticketId ? (ALL_TICKETS.find(t => t.id === ticketId)?.label ?? ticketId) : 'Manual time entry',
         description: notes || undefined,
-      }
-      setLastEntries((prev) => [entry, ...prev].slice(0, 3))
-      setStatus('ready')
-      setRunningSince(null)
-      setAccumulatedMs(0)
-      setSelectedTicketId(null)
-      setNotes('')
+      };
+      setLastEntries(prev => [entry, ...prev].slice(0, 3));
+      setStatus('ready');
+      setRunningSince(null);
+      setAccumulatedMs(0);
+      setSelectedTicketId(null);
+      setNotes('');
     },
     onManualEntry: () => alert('Host: open the manual-entry form modal'),
     onOpenMyTime: () => alert('Host: navigate to "My Time"'),
     onOpenMyTimeMenu: () => alert('Host: open the "My Time" split menu'),
-    onEntryClick: (entry) => alert(`Host: navigate to entry "${entry.title}"`),
-  }
+    onEntryClick: entry => alert(`Host: navigate to entry "${entry.title}"`),
+  };
 }
 
 /** Mock header strip so the `HeaderButton` resolves its `h-full` and the popover anchors correctly. */
 function HeaderBar() {
   return (
-    <div className="flex h-14 w-full items-center justify-end border-b border-ods-border bg-ods-card divide-x divide-ods-border">
+    <div className="flex h-14 w-full items-center justify-end divide-x divide-ods-border border-b border-ods-border bg-ods-card">
       <TimeTrackerHeaderButton />
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -209,14 +207,14 @@ function HeaderBar() {
 /** Idle. Stop button is hidden until tracking starts; pre-seeded last entries. */
 export const PanelReady: Story = {
   render: function PanelReadyRender() {
-    const host = useTimeTrackerHost({ status: 'ready' })
+    const host = useTimeTrackerHost({ status: 'ready' });
     return (
       <div className="max-w-[460px]">
         <TimeTrackerPanel {...host} onClose={() => {}} />
       </div>
-    )
+    );
   },
-}
+};
 
 /** Tracking — the timer ticks live and a ticket is selected, so Stop (finish) is enabled. */
 export const PanelTracking: Story = {
@@ -225,14 +223,14 @@ export const PanelTracking: Story = {
       status: 'tracking',
       runningSince: Date.now() - 5_000,
       selectedTicketId: 'TICK-102',
-    })
+    });
     return (
       <div className="max-w-[460px]">
         <TimeTrackerPanel {...host} onClose={() => {}} />
       </div>
-    )
+    );
   },
-}
+};
 
 /** Paused at 00:08:17 with notes filled — Stop (finish) is enabled via the notes rule. */
 export const PanelPaused: Story = {
@@ -241,14 +239,14 @@ export const PanelPaused: Story = {
       status: 'paused',
       accumulatedMs: 497_000,
       notes: 'Walked user through Storage Sense setup, scheduled monthly cleanup.',
-    })
+    });
     return (
       <div className="max-w-[460px]">
         <TimeTrackerPanel {...host} onClose={() => {}} />
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * Tracking with no ticket and no notes — pressing Finish (the yellow check) surfaces inline
@@ -256,26 +254,26 @@ export const PanelPaused: Story = {
  */
 export const PanelFinishGate: Story = {
   render: function PanelFinishGateRender() {
-    const host = useTimeTrackerHost({ status: 'tracking', runningSince: Date.now() - 42_000 })
+    const host = useTimeTrackerHost({ status: 'tracking', runningSince: Date.now() - 42_000 });
     return (
       <div className="max-w-[460px]">
         <TimeTrackerPanel {...host} onClose={() => {}} />
       </div>
-    )
+    );
   },
-}
+};
 
 /** Empty last-entries state — clock-history icon with a "No time logged / Last entries will appear here" placeholder (no list header or border). */
 export const PanelNoEntries: Story = {
   render: function PanelNoEntriesRender() {
-    const host = useTimeTrackerHost({ status: 'ready', lastEntries: [] })
+    const host = useTimeTrackerHost({ status: 'ready', lastEntries: [] });
     return (
       <div className="max-w-[460px]">
         <TimeTrackerPanel {...host} onClose={() => {}} />
       </div>
-    )
+    );
   },
-}
+};
 
 // ---------------------------------------------------------------------------
 // Header button stories — the trigger as it appears in the app header.
@@ -285,47 +283,47 @@ export const PanelNoEntries: Story = {
 export const HeaderButtonIdle: Story = {
   parameters: { layout: 'fullscreen' },
   render: function HeaderButtonIdleRender() {
-    const host = useTimeTrackerHost({ status: 'ready' })
+    const host = useTimeTrackerHost({ status: 'ready' });
     return (
       <TimeTrackerProvider {...host}>
         <HeaderBar />
-        <p className="p-4 text-h6 text-ods-text-secondary">Click the clock icon to open the time tracker.</p>
+        <p className="p-4 text-ods-text-secondary text-h6">Click the clock icon to open the time tracker.</p>
       </TimeTrackerProvider>
-    )
+    );
   },
-}
+};
 
 /** Active header button — shows the live elapsed time next to the clock icon. */
 export const HeaderButtonTracking: Story = {
   parameters: { layout: 'fullscreen' },
   render: function HeaderButtonTrackingRender() {
-    const host = useTimeTrackerHost({ status: 'tracking', runningSince: Date.now() - 65_000 })
+    const host = useTimeTrackerHost({ status: 'tracking', runningSince: Date.now() - 65_000 });
     return (
       <TimeTrackerProvider {...host}>
         <HeaderBar />
-        <p className="p-4 text-h6 text-ods-text-secondary">
+        <p className="p-4 text-ods-text-secondary text-h6">
           While tracking, the header shows the running timer. Click it to open the popup.
         </p>
       </TimeTrackerProvider>
-    )
+    );
   },
-}
+};
 
 /** Paused header button — clock icon and timer are greyed out (frozen elapsed time). */
 export const HeaderButtonPaused: Story = {
   parameters: { layout: 'fullscreen' },
   render: function HeaderButtonPausedRender() {
-    const host = useTimeTrackerHost({ status: 'paused', accumulatedMs: 65_000 })
+    const host = useTimeTrackerHost({ status: 'paused', accumulatedMs: 65_000 });
     return (
       <TimeTrackerProvider {...host}>
         <HeaderBar />
-        <p className="p-4 text-h6 text-ods-text-secondary">
+        <p className="p-4 text-ods-text-secondary text-h6">
           While paused, the clock and timer are muted to signal the session is on hold.
         </p>
       </TimeTrackerProvider>
-    )
+    );
   },
-}
+};
 
 // ---------------------------------------------------------------------------
 // Full interactive playground — provider + header button + simulated server
@@ -335,13 +333,13 @@ export const HeaderButtonPaused: Story = {
 export const Playground: Story = {
   parameters: { layout: 'fullscreen' },
   render: function PlaygroundRender() {
-    const host = useTimeTrackerHost({ serverSearch: true })
+    const host = useTimeTrackerHost({ serverSearch: true });
     return (
       <TimeTrackerProvider {...host}>
         <HeaderBar />
         <div className="max-w-xl p-4">
-          <p className="text-h3 text-ods-text-primary">Time tracker playground</p>
-          <ul className="mt-2 list-disc pl-5 text-h6 text-ods-text-secondary">
+          <p className="text-ods-text-primary text-h3">Time tracker playground</p>
+          <ul className="mt-2 list-disc pl-5 text-ods-text-secondary text-h6">
             <li>Open the popup from the clock button in the header above.</li>
             <li>Press play to start; the header and panel timers tick from the start time.</li>
             <li>Typing in “Assign Ticket” runs a simulated async search (loading spinner).</li>
@@ -350,6 +348,6 @@ export const Playground: Story = {
           </ul>
         </div>
       </TimeTrackerProvider>
-    )
+    );
   },
-}
+};

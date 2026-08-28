@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useToast } from "./use-toast";
-import { useRouter } from '../embed-shims/next-navigation';
 import { useRequiredEndpointsRuntime } from '../contexts/endpoints-runtime-context';
+import { useRouter } from '../embed-shims/next-navigation';
+import { apiErrorMessage } from '../utils/common';
 import { contentFetch } from '../utils/embed-content-fetch';
+import { useToast } from './use-toast';
 
 interface ContactSubmissionOptions {
   userId?: string;
@@ -52,66 +53,70 @@ export function useContactSubmission(options: ContactSubmissionOptions = {}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const submit = useCallback(async (formData: ContactFormData) => {
-    if (isSubmitting) return;
+  const submit = useCallback(
+    async (formData: ContactFormData) => {
+      if (isSubmitting) return;
 
-    setIsSubmitting(true);
+      setIsSubmitting(true);
 
-    try {
-      const response = await contentFetch(contactUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ...formData,
-          user_id: userId
-        }),
-      });
+      try {
+        const response = await contentFetch(contactUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            user_id: userId,
+          }),
+        });
 
-      const data = await response.json();
+        // Read the body ONLY on failure — nothing here consumes the success
+        // payload, and parsing it meant a 2xx with an empty (or non-JSON)
+        // body threw and toasted a failure for a message that was delivered.
+        if (!response.ok) {
+          const failure: unknown = await response.json().catch(() => null);
+          throw new Error(apiErrorMessage(failure, 'Failed to submit contact form'));
+        }
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit contact form');
+        // Success
+        setIsSuccess(true);
+        const message = successToastMessage
+          ? `Thank you! Your message has been sent. ${successToastMessage}`
+          : 'Thank you! Your message has been sent successfully.';
+
+        toast({
+          title: 'Message sent!',
+          description: message,
+          variant: 'success',
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+        toast({
+          title: 'Failed to send message',
+          description: message,
+          variant: 'destructive',
+        });
+        throw error; // allow caller to handle if needed
+      } finally {
+        setIsSubmitting(false);
       }
-
-      // Success
-      setIsSuccess(true);
-      const message = successToastMessage 
-        ? `Thank you! Your message has been sent. ${successToastMessage}`
-        : 'Thank you! Your message has been sent successfully.';
-      
-      toast({
-        title: "Message sent!",
-        description: message,
-        variant: 'success',
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
-      toast({ 
-        title: 'Failed to send message', 
-        description: message, 
-        variant: 'destructive' 
-      });
-      throw error; // allow caller to handle if needed
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [isSubmitting, toast, userId, successToastMessage, contactUrl]);
+    },
+    [isSubmitting, toast, userId, successToastMessage, contactUrl],
+  );
 
   // Handle redirect after success
   useEffect(() => {
-    if (isSuccess && successRedirectUrl) {
-      console.log('🚀 Contact submission successful, redirecting to:', successRedirectUrl);
-      const timer = setTimeout(() => {
-        console.log('🎯 Performing redirect now to:', successRedirectUrl);
-        if (successRedirectUrl.startsWith('http')) {
-          window.location.href = successRedirectUrl;
-        } else {
-          router.push(successRedirectUrl);
-        }
-      }, 1500);
-      
-      return () => clearTimeout(timer);
-    }
+    if (!isSuccess || !successRedirectUrl) return undefined;
+    console.log('🚀 Contact submission successful, redirecting to:', successRedirectUrl);
+    const timer = setTimeout(() => {
+      console.log('🎯 Performing redirect now to:', successRedirectUrl);
+      if (successRedirectUrl.startsWith('http')) {
+        window.location.href = successRedirectUrl;
+      } else {
+        router.push(successRedirectUrl);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
   }, [isSuccess, successRedirectUrl, router]);
 
   // Call onSuccess callback if provided

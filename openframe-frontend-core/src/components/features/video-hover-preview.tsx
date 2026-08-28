@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * <VideoHoverPreviewSurface> — THE shared hover-preview media zone.
@@ -20,13 +20,14 @@
  *     editor cards). Exactly one path is ever active.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
-import { cn } from '../../utils/cn';
-import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
-import { toMuxPreviewUrl } from './mux-origins';
-import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
+import type React from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from '../../embed-shims/next-image';
+import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
+import { cn } from '../../utils/cn';
 import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fallback';
+import { toMuxPreviewUrl } from './mux-origins';
+import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
 import { VideoPlayBadge } from './video-center-badge';
 
 export interface VideoHoverPreviewSurfaceProps {
@@ -108,13 +109,12 @@ export function VideoHoverPreviewSurface({
   const rootElRef = useRef<HTMLDivElement | null>(null);
   const [isNear, setIsNear] = useState(false);
   useEffect(() => {
-    if (gateControlled) return;
+    if (gateControlled) return undefined;
     const el = rootElRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(
-      entries => setIsNear(entries[0]?.isIntersecting ?? false),
-      { rootMargin: NEAR_VIEWPORT_ROOT_MARGIN },
-    );
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(entries => setIsNear(entries[0]?.isIntersecting ?? false), {
+      rootMargin: NEAR_VIEWPORT_ROOT_MARGIN,
+    });
     io.observe(el);
     return () => io.disconnect();
   }, [gateControlled]);
@@ -151,47 +151,45 @@ export function VideoHoverPreviewSurface({
             <Video kind="file" url={previewUrl} firstFrameOnly layout="fill" fit={fit} />
           )}
 
-          {badge === 'play' && !active && !continuation && (
-            <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />
-          )}
+          {badge === 'play' && !active && !continuation && <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />}
 
-                      <div
-              className="absolute inset-0"
-              style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
-            >
-              <Video
-                // Remount between modes: `startTime` + autoplay are LOAD-TIME
-                // props (playback-core binds them to one-shot durationchange /
-                // loadstart handlers), so re-propping an already-loaded element
-                // silently drops the seek. Only a Mux preview rewrite changed
-                // `src` before, which is why HLS resumed and plain MP4 did not.
-                key={continuation ? 'continuation' : 'preview'}
-                kind="file"
-                // Rendition-capped in BOTH modes: the cap was only skipped
-                // because changing `src` used to be the sole trigger for the
-                // seek; the explicit key handles that now, and a 320px mini
-                // player should never pull the uncapped manifest.
-                url={previewUrl}
-                poster={posterUrl}
-                {...(continuation
-                  ? {
-                      startTime,
-                      autoPlay: autoPlay && startMuted,
-                      startMuted,
-                      autoPlayUnmuted: autoPlay && !startMuted,
-                    }
-                  : { playWhenHovered: active })}
-                chromeless
-                layout="fill"
-                fit={fit}
-                preload={preload}
-                mutedIntent={mutedIntent}
-                hideMutedBadge={hideMutedBadge}
-                onMutedFallbackChange={onMutedFallbackChange}
-                onEnded={onEnded}
-                playerHandleRef={previewHandleRef}
-              />
-            </div>
+          <div
+            className="absolute inset-0"
+            style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
+          >
+            <Video
+              // Remount between modes: `startTime` + autoplay are LOAD-TIME
+              // props (playback-core binds them to one-shot durationchange /
+              // loadstart handlers), so re-propping an already-loaded element
+              // silently drops the seek. Only a Mux preview rewrite changed
+              // `src` before, which is why HLS resumed and plain MP4 did not.
+              key={continuation ? 'continuation' : 'preview'}
+              kind="file"
+              // Rendition-capped in BOTH modes: the cap was only skipped
+              // because changing `src` used to be the sole trigger for the
+              // seek; the explicit key handles that now, and a 320px mini
+              // player should never pull the uncapped manifest.
+              url={previewUrl}
+              poster={posterUrl}
+              {...(continuation
+                ? {
+                    startTime,
+                    autoPlay: autoPlay && startMuted,
+                    startMuted,
+                    autoPlayUnmuted: autoPlay && !startMuted,
+                  }
+                : { playWhenHovered: active })}
+              chromeless
+              layout="fill"
+              fit={fit}
+              preload={preload}
+              mutedIntent={mutedIntent}
+              hideMutedBadge={hideMutedBadge}
+              onMutedFallbackChange={onMutedFallbackChange}
+              onEnded={onEnded}
+              playerHandleRef={previewHandleRef}
+            />
+          </div>
         </>
       ) : (
         <div className="absolute inset-0 bg-ods-card" />

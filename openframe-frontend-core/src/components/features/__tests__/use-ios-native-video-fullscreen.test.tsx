@@ -1,6 +1,6 @@
+import { renderHook } from '@testing-library/react';
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
 import { useIosNativeVideoFullscreen } from '../use-ios-native-video-fullscreen';
 
 /**

@@ -1,30 +1,26 @@
-'use client'
+'use client';
 
-import type { ReactNode } from 'react'
-import { flexRender, type Header } from '@tanstack/react-table'
-import { cn } from '../../../utils/cn'
-import {
-  Arrow01DownIcon,
-  Arrow01UpIcon,
-  SwitchVrIcon,
-} from '../../icons-v2-generated'
-import { DataTableColumnFilter } from './data-table-column-filter'
-import { useDataTableContext } from './data-table'
-import type { TailwindBreakpoint } from './types'
-import { alignJustify, BREAKPOINT_ORDER, getHideAtVisibility } from './utils'
+import { flexRender, type Header } from '@tanstack/react-table';
+import type { ReactNode } from 'react';
+import { cn } from '../../../utils/cn';
+import { Arrow01DownIcon, Arrow01UpIcon, SwitchVrIcon } from '../../icons-v2-generated';
+import { useDataTableContext } from './data-table';
+import { DataTableColumnFilter } from './data-table-column-filter';
+import type { TailwindBreakpoint } from './types';
+import { alignJustify, BREAKPOINT_ORDER, getHideAtVisibility } from './utils';
 
 /** Single-column sort descriptor consumed by the header. */
 export interface DataTableSortState {
-  id: string
-  desc: boolean
+  id: string;
+  desc: boolean;
 }
 
 export interface DataTableHeaderProps {
-  className?: string
+  className?: string;
   /** Keep the header visible while scrolling. */
-  stickyHeader?: boolean
+  stickyHeader?: boolean;
   /** Tailwind top class for sticky offset, e.g. `'top-[56px]'`. */
-  stickyHeaderOffset?: string
+  stickyHeaderOffset?: string;
   /**
    * Content rendered at the right edge of the header, on the same row as
    * column labels. Use for row-count, header-level toolbar buttons, etc.
@@ -32,19 +28,19 @@ export interface DataTableHeaderProps {
    * @example
    * <DataTable.Header rightSlot={<DataTable.RowCount itemName="device" />} />
    */
-  rightSlot?: ReactNode
+  rightSlot?: ReactNode;
   /**
    * Current sort descriptor. The header only renders the direction indicator
    * based on this value — it doesn't own the state. Pair with `onSortChange`
    * and let the consumer decide what a click means (server query, in-memory
    * sort, TanStack's row-model sort, …).
    */
-  sort?: DataTableSortState | null
+  sort?: DataTableSortState | null;
   /**
    * Fires when a sortable column header is clicked. The consumer owns the
    * toggle cycle (e.g. none → asc → desc → none) and the actual data sort.
    */
-  onSortChange?: (columnId: string) => void
+  onSortChange?: (columnId: string) => void;
 }
 
 export function DataTableHeader({
@@ -55,11 +51,11 @@ export function DataTableHeader({
   sort = null,
   onSortChange,
 }: DataTableHeaderProps) {
-  const table = useDataTableContext()
+  const table = useDataTableContext();
 
   // Flat header group (nested headers can be added later if needed).
-  const headerGroup = table.getHeaderGroups()[0]
-  if (!headerGroup) return null
+  const headerGroup = table.getHeaderGroups()[0];
+  if (!headerGroup) return null;
 
   // Below lg only filterable columns (and explicit opt-ins) are visible — the same
   // `keepsCellOnTablet` predicate the cells themselves use, so the two cannot drift.
@@ -70,7 +66,7 @@ export function DataTableHeader({
   // point of this file no longer reading a media query.
   const hasTabletVisibleCell = headerGroup.headers.some(
     header => !header.isPlaceholder && keepsCellOnTablet(header.column.columnDef.meta),
-  )
+  );
 
   return (
     <div
@@ -80,7 +76,7 @@ export function DataTableHeader({
         className,
       )}
     >
-      <div className="flex items-stretch gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] relative">
+      <div className="relative flex items-stretch gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]">
         {headerGroup.headers.map(header => (
           <HeaderCell key={header.id} header={header} sort={sort} onSortChange={onSortChange} />
         ))}
@@ -89,14 +85,14 @@ export function DataTableHeader({
             className={cn(
               'flex items-center',
               hasTabletVisibleCell
-                ? 'absolute right-[var(--spacing-system-mf)] inset-y-0'
+                ? 'absolute inset-y-0 right-[var(--spacing-system-mf)]'
                 : // No cell is visible below lg, so there this slot is the only thing
                   // giving the row height and carries the same fixed 48 rather than
                   // padding out to 44. From lg the cells are back and it returns to
                   // the absolute placement. Safe as a `max-lg:` override: nothing
                   // else in this string sets margin or height, so it competes only
                   // with unprefixed defaults, never with a `md:`/`lg:` class.
-                  'max-lg:ml-auto max-lg:h-12 lg:absolute lg:right-[var(--spacing-system-mf)] lg:inset-y-0',
+                  'max-lg:ml-auto max-lg:h-12 lg:absolute lg:inset-y-0 lg:right-[var(--spacing-system-mf)]',
             )}
           >
             {rightSlot}
@@ -104,20 +100,20 @@ export function DataTableHeader({
         )}
       </div>
     </div>
-  )
+  );
 }
 
 /* ─────────────────────────────── internals ─────────────────────────────── */
 
-type AnyHeader = Header<unknown, unknown>
+type AnyHeader = Header<unknown, unknown>;
 
 interface HeaderCellProps {
-  header: AnyHeader
-  sort: DataTableSortState | null
-  onSortChange?: (columnId: string) => void
+  header: AnyHeader;
+  sort: DataTableSortState | null;
+  onSortChange?: (columnId: string) => void;
 }
 
-type ColumnMeta = AnyHeader['column']['columnDef']['meta']
+type ColumnMeta = AnyHeader['column']['columnDef']['meta'];
 
 /**
  * Whether a column's header stays visible below `lg`, where the row is narrow
@@ -125,7 +121,7 @@ type ColumnMeta = AnyHeader['column']['columnDef']['meta']
  * dropdowns, plus anything explicitly opted in via `meta.alwaysShowHeader`.
  */
 function keepsCellOnTablet(meta: ColumnMeta): boolean {
-  return Boolean(meta?.filter) || meta?.alwaysShowHeader === true
+  return Boolean(meta?.filter) || meta?.alwaysShowHeader === true;
 }
 
 // Literal class maps — Tailwind's scanner needs the full class strings, which a
@@ -135,15 +131,15 @@ const SHOW_FROM: Record<TailwindBreakpoint, string> = {
   lg: 'lg:flex',
   xl: 'xl:flex',
   '2xl': '2xl:flex',
-}
+};
 const HIDE_FROM: Record<TailwindBreakpoint, string> = {
   md: 'md:hidden',
   lg: 'lg:hidden',
   xl: 'xl:hidden',
   '2xl': '2xl:hidden',
-}
+};
 /** Index of `lg` in the `[base, md, lg, xl, 2xl]` visibility array. */
-const LG_STEP = BREAKPOINT_ORDER.indexOf('lg') + 1
+const LG_STEP = BREAKPOINT_ORDER.indexOf('lg') + 1;
 
 /**
  * Visibility classes for one header cell, as a plain min-width ladder.
@@ -160,22 +156,22 @@ function getCellVisibilityClasses(
   keepOnTablet: boolean,
   hideAt: TailwindBreakpoint | TailwindBreakpoint[] | undefined,
 ): string {
-  const fromHideAt = getHideAtVisibility(hideAt)
+  const fromHideAt = getHideAtVisibility(hideAt);
   const visible = fromHideAt.map((shown, step) =>
     keepOnTablet
       ? // Reachable below lg whatever `hideAt` says; from lg it governs again.
         step < LG_STEP || shown
       : // Otherwise lg is a floor `hideAt` can raise but never lower.
         shown && step >= LG_STEP,
-  )
+  );
 
-  const classes = [visible[0] ? 'flex' : 'hidden']
+  const classes = [visible[0] ? 'flex' : 'hidden'];
   for (let step = 1; step < visible.length; step++) {
-    if (visible[step] === visible[step - 1]) continue
-    const breakpoint = BREAKPOINT_ORDER[step - 1]
-    classes.push(visible[step] ? SHOW_FROM[breakpoint] : HIDE_FROM[breakpoint])
+    if (visible[step] === visible[step - 1]) continue;
+    const breakpoint = BREAKPOINT_ORDER[step - 1];
+    classes.push(visible[step] ? SHOW_FROM[breakpoint] : HIDE_FROM[breakpoint]);
   }
-  return classes.join(' ')
+  return classes.join(' ');
 }
 
 /**
@@ -193,18 +189,20 @@ function getCellVisibilityClasses(
  * table's load.
  */
 function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
-  if (header.isPlaceholder) return null
+  if (header.isPlaceholder) return null;
 
-  const column = header.column
-  const meta = column.columnDef.meta
-  const hasFilter = Boolean(meta?.filter)
-  const keepOnTablet = keepsCellOnTablet(meta)
-  const align = meta?.align ?? 'left'
+  const column = header.column;
+  const meta = column.columnDef.meta;
+  // Bind the filter config once. Branching on the local (rather than on a
+  // derived `Boolean(...)` flag) is what lets TypeScript narrow it to
+  // non-undefined in the JSX below without non-null assertions.
+  const filter = meta?.filter;
+  const keepOnTablet = keepsCellOnTablet(meta);
+  const align = meta?.align ?? 'left';
   // Sort is opt-in via `meta.sortable`. Direction is fully consumer-driven via
   // the `sort` prop; we do not consult TanStack's sort APIs here.
-  const canSort = meta?.sortable === true
-  const sortDir: false | 'asc' | 'desc' =
-    sort?.id === column.id ? (sort.desc ? 'desc' : 'asc') : false
+  const canSort = meta?.sortable === true;
+  const sortDir: false | 'asc' | 'desc' = sort?.id === column.id ? (sort.desc ? 'desc' : 'asc') : false;
 
   return (
     <div
@@ -230,17 +228,17 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
         // Specificity rather than `!important`: it stays a normal declaration, so a
         // consumer that genuinely needs a tablet width can still take it back with a
         // more specific rule — `!important` could only be answered with another one.
-        meta?.width || 'flex-1 min-w-0',
+        meta?.width || 'min-w-0 flex-1',
         keepOnTablet && 'max-lg:[&&]:w-auto max-lg:[&&]:flex-none max-lg:[&&]:basis-auto',
         meta?.headerClassName,
       )}
     >
-      {hasFilter ? (
+      {filter ? (
         <DataTableColumnFilter
           column={column}
-          options={meta!.filter!.options}
-          placement={meta!.filter!.placement}
-          pending={meta!.filter!.pending}
+          options={filter.options}
+          placement={filter.placement}
+          pending={filter.pending}
           label={resolveHeaderLabel(header)}
           align={align}
         />
@@ -249,7 +247,7 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
           className={cn(
             // Fixed 48px header height per design (20px label centered inside)
             // instead of the padding-driven 44px.
-            'flex w-full items-center gap-[var(--spacing-system-xsf)] h-12 rounded-sm select-none transition-colors duration-200',
+            'flex h-12 w-full select-none items-center gap-[var(--spacing-system-xsf)] rounded-sm transition-colors duration-200',
             // Same "always, neutralized below lg" shape as the width above.
             alignJustify(align),
             keepOnTablet && 'max-lg:justify-start',
@@ -262,30 +260,32 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function HeaderLabel({ header }: { header: AnyHeader }) {
-  const headerDef = header.column.columnDef.header
-  if (headerDef === undefined) return null
+  const headerDef = header.column.columnDef.header;
+  if (headerDef === undefined) return null;
   if (typeof headerDef === 'string') {
     return (
-      <span className="text-h5 text-ods-text-secondary uppercase whitespace-nowrap transition-colors duration-200 group-hover:text-ods-text-primary">
+      <span className="whitespace-nowrap uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary">
         {headerDef}
       </span>
-    )
+    );
   }
   // Render-function or ReactNode: caller is responsible for styling.
-  return <>{flexRender(headerDef, header.getContext())}</>
+  return <>{flexRender(headerDef, header.getContext())}</>;
 }
 
 function SortIcon({ sorted }: { sorted: false | 'asc' | 'desc' }) {
-  if (sorted === 'asc') return <Arrow01UpIcon className="w-4 h-4 text-ods-accent" />
-  if (sorted === 'desc') return <Arrow01DownIcon className="w-4 h-4 text-ods-accent" />
-  return <SwitchVrIcon className="w-4 h-4 text-ods-text-secondary transition-colors duration-200 group-hover:text-ods-text-primary" />
+  if (sorted === 'asc') return <Arrow01UpIcon className="h-4 w-4 text-ods-accent" />;
+  if (sorted === 'desc') return <Arrow01DownIcon className="h-4 w-4 text-ods-accent" />;
+  return (
+    <SwitchVrIcon className="h-4 w-4 text-ods-text-secondary transition-colors duration-200 group-hover:text-ods-text-primary" />
+  );
 }
 
 function resolveHeaderLabel(header: AnyHeader): string {
-  const h = header.column.columnDef.header
-  return typeof h === 'string' ? h : header.column.id
+  const h = header.column.columnDef.header;
+  return typeof h === 'string' ? h : header.column.id;
 }

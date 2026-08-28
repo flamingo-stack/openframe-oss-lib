@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<TicketDetailDrawer />` — the expanded view of a single ticket.
@@ -21,66 +21,51 @@
  * callbacks; we don't reach into the QueryClient.
  */
 
-import { useEffect, useRef } from 'react'
-import { useStickToBottom } from 'use-stick-to-bottom'
-import { Button } from './../ui/button'
-import { useChatIdentity } from './../chat/hooks/use-chat-identity'
-import {
-  ChatMessageRow,
-  ChatMessageRowSkeleton,
-} from './../chat/chat-message-row'
-import { EmptyState } from './../empty-state'
-import {
-  TicketAttachmentsList,
-  type TicketAttachment,
-} from './../ui/ticket-attachments-list'
-import { SquareAvatar } from './../ui/square-avatar'
-import { formatRelativeTime } from './../../utils/date-utils'
-import { useTicketEngagements } from './hooks/use-ticket-engagements'
-import type {
-  TicketEngagementFile,
-} from './hooks/use-ticket-engagements'
-import { TicketLinkedDeliveryCard } from './ticket-linked-delivery-card'
-import { useOptionalTicketLive } from './ticket-live-provider'
-import { TicketReplyComposer } from './ticket-reply-composer'
-import type {
-  AnyTicket,
-  TicketAssignedOwner,
-  MappedTicketActionError,
-} from './types'
-import { isOptimistic, TICKET_MARK_READ_DEBOUNCE_MS } from './types'
+import { useEffect, useRef } from 'react';
+import { useStickToBottom } from 'use-stick-to-bottom';
+import { formatRelativeTime } from './../../utils/date-utils';
+import { ChatMessageRow, ChatMessageRowSkeleton } from './../chat/chat-message-row';
+import { useChatIdentity } from './../chat/hooks/use-chat-identity';
+import type { ChatAttachment } from './../chat/utils/chat-attachment-markdown';
+import { EmptyState } from './../empty-state';
+import { Button } from './../ui/button';
+import { SquareAvatar } from './../ui/square-avatar';
+import { TicketAttachmentsList, type TicketAttachment } from './../ui/ticket-attachments-list';
+import { useTicketEngagements } from './hooks/use-ticket-engagements';
+import type { TicketEngagementFile } from './hooks/use-ticket-engagements';
+import { TicketLinkedDeliveryCard } from './ticket-linked-delivery-card';
+import { useOptionalTicketLive } from './ticket-live-provider';
+import { TicketReplyComposer } from './ticket-reply-composer';
+import type { AnyTicket, TicketAssignedOwner, MappedTicketActionError } from './types';
+import { isOptimistic, TICKET_MARK_READ_DEBOUNCE_MS } from './types';
 
 /** Identity bundle threaded through the action callbacks: local mirror
  *  UUID + HubSpot external_id. Actions send `external_id` to HubSpot
  *  (the only id it recognizes) and use `id` for the React-side mutex +
  *  TanStack cache. */
-export type TicketRef = { id: string; external_id: string }
+export type TicketRef = { id: string; external_id: string };
 
 export interface TicketDetailDrawerProps {
-  ticket: AnyTicket
-  busy: boolean
-  supportSystemDown: boolean
+  ticket: AnyTicket;
+  busy: boolean;
+  supportSystemDown: boolean;
   /** Single combined "reply" — text + optional attachments delivered as
    *  ONE Note engagement. */
-  onSendMessage: (
-    ticket: TicketRef,
-    text: string,
-    attachments: import('./../chat/utils/chat-attachment-markdown').ChatAttachment[],
-  ) => Promise<boolean>
-  onClose: (ticket: TicketRef, resolution?: string) => Promise<boolean>
-  onReopen: (ticket: TicketRef) => Promise<boolean>
+  onSendMessage: (ticket: TicketRef, text: string, attachments: ChatAttachment[]) => Promise<boolean>;
+  onClose: (ticket: TicketRef, resolution?: string) => Promise<boolean>;
+  onReopen: (ticket: TicketRef) => Promise<boolean>;
   /** Called after a successful close/reopen so the parent can collapse
    *  the drawer (status flipped — current action set is now stale). */
-  onActionCollapsed: () => void
+  onActionCollapsed: () => void;
   /** Persisted reply-failure surface — when non-null the drawer renders
    *  an inline banner above the composer with the mapped copy + a
    *  dismiss control. Distinct from the transient toast; the banner
    *  stays visible so the customer can locate the failed draft after
    *  the toast disappears. Cleared on the next successful send. */
-  replyError?: MappedTicketActionError | null
+  replyError?: MappedTicketActionError | null;
   /** Dismiss-X handler for the banner. Parent calls
    *  `actions.clearReplyError(ticket.external_id)`. */
-  onClearReplyError?: () => void
+  onClearReplyError?: () => void;
 }
 
 export function TicketDetailDrawer({
@@ -90,13 +75,12 @@ export function TicketDetailDrawer({
   onSendMessage,
   onClose,
   onReopen,
-  onActionCollapsed,
   replyError,
   onClearReplyError,
 }: TicketDetailDrawerProps) {
-  const isClosed = (ticket.status ?? '').toUpperCase() === 'CLOSED'
+  const isClosed = (ticket.status ?? '').toUpperCase() === 'CLOSED';
   return (
-    <div className="bg-ods-card border-t border-ods-border px-4 py-4 flex flex-col gap-4">
+    <div className="flex flex-col gap-4 border-t border-ods-border bg-ods-card px-4 py-4">
       {/* Assignee header — surfaces who's looking at this ticket on the
           support side. Populated server-side via `attachOwnerProfiles`;
           falls back to "Unassigned" when no agent is assigned OR when
@@ -109,14 +93,10 @@ export function TicketDetailDrawer({
           tickets with no linked task skip this entirely. The card itself
           links out to ClickUp with the per-status color badge so the
           customer can follow the delivery progress. */}
-      {ticket.clickup && (
-        <TicketLinkedDeliveryCard clickup={ticket.clickup} />
-      )}
+      {ticket.clickup && <TicketLinkedDeliveryCard clickup={ticket.clickup} />}
 
       <div>
-        <p className="text-h5 text-ods-text-secondary mb-2">
-          Conversation
-        </p>
+        <p className="mb-2 text-ods-text-secondary text-h5">Conversation</p>
         <TicketTimelinePanel ticket={ticket} />
       </div>
 
@@ -128,19 +108,13 @@ export function TicketDetailDrawer({
             (composer) actions still allow Retry; the closed (reopen)
             state still shows the banner because the user might have
             tried to reply to a then-closing ticket. */}
-        {replyError && (
-          <ReplyFailureBanner
-            error={replyError}
-            onDismiss={onClearReplyError ?? (() => undefined)}
-          />
-        )}
+        {replyError && <ReplyFailureBanner error={replyError} onDismiss={onClearReplyError ?? (() => undefined)} />}
         {isClosed ? (
           <ReopenAction
             ticketRef={{ id: ticket.id, external_id: ticket.external_id }}
             busy={busy}
             supportSystemDown={supportSystemDown}
             onReopen={onReopen}
-            onActionCollapsed={onActionCollapsed}
           />
         ) : (
           <TicketReplyComposer
@@ -153,7 +127,7 @@ export function TicketDetailDrawer({
         )}
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -180,7 +154,7 @@ export function TicketDetailDrawer({
 // backtracking class CodeQL flags for unbounded `\s+` on user input.
 // 16 chars of leading/trailing whitespace around `---` is far more
 // than any composed ticket body needs, so no real input is rejected.
-const TURN_SEPARATOR_RE = /[\s]{1,16}---[\s]{1,16}/g
+const TURN_SEPARATOR_RE = /[\s]{1,16}---[\s]{1,16}/g;
 
 // Slack-channel feed framing — ported from the hub's live community feed
 // (`components/slack/chat-interface.tsx`: `:62` bounded card, `:83` padding +
@@ -188,29 +162,28 @@ const TURN_SEPARATOR_RE = /[\s]{1,16}---[\s]{1,16}/g
 // within the ticket feed; the delivery `DevCardRowSkeletonList` keeps its own
 // (separate, untouched) frame literal. `max-h` is responsive (vs Slack's fixed
 // height).
-const TICKET_FEED_FRAME =
-  'bg-ods-card border border-ods-border rounded-[6px] overflow-y-auto w-full'
+const TICKET_FEED_FRAME = 'bg-ods-card border border-ods-border rounded-[6px] overflow-y-auto w-full';
 // FIXED height for EVERY state (skeleton, content, empty) — the Slack feed uses
 // a fixed-height box too (`chat-interface.tsx:62`). Fixed (not `max-h`) is the
 // fix for the "open shows 1 message, then the container grows as engagements
 // land" jank: the feed is its final size from first paint, so loaded content
 // just fills/scrolls inside it — the box never resizes.
-const TICKET_FEED_HEIGHT = 'h-[60vh] md:h-[420px]'
-const TICKET_FEED_INNER = 'flex flex-col gap-4 md:gap-6 px-4 md:px-6 py-4 md:py-6'
+const TICKET_FEED_HEIGHT = 'h-[60vh] md:h-[420px]';
+const TICKET_FEED_INNER = 'flex flex-col gap-4 md:gap-6 px-4 md:px-6 py-4 md:py-6';
 // Enough skeleton rows to fill the fixed height (avatar 40px + header + 2 body
 // lines + gap-6) so the loading state looks like a full conversation.
-const TICKET_FEED_SKELETON_ROWS = 6
+const TICKET_FEED_SKELETON_ROWS = 6;
 
 function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
-  const identity = useChatIdentity()
+  const identity = useChatIdentity();
   // Optimistic placeholders don't have a real external_id yet — skip
   // the engagement fetch until the real ticket lands.
-  const externalId = isOptimistic(ticket) ? null : ticket.external_id
+  const externalId = isOptimistic(ticket) ? null : ticket.external_id;
   // Live conversation refresh is PUSH-driven: `TicketLiveProvider`
   // invalidates `['ticket-engagements', id]` on stream events, so new
   // agent replies surface without any interval (polling was deleted
   // 2026-08; `refetchOnWindowFocus` remains the no-stream fallback).
-  const { engagements, isLoading } = useTicketEngagements(externalId, !!externalId)
+  const { engagements, isLoading } = useTicketEngagements(externalId, !!externalId);
 
   // Read-state lifecycle — this panel mounts exactly while the drawer is
   // open, so it owns: register the open ticket (provider suppresses
@@ -218,36 +191,36 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
   // as new messages stream in, flush on close. The provider's callbacks
   // are stable (useCallback) so these effects don't re-fire on unrelated
   // context-value changes.
-  const live = useOptionalTicketLive()
-  const setOpenTicketId = live?.setOpenTicketId
-  const markRead = live?.markRead
-  const markReadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const live = useOptionalTicketLive();
+  const setOpenTicketId = live?.setOpenTicketId;
+  const markRead = live?.markRead;
+  const markReadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!externalId || !setOpenTicketId || !markRead) return
-    setOpenTicketId(externalId)
-    void markRead(externalId)
+    if (!externalId || !setOpenTicketId || !markRead) return undefined;
+    setOpenTicketId(externalId);
+    void markRead(externalId);
     return () => {
       // Flush a pending debounced markRead on close so a reply that
       // arrived moments before closing is still receipted.
       if (markReadDebounceRef.current) {
-        clearTimeout(markReadDebounceRef.current)
-        markReadDebounceRef.current = null
-        void markRead(externalId)
+        clearTimeout(markReadDebounceRef.current);
+        markReadDebounceRef.current = null;
+        void markRead(externalId);
       }
-      setOpenTicketId(null)
-    }
-  }, [externalId, setOpenTicketId, markRead])
+      setOpenTicketId(null);
+    };
+  }, [externalId, setOpenTicketId, markRead]);
 
-  const engagementsCount = engagements.length
+  const engagementsCount = engagements.length;
   useEffect(() => {
-    if (!externalId || !markRead || engagementsCount === 0) return
-    if (markReadDebounceRef.current) clearTimeout(markReadDebounceRef.current)
+    if (!externalId || !markRead || engagementsCount === 0) return;
+    if (markReadDebounceRef.current) clearTimeout(markReadDebounceRef.current);
     markReadDebounceRef.current = setTimeout(() => {
-      markReadDebounceRef.current = null
-      void markRead(externalId)
-    }, TICKET_MARK_READ_DEBOUNCE_MS)
-  }, [engagementsCount, externalId, markRead])
+      markReadDebounceRef.current = null;
+      void markRead(externalId);
+    }, TICKET_MARK_READ_DEBOUNCE_MS);
+  }, [engagementsCount, externalId, markRead]);
 
   // Slack-style auto-tail (same lib mechanism `ChatMessageList` uses): jump to
   // the newest message on open (`initial:'instant'`), smooth-scroll on a new
@@ -257,11 +230,14 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
   // height, then again to real content). This inner scroll is a SEPARATE
   // container from `HelpCenterCard`'s page-level expand-scroll, so it never
   // fights the "scroll to top of the ticket card" behavior.
-  const { scrollRef, contentRef } = useStickToBottom({ initial: 'instant', resize: 'smooth' })
+  const { scrollRef, contentRef } = useStickToBottom({ initial: 'instant', resize: 'smooth' });
 
   const bodyTurns = ticket.body
-    ? ticket.body.split(TURN_SEPARATOR_RE).map((t) => t.trim()).filter(Boolean)
-    : []
+    ? ticket.body
+        .split(TURN_SEPARATOR_RE)
+        .map(t => t.trim())
+        .filter(Boolean)
+    : [];
 
   // Suppress `bodyTurns[0]` ("Original message") when the engagement
   // timeline already has a customer-authored message whose body
@@ -281,13 +257,11 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
   // labels as such when `bodyTurns[0]` is suppressed.
   const customerEngagementBodies = new Set<string>(
     engagements
-      .filter((e) => e.authorRole === 'customer')
-      .map((e) => (e.body ?? '').trim())
+      .filter(e => e.authorRole === 'customer')
+      .map(e => (e.body ?? '').trim())
       .filter(Boolean),
-  )
-  const suppressBodyTurnZero =
-    bodyTurns.length > 0 &&
-    customerEngagementBodies.has(bodyTurns[0])
+  );
+  const suppressBodyTurnZero = bodyTurns.length > 0 && customerEngagementBodies.has(bodyTurns[0]);
 
   // Customer name resolution precedence:
   //   1. LIVE chat identity (`identity.user.name`) — when the viewer
@@ -299,21 +273,14 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
   //      person's name instead of "Customer" generic.
   //   3. Session email — last resort.
   //   4. "You" — anonymous viewer.
-  const sessionEmailLower = identity.user?.email?.trim().toLowerCase() ?? null
+  const sessionEmailLower = identity.user?.email?.trim().toLowerCase() ?? null;
   const isViewerTheCustomer =
-    !!sessionEmailLower &&
-    ticket.customer_emails.some((e) => e.trim().toLowerCase() === sessionEmailLower)
-  const viewerName = identity.user?.name?.trim() || null
-  const ticketCustomerName = ticket.customer_name?.trim() || null
+    !!sessionEmailLower && ticket.customer_emails.some(e => e.trim().toLowerCase() === sessionEmailLower);
+  const viewerName = identity.user?.name?.trim() || null;
+  const ticketCustomerName = ticket.customer_name?.trim() || null;
   const customerName =
-    (isViewerTheCustomer ? viewerName : null) ||
-    ticketCustomerName ||
-    viewerName ||
-    identity.user?.email ||
-    'You'
-  const customerAvatar = isViewerTheCustomer
-    ? identity.user?.avatarUrl ?? undefined
-    : undefined
+    (isViewerTheCustomer ? viewerName : null) || ticketCustomerName || viewerName || identity.user?.email || 'You';
+  const customerAvatar = isViewerTheCustomer ? (identity.user?.avatarUrl ?? undefined) : undefined;
 
   // Loading takes precedence over partial content — this is the fix for the
   // "open shows 1 message, then the rest load and the box grows" jank. The
@@ -336,7 +303,7 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           ))}
         </div>
       </div>
-    )
+    );
   }
 
   if (bodyTurns.length === 0 && engagements.length === 0) {
@@ -347,13 +314,13 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
         description="Reply below to start the thread with the support team."
         showCTA={false}
       />
-    )
+    );
   }
 
   return (
     <div ref={scrollRef} className={`${TICKET_FEED_FRAME} ${TICKET_FEED_HEIGHT}`}>
       <div ref={contentRef} className={TICKET_FEED_INNER}>
-      {/* Customer-authored description + any legacy `---`-joined
+        {/* Customer-authored description + any legacy `---`-joined
           comments. Always rendered ABOVE the engagement timeline as
           "Original message" because the server's intake-burst filter
           (see `filterCustomerVisibleTimeline` in
@@ -364,28 +331,28 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           intake (admin-created, email channel) bodyTurns shows the
           manually-entered description and engagements show subsequent
           replies — same flow, no duplication. */}
-      {bodyTurns.map((turn, i) => {
-        // Drop the redundant first turn when the engagement timeline
-        // below already renders the same customer-authored body. See
-        // `suppressBodyTurnZero` derivation above for the rationale.
-        if (i === 0 && suppressBodyTurnZero) return null
-        const isResolution = turn.startsWith('[Resolution]')
-        const text = isResolution ? turn.replace(/^\[Resolution\]\s*/, '') : turn
-        // Body turns don't carry per-turn timestamps — `ticket.body` is a
-        // single content field that HubSpot appends to. They render as the
-        // customer's own messages (no role chip — the Slack-channel feed has
-        // no role labels), oldest-first above the engagement timeline.
-        return (
-          <ChatMessageRow
-            key={`body-${i}-${turn.slice(0, 24)}`}
-            displayName={customerName}
-            avatarUrl={customerAvatar}
-            body={text}
-          />
-        )
-      })}
+        {bodyTurns.map((turn, i) => {
+          // Drop the redundant first turn when the engagement timeline
+          // below already renders the same customer-authored body. See
+          // `suppressBodyTurnZero` derivation above for the rationale.
+          if (i === 0 && suppressBodyTurnZero) return null;
+          const isResolution = turn.startsWith('[Resolution]');
+          const text = isResolution ? turn.replace(/^\[Resolution\]\s*/, '') : turn;
+          // Body turns don't carry per-turn timestamps — `ticket.body` is a
+          // single content field that HubSpot appends to. They render as the
+          // customer's own messages (no role chip — the Slack-channel feed has
+          // no role labels), oldest-first above the engagement timeline.
+          return (
+            <ChatMessageRow
+              key={`body-${i}-${turn.slice(0, 24)}`}
+              displayName={customerName}
+              avatarUrl={customerAvatar}
+              body={text}
+            />
+          );
+        })}
 
-      {/* Engagement timeline — interleaves customer-authored Custom
+        {/* Engagement timeline — interleaves customer-authored Custom
           Channel messages (authorRole='customer') and team-authored
           Notes (authorRole='support').
           ATTRIBUTION RULES (per repo convention):
@@ -407,97 +374,97 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
               display info. When the owner isn't a known Flamingo
               employee, both fields are null and we fall back to
               the generic "Support team" treatment. */}
-      {engagements.map((eng) => {
-        const isCustomer = eng.authorRole === 'customer'
-        // Per-message own-reply check: the server populates `authorId`
-        // with the message sender's email (resolved server-side via
-        // the HubSpot Conversations actor batch-read for Custom
-        // Channel visitor messages). When that email matches the
-        // session viewer's email, the bubble is the viewer's OWN
-        // reply and renders with LIVE chat identity (name + avatar
-        // from chat-auth headers).
-        const isOwnReply =
-          isCustomer &&
-          !!eng.authorId &&
-          !!identity.user?.email &&
-          eng.authorId.toLowerCase() === identity.user.email.toLowerCase()
+        {engagements.map(eng => {
+          const isCustomer = eng.authorRole === 'customer';
+          // Per-message own-reply check: the server populates `authorId`
+          // with the message sender's email (resolved server-side via
+          // the HubSpot Conversations actor batch-read for Custom
+          // Channel visitor messages). When that email matches the
+          // session viewer's email, the bubble is the viewer's OWN
+          // reply and renders with LIVE chat identity (name + avatar
+          // from chat-auth headers).
+          const isOwnReply =
+            isCustomer &&
+            !!eng.authorId &&
+            !!identity.user?.email &&
+            eng.authorId.toLowerCase() === identity.user.email.toLowerCase();
 
-        let author: string
-        let avatarSrc: string | undefined
-        if (isCustomer && isOwnReply) {
-          // Live identity — 1:1 from chat auth headers.
-          author = identity.user?.name?.trim() || customerName
-          avatarSrc = identity.user?.avatarUrl ?? undefined
-        } else if (isCustomer) {
-          // Customer bubble whose sender email isn't the current
-          // session viewer. Two sub-cases:
-          //   (a) Same customer as the ticket but viewed by an admin
-          //       (or no sender_email on the engagement at all — the
-          //       Conversations API leaves it null on Custom Channels).
-          //       Use `ticket.customer_name` from the mirror — that's
-          //       the canonical HubSpot contact name for THIS ticket.
-          //   (b) Multi-contact ticket (CC/BCC) — a different customer
-          //       email appears here. We fall back to the same
-          //       `ticket.customer_name` rather than leak the second
-          //       contact's address; close enough for the rare case.
-          author = ticketCustomerName || 'Customer'
-          avatarSrc = undefined
-        } else if (eng.authorName && eng.authorAvatarUrl) {
-          // Resolved Flamingo employee — server matched the HubSpot
-          // owner's email against `profiles` AND has an avatar to
-          // prove it. Avatar presence IS the trust signal: only
-          // owner-resolved employees carry one; raw HubSpot
-          // `sender_name` (bots, integrations, system actors,
-          // unmatched humans) carries name without avatar and gets
-          // the generic "Support team" treatment so we never
-          // attribute a customer-facing bubble to a bot string
-          // ("HubSpot Bot", "Slack Integration", etc.).
-          author = eng.authorName
-          avatarSrc = eng.authorAvatarUrl
-        } else {
-          // Unmatched / unknown / bot / integration / system actor —
-          // generic fallback. Customer doesn't need to see internal
-          // tool branding (which has the customer "talking to" a bot
-          // string instead of a person).
-          author = 'Support team'
-          avatarSrc = undefined
-        }
+          let author: string;
+          let avatarSrc: string | undefined;
+          if (isCustomer && isOwnReply) {
+            // Live identity — 1:1 from chat auth headers.
+            author = identity.user?.name?.trim() || customerName;
+            avatarSrc = identity.user?.avatarUrl ?? undefined;
+          } else if (isCustomer) {
+            // Customer bubble whose sender email isn't the current
+            // session viewer. Two sub-cases:
+            //   (a) Same customer as the ticket but viewed by an admin
+            //       (or no sender_email on the engagement at all — the
+            //       Conversations API leaves it null on Custom Channels).
+            //       Use `ticket.customer_name` from the mirror — that's
+            //       the canonical HubSpot contact name for THIS ticket.
+            //   (b) Multi-contact ticket (CC/BCC) — a different customer
+            //       email appears here. We fall back to the same
+            //       `ticket.customer_name` rather than leak the second
+            //       contact's address; close enough for the rare case.
+            author = ticketCustomerName || 'Customer';
+            avatarSrc = undefined;
+          } else if (eng.authorName && eng.authorAvatarUrl) {
+            // Resolved Flamingo employee — server matched the HubSpot
+            // owner's email against `profiles` AND has an avatar to
+            // prove it. Avatar presence IS the trust signal: only
+            // owner-resolved employees carry one; raw HubSpot
+            // `sender_name` (bots, integrations, system actors,
+            // unmatched humans) carries name without avatar and gets
+            // the generic "Support team" treatment so we never
+            // attribute a customer-facing bubble to a bot string
+            // ("HubSpot Bot", "Slack Integration", etc.).
+            author = eng.authorName;
+            avatarSrc = eng.authorAvatarUrl;
+          } else {
+            // Unmatched / unknown / bot / integration / system actor —
+            // generic fallback. Customer doesn't need to see internal
+            // tool branding (which has the customer "talking to" a bot
+            // string instead of a person).
+            author = 'Support team';
+            avatarSrc = undefined;
+          }
 
-        // Role label: every engagement is a customer-visible
-        // Conversations message (customer ↔ agent on the Custom
-        // Channel). There are no internal Notes on this surface
-        // anymore — the read path explicitly filters them. So
-        // "Reply" for BOTH sides. The previous "Note" label for
-        // support bubbles was a legacy artifact from when Notes
-        // were rendered and made customers think their support
-        // engineer was leaving internal comments on their ticket.
-        const engAttachments = mapEngagementAttachments(eng.attachments)
-        return (
-          <ChatMessageRow
-            key={eng.id}
-            displayName={author}
-            avatarUrl={avatarSrc}
-            timeLabel={eng.createdAt ? formatRelativeTime(eng.createdAt) : null}
-            body={stripAttachmentsPreamble(eng.body ?? '')}
-            footer={
-              engAttachments.length > 0 ? (
-                <div className="mt-2">
-                  <TicketAttachmentsList attachments={engAttachments} size="compact" />
-                </div>
-              ) : null
-            }
-          />
-        )
-      })}
+          // Role label: every engagement is a customer-visible
+          // Conversations message (customer ↔ agent on the Custom
+          // Channel). There are no internal Notes on this surface
+          // anymore — the read path explicitly filters them. So
+          // "Reply" for BOTH sides. The previous "Note" label for
+          // support bubbles was a legacy artifact from when Notes
+          // were rendered and made customers think their support
+          // engineer was leaving internal comments on their ticket.
+          const engAttachments = mapEngagementAttachments(eng.attachments);
+          return (
+            <ChatMessageRow
+              key={eng.id}
+              displayName={author}
+              avatarUrl={avatarSrc}
+              timeLabel={eng.createdAt ? formatRelativeTime(eng.createdAt) : null}
+              body={stripAttachmentsPreamble(eng.body ?? '')}
+              footer={
+                engAttachments.length > 0 ? (
+                  <div className="mt-2">
+                    <TicketAttachmentsList attachments={engAttachments} size="compact" />
+                  </div>
+                ) : null
+              }
+            />
+          );
+        })}
 
-      {/* No trailing refetch skeleton in the tailing feed: a skeleton mounted
+        {/* No trailing refetch skeleton in the tailing feed: a skeleton mounted
           inside `contentRef` on a background refetch would make the auto-tail
           smooth-scroll to the skeleton and then again to the real row (a
           double-jump). The smooth-tail to the appended real reply IS the
           feedback. (Removed the former background-refetch rows={1} skeleton.) */}
       </div>
     </div>
-  )
+  );
 }
 
 /** Map the engagement file shape to the lib's canonical
@@ -505,28 +472,28 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
  *  `<TicketAttachmentsList>`. Engagement `url` becomes a
  *  window.open-style download click; missing names degrade to
  *  `file-<id>` so the chip never renders an empty label. */
-function mapEngagementAttachments(
-  files: TicketEngagementFile[],
-): TicketAttachment[] {
-  return files.map((f) => ({
-    id: f.id,
-    fileName: f.name ?? `file-${f.id}`,
-    fileSize: f.size ? formatBytes(f.size) : '',
-    // Show an inline thumbnail for image attachments (the signed `url` is a
-    // viewable URL). Non-images fall back to the file-type icon. SquareAvatar
-    // degrades to initials on a broken/expired image URL.
-    thumbnailSrc:
-      f.url && (f.mime?.startsWith('image/') ?? false) ? f.url : undefined,
-    onDownload: f.url
-      ? () => window.open(f.url!, '_blank', 'noopener,noreferrer')
-      : undefined,
-  }))
+function mapEngagementAttachments(files: TicketEngagementFile[]): TicketAttachment[] {
+  return files.map(f => {
+    // Captured before the `onDownload` closure below: a narrowing of `f.url`
+    // does not reach into a callback that runs on a later click.
+    const url = f.url;
+    return {
+      id: f.id,
+      fileName: f.name ?? `file-${f.id}`,
+      fileSize: f.size ? formatBytes(f.size) : '',
+      // Show an inline thumbnail for image attachments (the signed `url` is a
+      // viewable URL). Non-images fall back to the file-type icon. SquareAvatar
+      // degrades to initials on a broken/expired image URL.
+      thumbnailSrc: url && (f.mime?.startsWith('image/') ?? false) ? url : undefined,
+      onDownload: url ? () => window.open(url, '_blank', 'noopener,noreferrer') : undefined,
+    };
+  });
 }
 
 function formatBytes(size: number): string {
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /** Strip the redundant `Attachments:\n\n filename.png\n filename2.png`
@@ -539,9 +506,9 @@ function formatBytes(size: number): string {
  *  so server-side wording tweaks like "Attachments (3):" still strip
  *  cleanly. Idempotent — a body with no preamble passes through
  *  untouched. */
-const ATTACHMENTS_PREAMBLE_RE = /\s*\n\s*Attachments\b[^]*$/i
+const ATTACHMENTS_PREAMBLE_RE = /\s*\n\s*Attachments\b[^]*$/i;
 function stripAttachmentsPreamble(body: string): string {
-  return body.replace(ATTACHMENTS_PREAMBLE_RE, '').trim()
+  return body.replace(ATTACHMENTS_PREAMBLE_RE, '').trim();
 }
 
 function ReopenAction({
@@ -549,16 +516,14 @@ function ReopenAction({
   busy,
   supportSystemDown,
   onReopen,
-  onActionCollapsed,
 }: {
-  ticketRef: TicketRef
-  busy: boolean
-  supportSystemDown: boolean
-  onReopen: TicketDetailDrawerProps['onReopen']
-  onActionCollapsed: TicketDetailDrawerProps['onActionCollapsed']
+  ticketRef: TicketRef;
+  busy: boolean;
+  supportSystemDown: boolean;
+  onReopen: TicketDetailDrawerProps['onReopen'];
 }) {
   const handleReopen = async () => {
-    // Intentionally do NOT call `onActionCollapsed()` here. Pre-PR #1053
+    // Deliberately does NOT take (or call) the parent's `onActionCollapsed`. Pre-PR #1053
     // every reopen was followed by a full list refetch which removed
     // the (now-OPEN) row from a `?status=closed` view, so collapsing
     // the drawer hid the disappearance flash. After #1053+#1055 the
@@ -566,8 +531,8 @@ function ReopenAction({
     // update — collapsing the drawer now actively dismisses the
     // ticket the user is working on. Keep it mounted; the badge flip
     // is enough feedback. (Reported 2026-05-29.)
-    void (await onReopen(ticketRef))
-  }
+    void (await onReopen(ticketRef));
+  };
   return (
     <div className="flex justify-end">
       {/* Reopen is a secondary, reversible action — `outline` (not the filled
@@ -584,7 +549,7 @@ function ReopenAction({
         Reopen
       </Button>
     </div>
-  )
+  );
 }
 
 /**
@@ -601,18 +566,12 @@ function ReopenAction({
  * is uniform; the parent's composer continues to function for any
  * non-thread-deletion reply path.
  */
-function ReplyFailureBanner({
-  error,
-  onDismiss,
-}: {
-  error: MappedTicketActionError
-  onDismiss: () => void
-}) {
+function ReplyFailureBanner({ error, onDismiss }: { error: MappedTicketActionError; onDismiss: () => void }) {
   return (
     <div
       role="status"
       aria-live="polite"
-      className="mb-3 flex items-start gap-3 rounded-md border border-ods-error bg-ods-error-secondary px-3 py-2 text-h6 text-ods-error"
+      className="mb-3 flex items-start gap-3 rounded-md border border-ods-error bg-ods-error-secondary px-3 py-2 text-ods-error text-h6"
     >
       <span className="font-medium leading-snug">{error.message}</span>
       <Button
@@ -620,12 +579,12 @@ function ReplyFailureBanner({
         variant="transparent"
         onClick={onDismiss}
         aria-label="Dismiss reply failure"
-        className="ml-auto px-2 py-0.5 text-h6 uppercase text-ods-error hover:bg-ods-error-secondary border-transparent"
+        className="ml-auto border-transparent px-2 py-0.5 uppercase text-ods-error text-h6 hover:bg-ods-error-secondary"
       >
         Dismiss
       </Button>
     </div>
-  )
+  );
 }
 
 /**
@@ -640,11 +599,7 @@ function ReplyFailureBanner({
  * everywhere else in the lib (matches the dev-section message-bubble
  * avatars). No bespoke avatar markup.
  */
-function AssignedAgentRow({
-  assignedOwner,
-}: {
-  assignedOwner: TicketAssignedOwner | null
-}) {
+function AssignedAgentRow({ assignedOwner }: { assignedOwner: TicketAssignedOwner | null }) {
   // Display label precedence:
   //   1. `name` from the mirror (employee match OR HubSpot's first+last)
   //   2. `email` local-part — covers HubSpot owners that exist but have
@@ -652,17 +607,14 @@ function AssignedAgentRow({
   //      "Unassigned" would be misleading)
   //   3. "Unassigned" — only when the ticket has no `assigned_to` OR
   //      the owner couldn't be resolved against the mirror at all
-  const trimmedName = assignedOwner?.name?.trim() || null
-  const emailFallback = assignedOwner?.email?.trim() || null
-  const displayLabel =
-    trimmedName ?? (emailFallback ? emailFallback.split('@')[0] : null)
+  const trimmedName = assignedOwner?.name?.trim() || null;
+  const emailFallback = assignedOwner?.email?.trim() || null;
+  const displayLabel = trimmedName ?? (emailFallback ? emailFallback.split('@')[0] : null);
   return (
     <div className="flex items-center gap-2 text-h6">
-      <span className="text-h5 text-ods-text-secondary">
-        Assigned to
-      </span>
+      <span className="text-ods-text-secondary text-h5">Assigned to</span>
       {displayLabel ? (
-        <span className="flex items-center gap-1.5 text-ods-text-primary font-medium">
+        <span className="flex items-center gap-1.5 font-medium text-ods-text-primary">
           {/* Avatar loads direct; `SquareAvatar`'s own onError falls back to initials. */}
           <SquareAvatar
             size="sm"
@@ -674,8 +626,8 @@ function AssignedAgentRow({
           {displayLabel}
         </span>
       ) : (
-        <span className="text-ods-text-secondary italic">Unassigned</span>
+        <span className="italic text-ods-text-secondary">Unassigned</span>
       )}
     </div>
-  )
+  );
 }

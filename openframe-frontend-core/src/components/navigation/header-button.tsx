@@ -1,20 +1,20 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { UnreadDot } from './unread-dot'
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import { UnreadDot } from './unread-dot';
 
 export interface HeaderButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Whether the button is in active/pressed state */
-  isActive?: boolean
+  isActive?: boolean;
   /** Icon to display in the button */
-  icon: React.ReactNode
+  icon: React.ReactNode;
   /** Render the shared `UnreadDot` at the icon's top-right (the
    *  notifications-bell treatment, promoted to the cell primitive so
    *  indicator cells never copy the dot markup). */
-  showUnreadDot?: boolean
+  showUnreadDot?: boolean;
   /** Additional class names */
-  className?: string
+  className?: string;
 }
 
 export function HeaderButton({
@@ -27,18 +27,18 @@ export function HeaderButton({
   return (
     <button
       className={cn(
-        "flex items-center justify-center shrink-0",
-        "transition-colors duration-200",
+        'flex shrink-0 items-center justify-center',
+        'transition-colors duration-200',
         // Square cell width follows the TopNavigation size (56px small /
         // 72px big) via the shell's --top-nav-cell var; 56px fallback for
         // standalone use.
-        "w-[var(--top-nav-cell,3.5rem)] h-full",
+        'h-full w-[var(--top-nav-cell,3.5rem)]',
         isActive
-          ? "text-ods-text-primary bg-ods-bg-active"
+          ? 'bg-ods-bg-active text-ods-text-primary'
           : // Transparent at rest so the cell inherits the bar's background
             // (TopNavigation `backgroundClassName` can differ per platform).
-            "text-ods-text-secondary bg-transparent hover:bg-ods-bg-hover",
-        className
+            'bg-transparent text-ods-text-secondary hover:bg-ods-bg-hover',
+        className,
       )}
       {...props}
     >
@@ -51,7 +51,7 @@ export function HeaderButton({
         icon
       )}
     </button>
-  )
+  );
 }
 
-export default HeaderButton
+export default HeaderButton;

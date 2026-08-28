@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * Flattened view of the AI agent's {@code messageData} union. The GraphQL query selects the fields the
  * harness needs across several concrete types (TextData, ExecutedToolData, ApprovalRequestData,
- * ErrorData) via inline fragments; {@code type} discriminates, and fields not present on a given
+ * ErrorData, AskData) via inline fragments; {@code type} discriminates, and fields not present on a given
  * variant stay null.
  */
 @Data
@@ -39,4 +39,10 @@ public class MessageData {
     // ErrorData
     private String error;
     private String details;
+
+    // AskData -- the router's disambiguation question and the choices it offered. Without these a run
+    // that ends in an ASK dumps a bare "ASK:" line, and what was actually asked is only recoverable
+    // from the agent's upstream request log.
+    private String question;
+    private List<AskOption> options;
 }

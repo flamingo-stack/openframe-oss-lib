@@ -1,37 +1,37 @@
-'use client'
+'use client';
 
-import type * as React from 'react'
-import { cn } from '../../../utils/cn'
-import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
-import { Button } from '../../ui/button'
-import { Input } from '../../ui/input'
-import { PasswordInput } from '../../ui/password-input'
+import type { KeyboardEvent } from 'react';
+import { useDeferredError } from '../../../hooks/ui/use-deferred-error';
+import { cn } from '../../../utils/cn';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { PasswordInput } from '../../ui/password-input';
 
 export interface OpenFrameSsoLoginFormProps {
   /** Controlled field values */
-  email: string
-  password: string
-  onEmailChange: (value: string) => void
-  onPasswordChange: (value: string) => void
+  email: string;
+  password: string;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
   /** Primary submit ("Continue") */
-  onSubmit: () => void
-  onForgotPassword: () => void
-  submitDisabled?: boolean
-  loading?: boolean
-  disabled?: boolean
+  onSubmit: () => void;
+  onForgotPassword: () => void;
+  submitDisabled?: boolean;
+  loading?: boolean;
+  disabled?: boolean;
   errors?: {
-    email?: string
-    password?: string
-  }
-  title?: string
-  subtitle?: string
-  emailLabel?: string
-  passwordLabel?: string
-  emailPlaceholder?: string
-  passwordPlaceholder?: string
-  forgotPasswordLabel?: string
-  submitLabel?: string
-  className?: string
+    email?: string;
+    password?: string;
+  };
+  title?: string;
+  subtitle?: string;
+  emailLabel?: string;
+  passwordLabel?: string;
+  emailPlaceholder?: string;
+  passwordPlaceholder?: string;
+  forgotPasswordLabel?: string;
+  submitLabel?: string;
+  className?: string;
 }
 
 /**
@@ -59,17 +59,17 @@ export function OpenFrameSsoLoginForm({
   submitLabel = 'Continue',
   className,
 }: OpenFrameSsoLoginFormProps) {
-  const fieldsDisabled = disabled || loading
+  const fieldsDisabled = disabled || loading;
 
   // Validation messages are deferred while the user is typing (shown on blur or after a pause).
-  const emailErr = useDeferredError(errors?.email, email)
-  const passwordErr = useDeferredError(errors?.password, password)
+  const emailErr = useDeferredError(errors?.email, email);
+  const passwordErr = useDeferredError(errors?.password, password);
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldsDisabled && !submitDisabled) {
-      onSubmit()
+      onSubmit();
     }
-  }
+  };
 
   return (
     <div
@@ -80,8 +80,8 @@ export function OpenFrameSsoLoginForm({
     >
       {/* Header */}
       <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-        <h1 className="text-h2 text-ods-text-primary tracking-[-0.64px]">{title}</h1>
-        <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
+        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{title}</h1>
+        <p className="text-ods-text-secondary text-h4">{subtitle}</p>
       </div>
 
       <Input
@@ -92,7 +92,7 @@ export function OpenFrameSsoLoginForm({
         error={emailErr.error}
         disabled={fieldsDisabled}
         onBlur={emailErr.onBlur}
-        onChange={(event) => onEmailChange(event.target.value)}
+        onChange={event => onEmailChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
 
@@ -103,7 +103,7 @@ export function OpenFrameSsoLoginForm({
         error={passwordErr.error}
         disabled={fieldsDisabled}
         onBlur={passwordErr.onBlur}
-        onChange={(event) => onPasswordChange(event.target.value)}
+        onChange={event => onPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
 
@@ -132,5 +132,5 @@ export function OpenFrameSsoLoginForm({
         </Button>
       </div>
     </div>
-  )
+  );
 }

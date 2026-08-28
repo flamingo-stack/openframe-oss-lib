@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from 'react';
+import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { UserIcon } from '../icons-v2-generated/users/user-icon';
@@ -27,7 +27,7 @@ export interface TicketInfoSectionProps {
   /** Device info */
   device?: {
     name: string;
-    icon?: React.ReactNode;
+    icon?: ReactNode;
     onClick?: () => void;
   };
   /** Status tag */
@@ -94,32 +94,32 @@ function InfoCell({
 }: {
   value: string;
   label: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   onClick?: () => void;
 }) {
   return (
-    <div className="flex-1 min-w-0 overflow-hidden">
+    <div className="min-w-0 flex-1 overflow-hidden">
       <div className="flex flex-col justify-center">
-        <div className="flex items-center gap-1 w-full min-w-0">
+        <div className="flex w-full min-w-0 items-center gap-1">
           {icon && (
-            <span className="shrink-0 size-4 flex items-center justify-center text-ods-text-secondary">{icon}</span>
+            <span className="flex size-4 shrink-0 items-center justify-center text-ods-text-secondary">{icon}</span>
           )}
           {onClick ? (
             <button
               type="button"
               onClick={onClick}
-              className="text-h4 text-ods-text-primary truncate hover:text-ods-accent transition-colors cursor-pointer text-left"
+              className="cursor-pointer truncate text-left text-ods-text-primary transition-colors text-h4 hover:text-ods-accent"
               title={value}
             >
               {value}
             </button>
           ) : (
-            <span className="text-h4 text-ods-text-primary truncate" title={value}>
+            <span className="truncate text-ods-text-primary text-h4" title={value}>
               {value}
             </span>
           )}
         </div>
-        <span className="text-h6 text-ods-text-secondary truncate">{label}</span>
+        <span className="truncate text-ods-text-secondary text-h6">{label}</span>
       </div>
     </div>
   );
@@ -151,11 +151,11 @@ export function TicketInfoSection({
   isAddingNote,
 }: TicketInfoSectionProps) {
   return (
-    <div className={cn('rounded-[6px] border border-ods-border overflow-hidden', className)}>
+    <div className={cn('overflow-hidden rounded-[6px] border border-ods-border', className)}>
       {/* Header row */}
-      <div className="grid grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] gap-4 px-4 py-3 bg-ods-card border-b border-ods-border items-center">
+      <div className="grid grid-cols-2 items-center gap-4 border-b border-ods-border bg-ods-card px-4 py-3 lg:grid-cols-[1fr_1fr_1fr_auto]">
         {/* Organization with image */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
           <SquareAvatar
             src={organization?.imageSrc}
             alt={organization?.name}
@@ -178,11 +178,11 @@ export function TicketInfoSection({
             />
           ) : (
             <div className="min-w-0">
-              <div className="flex items-center gap-1 text-h4 text-ods-text-secondary">
+              <div className="flex items-center gap-1 text-ods-text-secondary text-h4">
                 <UserIcon className="size-4 shrink-0" />
                 <span className="truncate">Unassigned</span>
               </div>
-              <span className="text-h6 text-ods-text-secondary truncate block">Assigned</span>
+              <span className="block truncate text-ods-text-secondary text-h6">Assigned</span>
             </div>
           )}
         </div>
@@ -191,7 +191,7 @@ export function TicketInfoSection({
         <InfoCell value={device?.name || 'Unassigned'} label="Device" icon={device?.icon} onClick={device?.onClick} />
 
         {/* Status tag + expand button */}
-        <div className="flex items-center gap-4 min-w-0">
+        <div className="flex min-w-0 items-center gap-4">
           {(status || statusLabel) && (
             <div className="min-w-0">
               <TicketStatusTag
@@ -211,9 +211,9 @@ export function TicketInfoSection({
               type="button"
               onClick={onExpand}
               className={cn(
-                'shrink-0 flex items-center justify-center p-3 rounded-[6px]',
-                'bg-ods-card border border-ods-border',
-                'hover:bg-ods-bg-hover transition-colors duration-150',
+                'flex shrink-0 items-center justify-center rounded-[6px] p-3',
+                'border border-ods-border bg-ods-card',
+                'transition-colors duration-150 hover:bg-ods-bg-hover',
               )}
               aria-label={expanded ? 'Collapse' : 'Expand'}
             >
@@ -233,13 +233,13 @@ export function TicketInfoSection({
         <>
           {/* Second info row: Created */}
           {createdAt && (
-            <div className="grid grid-cols-2 gap-4 px-4 py-3 bg-ods-bg border-b border-ods-border items-center">
+            <div className="grid grid-cols-2 items-center gap-4 border-b border-ods-border bg-ods-bg px-4 py-3">
               <InfoCell value={createdAt} label="Created" />
             </div>
           )}
 
           {/* Content area */}
-          <div className="flex flex-col gap-4 p-4 bg-ods-bg border-b border-ods-border">
+          <div className="flex flex-col gap-4 border-b border-ods-border bg-ods-bg p-4">
             {/* Description */}
             {description && <SimpleMarkdownRenderer content={description} />}
 
@@ -253,7 +253,7 @@ export function TicketInfoSection({
             {/* Tags */}
             {tags && tags.length > 0 && (
               <TicketDetailSection label="Tags">
-                <div className="flex flex-wrap gap-2 min-w-0">
+                <div className="flex min-w-0 flex-wrap gap-2">
                   {tags.map(tag => (
                     <Tag key={tag} label={tag} variant="outline" className="max-w-full" />
                   ))}

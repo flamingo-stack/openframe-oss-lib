@@ -1,21 +1,20 @@
-"use client"
+'use client';
 
-import React from 'react'
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
-import { Button } from './button'
-import { cn } from '../../utils/cn'
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { cn } from '../../utils/cn';
+import { Button } from './button';
 
 interface ErrorStateProps {
-  title?: string
-  message: string
-  variant?: 'error' | 'warning' | 'info'
-  showIcon?: boolean
-  showRetry?: boolean
-  showHome?: boolean
-  onRetry?: () => void
-  onHome?: () => void
-  className?: string
-  containerClassName?: string
+  title?: string;
+  message: string;
+  variant?: 'error' | 'warning' | 'info';
+  showIcon?: boolean;
+  showRetry?: boolean;
+  showHome?: boolean;
+  onRetry?: () => void;
+  onHome?: () => void;
+  className?: string;
+  containerClassName?: string;
 }
 
 export function ErrorState({
@@ -28,7 +27,7 @@ export function ErrorState({
   onRetry,
   onHome,
   className,
-  containerClassName
+  containerClassName,
 }: ErrorStateProps) {
   const getVariantStyles = () => {
     switch (variant) {
@@ -40,48 +39,42 @@ export function ErrorState({
           bg: 'bg-ods-error-secondary',
           border: 'border-ods-error',
           text: 'text-ods-error',
-          icon: 'text-ods-error'
-        }
+          icon: 'text-ods-error',
+        };
       case 'warning':
         return {
           bg: 'bg-ods-warning-secondary',
           border: 'border-ods-warning',
           text: 'text-ods-warning',
-          icon: 'text-ods-warning'
-        }
+          icon: 'text-ods-warning',
+        };
+      // `default`, not `case 'info'`: the switch has to be TOTAL. Falling off
+      // the end returned `undefined`, and every read below (`styles.bg`) would
+      // then throw — a blank screen instead of the error the component exists
+      // to show. Reachable from any untyped host passing an unknown variant.
       case 'info':
+      default:
         return {
           bg: 'bg-ods-bg-surface',
           border: 'border-ods-border',
           text: 'text-ods-text-secondary',
-          icon: 'text-ods-text-secondary'
-        }
+          icon: 'text-ods-text-secondary',
+        };
     }
-  }
+  };
 
-  const styles = getVariantStyles()
+  const styles = getVariantStyles();
 
   return (
-    <div className={cn("p-6", containerClassName)}>
-      <div className={cn(
-        "rounded-lg p-4 border",
-        styles.bg,
-        styles.border,
-        className
-      )}>
+    <div className={cn('p-6', containerClassName)}>
+      <div className={cn('rounded-lg border p-4', styles.bg, styles.border, className)}>
         <div className="flex items-start gap-3">
-          {showIcon && (
-            <AlertTriangle className={cn("h-5 w-5 mt-0.5 flex-shrink-0", styles.icon)} />
-          )}
+          {showIcon && <AlertTriangle className={cn('mt-0.5 h-5 w-5 flex-shrink-0', styles.icon)} />}
           <div className="flex-1">
-            <h3 className={cn("font-semibold mb-1", styles.text)}>
-              {title}
-            </h3>
-            <p className={cn("text-h6", styles.text)}>
-              {message}
-            </p>
+            <h3 className={cn('mb-1 font-semibold', styles.text)}>{title}</h3>
+            <p className={cn('text-h6', styles.text)}>{message}</p>
             {(showRetry || showHome) && (
-              <div className="flex gap-2 mt-3">
+              <div className="mt-3 flex gap-2">
                 {showRetry && onRetry && (
                   <Button
                     onClick={onRetry}
@@ -110,11 +103,19 @@ export function ErrorState({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // Convenience components for common error scenarios
-export function PageError({ message, onRetry, onHome }: { message: string; onRetry?: () => void; onHome?: () => void }) {
+export function PageError({
+  message,
+  onRetry,
+  onHome,
+}: {
+  message: string;
+  onRetry?: () => void;
+  onHome?: () => void;
+}) {
   return (
     <ErrorState
       title="Page Error"
@@ -125,29 +126,19 @@ export function PageError({ message, onRetry, onHome }: { message: string; onRet
       onRetry={onRetry}
       onHome={onHome}
     />
-  )
+  );
 }
 
 export function LoadError({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <ErrorState
-      title="Loading Error"
-      message={message}
-      variant="error"
-      showRetry={!!onRetry}
-      onRetry={onRetry}
-    />
-  )
+  return <ErrorState title="Loading Error" message={message} variant="error" showRetry={!!onRetry} onRetry={onRetry} />;
 }
 
-export function NotFoundError({ message = "The requested item was not found", onHome }: { message?: string; onHome?: () => void }) {
-  return (
-    <ErrorState
-      title="Not Found"
-      message={message}
-      variant="warning"
-      showHome={!!onHome}
-      onHome={onHome}
-    />
-  )
+export function NotFoundError({
+  message = 'The requested item was not found',
+  onHome,
+}: {
+  message?: string;
+  onHome?: () => void;
+}) {
+  return <ErrorState title="Not Found" message={message} variant="warning" showHome={!!onHome} onHome={onHome} />;
 }
