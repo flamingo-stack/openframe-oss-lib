@@ -340,6 +340,7 @@ export {
   buildDefaultHref,
   type ContentHrefOptions,
   type ComposeContentUrl,
+  type ComposedContentUrl,
 } from './content-href';
 
 // Invisible bot-protection signals (honeypot + timing) — pure + server-safe so

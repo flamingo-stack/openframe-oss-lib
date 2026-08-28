@@ -83,10 +83,10 @@ import type { BaseProgramItem, ProgramConfig } from '../types/entities/program-t
 import { getStatusColorScheme } from '../utils/agent-status-message';
 import { resolveHrefForRuntime } from '../utils/chat-nav-resolution';
 import { safeHref } from '../utils/compact-card-classes';
+import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
 import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
-import { handleChatNavClick } from '../utils/nav-click-handler';
-import { resolveFetchedCardHref, readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
+import { resolveFetchedCardHref, pickFetchedCardHref, readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
 import { getSourceLabel } from '../utils/source-icons';
 import { resolveSourceRowCTA, resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
@@ -1215,13 +1215,18 @@ interface ChatCardRegistryEntry {
    *  non-null `href`, the pre-computed `isNewTab` reflects the actual
    *  destination, and the click goes through `handleChatNavClick` (no
    *  silent bypass of embed-mode / close-on-nav). Takes precedence over
-   *  the `composeContentUrl` fallback below. */
+   *  the `composeContentUrl` fallback below — but NOT over an explicit
+   *  host `override` for the type (see `pickFetchedCardHref`). */
   fallbackHref?: (item: ChatCardItem) => string | null;
-  /** Opt OUT of the post-fetch `composeContentUrl` fallback (see
+  /** Opt OUT of the post-fetch `composeContentUrl` SYNTHESIS (see
    *  `resolveFetchedCardHref`). Set for types with NO public destination
    *  — the seam would otherwise synthesize `<contentOrigin>/<type>/<id>`
-   *  from its default branch and hand the user a 404. Types with a real
-   *  route (hosted, or covered by a host `override`) leave it unset. */
+   *  from its default branch and hand the user a 404.
+   *
+   *  It does NOT opt out of the seam itself: an explicit host `override`
+   *  for the type still wins (`pickFetchedCardHref`). That split is the
+   *  point — a host that re-homes a type must be able to say so even when
+   *  the row already carries the content host's own url. */
   noComposedHref?: boolean;
 }
 
@@ -1234,6 +1239,12 @@ interface ChatCardRegistryEntry {
  * (`fallbackHref`), no `<origin>/<type>/<id>` synthesis
  * (`noComposedHref`). Loading shows the skeleton, exactly like every
  * other fetch card.
+ *
+ * NOTE `item.url` is minted by the CONTENT host for its OWN surface, so an
+ * embedder that serves the same rows elsewhere overrides the type in its
+ * `composeContentUrl` config and that wins here — see `pickFetchedCardHref`.
+ * (Observed: hub tickets are `/tickets?ticket=…`, which in the OpenFrame
+ * console resolved against its own unrelated `/tickets` board.)
  */
 function refHydratedEntry(
   docType: string,
@@ -1667,7 +1678,7 @@ function ChatCardNavWrap({
     if (targetEl?.closest?.('button')) return;
     if (!targetEl?.closest?.('a')) return;
 
-    const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform }, router.push);
+    const handled = executeNavigation({ event: e, runtime, href, path, targetPlatform, fallbackNavigate: router.push });
     if (!handled) return;
     // Modifier-clicks fall through (handled=false) without stopPropagation
     // so ancestor telemetry handlers still see the bubble.
@@ -1763,16 +1774,22 @@ export function ChatCardLoader({
   // visit. `safeHref` blocks `javascript:` / `data:` payloads even
   // though the registry callers compose hub-internal strings today.
   //
-  // Two sources, in order:
+  // Two producers, ranked by `pickFetchedCardHref` (which owns the
+  // precedence and its rationale):
   //   1. the registry's per-type `fallbackHref` — an explicit non-content
-  //      destination (marketing campaign → `/admin/...`);
+  //      destination (marketing campaign → `/admin/...`, or a ref-hydrated
+  //      row's own `item.url`);
   //   2. the host's `composeContentUrl` seam via `resolveFetchedCardHref` —
   //      the SAME resolver page cards go through. This is what makes cards
   //      clickable on every transport: the wire ships bare
   //      `[card://type:id]` markers with no metadata, so the ref reaches
   //      us with `url: null` and `resolveSourceRowCTA` has nothing to route.
+  // …except an EXPLICIT host override outranks both: the seam is asked
+  // even for `fallbackHref` / `noComposedHref` types now, and its answer is
+  // taken only when the host actually re-homed the type (never when the
+  // composer merely synthesized one) — the case those two flags guard against.
   const composedHref =
-    fetchEntry?.contentRefType && !resolvedChatRef.url && item && !fetchEntry.fallbackHref && !fetchEntry.noComposedHref
+    fetchEntry?.contentRefType && !resolvedChatRef.url && item
       ? resolveFetchedCardHref({
           contentRefType: fetchEntry.contentRefType,
           id: resolvedChatRef.id,
@@ -1780,19 +1797,22 @@ export function ChatCardLoader({
           composeContentUrl: runtime.composeContentUrl,
         })
       : null;
-  const hrefResolvedChatRef: ChatRef =
-    fetchEntry && !resolvedChatRef.url && item && fetchEntry.fallbackHref
-      ? {
-          ...resolvedChatRef,
-          url: safeHref(fetchEntry.fallbackHref(item)),
-        }
-      : composedHref
-        ? {
-            ...resolvedChatRef,
-            url: safeHref(composedHref.href),
-            targetPlatform: composedHref.targetPlatform ?? resolvedChatRef.targetPlatform ?? null,
-          }
-        : resolvedChatRef;
+  const hrefChoice =
+    fetchEntry && !resolvedChatRef.url && item
+      ? pickFetchedCardHref({
+          composed: composedHref,
+          itemHref: fetchEntry.fallbackHref?.(item) ?? null,
+          allowComposed: !fetchEntry.noComposedHref,
+        })
+      : null;
+  const hrefResolvedChatRef: ChatRef = hrefChoice
+    ? {
+        ...resolvedChatRef,
+        url: safeHref(hrefChoice.href),
+        // The `item` branch carries no platform of its own — keep the ref's.
+        targetPlatform: hrefChoice.targetPlatform ?? resolvedChatRef.targetPlatform ?? null,
+      }
+    : resolvedChatRef;
 
   // Title enrichment, same synthetic-ref gap as the href above: a Mingo
   // `[card://type:id]` marker produces `title: <id>` because the transport

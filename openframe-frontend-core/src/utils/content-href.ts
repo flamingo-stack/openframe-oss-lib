@@ -112,10 +112,34 @@ export interface ContentHrefOptions {
   overrides?: Record<string, (identifier: string) => { href: string; targetPlatform: string | null }>;
 }
 
+/** What the seam resolves a content reference to. */
+export interface ComposedContentUrl {
+  href: string;
+  targetPlatform: string | null;
+  /**
+   * Set ONLY when the href came from the host's EXPLICIT per-type `overrides`
+   * entry — i.e. the host stated where this type lives in ITS app, rather than
+   * the composer falling through to a hosted-suffix or `<origin>/<type>/<id>`
+   * synthesis.
+   *
+   * The distinction is load-bearing for fetch-mode chat cards whose fetched row
+   * already carries a destination (`refHydratedEntry`'s `item.url`, minted by
+   * the CONTENT HOST for its OWN surface). That url must beat a synthesized
+   * guess, but must NOT beat a host that has explicitly re-homed the type:
+   * a HubSpot ticket's `item.url` is the hub's `/tickets?ticket=…`, which in an
+   * embedder that serves the same ticket at `/help-center/tickets` silently
+   * resolves against the embedder's own unrelated `/tickets` route.
+   *
+   * Optional and absent by default, so a hand-written composer (the hub's
+   * cross-platform one) keeps the pre-existing "row url wins" behavior.
+   */
+  hostOverride?: boolean;
+}
+
 /** The unified `composeContentUrl` seam shape on `ChatRuntime`. ALWAYS returns
  *  a tuple (never null) — the seam type is non-nullable and callers read
  *  `.href` unconditionally. */
-export type ComposeContentUrl = (input: ComposeContentUrlInput) => { href: string; targetPlatform: string | null };
+export type ComposeContentUrl = (input: ComposeContentUrlInput) => ComposedContentUrl;
 
 /**
  * Owning platform of a content row, from the hydrated junction the list APIs
@@ -162,7 +186,8 @@ function lastPathSegment(url: string): string | null {
  * Build the embedder's `composeContentUrl` for the unified seam.
  *
  * Resolution order (the merged rule used by BOTH page views and chat cards):
- *   1. `overrides[type]` — explicit per-type href.
+ *   1. `overrides[type]` — explicit per-type href, returned with
+ *      `hostOverride: true` (the only branch that sets it).
  *   2. `hostedTypes.has(type)` → relative `/<suffix>/<slug>` (in-app, soft-nav).
  *      Chat rows carry the hub URL not the slug, so the slug is recovered from
  *      `externalUrl`; page views pass the slug as `identifier`.
@@ -184,7 +209,9 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
     const type = canonicalContentRefType(rawType);
     const override =
       opts.overrides && Object.prototype.hasOwnProperty.call(opts.overrides, type) ? opts.overrides[type] : undefined;
-    if (override) return override(identifier);
+    // Flagged as an explicit host decision — see `ComposedContentUrl.hostOverride`
+    // for why a fetch-mode card has to tell this apart from the branches below.
+    if (override) return { ...override(identifier), hostOverride: true };
 
     const seg = (Object.prototype.hasOwnProperty.call(suffixes, type) ? suffixes[type] : undefined) ?? type;
 

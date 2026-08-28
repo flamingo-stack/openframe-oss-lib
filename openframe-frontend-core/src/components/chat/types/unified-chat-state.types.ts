@@ -286,9 +286,16 @@ export interface UnifiedChatState {
 
   /**
    * Trigger the chat's "Display this row" affordance — same as `discussRef`
-   * but for read-only card display rather than a question. Guide-mode only.
+   * but for read-only card display rather than a question. Guide-mode only:
+   * it dispatches a `/<cmd> display "<x>"` slash command, and only the SSE
+   * transport has a slash-command registry.
+   *
+   * OPTIONAL, and OMITTED — not stubbed — by adapters that have no display
+   * path. Consumers gate the affordance on its presence (`entity-cards`'
+   * dispatcher falls back to "Ask Mingo" when it is absent), so a no-op stub
+   * renders a dead "Display" row where the action that works belongs.
    */
-  displayRef: (ref: ChatRef) => void;
+  displayRef?: (ref: ChatRef) => void;
 
   // ─── Per-turn LLM metadata (Guide/SSE only) ───────────────────────────────
   /**
