@@ -46,8 +46,8 @@ public class TicketMapper extends BaseRestMapper {
                 .owner(toOwnerResponse(ticket.getOwner()))
                 .deviceId(ticket.getDeviceId())
                 .deviceHostname(ticket.getDeviceHostname())
-                .organizationId(ticket.getOrganizationId())
-                .organizationName(ticket.getOrganizationName())
+                .customerId(ticket.getOrganizationId())
+                .customerName(ticket.getOrganizationName())
                 .reporterId(ticket.getReporterId())
                 .reporterName(ticket.getReporterName())
                 .assignedTo(ticket.getAssignedTo())
@@ -76,16 +76,12 @@ public class TicketMapper extends BaseRestMapper {
     }
 
     public TicketOwnerResponse toOwnerResponse(TicketOwner owner) {
-        if (owner == null) {
-            return null;
-        }
-        TicketOwnerResponse.TicketOwnerResponseBuilder builder = TicketOwnerResponse.builder().type(owner.getType());
-        if (owner instanceof ClientTicketOwner client) {
-            builder.machineId(client.getMachineId());
-        } else if (owner instanceof AdminTicketOwner admin) {
-            builder.userId(admin.getUserId());
-        }
-        return builder.build();
+        return switch (owner) {
+            case null -> null;
+            case ClientTicketOwner client -> new TicketOwnerResponse(owner.getType(), client.getMachineId(), null);
+            case AdminTicketOwner admin -> new TicketOwnerResponse(owner.getType(), null, admin.getUserId());
+            default -> new TicketOwnerResponse(owner.getType(), null, null);
+        };
     }
 
     public TicketStatusResponse toStatusResponse(TicketStatusDefinition status) {
@@ -154,7 +150,7 @@ public class TicketMapper extends BaseRestMapper {
         }
         return TicketFiltersResponse.builder()
                 .statuses(toFilterOptions(filters.getStatuses()))
-                .organizationIds(toFilterOptions(filters.getOrganizationIds()))
+                .customerIds(toFilterOptions(filters.getOrganizationIds()))
                 .assigneeIds(toFilterOptions(filters.getAssigneeIds()))
                 .tagIds(toFilterOptions(filters.getTagIds()))
                 .build();
@@ -162,10 +158,7 @@ public class TicketMapper extends BaseRestMapper {
 
     private List<TicketFilterOptionResponse> toFilterOptions(List<TicketFilterOption> options) {
         return options == null ? List.of() : options.stream()
-                .map(option -> TicketFilterOptionResponse.builder()
-                        .value(option.getValue())
-                        .label(option.getLabel())
-                        .build())
+                .map(option -> new TicketFilterOptionResponse(option.getValue(), option.getLabel()))
                 .toList();
     }
 
