@@ -66,6 +66,11 @@ public class TransientGatewayRetryFilter implements Filter {
                 return response;
             }
             response = ctx.next(requestSpec, responseSpec);
+            if (response == null) {
+                // The retry produced no response at all; there is no status to re-check, and an NPE
+                // raised on the next loop condition would mask the underlying connect failure.
+                return null;
+            }
         }
         return response;
     }
