@@ -43,6 +43,20 @@ export const outlineBorderClasses =
 // `Button`'s own flat `[&_svg]:h-5` stays as it is for ordinary (non-split) buttons.
 export const splitGlyphSizeClasses = '[&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6';
 
+// Per-size glyph scale for `Button`'s split slots AND the loading overlay that
+// covers them, so those two read from ONE place — the overlay sits outside both
+// slots and inherits neither their sizing nor a shell base rule, so without this it
+// would have to restate a number, which is the divergence described above.
+//
+// Scoped to `Button` on purpose: `SplitButton` keeps its own `small` ramp
+// (12px → 16px, vs the flat 16px here) and only shares the `default` step through
+// `splitGlyphSizeClasses`. Aligning `small` too is a visible design change, so it is
+// not folded in here silently.
+export const splitGlyphSizeBySize = {
+  default: splitGlyphSizeClasses,
+  small: '[&_svg]:h-4 [&_svg]:w-4',
+} as const;
+
 // Color of the vertical seam between the main and icon halves (split layouts).
 export const splitDividerColorClasses = {
   accent: 'border-ods-accent-active',
