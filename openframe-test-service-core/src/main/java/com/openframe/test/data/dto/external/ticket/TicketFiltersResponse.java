@@ -22,7 +22,7 @@ public class TicketFiltersResponse {
 
     private List<TicketFilterOptionResponse> statuses;
 
-    private List<TicketFilterOptionResponse> organizationIds;
+    private List<TicketFilterOptionResponse> customerIds;
 
     private List<TicketFilterOptionResponse> assigneeIds;
 

@@ -63,6 +63,15 @@ public class RateLimitRetryFilter implements Filter {
                            FilterContext ctx) {
         awaitTurn();
         Response response = ctx.next(requestSpec, responseSpec);
+        if (response == null) {
+            // RestAssured hands back null when the request never produced a response at all -- in
+            // practice a connect failure that outlived RetryingHttpClientFactory's attempts. Nothing
+            // here can interpret that, and touching it would replace a legible network error with an
+            // NPE pointing at this filter, so pass it straight through.
+            log.warn("No response for {} {}; passing through untouched",
+                    requestSpec.getMethod(), requestSpec.getURI());
+            return null;
+        }
         observeLimit(response);
 
         for (int attempt = 1; attempt <= MAX_ATTEMPTS && response.getStatusCode() == TOO_MANY_REQUESTS; attempt++) {

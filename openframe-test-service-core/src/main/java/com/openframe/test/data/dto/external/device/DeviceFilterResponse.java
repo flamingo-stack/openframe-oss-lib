@@ -26,7 +26,7 @@ public class DeviceFilterResponse {
 
     private List<DeviceFilterItem> osTypes;
 
-    private List<DeviceFilterItem> organizationIds;
+    private List<DeviceFilterItem> customerIds;
 
     private List<TagFilterItem> tagKeys;
 

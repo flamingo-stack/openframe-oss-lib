@@ -47,6 +47,11 @@ public class TransientGatewayRetryFilter implements Filter {
                            FilterableResponseSpecification responseSpec,
                            FilterContext ctx) {
         Response response = ctx.next(requestSpec, responseSpec);
+        if (response == null) {
+            // No response at all (a connect failure that outlived the client's own retries). There is no
+            // status code to inspect, and an NPE raised here would mask the real cause.
+            return null;
+        }
 
         String method = requestSpec.getMethod();
         if (!IDEMPOTENT_METHODS.contains(method)) {

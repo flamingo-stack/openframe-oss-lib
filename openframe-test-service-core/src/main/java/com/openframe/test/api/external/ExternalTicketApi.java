@@ -27,7 +27,7 @@ import static io.restassured.RestAssured.given;
  *
  * <p>Tickets are the only External API resource whose controller resolves a real principal (from the
  * {@code X-User-Id} the gateway injects), so these endpoints act as a specific user where the device,
- * organization, log, and tool endpoints do not.
+ * customer, log, and tool endpoints do not.
  *
  * <p>Note there is no delete: a ticket, once created, can only be transitioned. Teardown archives.
  */
@@ -41,7 +41,7 @@ public class ExternalTicketApi {
     private static final String BY_ID = TICKETS + "/{id}";
     private static final String ASSIGNEE = BY_ID + "/assignee";
     private static final String DEVICE = BY_ID + "/device";
-    private static final String ORGANIZATION = BY_ID + "/organization";
+    private static final String CUSTOMER = BY_ID + "/customer";
     private static final String TRANSITION = BY_ID + "/transition";
     private static final String NOTES = BY_ID + "/notes";
     private static final String NOTE_BY_ID = NOTES + "/{noteId}";
@@ -167,10 +167,10 @@ public class ExternalTicketApi {
                 .extract().as(TicketResponse.class);
     }
 
-    public static TicketResponse unlinkOrganization(String id) {
+    public static TicketResponse unlinkCustomer(String id) {
         return given(getExternalApiSpec())
                 .pathParam("id", id)
-                .delete(ORGANIZATION)
+                .delete(CUSTOMER)
                 .then().statusCode(200)
                 .extract().as(TicketResponse.class);
     }

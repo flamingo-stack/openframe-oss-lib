@@ -2,11 +2,11 @@ package com.openframe.test.tests.external;
 
 import com.openframe.test.api.external.ExternalDeviceApi;
 import com.openframe.test.api.external.ExternalLogApi;
-import com.openframe.test.api.external.ExternalOrganizationApi;
+import com.openframe.test.api.external.ExternalCustomerApi;
 import com.openframe.test.api.external.ExternalTicketApi;
 import com.openframe.test.data.dto.external.common.PageInfo;
-import com.openframe.test.data.dto.external.organization.OrganizationResponse;
-import com.openframe.test.data.dto.external.organization.OrganizationsResponse;
+import com.openframe.test.data.dto.external.customer.CustomerResponse;
+import com.openframe.test.data.dto.external.customer.CustomersResponse;
 import io.restassured.response.Response;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +46,7 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
 
     /** The paginated collections, each as a raw call so the status code can be asserted directly. */
     private static final Map<String, Function<Map<String, Object>, Response>> PAGINATED = Map.of(
-            "organizations", ExternalOrganizationApi::listOrganizationsRaw,
+            "customers", ExternalCustomerApi::listCustomersRaw,
             "devices", ExternalDeviceApi::listDevicesRaw,
             "tickets", ExternalTicketApi::listTicketsRaw,
             "logs", ExternalLogApi::listLogsRaw);
@@ -102,9 +102,9 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
     @Test
     @DisplayName("Page size is honoured")
     public void testPageSizeIsHonoured() {
-        OrganizationsResponse page = ExternalOrganizationApi.listOrganizations(Map.of("limit", 1));
+        CustomersResponse page = ExternalCustomerApi.listCustomers(Map.of("limit", 1));
 
-        assertThat(page.getOrganizations()).as("limit=1 should return at most one row")
+        assertThat(page.getCustomers()).as("limit=1 should return at most one row")
                 .hasSizeLessThanOrEqualTo(1);
         assertThat(page.getPageInfo()).as("Paginated response should carry pageInfo").isNotNull();
     }
@@ -115,22 +115,22 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
     @Test
     @DisplayName("Cursor advances to a disjoint page")
     public void testCursorAdvancesToNextPage() {
-        OrganizationsResponse first = ExternalOrganizationApi.listOrganizations(Map.of("limit", 1));
+        CustomersResponse first = ExternalCustomerApi.listCustomers(Map.of("limit", 1));
         PageInfo pageInfo = first.getPageInfo();
 
         if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.getHasNextPage())) {
-            log.info("Only one page of organizations on this tenant; nothing to page through");
+            log.info("Only one page of customers on this tenant; nothing to page through");
             return;
         }
         assertThat(pageInfo.getEndCursor()).as("hasNextPage=true must come with an endCursor").isNotNull();
 
-        OrganizationsResponse second = ExternalOrganizationApi
-                .listOrganizations(Map.of("limit", 1, "cursor", pageInfo.getEndCursor()));
+        CustomersResponse second = ExternalCustomerApi
+                .listCustomers(Map.of("limit", 1, "cursor", pageInfo.getEndCursor()));
 
-        assertThat(second.getOrganizations()).as("Following the cursor should return a page").isNotEmpty();
+        assertThat(second.getCustomers()).as("Following the cursor should return a page").isNotEmpty();
         // The point of a cursor is that it does not re-serve what the caller already has.
-        List<String> firstIds = first.getOrganizations().stream().map(OrganizationResponse::getId).toList();
-        assertThat(second.getOrganizations())
+        List<String> firstIds = first.getCustomers().stream().map(CustomerResponse::getId).toList();
+        assertThat(second.getCustomers())
                 .as("The second page must not repeat rows from the first")
                 .noneSatisfy(org -> assertThat(firstIds).contains(org.getId()));
         assertThat(second.getPageInfo().getHasPreviousPage())
@@ -141,36 +141,18 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(6)
     @Test
-    @DisplayName("Malformed cursor is silently ignored (known weakness)")
-    public void testMalformedCursorIsSilentlyIgnored() {
-        OrganizationsResponse unpaged = ExternalOrganizationApi.listOrganizations(Map.of("limit", 2));
-        Response response = ExternalOrganizationApi
-                .listOrganizationsRaw(Map.of("limit", 2, "cursor", "not-a-valid-cursor"));
+    @DisplayName("Malformed cursor is rejected")
+    public void testMalformedCursorIsRejected() {
+        Response response = ExternalCustomerApi
+                .listCustomersRaw(Map.of("limit", 2, "cursor", "not-a-valid-cursor"));
 
-        // Characterisation, not endorsement. An unparseable cursor is accepted and answered with the
-        // first page, indistinguishable from having sent no cursor at all — hasPreviousPage is even
-        // reported as false. A client paging a large collection whose cursor gets corrupted therefore
-        // restarts from the beginning silently and loops forever instead of erroring.
-        //
-        // Rejecting it with a 400 would be the better contract. This case pins the current behaviour so
-        // the suite stays green while it stands and fails loudly the day it changes — when it does,
-        // replace this with the 400 assertion rather than adjusting it.
+        // This used to be a characterisation test. The API previously accepted an unparseable cursor and
+        // answered with the first page, indistinguishable from sending no cursor at all — so a client
+        // whose cursor got corrupted mid-pagination silently restarted and looped forever. It now
+        // rejects, which is the correct contract, and this asserts the fix rather than the old wart.
         assertThat(response.getStatusCode())
-                .as("Current behaviour: an unparseable cursor is accepted rather than rejected")
-                .isEqualTo(200);
-
-        OrganizationsResponse withBadCursor = response.as(OrganizationsResponse.class);
-        List<String> unpagedIds = unpaged.getOrganizations().stream()
-                .map(OrganizationResponse::getId).toList();
-        List<String> badCursorIds = withBadCursor.getOrganizations().stream()
-                .map(OrganizationResponse::getId).toList();
-
-        assertThat(badCursorIds)
-                .as("A malformed cursor currently yields exactly the unpaged first page")
-                .isEqualTo(unpagedIds);
-        assertThat(withBadCursor.getPageInfo().getHasPreviousPage())
-                .as("And it reports no previous page, so a client cannot detect the reset")
-                .isFalse();
+                .as("An unparseable cursor should be rejected, not silently reset to the first page")
+                .isEqualTo(400);
     }
 
     @Tag("feature")
@@ -183,10 +165,10 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
         // above, this one behaves correctly: an empty page that reports a previous page.
         String cursor = Base64.getEncoder()
                 .encodeToString("000000000000000000000000".getBytes(StandardCharsets.UTF_8));
-        OrganizationsResponse response = ExternalOrganizationApi
-                .listOrganizations(Map.of("limit", 2, "cursor", cursor));
+        CustomersResponse response = ExternalCustomerApi
+                .listCustomers(Map.of("limit", 2, "cursor", cursor));
 
-        assertThat(response.getOrganizations()).as("No rows follow a cursor past the end").isEmpty();
+        assertThat(response.getCustomers()).as("No rows follow a cursor past the end").isEmpty();
         assertThat(response.getPageInfo().getHasNextPage()).as("There is nothing after the end").isFalse();
         assertThat(response.getPageInfo().getHasPreviousPage())
                 .as("A page past the end still has pages before it").isTrue();

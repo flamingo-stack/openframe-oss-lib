@@ -48,9 +48,9 @@ public class TicketResponse {
 
     private String deviceHostname;
 
-    private String organizationId;
+    private String customerId;
 
-    private String organizationName;
+    private String customerName;
 
     private String reporterId;
 

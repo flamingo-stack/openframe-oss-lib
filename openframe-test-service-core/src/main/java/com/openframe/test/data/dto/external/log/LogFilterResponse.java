@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import com.openframe.test.data.dto.external.organization.OrganizationFilterResponse;
+import com.openframe.test.data.dto.external.customer.CustomerFilterResponse;
 import java.util.List;
 
 /**
@@ -27,5 +27,5 @@ public class LogFilterResponse {
 
     private List<String> severities;
 
-    private List<OrganizationFilterResponse> organizations;
+    private List<CustomerFilterResponse> customers;
 }

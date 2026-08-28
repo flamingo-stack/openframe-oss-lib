@@ -67,10 +67,10 @@ public class ExternalLogsTest extends ExternalApiBaseTest {
         assertThat(filters.getEventTypes()).as("Event types should not contain nulls").doesNotContainNull();
         assertThat(filters.getToolTypes()).as("Tool types should not contain nulls").doesNotContainNull();
         assertThat(filters.getSeverities()).as("Severities should not contain nulls").doesNotContainNull();
-        if (filters.getOrganizations() != null) {
-            assertThat(filters.getOrganizations()).allSatisfy(org -> {
-                assertThat(org.getId()).as("Organization filter option id").isNotNull();
-                assertThat(org.getName()).as("Organization filter option name").isNotNull();
+        if (filters.getCustomers() != null) {
+            assertThat(filters.getCustomers()).allSatisfy(customer -> {
+                assertThat(customer.getId()).as("Customer filter option id").isNotNull();
+                assertThat(customer.getName()).as("Customer filter option name").isNotNull();
             });
         }
     }

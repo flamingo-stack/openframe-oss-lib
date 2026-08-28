@@ -1,8 +1,8 @@
 package com.openframe.test.tests.external;
 
-import com.openframe.test.api.external.ExternalOrganizationApi;
+import com.openframe.test.api.external.ExternalCustomerApi;
 import com.openframe.test.config.ExternalApiConfig;
-import com.openframe.test.data.dto.external.organization.OrganizationResponse;
+import com.openframe.test.data.dto.external.customer.CustomerResponse;
 import com.openframe.test.tests.BaseTest;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,7 +23,7 @@ import java.util.List;
  * <ul>
  *   <li>never mutate a record it did not create (the one exception is the device nickname round-trip,
  *       which restores the original value);</li>
- *   <li>clean up everything it did create, via {@link #trackOrganization}.</li>
+ *   <li>clean up everything it did create, via {@link #trackCustomer}.</li>
  * </ul>
  */
 @Slf4j
@@ -35,36 +35,34 @@ public abstract class ExternalApiBaseTest extends BaseTest {
     protected static final String STATUS_ACTIVE = "ACTIVE";
     protected static final String STATUS_ARCHIVED = "ARCHIVED";
 
-    /** Business {@code organizationId}s, which is what the mutation routes take — not the Mongo {@code id}. */
-    private static final List<String> createdOrganizationIds = new ArrayList<>();
+    private static final List<String> createdCustomerIds = new ArrayList<>();
 
     /**
-     * Registers an organization for archival at the end of the class.
+     * Registers a customer for archival at the end of the class.
      *
      * <p>Archive is the strongest cleanup the External API offers — there is no delete — but it is
      * reversible and takes the row out of the default {@code status=ACTIVE} listing, which is what the
      * other cases assert against.
      */
-    protected static OrganizationResponse trackOrganization(OrganizationResponse organization) {
-        createdOrganizationIds.add(organization.getOrganizationId());
-        return organization;
+    protected static CustomerResponse trackCustomer(CustomerResponse customer) {
+        createdCustomerIds.add(customer.getId());
+        return customer;
     }
 
     /**
-     * Archives every organization this class created. Best-effort per record: one failure must not
-     * strand the rest, and a cleanup failure must not mask the real test result.
+     * Archives every customer this class created. Best-effort per record: one failure must not strand
+     * the rest, and a cleanup failure must not mask the real test result.
      */
-    protected static void archiveTrackedOrganizations() {
-        for (String organizationId : createdOrganizationIds) {
+    protected static void archiveTrackedCustomers() {
+        for (String customerId : createdCustomerIds) {
             try {
-                ExternalOrganizationApi.updateStatus(organizationId, STATUS_ARCHIVED);
-                log.info("Cleaned up organization {}", organizationId);
+                ExternalCustomerApi.updateStatus(customerId, STATUS_ARCHIVED);
+                log.info("Cleaned up customer {}", customerId);
             } catch (Exception e) {
-                log.warn("Could not archive organization {} during teardown: {}",
-                        organizationId, e.getMessage());
+                log.warn("Could not archive customer {} during teardown: {}", customerId, e.getMessage());
             }
         }
-        createdOrganizationIds.clear();
+        createdCustomerIds.clear();
     }
 
     /** Logged once per class so a failing run records which key it ran as, without leaking the secret. */

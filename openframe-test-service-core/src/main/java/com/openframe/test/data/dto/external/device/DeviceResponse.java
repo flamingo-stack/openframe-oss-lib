@@ -44,7 +44,7 @@ public class DeviceResponse {
 
     private Instant lastSeen;
 
-    private String organizationId;
+    private String customerId;
 
     private String serialNumber;
 

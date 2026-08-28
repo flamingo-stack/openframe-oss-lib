@@ -36,9 +36,9 @@ public class LogResponse {
 
     private String hostname;
 
-    private String organizationId;
+    private String customerId;
 
-    private String organizationName;
+    private String customerName;
 
     private String summary;
 

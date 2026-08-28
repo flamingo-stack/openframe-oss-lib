@@ -31,7 +31,7 @@ public class CreateTicketRequest {
 
     private String deviceId;
 
-    private String organizationId;
+    private String customerId;
 
     private String assigneeId;
 

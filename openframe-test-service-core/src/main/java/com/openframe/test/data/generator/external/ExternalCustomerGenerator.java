@@ -1,7 +1,7 @@
 package com.openframe.test.data.generator.external;
 
-import com.openframe.test.data.dto.external.organization.CreateOrganizationRequest;
-import com.openframe.test.data.dto.external.organization.UpdateOrganizationRequest;
+import com.openframe.test.data.dto.external.customer.CreateCustomerRequest;
+import com.openframe.test.data.dto.external.customer.UpdateCustomerRequest;
 import com.openframe.test.data.dto.organization.AddressDto;
 import com.openframe.test.data.dto.organization.ContactInformationDto;
 import com.openframe.test.data.dto.organization.ContactPersonDto;
@@ -15,21 +15,22 @@ import static com.openframe.test.data.generator.external.ExternalTestData.faker;
 import static com.openframe.test.data.generator.external.ExternalTestData.uniqueName;
 
 /**
- * Organization payloads for the External API.
+ * Customer payloads for the External API. (The External API renamed this resource from organizations;
+ * the internal GraphQL API still calls it organizations.)
  *
  * <p>Separate from {@link com.openframe.test.data.generator.OrganizationGenerator} because the External
  * contract types {@code monthlyRevenue} as a JSON number ({@link BigDecimal}) where the GraphQL DTO uses
  * a String — the same builder cannot serve both.
  */
-public class ExternalOrganizationGenerator {
+public class ExternalCustomerGenerator {
 
-    public static CreateOrganizationRequest createOrganizationRequest() {
-        return createOrganizationRequest(true);
+    public static CreateCustomerRequest createCustomerRequest() {
+        return createCustomerRequest(true);
     }
 
-    public static CreateOrganizationRequest createOrganizationRequest(boolean mailingAddressSameAsPhysical) {
+    public static CreateCustomerRequest createCustomerRequest(boolean mailingAddressSameAsPhysical) {
         Faker faker = faker();
-        return CreateOrganizationRequest.builder()
+        return CreateCustomerRequest.builder()
                 .name(uniqueName(faker.company().name()))
                 .category(faker.company().industry())
                 .numberOfEmployees(faker.number().numberBetween(1, 5000))
@@ -43,9 +44,9 @@ public class ExternalOrganizationGenerator {
     }
 
     /** A full-field update, so a round-trip assertion covers every writable attribute. */
-    public static UpdateOrganizationRequest updateOrganizationRequest(boolean mailingAddressSameAsPhysical) {
+    public static UpdateCustomerRequest updateCustomerRequest(boolean mailingAddressSameAsPhysical) {
         Faker faker = faker();
-        return UpdateOrganizationRequest.builder()
+        return UpdateCustomerRequest.builder()
                 .name(uniqueName(faker.company().name()))
                 .category(faker.company().industry())
                 .numberOfEmployees(faker.number().numberBetween(1, 5000))

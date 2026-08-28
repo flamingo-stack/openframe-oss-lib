@@ -28,7 +28,7 @@ public class UpdateTicketRequest {
 
     private String deviceId;
 
-    private String organizationId;
+    private String customerId;
 
     private String assigneeId;
 

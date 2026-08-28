@@ -1,4 +1,4 @@
-package com.openframe.test.data.dto.external.organization;
+package com.openframe.test.data.dto.external.customer;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * Updated organization data
+ * Create customer request
  *
  * <p>Generated from the OpenFrame External API OpenAPI contract ({@code GET /api-docs}), version 1.1.0.
  */
@@ -22,8 +22,9 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class UpdateOrganizationRequest {
+public class CreateCustomerRequest {
 
+    /** Required by the contract. */
     private String name;
 
     private String category;

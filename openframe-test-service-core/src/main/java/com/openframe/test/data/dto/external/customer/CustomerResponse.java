@@ -1,7 +1,6 @@
-package com.openframe.test.data.dto.external.organization;
+package com.openframe.test.data.dto.external.customer;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,10 +8,11 @@ import lombok.NoArgsConstructor;
 
 import com.openframe.test.data.dto.organization.ContactInformationDto;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 
 /**
- * Organization data to create
+ * Customer
  *
  * <p>Generated from the OpenFrame External API OpenAPI contract ({@code GET /api-docs}), version 1.1.0.
  */
@@ -21,10 +21,10 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public class CreateOrganizationRequest {
+public class CustomerResponse {
 
-    /** Required by the contract. */
+    private String id;
+
     private String name;
 
     private String category;
@@ -42,4 +42,16 @@ public class CreateOrganizationRequest {
     private LocalDate contractStartDate;
 
     private LocalDate contractEndDate;
+
+    private Instant createdAt;
+
+    private Instant updatedAt;
+
+    private Instant lastActivityAt;
+
+    private Boolean isDefault;
+
+    private String status;
+
+    private Instant statusChangedAt;
 }

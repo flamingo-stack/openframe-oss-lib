@@ -1,16 +1,14 @@
-package com.openframe.test.data.dto.external.organization;
+package com.openframe.test.data.dto.external.customer;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import com.openframe.test.data.dto.external.common.PageInfo;
-import java.util.List;
-
 /**
- * Paginated list of organizations
+ * Customer status update
  *
  * <p>Generated from the OpenFrame External API OpenAPI contract ({@code GET /api-docs}), version 1.1.0.
  */
@@ -19,13 +17,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class OrganizationsResponse {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class UpdateCustomerStatusRequest {
 
-    private List<OrganizationResponse> organizations;
-
-    private Integer total;
-
-    private Integer filteredCount;
-
-    private PageInfo pageInfo;
+    /** Contract values: ARCHIVED, ACTIVE. Kept as String so a new backend value deserializes rather than throwing. */
+    private String status;
 }

@@ -186,7 +186,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
 
         assertThat(filters).as("Filter response should not be null").isNotNull();
         assertOptions(filters.getStatuses(), "statuses");
-        assertOptions(filters.getOrganizationIds(), "organizationIds");
+        assertOptions(filters.getCustomerIds(), "customerIds");
         assertOptions(filters.getAssigneeIds(), "assigneeIds");
         assertOptions(filters.getTagIds(), "tagIds");
     }
@@ -353,16 +353,16 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("update")
     @Order(16)
     @Test
-    @DisplayName("Unlink device and organization")
-    public void testUnlinkDeviceAndOrganization() {
+    @DisplayName("Unlink device and customer")
+    public void testUnlinkDeviceAndCustomer() {
         TicketResponse withoutDevice = ExternalTicketApi.unlinkDevice(created.getId());
         assertThat(withoutDevice.getDeviceId()).as("Device should be unlinked from the ticket").isNull();
 
-        TicketResponse withoutOrg = ExternalTicketApi.unlinkOrganization(created.getId());
-        assertThat(withoutOrg.getOrganizationId()).as("Organization should be unlinked from the ticket")
+        TicketResponse withoutCustomer = ExternalTicketApi.unlinkCustomer(created.getId());
+        assertThat(withoutCustomer.getCustomerId()).as("Customer should be unlinked from the ticket")
                 .isNull();
 
-        created = withoutOrg;
+        created = withoutCustomer;
     }
 
     // --- negative cases ---------------------------------------------------------------------
