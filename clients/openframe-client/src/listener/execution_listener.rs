@@ -157,7 +157,7 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
                 log_finished(&execution_id, &schedule_id, &script_id, &result);
                 let key = entry_key(request.execution_id, request.script_id);
                 let bytes = self.encode_for_publish(&result).await;
-                self.enqueue_or_send(key, &result_subject, bytes).await;
+                self.deliver(key, &result_subject, bytes).await;
             }
         }
 
@@ -189,7 +189,7 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
             }
         };
         let subject = format!("machine.{}.{}", machine_id, EXECUTION_ACK_KIND);
-        self.enqueue_or_send(format!("ack:{execution_id}"), &subject, bytes)
+        self.deliver(format!("ack:{execution_id}"), &subject, bytes)
             .await;
     }
 
@@ -198,39 +198,46 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
         ResultStore::encode_result(result, limit)
     }
 
-    async fn enqueue_or_send(&self, key: String, subject: &str, bytes: Vec<u8>) {
+    async fn deliver(&self, key: String, subject: &str, bytes: Vec<u8>) {
         if self.result_store.enabled() {
-            match self
-                .result_store
-                .enqueue(key, subject.to_string(), bytes)
-                .await
-            {
-                Ok(()) => self.flush_notify.notify_one(),
-                Err(e) => {
-                    error!(kind = M::KIND, subject, error = %e, "Failed to enqueue outbound message, dropping")
-                }
-            }
+            self.enqueue_outbound(key, subject, bytes).await;
         } else {
-            let publisher = self.nats_message_publisher.clone();
-            let subject = subject.to_string();
-            tokio::spawn(async move {
-                let max_backoff = Duration::from_millis(FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS);
-                let mut backoff = Duration::from_millis(FALLBACK_PUBLISH_INITIAL_RETRY_DELAY_MS);
-                for attempt in 1..=FALLBACK_PUBLISH_MAX_RETRIES {
-                    match publisher.publish_acked(&subject, &bytes).await {
-                        Ok(()) => return,
-                        Err(e) => {
-                            warn!(kind = M::KIND, subject = %subject, attempt, error = %e, "Fallback publish failed, retrying in memory");
-                            if attempt < FALLBACK_PUBLISH_MAX_RETRIES {
-                                tokio::time::sleep(backoff).await;
-                                backoff = (backoff * 2).min(max_backoff);
-                            }
+            self.spawn_fallback_publish(subject.to_string(), bytes);
+        }
+    }
+
+    async fn enqueue_outbound(&self, key: String, subject: &str, bytes: Vec<u8>) {
+        match self
+            .result_store
+            .enqueue(key, subject.to_string(), bytes)
+            .await
+        {
+            Ok(()) => self.flush_notify.notify_one(),
+            Err(e) => {
+                error!(kind = M::KIND, subject, error = %e, "Failed to enqueue outbound message, dropping")
+            }
+        }
+    }
+
+    fn spawn_fallback_publish(&self, subject: String, bytes: Vec<u8>) {
+        let publisher = self.nats_message_publisher.clone();
+        tokio::spawn(async move {
+            let max_backoff = Duration::from_millis(FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS);
+            let mut backoff = Duration::from_millis(FALLBACK_PUBLISH_INITIAL_RETRY_DELAY_MS);
+            for attempt in 1..=FALLBACK_PUBLISH_MAX_RETRIES {
+                match publisher.publish_acked(&subject, &bytes).await {
+                    Ok(()) => return,
+                    Err(e) => {
+                        warn!(kind = M::KIND, subject = %subject, attempt, error = %e, "Fallback publish failed, retrying in memory");
+                        if attempt < FALLBACK_PUBLISH_MAX_RETRIES {
+                            tokio::time::sleep(backoff).await;
+                            backoff = (backoff * 2).min(max_backoff);
                         }
                     }
                 }
-                error!(kind = M::KIND, subject = %subject, "Fallback publish gave up after retries, message lost");
-            });
-        }
+            }
+            error!(kind = M::KIND, subject = %subject, "Fallback publish gave up after retries, message lost");
+        });
     }
 
     async fn handle_durable(
@@ -335,7 +342,7 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
             log_finished(execution_id, schedule_id, &script_id, &result);
             let key = entry_key(request.execution_id, request.script_id);
             let bytes = self.encode_for_publish(&result).await;
-            self.enqueue_or_send(key, result_subject, bytes).await;
+            self.deliver(key, result_subject, bytes).await;
         }
     }
 }
