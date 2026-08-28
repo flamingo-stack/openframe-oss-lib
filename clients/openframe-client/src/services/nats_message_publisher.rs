@@ -31,17 +31,15 @@ impl NatsMessagePublisher {
         Ok(())
     }
 
-    pub async fn publish_raw(&self, subject: &str, bytes: &[u8]) -> Result<()> {
+    pub async fn publish_acked(&self, subject: &str, bytes: &[u8]) -> Result<()> {
         let client = self.nats_connection_manager.get_client().await?;
+        let js = async_nats::jetstream::new((*client).clone());
 
-        client
-            .publish(subject.to_string(), bytes.to_vec().into())
+        js.publish(subject.to_string(), bytes.to_vec().into())
             .await
-            .context("Failed to publish message to NATS")?;
-        client
-            .flush()
+            .context("Failed to publish to JetStream")?
             .await
-            .context("Failed to flush NATS publish")?;
+            .context("Failed to receive JetStream ack")?;
         Ok(())
     }
 
@@ -52,12 +50,12 @@ impl NatsMessagePublisher {
 }
 
 impl crate::services::result_store::ResultPublisher for NatsMessagePublisher {
-    fn publish_raw(
+    fn publish_acked(
         &self,
         subject: &str,
         bytes: &[u8],
     ) -> impl std::future::Future<Output = Result<()>> + Send {
-        NatsMessagePublisher::publish_raw(self, subject, bytes)
+        NatsMessagePublisher::publish_acked(self, subject, bytes)
     }
 
     fn max_payload(&self) -> impl std::future::Future<Output = Option<usize>> + Send {
