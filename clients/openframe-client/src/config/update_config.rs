@@ -21,11 +21,11 @@ pub const OUTBOX_MAX_ENTRIES: usize = 500;
 pub const OUTBOX_FLUSH_INTERVAL_SECS: u64 = 30;
 pub const FLUSH_PUBLISH_TIMEOUT_SECS: u64 = 30;
 // In-memory retry when the durable store is unavailable (redb failed to open).
-pub const DEGRADED_PUBLISH_INITIAL_BACKOFF_MS: u64 = 1000;
-pub const DEGRADED_PUBLISH_MAX_BACKOFF_MS: u64 = 30000;
+pub const FALLBACK_PUBLISH_INITIAL_RETRY_DELAY_MS: u64 = 1000;
+pub const FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS: u64 = 30000;
 // Bounded so a permanent publish failure (e.g. missing stream) cannot pile up
 // detached tasks; ~8 min of retrying with the backoff above.
-pub const DEGRADED_PUBLISH_MAX_ATTEMPTS: u32 = 20;
+pub const FALLBACK_PUBLISH_MAX_RETRIES: u32 = 20;
 
 pub const NATS_PAYLOAD_FALLBACK_BYTES: usize = 5 * 1024 * 1024;
 pub const NATS_PAYLOAD_HEADROOM_BYTES: usize = 64 * 1024;

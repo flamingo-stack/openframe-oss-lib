@@ -9,8 +9,8 @@ use tokio::time::Duration;
 use tracing::{error, info, warn};
 
 use crate::config::update_config::{
-    DEGRADED_PUBLISH_INITIAL_BACKOFF_MS, DEGRADED_PUBLISH_MAX_ATTEMPTS,
-    DEGRADED_PUBLISH_MAX_BACKOFF_MS, RECONNECTION_DELAY_MS,
+    FALLBACK_PUBLISH_INITIAL_RETRY_DELAY_MS, FALLBACK_PUBLISH_MAX_RETRIES,
+    FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS, RECONNECTION_DELAY_MS,
 };
 use crate::models::{ExecutionAck, ExecutionMessage, ExecutionRequest, RmmResult};
 use crate::services::execution_service::ExecutionService;
@@ -214,21 +214,21 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
             let publisher = self.nats_message_publisher.clone();
             let subject = subject.to_string();
             tokio::spawn(async move {
-                let max_backoff = Duration::from_millis(DEGRADED_PUBLISH_MAX_BACKOFF_MS);
-                let mut backoff = Duration::from_millis(DEGRADED_PUBLISH_INITIAL_BACKOFF_MS);
-                for attempt in 1..=DEGRADED_PUBLISH_MAX_ATTEMPTS {
+                let max_backoff = Duration::from_millis(FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS);
+                let mut backoff = Duration::from_millis(FALLBACK_PUBLISH_INITIAL_RETRY_DELAY_MS);
+                for attempt in 1..=FALLBACK_PUBLISH_MAX_RETRIES {
                     match publisher.publish_acked(&subject, &bytes).await {
                         Ok(()) => return,
                         Err(e) => {
-                            warn!(kind = M::KIND, subject = %subject, attempt, error = %e, "Degraded publish failed, retrying in memory");
-                            if attempt < DEGRADED_PUBLISH_MAX_ATTEMPTS {
+                            warn!(kind = M::KIND, subject = %subject, attempt, error = %e, "Fallback publish failed, retrying in memory");
+                            if attempt < FALLBACK_PUBLISH_MAX_RETRIES {
                                 tokio::time::sleep(backoff).await;
                                 backoff = (backoff * 2).min(max_backoff);
                             }
                         }
                     }
                 }
-                error!(kind = M::KIND, subject = %subject, "Degraded publish gave up after retries, message lost");
+                error!(kind = M::KIND, subject = %subject, "Fallback publish gave up after retries, message lost");
             });
         }
     }
