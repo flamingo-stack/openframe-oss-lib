@@ -9,7 +9,7 @@ import {
   buttonSurfaceClasses,
   outlineBorderClasses,
   splitDividerColorClasses,
-  splitGlyphSizeClasses,
+  splitGlyphSizeBySize,
 } from './button-styles';
 
 // Default layout: centered single content area, padding/gap on the button itself.
@@ -146,12 +146,21 @@ const splitSlotVariants = cva(
         main: 'gap-[var(--spacing-system-xsf)]',
         icon: 'border-l',
       },
-      size: { default: splitGlyphSizeClasses, small: '[&_svg]:h-4 [&_svg]:w-4' },
+      size: splitGlyphSizeBySize,
       variant: { accent: '', outline: '', transparent: '', destructive: '', warning: '' },
+      fullWidth: { true: '', false: '' },
     },
     compoundVariants: [
       { slot: 'main', size: 'default', class: 'px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)]' },
       { slot: 'main', size: 'small', class: 'px-[var(--spacing-system-xs)]' },
+      // `fullWidth` stretches the SHELL, not its children, so without this the main
+      // half stays content-sized and the icon half floats mid-button with dead space
+      // after it instead of sitting flush against the trailing edge. Keyed on
+      // `fullWidth` to match `SplitButton`, which grows its main half on exactly the
+      // same condition (`grow={fullWidth}`) — the two split layouts render side by
+      // side in the same rows and must not disagree. Callers that stretch the shell
+      // some other way (a `flex-1` className, a grid cell) keep the old behaviour.
+      { slot: 'main', fullWidth: true, class: 'flex-1' },
       { slot: 'icon', size: 'default', class: 'w-10' },
       { slot: 'icon', size: 'small', class: 'w-6 md:w-8' },
       {
@@ -181,7 +190,7 @@ const splitSlotVariants = cva(
         ),
       },
     ],
-    defaultVariants: { slot: 'main', size: 'default', variant: 'accent' },
+    defaultVariants: { slot: 'main', size: 'default', variant: 'accent', fullWidth: false },
   },
 );
 
@@ -268,7 +277,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
     const safeSize = size ?? 'default';
     const safeVariant = (variant ?? 'accent') as 'accent' | 'outline' | 'transparent' | 'destructive' | 'warning';
     const shellClasses = cn(splitShellVariants({ variant: safeVariant, size: safeSize, font, fullWidth }), className);
-    const mainSlotClass = splitSlotVariants({ slot: 'main', size: safeSize, variant: safeVariant });
+    const mainSlotClass = splitSlotVariants({ slot: 'main', size: safeSize, variant: safeVariant, fullWidth });
     const iconSlotClass = splitSlotVariants({ slot: 'icon', size: safeSize, variant: safeVariant });
 
     const splitContent = (
@@ -284,7 +293,17 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
           </span>
         </span>
         {loading && (
-          <span className="absolute inset-0 inline-flex items-center justify-center text-ods-text-primary">
+          // Carries the glyph scale itself: this overlay is a SIBLING of the slots, so
+          // it inherits neither their `[&_svg]` sizing nor a shell base rule (the shell
+          // deliberately has none — see `splitSlotVariants`). Without it the spinner
+          // renders unconstrained and fills the button. Reads the same per-size ramp the
+          // slots do, so it matches the glyphs it covers at both breakpoints.
+          <span
+            className={cn(
+              'absolute inset-0 inline-flex items-center justify-center text-ods-text-primary',
+              splitGlyphSizeBySize[safeSize],
+            )}
+          >
             <Spinner />
           </span>
         )}
