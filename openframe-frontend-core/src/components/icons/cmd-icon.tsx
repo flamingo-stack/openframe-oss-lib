@@ -1,14 +1,14 @@
-import React from 'react'
+import type React from 'react';
 
 /** @deprecated Use icons from icons-v2-generated instead. */
 export interface CmdIconProps {
-  size?: number
-  className?: string
-  color?: string
+  size?: number;
+  className?: string;
+  color?: string;
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export const CmdIcon: React.FC<CmdIconProps> = ({ size = 16, className = '', color='white'}) => {
+export const CmdIcon: React.FC<CmdIconProps> = ({ size = 16, className = '', color = 'white' }) => {
   return (
     <svg
       width={size}
@@ -22,19 +22,11 @@ export const CmdIcon: React.FC<CmdIconProps> = ({ size = 16, className = '', col
         d="M3 4C3 3.44772 3.44772 3 4 3H20C20.5523 3 21 3.44772 21 4V20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V4Z"
         stroke={color}
       />
-      <text
-        x="12"
-        y="16"
-        textAnchor="middle"
-        fill={color}
-        fontSize="10"
-        fontFamily="monospace"
-        fontWeight="bold"
-      >
+      <text x="12" y="16" textAnchor="middle" fill={color} fontSize="10" fontFamily="monospace" fontWeight="bold">
         \&gt;
       </text>
     </svg>
-  )
-}
+  );
+};
 
-CmdIcon.displayName = 'CmdIcon'
+CmdIcon.displayName = 'CmdIcon';

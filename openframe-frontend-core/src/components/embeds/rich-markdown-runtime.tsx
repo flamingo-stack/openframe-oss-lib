@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 /**
  * Runtime knobs threaded from `<RichMarkdownRenderer>` down to its
@@ -20,15 +20,15 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react'
  * the hub. Embedders override per-prop as needed.
  */
 export interface RichMarkdownRuntime {
-  redditProxyUrl: string
-  twitterProxyUrl: string
-  ogScraperUrl: string
+  redditProxyUrl: string;
+  twitterProxyUrl: string;
+  ogScraperUrl: string;
   /** Hub-only Supabase image transformer. Returning null means "don't
    *  rewrite — use the src as-is". Defaults to identity (no rewrite). */
   transformImageSrc: (
     src: string,
-    opts?: { width?: number; quality?: number; resize?: 'cover' | 'contain' | 'fill' }
-  ) => string | null
+    opts?: { width?: number; quality?: number; resize?: 'cover' | 'contain' | 'fill' },
+  ) => string | null;
 }
 
 const DEFAULT_RUNTIME: RichMarkdownRuntime = {
@@ -36,9 +36,9 @@ const DEFAULT_RUNTIME: RichMarkdownRuntime = {
   twitterProxyUrl: '/api/blog/twitter-proxy',
   ogScraperUrl: '/api/og-scraper',
   transformImageSrc: () => null,
-}
+};
 
-const RichMarkdownRuntimeContext = createContext<RichMarkdownRuntime>(DEFAULT_RUNTIME)
+const RichMarkdownRuntimeContext = createContext<RichMarkdownRuntime>(DEFAULT_RUNTIME);
 
 /**
  * Provider that fills in defaults for any prop the caller didn't pass.
@@ -60,12 +60,8 @@ export function RichMarkdownRuntimeProvider({
       transformImageSrc: transformImageSrc ?? DEFAULT_RUNTIME.transformImageSrc,
     }),
     [redditProxyUrl, twitterProxyUrl, ogScraperUrl, transformImageSrc],
-  )
-  return (
-    <RichMarkdownRuntimeContext.Provider value={value}>
-      {children}
-    </RichMarkdownRuntimeContext.Provider>
-  )
+  );
+  return <RichMarkdownRuntimeContext.Provider value={value}>{children}</RichMarkdownRuntimeContext.Provider>;
 }
 
 /**
@@ -75,5 +71,5 @@ export function RichMarkdownRuntimeProvider({
  * `<RedditEmbedClient>` directly) get the hub-matching defaults for free.
  */
 export function useRichMarkdownRuntime(): RichMarkdownRuntime {
-  return useContext(RichMarkdownRuntimeContext)
+  return useContext(RichMarkdownRuntimeContext);
 }

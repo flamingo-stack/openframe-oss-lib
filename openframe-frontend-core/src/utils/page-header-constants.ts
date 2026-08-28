@@ -12,4 +12,4 @@
 /** Tailwind class applied uniformly to every section-hero / page-header
  *  icon across the lib (Roadmap Map, Releases Rocket, Knowledge Hub
  *  BookOpen, Data Room Building2, …). Yellow accent color, 40x40. */
-export const SECTION_HERO_ICON_CLASS = 'h-10 w-10 text-ods-accent'
+export const SECTION_HERO_ICON_CLASS = 'h-10 w-10 text-ods-accent';

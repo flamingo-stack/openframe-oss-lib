@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Chat-panel-local context.
@@ -21,17 +21,17 @@
  * card rendered outside the panel) — consumers MUST handle `null`.
  */
 
-import { createContext, useContext } from 'react'
+import { createContext, useContext } from 'react';
 
 export interface ChatPanelHandle {
   /** Close the chat panel. Called by inline cards' nav click handler
    *  ONLY when the resolved navigation is same-tab. */
-  closeChat: () => void
+  closeChat: () => void;
 }
 
-export const ChatPanelContext = createContext<ChatPanelHandle | null>(null)
+export const ChatPanelContext = createContext<ChatPanelHandle | null>(null);
 
 /** Optional consumer — returns `null` when no provider mounted. */
 export function useChatPanel(): ChatPanelHandle | null {
-  return useContext(ChatPanelContext)
+  return useContext(ChatPanelContext);
 }

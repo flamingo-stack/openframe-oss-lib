@@ -1,5 +1,5 @@
-import path from 'path'
-import { defineConfig } from 'vitest/config'
+import path from 'path';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
@@ -11,21 +11,11 @@ export default defineConfig({
     // during dev; the snapshot ships compiled-but-not-test-runnable
     // copies of the source tree and breaks vitest's setup-file
     // resolution). Also skip dist/ + node_modules for safety.
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/.yalc/**',
-    ],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.yalc/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        'dist/',
-        '**/*.test.ts',
-        '**/*.test.tsx',
-        'vitest.setup.ts',
-      ],
+      exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.test.tsx', 'vitest.setup.ts'],
     },
   },
   resolve: {
@@ -33,5 +23,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-})
-
+});

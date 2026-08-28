@@ -18,18 +18,18 @@
  *     by metadata-merge logic — they never clobber a prior value.
  */
 
-import { SCROLL_ANCHOR, type ScrollAnchor } from '../types/message.types'
+import { SCROLL_ANCHOR, type ScrollAnchor } from '../types/message.types';
 
-export { SCROLL_ANCHOR, type ScrollAnchor }
+export { SCROLL_ANCHOR, type ScrollAnchor };
 
 /** Wire-frame key for the `scrollAnchor` field on the metadata leading
  *  frame. Used as a computed property name on both the emit side
  *  (server) and the parse side (client) so a rename is one-file. */
-export const SCROLL_ANCHOR_WIRE_KEY = "scrollAnchor" as const
+export const SCROLL_ANCHOR_WIRE_KEY = 'scrollAnchor' as const;
 
 /** Narrow + validate a wire-supplied value. Returns the literal when
  *  it matches one of the registry's known values; returns `null`
  *  otherwise (which the metadata-merge null-skip filter then drops). */
 export function parseScrollAnchor(raw: unknown): ScrollAnchor | null {
-  return raw === SCROLL_ANCHOR.TOP || raw === SCROLL_ANCHOR.BOTTOM ? raw : null
+  return raw === SCROLL_ANCHOR.TOP || raw === SCROLL_ANCHOR.BOTTOM ? raw : null;
 }

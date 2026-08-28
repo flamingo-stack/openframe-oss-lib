@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /* ============================================================================
  * ⛔️ FROZEN — DO NOT MODIFY (AI agents & contributors, read this first)
@@ -81,14 +81,14 @@
  * (wrapped text never clips, so it never needs a tooltip).
  * ========================================================================== */
 
-import React from 'react'
-import { useIsTruncated } from '../../hooks/ui/use-is-truncated'
-import { cn } from '../../utils/cn'
-import type { ActionsMenuGroup } from '../ui/actions-menu'
-import { EntityImage } from '../ui/entity-image'
-import { FloatingTooltip } from '../ui/floating-tooltip'
-import { PageActions, type PageActionButton } from '../ui/page-actions'
-import { BackButton } from './back-button'
+import type React from 'react';
+import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
+import { cn } from '../../utils/cn';
+import type { ActionsMenuGroup } from '../ui/actions-menu';
+import { EntityImage } from '../ui/entity-image';
+import { FloatingTooltip } from '../ui/floating-tooltip';
+import { PageActions, type PageActionButton } from '../ui/page-actions';
+import { BackButton } from './back-button';
 
 /**
  * Minimum height of the title block's content column, matched to the action
@@ -99,42 +99,42 @@ import { BackButton } from './back-button'
  * height across pages whether or not they render action buttons, so the content
  * below starts at the same baseline. Exported so other page chrome can reuse it.
  */
-export const TITLE_BLOCK_MIN_HEIGHT = 'min-h-11 md:min-h-12'
+export const TITLE_BLOCK_MIN_HEIGHT = 'min-h-11 md:min-h-12';
 
 export interface TitleBlockProps {
-  title?: string
-  subtitle?: string
-  image?: { src: string; alt?: string }
-  backButton?: { label?: string; onClick: () => void }
-  actions?: PageActionButton[]
-  actionsVariant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
-  menuActions?: ActionsMenuGroup[]
+  title?: string;
+  subtitle?: string;
+  image?: { src: string; alt?: string };
+  backButton?: { label?: string; onClick: () => void };
+  actions?: PageActionButton[];
+  actionsVariant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary';
+  menuActions?: ActionsMenuGroup[];
   /** Desktop-only slot (e.g. a `TabSelector`) rendered with the actions. Hidden on mobile. */
-  selector?: React.ReactNode
+  selector?: React.ReactNode;
   /**
    * Visual variant.
    * - `plain` (default): transparent background, no border.
    * - `card`: card background, border, and padding on mobile only — collapses to plain on md+.
    */
-  variant?: 'plain' | 'card'
-  className?: string
+  variant?: 'plain' | 'card';
+  className?: string;
   /** Title typography size. Default `'h2'` (the frozen baseline). Pass `'h1'` to
    *  opt the title up to `text-h1` (the unified Help Center pages). Subtitle stays
    *  `text-h6` either way. */
-  titleSize?: 'h1' | 'h2'
+  titleSize?: 'h1' | 'h2';
   /** Optional node rendered inline, immediately after the title (e.g. a status `Tag`).
    *  Additive + default-preserving: omit it and every existing caller is byte-identical. */
-  titleAdornment?: React.ReactNode
+  titleAdornment?: React.ReactNode;
   /** When true, the title/subtitle TEXT is replaced by line-box-accurate skeleton bars
    *  (typography + surrounding markup unchanged, so header height is identical to loaded).
    *  Additive + default-preserving: omit it and every existing caller is byte-identical. */
-  loading?: boolean
+  loading?: boolean;
   /**
    * Render the ACTIONS as placeholders too. Separate from `loading` on purpose:
    * a page whose action set is already final (it depends on the route, not on
    * the record) keeps showing its real buttons while the title loads.
    */
-  loadingActions?: boolean
+  loadingActions?: boolean;
   /**
    * When the subtitle row occupies the layout. The subtitle is often optional
    * RECORD data — unknown while loading, sometimes absent afterwards — and there
@@ -150,11 +150,11 @@ export interface TitleBlockProps {
    *   loaded page ALWAYS has a subtitle — typically a standalone skeleton
    *   component matching a page whose subtitle is guaranteed.
    */
-  subtitleRow?: 'when-set' | 'while-loading' | 'always'
+  subtitleRow?: 'when-set' | 'while-loading' | 'always';
   /** When true, a long title WRAPS onto multiple lines instead of the frozen single-line
    *  ellipsis clamp. For content detail pages whose h1 is CMS data of arbitrary length.
    *  Additive + default-preserving: omit it and every existing caller is byte-identical. */
-  titleWrap?: boolean
+  titleWrap?: boolean;
 }
 
 /**
@@ -169,9 +169,9 @@ function TitleTextSkeleton({ widthClass, heightClass }: { widthClass: string; he
   return (
     <span
       aria-hidden
-      className={cn('inline-block max-w-full rounded-md bg-ods-border animate-pulse', widthClass, heightClass)}
+      className={cn('inline-block max-w-full animate-pulse rounded-md bg-ods-border', widthClass, heightClass)}
     />
-  )
+  );
 }
 
 /**
@@ -188,7 +188,7 @@ function TitleTextSkeleton({ widthClass, heightClass }: { widthClass: string; he
 const TITLE_SKELETON_SIZE = {
   h1: { width: 'w-56 md:w-80 lg:w-96', height: 'h-7 md:h-8 lg:h-9' },
   h2: { width: 'w-48 md:w-72', height: 'h-4 md:h-6' },
-} as const
+} as const;
 
 export function TitleBlock({
   title,
@@ -208,24 +208,27 @@ export function TitleBlock({
   subtitleRow = 'when-set',
   titleWrap = false,
 }: TitleBlockProps) {
-  const hasSubtitleRow =
-    !!subtitle || subtitleRow === 'always' || (subtitleRow === 'while-loading' && !!loading)
-  const hasActions = actions && actions.length > 0
-  const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
-  const titleClass = titleSize === 'h1' ? 'text-h1' : 'text-h2'
+  const hasSubtitleRow = !!subtitle || subtitleRow === 'always' || (subtitleRow === 'while-loading' && !!loading);
+  const hasActions = actions && actions.length > 0;
+  const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0);
+  const titleClass = titleSize === 'h1' ? 'text-h1' : 'text-h2';
   // Frozen baseline is the single-line `truncate`; `titleWrap` swaps it for
   // multi-line wrapping (break-words guards pathological unbroken tokens).
-  const titleOverflowClass = titleWrap ? 'break-words' : 'truncate'
-  const skeletonSize = TITLE_SKELETON_SIZE[titleSize]
+  const titleOverflowClass = titleWrap ? 'break-words' : 'truncate';
+  const skeletonSize = TITLE_SKELETON_SIZE[titleSize];
 
   // Exactly one title element renders per pass, so one ref covers every branch.
   // The tooltip arms itself only on real clipping — repeating a fully visible
   // title back to the user is noise, and `titleWrap`/loading never clip at all.
-  const { ref: titleRef, isTruncated: titleTruncated } = useIsTruncated<HTMLHeadingElement>(loading ? null : title)
+  const { ref: titleRef, isTruncated: titleTruncated } = useIsTruncated<HTMLHeadingElement>(loading ? null : title);
   const { ref: subtitleRef, isTruncated: subtitleTruncated } = useIsTruncated<HTMLParagraphElement>(
     loading ? null : subtitle,
-  )
-  const titleNode = loading ? <TitleTextSkeleton widthClass={skeletonSize.width} heightClass={skeletonSize.height} /> : title
+  );
+  const titleNode = loading ? (
+    <TitleTextSkeleton widthClass={skeletonSize.width} heightClass={skeletonSize.height} />
+  ) : (
+    title
+  );
 
   return (
     <div
@@ -237,9 +240,9 @@ export function TitleBlock({
         'pt-[var(--spacing-system-l)]',
         variant === 'card'
           ? cn(
-              'bg-ods-card border-b border-ods-border',
+              'border-b border-ods-border bg-ods-card',
               'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
-              'md:bg-transparent md:border-b-0',
+              'md:border-b-0 md:bg-transparent',
               'md:px-0 md:pb-0',
               'md:mb-[var(--spacing-system-l)]',
             )
@@ -250,41 +253,47 @@ export function TitleBlock({
       {/* md+: `flex-none` sizes the column to its content so a long title (capped
           at `max-w-full`, still truncating) pushes the actions onto the next
           wrap line; a short title leaves them inline. Base (mobile) keeps flex-1. */}
-      <div className={cn('flex flex-col justify-center gap-[var(--spacing-system-xs)] flex-1 min-w-0 md:flex-none md:max-w-full', TITLE_BLOCK_MIN_HEIGHT)}>
-        {backButton && (
-          <BackButton
-            onClick={backButton.onClick}
-            label={backButton.label}
-            className="hidden md:inline-flex"
-          />
+      <div
+        className={cn(
+          'flex min-w-0 flex-1 flex-col justify-center gap-[var(--spacing-system-xs)] md:max-w-full md:flex-none',
+          TITLE_BLOCK_MIN_HEIGHT,
         )}
-        {(image || hasSubtitleRow || loading) ? (
-          <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
-            {image && (
-              <EntityImage
-                src={image.src}
-                alt={image.alt}
-                fallbackText={image.alt || title}
-              />
-            )}
-            <div className="flex flex-col justify-center min-w-0 flex-1">
-              {(loading || title) && (
-                titleAdornment ? (
-                  <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
+      >
+        {backButton && (
+          <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden md:inline-flex" />
+        )}
+        {image || hasSubtitleRow || loading ? (
+          <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-m)]">
+            {image && <EntityImage src={image.src} alt={image.alt} fallbackText={image.alt || title} />}
+            <div className="flex min-w-0 flex-1 flex-col justify-center">
+              {(loading || title) &&
+                (titleAdornment ? (
+                  <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-m)]">
                     {/* `min-w-0` moves onto the tooltip's wrapper: the wrapper is
                         now the flex item, and without it the row refuses to
                         shrink and pushes the adornment out. */}
-                    <FloatingTooltip content={title} side="bottom" disabled={!titleTruncated} triggerClassName="min-w-0">
-                      <h1 ref={titleRef} className={cn(titleClass, 'text-ods-text-primary min-w-0', titleOverflowClass)}>{titleNode}</h1>
+                    <FloatingTooltip
+                      content={title}
+                      side="bottom"
+                      disabled={!titleTruncated}
+                      triggerClassName="min-w-0"
+                    >
+                      <h1
+                        ref={titleRef}
+                        className={cn(titleClass, 'min-w-0 text-ods-text-primary', titleOverflowClass)}
+                      >
+                        {titleNode}
+                      </h1>
                     </FloatingTooltip>
                     <span className="shrink-0">{titleAdornment}</span>
                   </div>
                 ) : (
                   <FloatingTooltip content={title} side="bottom" disabled={!titleTruncated}>
-                    <h1 ref={titleRef} className={cn(titleClass, 'text-ods-text-primary', titleOverflowClass)}>{titleNode}</h1>
+                    <h1 ref={titleRef} className={cn(titleClass, 'text-ods-text-primary', titleOverflowClass)}>
+                      {titleNode}
+                    </h1>
                   </FloatingTooltip>
-                )
-              )}
+                ))}
               {hasSubtitleRow && (
                 /* The NBSP is a pure spacer, reached only in `'always'` mode: an
                    empty `p` collapses to zero height (its only content would be
@@ -293,30 +302,37 @@ export function TitleBlock({
                 <FloatingTooltip content={subtitle} side="bottom" disabled={!subtitleTruncated}>
                   <p
                     ref={subtitleRef}
-                    className="text-h6 text-ods-text-secondary truncate"
+                    className="truncate text-ods-text-secondary text-h6"
                     aria-hidden={!loading && !subtitle ? true : undefined}
-                  >{loading ? <TitleTextSkeleton widthClass="w-28 md:w-36" heightClass="h-2.5 md:h-3" /> : (subtitle || '\u00A0')}</p>
+                  >
+                    {loading ? (
+                      <TitleTextSkeleton widthClass="w-28 md:w-36" heightClass="h-2.5 md:h-3" />
+                    ) : (
+                      subtitle || '\u00A0'
+                    )}
+                  </p>
                 </FloatingTooltip>
               )}
             </div>
           </div>
         ) : (
-          title && (
-            titleAdornment ? (
-              <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
-                <FloatingTooltip content={title} side="bottom" disabled={!titleTruncated} triggerClassName="min-w-0">
-                  <h1 ref={titleRef} className={cn(titleClass, 'text-ods-text-primary min-w-0', titleOverflowClass)}>{title}</h1>
-                </FloatingTooltip>
-                <span className="shrink-0">{titleAdornment}</span>
-              </div>
-            ) : (
-              /* This branch never had the single-line clamp, so text already
+          title &&
+          (titleAdornment ? (
+            <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-m)]">
+              <FloatingTooltip content={title} side="bottom" disabled={!titleTruncated} triggerClassName="min-w-0">
+                <h1 ref={titleRef} className={cn(titleClass, 'min-w-0 text-ods-text-primary', titleOverflowClass)}>
+                  {title}
+                </h1>
+              </FloatingTooltip>
+              <span className="shrink-0">{titleAdornment}</span>
+            </div>
+          ) : (
+            /* This branch never had the single-line clamp, so text already
                  wraps; `titleWrap` only adds break-words for pathological
                  unbroken tokens. No class change when the prop is unset —
                  the frozen baseline stays byte-identical. */
-              <h1 className={cn(titleClass, 'text-ods-text-primary', titleWrap && 'break-words')}>{title}</h1>
-            )
-          )
+            <h1 className={cn(titleClass, 'text-ods-text-primary', titleWrap && 'break-words')}>{title}</h1>
+          ))
         )}
       </div>
 
@@ -325,7 +341,7 @@ export function TitleBlock({
           page that passes `actions={[]}` — gating on `hasActions` alone would
           render nothing and then pop the real buttons in. */}
       {(hasActions || hasMenuActions || selector || loadingActions) && (
-        <div className="flex gap-2 items-center shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           <PageActions
             variant={actionsVariant}
             actions={actions ?? []}
@@ -336,7 +352,7 @@ export function TitleBlock({
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default TitleBlock
+export default TitleBlock;

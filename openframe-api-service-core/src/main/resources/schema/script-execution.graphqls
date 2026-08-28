@@ -7,6 +7,10 @@
 # TenantIdProvider — clients never specify tenantId.
 
 extend type Query {
+    """A single execution by its Relay id. Typed refetch — the alternative to node(id).
+    Throws (not null) if the id is absent or in another tenant."""
+    scriptExecution(id: ID!): ScriptExecution!
+
     scriptExecutions(
         scriptId: ID!
         filter: ScriptExecutionFilterInput,

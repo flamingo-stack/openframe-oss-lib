@@ -29,13 +29,13 @@ export const Default: Story = {
         <TabsTrigger value="history">History</TabsTrigger>
       </TabsList>
       <TabsContent value="overview">
-        <p className="text-h6 text-ods-text-secondary">Overview content.</p>
+        <p className="text-ods-text-secondary text-h6">Overview content.</p>
       </TabsContent>
       <TabsContent value="settings">
-        <p className="text-h6 text-ods-text-secondary">Settings content.</p>
+        <p className="text-ods-text-secondary text-h6">Settings content.</p>
       </TabsContent>
       <TabsContent value="history">
-        <p className="text-h6 text-ods-text-secondary">History content.</p>
+        <p className="text-ods-text-secondary text-h6">History content.</p>
       </TabsContent>
     </Tabs>
   ),
@@ -65,13 +65,13 @@ export const AdminRail: Story = {
         </TabsTrigger>
       </TabsList>
       <TabsContent value="rules">
-        <p className="pt-[var(--spacing-system-mf)] text-h6 text-ods-text-secondary">Rule configuration lives here.</p>
+        <p className="pt-[var(--spacing-system-mf)] text-ods-text-secondary text-h6">Rule configuration lives here.</p>
       </TabsContent>
       <TabsContent value="repos">
-        <p className="pt-[var(--spacing-system-mf)] text-h6 text-ods-text-secondary">Repository bindings live here.</p>
+        <p className="pt-[var(--spacing-system-mf)] text-ods-text-secondary text-h6">Repository bindings live here.</p>
       </TabsContent>
       <TabsContent value="runs">
-        <p className="pt-[var(--spacing-system-mf)] text-h6 text-ods-text-secondary">Sweep runs live here.</p>
+        <p className="pt-[var(--spacing-system-mf)] text-ods-text-secondary text-h6">Sweep runs live here.</p>
       </TabsContent>
     </Tabs>
   ),
@@ -93,7 +93,7 @@ export const AdminRailOverflow: Story = {
           ))}
         </TabsList>
         <TabsContent value="t1">
-          <p className="pt-[var(--spacing-system-mf)] text-h6 text-ods-text-secondary">General settings.</p>
+          <p className="pt-[var(--spacing-system-mf)] text-ods-text-secondary text-h6">General settings.</p>
         </TabsContent>
       </Tabs>
     </div>

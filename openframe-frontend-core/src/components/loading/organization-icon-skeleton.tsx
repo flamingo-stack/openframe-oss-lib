@@ -1,5 +1,4 @@
-import type React from "react"
-import { cn } from "../../utils/cn"
+import { cn } from '../../utils/cn';
 
 export interface OrganizationIconSkeletonProps {
   /**
@@ -11,22 +10,22 @@ export interface OrganizationIconSkeletonProps {
    * - l: 56px (w-14 h-14)
    * - xl: 64px (w-16 h-16) - for detail views
    */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'l' | 'xl'
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'l' | 'xl';
 
   /**
    * Additional CSS classes
    */
-  className?: string
+  className?: string;
 
   /**
    * Show background container (default: true)
    */
-  showBackground?: boolean
+  showBackground?: boolean;
 
   /**
    * Background style variant (default: 'dark')
    */
-  backgroundStyle?: 'dark' | 'light' | 'white'
+  backgroundStyle?: 'dark' | 'light' | 'white';
 }
 
 /**
@@ -38,8 +37,8 @@ const sizeClasses = {
   md: 'w-10 h-10',
   lg: 'w-12 h-12',
   l: 'w-14 h-14',
-  xl: 'w-16 h-16'
-}
+  xl: 'w-16 h-16',
+};
 
 /**
  * Background style classes matching VendorIcon/OrganizationIcon exactly
@@ -47,8 +46,8 @@ const sizeClasses = {
 const backgroundClasses = {
   dark: 'bg-ods-bg border border-ods-border',
   light: 'bg-ods-card border border-ods-border',
-  white: 'bg-white border border-[#E5E5E5]'
-}
+  white: 'bg-white border border-[#E5E5E5]',
+};
 
 /**
  * OrganizationIconSkeleton - Loading skeleton for OrganizationIcon
@@ -77,23 +76,19 @@ export function OrganizationIconSkeleton({
   size = 'md',
   className = '',
   showBackground = true,
-  backgroundStyle = 'dark'
+  backgroundStyle = 'dark',
 }: OrganizationIconSkeletonProps) {
   const containerClasses = cn(
     sizeClasses[size],
-    'rounded-lg flex items-center justify-center flex-shrink-0',
+    'flex flex-shrink-0 items-center justify-center rounded-lg',
     showBackground && backgroundClasses[backgroundStyle],
     !showBackground && 'overflow-hidden',
-    className
-  )
+    className,
+  );
 
   return (
-    <div
-      className={containerClasses}
-      role="status"
-      aria-label="Loading organization icon"
-    >
-      <div className="w-1/2 h-1/2 bg-ods-border rounded-sm animate-pulse" />
+    <div className={containerClasses} role="status" aria-label="Loading organization icon">
+      <div className="h-1/2 w-1/2 animate-pulse rounded-sm bg-ods-border" />
     </div>
-  )
+  );
 }

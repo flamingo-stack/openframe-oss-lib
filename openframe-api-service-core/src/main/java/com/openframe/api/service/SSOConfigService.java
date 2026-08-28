@@ -67,8 +67,8 @@ public class SSOConfigService {
      * Always returns a valid response object, even if configuration doesn't exist
      */
     public SSOConfigResponse getConfig(String provider) {
-        if (OPENFRAME_PROVIDER.equals(provider)) {
-            return openframeLoginConfig();
+        if (isOpenframeLogin(provider)) {
+            return openframeLoginConfig(provider);
         }
         return ssoConfigRepository.findByProvider(provider)
                 .map(config -> ssoConfigMapper.toResponse(
@@ -98,7 +98,7 @@ public class SSOConfigService {
     }
 
     public void deleteConfig(String provider) {
-        ssoConfigRepository.findByProvider(provider)
+        ssoConfigRepository.findByProvider(isOpenframeLogin(provider) ? OPENFRAME_PROVIDER : provider)
                 .ifPresent(config -> {
                     ssoConfigRepository.delete(config);
                     log.info("Successfully deleted SSO configuration for provider '{}'", provider);
@@ -126,7 +126,7 @@ public class SSOConfigService {
     }
 
     public void toggleEnabled(String provider, boolean enabled) {
-        if (OPENFRAME_PROVIDER.equals(provider)) {
+        if (isOpenframeLogin(provider)) {
             toggleOpenframeLogin(enabled);
             return;
         }
@@ -160,14 +160,27 @@ public class SSOConfigService {
         ssoConfigProcessor.postProcessConfigToggled(savedConfig);
     }
 
-    private SSOConfigResponse openframeLoginConfig() {
+    private SSOConfigResponse openframeLoginConfig(String requestedProvider) {
         boolean enabled = ssoConfigRepository.findByProvider(OPENFRAME_PROVIDER)
                 .map(SSOConfig::isEnabled)
                 .orElse(true);
         return SSOConfigResponse.builder()
-                .provider(OPENFRAME_PROVIDER)
+                .provider(requestedProvider)
                 .enabled(enabled)
                 .build();
+    }
+
+    /**
+     * The built-in login answers under both ids: canonical {@code openframe-sso} (what discovery
+     * reports and what the toggle document stores) and the {@code openframe} alias some frontends
+     * use. Without the alias, {@code GET /sso/openframe} fell through to the generic "no config"
+     * fallback and misreported the enabled-by-default login as disabled.
+     * <p>
+     * TODO: once the new mobile app version is released and "openframe" becomes the canonical id
+     * (see {@link SSOConfig#OPENFRAME_PROVIDER}), remove this alias handling.
+     */
+    private static boolean isOpenframeLogin(String provider) {
+        return OPENFRAME_PROVIDER.equals(provider) || "openframe".equals(provider);
     }
 
     private void validateAutoProvision(String provider, SSOConfigRequest request) {

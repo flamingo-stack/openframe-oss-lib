@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -15,6 +17,6 @@ public class ScriptExecutionAcknowledgeMessage {
 
     private String executionId;
     private String machineId;
-    private String scriptId;
     private String scheduleId;
+    private List<String> scriptIds;
 }

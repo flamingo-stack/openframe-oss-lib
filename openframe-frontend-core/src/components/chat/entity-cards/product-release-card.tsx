@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * ProductReleaseCard — chat entity-card re-export of the canonical
@@ -15,5 +15,5 @@ export {
   type ProductReleaseCardProps,
   type ProductReleaseCardSize,
   type ProductReleaseCardAnchorProps,
-} from '../../shared/product-release/product-release-card'
-export { ProductReleaseCardSkeleton } from '../../shared/product-release/product-release-card-skeleton'
+} from '../../shared/product-release/product-release-card';
+export { ProductReleaseCardSkeleton } from '../../shared/product-release/product-release-card-skeleton';

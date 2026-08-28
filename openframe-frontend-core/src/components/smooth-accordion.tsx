@@ -1,95 +1,98 @@
-import * as React from 'react';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
+import {
+  type ComponentPropsWithoutRef,
+  type ElementRef,
+  type ReactNode,
+  forwardRef,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import { cn } from '../utils/cn';
 import { ChevronButton } from './ui/chevron-button';
-import { cn } from "../utils/cn";
 
 // --- SmoothAccordion -----------------------------------------------------------------
 // Wrapper that re-exports AccordionPrimitive.Root for convenience
 export const SmoothAccordion = AccordionPrimitive.Root;
 
 // --- SmoothAccordionItem --------------------------------------------------------------
-export const SmoothAccordionItem = React.forwardRef<
-  React.ElementRef<typeof AccordionPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>
+export const SmoothAccordionItem = forwardRef<
+  ElementRef<typeof AccordionPrimitive.Item>,
+  ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>
 >(({ className, ...props }, ref) => (
-  <AccordionPrimitive.Item
-    ref={ref}
-    className={cn('border-0', className)}
-    {...props}
-  />
+  <AccordionPrimitive.Item ref={ref} className={cn('border-0', className)} {...props} />
 ));
 SmoothAccordionItem.displayName = 'SmoothAccordionItem';
 
 // --- SmoothAccordionTrigger -----------------------------------------------------------
-interface SmoothAccordionTriggerProps
-  extends React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger> {
-  label: React.ReactNode;
+interface SmoothAccordionTriggerProps extends ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger> {
+  label: ReactNode;
   className?: string;
 }
 
-export const SmoothAccordionTrigger = React.forwardRef<
-  HTMLButtonElement,
-  SmoothAccordionTriggerProps
->(({ label, className, ...props }, ref) => (
-  <AccordionPrimitive.Header className="flex">
-    <AccordionPrimitive.Trigger
-      ref={ref}
-      className={cn(
-        'group flex w-full items-center justify-between px-6 md:px-8 py-6 text-left hover:no-underline focus:outline-none transition-colors duration-200 ease-in-out',
-        className,
-      )}
-      {...props}
-    >
-      <span className="text-h3 text-ods-text-primary">
-        {label}
-      </span>
-      <ChevronButton
-        size="md"
-        isExpanded={false}
-        backgroundColor="transparent"
-        borderColor="var(--color-border-default)"
-        className="transition-transform duration-300 ease-in-out group-data-[state=open]:rotate-180"
-      />
-    </AccordionPrimitive.Trigger>
-  </AccordionPrimitive.Header>
-));
+export const SmoothAccordionTrigger = forwardRef<HTMLButtonElement, SmoothAccordionTriggerProps>(
+  ({ label, className, ...props }, ref) => (
+    <AccordionPrimitive.Header className="flex">
+      <AccordionPrimitive.Trigger
+        ref={ref}
+        className={cn(
+          'group flex w-full items-center justify-between px-6 py-6 text-left transition-colors duration-200 ease-in-out hover:no-underline focus:outline-none md:px-8',
+          className,
+        )}
+        {...props}
+      >
+        <span className="text-ods-text-primary text-h3">{label}</span>
+        <ChevronButton
+          size="md"
+          isExpanded={false}
+          backgroundColor="transparent"
+          borderColor="var(--color-border-default)"
+          className="transition-transform duration-300 ease-in-out group-data-[state=open]:rotate-180"
+        />
+      </AccordionPrimitive.Trigger>
+    </AccordionPrimitive.Header>
+  ),
+);
 SmoothAccordionTrigger.displayName = 'SmoothAccordionTrigger';
 
 // --- SmoothAccordionContent -----------------------------------------------------------
 // Uses dynamic height measurement with ResizeObserver for ultra-smooth animation.
-export const SmoothAccordionContent = React.forwardRef<
+export const SmoothAccordionContent = forwardRef<
   HTMLDivElement,
-  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>
+  // `data-state` is injected by Radix at render time, not declared on
+  // `Content`'s own props — declare the one attribute this component reads.
+  ComponentPropsWithoutRef<typeof AccordionPrimitive.Content> & { 'data-state'?: 'open' | 'closed' }
 >(({ className, children, ...props }, ref) => {
-  const [maxHeight, setMaxHeight] = React.useState<number>(0);
-  const contentInnerRef = React.useRef<HTMLDivElement | null>(null);
+  const [maxHeight, setMaxHeight] = useState<number>(0);
+  const contentInnerRef = useRef<HTMLDivElement | null>(null);
 
   const composedRef = (node: HTMLDivElement) => {
     // Allow Radix to receive ref as well
     if (typeof ref === 'function') ref(node);
-    else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    else if (ref) ref.current = node;
     contentInnerRef.current = node;
   };
 
-  const updateHeight = React.useCallback(() => {
+  const updateHeight = useCallback(() => {
     if (contentInnerRef.current) {
       setMaxHeight(contentInnerRef.current.scrollHeight);
     }
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     updateHeight();
   }, [updateHeight, children]);
 
   // ResizeObserver for dynamic content
-  React.useEffect(() => {
-    if (!contentInnerRef.current) return;
+  useEffect(() => {
+    if (!contentInnerRef.current) return undefined;
     const ro = new ResizeObserver(updateHeight);
     ro.observe(contentInnerRef.current);
     return () => ro.disconnect();
   }, [updateHeight]);
 
-  const isOpen = (props as any)["data-state"] === "open";
+  const isOpen = props['data-state'] === 'open';
 
   return (
     <AccordionPrimitive.Content
@@ -121,4 +124,4 @@ export const SmoothAccordionContent = React.forwardRef<
     </AccordionPrimitive.Content>
   );
 });
-SmoothAccordionContent.displayName = 'SmoothAccordionContent'; 
+SmoothAccordionContent.displayName = 'SmoothAccordionContent';

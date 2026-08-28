@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<HelpCenterCreateForm />` — thin wrapper around the canonical
@@ -25,12 +25,12 @@
  * `<HelpCenterList />` focused on list/state/pagination concerns.
  */
 
-import { useState, type ChangeEvent } from 'react'
-import { Input, Label } from '../ui'
-import { ContactForm } from '../contact'
-import type { UseTicketActionsReturn } from './hooks/use-ticket-actions'
+import { useState, type ChangeEvent } from 'react';
+import { ContactForm } from '../contact';
+import { Input, Label } from '../ui';
+import type { UseTicketActionsReturn } from './hooks/use-ticket-actions';
 
-const SUBJECT_MAX_CHARS = 200
+const SUBJECT_MAX_CHARS = 200;
 
 export interface HelpCenterCreateFormProps {
   /** The full actions bag from `useTicketActions` — we read
@@ -39,7 +39,7 @@ export interface HelpCenterCreateFormProps {
    *  composition points (e.g. `<HelpCenterCard>` takes individual
    *  action callbacks because the drawer needs four of them; the form
    *  only needs one but the parent already has the bag in scope). */
-  actions: UseTicketActionsReturn
+  actions: UseTicketActionsReturn;
   /** Authoritative session identity, resolved by the parent
    *  (`HelpCenterList`) which already gates rendering on
    *  `identity.isLoading === false`. Passing these in (instead of
@@ -49,12 +49,12 @@ export interface HelpCenterCreateFormProps {
    *  with `user = null` and a stale `sessionEmail = ''`, locking
    *  react-hook-form's `defaultValues.email` to an empty string for
    *  the lifetime of the form — Zod then rejects the submit silently. */
-  sessionName: string
-  sessionEmail: string
+  sessionName: string;
+  sessionEmail: string;
   /** Disables every input + button when the support backend (HubSpot)
    *  is down. Wired from the parent's
    *  `useTicketActions.onSupportSystemDown` flag. */
-  supportSystemDown?: boolean
+  supportSystemDown?: boolean;
 }
 
 /**
@@ -92,12 +92,12 @@ export interface HelpCenterCreateFormProps {
  */
 export function HelpCenterCreateFormSkeleton() {
   return (
-    <div className="h-full flex flex-col border border-ods-border rounded-2xl md:rounded-3xl p-6 md:p-8 lg:p-10">
+    <div className="flex h-full flex-col rounded-2xl border border-ods-border p-6 md:rounded-3xl md:p-8 lg:p-10">
       {/* Heading container — mirrors `mb-6 md:mb-8` + h2 with its own
           `mb-3 md:mb-4` and `text-h2` height (32px font, line-height
           ~1.25 → 40px). h-10 bar matches the rendered h2 height. */}
       <div className="mb-6 md:mb-8">
-        <div className="h-10 w-72 bg-ods-border rounded animate-pulse mb-3 md:mb-4" />
+        <div className="mb-3 h-10 w-72 animate-pulse rounded bg-ods-border md:mb-4" />
       </div>
 
       {/* Form body — same `space-y-4 md:space-y-6` gap stack.
@@ -111,7 +111,7 @@ export function HelpCenterCreateFormSkeleton() {
           same 4 hidden inputs so the Subject placeholder lands at the
           same Y as the real Subject input. Removing them would shift
           the whole stack up by 24px on every page load. */}
-      <div className="flex flex-col flex-grow space-y-4 md:space-y-6">
+      <div className="flex flex-grow flex-col space-y-4 md:space-y-6">
         <input type="hidden" aria-hidden />
         <input type="hidden" aria-hidden />
         <input type="hidden" aria-hidden />
@@ -123,8 +123,8 @@ export function HelpCenterCreateFormSkeleton() {
             height: 27 + 4 + 48 (h-12 input) = 79px, identical to
             real form. */}
         <div className="flex flex-col">
-          <div className="h-[27px] w-20 bg-ods-border rounded animate-pulse mb-1" />
-          <div className="h-12 w-full bg-ods-border rounded animate-pulse" />
+          <div className="mb-1 h-[27px] w-20 animate-pulse rounded bg-ods-border" />
+          <div className="h-12 w-full animate-pulse rounded bg-ods-border" />
         </div>
 
         {/* Message section — `flex flex-col flex-grow` matches real
@@ -133,9 +133,9 @@ export function HelpCenterCreateFormSkeleton() {
             height when the wrapper has the standard list + footer
             below it. Same `h-[27px]` + `mb-1` Label pattern as Subject:
             27 + 4 + 96 = 127px, identical to real form. */}
-        <div className="flex flex-col flex-grow">
-          <div className="h-[27px] w-32 bg-ods-border rounded animate-pulse mb-1" />
-          <div className="h-24 w-full bg-ods-border rounded animate-pulse flex-grow" />
+        <div className="flex flex-grow flex-col">
+          <div className="mb-1 h-[27px] w-32 animate-pulse rounded bg-ods-border" />
+          <div className="h-24 w-full flex-grow animate-pulse rounded bg-ods-border" />
         </div>
 
         {/* Attachments row — mirrors the real `flex flex-col gap-2`
@@ -143,21 +143,21 @@ export function HelpCenterCreateFormSkeleton() {
             the h-7 add button + helper text. */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 bg-ods-border rounded animate-pulse shrink-0" />
-            <div className="h-4 w-40 bg-ods-border rounded animate-pulse" />
+            <div className="h-7 w-7 shrink-0 animate-pulse rounded bg-ods-border" />
+            <div className="h-4 w-40 animate-pulse rounded bg-ods-border" />
           </div>
         </div>
 
         {/* Footer — same `pt-2 mt-auto` so it sticks to the bottom.
             Button bar is h-12 to match the real `<Button>` height
             (48px). */}
-        <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-center justify-end w-full pt-2 mt-auto">
-          <div className="h-4 w-72 bg-ods-border rounded animate-pulse" />
-          <div className="h-12 w-32 bg-ods-border rounded animate-pulse" />
+        <div className="mt-auto flex w-full flex-col items-center justify-end gap-4 pt-2 md:flex-row md:gap-6">
+          <div className="h-4 w-72 animate-pulse rounded bg-ods-border" />
+          <div className="h-12 w-32 animate-pulse rounded bg-ods-border" />
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export function HelpCenterCreateForm({
@@ -166,8 +166,8 @@ export function HelpCenterCreateForm({
   sessionEmail,
   supportSystemDown = false,
 }: HelpCenterCreateFormProps) {
-  const [subject, setSubject] = useState('')
-  const [subjectError, setSubjectError] = useState<string | null>(null)
+  const [subject, setSubject] = useState('');
+  const [subjectError, setSubjectError] = useState<string | null>(null);
 
   // Subject input — slotted into `<ContactForm>`'s new `extraTopField`
   // position. Local state + error so the input behaves like the
@@ -182,26 +182,23 @@ export function HelpCenterCreateForm({
         type="text"
         value={subject}
         onChange={(e: ChangeEvent<HTMLInputElement>) => {
-          setSubject(e.target.value)
-          if (subjectError) setSubjectError(null)
+          setSubject(e.target.value);
+          if (subjectError) setSubjectError(null);
         }}
         placeholder="Briefly describe what's going on"
         maxLength={SUBJECT_MAX_CHARS}
         aria-invalid={!!subjectError}
         aria-describedby={subjectError ? 'help-center-subject-error' : undefined}
         disabled={supportSystemDown}
-        className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-12"
+        className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"
       />
       {subjectError && (
-        <span
-          id="help-center-subject-error"
-          className="text-ods-error text-h6 mt-1"
-        >
+        <span id="help-center-subject-error" className="mt-1 text-ods-error text-h6">
           {subjectError}
         </span>
       )}
     </div>
-  )
+  );
 
   return (
     <ContactForm
@@ -217,27 +214,27 @@ export function HelpCenterCreateForm({
       submitLabel="Open ticket"
       attachmentsEnabled
       onCustomSubmit={async (data, attachments) => {
-        const trimmedSubject = subject.trim()
+        const trimmedSubject = subject.trim();
         if (!trimmedSubject) {
-          setSubjectError('Subject is required')
+          setSubjectError('Subject is required');
           // Throw so `<ContactForm>`'s catch path doesn't `reset()` —
           // user keeps their typed message body and just adds a subject.
-          throw new Error('SUBJECT_REQUIRED')
+          throw new Error('SUBJECT_REQUIRED');
         }
-        setSubjectError(null)
+        setSubjectError(null);
         const ok = await actions.submitTicket({
           subject: trimmedSubject,
           content: data.message,
           attachments: attachments.length > 0 ? attachments : undefined,
-        })
+        });
         if (ok) {
-          setSubject('')
+          setSubject('');
         } else {
           // Same as above — keep inputs for retry. The toast is already
           // surfaced by `useTicketActions`.
-          throw new Error('TICKET_SUBMIT_FAILED')
+          throw new Error('TICKET_SUBMIT_FAILED');
         }
       }}
     />
-  )
+  );
 }

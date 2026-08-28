@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { clearAuthedAssetCache, useAuthedAssetSrc } from './use-authed-asset-src'
+import { clearAuthedAssetCache, useAuthedAssetSrc } from './use-authed-asset-src';
 
 /**
  * Image flavor of `useAuthedAssetSrc` — see that hook for the full contract.
@@ -13,7 +13,7 @@ import { clearAuthedAssetCache, useAuthedAssetSrc } from './use-authed-asset-src
  * the registered `EmbedAuthAdapter`.
  */
 export function useAuthedImageSrc(src?: string | null): string | undefined {
-  return useAuthedAssetSrc(src, 'image/*')
+  return useAuthedAssetSrc(src, 'image/*');
 }
 
 /**
@@ -21,4 +21,4 @@ export function useAuthedImageSrc(src?: string | null): string | undefined {
  * backs every authed asset (images AND caption tracks), so hosts keep calling
  * this single function on logout / forced re-login.
  */
-export const clearAuthedImageCache = clearAuthedAssetCache
+export const clearAuthedImageCache = clearAuthedAssetCache;

@@ -55,6 +55,11 @@ public class ScheduleRunDataFetcher {
     }
 
     @DgsQuery
+    public ScheduleRunResponse scheduleRun(@InputArgument @NotBlank String id) {
+        return scheduleRunService.get(decodeId(id));
+    }
+
+    @DgsQuery
     public CountedGenericConnection<GenericEdge<ScheduleRunResponse>> scheduleRuns(
             @InputArgument @NotBlank String scheduleId,
             @InputArgument @Valid ScheduleRunFilterInput filter,

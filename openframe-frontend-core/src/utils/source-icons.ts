@@ -27,55 +27,55 @@
 /** Map RagTableConfig.id → icon_name (resolvable via `getIconComponent`). */
 export const SOURCE_ICON_NAMES: Record<string, string> = {
   // Doc tables
-  'openframe-docs':              'openframe',
-  'data-room-docs':              'shield',
+  'openframe-docs': 'openframe',
+  'data-room-docs': 'shield',
 
   // CMS / programs
-  'blog-posts':                  'newspaper',
-  'product-releases':            'rocket',
-  'case-studies':                'briefcase',
-  'onboarding-guides':           'graduation-cap',
-  webinars:                      'video',
-  events:                        'calendar',
-  podcasts:                      'headphones',
-  'customer-interviews':         'users',
+  'blog-posts': 'newspaper',
+  'product-releases': 'rocket',
+  'case-studies': 'briefcase',
+  'onboarding-guides': 'graduation-cap',
+  webinars: 'video',
+  events: 'calendar',
+  podcasts: 'headphones',
+  'customer-interviews': 'users',
 
   // Financials
-  'investor-updates':            'mail',
-  'financial-kpis':              'activity',
-  'financial-cap-table':         'table',
-  'financial-pnl':               'trending-up',
-  'financial-balance-sheet':     'dollar-sign',
-  'financial-cash-flow':         'banknote',
+  'investor-updates': 'mail',
+  'financial-kpis': 'activity',
+  'financial-cap-table': 'table',
+  'financial-pnl': 'trending-up',
+  'financial-balance-sheet': 'dollar-sign',
+  'financial-cash-flow': 'banknote',
 
   // ClickUp
-  'clickup-roadmap':             'clickup',
-  'clickup-delivery':            'clickup',
-  'clickup-tasks-internal':      'clickup',
+  'clickup-roadmap': 'clickup',
+  'clickup-delivery': 'clickup',
+  'clickup-tasks-internal': 'clickup',
 
   // GitHub
-  'github-commits':              'github',
-  'github-pull-requests':        'github',
-  'github-pr-reviews':           'github',
-  'github-commits-public':       'github',
+  'github-commits': 'github',
+  'github-pull-requests': 'github',
+  'github-pr-reviews': 'github',
+  'github-commits-public': 'github',
   'github-pull-requests-public': 'github',
-  'github-pr-reviews-public':    'github',
+  'github-pr-reviews-public': 'github',
 
   // HubSpot
-  'hubspot-tickets':             'hubspot',
-  'hubspot-tickets-anon':        'hubspot',
-  'hubspot-tickets-self':        'hubspot',
+  'hubspot-tickets': 'hubspot',
+  'hubspot-tickets-anon': 'hubspot',
+  'hubspot-tickets-self': 'hubspot',
 
   // Communications
-  'slack-messages':              'slack',
-}
+  'slack-messages': 'slack',
+};
 
 /** Lookup an icon name by RagTableConfig.id. Returns undefined when
  *  unknown so callers can decide whether to fall back to documentType
  *  or to the generic FileText glyph in the icon registry. */
 export function getSourceIconName(tableId: string | null | undefined): string | undefined {
-  if (!tableId) return undefined
-  return SOURCE_ICON_NAMES[tableId]
+  if (!tableId) return undefined;
+  return SOURCE_ICON_NAMES[tableId];
 }
 
 /**
@@ -92,60 +92,60 @@ export function getSourceIconName(tableId: string | null | undefined): string | 
  */
 export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   // Doc tables
-  'openframe-docs':              'OpenFrame Docs',
-  'data-room-docs':              'Data Room',
+  'openframe-docs': 'OpenFrame Docs',
+  'data-room-docs': 'Data Room',
 
   // CMS / programs
-  'blog-posts':                  'Blog Posts',
-  'product-releases':            'Product Releases',
-  'case-studies':                'Case Studies',
-  'onboarding-guides':           'Onboarding Guides',
-  webinars:                      'Webinars',
-  events:                        'Events',
-  podcasts:                      'Podcasts',
-  'customer-interviews':         'Customer Interviews',
+  'blog-posts': 'Blog Posts',
+  'product-releases': 'Product Releases',
+  'case-studies': 'Case Studies',
+  'onboarding-guides': 'Onboarding Guides',
+  webinars: 'Webinars',
+  events: 'Events',
+  podcasts: 'Podcasts',
+  'customer-interviews': 'Customer Interviews',
 
   // Financials
-  'investor-updates':            'Investor Updates',
-  'financial-kpis':              'Financial KPIs',
-  'financial-cap-table':         'Cap Table',
-  'financial-pnl':               'Profit & Loss',
-  'financial-balance-sheet':     'Balance Sheet',
-  'financial-cash-flow':         'Cash Flow',
+  'investor-updates': 'Investor Updates',
+  'financial-kpis': 'Financial KPIs',
+  'financial-cap-table': 'Cap Table',
+  'financial-pnl': 'Profit & Loss',
+  'financial-balance-sheet': 'Balance Sheet',
+  'financial-cash-flow': 'Cash Flow',
 
   // ClickUp
-  'clickup-roadmap':             'ClickUp Roadmap',
-  'clickup-delivery':            'ClickUp Delivery',
-  'clickup-tasks-internal':      'ClickUp Tasks',
+  'clickup-roadmap': 'ClickUp Roadmap',
+  'clickup-delivery': 'ClickUp Delivery',
+  'clickup-tasks-internal': 'ClickUp Tasks',
 
   // GitHub
-  'github-commits':              'GitHub Commits',
-  'github-pull-requests':        'GitHub Pull Requests',
-  'github-pr-reviews':           'GitHub PR Reviews',
-  'github-commits-public':       'OpenFrame Commits',
+  'github-commits': 'GitHub Commits',
+  'github-pull-requests': 'GitHub Pull Requests',
+  'github-pr-reviews': 'GitHub PR Reviews',
+  'github-commits-public': 'OpenFrame Commits',
   'github-pull-requests-public': 'OpenFrame Pull Requests',
-  'github-pr-reviews-public':    'OpenFrame PR Reviews',
+  'github-pr-reviews-public': 'OpenFrame PR Reviews',
 
   // HubSpot
-  'hubspot-tickets':             'HubSpot Tickets',
+  'hubspot-tickets': 'HubSpot Tickets',
   // Anon + self share the "Tickets" root so the chip vocabulary is
   // uniform across logged-out (everyone's resolved support tickets,
   // anonymized → "Tickets") and logged-in (user-scoped → "My Tickets")
   // surfaces. The full-PII `hubspot-tickets` entry above is product-hub
   // internal only (admin view), kept as "HubSpot Tickets" to flag the
   // distinct scope.
-  'hubspot-tickets-anon':        'Tickets',
-  'hubspot-tickets-self':        'My Tickets',
+  'hubspot-tickets-anon': 'Tickets',
+  'hubspot-tickets-self': 'My Tickets',
 
   // Communications
-  'slack-messages':              'OpenMSP Community',
-}
+  'slack-messages': 'OpenMSP Community',
+};
 
 /** Lookup a human-readable label by RagTableConfig.id. Falls back
  *  to the raw id (chip text becomes the table slug — visible bug
  *  that prompts an entry to land in `SOURCE_LABELS_BY_TABLE`). */
 export function getSourceLabel(tableId: string): string {
-  return SOURCE_LABELS_BY_TABLE[tableId] ?? tableId
+  return SOURCE_LABELS_BY_TABLE[tableId] ?? tableId;
 }
 
 /**
@@ -171,48 +171,48 @@ export function getSourceLabel(tableId: string): string {
  */
 export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   // Doc tables
-  markdown:                       'openframe-docs',
-  data_room_doc:                  'data-room-docs',
+  markdown: 'openframe-docs',
+  data_room_doc: 'data-room-docs',
 
   // CMS / programs
-  blog_post:                      'blog-posts',
-  product_release:                'product-releases',
-  case_study:                     'case-studies',
-  onboarding_guide:               'onboarding-guides',
-  webinar:                        'webinars',
-  event:                          'events',
-  podcast:                        'podcasts',
-  customer_interview:             'customer-interviews',
+  blog_post: 'blog-posts',
+  product_release: 'product-releases',
+  case_study: 'case-studies',
+  onboarding_guide: 'onboarding-guides',
+  webinar: 'webinars',
+  event: 'events',
+  podcast: 'podcasts',
+  customer_interview: 'customer-interviews',
 
   // Financials
-  investor_update:                'investor-updates',
-  financial_kpi:                  'financial-kpis',
-  cap_table:                      'financial-cap-table',
-  profit_loss:                    'financial-pnl',
-  balance_sheet:                  'financial-balance-sheet',
-  cash_flow:                      'financial-cash-flow',
+  investor_update: 'investor-updates',
+  financial_kpi: 'financial-kpis',
+  cap_table: 'financial-cap-table',
+  profit_loss: 'financial-pnl',
+  balance_sheet: 'financial-balance-sheet',
+  cash_flow: 'financial-cash-flow',
 
   // ClickUp
-  roadmap_item:                   'clickup-roadmap',
-  delivery_item:                  'clickup-delivery',
-  internal_task:                  'clickup-tasks-internal',
+  roadmap_item: 'clickup-roadmap',
+  delivery_item: 'clickup-delivery',
+  internal_task: 'clickup-tasks-internal',
 
   // GitHub
-  github_commit:                  'github-commits',
-  github_pull_request:            'github-pull-requests',
-  github_pr_review:               'github-pr-reviews',
-  github_commit_public:           'github-commits-public',
-  github_pull_request_public:     'github-pull-requests-public',
-  github_pr_review_public:        'github-pr-reviews-public',
+  github_commit: 'github-commits',
+  github_pull_request: 'github-pull-requests',
+  github_pr_review: 'github-pr-reviews',
+  github_commit_public: 'github-commits-public',
+  github_pull_request_public: 'github-pull-requests-public',
+  github_pr_review_public: 'github-pr-reviews-public',
 
   // HubSpot
-  hubspot_ticket:                 'hubspot-tickets',
-  hubspot_ticket_anon:            'hubspot-tickets-anon',
-  hubspot_ticket_self:            'hubspot-tickets-self',
+  hubspot_ticket: 'hubspot-tickets',
+  hubspot_ticket_anon: 'hubspot-tickets-anon',
+  hubspot_ticket_self: 'hubspot-tickets-self',
 
   // Communications
-  slack_message:                  'slack-messages',
-}
+  slack_message: 'slack-messages',
+};
 
 /**
  * Default `tableIdForDocumentType` resolver used by `useEmbeddedChat` when
@@ -221,5 +221,5 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
  * still short-circuits gracefully on stale or custom types.
  */
 export function defaultTableIdForDocumentType(documentType: string): string | null {
-  return DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID[documentType] ?? null
+  return DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID[documentType] ?? null;
 }

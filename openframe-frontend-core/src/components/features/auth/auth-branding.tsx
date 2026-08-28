@@ -1,7 +1,7 @@
-'use client'
+'use client';
 
-import { OpenFrameLogo } from '../../icons'
-import { FlamingoLogoIcon } from '../../icons-v2-generated/logos/flamingo-logo-icon'
+import { OpenFrameLogo } from '../../icons';
+import { FlamingoLogoIcon } from '../../icons-v2-generated/logos/flamingo-logo-icon';
 
 /** OpenFrame logo + wordmark, shown at the top of the auth screens. */
 export function OpenFrameWordmark() {
@@ -12,14 +12,14 @@ export function OpenFrameWordmark() {
         lowerPathColor="var(--color-accent-primary)"
         upperPathColor="var(--color-text-primary)"
       />
-      <span className="text-h2 text-ods-text-primary tracking-[-0.64px]">OpenFrame</span>
+      <span className="tracking-[-0.64px] text-ods-text-primary text-h2">OpenFrame</span>
     </div>
-  )
+  );
 }
 
 export interface PoweredByFlamingoProps {
   /** Keep the small 56×16 logo at every breakpoint (default grows to 83×24 from tablet up). */
-  compact?: boolean
+  compact?: boolean;
 }
 
 /** "Powered by Flamingo" footer mark. */
@@ -30,5 +30,5 @@ export function PoweredByFlamingo({ compact = false }: PoweredByFlamingoProps) {
       {/* logo is 416×120 (≈3.47:1) — set explicit w/h so it isn't squashed to a square. */}
       <FlamingoLogoIcon className={compact ? 'h-4 w-14' : 'h-4 w-14 md:h-6 md:w-[83px]'} />
     </div>
-  )
+  );
 }

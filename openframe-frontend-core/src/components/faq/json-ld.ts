@@ -8,17 +8,16 @@
  * The hub used to harcode `name`/`description` here for OpenMSP; in the lib we
  * accept overrides so every embedder can supply its own platform branding.
  */
-import type { Faq } from '../../types/faq'
+import type { Faq } from '../../types/faq';
 
 export interface FaqSchemaOptions {
-  name?: string
-  description?: string
-  url?: string
+  name?: string;
+  description?: string;
+  url?: string;
 }
 
-const DEFAULT_NAME = 'Frequently Asked Questions'
-const DEFAULT_DESCRIPTION =
-  'Answers to common questions.'
+const DEFAULT_NAME = 'Frequently Asked Questions';
+const DEFAULT_DESCRIPTION = 'Answers to common questions.';
 
 export function baseFaqSchema(opts: FaqSchemaOptions = {}) {
   return {
@@ -27,13 +26,13 @@ export function baseFaqSchema(opts: FaqSchemaOptions = {}) {
     name: opts.name ?? DEFAULT_NAME,
     description: opts.description ?? DEFAULT_DESCRIPTION,
     ...(opts.url ? { url: opts.url } : {}),
-  } as const
+  } as const;
 }
 
 export function buildFaqJsonLdFromFaqs(faqs: Faq[], opts: FaqSchemaOptions = {}) {
   return {
     ...baseFaqSchema(opts),
-    mainEntity: faqs.map((faq) => ({
+    mainEntity: faqs.map(faq => ({
       '@type': 'Question',
       name: faq.question,
       acceptedAnswer: {
@@ -41,5 +40,5 @@ export function buildFaqJsonLdFromFaqs(faqs: Faq[], opts: FaqSchemaOptions = {})
         text: faq.answer,
       },
     })),
-  } as const
+  } as const;
 }

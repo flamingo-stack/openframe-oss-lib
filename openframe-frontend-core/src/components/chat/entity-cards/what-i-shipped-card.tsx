@@ -1,24 +1,24 @@
-import React from 'react'
-import { EmployeeEntryCard, EmployeeEntryCardSkeleton, type EmployeeEntryCardData } from './employee-entry-card'
-import { formatEntryMonthUTC } from '../../../utils/format'
+import type React from 'react';
+import { formatEntryMonthUTC } from '../../../utils/format';
+import { EmployeeEntryCard, EmployeeEntryCardSkeleton, type EmployeeEntryCardData } from './employee-entry-card';
 
 /** Minimal row shape the card renders. Both the hub dashboard entry and the
  *  related-content hydrated row satisfy it structurally. */
 export interface WhatIShippedCardData extends EmployeeEntryCardData {
-  entry_month?: string | null
+  entry_month?: string | null;
 }
 
 export interface WhatIShippedCardProps {
-  entry: WhatIShippedCardData
+  entry: WhatIShippedCardData;
   /** OG fallback cover. Caller computes it (hub: `useOgPlaceholderUrl`; related
    *  rail: `extras.buildOgPlaceholderUrl`). */
-  placeholderUrl?: string | null
+  placeholderUrl?: string | null;
   /** Owner action row (dashboard). Omit for a read-only card. */
-  actions?: React.ReactNode
+  actions?: React.ReactNode;
   /** When provided, the WHOLE card becomes a link (related-rail click-through).
    *  Don't combine with `actions` (nested interactive). */
-  anchorProps?: React.AnchorHTMLAttributes<HTMLAnchorElement>
-  className?: string
+  anchorProps?: React.AnchorHTMLAttributes<HTMLAnchorElement>;
+  className?: string;
 }
 
 /**
@@ -38,9 +38,9 @@ export function WhatIShippedCard({ entry, placeholderUrl, actions, anchorProps, 
       anchorProps={anchorProps}
       className={className}
     />
-  )
+  );
 }
 
 /** Loading skeleton matching WhatIShippedCard's shape. Shared with every other
  *  employee-entry card so the rail's placeholder never diverges from the card. */
-export const WhatIShippedCardSkeleton = EmployeeEntryCardSkeleton
+export const WhatIShippedCardSkeleton = EmployeeEntryCardSkeleton;

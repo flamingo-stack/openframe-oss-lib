@@ -39,11 +39,11 @@ public class LogResponse {
     @Schema(description = "Hostname of the device associated with the event")
     private String hostname;
     
-    @Schema(description = "Organization ID associated with the event")
-    private String organizationId;
+    @Schema(description = "Customer id associated with the event")
+    private String customerId;
     
-    @Schema(description = "Organization name associated with the event")
-    private String organizationName;
+    @Schema(description = "Customer name associated with the event")
+    private String customerName;
     
     @Schema(description = "Event summary")
     private String summary;

@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * A surface-scoped count of overlays (⋯ menus, popovers) currently open INSIDE
@@ -26,19 +26,18 @@
  * so overlays outside such a surface behave exactly as before.
  */
 
-import * as React from 'react'
+import { type ReactNode, createContext, useContext, useEffect, useMemo, useRef } from 'react';
 
 export interface OverlayOpenRegistry {
   /** Register one open overlay; call the returned fn to release it. */
-  acquire: () => () => void
+  acquire: () => () => void;
 }
 
-export const OverlayOpenRegistryContext =
-  React.createContext<OverlayOpenRegistry | null>(null)
+export const OverlayOpenRegistryContext = createContext<OverlayOpenRegistry | null>(null);
 
 /** Read the surrounding registry (or `null` when there is no provider). */
 export function useOverlayOpenRegistry(): OverlayOpenRegistry | null {
-  return React.useContext(OverlayOpenRegistryContext)
+  return useContext(OverlayOpenRegistryContext);
 }
 
 /**
@@ -46,17 +45,17 @@ export function useOverlayOpenRegistry(): OverlayOpenRegistry | null {
  * unconditionally — with no provider it does nothing.
  */
 export function useReportOverlayOpen(open: boolean): void {
-  const registry = useOverlayOpenRegistry()
-  React.useEffect(() => {
-    if (!open || !registry) return
-    return registry.acquire()
-  }, [open, registry])
+  const registry = useOverlayOpenRegistry();
+  useEffect(() => {
+    if (!open || !registry) return undefined;
+    return registry.acquire();
+  }, [open, registry]);
 }
 
 export interface OverlayOpenRegistryProviderProps {
   /** Fires on 0 → 1 and 1 → 0 transitions only, not on every acquire. */
-  onOpenChange?: (hasOpenOverlay: boolean) => void
-  children: React.ReactNode
+  onOpenChange?: (hasOpenOverlay: boolean) => void;
+  children: ReactNode;
 }
 
 /**
@@ -64,36 +63,34 @@ export interface OverlayOpenRegistryProviderProps {
  * mounting this provider does not re-render overlays when the count changes —
  * only the surface's own `onOpenChange` callback fires.
  */
-export function OverlayOpenRegistryProvider({
-  onOpenChange,
-  children,
-}: OverlayOpenRegistryProviderProps) {
-  const countRef = React.useRef(0)
-  const onOpenChangeRef = React.useRef(onOpenChange)
-  onOpenChangeRef.current = onOpenChange
+export function OverlayOpenRegistryProvider({ onOpenChange, children }: OverlayOpenRegistryProviderProps) {
+  const countRef = useRef(0);
+  // Refreshed after every commit rather than in the render body: `acquire` and
+  // its release are called from overlay mount/unmount effects, which are
+  // always past a commit.
+  const onOpenChangeRef = useRef(onOpenChange);
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  });
 
-  const registry = React.useMemo<OverlayOpenRegistry>(
+  const registry = useMemo<OverlayOpenRegistry>(
     () => ({
       acquire: () => {
-        countRef.current += 1
-        if (countRef.current === 1) onOpenChangeRef.current?.(true)
-        let released = false
+        countRef.current += 1;
+        if (countRef.current === 1) onOpenChangeRef.current?.(true);
+        let released = false;
         return () => {
           // Guard against a double release (StrictMode double-invokes effect
           // cleanups in development) driving the count negative.
-          if (released) return
-          released = true
-          countRef.current -= 1
-          if (countRef.current === 0) onOpenChangeRef.current?.(false)
-        }
+          if (released) return;
+          released = true;
+          countRef.current -= 1;
+          if (countRef.current === 0) onOpenChangeRef.current?.(false);
+        };
       },
     }),
     [],
-  )
+  );
 
-  return (
-    <OverlayOpenRegistryContext.Provider value={registry}>
-      {children}
-    </OverlayOpenRegistryContext.Provider>
-  )
+  return <OverlayOpenRegistryContext.Provider value={registry}>{children}</OverlayOpenRegistryContext.Provider>;
 }

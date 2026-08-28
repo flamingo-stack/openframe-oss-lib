@@ -9,6 +9,7 @@ use crate::platform::DirectoryManager;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::{
     AgentConfigurationService, InitialConfigurationService, InstalledToolsService,
+    MachineIdService, MACHINE_ID_HEADER,
 };
 
 use super::log_parser::LogBatchMessage;
@@ -21,22 +22,27 @@ const RECONNECT_DELAY_SECS: u64 = 5;
 const INITIAL_KEY_CHECK_INTERVAL_SECS: u64 = 10;
 const SOURCE_DISCOVERY_INTERVAL_SECS: u64 = 30;
 const NATS_SUBJECT: &str = "agents.logs";
-const NATS_HEADER_MACHINE_ID: &str = "openframe-client";
-
 pub struct NatsLogConnection {
     jetstream: Option<jetstream::Context>,
     server_host: String,
     tenant_domain: String,
     initial_key: String,
+    machine_id: String,
 }
 
 impl NatsLogConnection {
-    pub fn new(server_host: String, tenant_domain: String, initial_key: String) -> Self {
+    pub fn new(
+        server_host: String,
+        tenant_domain: String,
+        initial_key: String,
+        machine_id: String,
+    ) -> Self {
         Self {
             jetstream: None,
             server_host,
             tenant_domain,
             initial_key,
+            machine_id,
         }
     }
 
@@ -51,7 +57,7 @@ impl NatsLogConnection {
         let client = async_nats::ConnectOptions::new()
             .custom_header("x-tenant-domain", &self.tenant_domain)
             .custom_header("x-initial-key", &self.initial_key)
-            .custom_header("x-machine-id", NATS_HEADER_MACHINE_ID)
+            .custom_header(MACHINE_ID_HEADER, &self.machine_id)
             .retry_on_initial_connect()
             .reconnect_delay_callback(|attempt| {
                 let delay = Duration::from_secs(RECONNECT_DELAY_SECS);
@@ -119,6 +125,7 @@ pub struct LogStreamingRunManager {
     agent_config_service: AgentConfigurationService,
     installed_tools_service: InstalledToolsService,
     directory_manager: DirectoryManager,
+    machine_id: String,
 }
 
 impl LogStreamingRunManager {
@@ -138,6 +145,7 @@ impl LogStreamingRunManager {
 
         let log_file_path = directory_manager.logs_dir().join("openframe.log");
         let offset_file_path = directory_manager.secured_dir().join("log_stream_offset");
+        let machine_id = MachineIdService::new(directory_manager).get_or_create()?;
 
         Ok(Self {
             server_host,
@@ -149,6 +157,7 @@ impl LogStreamingRunManager {
             agent_config_service: agent_config_service.clone(),
             installed_tools_service: installed_tools_service.clone(),
             directory_manager: directory_manager.clone(),
+            machine_id,
         })
     }
 
@@ -160,6 +169,7 @@ impl LogStreamingRunManager {
                 self.server_host.clone(),
                 self.tenant_domain.clone(),
                 initial_key,
+                self.machine_id.clone(),
             );
 
             loop {

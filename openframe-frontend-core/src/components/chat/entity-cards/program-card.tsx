@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * ProgramCard (pure presentation). Generic card for podcasts / webinars /
@@ -19,19 +19,23 @@
  * and pass the resolved detail URL via `href`.
  */
 
-import React, { useState } from 'react'
-import Image from '../../../embed-shims/next-image'
-import { format } from 'date-fns'
-import { ExternalLink, Clock, Play, Video } from 'lucide-react'
-import { Button } from '../../ui/button/button'
-import { SquareAvatar } from '../../ui/square-avatar'
-import { ImageGalleryModal } from '../../ui/image-gallery-modal'
-import { cn } from '../../../utils/cn'
+import { format } from 'date-fns';
+import { ExternalLink, Clock, Play, Video } from 'lucide-react';
+import type React from 'react';
+import { useState } from 'react';
+import Image from '../../../embed-shims/next-image';
+import { cn } from '../../../utils/cn';
+import { formatDurationCompact, formatTimeWithTimezone, formatDurationFromRange } from '../../../utils/format';
+import { Button } from '../../ui/button/button';
+import { ImageGalleryModal } from '../../ui/image-gallery-modal';
+import { SquareAvatar } from '../../ui/square-avatar';
 import {
-  formatDurationCompact,
-  formatTimeWithTimezone,
-  formatDurationFromRange,
-} from '../../../utils/format'
+  programItemToStripProfile,
+  type BaseProgramItem,
+  type ProgramConfig,
+  type ProgramMedia,
+  type ProgramHost,
+} from '../types/entities/program-types';
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -43,20 +47,12 @@ import {
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
-} from '../utils/compact-card-classes'
-import {
-  programItemToStripProfile,
-  type BaseProgramItem,
-  type ProgramAuthorRef,
-  type ProgramConfig,
-  type ProgramMedia,
-  type ProgramHost,
-} from '../types/entities/program-types'
-import { EntityPortraitCard } from './entity-portrait-card'
-import { useEntityCardLink } from './use-entity-card-link'
-import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
+} from '../utils/compact-card-classes';
+import { EntityPortraitCard } from './entity-portrait-card';
+import { useEntityCardLink } from './use-entity-card-link';
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-type CardSize = 'default' | 'sm' | 'portrait'
+type CardSize = 'default' | 'sm' | 'portrait';
 
 /**
  * Format a Date with date-fns pinned to UTC. `date-fns` `format()` reads the
@@ -68,7 +64,13 @@ type CardSize = 'default' | 'sm' | 'portrait'
  * dep) and the repo-wide "pin program dates to UTC" convention.
  */
 function formatUtc(date: Date, fmt: string): string {
-  return format(new Date(date.getTime() + date.getTimezoneOffset() * 60_000), fmt)
+  // A row can legitimately arrive without a date (the field is not guaranteed by
+  // the wire type), and `new Date(undefined)` / `new Date('')` both give an
+  // Invalid Date, which makes date-fns `format()` throw RangeError. Thrown from
+  // render that takes down the whole card rail, not just this card — so the
+  // helper is total and an unknown date renders as nothing.
+  if (Number.isNaN(date.getTime())) return '';
+  return format(new Date(date.getTime() + date.getTimezoneOffset() * 60_000), fmt);
 }
 
 export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
@@ -87,123 +89,146 @@ export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
             <span className="h-3 w-11/12 rounded bg-ods-bg/40" />
           </span>
         </span>
-        <span className="flex shrink-0 items-center self-start h-5">
+        <span className="flex h-5 shrink-0 items-center self-start">
           <span className="h-3.5 w-3.5 rounded bg-ods-bg" />
         </span>
       </span>
-    )
+    );
   }
   return (
     <div
-      className="border border-ods-border rounded-lg overflow-hidden flex flex-col animate-pulse"
+      className="flex animate-pulse flex-col overflow-hidden rounded-lg border border-ods-border"
       style={{ backgroundColor: 'var(--ods-system-greys-black)' }}
     >
-      <div className="p-6 flex-1">
-        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-          <div className="w-full md:w-[180px] h-[180px] bg-ods-bg rounded-lg flex-shrink-0" />
-          <div className="flex-1 min-w-0 flex flex-col gap-3">
-            <div className="h-7 w-3/4 bg-ods-bg rounded" />
-            <div className="h-7 w-1/2 bg-ods-bg rounded" />
-            <div className="h-4 w-1/3 bg-ods-bg/60 rounded" />
+      <div className="flex-1 p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
+          <div className="h-[180px] w-full flex-shrink-0 rounded-lg bg-ods-bg md:w-[180px]" />
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <div className="h-7 w-3/4 rounded bg-ods-bg" />
+            <div className="h-7 w-1/2 rounded bg-ods-bg" />
+            <div className="h-4 w-1/3 rounded bg-ods-bg/60" />
             <div className="space-y-2">
-              <div className="h-3 w-full bg-ods-bg/60 rounded" />
-              <div className="h-3 w-5/6 bg-ods-bg/60 rounded" />
-              <div className="h-3 w-4/5 bg-ods-bg/60 rounded" />
+              <div className="h-3 w-full rounded bg-ods-bg/60" />
+              <div className="h-3 w-5/6 rounded bg-ods-bg/60" />
+              <div className="h-3 w-4/5 rounded bg-ods-bg/60" />
             </div>
           </div>
         </div>
       </div>
-      <div className="p-6 pt-0 mt-auto">
-        <div className="pt-4 border-t border-ods-border">
-          <div className="h-9 w-40 bg-ods-bg rounded" />
+      <div className="mt-auto p-6 pt-0">
+        <div className="border-t border-ods-border pt-4">
+          <div className="h-9 w-40 rounded bg-ods-bg" />
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export interface ProgramCardProps<T extends BaseProgramItem> {
-  config: ProgramConfig<T>
-  item: T
-  media?: ProgramMedia[]
-  renderMeta?: (item: T) => React.ReactNode
-  size?: CardSize
+  config: ProgramConfig<T>;
+  item: T;
+  media?: ProgramMedia[];
+  renderMeta?: (item: T) => React.ReactNode;
+  size?: CardSize;
   /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
-  showTypeBadge?: boolean
+  showTypeBadge?: boolean;
   /** Detail URL resolved by the caller. */
-  href: string
+  href: string;
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
    *  `computeIsNewTab` so the inner `<a>` matches the runtime
    *  nav decision (cross-platform / embed → new tab). Defaults to
    *  same-tab for non-chat callsites. */
-  target?: '_blank'
-  rel?: 'noopener noreferrer'
-  targetPlatform?: string | null
+  target?: '_blank';
+  rel?: 'noopener noreferrer';
+  targetPlatform?: string | null;
   /** OG placeholder URL used by the compact branch when no cover. */
-  placeholderUrl?: string | null
-  wholeCardClickable?: boolean
-  className?: string
+  placeholderUrl?: string | null;
+  wholeCardClickable?: boolean;
+  className?: string;
 }
 
 function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string; avatar: string | null }> {
-  if (!hosts) return []
+  if (!hosts) return [];
   try {
     if (Array.isArray(hosts)) {
-      return hosts.map((host) => ({
+      return hosts.map(host => ({
         name: host.name || 'Unknown',
         avatar: host.avatar_url || null,
-      }))
+      }));
     }
     if (typeof hosts === 'string') {
-      const parsed = JSON.parse(hosts)
+      const parsed: unknown = JSON.parse(hosts);
       if (Array.isArray(parsed)) {
-        return parsed.map((host: any) => ({
-          name: host.name || host.display_name || 'Unknown',
-          avatar: host.avatar_url || null,
-        }))
+        return parsed.map((host: unknown) => {
+          const row: Record<string, unknown> = typeof host === 'object' && host !== null ? { ...host } : {};
+          const name = typeof row.name === 'string' && row.name ? row.name : null;
+          const displayName = typeof row.display_name === 'string' && row.display_name ? row.display_name : null;
+          return {
+            name: name ?? displayName ?? 'Unknown',
+            avatar: typeof row.avatar_url === 'string' && row.avatar_url ? row.avatar_url : null,
+          };
+        });
       }
     }
   } catch (error) {
-    console.warn('Failed to parse hosts data:', error)
+    console.warn('Failed to parse hosts data:', error);
   }
-  return []
+  return [];
+}
+
+/**
+ * Webinar scheduling columns, read off a `BaseProgramItem` that has already
+ * been `in`-guarded for `start_at`. Each field is validated rather than
+ * asserted — the generic item type does not declare them.
+ */
+function webinarTiming(item: BaseProgramItem): {
+  startAt: string | null;
+  endAt: string | null;
+  timezone: string | null;
+} {
+  const str = (value: unknown): string | null => (typeof value === 'string' && value ? value : null);
+  return {
+    startAt: 'start_at' in item ? str(item.start_at) : null,
+    endAt: 'end_at' in item ? str(item.end_at) : null,
+    timezone: 'timezone' in item ? str(item.timezone) : null,
+  };
 }
 
 function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string }) {
-  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const openImageModal = (index: number, event?: React.MouseEvent) => {
-    if (event) event.stopPropagation()
-    setSelectedImageIndex(index)
-    setIsModalOpen(true)
-  }
+    if (event) event.stopPropagation();
+    setSelectedImageIndex(index);
+    setIsModalOpen(true);
+  };
   const closeImageModal = () => {
-    setIsModalOpen(false)
-    setSelectedImageIndex(null)
-  }
+    setIsModalOpen(false);
+    setSelectedImageIndex(null);
+  };
   return (
     <>
       <div className="p-6 pt-4">
-        <div className="overflow-x-auto mb-4">
+        <div className="mb-4 overflow-x-auto">
           <div className="flex gap-3 pb-2" style={{ width: 'max-content' }}>
             {images.map((mediaItem, index) => (
               <div
                 key={mediaItem.id}
-                className="flex-shrink-0 w-24 h-24 relative rounded-md overflow-hidden cursor-pointer group/thumb"
-                onClick={(e) => openImageModal(index, e)}
+                className="group/thumb relative h-24 w-24 flex-shrink-0 cursor-pointer overflow-hidden rounded-md"
+                onClick={e => openImageModal(index, e)}
               >
                 <Image
                   src={mediaItem.media_url}
                   alt={`${title} photo ${index + 1}`}
                   fill
-                  className="object-cover group-hover/thumb:scale-105 transition-transform duration-200"
+                  className="object-cover transition-transform duration-200 group-hover/thumb:scale-105"
                   sizes="96px"
                   loading="lazy"
                   unoptimized
                 />
-                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/thumb:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-                  <div className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center">
-                    <span className="text-black text-sm">+</span>
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity duration-200 group-hover/thumb:opacity-100">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/90">
+                    <span className="text-sm text-black">+</span>
                   </div>
                 </div>
               </div>
@@ -212,13 +237,13 @@ function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string
         </div>
       </div>
       <ImageGalleryModal
-        images={images.map((img) => img.media_url)}
+        images={images.map(img => img.media_url)}
         isOpen={isModalOpen}
         onClose={closeImageModal}
         initialIndex={selectedImageIndex || 0}
       />
     </>
-  )
+  );
 }
 
 export function ProgramCard<T extends BaseProgramItem>({
@@ -241,38 +266,40 @@ export function ProgramCard<T extends BaseProgramItem>({
     targetPlatform,
     target: targetProp,
     rel: relProp,
-  })
+  });
   const placeholderUrl = useEntityCardPlaceholder({
     title: item.title,
     placeholderUrl: placeholderUrlProp,
     aspect: size === 'sm' ? 'square' : 'wide',
-  })
-  const coverImage = item.cover_url
-  const images = media.filter((m) => m.media_type === 'image')
-  const hosts = getHosts(item.hosts)
-  const accentColor = 'var(--color-accent-primary)'
-  const isScheduled = 'status' in item && (item as any).status === 'scheduled'
+  });
+  const coverImage = item.cover_url;
+  const images = media.filter(m => m.media_type === 'image');
+  const hosts = getHosts(item.hosts);
+  const accentColor = 'var(--color-accent-primary)';
+  // `status` / `duration_seconds` / `location_name` / `start_at` … live on the
+  // concrete program shapes (PodcastItem / EventItem / WebinarItem), not on
+  // `BaseProgramItem`. The `in` guards narrow them to `unknown`, so each read
+  // below is followed by a real type check instead of a cast.
+  const isScheduled = 'status' in item && item.status === 'scheduled';
 
   // Compact per-type meta (duration / location / start time) — shared by the
   // `sm` and `portrait` densities.
   const compactTypeMeta = (): string | null => {
     if (config.type === 'podcast' && 'duration_seconds' in item && !isScheduled) {
-      const dur = (item as any).duration_seconds
-      if (typeof dur === 'number' && dur > 0) return formatDurationCompact(dur)
+      const dur = item.duration_seconds;
+      if (typeof dur === 'number' && dur > 0) return formatDurationCompact(dur);
     } else if (config.type === 'event' && 'location_name' in item) {
-      const loc = (item as any).location_name
-      if (typeof loc === 'string' && loc.trim().length > 0) return loc
+      const loc = item.location_name;
+      if (typeof loc === 'string' && loc.trim().length > 0) return loc;
     } else if (config.type === 'webinar' && 'start_at' in item) {
-      const w = item as any
-      const time = formatTimeWithTimezone(w.start_at, w.timezone ?? null)
-      const dur = formatDurationFromRange(w.start_at, w.end_at)
-      return dur ? `${time} · ${dur}` : time
+      const { startAt, endAt, timezone } = webinarTiming(item);
+      const time = formatTimeWithTimezone(startAt, timezone);
+      const dur = formatDurationFromRange(startAt, endAt);
+      return dur ? `${time} · ${dur}` : time;
     }
-    return null
-  }
-  const compactDate = (() => {
-    try { return formatUtc(new Date(item.date), 'MMM d, yyyy') } catch { return '' }
-  })()
+    return null;
+  };
+  const compactDate = formatUtc(new Date(item.date), 'MMM d, yyyy');
 
   if (size === 'portrait') {
     // Rail/strip density — mapped onto the shared <EntityPortraitCard> shell
@@ -280,8 +307,8 @@ export function ProgramCard<T extends BaseProgramItem>({
     // Person = author-first via programItemToStripProfile (author → primary
     // host); the date · duration meta line fills the subtitle when the
     // profile has no job title.
-    const profile = programItemToStripProfile(item as { author?: ProgramAuthorRef | null; hosts?: ProgramHost[] | null })
-    const dateMeta = [compactDate, compactTypeMeta()].filter(Boolean).join(' · ')
+    const profile = programItemToStripProfile(item);
+    const dateMeta = [compactDate, compactTypeMeta()].filter(Boolean).join(' · ');
     return (
       <EntityPortraitCard
         href={href}
@@ -300,146 +327,135 @@ export function ProgramCard<T extends BaseProgramItem>({
         }
         className={className}
       />
-    )
+    );
   }
 
   if (size === 'sm') {
-    const itemDate = compactDate
-    const compactCover = coverImage || placeholderUrl || null
-    const typeMeta = compactTypeMeta()
+    const itemDate = compactDate;
+    const compactCover = coverImage || placeholderUrl || null;
+    const typeMeta = compactTypeMeta();
     const subtitleParts = [itemDate, typeMeta, config.labels?.singular].filter(
       (s): s is string => typeof s === 'string' && s.length > 0,
-    )
+    );
     return (
       <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
-            <Image
-              src={compactCover}
-              alt={item.title}
-              fill
-              sizes="56px"
-              className="object-contain"
-              unoptimized
-            />
+            <Image src={compactCover} alt={item.title} fill sizes="56px" className="object-contain" unoptimized />
           ) : (
             <span className="flex h-full w-full items-center justify-center text-ods-accent">
-              {config.type === 'podcast' ? <Play className="w-4 h-4" /> : config.type === 'webinar' ? <Video className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+              {config.type === 'podcast' ? (
+                <Play className="h-4 w-4" />
+              ) : config.type === 'webinar' ? (
+                <Video className="h-4 w-4" />
+              ) : (
+                <Clock className="h-4 w-4" />
+              )}
             </span>
           )}
           {config.type === 'podcast' && !isScheduled && compactCover && (
             <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Play className="w-4 h-4 text-ods-text-on-dark" fill="white" />
+              <Play className="h-4 w-4 text-ods-text-on-dark" fill="white" />
             </span>
           )}
         </span>
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>
-            <span className={cn(COMPACT_CARD_TITLE, 'font-heading')}>
-              {item.title}
-            </span>
+            <span className={cn(COMPACT_CARD_TITLE, 'font-heading')}>{item.title}</span>
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="truncate text-h6 text-ods-accent">
-              {subtitleParts.join(' · ')}
-            </span>
+            <span className="truncate text-ods-accent text-h6">{subtitleParts.join(' · ')}</span>
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className={COMPACT_CARD_SUMMARY}>
-              {item.description || COMPACT_CARD_ROW_FILLER}
-            </span>
+            <span className={COMPACT_CARD_SUMMARY}>{item.description || COMPACT_CARD_ROW_FILLER}</span>
           </span>
         </span>
-        <span className="flex shrink-0 items-center self-start h-5 text-ods-text-secondary">
-          <ExternalLink className="w-3.5 h-3.5" />
+        <span className="flex h-5 shrink-0 items-center self-start text-ods-text-secondary">
+          <ExternalLink className="h-3.5 w-3.5" />
         </span>
       </a>
-    )
+    );
   }
 
-  const itemDate = new Date(item.date)
-  const dateFormat = formatUtc(itemDate, 'EEEE d MMMM')
+  const itemDate = new Date(item.date);
+  const dateFormat = formatUtc(itemDate, 'EEEE d MMMM');
 
   const defaultRenderMeta = () => {
     if (config.type === 'podcast' && 'duration_seconds' in item && !isScheduled) {
+      const dur = item.duration_seconds;
       return (
         <>
-          <Clock className="w-4 h-4 text-ods-text-secondary" />
+          <Clock className="h-4 w-4 text-ods-text-secondary" />
           <span className="font-body text-ods-text-secondary">
-            {formatDurationCompact((item as any).duration_seconds)}
+            {formatDurationCompact(typeof dur === 'number' ? dur : null)}
           </span>
         </>
-      )
+      );
     }
     if (config.type === 'event' && 'location_name' in item) {
+      const loc = item.location_name;
       return (
-        <span className="font-body text-ods-text-secondary">
-          {(item as any).location_name || 'Location TBD'}
-        </span>
-      )
+        <span className="font-body text-ods-text-secondary">{(typeof loc === 'string' && loc) || 'Location TBD'}</span>
+      );
     }
     if (config.type === 'webinar' && 'start_at' in item) {
-      const webinarItem = item as any
-      const duration = formatDurationFromRange(webinarItem.start_at, webinarItem.end_at)
+      const { startAt, endAt, timezone } = webinarTiming(item);
+      const duration = formatDurationFromRange(startAt, endAt);
       return (
         <>
-          <Video className="w-4 h-4 text-ods-text-secondary" />
+          <Video className="h-4 w-4 text-ods-text-secondary" />
           <span className="font-body text-ods-text-secondary">
-            {formatTimeWithTimezone(webinarItem.start_at, webinarItem.timezone ?? null)}
+            {formatTimeWithTimezone(startAt, timezone)}
             {duration && ` · ${duration}`}
           </span>
-          {webinarItem.timezone && (
-            <span className="text-h6 text-ods-text-secondary">
-              ({webinarItem.timezone})
-            </span>
-          )}
+          {timezone && <span className="text-ods-text-secondary text-h6">({timezone})</span>}
         </>
-      )
+      );
     }
-    return null
-  }
+    return null;
+  };
 
   const cardHeader = (
-    <div className="p-6 border-ods-border flex-1">
-      <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+    <div className="flex-1 border-ods-border p-6">
+      <div className="flex flex-col gap-4 md:flex-row md:gap-6">
         {coverImage && (
-          <div className="w-full md:w-[180px] flex-shrink-0 flex items-center">
-            <div className="relative rounded-lg overflow-hidden">
+          <div className="flex w-full flex-shrink-0 items-center md:w-[180px]">
+            <div className="relative overflow-hidden rounded-lg">
               <Image
                 src={coverImage}
                 alt={item.title}
                 width={180}
                 height={180}
-                className="w-full h-auto rounded-lg object-contain"
+                className="h-auto w-full rounded-lg object-contain"
                 unoptimized
               />
               {config.type === 'podcast' && !isScheduled && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
-                  <Play className="w-10 h-10 text-ods-text-on-dark" fill="white" />
+                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Play className="h-10 w-10 text-ods-text-on-dark" fill="white" />
                 </div>
               )}
             </div>
           </div>
         )}
 
-        <div className="flex-1 min-w-0 flex flex-col">
-          <h3 className="text-h2 text-ods-text-primary mb-3 min-h-[3rem] md:min-h-[3.5rem] line-clamp-2 flex items-center">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h3 className="mb-3 line-clamp-2 flex min-h-[3rem] items-center text-ods-text-primary text-h2 md:min-h-[3.5rem]">
             {item.title}
           </h3>
 
-          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-4">
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
             <span className="text-h6" style={{ color: accentColor }}>
               {dateFormat}
             </span>
             {renderMeta ? (
               <>
-                <span className="hidden md:inline text-ods-text-secondary">•</span>
+                <span className="hidden text-ods-text-secondary md:inline">•</span>
                 {renderMeta(item)}
               </>
             ) : (
               defaultRenderMeta() && (
                 <>
-                  <span className="hidden md:inline text-ods-text-secondary">•</span>
+                  <span className="hidden text-ods-text-secondary md:inline">•</span>
                   <div className="flex items-center gap-2">{defaultRenderMeta()}</div>
                 </>
               )
@@ -447,15 +463,13 @@ export function ProgramCard<T extends BaseProgramItem>({
           </div>
 
           <div className="flex-1">
-            <p className="text-h6 text-ods-text-secondary line-clamp-3 min-h-[4.5rem]">
-              {item.description}
-            </p>
+            <p className="line-clamp-3 min-h-[4.5rem] text-ods-text-secondary text-h6">{item.description}</p>
           </div>
         </div>
 
         {hosts.length > 0 && (
           <div className="md:text-right">
-            <div className="flex flex-wrap md:justify-end gap-2">
+            <div className="flex flex-wrap gap-2 md:justify-end">
               {hosts.map((host, index) => (
                 <SquareAvatar
                   variant="round"
@@ -471,13 +485,13 @@ export function ProgramCard<T extends BaseProgramItem>({
         )}
       </div>
     </div>
-  )
+  );
 
   const cardFrameClass = cn(
-    'border border-ods-border rounded-lg overflow-hidden group transition-all duration-200 flex flex-col',
+    'group flex flex-col overflow-hidden rounded-lg border border-ods-border transition-all duration-200',
     className,
-  )
-  const cardFrameStyle = { backgroundColor: 'var(--ods-system-greys-black)' } as const
+  );
+  const cardFrameStyle = { backgroundColor: 'var(--ods-system-greys-black)' } as const;
 
   if (wholeCardClickable) {
     return (
@@ -485,25 +499,25 @@ export function ProgramCard<T extends BaseProgramItem>({
         href={href}
         target={target}
         rel={rel}
-        className={cn(cardFrameClass, 'hover:border-ods-accent/50 no-underline')}
+        className={cn(cardFrameClass, 'no-underline hover:border-ods-accent/50')}
         style={cardFrameStyle}
         aria-label={`Open ${item.title}`}
       >
         {cardHeader}
         {images.length > 0 && <MediaGallery images={images} title={item.title} />}
-        <div className="p-6 pt-0 mt-auto">
-          <div className="pt-4 border-t border-ods-border">
+        <div className="mt-auto p-6 pt-0">
+          <div className="border-t border-ods-border pt-4">
             <span
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-ods-accent text-ods-accent text-h6"
+              className="inline-flex items-center gap-2 rounded-md border border-ods-accent px-4 py-2 text-ods-accent text-h6"
               aria-hidden="true"
             >
               View {config.labels.singular} Details
-              <ExternalLink className="w-5 h-5" />
+              <ExternalLink className="h-5 w-5" />
             </span>
           </div>
         </div>
       </a>
-    )
+    );
   }
 
   return (
@@ -512,19 +526,19 @@ export function ProgramCard<T extends BaseProgramItem>({
         {cardHeader}
       </a>
       {images.length > 0 && <MediaGallery images={images} title={item.title} />}
-      <div className="p-6 pt-0 mt-auto">
-        <div className="pt-4 border-t border-ods-border">
+      <div className="mt-auto p-6 pt-0">
+        <div className="border-t border-ods-border pt-4">
           <Button
             variant="outline"
             size="small-legacy"
             href={href}
             openInNewTab={target === '_blank'}
-            rightIcon={<ExternalLink className="w-5 h-5" />}
+            rightIcon={<ExternalLink className="h-5 w-5" />}
           >
             View {config.labels.singular} Details
           </Button>
         </div>
       </div>
     </div>
-  )
+  );
 }
