@@ -7,6 +7,8 @@ import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import io.swagger.v3.oas.models.responses.ApiResponse;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,7 +36,7 @@ public class OpenApiConfig {
                     ## Resources
                     
                     - **Devices** – list, filter, inspect, update status/nickname
-                    - **Organizations** – full CRUD incl. archiving
+                    - **Customers** – full CRUD incl. archiving
                     - **Tickets** – list, create, update, transition, assign, tag and annotate tickets (SaaS deployments)
                     - **Logs** / **Tools** – read access and integration proxying
                     
@@ -100,4 +102,19 @@ public class OpenApiConfig {
                 .pathsToExclude("/actuator/**", "/api/core/**")
                 .build();
     }
-} 
+
+    /**
+     * Responses every endpoint shares (gateway auth, rate limiting, server errors) are declared
+     * once here instead of being copy-pasted onto each operation.
+     */
+    @Bean
+    public OpenApiCustomizer commonResponsesCustomizer() {
+        return openApi -> openApi.getPaths().values().forEach(path -> path.readOperations().forEach(operation -> {
+            var responses = operation.getResponses();
+            responses.computeIfAbsent("400", code -> new ApiResponse().description("Invalid request parameters, body or cursor"));
+            responses.computeIfAbsent("401", code -> new ApiResponse().description("Unauthorized - invalid or missing API key"));
+            responses.computeIfAbsent("429", code -> new ApiResponse().description("Rate limit exceeded - see the X-RateLimit-* headers"));
+            responses.computeIfAbsent("500", code -> new ApiResponse().description("Internal server error"));
+        }));
+    }
+}
