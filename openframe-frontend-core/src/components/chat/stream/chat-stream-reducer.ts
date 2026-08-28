@@ -51,7 +51,7 @@
  */
 
 import { escapeThinkingTags } from '../../../chat-protocol/decode';
-import { errorDetailsMessage, isGuideOrigin } from '../../../chat-protocol/events';
+import { errorDetailsMessage } from '../../../chat-protocol/events';
 import {
   CHAT_OWNER_ADMIN,
   type ChatStreamEvent,
@@ -77,7 +77,7 @@ import type {
   UnifiedChatMessage,
   UnifiedUsageBreakdown,
 } from '../types/unified-chat-state.types';
-import { approvalDisplaysInline, guideApprovalOrigin } from '../utils/approval-display';
+import { approvalDisplaysInline } from '../utils/approval-display';
 import {
   type MessageSegmentAccumulator,
   createMessageSegmentAccumulator,
@@ -161,15 +161,6 @@ export interface ChatReducerState {
     contextWindowMaxTokens: number | null;
   } | null;
   approvalStatuses: Record<string, ChatApprovalStatus>;
-  /**
-   * Hub conversation id for the Product Guide half of this dialog, learned from
-   * a guide metadata frame. The hub mints it and requires it back on every
-   * confirm-tool call, so a host resolving a guide approval card reads it from
-   * here. Null until a guide turn has streamed — an approval that arrives from
-   * history (after a reload) has no live frame to learn it from, which is why
-   * the agent should also expose it per dialog.
-   */
-  guideConversationId: string | null;
 }
 
 /** Escalated-approval bookkeeping entry (mirrors the legacy processor). */
@@ -539,7 +530,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   let streamingPhase: StreamingPhase = 'idle';
   let dialogTokenUsage: DialogTokenUsage | null = null;
   let liveModel: ChatReducerState['liveModel'] = null;
-  let guideConversationId: string | null = null;
   let approvalStatuses: Record<string, ChatApprovalStatus> = {
     ...(options.approvalStatuses ?? {}),
   };
@@ -701,7 +691,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         dialogTokenUsage,
         liveModel,
         approvalStatuses,
-        guideConversationId,
       };
     }
     return stateCache;
@@ -996,17 +985,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       }
 
       case 'metadata': {
-        // A guide metadata event carries ONLY the hub's conversation id (the
-        // decoder strips the rest): record it and stop. Falling through would
-        // rebuild `liveModel` from an event with no model in it and blank the
-        // dialog's model badge mid-answer.
-        if (isGuideOrigin(event)) {
-          if (typeof event.conversationId === 'string' && event.conversationId) {
-            guideConversationId = event.conversationId;
-            invalidate();
-          }
-          break;
-        }
         // Legacy `parseChunkToAction` action shape, reconstructed for the
         // callback contract.
         emit('onMetadata', {
@@ -1025,21 +1003,13 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         break;
       }
 
-      // The three APPEND-ONLY body streams share one shape: accumulate the
-      // verbatim slice into the trailing segment of the matching kind (the
-      // accumulator coalesces), then emit. `guide-delta` is NATS-only today
-      // but rides the identical path so a guide body streams, coalesces and
-      // continues post-MESSAGE_END exactly like answer text.
+      // Both APPEND-ONLY body streams share one shape: accumulate the verbatim
+      // slice into the trailing segment of the matching kind (the accumulator
+      // coalesces), then emit.
       case 'text-delta':
-      case 'thinking-delta':
-      case 'guide-delta': {
-        const kind = event.type === 'text-delta' ? 'text' : event.type === 'thinking-delta' ? 'thinking' : 'guide';
-        const segments =
-          kind === 'text'
-            ? accumulator.appendText(event.text)
-            : kind === 'thinking'
-              ? accumulator.appendThinking(event.text)
-              : accumulator.appendGuide(event.text);
+      case 'thinking-delta': {
+        const kind = event.type === 'text-delta' ? 'text' : 'thinking';
+        const segments = kind === 'text' ? accumulator.appendText(event.text) : accumulator.appendThinking(event.text);
         // Append-mode only for *true* post-stream continuation (after a
         // MESSAGE_END we actually saw). Cold-start chunks (no prior
         // MESSAGE_START) emit cumulative segments so the consumer can spawn
@@ -1115,10 +1085,8 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         const approvalType = event.approvalType ?? 'USER';
         const toolCalls = event.toolCalls;
         // Where this card renders is ONE rule, shared with the SSE kernel and
-        // the history replay (`approval-display`) — a Product Guide proposal
-        // that renders inline live must not move on the next page load.
-        const guideOrigin = guideApprovalOrigin(event);
-        const displayInline = (type: string) => approvalDisplaysInline(event, type, displayApprovalTypes);
+        // the history replay (`approval-display`).
+        const displayInline = (type: string) => approvalDisplaysInline(type, displayApprovalTypes);
 
         if (toolCalls && toolCalls.length > 0) {
           // ── Batch form ──
@@ -1150,7 +1118,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
               status,
               undefined,
               undefined,
-              guideOrigin,
             );
             applyAccumulated(before, segments);
             break;
@@ -1170,7 +1137,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
               approvalType,
               status,
               undefined,
-              guideOrigin,
             );
           }
           applyAccumulated(before, segments);
@@ -1189,10 +1155,8 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
             explanation,
             approvalType,
             status,
-            // SSE-shaped cards (a re-streamed Product Guide proposal) carry
-            // their body as structured rows rather than prose.
+            // SSE-shaped cards carry their body as structured rows rather than prose.
             event.fields,
-            guideOrigin,
           );
           applyAccumulated(before, segments);
         } else {
@@ -1704,7 +1668,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     streamingPhase = 'idle';
     dialogTokenUsage = null;
     liveModel = null;
-    guideConversationId = null;
     approvalStatuses = {};
     accumulator.reset();
     pendingEscalated.clear();
@@ -1752,7 +1715,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     streamingPhase = 'idle';
     dialogTokenUsage = null;
     liveModel = null;
-    guideConversationId = null;
     accumulator.reset();
     pendingEscalated.clear();
     isInStream = false;
