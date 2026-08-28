@@ -54,6 +54,12 @@ public class ScheduleRunDataFetcher {
         return RELAY.toGlobalId("ScheduleRun", run.getId());
     }
 
+    /** Single schedule fire by its (Relay-encoded) id — the typed alternative to a {@code node(id)} refetch. */
+    @DgsQuery
+    public ScheduleRunResponse scheduleRun(@InputArgument @NotBlank String id) {
+        return scheduleRunService.get(decodeId(id));
+    }
+
     @DgsQuery
     public CountedGenericConnection<GenericEdge<ScheduleRunResponse>> scheduleRuns(
             @InputArgument @NotBlank String scheduleId,

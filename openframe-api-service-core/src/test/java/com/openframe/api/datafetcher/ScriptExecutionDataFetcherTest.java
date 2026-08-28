@@ -59,6 +59,29 @@ class ScriptExecutionDataFetcherTest {
     private ScriptExecutionDataFetcher dataFetcher;
 
     @Test
+    @DisplayName("scriptExecution: decodes the Relay id and returns the execution from the service (typed node(id) alternative)")
+    void scriptExecution_returnsByDecodedGlobalId() {
+        String rawId = "doc-1";
+        String globalId = new Relay().toGlobalId("ScriptExecution", rawId);
+        ScriptExecutionResponse response = ScriptExecutionResponse.builder().id(rawId).build();
+        when(scriptExecutionService.get(rawId)).thenReturn(response);
+
+        assertThat(dataFetcher.scriptExecution(globalId)).isSameAs(response);
+        verify(scriptExecutionService).get(rawId);
+    }
+
+    @Test
+    @DisplayName("scriptExecution: also accepts a raw Mongo ObjectId (same permissive decode as the list queries)")
+    void scriptExecution_acceptsRawMongoObjectId() {
+        String rawId = "6a681dba27c56915cbcaac2d";
+        ScriptExecutionResponse response = ScriptExecutionResponse.builder().id(rawId).build();
+        when(scriptExecutionService.get(rawId)).thenReturn(response);
+
+        assertThat(dataFetcher.scriptExecution(rawId)).isSameAs(response);
+        verify(scriptExecutionService).get(rawId);
+    }
+
+    @Test
     @DisplayName("scriptExecutions: decodes scriptId + initiatorIds (User global ids) to raw; machineIds are plain UUIDs passed through untouched")
     void scriptExecutions() {
         ScriptExecutionFilterInput filter = ScriptExecutionFilterInput.builder()

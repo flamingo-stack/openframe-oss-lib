@@ -9,6 +9,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptExecutionMapper;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
@@ -51,6 +52,17 @@ public class ScriptExecutionService {
         return scriptExecutionRepository
                 .findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
                 .map(scriptExecutionMapper::toResponse);
+    }
+
+    /**
+     * Get a single execution by its raw {@code _id} within the current tenant — the throwing
+     * counterpart of {@link #findById(String)}, backing the {@code scriptExecution(id)} query.
+     *
+     * @throws NotFoundException if the row does not exist or belongs to another tenant.
+     */
+    public ScriptExecutionResponse get(String id) {
+        return findById(id)
+                .orElseThrow(() -> new NotFoundException("Script execution not found: " + id));
     }
 
     /**
