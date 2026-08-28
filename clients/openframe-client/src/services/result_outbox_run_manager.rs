@@ -5,6 +5,7 @@ use tokio::time::{interval, timeout, Duration};
 use tracing::{error, info, warn};
 
 use crate::config::update_config::{FLUSH_PUBLISH_TIMEOUT_SECS, OUTBOX_FLUSH_INTERVAL_SECS};
+use crate::models::is_ack_subject;
 use crate::services::result_store::{payload_limit, ResultPublisher, ResultStore};
 
 pub struct ResultOutboxRunManager<P: ResultPublisher> {
@@ -75,20 +76,24 @@ impl<P: ResultPublisher + 'static> ResultOutboxRunManager<P> {
                         continue;
                     }
 
-                    match timeout(publish_timeout, publisher.publish_acked(&subject, &bytes)).await
-                    {
+                    let outcome = if is_ack_subject(&subject) {
+                        timeout(publish_timeout, publisher.publish_acked(&subject, &bytes)).await
+                    } else {
+                        timeout(publish_timeout, publisher.publish_raw(&subject, &bytes)).await
+                    };
+                    match outcome {
                         Ok(Ok(())) => {
                             if let Err(e) = store.remove(key).await {
                                 warn!(error = %e, "Delivered result but failed to remove from outbox");
                             }
                         }
                         Ok(Err(e)) => {
-                            warn!(error = %e, "Outbox publish failed, retrying next tick");
-                            break;
+                            warn!(key = %key, subject = %subject, error = %e, "Outbox publish failed, retrying next tick");
+                            continue;
                         }
                         Err(_) => {
-                            warn!("Outbox publish timed out, retrying next tick");
-                            break;
+                            warn!(key = %key, subject = %subject, "Outbox publish timed out, retrying next tick");
+                            continue;
                         }
                     }
                 }
