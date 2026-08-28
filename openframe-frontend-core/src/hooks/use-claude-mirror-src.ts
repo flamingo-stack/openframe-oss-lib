@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context'
-import { toClaudeMirrorPath } from '../utils/embed-url-converters'
+import { useEffect, useState } from 'react';
+import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
+import { toClaudeMirrorPath } from '../utils/embed-url-converters';
 
 export type ClaudeMirrorStatus =
   /** No mirror candidate at all (no proxy configured, or a non-mirrorable url). */
@@ -10,13 +10,13 @@ export type ClaudeMirrorStatus =
   /** Probing the host for a self-hosted mirror (or minting one on first view). */
   | 'probing'
   /** A mirror exists and `src` points at it. */
-  | 'found'
+  | 'found';
 
 export interface ClaudeMirrorState {
   /** The mirror src when found (with a cache-bust once a re-publish is
    *  detected), else `null`. */
-  src: string | null
-  status: ClaudeMirrorStatus
+  src: string | null;
+  status: ClaudeMirrorStatus;
 }
 
 /**
@@ -27,12 +27,12 @@ export interface ClaudeMirrorState {
  */
 async function revalidateMirror(mirrorPath: string): Promise<string | null> {
   try {
-    const res = await fetch(`${mirrorPath}?revalidate=1`)
-    if (!res.ok) return null
-    const body = (await res.json()) as { updated?: boolean; version?: string | null }
-    return body?.updated ? String(body.version ?? Date.now()) : null
+    const res = await fetch(`${mirrorPath}?revalidate=1`);
+    if (!res.ok) return null;
+    const body = (await res.json()) as { updated?: boolean; version?: string | null };
+    return body?.updated ? String(body.version ?? Date.now()) : null;
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -60,44 +60,47 @@ async function revalidateMirror(mirrorPath: string): Promise<string | null> {
  * the mirror leg entirely (`absent`).
  */
 export function useClaudeMirrorSrc(url: string): ClaudeMirrorState {
-  const endpoints = useEndpointsRuntime()
-  const mirrorPath = toClaudeMirrorPath(url, endpoints?.storageViewBaseUrl)
-  const [state, setState] = useState<ClaudeMirrorState>(() => ({
-    src: null,
-    status: mirrorPath ? 'probing' : 'absent',
-  }))
+  const endpoints = useEndpointsRuntime();
+  const mirrorPath = toClaudeMirrorPath(url, endpoints?.storageViewBaseUrl);
+
+  // Keyed on `mirrorPath` and DERIVED rather than seeded by the effect: when
+  // the url changes, the fallback below is what a reader sees, so a previous
+  // artifact's `found` src can never be shown for a new one. Doing that with a
+  // synchronous `setState` in the effect body is the cascading-render pattern
+  // `react-hooks/set-state-in-effect` rules out; the effect now only settles
+  // state from its async callbacks.
+  const [resolved, setResolved] = useState<{ key: string; value: ClaudeMirrorState } | null>(null);
+  const state: ClaudeMirrorState =
+    resolved && resolved.key === mirrorPath ? resolved.value : { src: null, status: mirrorPath ? 'probing' : 'absent' };
 
   useEffect(() => {
-    if (!mirrorPath) {
-      setState({ src: null, status: 'absent' })
-      return
-    }
-    setState({ src: null, status: 'probing' })
-    let cancelled = false
+    if (!mirrorPath) return undefined;
+    let cancelled = false;
+    const settle = (value: ClaudeMirrorState) => {
+      if (!cancelled) setResolved({ key: mirrorPath, value });
+    };
     fetch(mirrorPath, { headers: { Range: 'bytes=0-0' } })
-      .then((res) => {
-        if (cancelled) return
+      .then(res => {
+        if (cancelled) return;
         if (!(res.ok || res.status === 206)) {
-          setState({ src: null, status: 'absent' })
-          return
+          settle({ src: null, status: 'absent' });
+          return;
         }
-        setState({ src: mirrorPath, status: 'found' })
+        settle({ src: mirrorPath, status: 'found' });
         // Background freshness check — reload in place only if it changed.
-        revalidateMirror(mirrorPath).then((bust) => {
-          if (!cancelled && bust) {
-            setState({ src: `${mirrorPath}?v=${encodeURIComponent(bust)}`, status: 'found' })
-          }
-        })
+        void revalidateMirror(mirrorPath).then(bust => {
+          if (bust) settle({ src: `${mirrorPath}?v=${encodeURIComponent(bust)}`, status: 'found' });
+        });
       })
       .catch(() => {
         // No proxy on this host / network blip — the caller's claude.ai
         // fallback stands, same as before mirrors existed.
-        if (!cancelled) setState({ src: null, status: 'absent' })
-      })
+        settle({ src: null, status: 'absent' });
+      });
     return () => {
-      cancelled = true
-    }
-  }, [mirrorPath])
+      cancelled = true;
+    };
+  }, [mirrorPath]);
 
-  return state
+  return state;
 }

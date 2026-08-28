@@ -1,5 +1,1 @@
-export {
-  ContactForm,
-  type ContactFormProps,
-  type ContactFormHideableField,
-} from './contact-form'
+export { ContactForm, type ContactFormProps, type ContactFormHideableField } from './contact-form';

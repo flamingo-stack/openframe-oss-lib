@@ -10,7 +10,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'A checkbox with label inside a bordered block container. Matches the ODS design system with dark theme styling.',
+        component:
+          'A checkbox with label inside a bordered block container. Matches the ODS design system with dark theme styling.',
       },
     },
   },
@@ -41,11 +42,7 @@ const meta = {
       description: 'Callback when checked state changes',
     },
   },
-  decorators: [
-    (Story) => (
-       <Story />
-    ),
-  ],
+  decorators: [Story => <Story />],
 } satisfies Meta<typeof CheckboxBlock>;
 
 export default meta;
@@ -111,14 +108,8 @@ export const Controlled: Story = {
     const [checked, setChecked] = useState(false);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <CheckboxBlock
-          label="Controlled Checkbox"
-          checked={checked}
-          onCheckedChange={setChecked}
-        />
-        <span style={{ color: '#888', fontSize: '14px' }}>
-          Checked: {checked ? 'true' : 'false'}
-        </span>
+        <CheckboxBlock label="Controlled Checkbox" checked={checked} onCheckedChange={setChecked} />
+        <span style={{ color: '#888', fontSize: '14px' }}>Checked: {checked ? 'true' : 'false'}</span>
       </div>
     );
   },
@@ -188,7 +179,8 @@ export const WithDescriptionDisabled: Story = {
 export const Error: Story = {
   args: {
     label: 'Send me an SMS if my email gets caught by spam filters',
-    description: 'I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply.',
+    description:
+      'I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply.',
     error: 'Please agree to SMS notifications to continue.',
   },
 };
@@ -199,14 +191,11 @@ export const Error: Story = {
 export const FlamingoError: Story = {
   args: {
     label: 'Send me an SMS if my email gets caught by spam filters',
-    description: 'I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply.',
+    description:
+      'I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply.',
     error: 'Please agree to SMS notifications to continue.',
   },
-  decorators: [
-    (Story) => (
-      <Story />
-    ),
-  ],
+  decorators: [Story => <Story />],
 };
 
 /**
@@ -215,11 +204,12 @@ export const FlamingoError: Story = {
 export const FlamingoChecked: Story = {
   args: {
     label: 'Send me an SMS if my email gets caught by spam filters',
-    description: 'I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply.',
+    description:
+      'I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply.',
     defaultChecked: true,
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div data-app-type="flamingo" style={{ width: '320px' }}>
         <Story />
       </div>

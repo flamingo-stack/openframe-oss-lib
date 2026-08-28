@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react';
 
 /**
  * Extra `collisionPadding.bottom` (px) a Radix popper needs to clear the
@@ -32,64 +32,62 @@ import { useSyncExternalStore } from 'react'
  * is left above the keyboard would then spill back over it.
  */
 
-const KEYBOARD_INSET_VAR = '--of-keyboard-inset'
+const KEYBOARD_INSET_VAR = '--of-keyboard-inset';
 
 function measure(): number {
-  if (typeof document === 'undefined') return 0
-  const inset = Number.parseFloat(
-    getComputedStyle(document.documentElement).getPropertyValue(KEYBOARD_INSET_VAR),
-  )
+  if (typeof document === 'undefined') return 0;
+  const inset = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(KEYBOARD_INSET_VAR));
   // Also catches the NaN of an unset variable.
-  if (!(inset > 0)) return 0
+  if (!(inset > 0)) return 0;
   // How far floating-ui's own viewport bottom sits below the top of the
   // keyboard. iOS reports the keyboard on the visual viewport and Android does
   // not; measuring the difference rather than branching on the platform keeps
   // both correct and can never reserve the same keyboard twice.
-  const layoutHeight = document.documentElement.clientHeight
-  const viewport = window.visualViewport
-  const viewportBottom = viewport ? viewport.offsetTop + viewport.height : layoutHeight
-  return Math.max(0, Math.round(viewportBottom - (layoutHeight - inset)))
+  const layoutHeight = document.documentElement.clientHeight;
+  const viewport = window.visualViewport;
+  const viewportBottom = viewport ? viewport.offsetTop + viewport.height : layoutHeight;
+  return Math.max(0, Math.round(viewportBottom - (layoutHeight - inset)));
 }
 
 // One document-wide subscription for every popper on the page: the keyboard is
 // a single global, and each open dropdown re-reading it would mean another
 // MutationObserver plus a forced style resolve per keystroke-driven re-render.
-const listeners = new Set<() => void>()
-let padding = 0
-let teardown: (() => void) | null = null
+const listeners = new Set<() => void>();
+let padding = 0;
+let teardown: (() => void) | null = null;
 
 function sync(): void {
-  const next = measure()
-  if (next === padding) return
-  padding = next
-  for (const notify of listeners) notify()
+  const next = measure();
+  if (next === padding) return;
+  padding = next;
+  for (const notify of listeners) notify();
 }
 
 function subscribe(onStoreChange: () => void): () => void {
-  listeners.add(onStoreChange)
+  listeners.add(onStoreChange);
   if (listeners.size === 1) {
-    padding = measure()
+    padding = measure();
     // Two independent signals. The inset lands on <html>'s inline style, so the
     // attribute is the only notification for it; the visual viewport moves on
     // its own schedule (iOS reports the keyboard there, and a pinch-zoom shifts
     // it with no keyboard involved at all) and changes what is left to reserve.
-    const observer = new MutationObserver(sync)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] })
-    const viewport = window.visualViewport
-    viewport?.addEventListener('resize', sync)
-    viewport?.addEventListener('scroll', sync)
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+    const viewport = window.visualViewport;
+    viewport?.addEventListener('resize', sync);
+    viewport?.addEventListener('scroll', sync);
     teardown = () => {
-      observer.disconnect()
-      viewport?.removeEventListener('resize', sync)
-      viewport?.removeEventListener('scroll', sync)
-    }
+      observer.disconnect();
+      viewport?.removeEventListener('resize', sync);
+      viewport?.removeEventListener('scroll', sync);
+    };
   }
   return () => {
-    listeners.delete(onStoreChange)
-    if (listeners.size > 0) return
-    teardown?.()
-    teardown = null
-  }
+    listeners.delete(onStoreChange);
+    if (listeners.size > 0) return;
+    teardown?.();
+    teardown = null;
+  };
 }
 
 export function useKeyboardCollisionPadding(): number {
@@ -97,5 +95,5 @@ export function useKeyboardCollisionPadding(): number {
     subscribe,
     () => padding,
     () => 0,
-  )
+  );
 }

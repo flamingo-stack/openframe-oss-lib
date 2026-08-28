@@ -18,12 +18,12 @@
 
 import type { ReactNode } from 'react';
 import { useRouter } from '../../../embed-shims/next-navigation';
-import { PageShell, PageLayout } from '../../ui';
-import { DevSectionView } from './dev-section-view';
 import {
   OPENFRAME_DEV_SECTIONS,
   type OpenframeDevSectionKey,
 } from '../../../utils/dev-sections/openframe-dev-sections';
+import { PageShell, PageLayout } from '../../ui';
+import { DevSectionView } from './dev-section-view';
 
 export interface DevSectionPageProps {
   sectionKey: OpenframeDevSectionKey;

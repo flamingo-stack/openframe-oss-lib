@@ -1,7 +1,6 @@
-"use client"
+'use client';
 
-import React from 'react';
-import { cn } from "../utils/cn";
+import { cn } from '../utils/cn';
 import { getProxiedImageUrl } from '../utils/image-proxy';
 import { SquareAvatar } from './ui/square-avatar';
 
@@ -14,16 +13,14 @@ interface MSPDisplayProps {
 
 export function MSPDisplay({ name, logoUrl, size = 40, className }: MSPDisplayProps) {
   return (
-    <div className={cn('flex items-center gap-2 min-w-0', className)}>
+    <div className={cn('flex min-w-0 items-center gap-2', className)}>
       <SquareAvatar
         src={logoUrl ? getProxiedImageUrl(logoUrl) || logoUrl : undefined}
         fallback={name}
         alt={name}
         sizePx={size}
       />
-      <h2 className="truncate pl-2">
-        {name}
-      </h2>
+      <h2 className="truncate pl-2">{name}</h2>
     </div>
   );
-} 
+}

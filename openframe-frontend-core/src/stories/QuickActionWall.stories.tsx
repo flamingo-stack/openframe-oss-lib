@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { QuickActionWall, interleave } from '../components/chat/quick-action-wall'
-import type { QuickActionChip, QuickActionThemeSpec } from '../components/chat/quick-action-chip'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { QuickActionChip, QuickActionThemeSpec } from '../components/chat/quick-action-chip';
+import { QuickActionWall, interleave } from '../components/chat/quick-action-wall';
 
 // Theme specs are CALLER-supplied (the lib ships no registry, no fallbacks):
 // these are this story's own demo specs — real consumers resolve agent
@@ -8,12 +8,12 @@ import type { QuickActionChip, QuickActionThemeSpec } from '../components/chat/q
 const IT_THEME: QuickActionThemeSpec = {
   accent: 'var(--color-warning)',
   lozenge: { label: 'IT', className: 'text-ods-warning' },
-}
+};
 const SEC_THEME: QuickActionThemeSpec = {
   accent: 'var(--color-error)',
   lozenge: { label: 'SEC', className: 'text-ods-error' },
-}
-const FAE_THEME: QuickActionThemeSpec = { accent: 'pink' }
+};
+const FAE_THEME: QuickActionThemeSpec = { accent: 'pink' };
 
 // A mixed IT/SEC stream (per-chip themes + lozenges) and a fae wall — the two
 // wall registers: category-classified deck panels vs agent-themed hero walls.
@@ -24,7 +24,7 @@ const IT_ACTIONS: ReadonlyArray<QuickActionChip> = [
   { id: 'vpn', label: 'VPN will not connect', icon: { name: 'globe' }, theme: IT_THEME },
   { id: 'disk-full', label: 'Disk almost full', icon: { name: 'hard-drive' }, theme: IT_THEME },
   { id: 'onboard', label: 'Onboard a new hire', icon: { name: 'user-plus' }, theme: IT_THEME },
-]
+];
 
 const SEC_ACTIONS: ReadonlyArray<QuickActionChip> = [
   { id: 'phishing', label: 'Phishing report triage', icon: { name: 'fish' }, theme: SEC_THEME },
@@ -32,7 +32,7 @@ const SEC_ACTIONS: ReadonlyArray<QuickActionChip> = [
   { id: 'patch', label: 'Patch the CVE', icon: { name: 'bug' }, theme: SEC_THEME },
   { id: 'offboard', label: 'Revoke access on exit', icon: { name: 'user-minus' }, theme: SEC_THEME },
   { id: 'edr-alert', label: 'EDR alert review', icon: { name: 'radar' }, theme: SEC_THEME },
-]
+];
 
 const FAE_ACTIONS: ReadonlyArray<QuickActionChip> = [
   { id: 'how-to-start', label: 'How to start', icon: { name: 'fae' } },
@@ -41,7 +41,7 @@ const FAE_ACTIONS: ReadonlyArray<QuickActionChip> = [
   { id: 'remote-connection', label: 'Remote connection', icon: { name: 'rocket' }, theme: FAE_THEME },
   { id: 'run-scripts', label: 'Run scripts', icon: { name: 'bracket-curly' }, theme: FAE_THEME },
   { id: 'device-software', label: 'Device software', icon: { name: 'package' }, theme: FAE_THEME },
-]
+];
 
 const meta: Meta<typeof QuickActionWall> = {
   title: 'Chat/QuickActionWall',
@@ -56,16 +56,16 @@ const meta: Meta<typeof QuickActionWall> = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div className="bg-ods-bg p-[var(--spacing-system-xl)]">
         <Story />
       </div>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof QuickActionWall>
+export default meta;
+type Story = StoryObj<typeof QuickActionWall>;
 
 /** Vertical wall (bottom fade → bottom→top marquee): the deck-panel register —
  *  mixed IT/SEC stream with lozenges, decorative chips. */
@@ -81,35 +81,35 @@ export const VerticalMixedStream: Story = {
       />
     </div>
   ),
-}
+};
 
 /** Horizontal wall (right fade): the hero-tab register — a wide fae wall
  *  drifting right→left, interactive chips (hover pauses the track). */
 export const HorizontalInteractive: Story = {
   render: () => (
     <QuickActionWall
-      chips={FAE_ACTIONS.map((c, i) => ({ ...c, selected: i === 0, selectedAccent: 'pink', onSelect: () => console.log(c.id) }))}
+      chips={FAE_ACTIONS.map((c, i) => ({
+        ...c,
+        selected: i === 0,
+        selectedAccent: 'pink',
+        onSelect: () => console.log(c.id),
+      }))}
       fade="right"
       className="w-full"
       contentClassName="w-[1400px]"
     />
   ),
-}
+};
 
 /** Plain mode — the consumer's opt-out: same chips and layout, no marquee,
  *  no blur. */
 export const Plain: Story = {
   render: () => (
     <div className="rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]">
-      <QuickActionWall
-        chips={interleave(IT_ACTIONS, SEC_ACTIONS)}
-        mode="plain"
-        lozenges
-        className="max-h-[180px]"
-      />
+      <QuickActionWall chips={interleave(IT_ACTIONS, SEC_ACTIONS)} mode="plain" lozenges className="max-h-[180px]" />
     </div>
   ),
-}
+};
 
 /** Loading: skeleton chips (1:1 geometry, lozenge slots reserved) — static
  *  until real chips land. */
@@ -126,15 +126,15 @@ export const Loading: Story = {
       />
     </div>
   ),
-}
+};
 
 // Brick-mode chip set: enough distinct actions to fill more than two full
 // courses, so the agent cap and the even split are both visible.
 const BRICK_ACTIONS: ReadonlyArray<QuickActionChip> = [
   ...IT_ACTIONS,
   ...SEC_ACTIONS,
-  ...FAE_ACTIONS.map((c) => ({ ...c, theme: FAE_THEME })),
-].map((c) => ({ ...c, onSelect: () => console.log(c.id) }))
+  ...FAE_ACTIONS.map(c => ({ ...c, theme: FAE_THEME })),
+].map(c => ({ ...c, onSelect: () => console.log(c.id) }));
 
 /** Brick, chat agent (`agentSlug="mingo"`): the stack grows with the chip
  *  supply but caps at 2 rows. Originals are split evenly across the two rows
@@ -154,7 +154,7 @@ export const BrickAgentCapped: Story = {
       className="max-h-44"
     />
   ),
-}
+};
 
 /** Brick, few actions (`agentSlug="fae"`, 3 chips): fewer than one course, so
  *  the stack collapses to a SINGLE row padded with its own repeats instead of
@@ -162,7 +162,7 @@ export const BrickAgentCapped: Story = {
 export const BrickFewActions: Story = {
   render: () => (
     <QuickActionWall
-      chips={FAE_ACTIONS.slice(0, 3).map((c) => ({ ...c, theme: FAE_THEME, onSelect: () => console.log(c.id) }))}
+      chips={FAE_ACTIONS.slice(0, 3).map(c => ({ ...c, theme: FAE_THEME, onSelect: () => console.log(c.id) }))}
       agentSlug="fae"
       rows={4}
       pauseOnHover
@@ -174,7 +174,7 @@ export const BrickFewActions: Story = {
       className="max-h-44"
     />
   ),
-}
+};
 
 /** Brick, narrow composer: the per-row pad target adapts to the measured
  *  container width, so a chat-composer-width wall repeats each action only as
@@ -185,7 +185,7 @@ export const BrickNarrowComposer: Story = {
   render: () => (
     <div className="w-[420px] max-w-full rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]">
       <QuickActionWall
-        chips={FAE_ACTIONS.slice(0, 3).map((c) => ({ ...c, theme: FAE_THEME, onSelect: () => console.log(c.id) }))}
+        chips={FAE_ACTIONS.slice(0, 3).map(c => ({ ...c, theme: FAE_THEME, onSelect: () => console.log(c.id) }))}
         agentSlug="fae"
         rows={4}
         pauseOnHover
@@ -198,7 +198,7 @@ export const BrickNarrowComposer: Story = {
       />
     </div>
   ),
-}
+};
 
 /** Brick, single short chip: one tiny one-word action ("ONE") in a ~412px
  *  composer. The pad target is measured from the ACTUAL chip width, so a narrow
@@ -221,7 +221,7 @@ export const BrickSingleShortChip: Story = {
       />
     </div>
   ),
-}
+};
 
 /** Brick, non-agent (no `agentSlug`): keeps exactly `rows` rows (marketing /
  *  onboarding walls are sized for their design), still getting the even split
@@ -238,4 +238,4 @@ export const BrickNonAgent: Story = {
       className="max-h-56"
     />
   ),
-}
+};

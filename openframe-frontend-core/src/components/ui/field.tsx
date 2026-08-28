@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { Label } from './label'
-import { InfoHint } from './info-hint'
+import { type ReactNode, useId } from 'react';
+import { InfoHint } from './info-hint';
+import { Label } from './label';
 
 /**
  * Accessibility props handed to the control by the `Field` render-prop.
@@ -10,32 +10,32 @@ import { InfoHint } from './info-hint'
  * error message are all announced.
  */
 export interface FieldRenderProps {
-  id: string
-  'aria-required'?: boolean
-  'aria-invalid'?: boolean
-  'aria-describedby'?: string
+  id: string;
+  'aria-required'?: boolean;
+  'aria-invalid'?: boolean;
+  'aria-describedby'?: string;
 }
 
 export interface FieldProps {
-  label: string
+  label: string;
   /** Definition shown in a hover `InfoHint` next to the label. */
-  hint?: React.ReactNode
-  required?: boolean
-  children: (props: FieldRenderProps) => React.ReactNode
-  error?: string | null
+  hint?: ReactNode;
+  required?: boolean;
+  children: (props: FieldRenderProps) => ReactNode;
+  error?: string | null;
   /**
    * Inline content after the label text — AI badges, confidence chips. Lives in
    * the LABEL ROW so fields that carry badges keep the same geometry as fields
    * that don't; a hand-rolled label row next to a `Field` is what makes two
    * columns' controls land at different heights.
    */
-  labelExtras?: React.ReactNode
+  labelExtras?: ReactNode;
   /**
    * Right-aligned content at the end of the label row — character counters,
    * shortcuts. Same rationale: a counter rendered as its own row under the
    * control gives that column an extra line and misaligns every sibling.
    */
-  labelEnd?: React.ReactNode
+  labelEnd?: ReactNode;
 }
 
 /**
@@ -56,14 +56,14 @@ export interface FieldProps {
  * type doesn't offer one.
  */
 export function Field({ label, hint, required, children, error, labelExtras, labelEnd }: FieldProps) {
-  const controlId = React.useId()
-  const errorId = `${controlId}-error`
+  const controlId = useId();
+  const errorId = `${controlId}-error`;
   const renderProps: FieldRenderProps = {
     id: controlId,
     // A bare `*` draws a star and tells assistive tech nothing.
     ...(required ? { 'aria-required': true } : {}),
     ...(error ? { 'aria-invalid': true, 'aria-describedby': errorId } : {}),
-  }
+  };
   return (
     <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
       <div className="flex items-center gap-1.5">
@@ -75,16 +75,14 @@ export function Field({ label, hint, required, children, error, labelExtras, lab
         {labelExtras}
         {labelEnd && <span className="ml-auto shrink-0">{labelEnd}</span>}
       </div>
-      <div className="pt-[var(--spacing-system-xxs)]">
-        {children(renderProps)}
-      </div>
+      <div className="pt-[var(--spacing-system-xxs)]">{children(renderProps)}</div>
       {/* `role="alert"` + the id the control points at: a validation message
           rendered as plain text is never announced. */}
       {error && (
-        <p id={errorId} role="alert" className="text-h6 text-ods-error">
+        <p id={errorId} role="alert" className="text-ods-error text-h6">
           {error}
         </p>
       )}
     </div>
-  )
+  );
 }

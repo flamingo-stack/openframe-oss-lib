@@ -26,6 +26,16 @@
  */
 
 import {
+  ESCALATION_STATE,
+  errorDetailsMessage,
+  escalationResolvedStatus,
+  type ChatStreamEvent,
+} from '../../../chat-protocol/events';
+// One normalizer for ask rows, shared with the live decoder — history and the
+// stream must agree on which options are usable.
+import { guideFrameEvent, normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
+import { applyApprovalStatusToSegment } from '../stream/message-mutations';
+import {
   MESSAGE_TYPE,
   OWNER_TYPE,
   type AuthorType,
@@ -36,29 +46,24 @@ import {
   type MessageProcessingOptions,
   type MessageData,
   type MessageOwner,
-} from '../types'
-import { ESCALATION_STATE, escalationResolvedStatus, type ChatStreamEvent } from '../../../chat-protocol/events'
-// One normalizer for ask rows, shared with the live decoder — history and the
-// stream must agree on which options are usable.
-import { guideFrameEvent, normalizeAskOptions } from '../../../chat-protocol/nats-decoder'
-import { approvalDisplaysInline, guideApprovalOrigin } from './approval-display'
-import { MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator'
-import { applyApprovalStatusToSegment } from '../stream/message-mutations'
-import { getCommandText } from './tool-call-helpers'
+} from '../types';
+import { approvalDisplaysInline, guideApprovalOrigin } from './approval-display';
+import { type MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator';
+import { getCommandText } from './tool-call-helpers';
 
 function getOwnerDisplayName(owner?: MessageOwner): string {
   if (owner?.type === OWNER_TYPE.ADMIN && owner.user) {
-    const { firstName, lastName } = owner.user
-    const name = [firstName, lastName].filter(Boolean).join(' ')
-    if (name) return name
+    const { firstName, lastName } = owner.user;
+    const name = [firstName, lastName].filter(Boolean).join(' ');
+    if (name) return name;
   }
-  return owner?.type === OWNER_TYPE.ADMIN ? 'Admin' : 'You'
+  return owner?.type === OWNER_TYPE.ADMIN ? 'Admin' : 'You';
 }
 
 /** Per-message author avatar (e.g. an admin's profile photo) when the owner
  *  carries one. `imageUrl` may be relative; the host resolves it downstream. */
 function getOwnerAvatar(owner?: MessageOwner): string | undefined {
-  return owner?.user?.image?.imageUrl ?? undefined
+  return owner?.user?.image?.imageUrl ?? undefined;
 }
 
 function pushStandaloneMessages(
@@ -66,7 +71,7 @@ function pushStandaloneMessages(
   msg: HistoricalMessage,
   messageDataArray: MessageData[],
 ): void {
-  messageDataArray.forEach((data) => {
+  messageDataArray.forEach(data => {
     if (data.type === MESSAGE_TYPE.SYSTEM && 'text' in data && data.text) {
       processedMessages.push({
         id: msg.id,
@@ -76,9 +81,9 @@ function pushStandaloneMessages(
         authorType: 'system',
         timestamp: new Date(msg.createdAt),
         ...(typeof msg.lastChunkStreamSeq === 'number' ? { streamSeq: msg.lastChunkStreamSeq } : {}),
-      })
+      });
     }
-  })
+  });
 }
 
 // =============================================================================
@@ -106,15 +111,15 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
   switch (data.type) {
     case MESSAGE_TYPE.TEXT:
       if ('text' in data && data.text) {
-        return { type: 'text-delta', text: data.text }
+        return { type: 'text-delta', text: data.text };
       }
-      return null
+      return null;
 
     case MESSAGE_TYPE.THINKING:
       if ('text' in data && data.text) {
-        return { type: 'thinking-delta', text: data.text }
+        return { type: 'thinking-delta', text: data.text };
       }
-      return null
+      return null;
 
     // Two persisted shapes, mirroring the live `GUIDE` chunk: the answer body
     // (`text`) and a Product Guide frame the agent re-streamed (`payload`,
@@ -123,29 +128,29 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
     // history and realtime disagree about the same bytes.
     case MESSAGE_TYPE.GUIDE: {
       if ('text' in data && data.text) {
-        return { type: 'guide-delta', text: data.text }
+        return { type: 'guide-delta', text: data.text };
       }
-      const payload = 'payload' in data ? data.payload : undefined
+      const payload = 'payload' in data ? data.payload : undefined;
       if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-        return guideFrameEvent(payload as Record<string, unknown>)
+        return guideFrameEvent(payload);
       }
-      return null
+      return null;
     }
 
     // Same completeness gate as the live decoder (`decodeNatsChunk`): a
     // persisted row without a question or without options is not a card the
     // user can answer, so it replays as nothing rather than as empty chrome.
     case MESSAGE_TYPE.ASK: {
-      if (!('question' in data)) return null
-      const question = typeof data.question === 'string' ? data.question.trim() : ''
-      const options = normalizeAskOptions(data.options)
-      if (!question || options.length === 0) return null
+      if (!('question' in data)) return null;
+      const question = typeof data.question === 'string' ? data.question.trim() : '';
+      const options = normalizeAskOptions(data.options);
+      if (!question || options.length === 0) return null;
       return {
         type: 'ask',
         ...(data.text ? { text: data.text } : {}),
         question,
         options,
-      }
+      };
     }
 
     case MESSAGE_TYPE.EXECUTING_TOOL:
@@ -164,9 +169,9 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
             parameters: data.parameters,
             toolExecutionRequestId: data.toolExecutionRequestId,
           },
-        }
+        };
       }
-      return null
+      return null;
 
     case MESSAGE_TYPE.EXECUTED_TOOL:
       if ('integratedToolType' in data) {
@@ -182,9 +187,9 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
             success: data.success,
             toolExecutionRequestId: data.toolExecutionRequestId,
           },
-        }
+        };
       }
-      return null
+      return null;
 
     case MESSAGE_TYPE.APPROVAL_REQUEST:
       if ('approvalRequestId' in data && data.approvalRequestId) {
@@ -195,9 +200,9 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
           command: data.command || '',
           explanation: data.explanation,
           ...(Array.isArray(data.toolCalls) ? { toolCalls: data.toolCalls } : {}),
-        }
+        };
       }
-      return null
+      return null;
 
     case MESSAGE_TYPE.APPROVAL_RESULT:
       if ('approvalRequestId' in data && data.approvalRequestId) {
@@ -207,28 +212,28 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
           status: data.approved ? 'approved' : 'rejected',
           approvalType: data.approvalType,
           resolvedByName: 'resolvedByName' in data ? data.resolvedByName : undefined,
-        }
+        };
       }
-      return null
+      return null;
 
     case MESSAGE_TYPE.ESCALATION_OFFER: {
-      if (!('offerId' in data) || !data.offerId) return null
+      if (!('offerId' in data) || !data.offerId) return null;
       if (data.state === ESCALATION_STATE.PENDING) {
         return {
           type: 'escalation-offer',
           offerId: data.offerId,
           text: data.text || '',
           origin: data.origin,
-        }
+        };
       }
-      const status = escalationResolvedStatus(data.state)
-      if (!status) return null
+      const status = escalationResolvedStatus(data.state);
+      if (!status) return null;
       return {
         type: 'escalation-offer-resolved',
         offerId: data.offerId,
         status,
         resolvedByName: data.resolvedByName,
-      }
+      };
     }
 
     case MESSAGE_TYPE.TICKET_ESCALATED:
@@ -239,17 +244,17 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
           reason: data.reason,
           ticketNumber: data.ticketNumber,
           text: data.text,
-        }
+        };
       }
-      return null
+      return null;
 
     // Same completeness gate as the live decoder: `kind` (an OPEN string —
     // unknown kinds render as a neutral line) is the only required field.
     // Field names match the chunk, so ONE mapping covers both paths; the
     // typeof gates also fold the row's GraphQL nulls to undefined.
     case MESSAGE_TYPE.TICKET_EVENT: {
-      const kind = 'kind' in data && typeof data.kind === 'string' ? data.kind.trim() : ''
-      if (!kind) return null
+      const kind = 'kind' in data && typeof data.kind === 'string' ? data.kind.trim() : '';
+      if (!kind) return null;
       return {
         type: 'ticket-event',
         kind,
@@ -258,10 +263,8 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
         actorType: typeof data.actorType === 'string' ? data.actorType : undefined,
         reason: typeof data.reason === 'string' && data.reason.trim() ? data.reason : undefined,
         targetStatusKind:
-          typeof data.targetStatusKind === 'string' && data.targetStatusKind.trim()
-            ? data.targetStatusKind
-            : undefined,
-      }
+          typeof data.targetStatusKind === 'string' && data.targetStatusKind.trim() ? data.targetStatusKind : undefined,
+      };
     }
 
     case MESSAGE_TYPE.ERROR:
@@ -270,29 +273,29 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
           type: 'error',
           title: data.error || 'An error occurred',
           details: 'details' in data ? data.details : undefined,
-        }
+        };
       }
-      return null
+      return null;
 
     case MESSAGE_TYPE.CONTEXT_COMPACTION_START:
-      return { type: 'compaction', phase: 'start' }
+      return { type: 'compaction', phase: 'start' };
 
     case MESSAGE_TYPE.CONTEXT_COMPACTION_END:
       return {
         type: 'compaction',
         phase: 'end',
         summary: 'summary' in data && typeof data.summary === 'string' ? data.summary : undefined,
-      }
+      };
 
     case MESSAGE_TYPE.SYSTEM:
       if ('text' in data && data.text) {
-        return { type: 'participant', kind: 'system', text: data.text }
+        return { type: 'participant', kind: 'system', text: data.text };
       }
-      return null
+      return null;
 
     default:
       // Unknown message type — ignore.
-      return null
+      return null;
   }
 }
 
@@ -303,7 +306,7 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
 type EscalatedApprovals = Map<
   string,
   { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
->
+>;
 
 /**
  * Terminal escalation-offer resolutions collected while walking history, so
@@ -312,10 +315,7 @@ type EscalatedApprovals = Map<
  * SUPERSEDED, which puts them in different assistant envelopes — by the time
  * the resolution is read, the accumulator holding the card has been reset.
  */
-type OfferResolutions = Map<
-  string,
-  { status: ChatApprovalStatus; resolvedByName?: string | null }
->
+type OfferResolutions = Map<string, { status: ChatApprovalStatus; resolvedByName?: string | null }>;
 
 /**
  * Replay one decoded event into the shared per-turn segment kernel with the
@@ -335,7 +335,7 @@ function applyHistoryEvent(
   // batchApprovalsEnabled is owned by the consumer (oss-tenant chat client /
   // openframe-frontend tickets). Defaults to ON so consumers that haven't
   // wired the flag yet get the batch UI; pass `false` to force legacy.
-  const { displayApprovalTypes, batchApprovalsEnabled = true, escalationOfferStates } = options
+  const { displayApprovalTypes, batchApprovalsEnabled = true, escalationOfferStates } = options;
 
   switch (event.type) {
     case 'escalation-offer':
@@ -346,8 +346,8 @@ function applyHistoryEvent(
         event.text,
         event.origin,
         escalationOfferStates?.[event.offerId] ?? 'pending',
-      )
-      break
+      );
+      break;
 
     case 'ticket-escalated':
       accumulator.addTicketEscalated({
@@ -355,8 +355,8 @@ function applyHistoryEvent(
         ticketNumber: event.ticketNumber,
         reason: event.reason,
         text: event.text,
-      })
-      break
+      });
+      break;
 
     // Seq-less on purpose: the persisted row's sequence lives on the message
     // (`lastChunkStreamSeq`), not in `messageData`. A live redelivery of the
@@ -377,8 +377,8 @@ function applyHistoryEvent(
         },
         undefined,
         rowCreatedAt,
-      )
-      break
+      );
+      break;
 
     case 'escalation-offer-resolved':
       // Recorded, not applied here: `applyOfferResolutions` runs after every
@@ -386,58 +386,58 @@ function applyHistoryEvent(
       offerResolutions?.set(event.offerId, {
         status: event.status,
         resolvedByName: event.resolvedByName,
-      })
-      break
+      });
+      break;
 
     case 'text-delta':
-      accumulator.appendText(event.text)
-      break
+      accumulator.appendText(event.text);
+      break;
 
     case 'thinking-delta':
-      accumulator.appendThinking(event.text)
-      break
+      accumulator.appendThinking(event.text);
+      break;
 
     case 'guide-delta':
-      accumulator.appendGuide(event.text)
-      break
+      accumulator.appendGuide(event.text);
+      break;
 
     // Mirror of the live path: the intro sentence replays as answer text in
     // front of the card, so a reloaded thread reads exactly like the stream did.
     case 'ask':
-      if (event.text) accumulator.appendText(event.text)
-      accumulator.addAsk(event.question, event.options)
-      break
+      if (event.text) accumulator.appendText(event.text);
+      accumulator.addAsk(event.question, event.options);
+      break;
 
     case 'tool-execution':
-      accumulator.addToolExecution({ type: 'tool_execution', data: event.data })
-      break
+      accumulator.addToolExecution({ type: 'tool_execution', data: event.data });
+      break;
 
     case 'approval-request': {
-      const approvalType = event.approvalType || 'CLIENT'
-      const toolCalls = event.toolCalls as PendingToolCallData[] | undefined
-      const isBatch = !!toolCalls && toolCalls.length > 0
+      const approvalType = event.approvalType || 'CLIENT';
+      const toolCalls = event.toolCalls;
+      const isBatch = !!toolCalls && toolCalls.length > 0;
       // Same rule the live kernels use — a card must not change where it
       // renders (or which backend its buttons hit) just because the page was
       // reloaded and it came back through history instead of the stream.
-      const guideOrigin = guideApprovalOrigin(event)
+      const guideOrigin = guideApprovalOrigin(event);
 
       if (approvalDisplaysInline(event, approvalType, displayApprovalTypes)) {
         if (isBatch) {
-          const status = (approvalStatuses[event.requestId] as ChatApprovalStatus) || 'pending'
+          const status = (approvalStatuses[event.requestId] as ChatApprovalStatus) || 'pending';
           if (batchApprovalsEnabled) {
             accumulator.addApprovalBatch(
               event.requestId,
               approvalType,
-              toolCalls!,
+              toolCalls,
               status,
               undefined,
               undefined,
               guideOrigin,
-            )
+            );
           } else {
             // Flag OFF — unfold batch into N legacy approval cards (same id).
-            for (const call of toolCalls!) {
-              if (!call.requiresApproval) continue
+            for (const call of toolCalls) {
+              if (!call.requiresApproval) continue;
               accumulator.addApprovalRequest(
                 event.requestId,
                 getCommandText(call),
@@ -446,7 +446,7 @@ function applyHistoryEvent(
                 status,
                 undefined,
                 guideOrigin,
-              )
+              );
             }
           }
         } else {
@@ -457,8 +457,8 @@ function applyHistoryEvent(
           // pending and `flushPendingApprovals()` resurrects it as a stale
           // sticky card on every history re-process. Mirror the batch path
           // and honor `approvalStatuses`.
-          const resolvedStatus = approvalStatuses[event.requestId] as ChatApprovalStatus | undefined
-          const isResolved = resolvedStatus === 'approved' || resolvedStatus === 'rejected'
+          const resolvedStatus = approvalStatuses[event.requestId] as ChatApprovalStatus | undefined;
+          const isResolved = resolvedStatus === 'approved' || resolvedStatus === 'rejected';
           // A guide card is added inline even while pending. The tracked path
           // below ends in `flushPendingApprovals`, whose segments the consumer
           // lifts into a sticky footer — that is the treatment for the
@@ -473,14 +473,14 @@ function applyHistoryEvent(
               resolvedStatus ?? 'pending',
               event.fields,
               guideOrigin,
-            )
+            );
           } else {
             accumulator.trackApprovalRequest(event.requestId, {
               command: event.command || '',
               explanation: event.explanation,
               approvalType,
               fields: event.fields,
-            })
+            });
           }
         }
       } else {
@@ -489,18 +489,18 @@ function applyHistoryEvent(
           explanation: event.explanation,
           approvalType,
           ...(isBatch ? { toolCalls } : {}),
-        })
+        });
       }
-      break
+      break;
     }
 
     case 'approval-resolved': {
-      const requestId = event.requestId
-      if (!requestId) break
-      const existingStatus = approvalStatuses[requestId] as ChatApprovalStatus | undefined
-      const status: ChatApprovalStatus = existingStatus || event.status
-      const resolvedByName = event.resolvedByName
-      const escalatedData = escalatedApprovals?.get(requestId)
+      const requestId = event.requestId;
+      if (!requestId) break;
+      const existingStatus = approvalStatuses[requestId] as ChatApprovalStatus | undefined;
+      const status: ChatApprovalStatus = existingStatus || event.status;
+      const resolvedByName = event.resolvedByName;
+      const escalatedData = escalatedApprovals?.get(requestId);
 
       if (escalatedData?.toolCalls && escalatedData.toolCalls.length > 0) {
         if (batchApprovalsEnabled) {
@@ -511,21 +511,21 @@ function applyHistoryEvent(
             status,
             undefined,
             resolvedByName,
-          )
+          );
         } else {
           for (const call of escalatedData.toolCalls) {
-            if (!call.requiresApproval) continue
+            if (!call.requiresApproval) continue;
             accumulator.addApprovalRequest(
               requestId,
               getCommandText(call),
               call.toolExplanation,
               escalatedData.approvalType,
               status,
-            )
+            );
           }
         }
-        escalatedApprovals?.delete(requestId)
-        break
+        escalatedApprovals?.delete(requestId);
+        break;
       }
 
       if (escalatedData) {
@@ -533,51 +533,41 @@ function applyHistoryEvent(
           command: escalatedData.command,
           explanation: escalatedData.explanation,
           approvalType: escalatedData.approvalType,
-        })
-        escalatedApprovals?.delete(requestId)
+        });
+        escalatedApprovals?.delete(requestId);
       }
 
       // If a segment with this id is already present (batch or legacy), just
       // flip its status. updateApprovalStatus matches both `approval_batch`
       // and `approval_request` segments.
-      const before = accumulator.getSegments()
-      const after = accumulator.updateApprovalStatus(requestId, status, resolvedByName)
-      const updatedExisting = before.some((s, i) => after[i] !== s)
-      if (updatedExisting) break
+      const before = accumulator.getSegments();
+      const after = accumulator.updateApprovalStatus(requestId, status, resolvedByName);
+      const updatedExisting = before.some((s, i) => after[i] !== s);
+      if (updatedExisting) break;
 
-      accumulator.processApprovalResult(
-        requestId,
-        status === 'approved',
-        event.approvalType || 'USER',
-      )
-      break
+      accumulator.processApprovalResult(requestId, status === 'approved', event.approvalType || 'USER');
+      break;
     }
 
     case 'error': {
-      let message: string | undefined
-      if (event.details) {
-        try {
-          message = JSON.parse(event.details)?.error?.message
-        } catch {
-          message = event.details
-        }
-      }
-      accumulator.addError(event.title, message)
-      break
+      // Shared with the live path in `chat-stream-reducer` — one decoder so a
+      // card cannot read one way live and another on refresh.
+      accumulator.addError(event.title, errorDetailsMessage(event.details));
+      break;
     }
 
     case 'compaction':
       if (event.phase === 'start') {
-        accumulator.addContextCompaction()
+        accumulator.addContextCompaction();
       } else {
-        accumulator.completeContextCompaction(event.summary)
+        accumulator.completeContextCompaction(event.summary);
       }
-      break
+      break;
 
     default:
       // Participant/system rows are envelope concerns; everything else is
       // realtime-only vocabulary that never appears in persisted rows.
-      break
+      break;
   }
 }
 
@@ -589,8 +579,8 @@ function applyHistoryEvent(
  * Result type for historical message processing
  */
 export interface ProcessHistoricalMessagesResult {
-  messages: ProcessedMessage[]
-  escalatedApprovals: EscalatedApprovals
+  messages: ProcessedMessage[];
+  escalatedApprovals: EscalatedApprovals;
 }
 
 /**
@@ -620,31 +610,31 @@ export function processHistoricalMessages(
     escalationOfferStates,
     onEscalationApprove,
     onEscalationReject,
-  } = options
+  } = options;
 
-  const processedMessages: ProcessedMessage[] = []
+  const processedMessages: ProcessedMessage[] = [];
   const accumulator = createMessageSegmentAccumulator({
     onApprove,
     onReject,
     onEscalationApprove,
     onEscalationReject,
-  })
-  const escalatedApprovals: EscalatedApprovals = new Map()
-  const offerResolutions: OfferResolutions = new Map()
+  });
+  const escalatedApprovals: EscalatedApprovals = new Map();
+  const offerResolutions: OfferResolutions = new Map();
 
-  let currentAssistantId: string | null = null
-  let currentAssistantTimestamp: Date | null = null
-  let lastAssistantId: string | null = null
+  let currentAssistantId: string | null = null;
+  let currentAssistantTimestamp: Date | null = null;
+  let lastAssistantId: string | null = null;
   // MAX persisted seq across the rows grouped into the current assistant turn
   // — carried onto the flushed message's streamSeq for per-role merge coverage.
-  let currentAssistantStreamSeq: number | undefined
+  let currentAssistantStreamSeq: number | undefined;
 
   /**
    * Flush the current assistant message to processedMessages.
    * Uses the LAST message ID in the group for stable React keys across page boundaries.
    */
   const flushAssistantMessage = () => {
-    const idToUse = lastAssistantId || currentAssistantId
+    const idToUse = lastAssistantId || currentAssistantId;
     if (idToUse && accumulator.hasContent()) {
       processedMessages.push({
         id: idToUse,
@@ -652,12 +642,12 @@ export function processHistoricalMessages(
         content: accumulator.getSegments(),
         name: assistantName,
         assistantType,
-        authorType: assistantType as AuthorType,
+        authorType: assistantType,
         timestamp: currentAssistantTimestamp || new Date(),
         avatar: assistantAvatar,
         ...(currentAssistantStreamSeq !== undefined ? { streamSeq: currentAssistantStreamSeq } : {}),
-      })
-      accumulator.resetSegments()
+      });
+      accumulator.resetSegments();
     }
     // Reset grouping identity + seq UNCONDITIONALLY — even on an EMPTY flush (an
     // assistant turn whose only data was a filtered/escalated approval renders
@@ -666,50 +656,47 @@ export function processHistoricalMessages(
     // `currentAssistantStreamSeq` bleed into the NEXT assistant turn: `!currentAssistantId`
     // stays false so it keeps the old id/timestamp, and `Math.max` inflates its
     // streamSeq — which then over-covers synthetics in the history merge.
-    currentAssistantId = null
-    currentAssistantTimestamp = null
-    lastAssistantId = null
-    currentAssistantStreamSeq = undefined
-  }
+    currentAssistantId = null;
+    currentAssistantTimestamp = null;
+    lastAssistantId = null;
+    currentAssistantStreamSeq = undefined;
+  };
 
   messages.forEach((msg, index) => {
     // Filter by chat type if specified
-    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return
+    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return;
 
     const messageDataArray = Array.isArray(msg.messageData)
       ? msg.messageData
       : msg.messageData
-      ? [msg.messageData]
-      : []
+        ? [msg.messageData]
+        : [];
 
-    const hasStandaloneData = messageDataArray.some((data) =>
-      data.type === MESSAGE_TYPE.SYSTEM
-    )
+    const hasStandaloneData = messageDataArray.some(data => data.type === MESSAGE_TYPE.SYSTEM);
     if (hasStandaloneData) {
-      flushAssistantMessage()
-      pushStandaloneMessages(processedMessages, msg, messageDataArray)
-      return
+      flushAssistantMessage();
+      pushStandaloneMessages(processedMessages, msg, messageDataArray);
+      return;
     }
 
-    const isUserMessage =
-      msg.owner?.type === OWNER_TYPE.CLIENT || msg.owner?.type === OWNER_TYPE.ADMIN
+    const isUserMessage = msg.owner?.type === OWNER_TYPE.CLIENT || msg.owner?.type === OWNER_TYPE.ADMIN;
 
     if (isUserMessage) {
-      flushAssistantMessage()
+      flushAssistantMessage();
 
-      const userAuthorType: AuthorType = msg.owner?.type === OWNER_TYPE.ADMIN ? 'admin' : 'user'
-      messageDataArray.forEach((data) => {
+      const userAuthorType: AuthorType = msg.owner?.type === OWNER_TYPE.ADMIN ? 'admin' : 'user';
+      messageDataArray.forEach(data => {
         if (data.type === MESSAGE_TYPE.TEXT && 'text' in data && data.text) {
           // `TextData.contextItems` (server: `[{ type, id }]`) — the entity
           // context the user attached to this message. Surface it so the bubble
           // renders its chip strip from history (no label on the wire → fall
           // back to the id, matching the realtime path).
-          const rawContext = (data as { contextItems?: Array<{ type?: unknown; id?: unknown }> }).contextItems
+          const rawContext = (data as { contextItems?: Array<{ type?: unknown; id?: unknown }> }).contextItems;
           const contextItems = Array.isArray(rawContext)
             ? rawContext
-                .filter((c) => typeof c?.type === 'string' && typeof c?.id === 'string')
-                .map((c) => ({ type: c.type as string, id: c.id as string, label: c.id as string }))
-            : undefined
+                .filter(c => typeof c?.type === 'string' && typeof c?.id === 'string')
+                .map(c => ({ type: c.type as string, id: c.id as string, label: c.id as string }))
+            : undefined;
           processedMessages.push({
             id: msg.id,
             role: 'user',
@@ -720,25 +707,25 @@ export function processHistoricalMessages(
             timestamp: new Date(msg.createdAt),
             ...(contextItems && contextItems.length > 0 ? { contextItems } : {}),
             ...(typeof msg.lastChunkStreamSeq === 'number' ? { streamSeq: msg.lastChunkStreamSeq } : {}),
-          })
+          });
         }
-      })
+      });
     } else {
       if (!currentAssistantId) {
-        currentAssistantId = msg.id
-        currentAssistantTimestamp = new Date(msg.createdAt)
+        currentAssistantId = msg.id;
+        currentAssistantTimestamp = new Date(msg.createdAt);
       }
-      lastAssistantId = msg.id
+      lastAssistantId = msg.id;
       if (typeof msg.lastChunkStreamSeq === 'number') {
         currentAssistantStreamSeq =
           currentAssistantStreamSeq === undefined
             ? msg.lastChunkStreamSeq
-            : Math.max(currentAssistantStreamSeq, msg.lastChunkStreamSeq)
+            : Math.max(currentAssistantStreamSeq, msg.lastChunkStreamSeq);
       }
 
-      messageDataArray.forEach((data) => {
-        const event = decodeHistoricalMessageData(data)
-        if (!event) return
+      messageDataArray.forEach(data => {
+        const event = decodeHistoricalMessageData(data);
+        if (!event) return;
         applyHistoryEvent(
           event,
           accumulator,
@@ -747,25 +734,24 @@ export function processHistoricalMessages(
           escalatedApprovals,
           offerResolutions,
           new Date(msg.createdAt),
-        )
-      })
+        );
+      });
 
       // Check if we should flush (next message is from user or last message)
-      const nextMsg = messages[index + 1]
-      const isLastMessage = index === messages.length - 1
+      const nextMsg = messages[index + 1];
+      const isLastMessage = index === messages.length - 1;
       const nextIsFromUser =
-        nextMsg &&
-        (nextMsg.owner?.type === OWNER_TYPE.CLIENT || nextMsg.owner?.type === OWNER_TYPE.ADMIN)
+        nextMsg && (nextMsg.owner?.type === OWNER_TYPE.CLIENT || nextMsg.owner?.type === OWNER_TYPE.ADMIN);
 
       if (isLastMessage || nextIsFromUser) {
-        flushAssistantMessage()
+        flushAssistantMessage();
       }
     }
-  })
+  });
 
-  flushAssistantMessage()
+  flushAssistantMessage();
 
-  const pendingApprovalSegments = accumulator.flushPendingApprovals()
+  const pendingApprovalSegments = accumulator.flushPendingApprovals();
   if (pendingApprovalSegments.length > 0) {
     processedMessages.push({
       id: `pending-approvals-${Date.now()}`,
@@ -775,47 +761,48 @@ export function processHistoricalMessages(
       assistantType,
       timestamp: new Date(),
       avatar: assistantAvatar,
-    })
+    });
   }
 
-  applyOfferResolutions(processedMessages, offerResolutions)
+  const resolvedMessages = applyOfferResolutions(processedMessages, offerResolutions);
 
   return {
-    messages: processedMessages,
-    escalatedApprovals: escalatedApprovals
-  }
+    messages: resolvedMessages,
+    escalatedApprovals: escalatedApprovals,
+  };
 }
 
 /**
  * Flip escalation-offer cards that were flushed into an EARLIER bubble than
- * their resolution row. Mutates `processedMessages` in place (it is local to
- * the caller and not yet handed out). Uses the same `applyApprovalStatusToSegment`
- * rule as the live projection so the two paths cannot drift.
+ * their resolution row. Returns a new list (unchanged bubbles keep their
+ * identity, so the array is only rebuilt when something actually flipped).
+ * Uses the same `applyApprovalStatusToSegment` rule as the live projection so
+ * the two paths cannot drift.
  */
 function applyOfferResolutions(
   processedMessages: ProcessedMessage[],
   offerResolutions: OfferResolutions,
-): void {
-  if (offerResolutions.size === 0) return
+): ProcessedMessage[] {
+  if (offerResolutions.size === 0) return processedMessages;
 
-  processedMessages.forEach((msg, index) => {
-    if (!Array.isArray(msg.content)) return
-    let changed = false
-    const content = msg.content.map((segment) => {
-      if (segment.type !== 'escalation_offer') return segment
-      const resolution = offerResolutions.get(segment.data.offerId)
-      if (!resolution) return segment
+  return processedMessages.map(msg => {
+    if (!Array.isArray(msg.content)) return msg;
+    let changed = false;
+    const content = msg.content.map(segment => {
+      if (segment.type !== 'escalation_offer') return segment;
+      const resolution = offerResolutions.get(segment.data.offerId);
+      if (!resolution) return segment;
       const next = applyApprovalStatusToSegment(
         segment,
         segment.data.offerId,
         resolution.status,
         resolution.resolvedByName,
-      )
-      if (next !== segment) changed = true
-      return next
-    })
-    if (changed) processedMessages[index] = { ...msg, content }
-  })
+      );
+      if (next !== segment) changed = true;
+      return next;
+    });
+    return changed ? { ...msg, content } : msg;
+  });
 }
 
 /**
@@ -824,22 +811,22 @@ function applyOfferResolutions(
  */
 export function extractErrorMessages(
   messages: HistoricalMessage[],
-  options: MessageProcessingOptions = {}
+  options: MessageProcessingOptions = {},
 ): ProcessedMessage[] {
-  const { assistantName = 'Fae', assistantType = 'fae', assistantAvatar, chatTypeFilter } = options
+  const { assistantName = 'Fae', assistantType = 'fae', assistantAvatar, chatTypeFilter } = options;
 
-  const errorMessages: ProcessedMessage[] = []
+  const errorMessages: ProcessedMessage[] = [];
 
-  messages.forEach((msg) => {
-    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return
+  messages.forEach(msg => {
+    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return;
 
     const messageDataArray = Array.isArray(msg.messageData)
       ? msg.messageData
       : msg.messageData
-      ? [msg.messageData]
-      : []
+        ? [msg.messageData]
+        : [];
 
-    messageDataArray.forEach((data) => {
+    messageDataArray.forEach(data => {
       if (data.type === MESSAGE_TYPE.ERROR) {
         errorMessages.push({
           id: `${msg.id}-error`,
@@ -849,12 +836,12 @@ export function extractErrorMessages(
           assistantType,
           timestamp: new Date(msg.createdAt),
           avatar: assistantAvatar,
-        })
+        });
       }
-    })
-  })
+    });
+  });
 
-  return errorMessages
+  return errorMessages;
 }
 
 /**
@@ -865,4 +852,4 @@ export function extractErrorMessages(
  * same corpus). The duplicate envelope was deleted in Phase 3 — kept as an
  * alias for the established import sites.
  */
-export const processHistoricalMessagesWithErrors = processHistoricalMessages
+export const processHistoricalMessagesWithErrors = processHistoricalMessages;

@@ -1,40 +1,39 @@
-'use client'
+'use client';
 
-import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { DraggerIcon } from '../icons-v2-generated/interface/dragger-icon'
-import { TrashIcon } from '../icons-v2-generated/interface/trash-icon'
-import { InfoCircleIcon } from '../icons-v2-generated/signs-and-symbols/info-circle-icon'
-import { Button } from './button'
-import { ColorPresetSelect, ColorPickerInput } from './color-preset-select'
-import { Input } from './input'
-import { type TagProps } from './tag'
-import { TicketStatusTag } from './ticket-status-tag'
-import { TouchFriendlyTooltip } from './touch-friendly-tooltip'
+import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
+import { cn } from '../../utils/cn';
+import { DraggerIcon } from '../icons-v2-generated/interface/dragger-icon';
+import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
+import { InfoCircleIcon } from '../icons-v2-generated/signs-and-symbols/info-circle-icon';
+import { Button } from './button';
+import { ColorPresetSelect, ColorPickerInput } from './color-preset-select';
+import { Input } from './input';
+import type { TagProps } from './tag';
+import { TicketStatusTag } from './ticket-status-tag';
+import { TouchFriendlyTooltip } from './touch-friendly-tooltip';
 
-type SystemTagVariant = Extract<TagProps['variant'], 'outline' | 'primary'>
+type SystemTagVariant = Extract<TagProps['variant'], 'outline' | 'primary'>;
 
 export interface TicketStatusConfigRowProps {
-  variant: 'system' | 'custom'
+  variant: 'system' | 'custom';
   /**
    * Canonical ticket-status key for system rows (e.g. 'ACTIVE', 'RESOLVED'),
    * or the row's unique id for custom rows. Forwarded to TicketStatusTag.
    */
-  statusKey: string
-  name: string
-  onNameChange?: (value: string) => void
-  color?: string
-  presetKey?: string
-  onColorChange?: (next: { color: string; preset?: string }) => void
-  systemTooltip?: string
-  systemTagVariant?: SystemTagVariant
-  onDelete?: () => void
-  deleteDisabled?: boolean
-  deleteDisabledReason?: string
-  dragHandleProps?: DraggableSyntheticListeners
-  dragHandleAttributes?: DraggableAttributes
-  isDragging?: boolean
+  statusKey: string;
+  name: string;
+  onNameChange?: (value: string) => void;
+  color?: string;
+  presetKey?: string;
+  onColorChange?: (next: { color: string; preset?: string }) => void;
+  systemTooltip?: string;
+  systemTagVariant?: SystemTagVariant;
+  onDelete?: () => void;
+  deleteDisabled?: boolean;
+  deleteDisabledReason?: string;
+  dragHandleProps?: DraggableSyntheticListeners;
+  dragHandleAttributes?: DraggableAttributes;
+  isDragging?: boolean;
 }
 
 export function TicketStatusConfigRow({
@@ -54,14 +53,14 @@ export function TicketStatusConfigRow({
   dragHandleAttributes,
   isDragging,
 }: TicketStatusConfigRowProps) {
-  const isSystem = variant === 'system'
-  const isCustomColor = !isSystem && presetKey === undefined
-  const previewColor = isSystem ? undefined : color
-  const showColorPicker = !isSystem && onColorChange && color !== undefined
+  const isSystem = variant === 'system';
+  const isCustomColor = !isSystem && presetKey === undefined;
+  const previewColor = isSystem ? undefined : color;
+  const showColorPicker = !isSystem && onColorChange && color !== undefined;
   // Custom rows render as filled pills (no border); system rows take the
   // page-configured variant (outline/primary). text-h5 already uppercases.
-  const previewVariant: SystemTagVariant | undefined = systemTagVariant ?? (isSystem ? undefined : 'primary')
-  const colClass = 'min-w-0 grow basis-[calc(50%-6px)] md:basis-0'
+  const previewVariant: SystemTagVariant | undefined = systemTagVariant ?? (isSystem ? undefined : 'primary');
+  const colClass = 'min-w-0 grow basis-[calc(50%-6px)] md:basis-0';
 
   return (
     <div
@@ -150,12 +149,12 @@ export function TicketStatusConfigRow({
                 onClick={deleteDisabled ? undefined : onDelete}
                 className={cn('size-11 md:size-12', deleteDisabled && 'pointer-events-none')}
               >
-                <TrashIcon className="text-ods-error"/>
+                <TrashIcon className="text-ods-error" />
               </Button>
             </span>
           </TouchFriendlyTooltip>
         )}
       </div>
     </div>
-  )
+  );
 }

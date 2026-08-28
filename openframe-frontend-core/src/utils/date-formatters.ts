@@ -4,14 +4,21 @@
  */
 
 const MONTHS_LONG = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-] as const
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
 
-const MONTHS_SHORT = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-] as const
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 /**
  * Split an ISO date / date-time string into `[year, month, day]` strings.
@@ -19,10 +26,10 @@ const MONTHS_SHORT = [
  * (which renders `"2025-11-11"` as Nov 10 west of UTC).
  */
 function splitYmd(dateString: string): [string, string, string] | null {
-  const head = dateString.split('T')[0]
-  const parts = head.split('-')
-  if (parts.length !== 3) return null
-  return [parts[0], parts[1], parts[2]]
+  const head = dateString.split('T')[0];
+  const parts = head.split('-');
+  if (parts.length !== 3) return null;
+  return [parts[0], parts[1], parts[2]];
 }
 
 /**
@@ -30,10 +37,10 @@ function splitYmd(dateString: string): [string, string, string] | null {
  * @returns e.g. `"November 11, 2025"`
  */
 export function formatReleaseDate(dateString: string): string {
-  const ymd = splitYmd(dateString)
-  if (!ymd) return dateString
-  const [year, month, day] = ymd
-  return `${MONTHS_LONG[parseInt(month) - 1]} ${parseInt(day)}, ${year}`
+  const ymd = splitYmd(dateString);
+  if (!ymd) return dateString;
+  const [year, month, day] = ymd;
+  return `${MONTHS_LONG[parseInt(month) - 1]} ${parseInt(day)}, ${year}`;
 }
 
 /**
@@ -44,10 +51,10 @@ export function formatReleaseDate(dateString: string): string {
  * lib chat cards (campaign-card-admin).
  */
 export function formatDateShort(dateString: string): string {
-  const ymd = splitYmd(dateString)
-  if (!ymd) return dateString
-  const [year, month, day] = ymd
-  return `${MONTHS_SHORT[parseInt(month) - 1]} ${parseInt(day)}, ${year}`
+  const ymd = splitYmd(dateString);
+  if (!ymd) return dateString;
+  const [year, month, day] = ymd;
+  return `${MONTHS_SHORT[parseInt(month) - 1]} ${parseInt(day)}, ${year}`;
 }
 
 /**
@@ -56,8 +63,8 @@ export function formatDateShort(dateString: string): string {
  * interview cards where the compact MM/DD/YYYY layout is desired.
  */
 export function formatDateSlashUTC(dateString: string): string {
-  const ymd = splitYmd(dateString)
-  if (!ymd) return dateString
-  const [year, month, day] = ymd
-  return `${month}/${day}/${year}`
+  const ymd = splitYmd(dateString);
+  if (!ymd) return dateString;
+  const [year, month, day] = ymd;
+  return `${month}/${day}/${year}`;
 }

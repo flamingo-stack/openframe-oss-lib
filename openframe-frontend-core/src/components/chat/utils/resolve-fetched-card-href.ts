@@ -31,26 +31,26 @@
  * Pure — no React, no DOM. The caller owns `safeHref` validation.
  */
 
-import type { ComposeContentUrl } from '../../../utils/content-href'
-import { canonicalContentRefType } from '../../../utils/list-url'
+import type { ComposeContentUrl } from '../../../utils/content-href';
+import { canonicalContentRefType } from '../../../utils/list-url';
 
 export interface FetchedCardHrefInput {
   /** Canonical `documentType` for the seam (registry `contentRefType`). */
-  contentRefType: string
+  contentRefType: string;
   /** The marker's primary key — `ChatRef.id`, NOT the fetched row's id. */
-  id: string
+  id: string;
   /** The row the card fetched. Shape is per-type and opaque here; only
    *  `slug` and `platforms` are read, both defensively. */
-  item: unknown
+  item: unknown;
   /** Host seam. Absent (unwired runtime) → no fallback, same as today. */
-  composeContentUrl?: ComposeContentUrl
+  composeContentUrl?: ComposeContentUrl;
 }
 
 /** Read `item.slug` when it is a non-empty string. */
 function readSlug(item: unknown): string | null {
-  if (!item || typeof item !== 'object') return null
-  const slug = (item as { slug?: unknown }).slug
-  return typeof slug === 'string' && slug.trim() ? slug.trim() : null
+  if (!item || typeof item !== 'object') return null;
+  const slug = (item as { slug?: unknown }).slug;
+  return typeof slug === 'string' && slug.trim() ? slug.trim() : null;
 }
 
 /**
@@ -62,12 +62,12 @@ function readSlug(item: unknown): string | null {
  * otherwise say `86ad3qvv5`. Once the row loads, this is the real title.
  */
 export function readFetchedCardTitle(item: unknown): string | null {
-  if (!item || typeof item !== 'object') return null
+  if (!item || typeof item !== 'object') return null;
   for (const key of ['title', 'name'] as const) {
-    const value = (item as Record<string, unknown>)[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
+    const value = (item as Record<string, unknown>)[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
   }
-  return null
+  return null;
 }
 
 /** Read the row's platform-association array — the hub composer keys its
@@ -76,13 +76,13 @@ export function readFetchedCardTitle(item: unknown): string | null {
  *  `<canonicalType>_platforms` (e.g. `blog_post_platforms`), with a plain
  *  `platforms` fallback for shapes that use the generic key. */
 function readPlatforms(item: unknown, canonicalType: string): Array<{ name?: string }> | undefined {
-  if (!item || typeof item !== 'object') return undefined
-  const obj = item as Record<string, unknown>
+  if (!item || typeof item !== 'object') return undefined;
+  const obj = item as Record<string, unknown>;
   for (const key of [`${canonicalType}_platforms`, 'platforms']) {
-    const platforms = obj[key]
-    if (Array.isArray(platforms)) return platforms as Array<{ name?: string }>
+    const platforms = obj[key];
+    if (Array.isArray(platforms)) return platforms as Array<{ name?: string }>;
   }
-  return undefined
+  return undefined;
 }
 
 /**
@@ -96,8 +96,8 @@ export function resolveFetchedCardHref({
   item,
   composeContentUrl,
 }: FetchedCardHrefInput): { href: string; targetPlatform: string | null } | null {
-  if (!composeContentUrl || !contentRefType || !id) return null
-  const canonicalType = canonicalContentRefType(contentRefType)
+  if (!composeContentUrl || !contentRefType || !id) return null;
+  const canonicalType = canonicalContentRefType(contentRefType);
   return composeContentUrl({
     // The card registry keys some entries by the legacy rail vocabulary
     // (`blog_post_existing`) because that is what `buildListUrl` expects.
@@ -108,5 +108,5 @@ export function resolveFetchedCardHref({
     identifier: id,
     slug: readSlug(item),
     platforms: readPlatforms(item, canonicalType),
-  })
+  });
 }

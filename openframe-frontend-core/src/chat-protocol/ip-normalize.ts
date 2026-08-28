@@ -36,57 +36,57 @@
  */
 
 /** Longest accepted candidate. A full IPv6 + zone fits well inside this. */
-export const IP_BUCKET_KEY_MAX_LENGTH = 64
+export const IP_BUCKET_KEY_MAX_LENGTH = 64;
 
 function isIpv4(value: string): boolean {
-  const parts = value.split('.')
-  if (parts.length !== 4) return false
+  const parts = value.split('.');
+  if (parts.length !== 4) return false;
   for (const part of parts) {
-    if (!/^\d{1,3}$/.test(part)) return false
+    if (!/^\d{1,3}$/.test(part)) return false;
     // Leading zeros are a SECOND spelling of the same address (`203.0.113.04`),
     // so accepting them verbatim splits one peer across two buckets. Reject
     // rather than canonicalize: no legitimate emitter zero-pads, and some
     // resolvers read a `0`-prefixed octet as octal, i.e. it is not even
     // reliably the same address.
-    if (part.length > 1 && part.startsWith('0')) return false
-    if (Number(part) > 255) return false
+    if (part.length > 1 && part.startsWith('0')) return false;
+    if (Number(part) > 255) return false;
   }
-  return true
+  return true;
 }
 
 function isIpv6(value: string): boolean {
-  if (!value.includes(':')) return false
+  if (!value.includes(':')) return false;
   // Charset gate first: hex digits, separators, and the dots of a trailing
   // embedded IPv4. Anything else (a hostname, a header injection) is out.
-  if (!/^[0-9a-f:.]+$/.test(value)) return false
-  if (value.includes(':::')) return false
+  if (!/^[0-9a-f:.]+$/.test(value)) return false;
+  if (value.includes(':::')) return false;
   // A dangling separator (`2001:db8::1:`) leaves an EMPTY trailing group that
   // is not part of a `::` compression — malformed, not an address.
-  if (value.endsWith(':') && !value.endsWith('::')) return false
-  if (value.startsWith(':') && !value.startsWith('::')) return false
-  const compressions = value.split('::').length - 1
-  if (compressions > 1) return false
-  const groups = value.split(':')
-  if (groups.length > 8) return false
+  if (value.endsWith(':') && !value.endsWith('::')) return false;
+  if (value.startsWith(':') && !value.startsWith('::')) return false;
+  const compressions = value.split('::').length - 1;
+  if (compressions > 1) return false;
+  const groups = value.split(':');
+  if (groups.length > 8) return false;
   for (let i = 0; i < groups.length; i += 1) {
-    const group = groups[i]
-    if (group === '') continue
+    const group = groups[i];
+    if (group === '') continue;
     if (group.includes('.')) {
       // An embedded IPv4 occupies the LAST two groups; anywhere else
       // (`1.2.3.4::1`) it is malformed.
-      if (i !== groups.length - 1) return false
-      if (!isIpv4(group)) return false
-      continue
+      if (i !== groups.length - 1) return false;
+      if (!isIpv4(group)) return false;
+      continue;
     }
-    if (!/^[0-9a-f]{1,4}$/.test(group)) return false
+    if (!/^[0-9a-f]{1,4}$/.test(group)) return false;
   }
   // Uncompressed form must be exactly 8 groups (a trailing embedded IPv4
   // occupies two, so 7 written groups is also complete).
   if (compressions === 0) {
-    const embedsIpv4 = groups[groups.length - 1]?.includes('.') ?? false
-    if (groups.length !== (embedsIpv4 ? 7 : 8)) return false
+    const embedsIpv4 = groups[groups.length - 1]?.includes('.') ?? false;
+    if (groups.length !== (embedsIpv4 ? 7 : 8)) return false;
   }
-  return true
+  return true;
 }
 
 /**
@@ -94,24 +94,24 @@ function isIpv6(value: string): boolean {
  * value is not a usable address.
  */
 export function normalizeIpForBucketKey(value: string): string | null {
-  if (typeof value !== 'string') return null
-  let candidate = value.trim()
-  if (candidate === '' || candidate.length > IP_BUCKET_KEY_MAX_LENGTH) return null
+  if (typeof value !== 'string') return null;
+  let candidate = value.trim();
+  if (candidate === '' || candidate.length > IP_BUCKET_KEY_MAX_LENGTH) return null;
 
   // `[2001:db8::1]` / `[::1]:443` — the bracketed forms a proxy emits so the
   // port is unambiguous.
   if (candidate.startsWith('[')) {
-    const close = candidate.indexOf(']')
-    if (close === -1) return null
-    const trailer = candidate.slice(close + 1)
-    if (trailer !== '' && !/^:\d{1,5}$/.test(trailer)) return null
-    candidate = candidate.slice(1, close)
+    const close = candidate.indexOf(']');
+    if (close === -1) return null;
+    const trailer = candidate.slice(close + 1);
+    if (trailer !== '' && !/^:\d{1,5}$/.test(trailer)) return null;
+    candidate = candidate.slice(1, close);
   }
 
   // `%eth0` / `%25eth0` scope id — host-local, never part of peer identity.
-  const zone = candidate.indexOf('%')
-  if (zone !== -1) candidate = candidate.slice(0, zone)
-  if (candidate === '') return null
+  const zone = candidate.indexOf('%');
+  if (zone !== -1) candidate = candidate.slice(0, zone);
+  if (candidate === '') return null;
 
   // UNBRACKETED `203.0.113.4:8080` — Azure App Service / Front Door and several
   // CDNs write the client hop that way. Rejecting it left the caller with NO
@@ -120,15 +120,15 @@ export function normalizeIpForBucketKey(value: string): string | null {
   // when the remainder is a valid IPv4; an unbracketed IPv6 with a bare port
   // (`::1:443`) is genuinely ambiguous — `:443` is equally a final group — so
   // that shape is left to the IPv6 path.
-  const portSplit = candidate.lastIndexOf(':')
+  const portSplit = candidate.lastIndexOf(':');
   if (portSplit > 0 && /^\d{1,5}$/.test(candidate.slice(portSplit + 1))) {
-    const head = candidate.slice(0, portSplit)
-    if (isIpv4(head)) candidate = head
+    const head = candidate.slice(0, portSplit);
+    if (isIpv4(head)) candidate = head;
   }
 
-  if (isIpv4(candidate)) return candidate
+  if (isIpv4(candidate)) return candidate;
 
-  const lowered = candidate.toLowerCase()
+  const lowered = candidate.toLowerCase();
 
   // IPv4-mapped IPv6 → the bare IPv4 (same peer, one bucket). EVERY spelling
   // is handled: the compressed `::ffff:1.2.3.4` that dual-stack listeners
@@ -138,9 +138,9 @@ export function normalizeIpForBucketKey(value: string): string | null {
   // produces — leading zeros in an IPv6 group are purely cosmetic, so all
   // three name the same peer. Matching only some of them would split one peer
   // across two buckets — the exact failure this module exists to prevent.
-  const mapped = /^(?:(?:0{1,4}:){5}|::)ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(lowered)
-  if (mapped) return isIpv4(mapped[1]) ? mapped[1] : null
+  const mapped = /^(?:(?:0{1,4}:){5}|::)ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(lowered);
+  if (mapped) return isIpv4(mapped[1]) ? mapped[1] : null;
 
-  if (isIpv6(lowered)) return lowered
-  return null
+  if (isIpv6(lowered)) return lowered;
+  return null;
 }

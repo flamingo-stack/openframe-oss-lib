@@ -1,9 +1,8 @@
-"use client";
+'use client';
 
-import React from 'react';
 import type { VideoTeaser } from '../../types/video-processing';
-import { VideoBitesStrip } from './video-bites-strip';
 import { DEFAULT_VIDEO_BITES_TITLE } from './video-bites-shared';
+import { VideoBitesStrip } from './video-bites-strip';
 
 /**
  * @deprecated Transitional shim — use `<VideoBitesStrip>` directly.
@@ -34,12 +33,5 @@ export function VideoBitesDisplay({
   filterPublished = true,
   showTitle = true,
 }: VideoBitesDisplayProps) {
-  return (
-    <VideoBitesStrip
-      bites={bites}
-      title={title}
-      filterPublished={filterPublished}
-      showTitle={showTitle}
-    />
-  );
+  return <VideoBitesStrip bites={bites} title={title} filterPublished={filterPublished} showTitle={showTitle} />;
 }

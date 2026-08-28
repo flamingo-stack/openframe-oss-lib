@@ -12,7 +12,7 @@ export {
   MessageSegmentAccumulator,
   createMessageSegmentAccumulator,
   type AccumulatorCallbacks,
-} from './message-segment-accumulator'
+} from './message-segment-accumulator';
 
 // Where an approval card renders — one rule for both live kernels, the history
 // replay, and hosts that sort cards between their own footer and the flow.
@@ -21,7 +21,7 @@ export {
   guideApprovalOrigin,
   approvalDisplaysInline,
   isGuideApprovalSegment,
-} from './approval-display'
+} from './approval-display';
 
 // Historical message processing
 export {
@@ -29,13 +29,10 @@ export {
   extractErrorMessages,
   processHistoricalMessagesWithErrors,
   decodeHistoricalMessageData,
-} from './process-historical-messages'
+} from './process-historical-messages';
 
 // Incomplete message state extraction
-export {
-  extractIncompleteMessageState,
-  extractIncompleteTailState,
-} from './extract-incomplete-message-state'
+export { extractIncompleteMessageState, extractIncompleteTailState } from './extract-incomplete-message-state';
 
 // History <-> realtime reconciliation
 export {
@@ -47,25 +44,22 @@ export {
   type MergeableChatMessage,
   type HistoryMergeInput,
   type HistoryPrependResult,
-} from './history-merge'
+} from './history-merge';
 
 // Tool call helpers
-export { getCommandText } from './tool-call-helpers'
+export { getCommandText } from './tool-call-helpers';
 
 // Chat-side click + navigation helpers
-export { CHIP_ACTION_BUTTON_CLASS } from './chip-action-class'
-export { chatChipClass, type ChipClassOptions } from './chip-styles'
+export { CHIP_ACTION_BUTTON_CLASS } from './chip-action-class';
+export { chatChipClass, type ChipClassOptions } from './chip-styles';
 export {
   NEW_TAB_FEATURES,
   isModifierClick,
   stripSameOriginToPath,
   resolveExternalNavigation,
   type ExternalNavResolution,
-} from './chat-nav-resolution'
-export {
-  handleChatNavClick,
-  type ChatNavClickInput,
-} from './nav-click-handler'
+} from './chat-nav-resolution';
+export { handleChatNavClick, type ChatNavClickInput } from './nav-click-handler';
 // The unified navigation-execution primitive — single source of truth for
 // new-tab/same-tab + internal/external + embed/host + the runtime→router→window
 // fallback. Every surface routes through it (handleChatNavClick is now a wrapper).
@@ -75,37 +69,23 @@ export {
   type ExecuteNavigationClickArgs,
   type ExecuteNavigationImperativeArgs,
   type NavClickEvent,
-} from './execute-navigation'
-export {
-  computeIsNewTab,
-  newTabAnchorAttrs,
-  buildAnchorProps,
-} from './nav-anchor-props'
-export { isCrossOriginUrl } from './is-cross-origin-url'
-export {
-  decideNewTab,
-  type DecideNewTabInput,
-  type NavSurface,
-  type RuntimeMode,
-} from './decide-new-tab'
+} from './execute-navigation';
+export { computeIsNewTab, newTabAnchorAttrs, buildAnchorProps } from './nav-anchor-props';
+export { isCrossOriginUrl } from './is-cross-origin-url';
+export { decideNewTab, type DecideNewTabInput, type NavSurface, type RuntimeMode } from './decide-new-tab';
 
 // Embed-surface auth moved to `utils/` (embed-proxy-auth-storage /
 // embed-authed-fetch) — import the Embed* names from
 // `@flamingo-stack/openframe-frontend-core/utils`.
 
 // Pure content helpers
-export { flattenAssistantContent } from './flatten-assistant-content'
-export {
-  SCROLL_ANCHOR,
-  type ScrollAnchor,
-  SCROLL_ANCHOR_WIRE_KEY,
-  parseScrollAnchor,
-} from './scroll-anchor'
+export { flattenAssistantContent } from './flatten-assistant-content';
+export { SCROLL_ANCHOR, type ScrollAnchor, SCROLL_ANCHOR_WIRE_KEY, parseScrollAnchor } from './scroll-anchor';
 export {
   AUTO_CONTINUATION_DIRECTIVE_PREFIX,
   buildAutoContinuationDirective,
   type BuildAutoContinuationOptions,
-} from './auto-continuation-directive'
+} from './auto-continuation-directive';
 
 // Slash-command + dispatch (lib-portable subset)
 export {
@@ -116,7 +96,7 @@ export {
   type CommandOverride,
   extractEntityIdFilter,
   buildDiscussAddendum,
-} from './slash-dispatch-utils'
+} from './slash-dispatch-utils';
 
 // Chat-attachment markdown formatter + strip parser
 export {
@@ -130,16 +110,16 @@ export {
   CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED,
   CHAT_ATTACHMENT_MARKDOWN_PATTERN,
   stripChatAttachmentMarkdown,
-} from './chat-attachment-markdown'
+} from './chat-attachment-markdown';
 
 // External app deep-links (chat surfaces)
-export { clickupTaskUrl } from './external-app-urls'
+export { clickupTaskUrl } from './external-app-urls';
 
 // Agent status → color scheme
-export { type ColorScheme, getStatusColorScheme } from './agent-status-message'
+export { type ColorScheme, getStatusColorScheme } from './agent-status-message';
 
 // ClickUp task-type label + canonical custom_item_id map
-export { getTaskTypeLabel, CUSTOM_ITEM_ID } from './clickup-task-type-utils'
+export { getTaskTypeLabel, CUSTOM_ITEM_ID } from './clickup-task-type-utils';
 
 // Compact-card class constants + safe-href guard
 export {
@@ -158,7 +138,7 @@ export {
   COMPACT_CARD_META_ROW,
   COMPACT_CARD_ROW_FILLER,
   safeHref,
-} from './compact-card-classes'
+} from './compact-card-classes';
 
 // Icon + source registries (chat surfaces). The icon-registry file is
 // the SINGLE source of truth for all icon-name → React-component lookup
@@ -171,17 +151,11 @@ export {
   normalizeIconKey,
   getDynamicIcon,
   type DynamicIconSize,
-} from './icon-registry'
+} from './icon-registry';
 // Library icon resolver — `icons-v2-generated`-backed, shared by the chat
 // empty-state chips, the slash-command autocomplete, AND the admin icon picker
 // (`ICON_OPTIONS`), so picked icons always display.
-export {
-  resolveIcon,
-  ICON_ALIASES,
-  ICON_OPTIONS,
-  type IconComponent,
-  type IconOption,
-} from './icon-library'
+export { resolveIcon, ICON_ALIASES, ICON_OPTIONS, type IconComponent, type IconOption } from './icon-library';
 export {
   SOURCE_ICON_NAMES,
   getSourceIconName,
@@ -189,29 +163,21 @@ export {
   getSourceLabel,
   DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID,
   defaultTableIdForDocumentType,
-} from './source-icons'
+} from './source-icons';
 export {
   type SourceRowInput,
   type SourceRowContext,
   type SourceRowCTA,
   resolveSourceRowCTA,
   resolveSourceIcon,
-} from './source-row-cta'
+} from './source-row-cta';
 
 // Post-fetch enrichment for the minimal ChatRef descriptor a
 // `[card://type:id]` marker produces (the wire ships no card metadata).
-export {
-  resolveFetchedCardHref,
-  readFetchedCardTitle,
-  type FetchedCardHrefInput,
-} from './resolve-fetched-card-href'
+export { resolveFetchedCardHref, readFetchedCardTitle, type FetchedCardHrefInput } from './resolve-fetched-card-href';
 
 // The ONE "Ask Mingo" prompt builder — shared by the SSE adapter, the NATS
 // adapter, and hosts that inject their own Mingo state (openframe-frontend).
-export {
-  buildDiscussPrompt,
-  type DiscussPromptRef,
-  type BuildDiscussPromptOptions,
-} from './discuss-ref-prompt'
+export { buildDiscussPrompt, type DiscussPromptRef, type BuildDiscussPromptOptions } from './discuss-ref-prompt';
 
-export * from './scripted-stream'
+export * from './scripted-stream';

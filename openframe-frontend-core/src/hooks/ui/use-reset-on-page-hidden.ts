@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect } from 'react';
 
 /**
  * Runs `reset` whenever the tab is hidden or the window loses focus — exactly the
@@ -20,13 +20,13 @@ import { useEffect } from 'react'
 export function useResetOnPageHidden(reset: () => void): void {
   useEffect(() => {
     const onVisibility = () => {
-      if (document.visibilityState === 'hidden') reset()
-    }
-    window.addEventListener('blur', reset)
-    document.addEventListener('visibilitychange', onVisibility)
+      if (document.visibilityState === 'hidden') reset();
+    };
+    window.addEventListener('blur', reset);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      window.removeEventListener('blur', reset)
-      document.removeEventListener('visibilitychange', onVisibility)
-    }
-  }, [reset])
+      window.removeEventListener('blur', reset);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [reset]);
 }

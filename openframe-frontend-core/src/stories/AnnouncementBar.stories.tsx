@@ -1,9 +1,9 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import type { Announcement } from '../types/announcement'
-import { AnnouncementBar } from '../components/announcement-bar'
-import { clearAnnouncementDismissals } from '../utils/announcement-storage'
-import { getAppType } from '../utils/app-config'
-import { EndpointsRuntimeContext, type EndpointsRuntime } from '../contexts/endpoints-runtime-context'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { AnnouncementBar } from '../components/announcement-bar';
+import { EndpointsRuntimeContext, type EndpointsRuntime } from '../contexts/endpoints-runtime-context';
+import type { Announcement } from '../types/announcement';
+import { clearAnnouncementDismissals } from '../utils/announcement-storage';
+import { getAppType } from '../utils/app-config';
 
 /**
  * Stories drive the bar through its real `initialAnnouncement` prop (the hub's
@@ -12,10 +12,10 @@ import { EndpointsRuntimeContext, type EndpointsRuntime } from '../contexts/endp
  * by a previous interaction so every story starts visible.
  */
 function clearDismissals() {
-  clearAnnouncementDismissals(getAppType())
+  clearAnnouncementDismissals(getAppType());
 }
 
-const now = new Date().toISOString()
+const now = new Date().toISOString();
 
 const baseAnnouncement: Announcement = {
   id: 'story-1',
@@ -26,7 +26,7 @@ const baseAnnouncement: Announcement = {
   is_active: true,
   created_at: now,
   updated_at: now,
-}
+};
 
 const meta = {
   title: 'Features/AnnouncementBar',
@@ -41,23 +41,23 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => {
-      clearDismissals()
-      return <Story />
+    Story => {
+      clearDismissals();
+      return <Story />;
     },
   ],
   tags: ['autodocs'],
-} satisfies Meta<typeof AnnouncementBar>
+} satisfies Meta<typeof AnnouncementBar>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Default announcement with an icon and description.
  */
 export const Default: Story = {
   args: { initialAnnouncement: baseAnnouncement },
-}
+};
 
 /**
  * Announcement with a CTA button.
@@ -81,7 +81,7 @@ export const WithCTA: Story = {
       cta_button_text_color: '#FFFFFF',
     },
   },
-}
+};
 
 /**
  * Non-dismissible announcement — `dismissible={false}` drops the close (X)
@@ -101,7 +101,7 @@ export const WithoutCloseButton: Story = {
       cta_target: '_blank',
     },
   },
-}
+};
 
 /**
  * Announcement with a CTA button that opens in the same tab.
@@ -121,7 +121,7 @@ export const WithCTASameTab: Story = {
       cta_target: '_self',
     },
   },
-}
+};
 
 /**
  * Dark background: text flips to the light shade via pickReadableTextColor.
@@ -137,7 +137,7 @@ export const DarkBackground: Story = {
       icon_name: 'megaphone',
     },
   },
-}
+};
 
 /**
  * Announcement with a blue background.
@@ -153,7 +153,7 @@ export const BlueBackground: Story = {
       icon_name: 'megaphone',
     },
   },
-}
+};
 
 /**
  * Announcement with a green background.
@@ -169,7 +169,7 @@ export const GreenBackground: Story = {
       icon_name: 'bell',
     },
   },
-}
+};
 
 /**
  * Announcement with OpenFrame logo icon.
@@ -191,7 +191,7 @@ export const WithOpenFrameLogo: Story = {
       cta_button_text_color: '#FFD951',
     },
   },
-}
+};
 
 /**
  * Announcement with a PNG icon.
@@ -207,7 +207,7 @@ export const WithPNGIcon: Story = {
       icon_url: 'https://placehold.co/32x32/1a1a1a/white?text=OF',
     },
   },
-}
+};
 
 /**
  * Long title and description to test truncation.
@@ -217,7 +217,8 @@ export const LongContent: Story = {
     initialAnnouncement: {
       ...baseAnnouncement,
       id: 'story-long',
-      title: 'This is a very long announcement title that should be truncated on smaller screens to prevent layout issues',
+      title:
+        'This is a very long announcement title that should be truncated on smaller screens to prevent layout issues',
       description:
         'This is an extremely long description that goes into great detail about the announcement. It should be truncated on the desktop view and hidden on mobile view to keep the bar compact and readable.',
       background_color: '#FCA5A5',
@@ -228,7 +229,7 @@ export const LongContent: Story = {
       cta_target: '_self',
     },
   },
-}
+};
 
 /**
  * previewMode, the admin live-preview path: render-only, inert dismiss,
@@ -244,7 +245,7 @@ export const PreviewMode: Story = {
     },
     previewMode: true,
   },
-}
+};
 
 /**
  * No active announcement: the bar renders nothing.
@@ -252,7 +253,7 @@ export const PreviewMode: Story = {
 export const NoAnnouncement: Story = {
   args: { initialAnnouncement: null },
   decorators: [
-    (Story) => (
+    Story => (
       <div>
         <Story />
         <p className="p-4 text-sm text-ods-text-secondary">
@@ -261,7 +262,7 @@ export const NoAnnouncement: Story = {
       </div>
     ),
   ],
-}
+};
 
 /**
  * Client-only mode (no SSR), the react-embedding-example structure: the
@@ -274,15 +275,15 @@ const embedEndpoints: EndpointsRuntime = {
   announcementsUrl: '/content/api/announcements/active',
   accessCode: { validateUrl: '/content/api/validate-access-code', consumeUrl: '/content/api/consume-access-code' },
   contactUrl: '/content/api/contact',
-}
+};
 
 export const ClientOnlyEmbed: Story = {
   args: {},
   decorators: [
-    (Story) => {
-      const originalFetch = window.fetch
+    Story => {
+      const originalFetch = window.fetch;
       window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-        const requestUrl = typeof input === 'string' ? input : input.toString()
+        const requestUrl = typeof input === 'string' ? input : input.toString();
         if (requestUrl.includes('/content/api/announcements/active')) {
           return new Response(
             JSON.stringify({
@@ -294,15 +295,15 @@ export const ClientOnlyEmbed: Story = {
               },
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
-          )
+          );
         }
-        return originalFetch(input, init)
-      }) as typeof window.fetch
+        return originalFetch(input, init);
+      }) as typeof window.fetch;
       return (
         <EndpointsRuntimeContext.Provider value={embedEndpoints}>
           <Story />
         </EndpointsRuntimeContext.Provider>
-      )
+      );
     },
   ],
-}
+};

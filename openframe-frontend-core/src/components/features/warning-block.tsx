@@ -1,28 +1,28 @@
-'use client'
+'use client';
 
-import { AlertTriangle } from 'lucide-react'
-import React from 'react'
-import { cn } from '../../utils/cn'
+import { AlertTriangle } from 'lucide-react';
+import type React from 'react';
+import { cn } from '../../utils/cn';
 
 export interface WarningBlockProps {
   /** Text rendered inside the highlighted warning banner header. */
-  title: React.ReactNode
+  title: React.ReactNode;
   /**
    * Icon shown at the start of the banner. Defaults to a triangle alert icon.
    * Pass `null` to hide the icon entirely.
    */
-  icon?: React.ReactNode
+  icon?: React.ReactNode;
   /**
    * Body content rendered below the banner — description paragraphs, one or more
    * `PathsDisplay` lists, command rows, etc. Fully composable so a single block
    * can mix text and multiple path groups (see the New Device warning blocks).
    */
-  children?: React.ReactNode
+  children?: React.ReactNode;
   /** Extra classes for the outer card container. */
-  className?: string
+  className?: string;
 }
 
-const DEFAULT_ICON = <AlertTriangle className="h-6 w-6" />
+const DEFAULT_ICON = <AlertTriangle className="h-6 w-6" />;
 
 /**
  * WarningBlock - a card with a highlighted "attention / warning" banner header
@@ -38,17 +38,12 @@ const DEFAULT_ICON = <AlertTriangle className="h-6 w-6" />
  */
 export function WarningBlock({ title, icon = DEFAULT_ICON, children, className }: WarningBlockProps) {
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-3 rounded-[6px] border border-ods-border bg-ods-card p-4',
-        className
-      )}
-    >
+    <div className={cn('flex flex-col gap-3 rounded-[6px] border border-ods-border bg-ods-card p-4', className)}>
       <div className="flex items-start gap-4 overflow-hidden rounded-[6px] bg-ods-warning-secondary p-3 text-ods-warning">
         {icon != null && <span className="shrink-0">{icon}</span>}
         <p className="min-w-0 flex-1 text-h3">{title}</p>
       </div>
       {children}
     </div>
-  )
+  );
 }

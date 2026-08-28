@@ -13,16 +13,16 @@
  * under the test's control. (The real-mermaid security fixture lives in
  * ./mermaid-security.test.ts and must stay unmocked, hence a separate file.)
  */
-import { render, act } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, act, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 interface Deferred {
-  chart: string
-  resolve: (value: { svg: string }) => void
-  reject: (err: Error) => void
+  chart: string;
+  resolve: (value: { svg: string }) => void;
+  reject: (err: Error) => void;
 }
 
-const renders: Deferred[] = []
+const renders: Deferred[] = [];
 
 vi.mock('mermaid', () => ({
   default: {
@@ -30,13 +30,13 @@ vi.mock('mermaid', () => ({
     render: vi.fn(
       (_id: string, chart: string) =>
         new Promise<{ svg: string }>((resolve, reject) => {
-          renders.push({ chart, resolve, reject })
+          renders.push({ chart, resolve, reject });
         }),
     ),
   },
-}))
+}));
 
-import { MermaidDiagram } from '../mermaid-diagram'
+import { MermaidDiagram } from '../mermaid-diagram';
 
 /**
  * Let the mocked dynamic import + the resolved promise chain flush.
@@ -55,68 +55,62 @@ import { MermaidDiagram } from '../mermaid-diagram'
 const flushUntil = async (done: () => boolean, what: string) => {
   for (let i = 0; i < 50; i++) {
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
-    if (done()) return
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    if (done()) return;
   }
-  throw new Error(`timed out waiting for ${what}`)
-}
+  throw new Error(`timed out waiting for ${what}`);
+};
 
 /** Settle pending state updates when there is no specific condition to await. */
 const flush = async () => {
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0))
-  })
-}
+    await new Promise(resolve => setTimeout(resolve, 0));
+  });
+};
 
 /** Wait until `mermaid.render` has been called exactly `n` times. */
-const flushRenders = (n: number) =>
-  flushUntil(() => renders.length >= n, `${n} mermaid.render call(s)`)
+const flushRenders = (n: number) => flushUntil(() => renders.length >= n, `${n} mermaid.render call(s)`);
 
-const svgOf = (container: HTMLElement) =>
-  container.querySelector('.mermaid-svg-container')?.innerHTML ?? ''
+const svgOf = () => screen.queryByTestId('mermaid-svg-container')?.innerHTML ?? '';
 
 describe('MermaidDiagram stale-render guard', () => {
   beforeEach(() => {
-    renders.length = 0
-  })
+    renders.length = 0;
+  });
 
   it('ignores an earlier render that resolves after a newer chart', async () => {
-    const view = render(<MermaidDiagram chart="graph TD\n A-->B" />)
-    await flushRenders(1)
-    view.rerender(<MermaidDiagram chart="graph TD\n A-->B\n B-->C" />)
-    await flushRenders(2)
+    const view = render(<MermaidDiagram chart="graph TD\n A-->B" />);
+    await flushRenders(1);
+    view.rerender(<MermaidDiagram chart="graph TD\n A-->B\n B-->C" />);
+    await flushRenders(2);
 
-    // Newer render lands first, then the abandoned earlier one.
-    await act(async () => {
-      renders[1]!.resolve({ svg: '<svg id="new"></svg>' })
-    })
-    await act(async () => {
-      renders[0]!.resolve({ svg: '<svg id="stale"></svg>' })
-    })
-    await flush()
+    // Newer render lands first, then the abandoned earlier one. Settling a
+    // deferred is not itself a React update — the `setSvg` happens in the
+    // promise continuation, which `flush()` runs inside `act`.
+    renders[1].resolve({ svg: '<svg id="new"></svg>' });
+    await flush();
+    renders[0].resolve({ svg: '<svg id="stale"></svg>' });
+    await flush();
 
-    expect(svgOf(view.container)).toContain('id="new"')
-    expect(svgOf(view.container)).not.toContain('id="stale"')
-  })
+    expect(svgOf()).toContain('id="new"');
+    expect(svgOf()).not.toContain('id="stale"');
+  });
 
   it('ignores a late failure from an abandoned render', async () => {
-    const view = render(<MermaidDiagram chart="graph TD\n A-->B" />)
-    await flushRenders(1)
-    view.rerender(<MermaidDiagram chart="graph TD\n A-->B\n B-->C" />)
-    await flushRenders(2)
+    const view = render(<MermaidDiagram chart="graph TD\n A-->B" />);
+    await flushRenders(1);
+    view.rerender(<MermaidDiagram chart="graph TD\n A-->B\n B-->C" />);
+    await flushRenders(2);
 
-    await act(async () => {
-      renders[1]!.resolve({ svg: '<svg id="new"></svg>' })
-    })
-    await act(async () => {
-      renders[0]!.reject(new Error('Diagram rendering timed out after 15000ms'))
-    })
-    await flush()
+    renders[1].resolve({ svg: '<svg id="new"></svg>' });
+    await flush();
+    renders[0].reject(new Error('Diagram rendering timed out after 15000ms'));
+    await flush();
 
-    expect(view.container.textContent).not.toContain('Diagram Error')
-    expect(svgOf(view.container)).toContain('id="new"')
-  })
+    expect(view.container.textContent).not.toContain('Diagram Error');
+    expect(svgOf()).toContain('id="new"');
+  });
 
   /**
    * The error state must not be STICKY. This is the streaming hot path, not an
@@ -127,25 +121,21 @@ describe('MermaidDiagram stale-render guard', () => {
    * diagram never appears even though its render succeeded.
    */
   it('recovers from a transient failure once a later render succeeds', async () => {
-    const view = render(<MermaidDiagram chart="graph TD" />)
-    await flushRenders(1)
+    const view = render(<MermaidDiagram chart="graph TD" />);
+    await flushRenders(1);
 
     // Partial chart → parse error, exactly what a mid-stream prefix produces.
-    await act(async () => {
-      renders[0]!.reject(new Error('Parse error on line 1'))
-    })
-    await flush()
-    expect(view.container.textContent).toContain('Diagram Error')
+    renders[0].reject(new Error('Parse error on line 1'));
+    await flush();
+    expect(view.container.textContent).toContain('Diagram Error');
 
     // The next delta completes the chart and renders cleanly.
-    view.rerender(<MermaidDiagram chart="graph TD\n A-->B" />)
-    await flushRenders(2)
-    await act(async () => {
-      renders[1]!.resolve({ svg: '<svg id="settled"></svg>' })
-    })
-    await flush()
+    view.rerender(<MermaidDiagram chart="graph TD\n A-->B" />);
+    await flushRenders(2);
+    renders[1].resolve({ svg: '<svg id="settled"></svg>' });
+    await flush();
 
-    expect(view.container.textContent).not.toContain('Diagram Error')
-    expect(svgOf(view.container)).toContain('id="settled"')
-  })
-})
+    expect(view.container.textContent).not.toContain('Diagram Error');
+    expect(svgOf()).toContain('id="settled"');
+  });
+});

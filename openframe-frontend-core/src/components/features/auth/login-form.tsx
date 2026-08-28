@@ -1,39 +1,39 @@
-'use client'
+'use client';
 
-import type * as React from 'react'
-import { cn } from '../../../utils/cn'
-import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
-import { Input } from '../../ui/input'
-import type { AuthSsoProvider } from './sso-providers'
-import { SsoProviderButtons } from './sso-providers'
+import type { KeyboardEvent } from 'react';
+import { useDeferredError } from '../../../hooks/ui/use-deferred-error';
+import { cn } from '../../../utils/cn';
+import { Input } from '../../ui/input';
+import type { AuthSsoProvider } from './sso-providers';
+import { SsoProviderButtons } from './sso-providers';
 
 export interface LoginFormProps {
   /** Controlled email value */
-  email: string
-  onEmailChange: (value: string) => void
+  email: string;
+  onEmailChange: (value: string) => void;
   /** Enter-key handler on the email field (optional). */
-  onSubmit?: () => void
-  emailPlaceholder?: string
-  loading?: boolean
-  disabled?: boolean
+  onSubmit?: () => void;
+  emailPlaceholder?: string;
+  loading?: boolean;
+  disabled?: boolean;
   errors?: {
-    email?: string
-  }
+    email?: string;
+  };
   /** Informational status under the email field (e.g. live tenant discovery). `errors.email` wins. */
-  emailStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' }
+  emailStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' };
   /**
    * SSO providers rendered below the email field. Always visible; gate
    * clickability with `ssoDisabled` / `ssoEnabledProviders`.
    */
-  ssoProviders: AuthSsoProvider[]
-  onSsoClick?: (provider: AuthSsoProvider) => void
+  ssoProviders: AuthSsoProvider[];
+  onSsoClick?: (provider: AuthSsoProvider) => void;
   /** Disables every provider button (e.g. until the email passes discovery). */
-  ssoDisabled?: boolean
+  ssoDisabled?: boolean;
   /** When set, only these providers are clickable; the rest stay disabled. */
-  ssoEnabledProviders?: AuthSsoProvider[]
+  ssoEnabledProviders?: AuthSsoProvider[];
   /** Verb prefix for provider buttons, e.g. "Continue with". Ignored for "openframe". */
-  ssoActionLabel?: string
-  className?: string
+  ssoActionLabel?: string;
+  className?: string;
 }
 
 /**
@@ -58,16 +58,16 @@ export function LoginForm({
   ssoActionLabel = 'Continue with',
   className,
 }: LoginFormProps) {
-  const fieldDisabled = disabled || loading
+  const fieldDisabled = disabled || loading;
 
   // Validation messages are deferred while the user is typing (shown on blur or after a pause).
-  const emailErr = useDeferredError(errors?.email, email)
+  const emailErr = useDeferredError(errors?.email, email);
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldDisabled) {
-      onSubmit?.()
+      onSubmit?.();
     }
-  }
+  };
 
   return (
     <div
@@ -78,8 +78,8 @@ export function LoginForm({
     >
       {/* Header */}
       <div className="flex flex-col">
-        <h1 className="text-h2 text-ods-text-primary tracking-[-0.64px]">Login to OpenFrame</h1>
-        <p className="text-h4 text-ods-text-secondary">Enter your email to access your organization.</p>
+        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">Login to OpenFrame</h1>
+        <p className="text-ods-text-secondary text-h4">Enter your email to access your organization.</p>
       </div>
 
       {/* Email */}
@@ -92,7 +92,7 @@ export function LoginForm({
         errorVariant={emailErr.error ? 'error' : emailStatus?.variant}
         disabled={fieldDisabled}
         onBlur={emailErr.onBlur}
-        onChange={(event) => onEmailChange(event.target.value)}
+        onChange={event => onEmailChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
 
@@ -105,5 +105,5 @@ export function LoginForm({
         enabledProviders={ssoEnabledProviders}
       />
     </div>
-  )
+  );
 }
