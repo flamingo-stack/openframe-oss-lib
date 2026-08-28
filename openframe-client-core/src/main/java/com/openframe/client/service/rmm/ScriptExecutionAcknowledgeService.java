@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -18,31 +19,43 @@ public class ScriptExecutionAcknowledgeService {
     private final ScriptExecutionRepository scriptExecutionRepository;
 
     public void acknowledge(ScriptExecutionAcknowledgeMessage ack) {
-        if (ack.getExecutionId() == null || ack.getMachineId() == null || ack.getScriptId() == null) {
-            log.warn("Execution ack missing ids: executionId={} machineId={} scriptId={} — ignoring",
-                    ack.getExecutionId(), ack.getMachineId(), ack.getScriptId());
+        if (isIncomplete(ack)) {
+            log.warn("Execution ack missing ids: executionId={} machineId={} scriptIds={} — ignoring",
+                    ack.getExecutionId(), ack.getMachineId(), ack.getScriptIds());
             return;
         }
-        scriptExecutionRepository
-                .findByMachineIdAndExecutionIdAndScriptId(ack.getMachineId(), ack.getExecutionId(), ack.getScriptId())
-                .ifPresentOrElse(row -> flipToRunning(row, ack), () -> logMissingLeaf(ack));
+
+        List<ScriptExecution> leaves = scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptIdIn(
+                ack.getMachineId(), ack.getExecutionId(), ack.getScriptIds());
+        if (leaves.isEmpty()) {
+            log.warn("Execution ack: no leaf for executionId={} machineId={} scriptIds={}",
+                    ack.getExecutionId(), ack.getMachineId(), ack.getScriptIds());
+            return;
+        }
+
+        List<ScriptExecution> queued = leaves.stream()
+                .filter(row -> row.getStatus() == ExecutionStatus.QUEUED)
+                .toList();
+        if (queued.isEmpty()) {
+            log.debug("Execution ack: no QUEUED leaf to flip (already acked/resolved) executionId={} machineId={} scriptIds={}",
+                    ack.getExecutionId(), ack.getMachineId(), ack.getScriptIds());
+            return;
+        }
+
+        Instant now = Instant.now();
+        queued.forEach(row -> flipToRunning(row, now));
+        scriptExecutionRepository.saveAll(queued);
+        log.info("Execution ack: QUEUED→RUNNING for {} leaf(s) executionId={} machineId={} scriptIds={}",
+                queued.size(), ack.getExecutionId(), ack.getMachineId(), ack.getScriptIds());
     }
 
-    private void flipToRunning(ScriptExecution row, ScriptExecutionAcknowledgeMessage ack) {
-        if (row.getStatus() != ExecutionStatus.QUEUED) {
-            log.debug("Execution ack: leaf not QUEUED (status={}) — no flip executionId={} scriptId={} machineId={}",
-                    row.getStatus(), ack.getExecutionId(), ack.getScriptId(), ack.getMachineId());
-            return;
-        }
+    private boolean isIncomplete(ScriptExecutionAcknowledgeMessage ack) {
+        return ack.getExecutionId() == null || ack.getMachineId() == null
+                || ack.getScriptIds() == null || ack.getScriptIds().isEmpty();
+    }
+
+    private void flipToRunning(ScriptExecution row, Instant now) {
         row.setStatus(ExecutionStatus.RUNNING);
-        row.setStatusChangedAt(Instant.now());
-        scriptExecutionRepository.save(row);
-        log.info("Execution ack: QUEUED→RUNNING executionId={} scriptId={} machineId={}",
-                ack.getExecutionId(), ack.getScriptId(), ack.getMachineId());
-    }
-
-    private void logMissingLeaf(ScriptExecutionAcknowledgeMessage ack) {
-        log.warn("Execution ack: no leaf for executionId={} machineId={} scriptId={}",
-                ack.getExecutionId(), ack.getMachineId(), ack.getScriptId());
+        row.setStatusChangedAt(now);
     }
 }

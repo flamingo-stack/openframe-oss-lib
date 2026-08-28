@@ -43,6 +43,30 @@ class CustomScriptExecutionRepositoryImplReadPreferenceTest {
     }
 
     @Test
+    @DisplayName("batch ack lookup (findBy machine+execution+scriptId IN) reads from PRIMARY, scoped to the delivery + scriptIds")
+    void findLeavesForAck_readsFromPrimary() {
+        when(mongoTemplate.find(any(Query.class), eq(ScriptExecution.class))).thenReturn(List.of());
+
+        repo.findByMachineIdAndExecutionIdAndScriptIdIn("m-1", "exec-1", List.of("script-1", "script-2"));
+
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(captor.capture(), eq(ScriptExecution.class));
+        Query q = captor.getValue();
+        assertThat(q.getReadPreference()).isEqualTo(ReadPreference.primary());
+        Document qo = q.getQueryObject();
+        assertThat(qo.get("machineId")).isEqualTo("m-1");
+        assertThat(qo.get("executionId")).isEqualTo("exec-1");
+        assertThat(((Document) qo.get("scriptId")).get("$in")).isEqualTo(List.of("script-1", "script-2"));
+    }
+
+    @Test
+    @DisplayName("batch ack lookup short-circuits to empty on empty scriptIds — no Mongo query")
+    void findLeavesForAck_emptyScriptIds_shortCircuits() {
+        assertThat(repo.findByMachineIdAndExecutionIdAndScriptIdIn("m-1", "exec-1", List.of())).isEmpty();
+        verify(mongoTemplate, org.mockito.Mockito.never()).find(any(Query.class), eq(ScriptExecution.class));
+    }
+
+    @Test
     @DisplayName("header aggregation (countLeavesByStatus) counts QUEUED + RUNNING (in-progress) then FAILED from PRIMARY, scoped to (tenant, execution)")
     void countLeavesByStatus_countsFromPrimary() {
         when(mongoTemplate.count(any(Query.class), eq(ScriptExecution.class))).thenReturn(2L, 3L, 1L);   // QUEUED, RUNNING, FAILED
