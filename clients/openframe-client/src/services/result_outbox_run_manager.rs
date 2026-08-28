@@ -75,7 +75,8 @@ impl<P: ResultPublisher + 'static> ResultOutboxRunManager<P> {
                         continue;
                     }
 
-                    match timeout(publish_timeout, publisher.publish_raw(&subject, &bytes)).await {
+                    match timeout(publish_timeout, publisher.publish_acked(&subject, &bytes)).await
+                    {
                         Ok(Ok(())) => {
                             if let Err(e) = store.remove(key).await {
                                 warn!(error = %e, "Delivered result but failed to remove from outbox");

@@ -23,9 +23,9 @@ pub mod tool_version_overrides;
 pub mod update_state;
 
 pub use execution::{
-    CommandMessage, ExecutionMessage, ExecutionRequest, PrivilegeLevel, RmmResult, ScriptEnvVar,
-    ScriptMessage, ScriptScheduleExecutionItem, ScriptScheduleExecutionMessage, ScriptShell,
-    ScriptSpec,
+    CommandMessage, ExecutionAck, ExecutionMessage, ExecutionRequest, PrivilegeLevel, RmmResult,
+    ScriptEnvVar, ScriptMessage, ScriptScheduleExecutionItem, ScriptScheduleExecutionMessage,
+    ScriptShell, ScriptSpec,
 };
 
 pub use agent_configuration::AgentConfiguration;
