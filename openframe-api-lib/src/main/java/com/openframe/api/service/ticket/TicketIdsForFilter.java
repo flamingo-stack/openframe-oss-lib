@@ -20,7 +20,7 @@ import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Component
 @RequiredArgsConstructor
-public class TicketIdRestrictionResolver {
+public class TicketIdsForFilter {
 
     private final TicketTagService ticketTagService;
     private final NotificationReadStateRepository readStateRepository;

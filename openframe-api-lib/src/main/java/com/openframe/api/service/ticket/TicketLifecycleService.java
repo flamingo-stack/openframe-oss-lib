@@ -51,7 +51,7 @@ public class TicketLifecycleService {
     private final TicketTransitionPolicyValidator transitionPolicy;
     private final TenantIdProvider tenantIdProvider;
     private final TicketTagService ticketTagService;
-    private final TicketIdRestrictionResolver ticketIdRestrictionResolver;
+    private final TicketIdsForFilter ticketIdsForFilter;
     private final TicketResolverStamp ticketResolverStamp;
     private final TicketStatusHistoryService historyService;
     private final List<TicketEventListener> listeners;
@@ -217,7 +217,7 @@ public class TicketLifecycleService {
 
         String resolvedId = resolved.getId();
         TicketQueryFilter queryFilter = buildArchiveFilter(resolvedId, filterInput);
-        List<String> restrictToTicketIds = ticketIdRestrictionResolver.resolve(principal, filterInput);
+        List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filterInput);
 
         Query idsQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
         List<String> resolvedIds = ticketRepository.findTicketsWithCursor(idsQuery, null, 0, "order", "ASC")

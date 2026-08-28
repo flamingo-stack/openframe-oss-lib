@@ -65,7 +65,7 @@ public class TicketService {
     private final TicketRepository ticketRepository;
     private final TicketNumberService ticketNumberService;
     private final TicketTagService ticketTagService;
-    private final TicketIdRestrictionResolver ticketIdRestrictionResolver;
+    private final TicketIdsForFilter ticketIdsForFilter;
     private final MachineRepository machineRepository;
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
@@ -547,7 +547,7 @@ public class TicketService {
     private Query buildTicketQuery(AuthPrincipal principal, TicketFilterInput filter,
                                    String search, String ownerMachineId) {
         TicketQueryFilter queryFilter = toQueryFilter(filter);
-        List<String> restrictToTicketIds = ticketIdRestrictionResolver.resolve(principal, filter);
+        List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filter);
         return ticketRepository.buildTicketQuery(queryFilter, search, restrictToTicketIds, ownerMachineId);
     }
 
