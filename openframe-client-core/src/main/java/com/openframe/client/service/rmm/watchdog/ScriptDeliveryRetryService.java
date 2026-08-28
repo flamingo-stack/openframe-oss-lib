@@ -125,7 +125,6 @@ public class ScriptDeliveryRetryService {
         if (failed.isEmpty()) {
             return;
         }
-        // The delivery.failed metric is recorded per-reason at the fail site (exhausted / offline).
         scriptExecutionRepository.saveAll(failed);
         headerWatchdogService.finalizeAffectedHeaders(failed);
     }
