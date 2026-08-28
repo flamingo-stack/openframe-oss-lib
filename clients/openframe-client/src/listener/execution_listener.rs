@@ -8,8 +8,11 @@ use tokio::sync::Notify;
 use tokio::time::Duration;
 use tracing::{error, info, warn};
 
-use crate::config::update_config::RECONNECTION_DELAY_MS;
-use crate::models::{ExecutionMessage, ExecutionRequest, RmmResult};
+use crate::config::update_config::{
+    DEGRADED_PUBLISH_INITIAL_BACKOFF_MS, DEGRADED_PUBLISH_MAX_ATTEMPTS,
+    DEGRADED_PUBLISH_MAX_BACKOFF_MS, RECONNECTION_DELAY_MS,
+};
+use crate::models::{ExecutionAck, ExecutionMessage, ExecutionRequest, RmmResult};
 use crate::services::execution_service::ExecutionService;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
@@ -17,6 +20,8 @@ use crate::services::result_store::{
     entry_key, now_secs, payload_limit, JournalRecord, ResultStore,
 };
 use crate::services::AgentConfigurationService;
+
+const EXECUTION_ACK_KIND: &str = "execution.acknowledge";
 
 pub struct ExecutionListener<M> {
     nats_connection_manager: NatsConnectionManager,
@@ -131,6 +136,9 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
         let requests = parsed.to_requests();
         info!(kind = M::KIND, execution_id = %execution_id, schedule_id = %schedule_id, scripts = requests.len(), "Execution request received");
 
+        self.acknowledge_receipt(machine_id, &execution_id, parsed.schedule_id(), &requests)
+            .await;
+
         let result_subject = format!("machine.{}.{}.result", machine_id, M::RESULT_KIND);
 
         if M::DURABLE && self.result_store.enabled() {
@@ -147,12 +155,42 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
                 let script_id = request.script_id.unwrap_or("-").to_string();
                 let result = self.execution_service.execute(&request, machine_id).await;
                 log_finished(&execution_id, &schedule_id, &script_id, &result);
-                self.publish_result(&result_subject, &result, &execution_id, &script_id)
-                    .await;
+                let key = entry_key(request.execution_id, request.script_id);
+                let bytes = self.encode_for_publish(&result).await;
+                self.enqueue_or_send(key, &result_subject, bytes).await;
             }
         }
 
         Ok(())
+    }
+
+    async fn acknowledge_receipt(
+        &self,
+        machine_id: &str,
+        execution_id: &str,
+        schedule_id: Option<&str>,
+        requests: &[ExecutionRequest<'_>],
+    ) {
+        let ack = ExecutionAck {
+            execution_id: execution_id.to_string(),
+            machine_id: machine_id.to_string(),
+            schedule_id: schedule_id.map(str::to_string),
+            script_ids: requests
+                .iter()
+                .filter_map(|r| r.script_id)
+                .map(str::to_string)
+                .collect(),
+        };
+        let bytes = match serde_json::to_vec(&ack) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                error!(kind = M::KIND, execution_id = %execution_id, error = %e, "Failed to serialize execution ack");
+                return;
+            }
+        };
+        let subject = format!("machine.{}.{}", machine_id, EXECUTION_ACK_KIND);
+        self.enqueue_or_send(format!("ack:{execution_id}"), &subject, bytes)
+            .await;
     }
 
     async fn encode_for_publish(&self, result: &RmmResult) -> Vec<u8> {
@@ -160,20 +198,38 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
         ResultStore::encode_result(result, limit)
     }
 
-    async fn publish_result(
-        &self,
-        subject: &str,
-        result: &RmmResult,
-        execution_id: &str,
-        script_id: &str,
-    ) {
-        let bytes = self.encode_for_publish(result).await;
-        if let Err(e) = self
-            .nats_message_publisher
-            .publish_raw(subject, &bytes)
-            .await
-        {
-            error!(kind = M::KIND, execution_id = %execution_id, script_id = %script_id, error = %e, "Failed to publish result");
+    async fn enqueue_or_send(&self, key: String, subject: &str, bytes: Vec<u8>) {
+        if self.result_store.enabled() {
+            match self
+                .result_store
+                .enqueue(key, subject.to_string(), bytes)
+                .await
+            {
+                Ok(()) => self.flush_notify.notify_one(),
+                Err(e) => {
+                    error!(kind = M::KIND, subject, error = %e, "Failed to enqueue outbound message, dropping")
+                }
+            }
+        } else {
+            let publisher = self.nats_message_publisher.clone();
+            let subject = subject.to_string();
+            tokio::spawn(async move {
+                let max_backoff = Duration::from_millis(DEGRADED_PUBLISH_MAX_BACKOFF_MS);
+                let mut backoff = Duration::from_millis(DEGRADED_PUBLISH_INITIAL_BACKOFF_MS);
+                for attempt in 1..=DEGRADED_PUBLISH_MAX_ATTEMPTS {
+                    match publisher.publish_acked(&subject, &bytes).await {
+                        Ok(()) => return,
+                        Err(e) => {
+                            warn!(kind = M::KIND, subject = %subject, attempt, error = %e, "Degraded publish failed, retrying in memory");
+                            if attempt < DEGRADED_PUBLISH_MAX_ATTEMPTS {
+                                tokio::time::sleep(backoff).await;
+                                backoff = (backoff * 2).min(max_backoff);
+                            }
+                        }
+                    }
+                }
+                error!(kind = M::KIND, subject = %subject, "Degraded publish gave up after retries, message lost");
+            });
         }
     }
 
@@ -247,7 +303,7 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
                 let bytes = self.encode_for_publish(&result).await;
                 match self
                     .nats_message_publisher
-                    .publish_raw(result_subject, &bytes)
+                    .publish_acked(result_subject, &bytes)
                     .await
                 {
                     Ok(()) => {
@@ -277,8 +333,9 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
             let script_id = request.script_id.unwrap_or("-").to_string();
             let result = self.execution_service.execute(&request, machine_id).await;
             log_finished(execution_id, schedule_id, &script_id, &result);
-            self.publish_result(result_subject, &result, execution_id, &script_id)
-                .await;
+            let key = entry_key(request.execution_id, request.script_id);
+            let bytes = self.encode_for_publish(&result).await;
+            self.enqueue_or_send(key, result_subject, bytes).await;
         }
     }
 }
