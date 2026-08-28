@@ -187,7 +187,12 @@ public class NotificationReadStateService {
         List<NotificationReadState> unreadRows = repository.findByRecipientIdAndRecipientTypeAndEntity(
                 recipientId, recipientType, entityType, entityId, ReadStatus.UNREAD, tenantId);
         List<String> unreadIds = notificationIds(unreadRows);
-        long flipped = repository.markEntityAsRead(tenantId, recipientId, recipientType, entityType, entityId);
+        if (unreadIds.isEmpty()) {
+            return 0L;
+        }
+        // Flip the snapshot, not the entity: whatever turns read here is exactly what gets published,
+        // so no notification can end up read with its push banner still on someone's phone.
+        long flipped = repository.markAsReadByIds(tenantId, recipientId, recipientType, unreadIds);
         publish(recipientId, recipientType, unreadIds, NotificationReadEvent.Transition.READ);
         return flipped;
     }

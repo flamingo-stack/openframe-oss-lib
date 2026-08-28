@@ -93,11 +93,12 @@ public interface NotificationReadStateRepository
                                                                           ReadStatus status,
                                                                           String tenantId);
 
-    @Query("{ 'tenantId': ?0, 'recipientId': ?1, 'recipientType': ?2, 'entityType': ?3, 'entityId': ?4, 'status': 'UNREAD' }")
+    // Flips exactly the ids the caller snapshotted, never "everything still unread on that entity":
+    // a notification arriving mid-call would otherwise turn read without anyone retracting its push.
+    @Query("{ 'tenantId': ?0, 'recipientId': ?1, 'recipientType': ?2, 'notificationId': { '$in': ?3 }, 'status': 'UNREAD' }")
     @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
-    long markEntityAsRead(String tenantId,
-                          String recipientId,
-                          RecipientType recipientType,
-                          NotificationEntityType entityType,
-                          String entityId);
+    long markAsReadByIds(String tenantId,
+                         String recipientId,
+                         RecipientType recipientType,
+                         Collection<String> notificationIds);
 }
