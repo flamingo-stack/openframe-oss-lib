@@ -14,6 +14,7 @@ import {
   parseSchedulingLinkName,
   schedulingAudienceKey,
 } from '../hubspot-meetings-convention';
+import { ELAPSED_MS_FIELD, HUMANITY_SIGNAL_KEYS } from '../humanity-signals';
 
 describe('slug shape validator', () => {
   it('allows N segments and rejects invalid characters', () => {
@@ -150,11 +151,12 @@ describe('makeBookingSchema × SUPPORTED_FORM_FIELD_TYPES', () => {
 
   it('strips unknown keys (humanity signals ride alongside, read raw pre-parse)', () => {
     const schema = makeBookingSchema([], null);
-    const parsed = schema.safeParse({ ...base, contact_url_confirm: '', form_elapsed_ms: 4200 });
+    const signals = Object.fromEntries(HUMANITY_SIGNAL_KEYS.map(key => [key, key === ELAPSED_MS_FIELD ? 4200 : '']));
+    const parsed = schema.safeParse({ ...base, ...signals });
     // Throw rather than `if (parsed.success)`: the guard has to narrow the
     // discriminated union AND fail the test, and a conditional `expect` would
     // pass silently the day the parse starts failing.
     if (!parsed.success) throw new Error(`expected a successful parse: ${JSON.stringify(parsed.error.issues)}`);
-    expect('contact_url_confirm' in parsed.data).toBe(false);
+    for (const key of HUMANITY_SIGNAL_KEYS) expect(key in parsed.data).toBe(false);
   });
 });
