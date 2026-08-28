@@ -56,11 +56,11 @@ public class TicketResponse {
     @Schema(description = "Linked device hostname (denormalized)")
     private String deviceHostname;
 
-    @Schema(description = "Linked organizationId")
-    private String organizationId;
+    @Schema(description = "Linked customer id")
+    private String customerId;
 
-    @Schema(description = "Linked organization name (denormalized)")
-    private String organizationName;
+    @Schema(description = "Linked customer name (denormalized)")
+    private String customerName;
 
     @Schema(description = "Reporter user ID")
     private String reporterId;

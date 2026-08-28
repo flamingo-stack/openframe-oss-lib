@@ -12,10 +12,12 @@ import com.openframe.api.service.ticket.*;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatus;
+import com.openframe.external.web.ApiCaller;
 import com.openframe.external.dto.ticket.*;
 import com.openframe.external.mapper.TicketMapper;
 import com.openframe.external.security.ApiKeyPrincipalResolver;
 import com.openframe.external.service.TicketReadService;
+import com.openframe.external.util.ExternalCursors;
 import com.openframe.security.authentication.AuthPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -34,8 +36,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-import static com.openframe.core.constants.HttpHeaders.X_API_KEY_ID;
-import static com.openframe.core.constants.HttpHeaders.X_USER_ID;
 import static org.springframework.http.HttpStatus.*;
 
 /**
@@ -65,14 +65,6 @@ public class TicketController {
     @Operation(summary = "Get list of tickets",
             description = "Retrieve a cursor-paginated list of tickets with optional filtering, search and sorting. " +
                     "Cursors are ticket ids taken from pageInfo.endCursor.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved tickets",
-                    content = @Content(schema = @Schema(implementation = TicketsResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request parameters",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @GetMapping
     @ResponseStatus(OK)
     public TicketsResponse getTickets(
@@ -80,59 +72,53 @@ public class TicketController {
             @RequestParam(required = false) List<TicketStatus> statuses,
             @Parameter(description = "Lifecycle status ids to filter by (see /statuses)")
             @RequestParam(required = false) List<String> statusIds,
-            @Parameter(description = "Organization IDs to filter by")
-            @RequestParam(required = false) List<String> organizationIds,
+            @Parameter(description = "Customer ids to filter by")
+            @RequestParam(required = false) List<String> customerIds,
             @Parameter(description = "Assignee user IDs to filter by")
             @RequestParam(required = false) List<String> assigneeIds,
             @Parameter(description = "Tag ids to filter by (see /tags)")
             @RequestParam(required = false) List<String> tagIds,
-            @Parameter(description = "Search in title, description, ticket number, device, organization and assignee")
+            @Parameter(description = "Search in title, description, ticket number, device, customer and assignee")
             @RequestParam(required = false) String search,
             @Parameter(description = "Maximum number of items to return (default: 20, max: 100)")
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer limit,
-            @Parameter(description = "Cursor for pagination (ticket id from pageInfo.endCursor)")
+            @Parameter(description = "Cursor for pagination (ticket id from pageInfo.endCursor). An unreadable cursor is rejected with 400.")
             @RequestParam(required = false) String cursor,
-            @Parameter(description = "Field to sort by (e.g. createdAt, updatedAt, ticketNumber, statusKind, organizationName, assignedName, deviceHostname)")
+            @Parameter(description = "Field to sort by (e.g. createdAt, updatedAt, ticketNumber, statusKind, customerName, assignedName, deviceHostname)")
             @RequestParam(required = false) String sortField,
             @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
             @RequestParam(required = false, defaultValue = "DESC") String sortDirection,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting tickets - userId: {}, apiKeyId: {}, limit: {}, cursor: {}, search: {}, sortField: {}, sortDirection: {}",
-                userId, apiKeyId, limit, cursor, search, sortField, sortDirection);
+        log.debug("Getting tickets - userId: {}, apiKeyId: {}, limit: {}, cursor: {}, search: {}, sortField: {}, sortDirection: {}",
+                caller.userId(), caller.apiKeyId(), limit, cursor, search, sortField, sortDirection);
 
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         CountedGenericQueryResult<Ticket> result = ticketService.getTickets(
                 principal,
-                filter(statuses, statusIds, organizationIds, assigneeIds, tagIds),
-                CursorPaginationCriteria.builder().cursor(cursor).limit(limit).build(),
+                filter(statuses, statusIds, customerIds, assigneeIds, tagIds),
+                CursorPaginationCriteria.builder().cursor(ExternalCursors.requireTicketCursor(cursor)).limit(limit).build(),
                 search,
-                SortInput.from(sortField, sortDirection));
+                SortInput.from("customerName".equals(sortField) ? "organizationName" : sortField, sortDirection));
         return ticketMapper.toTicketsResponse(result, ticketReadService.toResponses(principal, result.getItems()));
     }
 
     @Operation(summary = "Get ticket filter options",
-            description = "Retrieve the available status, organization, assignee and tag filter values")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Filter options retrieved successfully",
-                    content = @Content(schema = @Schema(implementation = TicketFiltersResponse.class)))
-    })
+            description = "Retrieve the available status, customer, assignee and tag filter values")
     @GetMapping("/filters")
     @ResponseStatus(OK)
     public TicketFiltersResponse getTicketFilters(
             @RequestParam(required = false) List<TicketStatus> statuses,
             @RequestParam(required = false) List<String> statusIds,
-            @RequestParam(required = false) List<String> organizationIds,
+            @RequestParam(required = false) List<String> customerIds,
             @RequestParam(required = false) List<String> assigneeIds,
             @RequestParam(required = false) List<String> tagIds,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting ticket filters - userId: {}, apiKeyId: {}", userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.debug("Getting ticket filters - userId: {}, apiKeyId: {}", caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         return ticketMapper.toFiltersResponse(ticketFilterService.getFilters(
-                principal, filter(statuses, statusIds, organizationIds, assigneeIds, tagIds)).join());
+                principal, filter(statuses, statusIds, customerIds, assigneeIds, tagIds)).join());
     }
 
     @Operation(summary = "Get ticket statuses",
@@ -140,11 +126,10 @@ public class TicketController {
     @GetMapping("/statuses")
     @ResponseStatus(OK)
     public List<TicketStatusResponse> getTicketStatuses(
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting ticket statuses - userId: {}, apiKeyId: {}", userId, apiKeyId);
-        principalResolver.resolve(userId);
+        log.debug("Getting ticket statuses - userId: {}, apiKeyId: {}", caller.userId(), caller.apiKeyId());
+        principalResolver.resolve(caller.userId());
         return ticketMapper.toStatusResponses(ticketStatusService.list());
     }
 
@@ -152,11 +137,10 @@ public class TicketController {
     @GetMapping("/tags")
     @ResponseStatus(OK)
     public List<TicketTagResponse> getTicketTags(
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting ticket tags - userId: {}, apiKeyId: {}", userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.debug("Getting ticket tags - userId: {}, apiKeyId: {}", caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         return ticketMapper.toTagResponses(ticketTagService.getTags(principal));
     }
 
@@ -164,18 +148,15 @@ public class TicketController {
     @GetMapping("/statistics")
     @ResponseStatus(OK)
     public TicketStatisticsResponse getTicketStatistics(
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting ticket statistics - userId: {}, apiKeyId: {}", userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.debug("Getting ticket statistics - userId: {}, apiKeyId: {}", caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         return ticketMapper.toStatisticsResponse(ticketStatisticsService.getStatistics(principal));
     }
 
     @Operation(summary = "Get ticket by ID", description = "Retrieve a single ticket with its tags, notes and attachments")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Ticket found",
-                    content = @Content(schema = @Schema(implementation = TicketResponse.class))),
             @ApiResponse(responseCode = "404", description = "Ticket not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
@@ -183,11 +164,10 @@ public class TicketController {
     @ResponseStatus(OK)
     public TicketResponse getTicket(
             @Parameter(description = "Ticket ID") @PathVariable String id,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting ticket {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.debug("Getting ticket {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         Ticket ticket = ticketService.getTicket(principal, id)
                 .orElseThrow(() -> new TicketNotFoundException(id));
         return ticketReadService.toResponse(principal, ticket);
@@ -198,25 +178,22 @@ public class TicketController {
                     "the next ticket number, lands in the requested (or first custom) status and the assignee is notified.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Ticket created",
-                    content = @Content(schema = @Schema(implementation = TicketResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Validation error",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+                    content = @Content(schema = @Schema(implementation = TicketResponse.class)))
     })
     @PostMapping
     @ResponseStatus(CREATED)
     public TicketResponse createTicket(
             @Valid @RequestBody CreateTicketRequest request,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Creating ticket '{}' - userId: {}, apiKeyId: {}", request.title(), userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Creating ticket '{}' - userId: {}, apiKeyId: {}", request.title(), caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         CreateTicketInput input = CreateTicketInput.builder()
                 .title(request.title())
                 .description(request.description())
                 .statusId(request.statusId())
                 .deviceId(request.deviceId())
-                .organizationId(request.organizationId())
+                .organizationId(request.customerId())
                 .assigneeId(request.assigneeId())
                 .tagIds(request.tagIds())
                 .build();
@@ -224,30 +201,23 @@ public class TicketController {
     }
 
     @Operation(summary = "Update a ticket",
-            description = "Partially update title, description, linked device/organization, assignee and tags. " +
+            description = "Partially update title, description, linked device/customer, assignee and tags. " +
                     "Use the transition endpoint to change the status.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Ticket updated",
-                    content = @Content(schema = @Schema(implementation = TicketResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Validation error",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @PatchMapping("/{id}")
     @ResponseStatus(OK)
     public TicketResponse updateTicket(
             @Parameter(description = "Ticket ID") @PathVariable String id,
             @Valid @RequestBody UpdateTicketRequest request,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Updating ticket {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Updating ticket {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         UpdateTicketInput input = UpdateTicketInput.builder()
                 .id(id)
                 .title(request.title())
                 .description(request.description())
                 .deviceId(request.deviceId())
-                .organizationId(request.organizationId())
+                .organizationId(request.customerId())
                 .assigneeId(request.assigneeId())
                 .tagIds(request.tagIds())
                 .build();
@@ -258,8 +228,6 @@ public class TicketController {
             description = "Move the ticket to one of its availableTransitions. Resolving stamps resolvedAt/resolvedBy; " +
                     "leaving AI assistance hands the conversation over to a technician.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Ticket transitioned",
-                    content = @Content(schema = @Schema(implementation = TicketResponse.class))),
             @ApiResponse(responseCode = "404", description = "Ticket or status not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "409", description = "Transition not allowed from the current status",
@@ -270,11 +238,10 @@ public class TicketController {
     public TicketResponse transitionTicket(
             @Parameter(description = "Ticket ID") @PathVariable String id,
             @Valid @RequestBody TransitionTicketRequest request,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Transitioning ticket {} to status {} - userId: {}, apiKeyId: {}", id, request.toStatusId(), userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Transitioning ticket {} to status {} - userId: {}, apiKeyId: {}", id, request.toStatusId(), caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         TransitionTicketInput input = TransitionTicketInput.builder()
                 .ticketId(id)
                 .toStatusId(request.toStatusId())
@@ -289,11 +256,10 @@ public class TicketController {
     public TicketResponse assignTicket(
             @Parameter(description = "Ticket ID") @PathVariable String id,
             @Valid @RequestBody AssignTicketRequest request,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Assigning ticket {} to {} - userId: {}, apiKeyId: {}", id, request.assigneeId(), userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Assigning ticket {} to {} - userId: {}, apiKeyId: {}", id, request.assigneeId(), caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         return ticketReadService.toResponse(principal, ticketService.assignTicket(principal, id, request.assigneeId()));
     }
 
@@ -302,11 +268,10 @@ public class TicketController {
     @ResponseStatus(OK)
     public TicketResponse unassignTicket(
             @Parameter(description = "Ticket ID") @PathVariable String id,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Unassigning ticket {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Unassigning ticket {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         return ticketReadService.toResponse(principal, ticketService.unassignTicket(principal, id));
     }
 
@@ -315,25 +280,23 @@ public class TicketController {
     @ResponseStatus(OK)
     public TicketResponse unlinkDevice(
             @Parameter(description = "Ticket ID") @PathVariable String id,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Unlinking device from ticket {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Unlinking device from ticket {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         return ticketReadService.toResponse(principal, ticketService.unlinkDeviceFromTicket(principal, id));
     }
 
-    @Operation(summary = "Unlink the organization",
-            description = "Remove the linked organization (and, as a consequence, the linked device) from the ticket")
-    @DeleteMapping("/{id}/organization")
+    @Operation(summary = "Unlink the customer",
+            description = "Remove the linked customer (and, as a consequence, the linked device) from the ticket")
+    @DeleteMapping("/{id}/customer")
     @ResponseStatus(OK)
-    public TicketResponse unlinkOrganization(
+    public TicketResponse unlinkCustomer(
             @Parameter(description = "Ticket ID") @PathVariable String id,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Unlinking organization from ticket {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Unlinking customer from ticket {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         return ticketReadService.toResponse(principal, ticketService.unlinkOrganizationFromTicket(principal, id));
     }
 
@@ -343,13 +306,12 @@ public class TicketController {
     public TicketResponse addTag(
             @Parameter(description = "Ticket ID") @PathVariable String id,
             @Parameter(description = "Tag ID (see /tags)") @PathVariable String tagId,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Adding tag {} to ticket {} - userId: {}, apiKeyId: {}", tagId, id, userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Adding tag {} to ticket {} - userId: {}, apiKeyId: {}", tagId, id, caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         ticketTagService.addTagToTicket(principal, id, tagId);
-        return getTicket(id, userId, apiKeyId);
+        return getTicket(id, caller);
     }
 
     @Operation(summary = "Remove a tag from a ticket")
@@ -358,13 +320,12 @@ public class TicketController {
     public TicketResponse removeTag(
             @Parameter(description = "Ticket ID") @PathVariable String id,
             @Parameter(description = "Tag ID") @PathVariable String tagId,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Removing tag {} from ticket {} - userId: {}, apiKeyId: {}", tagId, id, userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Removing tag {} from ticket {} - userId: {}, apiKeyId: {}", tagId, id, caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         ticketTagService.removeTagFromTicket(principal, id, tagId);
-        return getTicket(id, userId, apiKeyId);
+        return getTicket(id, caller);
     }
 
     @Operation(summary = "Add an internal note to a ticket")
@@ -377,11 +338,10 @@ public class TicketController {
     public TicketNoteResponse addNote(
             @Parameter(description = "Ticket ID") @PathVariable String id,
             @Valid @RequestBody TicketNoteRequest request,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Adding note to ticket {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Adding note to ticket {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         return ticketMapper.toNoteResponse(ticketNoteService.addNote(principal, id, request.content()));
     }
 
@@ -392,11 +352,10 @@ public class TicketController {
             @Parameter(description = "Ticket ID") @PathVariable String id,
             @Parameter(description = "Note ID") @PathVariable String noteId,
             @Valid @RequestBody TicketNoteRequest request,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Updating note {} on ticket {} - userId: {}, apiKeyId: {}", noteId, id, userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Updating note {} on ticket {} - userId: {}, apiKeyId: {}", noteId, id, caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         return ticketMapper.toNoteResponse(ticketNoteService.updateNote(principal, noteId, request.content()));
     }
 
@@ -406,20 +365,19 @@ public class TicketController {
     public void deleteNote(
             @Parameter(description = "Ticket ID") @PathVariable String id,
             @Parameter(description = "Note ID") @PathVariable String noteId,
-            @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Deleting note {} on ticket {} - userId: {}, apiKeyId: {}", noteId, id, userId, apiKeyId);
-        AuthPrincipal principal = principalResolver.resolve(userId);
+        log.info("Deleting note {} on ticket {} - userId: {}, apiKeyId: {}", noteId, id, caller.userId(), caller.apiKeyId());
+        AuthPrincipal principal = principalResolver.resolve(caller.userId());
         ticketNoteService.deleteNote(principal, noteId);
     }
 
     private static TicketFilterInput filter(List<TicketStatus> statuses, List<String> statusIds,
-                                            List<String> organizationIds, List<String> assigneeIds, List<String> tagIds) {
+                                            List<String> customerIds, List<String> assigneeIds, List<String> tagIds) {
         return TicketFilterInput.builder()
                 .statuses(statuses)
                 .statusIds(statusIds)
-                .organizationIds(organizationIds)
+                .organizationIds(customerIds)
                 .assigneeIds(assigneeIds)
                 .tagIds(tagIds)
                 .build();

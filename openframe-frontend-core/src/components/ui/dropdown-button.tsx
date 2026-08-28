@@ -29,6 +29,14 @@ export interface DropdownButtonProps {
   /** Spinner state for the trigger (either look). */
   loading?: boolean;
   disabled?: boolean;
+  /**
+   * Stretch the trigger to fill its container. Prefer this over a `w-full`
+   * className: the seam trigger's main half only absorbs the extra width — keeping
+   * the chevron flush against the trailing edge instead of floating mid-button —
+   * when the underlying `Button` is told it is full width, which a className
+   * cannot communicate.
+   */
+  fullWidth?: boolean;
   className?: string;
   ariaLabel?: string;
   align?: 'start' | 'center' | 'end';
@@ -69,6 +77,7 @@ export function DropdownButton({
   size = 'small-legacy',
   loading = false,
   disabled,
+  fullWidth,
   className,
   ariaLabel,
   align = 'end',
@@ -104,6 +113,7 @@ export function DropdownButton({
       size={size}
       disabled={disabled}
       loading={loading}
+      fullWidth={fullWidth}
       aria-label={resolvedAriaLabel}
       leftIcon={icon}
       rightIcon={
@@ -122,6 +132,7 @@ export function DropdownButton({
       variant="outline"
       disabled={disabled}
       loading={loading}
+      fullWidth={fullWidth}
       aria-label={resolvedAriaLabel}
       leftIcon={icon}
       splitIcon={<Chevron02DownIcon className={cn('transition-transform duration-fast', open && 'rotate-180')} />}
