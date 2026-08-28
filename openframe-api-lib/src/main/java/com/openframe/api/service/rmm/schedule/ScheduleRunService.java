@@ -13,6 +13,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.filter.ScheduleRunQueryFilter;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.core.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -102,6 +103,11 @@ public class ScheduleRunService {
                             .countRespondedDevicesByExecutionIds(tenantId, List.of(h.getExecutionId()));
                     return toResponse(h, respondedByExecutionId.getOrDefault(h.getExecutionId(), 0L).intValue());
                 });
+    }
+
+    public ScheduleRunResponse get(String id) {
+        return findById(id)
+                .orElseThrow(() -> new NotFoundException("Schedule run not found: " + id));
     }
 
     private static ScheduleRunQueryFilter toQueryFilter(ScheduleRunFilterInput input) {

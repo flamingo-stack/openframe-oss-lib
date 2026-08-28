@@ -68,6 +68,11 @@ public class ScriptExecutionDataFetcher {
     }
 
     @DgsQuery
+    public ScriptExecutionResponse scriptExecution(@InputArgument @NotBlank String id) {
+        return scriptExecutionService.get(decodeId(id));
+    }
+
+    @DgsQuery
     public CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> scriptExecutions(
             @InputArgument @NotBlank String scriptId,
             @InputArgument @Valid ScriptExecutionFilterInput filter,
