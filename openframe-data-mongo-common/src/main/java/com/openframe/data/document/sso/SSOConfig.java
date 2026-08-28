@@ -20,8 +20,12 @@ public class SSOConfig implements TenantScoped {
      * config with this id carries no client credentials and only its {@code enabled} flag matters —
      * no document means enabled. Kept in this collection so the standard per-provider toggle API
      * covers it; every consumer that builds OAuth clients must skip it.
+     * <p>
+     * The id is {@code openframe-sso} for backward compatibility: deployed frontends match this
+     * exact string in the {@code /tenant/discover} provider list to decide whether to render the
+     * password form.
      */
-    public static final String OPENFRAME_PROVIDER = "openframe";
+    public static final String OPENFRAME_PROVIDER = "openframe-sso";
 
     @Id
     private String id;
