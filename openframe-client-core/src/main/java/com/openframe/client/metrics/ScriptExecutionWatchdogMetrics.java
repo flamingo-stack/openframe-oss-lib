@@ -11,6 +11,9 @@ public class ScriptExecutionWatchdogMetrics {
     private static final String DELIVERY_FAILED_COUNTER = "openframe.rmm.execution.delivery.failed";
     private static final String TAG_KIND = "kind";
     private static final String KIND_SCRIPT = "script";
+    private static final String TAG_REASON = "reason";
+    private static final String REASON_EXHAUSTED = "exhausted";
+    private static final String REASON_OFFLINE = "offline";
 
     private final MeterRegistry meterRegistry;
 
@@ -37,14 +40,18 @@ public class ScriptExecutionWatchdogMetrics {
         meterRegistry.counter(DELIVERY_RETRIED_COUNTER, TAG_KIND, KIND_SCRIPT).increment(count);
     }
 
-    /**
-     * Records that {@code count} script leaves were failed because the agent never acknowledged
-     * delivery within the QUEUED retry budget (distinct from a result-driven or stuck-RUNNING failure).
-     */
-    public void recordDeliveryFailed(long count) {
+    public void recordDeliveryFailedExhausted(long count) {
+        recordDeliveryFailed(count, REASON_EXHAUSTED);
+    }
+
+    public void recordDeliveryFailedOffline(long count) {
+        recordDeliveryFailed(count, REASON_OFFLINE);
+    }
+
+    private void recordDeliveryFailed(long count, String reason) {
         if (count <= 0) {
             return;
         }
-        meterRegistry.counter(DELIVERY_FAILED_COUNTER, TAG_KIND, KIND_SCRIPT).increment(count);
+        meterRegistry.counter(DELIVERY_FAILED_COUNTER, TAG_KIND, KIND_SCRIPT, TAG_REASON, reason).increment(count);
     }
 }

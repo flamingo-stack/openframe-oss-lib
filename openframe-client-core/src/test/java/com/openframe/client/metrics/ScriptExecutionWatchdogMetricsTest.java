@@ -43,16 +43,34 @@ class ScriptExecutionWatchdogMetricsTest {
     }
 
     @Test
-    void recordDeliveryFailedIncrementsKindScriptCounter() {
-        metrics.recordDeliveryFailed(4);
+    void recordDeliveryFailedExhaustedTagsReasonExhausted() {
+        metrics.recordDeliveryFailedExhausted(4);
 
-        assertThat(registry.get(DELIVERY_FAILED_COUNTER).tag("kind", "script").counter().count()).isEqualTo(4.0);
+        assertThat(registry.get(DELIVERY_FAILED_COUNTER).tag("kind", "script").tag("reason", "exhausted")
+                .counter().count()).isEqualTo(4.0);
+    }
+
+    @Test
+    void recordDeliveryFailedOfflineTagsReasonOffline() {
+        metrics.recordDeliveryFailedOffline(2);
+
+        assertThat(registry.get(DELIVERY_FAILED_COUNTER).tag("kind", "script").tag("reason", "offline")
+                .counter().count()).isEqualTo(2.0);
+    }
+
+    @Test
+    void exhaustedAndOfflineAreSeparateSeries() {
+        metrics.recordDeliveryFailedExhausted(3);
+        metrics.recordDeliveryFailedOffline(1);
+
+        assertThat(registry.get(DELIVERY_FAILED_COUNTER).tag("reason", "exhausted").counter().count()).isEqualTo(3.0);
+        assertThat(registry.get(DELIVERY_FAILED_COUNTER).tag("reason", "offline").counter().count()).isEqualTo(1.0);
     }
 
     @Test
     void deliveryCountersAreNoOpForNonPositiveCount() {
         metrics.recordDeliveryRetried(0);
-        metrics.recordDeliveryFailed(-1);
+        metrics.recordDeliveryFailedExhausted(-1);
 
         assertThatThrownBy(() -> registry.get(DELIVERY_RETRIED_COUNTER).counter()).isInstanceOf(MeterNotFoundException.class);
         assertThatThrownBy(() -> registry.get(DELIVERY_FAILED_COUNTER).counter()).isInstanceOf(MeterNotFoundException.class);
