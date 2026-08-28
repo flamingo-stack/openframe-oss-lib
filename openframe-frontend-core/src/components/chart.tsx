@@ -12,7 +12,7 @@ import {
   useMemo,
 } from 'react';
 import { Legend, ResponsiveContainer, Tooltip } from 'recharts';
-import type { LegendPayload, TooltipContentProps, TooltipPayloadEntry } from 'recharts';
+import type { DefaultTooltipContentProps, LegendPayload, TooltipContentProps } from 'recharts';
 
 import { cn } from '../utils/cn';
 
@@ -110,8 +110,26 @@ const ChartTooltip = Tooltip;
  */
 type ChartTooltipDatum = { fill?: string };
 
+/**
+ * One tooltip entry, derived from the only tooltip payload type the recharts package
+ * ROOT exports. Deriving rather than naming it is deliberate on both counts:
+ *
+ * - `TooltipPayloadEntry` is not root-exported by any recharts 3.x (it lives in
+ *   `util/ChartUtils`, which the root does not re-export), so importing it never
+ *   type-checked and broke the declaration build.
+ * - `TooltipContentProps['payload']` is widened to `ReadonlyArray<any>`, so deriving
+ *   from THAT would silently restore the `any` this type exists to remove.
+ *
+ * `DefaultTooltipContentProps['payload']` is the exact `Payload<…>` array that
+ * `formatter` and `labelFormatter` take, so entries stay assignable to them and new
+ * recharts fields (3.6 added a required `graphicalItemId`) are picked up for free.
+ */
+type RechartsTooltipEntry = NonNullable<
+  DefaultTooltipContentProps<number | string, number | string>['payload']
+>[number];
+
 /** A recharts tooltip entry with its `any` datum narrowed to {@link ChartTooltipDatum}. */
-type ChartTooltipEntry = Omit<TooltipPayloadEntry<number | string, number | string>, 'payload'> & {
+type ChartTooltipEntry = Omit<RechartsTooltipEntry, 'payload'> & {
   payload?: ChartTooltipDatum;
 };
 
@@ -123,7 +141,7 @@ type ChartTooltipEntry = Omit<TooltipPayloadEntry<number | string, number | stri
  *
  * `payload` is re-declared because recharts widens it to `ReadonlyArray<any>`
  * on `TooltipContentProps` even though it hands over the very same entries
- * `TooltipPayloadEntry` describes.
+ * {@link RechartsTooltipEntry} describes.
  */
 type ChartTooltipContentProps = Omit<Partial<TooltipContentProps<number | string, number | string>>, 'payload'> &
   ComponentProps<'div'> & {
