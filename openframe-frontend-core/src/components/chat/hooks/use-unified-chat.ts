@@ -153,10 +153,16 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
     (ref: Parameters<UnifiedChatState['discussRef']>[0]) => activeStateRef.current.discussRef(ref),
     [],
   );
-  const displayRef = useCallback(
-    (ref: Parameters<UnifiedChatState['displayRef']>[0]) => activeStateRef.current.displayRef(ref),
+  // `displayRef` is OPTIONAL on the state and consumers gate the "Display"
+  // affordance on its presence, so the forward has to be able to be absent
+  // too: an always-truthy wrapper around a missing method advertises a
+  // display path that isn't there and throws when the menu row is clicked.
+  // Only the flag flips identity — the wrapper itself stays stable.
+  const displayRefForward = useCallback(
+    (ref: Parameters<NonNullable<UnifiedChatState['displayRef']>>[0]) => activeStateRef.current.displayRef?.(ref),
     [],
   );
+  const displayRef = activeState.displayRef ? displayRefForward : undefined;
 
   // Dialog-management forwards — one thin wrapper per action so the
   // returned identity stays stable as long as the active adapter's

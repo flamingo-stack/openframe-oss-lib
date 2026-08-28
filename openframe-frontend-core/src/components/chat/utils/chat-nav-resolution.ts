@@ -32,9 +32,15 @@ export function isModifierClick(e: {
   return e.button !== 0 || !!e.metaKey || !!e.ctrlKey || !!e.shiftKey || !!e.altKey;
 }
 
-/** Strip the origin from a same-origin absolute URL, returning a relative
- *  path the host's router will treat as in-app navigation. Pass-through
- *  for already-relative URLs and for cross-origin URLs. */
+/** Strip the origin from an absolute URL, returning a relative path the host's
+ *  router will treat as in-app navigation. Already-relative URLs pass through.
+ *
+ *  Strips the origin off ANY absolute URL, cross-origin included — the caller
+ *  decides. The hub relies on that: its platforms are one Next app on several
+ *  origins, so an absolute `https://openmsp.ai/x` opened same-tab must stay on
+ *  whatever host is running (prod, a preview deploy, or localhost). Callers that
+ *  can be handed a genuinely FOREIGN href must check the origin first, or they
+ *  push a path that 404s on their own — see `runNavigation`. */
 export function stripSameOriginToPath(href: string): string {
   if (!href.startsWith('http')) return href;
   try {
