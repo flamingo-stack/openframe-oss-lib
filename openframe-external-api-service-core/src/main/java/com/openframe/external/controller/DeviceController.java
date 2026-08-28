@@ -19,6 +19,7 @@ import com.openframe.external.dto.device.DevicesResponse;
 import com.openframe.external.dto.device.UpdateDeviceNicknameRequest;
 import com.openframe.external.dto.device.UpdateDeviceStatusRequest;
 import com.openframe.external.mapper.DeviceMapper;
+import com.openframe.external.util.ExternalCursors;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -84,8 +85,8 @@ public class DeviceController {
             @Parameter(description = "Operating system types to filter by")
             @RequestParam(required = false) List<OsType> osTypes,
 
-            @Parameter(description = "Organization IDs to filter by")
-            @RequestParam(required = false) List<String> organizationIds,
+            @Parameter(description = "Customer ids to filter by")
+            @RequestParam(required = false) List<String> customerIds,
 
             @Parameter(description = "Tag keys to filter by")
             @RequestParam(required = false) List<String> tagKeys,
@@ -102,7 +103,7 @@ public class DeviceController {
             @Parameter(description = "Maximum number of items to return (default: 20, max: 100)")
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer limit,
 
-            @Parameter(description = "Cursor for pagination (optional)")
+            @Parameter(description = "Cursor for pagination (from pageInfo.endCursor). An unreadable cursor is rejected with 400.")
             @RequestParam(required = false) String cursor,
 
             @Parameter(description = "Field to sort by (e.g., hostname, displayName, status, lastSeen)")
@@ -121,14 +122,14 @@ public class DeviceController {
                 .statuses(statuses)
                 .deviceTypes(deviceTypes)
                 .osTypes(osTypes)
-                .organizationIds(organizationIds)
+                .organizationIds(customerIds)
                 .tagKeys(tagKeys)
                 .tagValues(tagValues)
                 .build();
 
         var result = deviceService.queryDevices(
                 filterCriteria,
-                CursorPaginationCriteria.fromRest(cursor, limit),
+                CursorPaginationCriteria.builder().cursor(ExternalCursors.decodeBase64(cursor)).limit(limit).build(),
                 search,
                 SortInput.from(sortField, sortDirection));
 
@@ -202,8 +203,8 @@ public class DeviceController {
             @Parameter(description = "Operating system types to filter by")
             @RequestParam(required = false) List<OsType> osTypes,
 
-            @Parameter(description = "Organization IDs to filter by")
-            @RequestParam(required = false) List<String> organizationIds,
+            @Parameter(description = "Customer ids to filter by")
+            @RequestParam(required = false) List<String> customerIds,
 
             @Parameter(description = "Tag keys to filter by")
             @RequestParam(required = false) List<String> tagKeys,
@@ -220,7 +221,7 @@ public class DeviceController {
                 .statuses(statuses)
                 .deviceTypes(deviceTypes)
                 .osTypes(osTypes)
-                .organizationIds(organizationIds)
+                .organizationIds(customerIds)
                 .tagKeys(tagKeys)
                 .tagValues(tagValues)
                 .build();

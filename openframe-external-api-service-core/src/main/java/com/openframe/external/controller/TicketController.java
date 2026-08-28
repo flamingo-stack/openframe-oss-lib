@@ -16,6 +16,7 @@ import com.openframe.external.dto.ticket.*;
 import com.openframe.external.mapper.TicketMapper;
 import com.openframe.external.security.ApiKeyPrincipalResolver;
 import com.openframe.external.service.TicketReadService;
+import com.openframe.external.util.ExternalCursors;
 import com.openframe.security.authentication.AuthPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -80,19 +81,19 @@ public class TicketController {
             @RequestParam(required = false) List<TicketStatus> statuses,
             @Parameter(description = "Lifecycle status ids to filter by (see /statuses)")
             @RequestParam(required = false) List<String> statusIds,
-            @Parameter(description = "Organization IDs to filter by")
-            @RequestParam(required = false) List<String> organizationIds,
+            @Parameter(description = "Customer ids to filter by")
+            @RequestParam(required = false) List<String> customerIds,
             @Parameter(description = "Assignee user IDs to filter by")
             @RequestParam(required = false) List<String> assigneeIds,
             @Parameter(description = "Tag ids to filter by (see /tags)")
             @RequestParam(required = false) List<String> tagIds,
-            @Parameter(description = "Search in title, description, ticket number, device, organization and assignee")
+            @Parameter(description = "Search in title, description, ticket number, device, customer and assignee")
             @RequestParam(required = false) String search,
             @Parameter(description = "Maximum number of items to return (default: 20, max: 100)")
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer limit,
-            @Parameter(description = "Cursor for pagination (ticket id from pageInfo.endCursor)")
+            @Parameter(description = "Cursor for pagination (ticket id from pageInfo.endCursor). An unreadable cursor is rejected with 400.")
             @RequestParam(required = false) String cursor,
-            @Parameter(description = "Field to sort by (e.g. createdAt, updatedAt, ticketNumber, statusKind, organizationName, assignedName, deviceHostname)")
+            @Parameter(description = "Field to sort by (e.g. createdAt, updatedAt, ticketNumber, statusKind, customerName, assignedName, deviceHostname)")
             @RequestParam(required = false) String sortField,
             @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
             @RequestParam(required = false, defaultValue = "DESC") String sortDirection,
@@ -105,15 +106,15 @@ public class TicketController {
         AuthPrincipal principal = principalResolver.resolve(userId);
         CountedGenericQueryResult<Ticket> result = ticketService.getTickets(
                 principal,
-                filter(statuses, statusIds, organizationIds, assigneeIds, tagIds),
-                CursorPaginationCriteria.builder().cursor(cursor).limit(limit).build(),
+                filter(statuses, statusIds, customerIds, assigneeIds, tagIds),
+                CursorPaginationCriteria.builder().cursor(ExternalCursors.requireTicketCursor(cursor)).limit(limit).build(),
                 search,
-                SortInput.from(sortField, sortDirection));
+                SortInput.from("customerName".equals(sortField) ? "organizationName" : sortField, sortDirection));
         return ticketMapper.toTicketsResponse(result, ticketReadService.toResponses(principal, result.getItems()));
     }
 
     @Operation(summary = "Get ticket filter options",
-            description = "Retrieve the available status, organization, assignee and tag filter values")
+            description = "Retrieve the available status, customer, assignee and tag filter values")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Filter options retrieved successfully",
                     content = @Content(schema = @Schema(implementation = TicketFiltersResponse.class)))
@@ -123,7 +124,7 @@ public class TicketController {
     public TicketFiltersResponse getTicketFilters(
             @RequestParam(required = false) List<TicketStatus> statuses,
             @RequestParam(required = false) List<String> statusIds,
-            @RequestParam(required = false) List<String> organizationIds,
+            @RequestParam(required = false) List<String> customerIds,
             @RequestParam(required = false) List<String> assigneeIds,
             @RequestParam(required = false) List<String> tagIds,
             @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
@@ -132,7 +133,7 @@ public class TicketController {
         log.info("Getting ticket filters - userId: {}, apiKeyId: {}", userId, apiKeyId);
         AuthPrincipal principal = principalResolver.resolve(userId);
         return ticketMapper.toFiltersResponse(ticketFilterService.getFilters(
-                principal, filter(statuses, statusIds, organizationIds, assigneeIds, tagIds)).join());
+                principal, filter(statuses, statusIds, customerIds, assigneeIds, tagIds)).join());
     }
 
     @Operation(summary = "Get ticket statuses",
@@ -216,7 +217,7 @@ public class TicketController {
                 .description(request.description())
                 .statusId(request.statusId())
                 .deviceId(request.deviceId())
-                .organizationId(request.organizationId())
+                .organizationId(request.customerId())
                 .assigneeId(request.assigneeId())
                 .tagIds(request.tagIds())
                 .build();
@@ -224,7 +225,7 @@ public class TicketController {
     }
 
     @Operation(summary = "Update a ticket",
-            description = "Partially update title, description, linked device/organization, assignee and tags. " +
+            description = "Partially update title, description, linked device/customer, assignee and tags. " +
                     "Use the transition endpoint to change the status.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Ticket updated",
@@ -247,7 +248,7 @@ public class TicketController {
                 .title(request.title())
                 .description(request.description())
                 .deviceId(request.deviceId())
-                .organizationId(request.organizationId())
+                .organizationId(request.customerId())
                 .assigneeId(request.assigneeId())
                 .tagIds(request.tagIds())
                 .build();
@@ -323,16 +324,16 @@ public class TicketController {
         return ticketReadService.toResponse(principal, ticketService.unlinkDeviceFromTicket(principal, id));
     }
 
-    @Operation(summary = "Unlink the organization",
-            description = "Remove the linked organization (and, as a consequence, the linked device) from the ticket")
-    @DeleteMapping("/{id}/organization")
+    @Operation(summary = "Unlink the customer",
+            description = "Remove the linked customer (and, as a consequence, the linked device) from the ticket")
+    @DeleteMapping("/{id}/customer")
     @ResponseStatus(OK)
-    public TicketResponse unlinkOrganization(
+    public TicketResponse unlinkCustomer(
             @Parameter(description = "Ticket ID") @PathVariable String id,
             @Parameter(hidden = true) @RequestHeader(X_USER_ID) String userId,
             @Parameter(hidden = true) @RequestHeader(value = X_API_KEY_ID, required = false) String apiKeyId) {
 
-        log.info("Unlinking organization from ticket {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
+        log.info("Unlinking customer from ticket {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
         AuthPrincipal principal = principalResolver.resolve(userId);
         return ticketReadService.toResponse(principal, ticketService.unlinkOrganizationFromTicket(principal, id));
     }
@@ -415,11 +416,11 @@ public class TicketController {
     }
 
     private static TicketFilterInput filter(List<TicketStatus> statuses, List<String> statusIds,
-                                            List<String> organizationIds, List<String> assigneeIds, List<String> tagIds) {
+                                            List<String> customerIds, List<String> assigneeIds, List<String> tagIds) {
         return TicketFilterInput.builder()
                 .statuses(statuses)
                 .statusIds(statusIds)
-                .organizationIds(organizationIds)
+                .organizationIds(customerIds)
                 .assigneeIds(assigneeIds)
                 .tagIds(tagIds)
                 .build();

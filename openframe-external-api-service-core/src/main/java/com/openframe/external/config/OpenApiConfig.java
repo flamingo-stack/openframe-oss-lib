@@ -34,7 +34,7 @@ public class OpenApiConfig {
                     ## Resources
                     
                     - **Devices** – list, filter, inspect, update status/nickname
-                    - **Organizations** – full CRUD incl. archiving
+                    - **Customers** – full CRUD incl. archiving
                     - **Tickets** – list, create, update, transition, assign, tag and annotate tickets (SaaS deployments)
                     - **Logs** / **Tools** – read access and integration proxying
                     

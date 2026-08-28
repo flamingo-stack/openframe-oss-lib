@@ -9,6 +9,7 @@ import com.openframe.api.dto.audit.LogFilterCriteria;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.external.mapper.LogMapper;
+import com.openframe.external.util.ExternalCursors;
 import com.openframe.external.exception.LogNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -68,15 +69,15 @@ public class LogController {
             @RequestParam(required = false) List<String> eventTypes,
             @Parameter(description = "Severity levels to filter")
             @RequestParam(required = false) List<String> severities,
-            @Parameter(description = "Organization IDs to filter by")
-            @RequestParam(required = false) List<String> organizationIds,
+            @Parameter(description = "Customer ids to filter by")
+            @RequestParam(required = false) List<String> customerIds,
             @Parameter(description = "Device ID to filter by (exact matching)")
             @RequestParam(required = false) String deviceId,
             @Parameter(description = "Search in log summary and content")
             @RequestParam(required = false) String search,
             @Parameter(description = "Page size (default: 20, max: 100)")
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer limit,
-            @Parameter(description = "Cursor for pagination")
+            @Parameter(description = "Cursor for pagination (from pageInfo.endCursor). An unreadable cursor is rejected with 400.")
             @RequestParam(required = false) String cursor,
             @Parameter(description = "Field to sort by (eventTimestamp is the only field sortable by the dashboard API; default: eventTimestamp)")
             @RequestParam(required = false) String sortField,
@@ -85,8 +86,8 @@ public class LogController {
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting logs - startDate: {}, endDate: {}, timestampFrom: {}, timestampTo: {}, toolTypes: {}, eventTypes: {}, severities: {}, organizationIds: {}, deviceId: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}", 
-                startDate, endDate, timestampFrom, timestampTo, toolTypes, eventTypes, severities, organizationIds, deviceId, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
+        log.info("Getting logs - startDate: {}, endDate: {}, timestampFrom: {}, timestampTo: {}, toolTypes: {}, eventTypes: {}, severities: {}, customerIds: {}, deviceId: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}", 
+                startDate, endDate, timestampFrom, timestampTo, toolTypes, eventTypes, severities, customerIds, deviceId, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
         
         LogFilterCriteria filterCriteria = LogFilterCriteria.builder()
                 .startDate(startDate)
@@ -96,13 +97,13 @@ public class LogController {
                 .toolTypes(toolTypes)
                 .eventTypes(eventTypes)
                 .severities(severities)
-                .organizationIds(organizationIds)
+                .organizationIds(customerIds)
                 .deviceId(deviceId)
                 .build();
         
         var result = logService.queryLogs(
                 filterCriteria,
-                CursorPaginationCriteria.fromRest(cursor, limit),
+                CursorPaginationCriteria.builder().cursor(ExternalCursors.decodeBase64(cursor)).limit(limit).build(),
                 search,
                 SortInput.from(sortField, sortDirection));
         return logMapper.toLogsResponse(result);
@@ -132,13 +133,13 @@ public class LogController {
             @RequestParam(required = false) List<String> eventTypes,
             @Parameter(description = "Severity levels to filter")
             @RequestParam(required = false) List<String> severities,
-            @Parameter(description = "Organization IDs to filter by")
-            @RequestParam(required = false) List<String> organizationIds,
+            @Parameter(description = "Customer ids to filter by")
+            @RequestParam(required = false) List<String> customerIds,
             @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
 
-        log.info("Getting log filters - startDate: {}, endDate: {}, toolTypes: {}, eventTypes: {}, severities: {}, organizationIds: {} - userId: {}, apiKeyId: {}", 
-                startDate, endDate, toolTypes, eventTypes, severities, organizationIds, userId, apiKeyId);
+        log.info("Getting log filters - startDate: {}, endDate: {}, toolTypes: {}, eventTypes: {}, severities: {}, customerIds: {} - userId: {}, apiKeyId: {}", 
+                startDate, endDate, toolTypes, eventTypes, severities, customerIds, userId, apiKeyId);
         
         LogFilterCriteria filterCriteria = LogFilterCriteria.builder()
                 .startDate(startDate)
@@ -146,7 +147,7 @@ public class LogController {
                 .toolTypes(toolTypes)
                 .eventTypes(eventTypes)
                 .severities(severities)
-                .organizationIds(organizationIds)
+                .organizationIds(customerIds)
                 .build();
         
         var filters = logService.getLogFilters(

@@ -46,8 +46,8 @@ public class TicketMapper extends BaseRestMapper {
                 .owner(toOwnerResponse(ticket.getOwner()))
                 .deviceId(ticket.getDeviceId())
                 .deviceHostname(ticket.getDeviceHostname())
-                .organizationId(ticket.getOrganizationId())
-                .organizationName(ticket.getOrganizationName())
+                .customerId(ticket.getOrganizationId())
+                .customerName(ticket.getOrganizationName())
                 .reporterId(ticket.getReporterId())
                 .reporterName(ticket.getReporterName())
                 .assignedTo(ticket.getAssignedTo())
@@ -154,7 +154,7 @@ public class TicketMapper extends BaseRestMapper {
         }
         return TicketFiltersResponse.builder()
                 .statuses(toFilterOptions(filters.getStatuses()))
-                .organizationIds(toFilterOptions(filters.getOrganizationIds()))
+                .customerIds(toFilterOptions(filters.getOrganizationIds()))
                 .assigneeIds(toFilterOptions(filters.getAssigneeIds()))
                 .tagIds(toFilterOptions(filters.getTagIds()))
                 .build();
