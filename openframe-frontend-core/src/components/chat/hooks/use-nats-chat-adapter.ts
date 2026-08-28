@@ -1093,11 +1093,10 @@ export function useNatsChatAdapter(
     },
     [sendMessage],
   );
-  // Display stays a no-op: it dispatches a `/…  display "<x>"` slash command,
-  // and the agent transport has no slash-command registry.
-  const displayRef = useCallback((_ref: ChatRef) => {
-    /* no-op in Mingo mode */
-  }, []);
+  // No `displayRef` here: it dispatches a `/… display "<x>"` slash command and
+  // the agent transport has no slash-command registry. OMITTED rather than
+  // stubbed — the card menu gates on the callback's presence, so a stub costs
+  // the row "Ask Mingo", which does work in Mingo mode.
 
   // ─── Return shape ─────────────────────────────────────────────────────────
 
@@ -1115,7 +1114,6 @@ export function useNatsChatAdapter(
       stopMessage,
       clearMessages,
       discussRef,
-      displayRef,
       // Model badge + token usage for the composer's `<ModelDisplay>`.
       // Model: live `metadata` frame → config baseline (host AI-config).
       // Tokens: live `token_usage` frame / dialog snapshot (`dialogTokenUsage`).
@@ -1160,7 +1158,6 @@ export function useNatsChatAdapter(
       stopMessage,
       clearMessages,
       discussRef,
-      displayRef,
       dialogs,
       dialogId,
       selectDialog,
