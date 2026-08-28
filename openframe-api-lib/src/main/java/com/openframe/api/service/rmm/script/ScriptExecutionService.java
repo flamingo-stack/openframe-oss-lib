@@ -54,12 +54,6 @@ public class ScriptExecutionService {
                 .map(scriptExecutionMapper::toResponse);
     }
 
-    /**
-     * Get a single execution by its raw {@code _id} within the current tenant — the throwing
-     * counterpart of {@link #findById(String)}, backing the {@code scriptExecution(id)} query.
-     *
-     * @throws NotFoundException if the row does not exist or belongs to another tenant.
-     */
     public ScriptExecutionResponse get(String id) {
         return findById(id)
                 .orElseThrow(() -> new NotFoundException("Script execution not found: " + id));

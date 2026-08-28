@@ -105,12 +105,6 @@ public class ScheduleRunService {
                 });
     }
 
-    /**
-     * Get a single schedule fire by its raw {@code _id} within the current tenant — the throwing
-     * counterpart of {@link #findById(String)}, backing the {@code scheduleRun(id)} query.
-     *
-     * @throws NotFoundException if the run does not exist or belongs to another tenant.
-     */
     public ScheduleRunResponse get(String id) {
         return findById(id)
                 .orElseThrow(() -> new NotFoundException("Schedule run not found: " + id));
