@@ -8,7 +8,7 @@ import com.openframe.external.dto.audit.LogResponse;
 import com.openframe.external.dto.audit.LogsResponse;
 import com.openframe.external.dto.audit.LogFilterResponse;
 import com.openframe.external.dto.audit.LogDetailsResponse;
-import com.openframe.external.dto.audit.OrganizationFilterResponse;
+import com.openframe.external.dto.audit.CustomerFilterResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -32,8 +32,8 @@ public class LogMapper extends BaseRestMapper {
                 .userId(logEvent.getUserId())
                 .deviceId(logEvent.getDeviceId())
                 .hostname(logEvent.getHostname())
-                .organizationId(logEvent.getOrganizationId())
-                .organizationName(logEvent.getOrganizationName())
+                .customerId(logEvent.getOrganizationId())
+                .customerName(logEvent.getOrganizationName())
                 .summary(logEvent.getSummary())
                 .timestamp(logEvent.getTimestamp())
                 .build();
@@ -63,18 +63,15 @@ public class LogMapper extends BaseRestMapper {
             return LogFilterResponse.builder().build();
         }
 
-        List<OrganizationFilterResponse> organizations = filters.getOrganizations().stream()
-                .map(org -> OrganizationFilterResponse.builder()
-                        .id(org.getId())
-                        .name(org.getName())
-                        .build())
+        List<CustomerFilterResponse> customers = filters.getOrganizations().stream()
+                .map(org -> new CustomerFilterResponse(org.getId(), org.getName()))
                 .collect(Collectors.toList());
 
         return LogFilterResponse.builder()
                 .toolTypes(filters.getToolTypes())
                 .eventTypes(filters.getEventTypes())
                 .severities(filters.getSeverities())
-                .organizations(organizations)
+                .customers(customers)
                 .build();
     }
 
@@ -93,8 +90,8 @@ public class LogMapper extends BaseRestMapper {
                 .userId(logDetails.getUserId())
                 .deviceId(logDetails.getDeviceId())
                 .hostname(logDetails.getHostname())
-                .organizationId(logDetails.getOrganizationId())
-                .organizationName(logDetails.getOrganizationName())
+                .customerId(logDetails.getOrganizationId())
+                .customerName(logDetails.getOrganizationName())
                 .summary(logDetails.getSummary())
                 .message(logDetails.getMessage())
                 .content(logDetails.getDetails())
