@@ -18,8 +18,8 @@ public class TicketFiltersResponse {
     @Schema(description = "Statuses (values are status ids on lifecycle tenants, legacy status names otherwise)")
     private List<TicketFilterOptionResponse> statuses;
 
-    @Schema(description = "Organizations (values are organizationIds)")
-    private List<TicketFilterOptionResponse> organizationIds;
+    @Schema(description = "Customers (values are customer ids)")
+    private List<TicketFilterOptionResponse> customerIds;
 
     @Schema(description = "Assignees (values are user ids)")
     private List<TicketFilterOptionResponse> assigneeIds;

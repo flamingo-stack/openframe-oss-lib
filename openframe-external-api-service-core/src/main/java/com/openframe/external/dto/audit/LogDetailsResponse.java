@@ -40,11 +40,11 @@ public class LogDetailsResponse {
     @Schema(description = "Hostname of the device associated with the event")
     private String hostname;
     
-    @Schema(description = "Organization ID associated with the event")
-    private String organizationId;
+    @Schema(description = "Customer id associated with the event")
+    private String customerId;
     
-    @Schema(description = "Organization name associated with the event")
-    private String organizationName;
+    @Schema(description = "Customer name associated with the event")
+    private String customerName;
     
     @Schema(description = "Summary of the log event")
     private String summary;
