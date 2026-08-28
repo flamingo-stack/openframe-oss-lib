@@ -1,39 +1,44 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { Button } from '../ui/button'
-import { cn } from '../../utils/cn'
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
+import { Button } from '../ui/button';
 
 export interface CommandBoxAction {
   /** Button label */
-  label: string
+  label: string;
   /** Click handler */
-  onClick: () => void
+  onClick: () => void;
   /** Button variant */
-  variant?: 'accent' | 'outline' | 'transparent' | 'destructive'
+  variant?: 'accent' | 'outline' | 'transparent' | 'destructive';
   /** Icon to display before the label */
-  icon?: React.ReactNode
+  icon?: React.ReactNode;
   /** Whether the button is disabled */
-  disabled?: boolean
+  disabled?: boolean;
   /** Whether the button is in loading state */
-  loading?: boolean
+  loading?: boolean;
 }
 
 export interface CommandBoxProps {
   /** The command text to display */
-  command: string
+  command: string;
   /** Title displayed above the command box */
-  title?: string
+  title?: string;
   /** Primary action button (displayed on the right) */
-  primaryAction?: CommandBoxAction
+  primaryAction?: CommandBoxAction;
   /** Secondary action button (displayed before primary) */
-  secondaryAction?: CommandBoxAction
+  secondaryAction?: CommandBoxAction;
   /** Additional CSS classes for the container */
-  className?: string
+  className?: string;
   /** Additional CSS classes for the command text */
-  commandClassName?: string
+  commandClassName?: string;
   /** Maximum lines to show (uses line-clamp, 0 for unlimited) */
-  maxLines?: number
+  maxLines?: number;
+  /** When set, shows a copy icon button in the top-right corner of the box */
+  onCopy?: () => void;
+  /** Accessible label for the corner copy button */
+  copyAriaLabel?: string;
 }
 
 /**
@@ -77,7 +82,7 @@ const lineClampClasses: Record<number, string> = {
   4: 'line-clamp-4',
   5: 'line-clamp-5',
   6: 'line-clamp-6',
-}
+};
 
 export function CommandBox({
   command,
@@ -86,30 +91,47 @@ export function CommandBox({
   secondaryAction,
   className,
   commandClassName,
-  maxLines = 0
+  maxLines = 0,
+  onCopy,
+  copyAriaLabel = 'Copy command',
 }: CommandBoxProps) {
   // Get static line-clamp class or undefined for unlimited
-  const lineClampClass = maxLines > 0 ? lineClampClasses[maxLines] : undefined
+  const lineClampClass = maxLines > 0 ? lineClampClasses[maxLines] : undefined;
+
+  const commandText = (
+    <div
+      className={cn(
+        'break-all text-ods-text-primary text-code',
+        onCopy && 'min-w-0 flex-1',
+        lineClampClass,
+        commandClassName,
+      )}
+    >
+      {command}
+    </div>
+  );
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      {title && (
-        <div className="text-ods-text-primary text-h4">
-          {title}
-        </div>
-      )}
-      <div className="bg-ods-bg border border-ods-border rounded-[6px] p-4">
-        <div
-          className={cn(
-            'text-ods-text-primary text-code break-all',
-            lineClampClass,
-            commandClassName
-          )}
-        >
-          {command}
-        </div>
+      {title && <div className="text-ods-text-primary text-h4">{title}</div>}
+      <div className="rounded-[6px] border border-ods-border bg-ods-bg p-4">
+        {onCopy ? (
+          <div className="flex items-start gap-4">
+            {commandText}
+            <button
+              type="button"
+              onClick={onCopy}
+              aria-label={copyAriaLabel}
+              className="shrink-0 rounded-md text-ods-text-secondary transition-colors hover:text-ods-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
+            >
+              <Copy02Icon className="h-5 w-5" />
+            </button>
+          </div>
+        ) : (
+          commandText
+        )}
         {(primaryAction || secondaryAction) && (
-          <div className="flex flex-col md:flex-row gap-3 md:justify-end mt-4">
+          <div className="mt-4 flex flex-col gap-3 md:flex-row md:justify-end">
             {secondaryAction && (
               <Button
                 variant={secondaryAction.variant || 'outline'}
@@ -138,5 +160,5 @@ export function CommandBox({
         )}
       </div>
     </div>
-  )
+  );
 }

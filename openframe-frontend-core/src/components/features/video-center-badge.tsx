@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * THE center media glyphs — the single visual identity for every play/unmute
@@ -23,25 +23,25 @@
  *     glyph language via CSS (see styles/app-globals.css).
  */
 
-import React from 'react'
-import { PlayFilledIcon } from '../icons/play-filled-icon'
-import { VolumeOffFilledIcon } from '../icons/volume-off-filled-icon'
-import { cn } from '../../utils/cn'
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import { PlayFilledIcon } from '../icons/play-filled-icon';
+import { VolumeOffFilledIcon } from '../icons/volume-off-filled-icon';
 
-export type VideoCenterBadgeSize = 'sm' | 'md' | 'lg'
+export type VideoCenterBadgeSize = 'sm' | 'md' | 'lg';
 
 const SIZES: Record<VideoCenterBadgeSize, number> = {
   sm: 20, // gallery thumbnails
   md: 56, // strip cards + unmute chip
   lg: 64, // hero facades
-}
+};
 
 /** Soft legibility shadow — NOT a background (per design: bare glyphs). */
-const GLYPH_SHADOW = 'drop-shadow(0 1px 4px rgba(0,0,0,0.5))'
+const GLYPH_SHADOW = 'drop-shadow(0 1px 4px rgba(0,0,0,0.5))';
 
 export interface VideoPlayBadgeProps {
-  size?: VideoCenterBadgeSize
-  className?: string
+  size?: VideoCenterBadgeSize;
+  className?: string;
 }
 
 /** Bare play glyph (the icon system's PlayIcon). Decorative
@@ -63,12 +63,12 @@ export function VideoPlayBadge({ size = 'md', className }: VideoPlayBadgeProps):
     >
       <PlayFilledIcon size={SIZES[size]} color="currentColor" />
     </div>
-  )
+  );
 }
 
 export interface VideoUnmuteGlyphProps {
-  size?: VideoCenterBadgeSize
-  className?: string
+  size?: VideoCenterBadgeSize;
+  className?: string;
 }
 
 /** Bare muted-volume glyph (the icon system's VolumeOffFilledIcon). Rendered
@@ -82,5 +82,5 @@ export function VideoUnmuteGlyph({ size = 'md', className }: VideoUnmuteGlyphPro
       className={cn('transition-colors group-hover/card:text-ods-accent', className)}
       style={{ filter: GLYPH_SHADOW }}
     />
-  )
+  );
 }

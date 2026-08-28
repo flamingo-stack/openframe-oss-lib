@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::runtime::Runtime;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::installation_initial_config_service::{
     InstallConfigParams, InstallationInitialConfigService,
@@ -212,6 +212,7 @@ impl Service {
                         let machine_info = PersistedMachineInfo {
                             machine_id,
                             client_secret,
+                            user_id: None,
                         };
                         match machine_info_persistence::write(&machine_info) {
                             Ok(()) => info!("Machine info persisted successfully"),
@@ -282,9 +283,13 @@ impl Service {
             InstallationInitialConfigService::new(dir_manager.clone())
                 .context("Failed to initialize InstallationInitialConfigService")?;
 
-        installation_initial_config_service
-            .build_and_save(params)
-            .context("Failed to process initial configuration during service installation")?;
+        if params.is_parameterless() {
+            info!("Parameterless install — configuration deferred to 'openframe auth'");
+        } else {
+            installation_initial_config_service
+                .build_and_save(params)
+                .context("Failed to process initial configuration during service installation")?;
+        }
 
         // Get the current executable path
         let current_exe_path =
@@ -365,21 +370,28 @@ impl Service {
             info!(
                 "Binary installed successfully. You can now use 'openframe' command from anywhere."
             );
-
-            #[cfg(target_os = "windows")]
-            {
-                if let Some(bin_dir) = install_path.parent() {
-                    info!("Adding {} to system PATH", bin_dir.display());
-                    Self::add_to_windows_path(bin_dir).context("Failed to add to PATH")?;
-
-                    info!("⚠️  Please restart your terminal to use 'openframe-client' command");
-                }
-            }
         } else {
             info!(
                 "Binary is already in the standard location: {}",
                 install_path.display()
             );
+        }
+
+        // Outside the copy branch: an install run from the installed location skips the copy,
+        // but the uninstall it launched first has already removed the alias and the PATH entry.
+        // Both operations are idempotent, so running them every time is safe.
+        if let Err(e) = Self::create_alias(&install_path) {
+            warn!("Failed to create 'openframe' alias: {:#}", e);
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(bin_dir) = install_path.parent() {
+                info!("Adding {} to system PATH", bin_dir.display());
+                Self::add_to_windows_path(bin_dir).context("Failed to add to PATH")?;
+
+                info!("⚠️  Please restart your terminal to use 'openframe-client' command");
+            }
         }
 
         // Use the installation path for the service registration
@@ -512,6 +524,8 @@ impl Service {
                 .ok()
         };
 
+        Self::remove_alias(&install_path);
+
         // Call platform-specific uninstall implementation
         #[cfg(target_os = "windows")]
         {
@@ -565,11 +579,114 @@ impl Service {
         #[cfg(target_os = "windows")]
         crate::platform::windows_path_migration::run();
 
+        // Awaiting-auth gate: after a parameterless install there is no initial
+        // configuration yet, and constructing the client without one would fail and
+        // crash-loop the service. Idle here until `openframe auth` writes it.
+        let initial_config_service =
+            crate::services::InitialConfigurationService::new(dir_manager.clone())
+                .context("Failed to initialize initial configuration service")?;
+        if !initial_config_service.is_configured() {
+            info!(
+                "Not authenticated yet — waiting for configuration (run 'openframe auth' with your tenant parameters)"
+            );
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(
+                    crate::config::update_config::AWAITING_AUTH_POLL_SECS,
+                ))
+                .await;
+                if initial_config_service.is_configured() {
+                    info!("Configuration detected — starting the client");
+                    break;
+                }
+            }
+        }
+
         // Initialize the client
         let client = Client::new()?;
 
         // Start the client
         client.start().await
+    }
+
+    /// `openframe` next to the installed `openframe-client`, so the documented
+    /// commands (`openframe auth ...`) work as typed.
+    fn alias_path(install_path: &Path) -> PathBuf {
+        #[cfg(target_os = "windows")]
+        {
+            install_path.with_file_name("openframe.cmd")
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            install_path.with_file_name("openframe")
+        }
+    }
+
+    fn create_alias(install_path: &Path) -> Result<()> {
+        let alias = Self::alias_path(install_path);
+        if alias.symlink_metadata().map(|_| true).unwrap_or(false) {
+            std::fs::remove_file(&alias)
+                .with_context(|| format!("Failed to remove existing alias {}", alias.display()))?;
+        }
+
+        // A shim, not a link: the updater swaps the binary by replacing its directory
+        // entry, so a hard link (or copy) would keep serving the pre-update binary
+        // forever. `%~dp0` resolves at run time, so the shim always execs the current exe.
+        #[cfg(target_os = "windows")]
+        {
+            let target = install_path
+                .file_name()
+                .map(|name| name.to_string_lossy().to_string())
+                .unwrap_or_else(|| "openframe-client.exe".to_string());
+            std::fs::write(&alias, format!("@\"%~dp0{}\" %*\r\n", target))
+                .with_context(|| format!("Failed to write alias shim at {}", alias.display()))?;
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            // A symlink stores the path and resolves at exec time, so it survives updates.
+            std::os::unix::fs::symlink(install_path, &alias)
+                .with_context(|| format!("Failed to symlink alias at {}", alias.display()))?;
+        }
+
+        info!("Created 'openframe' alias at {}", alias.display());
+        Ok(())
+    }
+
+    fn remove_alias(install_path: &Path) {
+        let alias = Self::alias_path(install_path);
+        if alias.symlink_metadata().is_ok() {
+            if let Err(e) = std::fs::remove_file(&alias) {
+                warn!("Failed to remove alias {}: {:#}", alias.display(), e);
+            }
+        }
+    }
+
+    /// Restart the service so a freshly written configuration is picked up now.
+    /// Needed for more than speed: the configuration is read once, when the client is
+    /// constructed, so re-running `auth` on an already-running client would otherwise
+    /// have no effect until the next restart.
+    ///
+    /// Errors only when the service was stopped and could not be started again — nothing
+    /// restarts an explicitly stopped service, so that case has to reach the operator.
+    pub async fn nudge_restart() -> Result<()> {
+        if !Self::is_installed() {
+            return Ok(());
+        }
+
+        // Only start what we actually stopped: if the stop fails the service is still
+        // running, and the awaiting-auth poll picks the configuration up on its own.
+        if let Err(e) =
+            crate::platform::system_service::stop_service(FULL_SERVICE_NAME, false).await
+        {
+            debug!(
+                "Could not stop the service to apply configuration, leaving it running: {:#}",
+                e
+            );
+            return Ok(());
+        }
+
+        crate::platform::system_service::start_service(FULL_SERVICE_NAME)
+            .await
+            .context("Failed to start the service after saving the configuration")
     }
 
     /// Get the standard installation location for the OpenFrame binary
@@ -731,8 +848,10 @@ impl Service {
     fn reg_value_to_string(raw: &winreg::RegValue) -> String {
         String::from_utf16_lossy(
             &raw.bytes
-                .chunks_exact(2)
-                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|c| u16::from_le_bytes(*c))
                 .collect::<Vec<u16>>(),
         )
         .trim_end_matches('\0')

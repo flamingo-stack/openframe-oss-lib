@@ -5,6 +5,7 @@ pub mod agent_token_response;
 pub mod device_tag;
 pub mod download_configuration;
 pub mod execution;
+pub mod hostname_report_message;
 pub mod initial_configuration;
 pub mod installed_agent_message;
 pub mod installed_tool;
@@ -22,9 +23,9 @@ pub mod tool_version_overrides;
 pub mod update_state;
 
 pub use execution::{
-    CommandMessage, ExecutionMessage, ExecutionRequest, PrivilegeLevel, RmmResult, ScriptEnvVar,
-    ScriptMessage, ScriptScheduleExecutionItem, ScriptScheduleExecutionMessage, ScriptShell,
-    ScriptSpec,
+    CommandMessage, ExecutionAck, ExecutionMessage, ExecutionRequest, PrivilegeLevel, RmmResult,
+    ScriptEnvVar, ScriptMessage, ScriptScheduleExecutionItem, ScriptScheduleExecutionMessage,
+    ScriptShell, ScriptSpec,
 };
 
 pub use agent_configuration::AgentConfiguration;
@@ -33,6 +34,7 @@ pub use agent_registration_response::AgentRegistrationResponse;
 pub use agent_token_response::AgentTokenResponse;
 pub use device_tag::DeviceTag;
 pub use download_configuration::{DownloadConfiguration, InstallationType};
+pub use hostname_report_message::HostnameReportMessage;
 pub use initial_configuration::InitialConfiguration;
 pub use installed_agent_message::InstalledAgentMessage;
 pub use installed_tool::{Installation, InstalledAsset, InstalledTool, ToolRecordState};

@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-import static com.openframe.data.document.rmm.OsType.MAC_OS;
+import static com.openframe.data.document.rmm.script.OsType.MAC_OS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;

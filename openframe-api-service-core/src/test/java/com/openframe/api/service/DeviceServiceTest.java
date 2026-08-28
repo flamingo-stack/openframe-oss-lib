@@ -3,8 +3,10 @@ package com.openframe.api.service;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.exception.DeviceNotFoundException;
+import com.openframe.api.mapper.DeviceFilterOptionMapper;
+import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
-import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
+import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
@@ -27,8 +29,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-import static com.openframe.data.document.rmm.OsType.MAC_OS;
-import static com.openframe.data.document.rmm.OsType.WINDOWS;
+import static com.openframe.data.document.rmm.script.OsType.MAC_OS;
+import static com.openframe.data.document.rmm.script.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,7 +54,7 @@ class DeviceServiceTest {
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private DeviceStatusProcessor deviceStatusProcessor;
-    @Mock private ScriptScheduleDeviceService scriptScheduleDeviceService;
+    @Mock private ScheduleScriptDeviceService scheduleScriptDeviceService;
     @Mock private DeviceFilterOptionMapper deviceFilterOptionMapper;
     @Mock
     private TenantIdProvider tenantIdProvider;
@@ -60,7 +62,7 @@ class DeviceServiceTest {
     private DeviceService service() {
         DeviceService s = new DeviceService(machineRepository, deviceOnlineDispatchRepository, machineWriter,
                 tagRepository, tagAssignmentRepository,
-                deviceStatusProcessor, scriptScheduleDeviceService, deviceFilterOptionMapper, tenantIdProvider);
+                deviceStatusProcessor, scheduleScriptDeviceService, deviceFilterOptionMapper, tenantIdProvider);
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         lenient().when(machineRepository.countMachines(any(), any(MachineQueryFilter.class), any())).thenReturn(0L);
         lenient().when(machineRepository.findMachinesWithCursor(any(), any(MachineQueryFilter.class), any(),
@@ -240,7 +242,7 @@ class DeviceServiceTest {
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
-        verify(scriptScheduleDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
+        verify(scheduleScriptDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
         verify(deviceOnlineDispatchRepository).deleteByTenantIdAndMachineId("t-1", "m-del");
     }
 
@@ -253,13 +255,13 @@ class DeviceServiceTest {
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
         doThrow(new RuntimeException("mongo hiccup"))
-                .when(scriptScheduleDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
+                .when(scheduleScriptDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
 
         assertThatThrownBy(() -> service().updateStatusByMachineId("m-del", DeviceStatus.DELETED))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("mongo hiccup");
 
-        verify(scriptScheduleDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
+        verify(scheduleScriptDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
         verify(machineRepository, never()).save(any());
         assertThat(m.getStatus()).isEqualTo(DeviceStatus.ONLINE);
         verifyNoInteractions(deviceStatusProcessor);
@@ -276,7 +278,7 @@ class DeviceServiceTest {
 
         service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
-        verify(scriptScheduleDeviceService, never()).removeDeviceFromAllSchedules(any(), any());
+        verify(scheduleScriptDeviceService, never()).removeDeviceFromAllSchedules(any(), any());
         verify(deviceOnlineDispatchRepository, never()).deleteByTenantIdAndMachineId(any(), any());
     }
 

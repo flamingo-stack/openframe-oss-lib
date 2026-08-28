@@ -1,11 +1,12 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import org.springframework.data.domain.Sort;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,6 +24,8 @@ import java.util.Optional;
 public interface CustomScriptExecutionRepository {
 
     Optional<ScriptExecution> findByMachineIdAndExecutionIdAndScriptId(String machineId, String executionId, String scriptId);
+
+    List<ScriptExecution> findByMachineIdAndExecutionIdAndScriptIdIn(String machineId, String executionId, Collection<String> scriptIds);
 
     /**
      * Cursor-paginated executions for one owner (script or schedule) within a tenant.
@@ -87,7 +90,7 @@ public interface CustomScriptExecutionRepository {
      * for non-{@code _id} sort fields (empty {@code sortValue} for null Instant), or the plain
      * hex {@code _id} for {@code _id} sort. Consumed by {@link #findPage} on the next request.
      */
-    String encodeCursor(com.openframe.data.document.rmm.ScriptExecution row, String sortField);
+    String encodeCursor(ScriptExecution row, String sortField);
 
     /**
      * Count leaf {@link ScriptExecution} rows for one schedule fire, grouped by status.
@@ -97,6 +100,9 @@ public interface CustomScriptExecutionRepository {
      */
     LeafStatusCounts countLeavesByStatus(String tenantId, String executionId);
 
-    /** Running/failed counts for the leaves of one schedule fire; other terminal statuses are irrelevant to the decision. */
-    record LeafStatusCounts(long running, long failed) {}
+    /**
+     * Leaf counts for one schedule fire. {@code inProgress} is the not-yet-terminal count — leaves that
+     * are QUEUED (awaiting agent ack) or RUNNING; the header stays open while it is &gt; 0.
+     */
+    record LeafStatusCounts(long inProgress, long failed) {}
 }

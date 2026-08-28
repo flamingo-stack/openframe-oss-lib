@@ -29,43 +29,43 @@ export interface OgPlaceholderEndpoints {
   /** Explicit base URL for the og-placeholder route. May already carry query
    *  params — they're preserved. Per-platform colors are NOT baked here; the
    *  route resolves them server-side from the platform. */
-  ogPlaceholderUrl?: string
+  ogPlaceholderUrl?: string;
   /** Sibling image route under the SAME API base. When `ogPlaceholderUrl` is
    *  unset, the base is derived from this by swapping the trailing
    *  `/image-proxy` segment for `/og-placeholder` — so a host that already
    *  proxies images gets the placeholder for free, with zero extra wiring. */
-  imageProxyUrlPrefix?: string
+  imageProxyUrlPrefix?: string;
 }
 
 export interface BuildOgPlaceholderOptions {
   /** Site name shown under the title. Skipped when empty. */
-  site?: string
+  site?: string;
   /** `'wide'` (1200×630, the route default — no `w`/`h` emitted) or
    *  `'square'` (1024×1024, for compact 56×56 chat-inline slots). */
-  aspect?: 'wide' | 'square'
+  aspect?: 'wide' | 'square';
   /** Explicit pixel overrides (win over `aspect`). */
-  width?: number
-  height?: number
+  width?: number;
+  height?: number;
 }
 
 /** Same-origin default — for hosts that serve the route themselves (the hub).
  *  Cross-origin embedders override via `ogPlaceholderUrl` or inherit it from
  *  `imageProxyUrlPrefix`. */
-const DEFAULT_OG_PLACEHOLDER_PATH = '/api/og-placeholder'
+const DEFAULT_OG_PLACEHOLDER_PATH = '/api/og-placeholder';
 
 /** Resolve the og-placeholder route base from the host's endpoints.
  *  Internal — callers go through `buildOgPlaceholderUrl(endpoints, …)`. */
 function resolveOgPlaceholderBase(endpoints?: OgPlaceholderEndpoints | null): string {
-  if (endpoints?.ogPlaceholderUrl) return endpoints.ogPlaceholderUrl
-  const imageProxy = endpoints?.imageProxyUrlPrefix
+  if (endpoints?.ogPlaceholderUrl) return endpoints.ogPlaceholderUrl;
+  const imageProxy = endpoints?.imageProxyUrlPrefix;
   if (imageProxy) {
     // `/image-proxy` and `/og-placeholder` are sibling API routes under one
     // base. Anchor to a path-segment boundary so we only rewrite the route
     // name, never an incidental substring.
-    const derived = imageProxy.replace(/\/image-proxy(?=$|[?/])/, '/og-placeholder')
-    if (derived !== imageProxy) return derived
+    const derived = imageProxy.replace(/\/image-proxy(?=$|[?/])/, '/og-placeholder');
+    if (derived !== imageProxy) return derived;
   }
-  return DEFAULT_OG_PLACEHOLDER_PATH
+  return DEFAULT_OG_PLACEHOLDER_PATH;
 }
 
 /**
@@ -83,23 +83,23 @@ export function buildOgPlaceholderUrl(
   title: string,
   options: BuildOgPlaceholderOptions = {},
 ): string {
-  const base = resolveOgPlaceholderBase(endpoints)
-  const qIndex = base.indexOf('?')
-  const path = qIndex === -1 ? base : base.slice(0, qIndex)
-  const params = new URLSearchParams(qIndex === -1 ? '' : base.slice(qIndex + 1))
+  const base = resolveOgPlaceholderBase(endpoints);
+  const qIndex = base.indexOf('?');
+  const path = qIndex === -1 ? base : base.slice(0, qIndex);
+  const params = new URLSearchParams(qIndex === -1 ? '' : base.slice(qIndex + 1));
 
-  params.set('title', title)
-  if (options.site) params.set('site', options.site)
+  params.set('title', title);
+  if (options.site) params.set('site', options.site);
 
   // Square aspect → request a 1024×1024 image so `object-cover` doesn't crop
   // the title off in compact slots. Wide leaves dimensions to the route
   // default (1200×630). Explicit width/height always win.
-  const width = options.width ?? (options.aspect === 'square' ? 1024 : undefined)
-  const height = options.height ?? (options.aspect === 'square' ? 1024 : undefined)
+  const width = options.width ?? (options.aspect === 'square' ? 1024 : undefined);
+  const height = options.height ?? (options.aspect === 'square' ? 1024 : undefined);
   // `Number.isFinite` does not coerce, so it already rejects `undefined` — no
   // separate `typeof === 'number'` guard needed.
-  if (Number.isFinite(width)) params.set('w', String(width))
-  if (Number.isFinite(height)) params.set('h', String(height))
+  if (Number.isFinite(width)) params.set('w', String(width));
+  if (Number.isFinite(height)) params.set('h', String(height));
 
-  return `${path}?${params.toString()}`
+  return `${path}?${params.toString()}`;
 }

@@ -5,32 +5,32 @@
 // (used for `<Link aria-disabled>` since anchors don't support `:disabled`).
 export const buttonSurfaceClasses = {
   accent:
-    "bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover active:bg-ods-accent-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled",
+    'bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover active:bg-ods-accent-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled',
   outline:
-    "bg-ods-card text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-ods-card disabled:text-ods-text-disabled aria-disabled:bg-ods-card aria-disabled:text-ods-text-disabled",
+    'bg-ods-card text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-ods-card disabled:text-ods-text-disabled aria-disabled:bg-ods-card aria-disabled:text-ods-text-disabled',
   transparent:
-    "bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-transparent disabled:text-ods-text-disabled aria-disabled:bg-transparent aria-disabled:text-ods-text-disabled",
+    'bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-transparent disabled:text-ods-text-disabled aria-disabled:bg-transparent aria-disabled:text-ods-text-disabled',
   destructive:
-    "bg-ods-error text-ods-text-on-accent hover:bg-ods-error-hover active:bg-ods-error-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled",
+    'bg-ods-error text-ods-text-on-accent hover:bg-ods-error-hover active:bg-ods-error-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled',
   warning:
-    "bg-ods-warning text-ods-text-on-accent hover:bg-ods-warning-hover active:bg-ods-warning-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled",
+    'bg-ods-warning text-ods-text-on-accent hover:bg-ods-warning-hover active:bg-ods-warning-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled',
   // A self-contained glyph (play badge, unmute glyph) that already carries its
   // own scrim: no button surface at all, in any state. Distinct from
   // `transparent`, whose hover/active fills would paint a rectangle behind the
   // glyph — which is why call sites were undoing them with
   // `hover:bg-transparent active:bg-transparent`.
   glyph:
-    "bg-transparent text-ods-text-primary hover:bg-transparent active:bg-transparent disabled:bg-transparent disabled:text-ods-text-disabled aria-disabled:bg-transparent aria-disabled:text-ods-text-disabled",
+    'bg-transparent text-ods-text-primary hover:bg-transparent active:bg-transparent disabled:bg-transparent disabled:text-ods-text-disabled aria-disabled:bg-transparent aria-disabled:text-ods-text-disabled',
   // Chrome that sits ON media (video cards, image lightboxes): a scrim disc so
   // the glyph stays legible over an arbitrary frame. Promoted to a variant
   // because the walkthrough card, its theater and the bite cards were each
   // stacking the same classes at the call site.
   overlay:
-    "rounded-full bg-ods-overlay text-ods-text-primary backdrop-blur-sm hover:text-ods-accent active:text-ods-accent-active disabled:text-ods-text-disabled aria-disabled:text-ods-text-disabled",
-} as const
+    'rounded-full bg-ods-overlay text-ods-text-primary backdrop-blur-sm hover:text-ods-accent active:text-ods-accent-active disabled:text-ods-text-disabled aria-disabled:text-ods-text-disabled',
+} as const;
 
 export const outlineBorderClasses =
-  "border border-ods-border hover:border-ods-border-hover active:border-ods-border-active disabled:border-ods-border aria-disabled:border-ods-border"
+  'border border-ods-border hover:border-ods-border-hover active:border-ods-border-active disabled:border-ods-border aria-disabled:border-ods-border';
 
 // Glyph scale for the split-layout button family: 16px below md, 24px from md.
 //
@@ -41,15 +41,29 @@ export const outlineBorderClasses =
 // responsive scale while the `Button` split slots re-declared a flat 20px, so a
 // "submenu" action's icons rendered 4px smaller than its neighbour's on desktop.
 // `Button`'s own flat `[&_svg]:h-5` stays as it is for ordinary (non-split) buttons.
-export const splitGlyphSizeClasses = "[&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6"
+export const splitGlyphSizeClasses = '[&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6';
+
+// Per-size glyph scale for `Button`'s split slots AND the loading overlay that
+// covers them, so those two read from ONE place — the overlay sits outside both
+// slots and inherits neither their sizing nor a shell base rule, so without this it
+// would have to restate a number, which is the divergence described above.
+//
+// Scoped to `Button` on purpose: `SplitButton` keeps its own `small` ramp
+// (12px → 16px, vs the flat 16px here) and only shares the `default` step through
+// `splitGlyphSizeClasses`. Aligning `small` too is a visible design change, so it is
+// not folded in here silently.
+export const splitGlyphSizeBySize = {
+  default: splitGlyphSizeClasses,
+  small: '[&_svg]:h-4 [&_svg]:w-4',
+} as const;
 
 // Color of the vertical seam between the main and icon halves (split layouts).
 export const splitDividerColorClasses = {
-  accent: "border-ods-accent-active",
-  outline: "border-ods-border",
-  transparent: "border-ods-border",
-  destructive: "border-ods-error-active",
-  warning: "border-ods-warning-active",
-} as const
+  accent: 'border-ods-accent-active',
+  outline: 'border-ods-border',
+  transparent: 'border-ods-border',
+  destructive: 'border-ods-error-active',
+  warning: 'border-ods-warning-active',
+} as const;
 
-export type ButtonSurfaceVariant = keyof typeof buttonSurfaceClasses
+export type ButtonSurfaceVariant = keyof typeof buttonSurfaceClasses;

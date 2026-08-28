@@ -1,3 +1,6 @@
+import type { RealCategory } from './categories';
+import type { Vendor } from './vendor';
+
 export interface CategoryCardProps {
   category: {
     id: string;
@@ -26,7 +29,7 @@ export interface RealCategoryCardProps {
   };
   vendorCount?: number;
   subcategoryCount?: number;
-  vendors?: any[];
+  vendors?: Vendor[];
   isLoading?: boolean;
   isLoadingVendorCount?: boolean;
   isLoadingSubcategoryCount?: boolean;
@@ -34,9 +37,10 @@ export interface RealCategoryCardProps {
 }
 
 export interface CategoryData {
-  data: any[];
+  data: RealCategory[];
   isLoading: boolean;
-  error: any;
-  vendors: any[];
+  /** Whatever the fetch layer threw — narrow at the point of display. */
+  error: unknown;
+  vendors: Vendor[];
   loading: boolean;
 }

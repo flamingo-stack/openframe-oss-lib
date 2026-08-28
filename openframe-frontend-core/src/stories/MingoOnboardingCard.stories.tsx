@@ -1,11 +1,10 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { MingoOnboardingCard } from '../components/chat/mingo-onboarding-card'
-import { resolveIcon } from '../components/chat/utils/icon-library'
-import { ClickupLogoGreyIcon } from '../components/icons-v2-generated/brand-logos/clickup-logo-grey-icon'
-import { CompassIcon } from '../components/icons-v2-generated/map-and-travel/compass-icon'
-import { Rocket02Icon } from '../components/icons-v2-generated/vehicles-and-delivery/rocket-02-icon'
-import { BracketCurlyIcon } from '../components/icons-v2-generated/coding/bracket-curly-icon'
-import { ChatsIcon } from '../components/icons-v2-generated/communication/chats-icon'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { MingoOnboardingCard } from '../components/chat/mingo-onboarding-card';
+import { resolveIcon } from '../components/chat/utils/icon-library';
+import { BracketCurlyIcon } from '../components/icons-v2-generated/coding/bracket-curly-icon';
+import { ChatsIcon } from '../components/icons-v2-generated/communication/chats-icon';
+import { CompassIcon } from '../components/icons-v2-generated/map-and-travel/compass-icon';
+import { Rocket02Icon } from '../components/icons-v2-generated/vehicles-and-delivery/rocket-02-icon';
 
 const meta: Meta<typeof MingoOnboardingCard> = {
   title: 'Chat/MingoOnboardingCard',
@@ -24,18 +23,18 @@ const meta: Meta<typeof MingoOnboardingCard> = {
     onClick: { control: false },
   },
   decorators: [
-    (Story) => (
-      <div className="w-[520px] bg-ods-bg p-4 rounded-md border border-ods-border">
+    Story => (
+      <div className="w-[520px] rounded-md border border-ods-border bg-ods-bg p-4">
         <div className="overflow-hidden rounded-md border border-ods-border">
           <Story />
         </div>
       </div>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 // =============================================================================
 // Single-card examples — icons are pulled directly from `icons-v2-generated`
@@ -49,7 +48,7 @@ export const Default: Story = {
     slashCommand: '/roadmap',
     description: 'Public product roadmap with upcoming features and releases',
   },
-}
+};
 
 export const WithoutDescription: Story = {
   args: {
@@ -57,7 +56,7 @@ export const WithoutDescription: Story = {
     title: 'ClickUp Roadmap',
     slashCommand: '/roadmap',
   },
-}
+};
 
 export const WithoutSlashCommand: Story = {
   args: {
@@ -65,7 +64,7 @@ export const WithoutSlashCommand: Story = {
     title: 'Get started',
     description: 'Browse onboarding guides and quick wins',
   },
-}
+};
 
 export const LongTitleTruncates: Story = {
   args: {
@@ -74,7 +73,7 @@ export const LongTitleTruncates: Story = {
     slashCommand: '/very-long-slash-command-name',
     description: 'Description for the truncating row.',
   },
-}
+};
 
 export const Clickable: Story = {
   args: {
@@ -83,11 +82,10 @@ export const Clickable: Story = {
     slashCommand: '/slack',
     description: 'Messages and discussions from the OpenMSP community Slack',
     onClick: () => {
-      // eslint-disable-next-line no-console
-      console.log('[story] card clicked')
+      console.log('[story] card clicked');
     },
   },
-}
+};
 
 export const WithActions: Story = {
   args: {
@@ -100,29 +98,26 @@ export const WithActions: Story = {
         id: 'recent',
         label: 'Recent',
         onClick: () => {
-          // eslint-disable-next-line no-console
-          console.log('[story] recent clicked')
+          console.log('[story] recent clicked');
         },
       },
       {
         id: 'search',
         label: 'Search',
         onClick: () => {
-          // eslint-disable-next-line no-console
-          console.log('[story] search clicked')
+          console.log('[story] search clicked');
         },
       },
       {
         id: 'find',
         label: 'Find',
         onClick: () => {
-          // eslint-disable-next-line no-console
-          console.log('[story] find clicked')
+          console.log('[story] find clicked');
         },
       },
     ],
   },
-}
+};
 
 // =============================================================================
 // Stack of `chipCommands` — mirrors Figma node 7363:205938 (full empty-state).
@@ -131,13 +126,13 @@ export const WithActions: Story = {
 // =============================================================================
 
 interface ChipCommand {
-  iconName: string
-  label: string
-  slashCommand: string
-  description: string
+  iconName: string;
+  label: string;
+  slashCommand: string;
+  description: string;
   /** Action labels for the outline-chip buttons below the description.
    *  Empty array → no action row (card stays click-only). */
-  actions: ReadonlyArray<string>
+  actions: ReadonlyArray<string>;
 }
 
 const SAMPLE_CHIP_COMMANDS: ReadonlyArray<ChipCommand> = [
@@ -232,7 +227,7 @@ const SAMPLE_CHIP_COMMANDS: ReadonlyArray<ChipCommand> = [
     description: 'Industry events, MSP meetups, and conferences',
     actions: ['Recent', 'Search'],
   },
-]
+];
 
 export const ChipCommands: Story = {
   parameters: {
@@ -245,28 +240,25 @@ export const ChipCommands: Story = {
   },
   render: () => (
     <>
-      {SAMPLE_CHIP_COMMANDS.map(
-        ({ iconName, label, slashCommand, description, actions }) => {
-          const Icon = resolveIcon(iconName)
-          return (
-            <MingoOnboardingCard
-              key={slashCommand + label}
-              icon={<Icon size={16} />}
-              title={label}
-              slashCommand={slashCommand}
-              description={description}
-              actions={actions.map((actionLabel) => ({
-                id: actionLabel.toLowerCase(),
-                label: actionLabel,
-                onClick: () => {
-                  // eslint-disable-next-line no-console
-                  console.log('[story] dispatch', slashCommand, actionLabel)
-                },
-              }))}
-            />
-          )
-        },
-      )}
+      {SAMPLE_CHIP_COMMANDS.map(({ iconName, label, slashCommand, description, actions }) => {
+        const Icon = resolveIcon(iconName);
+        return (
+          <MingoOnboardingCard
+            key={slashCommand + label}
+            icon={<Icon size={16} />}
+            title={label}
+            slashCommand={slashCommand}
+            description={description}
+            actions={actions.map(actionLabel => ({
+              id: actionLabel.toLowerCase(),
+              label: actionLabel,
+              onClick: () => {
+                console.log('[story] dispatch', slashCommand, actionLabel);
+              },
+            }))}
+          />
+        );
+      })}
     </>
   ),
-}
+};

@@ -10,6 +10,7 @@ extend type Mutation {
 "The 'Notify about' checkboxes. A notification type outside every group cannot be muted."
 enum NotificationSettingGroup {
     TICKET_ASSIGNED
+    TICKET_CREATED
     TICKET_STATUS_CHANGED
     CUSTOMER_REPLIED
     ADMIN_REPLIED
@@ -20,6 +21,8 @@ enum NotificationSettingGroup {
 
 type NotificationTypeSetting {
     group: NotificationSettingGroup!
+    "Ready-to-render checkbox caption — a new group ships its own label, the client never maps the enum."
+    label: String!
     enabled: Boolean!
 }
 

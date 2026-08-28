@@ -1,7 +1,8 @@
 package com.openframe.client.service.rmm.watchdog;
 
-import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.client.metrics.ScriptExecutionWatchdogMetrics;
+import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +11,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +21,7 @@ public class ScriptExecutionWatchdogService {
 
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleJobExecutionWatchdogService headerWatchdogService;
+    private final ScriptExecutionWatchdogMetrics watchdogMetrics;
 
     @Value("${openframe.rmm.execution.watchdog.grace-seconds:120}")
     private long graceSeconds;
@@ -31,15 +32,7 @@ public class ScriptExecutionWatchdogService {
     public void markStuckExecutionsAsFailed() {
         Instant now = Instant.now();
 
-        // Coarse, index-backed pre-filter: no RUNNING row can be stuck before the
-        // smallest possible per-row threshold elapses. Refine precisely in memory.
-        long coarseFloorSeconds = Math.min(graceSeconds, fallbackThresholdSeconds);
-        List<ScriptExecution> candidates = scriptExecutionRepository.findByStatusAndDispatchedAtBefore(
-                ExecutionStatus.RUNNING, now.minusSeconds(coarseFloorSeconds));
-
-        List<ScriptExecution> stuck = candidates.stream()
-                .filter(row -> isStuck(row, now))
-                .toList();
+        List<ScriptExecution> stuck = findStuckRunning(now);
         if (stuck.isEmpty()) {
             log.debug("No stuck Execution rows found");
             return;
@@ -48,29 +41,19 @@ public class ScriptExecutionWatchdogService {
         log.info("Found {} stuck Execution row(s) — transitioning to FAILED", stuck.size());
         stuck.forEach(row -> markFailing(row, now));
         scriptExecutionRepository.saveAll(stuck);
-
+        watchdogMetrics.recordScriptReaped(stuck.size());
         log.info("Marked {} Execution row(s) as FAILED", stuck.size());
 
-        finalizeAffectedScheduleHeaders(stuck);
+        headerWatchdogService.finalizeAffectedHeaders(stuck);
     }
 
-    private void finalizeAffectedScheduleHeaders(List<ScriptExecution> reaped) {
-        reaped.stream()
-                .filter(row -> row.getScheduleId() != null
-                        && row.getTenantId() != null
-                        && row.getExecutionId() != null)
-                .map(row -> Map.entry(row.getTenantId(), row.getExecutionId()))
-                .distinct()
-                .forEach(e -> headerWatchdogService.finalizeIfSettled(e.getKey(), e.getValue()));
-    }
-
-    private boolean isStuck(ScriptExecution row, Instant now) {
-        return row.getDispatchedAt() != null && row.getDispatchedAt().isBefore(now.minusSeconds(thresholdSecondsFor(row)));
-    }
-
-    private long thresholdSecondsFor(ScriptExecution row) {
-        Integer timeout = row.getTimeoutSeconds();
-        return timeout != null ? timeout + graceSeconds : fallbackThresholdSeconds;
+    private List<ScriptExecution> findStuckRunning(Instant now) {
+        long coarseFloorSeconds = Math.min(graceSeconds, fallbackThresholdSeconds);
+        return scriptExecutionRepository
+                .findByStatusAndDispatchedAtBefore(ExecutionStatus.RUNNING, now.minusSeconds(coarseFloorSeconds))
+                .stream()
+                .filter(row -> isStuck(row, now))
+                .toList();
     }
 
     private void markFailing(ScriptExecution row, Instant now) {
@@ -82,5 +65,14 @@ public class ScriptExecutionWatchdogService {
         row.setError(STUCK_ERROR_MESSAGE_FORMAT.formatted(thresholdSeconds));
         log.info("Reaping stuck Execution: executionId={} machineId={} dispatchedAt={} thresholdSeconds={}",
                 row.getExecutionId(), row.getMachineId(), row.getDispatchedAt(), thresholdSeconds);
+    }
+
+    private boolean isStuck(ScriptExecution row, Instant now) {
+        return row.getDispatchedAt() != null && row.getDispatchedAt().isBefore(now.minusSeconds(thresholdSecondsFor(row)));
+    }
+
+    private long thresholdSecondsFor(ScriptExecution row) {
+        Integer timeout = row.getTimeoutSeconds();
+        return timeout != null ? timeout + graceSeconds : fallbackThresholdSeconds;
     }
 }

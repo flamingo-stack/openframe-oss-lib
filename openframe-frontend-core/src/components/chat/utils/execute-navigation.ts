@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * THE single navigation-EXECUTION primitive for the whole lib.
@@ -28,39 +28,39 @@
  * new-tab/embed decision to make without a runtime.
  */
 
-import { computeIsNewTab } from './nav-anchor-props'
-import { NEW_TAB_FEATURES, stripSameOriginToPath } from './chat-nav-resolution'
-import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav'
-import type { ChatRuntime } from '../../../contexts/chat-runtime-context'
+import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
+import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
+import { NEW_TAB_FEATURES, stripSameOriginToPath } from './chat-nav-resolution';
+import { computeIsNewTab } from './nav-anchor-props';
 
 /** Minimal mouse-event surface — structural so chip buttons / tiles can call it
  *  without casting `React.MouseEvent`. */
 export interface NavClickEvent {
-  preventDefault(): void
-  button?: number
-  metaKey?: boolean
-  ctrlKey?: boolean
-  shiftKey?: boolean
-  altKey?: boolean
+  preventDefault(): void;
+  button?: number;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
 }
 
 export interface ExecuteNavigationClickArgs {
-  event: NavClickEvent
-  runtime: ChatRuntime | null | undefined
-  href: string
-  path?: string | null
-  targetPlatform?: string | null
+  event: NavClickEvent;
+  runtime: ChatRuntime | null | undefined;
+  href: string;
+  path?: string | null;
+  targetPlatform?: string | null;
   /** Host router fallback for same-origin soft-nav when the runtime doesn't wire
    *  `navigation.navigate` — pass `useRouter().push`. Without it, falls back to a
    *  full-page `window.location.assign`. */
-  fallbackNavigate?: (path: string) => void
+  fallbackNavigate?: (path: string) => void;
 }
 
 export interface ExecuteNavigationImperativeArgs {
-  runtime: ChatRuntime | null | undefined
-  href: string
-  targetPlatform?: string | null
-  fallbackNavigate?: (path: string) => void
+  runtime: ChatRuntime | null | undefined;
+  href: string;
+  targetPlatform?: string | null;
+  fallbackNavigate?: (path: string) => void;
 }
 
 /** Core: make the new-tab decision (when a runtime is present) and execute. */
@@ -72,13 +72,13 @@ function runNavigation(
   fallbackNavigate?: (path: string) => void,
 ): void {
   // No runtime → no embed/new-tab decision possible; plain same-tab fallback.
-  const isNewTab = runtime ? computeIsNewTab(runtime, href, targetPlatform ?? null) : false
+  const isNewTab = runtime ? computeIsNewTab(runtime, href, targetPlatform ?? null) : false;
   if (isNewTab) {
-    if (runtime?.navigation.openExternal) runtime.navigation.openExternal(href)
-    else window.open(href, '_blank', NEW_TAB_FEATURES)
-    return
+    if (runtime?.navigation.openExternal) runtime.navigation.openExternal(href);
+    else window.open(href, '_blank', NEW_TAB_FEATURES);
+    return;
   }
-  const target = stripSameOriginToPath(href)
+  const target = stripSameOriginToPath(href);
   // Same-page hash target (e.g. a chat card deep-linking to `/faqs#faq-item-49`):
   // route through the UNIFIED same-page-hash primitive FIRST. A host router /
   // `router.push` performs `pushState`, which the HTML spec says does NOT fire a
@@ -90,12 +90,12 @@ function runNavigation(
   // to the host nav / router below, which mount the new route where the hash is
   // read fresh on first render.
   if (target.includes('#') && navigateSamePageHash(target, { headerOffset: STICKY_HEADER_OFFSET_PX })) {
-    return
+    return;
   }
-  const handled = runtime?.navigation.navigate?.({ href, path, targetPlatform }) ?? false
+  const handled = runtime?.navigation.navigate?.({ href, path, targetPlatform }) ?? false;
   if (!handled) {
-    if (fallbackNavigate) fallbackNavigate(target)
-    else window.location.assign(target)
+    if (fallbackNavigate) fallbackNavigate(target);
+    else window.location.assign(target);
   }
 }
 
@@ -113,18 +113,18 @@ export function executeNavigation({
   fallbackNavigate,
 }: ExecuteNavigationClickArgs): boolean {
   if (!href) {
-    event.preventDefault()
-    return true
+    event.preventDefault();
+    return true;
   }
   // Modifier / non-primary clicks → NOT handled; let the browser do its native thing.
   // Deliberately NOT the shared `isModifierClick` (chat-nav-resolution): that predicate
   // treats an UNDEFINED `button` as a modifier (`button !== 0`), but a structural
   // NavClickEvent from a chip tile may omit `button` and MUST be a primary click (navigate).
-  if (event.button !== undefined && event.button !== 0) return false
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false
-  event.preventDefault()
-  runNavigation(runtime, href, path, targetPlatform, fallbackNavigate)
-  return true
+  if (event.button !== undefined && event.button !== 0) return false;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+  event.preventDefault();
+  runNavigation(runtime, href, path, targetPlatform, fallbackNavigate);
+  return true;
 }
 
 /**
@@ -137,5 +137,5 @@ export function executeNavigationImperative({
   targetPlatform,
   fallbackNavigate,
 }: ExecuteNavigationImperativeArgs): void {
-  runNavigation(runtime, href, undefined, targetPlatform, fallbackNavigate)
+  runNavigation(runtime, href, undefined, targetPlatform, fallbackNavigate);
 }

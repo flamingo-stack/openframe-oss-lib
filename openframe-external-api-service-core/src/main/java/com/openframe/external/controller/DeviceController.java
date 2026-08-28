@@ -4,21 +4,23 @@ import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.exception.DeviceNotFoundException;
-import com.openframe.api.service.DeviceFilterService;
-import com.openframe.api.service.DeviceService;
+import com.openframe.api.service.device.DeviceFilterService;
+import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.TagService;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.OsType;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tag.Tag;
+import com.openframe.external.web.ApiCaller;
 import com.openframe.external.dto.device.DeviceFilterResponse;
 import com.openframe.external.dto.device.DeviceResponse;
 import com.openframe.external.dto.device.DevicesResponse;
 import com.openframe.external.dto.device.UpdateDeviceNicknameRequest;
 import com.openframe.external.dto.device.UpdateDeviceStatusRequest;
 import com.openframe.external.mapper.DeviceMapper;
+import com.openframe.external.util.ExternalCursors;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -62,16 +64,6 @@ public class DeviceController {
             description = "Retrieve a paginated list of devices with optional filtering, search, and tags. " +
                     "Use includeTags=true to load tags for each device."
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved devices",
-                    content = @Content(schema = @Schema(implementation = DevicesResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request parameters",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal server error",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @GetMapping
     @ResponseStatus(OK)
     public DevicesResponse getDevices(
@@ -84,8 +76,8 @@ public class DeviceController {
             @Parameter(description = "Operating system types to filter by")
             @RequestParam(required = false) List<OsType> osTypes,
 
-            @Parameter(description = "Organization IDs to filter by")
-            @RequestParam(required = false) List<String> organizationIds,
+            @Parameter(description = "Customer ids to filter by")
+            @RequestParam(required = false) List<String> customerIds,
 
             @Parameter(description = "Tag keys to filter by")
             @RequestParam(required = false) List<String> tagKeys,
@@ -102,7 +94,7 @@ public class DeviceController {
             @Parameter(description = "Maximum number of items to return (default: 20, max: 100)")
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer limit,
 
-            @Parameter(description = "Cursor for pagination (optional)")
+            @Parameter(description = "Cursor for pagination (from pageInfo.endCursor). An unreadable cursor is rejected with 400.")
             @RequestParam(required = false) String cursor,
 
             @Parameter(description = "Field to sort by (e.g., hostname, displayName, status, lastSeen)")
@@ -111,24 +103,23 @@ public class DeviceController {
             @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
             @RequestParam(required = false, defaultValue = "DESC") String sortDirection,
 
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting devices - userId: {}, apiKeyId: {}, limit: {}, cursor: {}, search: {}, includeTags: {}, sortField: {}, sortDirection: {}",
-                userId, apiKeyId, limit, cursor, search, includeTags, sortField, sortDirection);
+        log.debug("Getting devices - userId: {}, apiKeyId: {}, limit: {}, cursor: {}, search: {}, includeTags: {}, sortField: {}, sortDirection: {}",
+                caller.userId(), caller.apiKeyId(), limit, cursor, search, includeTags, sortField, sortDirection);
 
         DeviceFilterCriteria filterCriteria = DeviceFilterCriteria.builder()
                 .statuses(statuses)
                 .deviceTypes(deviceTypes)
                 .osTypes(osTypes)
-                .organizationIds(organizationIds)
+                .organizationIds(customerIds)
                 .tagKeys(tagKeys)
                 .tagValues(tagValues)
                 .build();
 
         var result = deviceService.queryDevices(
                 filterCriteria,
-                CursorPaginationCriteria.fromRest(cursor, limit),
+                CursorPaginationCriteria.builder().cursor(ExternalCursors.decodeBase64(cursor)).limit(limit).build(),
                 search,
                 SortInput.from(sortField, sortDirection));
 
@@ -151,14 +142,8 @@ public class DeviceController {
             summary = "Get device by machine ID",
             description = "Retrieve detailed information about a specific device"
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Device found",
-                    content = @Content(schema = @Schema(implementation = DeviceResponse.class))),
+    @ApiResponses({
             @ApiResponse(responseCode = "404", description = "Device not found",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/{machineId}")
@@ -166,10 +151,9 @@ public class DeviceController {
     public DeviceResponse getDevice(
             @Parameter(description = "Machine ID of the device")
             @PathVariable String machineId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting device by ID: {} - userId: {}, apiKeyId: {}", machineId, userId, apiKeyId);
+        log.debug("Getting device by ID: {} - userId: {}, apiKeyId: {}", machineId, caller.userId(), caller.apiKeyId());
 
         Machine machine = deviceService.findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found with ID: " + machineId));
@@ -182,14 +166,6 @@ public class DeviceController {
             summary = "Get device filter options",
             description = "Retrieve available filter options for devices with counts"
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Filter options retrieved successfully",
-                    content = @Content(schema = @Schema(implementation = DeviceFilterResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal server error",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @GetMapping("/filters")
     @ResponseStatus(OK)
     public DeviceFilterResponse getDeviceFilters(
@@ -202,8 +178,8 @@ public class DeviceController {
             @Parameter(description = "Operating system types to filter by")
             @RequestParam(required = false) List<OsType> osTypes,
 
-            @Parameter(description = "Organization IDs to filter by")
-            @RequestParam(required = false) List<String> organizationIds,
+            @Parameter(description = "Customer ids to filter by")
+            @RequestParam(required = false) List<String> customerIds,
 
             @Parameter(description = "Tag keys to filter by")
             @RequestParam(required = false) List<String> tagKeys,
@@ -211,16 +187,15 @@ public class DeviceController {
             @Parameter(description = "Tag values to filter by")
             @RequestParam(required = false) List<String> tagValues,
 
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting device filters - userId: {}, apiKeyId: {}", userId, apiKeyId);
+        log.debug("Getting device filters - userId: {}, apiKeyId: {}", caller.userId(), caller.apiKeyId());
 
         DeviceFilterCriteria filterCriteria = DeviceFilterCriteria.builder()
                 .statuses(statuses)
                 .deviceTypes(deviceTypes)
                 .osTypes(osTypes)
-                .organizationIds(organizationIds)
+                .organizationIds(customerIds)
                 .tagKeys(tagKeys)
                 .tagValues(tagValues)
                 .build();
@@ -239,10 +214,9 @@ public class DeviceController {
             @Parameter(description = "Machine ID of the device")
             @PathVariable String machineId,
             @RequestBody UpdateDeviceStatusRequest request,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Updating device {} status to {} - userId: {}, apiKeyId: {}", machineId, request.status(), userId, apiKeyId);
+        log.info("Updating device {} status to {} - userId: {}, apiKeyId: {}", machineId, request.status(), caller.userId(), caller.apiKeyId());
         deviceService.updateStatusByMachineId(machineId, request.status());
     }
 
@@ -256,10 +230,9 @@ public class DeviceController {
             @Parameter(description = "Machine ID of the device")
             @PathVariable String machineId,
             @RequestBody UpdateDeviceNicknameRequest request,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Updating device {} nickname - userId: {}, apiKeyId: {}", machineId, userId, apiKeyId);
+        log.info("Updating device {} nickname - userId: {}, apiKeyId: {}", machineId, caller.userId(), caller.apiKeyId());
         deviceService.updateNickname(machineId, request.nickname());
     }
 

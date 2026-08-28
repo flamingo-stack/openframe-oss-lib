@@ -1,25 +1,25 @@
-import type { PendingToolCallData } from '../../chat/types'
-import type { TicketStatus } from '../../ui/ticket-status-tag'
+import type { PendingToolCallData } from '../../chat/types';
+import type { TicketStatus } from '../../ui/ticket-status-tag';
 
-export type BoardPriority = 'low' | 'medium' | 'high' | 'urgent'
+export type BoardPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 /** Latest pending tool-approval request attached to a board ticket (from `Ticket.pendingApproval`). */
 export interface BoardTicketPendingApproval {
-  id: string
-  approvalType?: string
-  command?: string
-  explanation?: string
-  createdAt?: string
-  toolCalls?: PendingToolCallData[]
+  id: string;
+  approvalType?: string;
+  command?: string;
+  explanation?: string;
+  createdAt?: string;
+  toolCalls?: PendingToolCallData[];
 }
 
 export interface BoardTicketAssignee {
-  id: string
-  initials?: string
-  avatarUrl?: string
-  name?: string
+  id: string;
+  initials?: string;
+  avatarUrl?: string;
+  name?: string;
   /** Deleted account (DELETED / SELF_DELETED) — renders the red user-x placeholder instead of the avatar. */
-  deleted?: boolean
+  deleted?: boolean;
 }
 
 /**
@@ -28,95 +28,102 @@ export interface BoardTicketAssignee {
  * (staleness has the lowest priority and must be suppressed when any other
  * signal — new message, approval, escalation — is present).
  */
-export type BoardTicketActivityKind = 'ai-working' | 'user-typing' | 'waiting-external' | 'stale'
+export type BoardTicketActivityKind = 'ai-working' | 'user-typing' | 'waiting-external' | 'stale';
 
 export interface BoardTicketActivity {
-  kind: BoardTicketActivityKind
+  kind: BoardTicketActivityKind;
   /**
    * Overrides the built-in label for the kind. Required in practice for
    * 'stale', whose label carries the computed duration ("No activity for
    * 2 hours") that only the consumer can know — and tick over time.
    */
-  label?: string
+  label?: string;
 }
 
 export interface BoardTicket {
-  id: string
-  title: string
-  ticketNumber: string
-  status: string
+  id: string;
+  title: string;
+  ticketNumber: string;
+  status: string;
 
-  deviceHostnames?: string[]
-  organizationName?: string
-  priority?: BoardPriority
-  assignees?: BoardTicketAssignee[]
-  tags?: string[]
-  createdAt?: string
-  hasNewMessage?: boolean
-  pendingApproval?: BoardTicketPendingApproval
+  deviceHostnames?: string[];
+  organizationName?: string;
+  priority?: BoardPriority;
+  assignees?: BoardTicketAssignee[];
+  tags?: string[];
+  createdAt?: string;
+  hasNewMessage?: boolean;
+  pendingApproval?: BoardTicketPendingApproval;
   /**
    * The client asked for a human and confirmed the handoff, so this ticket
    * reached its lane by escalation rather than an inactivity auto-escalation or
    * an admin takeover. Called out on the card because it changes how urgently a
    * technician should pick it up.
    */
-  escalatedByUser?: boolean
+  escalatedByUser?: boolean;
   /** Single live-activity indicator rendered as the card's footer row. */
-  activity?: BoardTicketActivity
+  activity?: BoardTicketActivity;
 }
 
 export interface BoardColumnDef {
-  id: string
+  id: string;
   /**
    * Canonical status key for header styling (e.g. 'ACTIVE', 'RESOLVED'), when the
    * column `id` is not itself a known status (e.g. a custom-status UUID). The
    * header resolves its TicketStatusTag variant/icon from this, falling back to
    * `id`. Leave undefined for custom statuses so they render from `color`.
    */
-  statusKey?: string
-  label: string
-  color: string
-  tickets: BoardTicket[]
+  statusKey?: string;
+  label: string;
+  color: string;
+  /**
+   * What this column's status means, shown from an info icon in the header
+   * (e.g. the system-status descriptions from the status settings page). No
+   * icon is rendered when absent.
+   */
+  tooltip?: string;
+  tickets: BoardTicket[];
 
-  total?: number
-  hasMore?: boolean
-  isLoading?: boolean
-  isLoadingMore?: boolean
+  total?: number;
+  hasMore?: boolean;
+  isLoading?: boolean;
+  isLoadingMore?: boolean;
 
-  system?: boolean
-  dropDisabled?: boolean
-  dragDisabled?: boolean
-  allowedFromColumns?: string[]
-  archivable?: boolean
+  system?: boolean;
+  dropDisabled?: boolean;
+  dragDisabled?: boolean;
+  allowedFromColumns?: string[];
+  archivable?: boolean;
 }
 
 export interface BoardChange {
-  ticketId: string
-  fromColumnId: string
-  toColumnId: string
-  afterTicketId: string | null
-  beforeTicketId: string | null
+  ticketId: string;
+  fromColumnId: string;
+  toColumnId: string;
+  afterTicketId: string | null;
+  beforeTicketId: string | null;
 }
 
 const STATUS_DEFAULTS: Record<TicketStatus, { label: string; color: string }> = {
   ACTIVE: { label: 'Active', color: '#5ea62e' },
-  AI_ASSISTANCE: { label: 'AI Assistance', color: '#888888' },
+  AI_ASSISTANCE: { label: 'AI Handling', color: '#888888' },
   TECH_REQUIRED: { label: 'Tech Required', color: '#e1b32f' },
   ON_HOLD: { label: 'On Hold', color: '#f36666' },
   RESOLVED: { label: 'Resolved', color: '#888888' },
   ARCHIVED: { label: 'Archived', color: '#3a3a3a' },
-}
+};
 
 export function columnFromTicketStatus(
   status: TicketStatus,
   tickets: BoardTicket[],
   overrides: Partial<Omit<BoardColumnDef, 'id' | 'tickets'>> = {},
 ): BoardColumnDef {
-  const defaults = STATUS_DEFAULTS[status]
+  const defaults = STATUS_DEFAULTS[status];
   return {
     id: status,
     label: overrides.label ?? defaults.label,
     color: overrides.color ?? defaults.color,
+    tooltip: overrides.tooltip,
     tickets,
     total: overrides.total,
     hasMore: overrides.hasMore,
@@ -127,13 +134,10 @@ export function columnFromTicketStatus(
     dragDisabled: overrides.dragDisabled,
     allowedFromColumns: overrides.allowedFromColumns,
     archivable: overrides.archivable,
-  }
+  };
 }
 
-export function groupTicketsByStatus(
-  tickets: BoardTicket[],
-  statuses: TicketStatus[],
-): BoardColumnDef[] {
+export function groupTicketsByStatus(tickets: BoardTicket[], statuses: TicketStatus[]): BoardColumnDef[] {
   const buckets: Record<TicketStatus, BoardTicket[]> = {
     ACTIVE: [],
     AI_ASSISTANCE: [],
@@ -141,17 +145,17 @@ export function groupTicketsByStatus(
     ON_HOLD: [],
     RESOLVED: [],
     ARCHIVED: [],
-  }
+  };
   for (const t of tickets) {
-    const canonical = canonicalize(t.status)
-    if (canonical) buckets[canonical].push(t)
+    const canonical = canonicalize(t.status);
+    if (canonical) buckets[canonical].push(t);
   }
-  return statuses.map(s => columnFromTicketStatus(s, buckets[s]))
+  return statuses.map(s => columnFromTicketStatus(s, buckets[s]));
 }
 
 function canonicalize(status: string): TicketStatus | null {
-  const upper = status.toUpperCase().replace(/\s+/g, '_')
-  if (upper === 'ACTION_REQUIRED') return 'TECH_REQUIRED'
+  const upper = status.toUpperCase().replace(/\s+/g, '_');
+  if (upper === 'ACTION_REQUIRED') return 'TECH_REQUIRED';
   if (
     upper === 'ACTIVE' ||
     upper === 'AI_ASSISTANCE' ||
@@ -160,7 +164,7 @@ function canonicalize(status: string): TicketStatus | null {
     upper === 'RESOLVED' ||
     upper === 'ARCHIVED'
   ) {
-    return upper
+    return upper;
   }
-  return null
+  return null;
 }

@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<ChatMessageRow>` — THE single source of truth for a Slack-channel-style
@@ -19,49 +19,43 @@
  * "N replies" badge; the ticket feed passes `<TicketAttachmentsList>`.
  */
 
-import Image from '../../embed-shims/next-image'
-import { getFirstLastInitials } from '../../utils/format'
-import { useProxiedImageUrl } from './hooks/use-proxied-image-url'
-import { useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react';
+import Image from '../../embed-shims/next-image';
+import { getFirstLastInitials } from '../../utils/format';
+import { useProxiedImageUrl } from './hooks/use-proxied-image-url';
 
 export interface ChatMessageRowProps {
   /** Display name (bold, top-left). */
-  displayName: string
+  displayName: string;
   /** Avatar image URL. Proxied via `useProxiedImageUrl`; falls back to
    *  initials in a same-sized `rounded-lg` box when absent. */
-  avatarUrl?: string | null
+  avatarUrl?: string | null;
   /** Pre-formatted relative-time label (e.g. "2h ago"). Caller formats it —
    *  Slack passes its server `displayTime`, tickets pass
    *  `formatRelativeTime(createdAt)`. Empty/undefined hides the time. */
-  timeLabel?: string | null
+  timeLabel?: string | null;
   /** Message body. Empty + no footer renders nothing under the header. */
-  body: string
+  body: string;
   /** Per-surface slot under the body: Slack reply badge / ticket attachments. */
-  footer?: ReactNode
+  footer?: ReactNode;
 }
 
-export function ChatMessageRow({
-  displayName,
-  avatarUrl,
-  timeLabel,
-  body,
-  footer,
-}: ChatMessageRowProps) {
+export function ChatMessageRow({ displayName, avatarUrl, timeLabel, body, footer }: ChatMessageRowProps) {
   // Avatars load directly from their (https) host — same as the rest of the app,
   // so the browser disk-caches them (Google/etc. send `cache-control: max-age`).
   // `useProxiedImageUrl` only rewrites http/relative URLs; https pass through.
-  const proxiedAvatar = useProxiedImageUrl(avatarUrl ?? '')
-  const resolvedAvatar = proxiedAvatar || avatarUrl || undefined
+  const proxiedAvatar = useProxiedImageUrl(avatarUrl ?? '');
+  const resolvedAvatar = proxiedAvatar || avatarUrl || undefined;
   // Fall back to the initials box if the avatar load FAILS (transient CDN 429,
   // ad-blocker, dead URL) instead of showing a broken image. Keyed on the URL
   // (not a bool) so a later render with a DIFFERENT avatar re-attempts the load
   // rather than inheriting a stale failure.
-  const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  const src = resolvedAvatar && resolvedAvatar !== failedSrc ? resolvedAvatar : undefined
-  const hasBody = body.trim().length > 0
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const src = resolvedAvatar && resolvedAvatar !== failedSrc ? resolvedAvatar : undefined;
+  const hasBody = body.trim().length > 0;
 
   return (
-    <div className="flex gap-2 md:gap-3 w-full min-w-0">
+    <div className="flex w-full min-w-0 gap-2 md:gap-3">
       {/* Avatar — verbatim Slack sizing: 32px → 40px, rounded-lg, object-cover.
           Initials fallback uses the SAME box so layout is identical with or
           without an image. */}
@@ -69,42 +63,36 @@ export function ChatMessageRow({
         <Image
           src={src}
           alt={displayName}
-          className="w-8 h-8 md:w-10 md:h-10 rounded-lg object-cover flex-shrink-0"
+          className="h-8 w-8 flex-shrink-0 rounded-lg object-cover md:h-10 md:w-10"
           width={40}
           height={40}
           onError={() => setFailedSrc(resolvedAvatar ?? null)}
         />
       ) : (
-        <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg flex-shrink-0 flex items-center justify-center bg-ods-bg border border-ods-border text-h6 text-ods-text-primary">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg text-ods-text-primary text-h6 md:h-10 md:w-10">
           {getFirstLastInitials(displayName) || '?'}
         </div>
       )}
 
       {/* Message content */}
-      <div className="flex-1 min-w-0 max-w-full">
+      <div className="min-w-0 max-w-full flex-1">
         {/* Header — name + relative time. Verbatim Slack typography. */}
-        <div className="flex items-center gap-2 max-w-full mb-1 min-w-0">
-          <span className="text-[14px] md:text-[15px] font-bold leading-[1.33] text-ods-text-primary font-body tracking-[-0.02em] truncate">
+        <div className="mb-1 flex min-w-0 max-w-full items-center gap-2">
+          <span className="truncate font-body text-[14px] font-bold leading-[1.33] tracking-[-0.02em] text-ods-text-primary md:text-[15px]">
             {displayName}
           </span>
-          {timeLabel && (
-            <span className="text-h6 text-ods-text-secondary flex-shrink-0">
-              {timeLabel}
-            </span>
-          )}
+          {timeLabel && <span className="flex-shrink-0 text-ods-text-secondary text-h6">{timeLabel}</span>}
         </div>
 
         {/* Body — verbatim Slack: 12/14px, pre-wrap, break-words. */}
         {hasBody && (
-          <div className="text-h6 text-ods-text-primary whitespace-pre-wrap break-words min-w-0 max-w-full">
-            {body}
-          </div>
+          <div className="min-w-0 max-w-full whitespace-pre-wrap break-words text-ods-text-primary text-h6">{body}</div>
         )}
 
         {footer}
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -117,18 +105,18 @@ export function ChatMessageRowSkeleton() {
   // Bars use `bg-ods-border` (NOT `bg-ods-skeleton` — that token resolves to
   // transparent in this build, leaving the box visually empty).
   return (
-    <div className="flex gap-2 md:gap-3 w-full min-w-0">
-      <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg flex-shrink-0 bg-ods-border animate-pulse" />
-      <div className="flex-1 min-w-0">
+    <div className="flex w-full min-w-0 gap-2 md:gap-3">
+      <div className="h-8 w-8 flex-shrink-0 animate-pulse rounded-lg bg-ods-border md:h-10 md:w-10" />
+      <div className="min-w-0 flex-1">
         {/* Header row — name + time bars, same mb-1 + gap-2 as the real header. */}
-        <div className="flex items-center gap-2 mb-1">
-          <div className="h-[15px] md:h-[20px] w-24 md:w-32 bg-ods-border rounded animate-pulse" />
-          <div className="h-[12px] md:h-[16px] w-12 md:w-16 bg-ods-border rounded animate-pulse" />
+        <div className="mb-1 flex items-center gap-2">
+          <div className="h-[15px] w-24 animate-pulse rounded bg-ods-border md:h-[20px] md:w-32" />
+          <div className="h-[12px] w-12 animate-pulse rounded bg-ods-border md:h-[16px] md:w-16" />
         </div>
         {/* Two body lines — match the 12/14px body line-height. */}
-        <div className="h-[14px] md:h-[18px] w-full bg-ods-border rounded animate-pulse" />
-        <div className="h-[14px] md:h-[18px] w-3/4 bg-ods-border rounded animate-pulse mt-1" />
+        <div className="h-[14px] w-full animate-pulse rounded bg-ods-border md:h-[18px]" />
+        <div className="mt-1 h-[14px] w-3/4 animate-pulse rounded bg-ods-border md:h-[18px]" />
       </div>
     </div>
-  )
+  );
 }

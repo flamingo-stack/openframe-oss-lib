@@ -73,10 +73,12 @@ public class SsoTenantRegistrationService {
                                                          long issuedAt) {
         return new SsoTenantRegCookiePayload(
                 state,
+                request.getEmail(),
                 request.getTenantName(),
                 request.getTenantDomain(),
                 provider,
                 request.getRedirectTo(),
+                request.isAuthMobile(),
                 request.getAccessCode(),
                 boundedAttribution(request.getAttribution()),
                 issuedAt,

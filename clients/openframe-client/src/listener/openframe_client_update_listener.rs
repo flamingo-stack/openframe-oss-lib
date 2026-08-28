@@ -14,6 +14,8 @@ use async_nats::jetstream::consumer::DeliverPolicy;
 use async_nats::jetstream::consumer::PushConsumer;
 use async_nats::jetstream::Message;
 use futures::StreamExt;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{error, info, warn};
 
@@ -67,6 +69,7 @@ impl OpenFrameClientUpdateListener {
     async fn listen(&self) -> Result<()> {
         info!("Run OpenFrame client update message listener");
         let machine_id = self.config_service.get_machine_id()?;
+        let reprovisioning = Arc::new(AtomicBool::new(false));
 
         loop {
             let client = self.nats_connection_manager.get_client().await?;
@@ -99,7 +102,16 @@ impl OpenFrameClientUpdateListener {
                     }
                     _ = reconnect_rx.recv() => {
                         info!("NATS reconnected, re-provisioning OpenFrame client update consumer");
-                        self.create_consumer(&js, &machine_id).await;
+                        if !reprovisioning.swap(true, Ordering::SeqCst) {
+                            let listener = self.clone();
+                            let js = js.clone();
+                            let machine_id = machine_id.clone();
+                            let reprovisioning = reprovisioning.clone();
+                            tokio::spawn(async move {
+                                listener.create_consumer(&js, &machine_id).await;
+                                reprovisioning.store(false, Ordering::SeqCst);
+                            });
+                        }
                     }
                 }
             }

@@ -1,8 +1,8 @@
 package com.openframe.data.nats.rmm.publisher;
 
 import com.openframe.core.exception.NatsException;
-import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.document.rmm.ScriptShell;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.nats.publisher.NatsMessagePublisher;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import org.junit.jupiter.api.BeforeEach;

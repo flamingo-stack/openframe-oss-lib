@@ -16,6 +16,7 @@ import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 import static com.openframe.authz.web.AuthStateUtils.clearCookie;
 import static com.openframe.authz.web.Redirects.foundAtRoot;
 import static java.net.URLEncoder.encode;
+import static org.springframework.util.StringUtils.hasText;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Locale.ROOT;
 
@@ -90,11 +91,17 @@ public interface SsoFlowHandler {
     default void clearFlowCookieAndRedirect(HttpServletResponse response,
                                             Cookie flowCookie,
                                             String tenantId,
-                                            String redirectTo) {
+                                            String redirectTo,
+                                            boolean authMobile) {
         clearCookie(response, flowCookie.getName());
         String path = "/oauth/continue?tenantId=" +
                 encode(tenantId, UTF_8);
-        // TODO: Add redirectTo support for local debugging
+        if (hasText(redirectTo)) {
+            path += "&redirectTo=" + encode(redirectTo, UTF_8);
+        }
+        if (authMobile) {
+            path += "&authMobile=true";
+        }
         foundAtRoot(response, path);
     }
 }

@@ -1,8 +1,23 @@
-"use client"
+'use client';
 
 import { Mail } from 'lucide-react';
+import {
+  GitHubIcon,
+  RedditIcon,
+  XLogo,
+  LinkedInIcon,
+  LumaIcon,
+  WhatsAppIcon,
+  GlobeIcon,
+  MessageCircleIcon,
+  TelegramIcon,
+  YouTubeIcon,
+  InstagramIcon,
+  FacebookIcon,
+  SlackIcon,
+  CopyIcon,
+} from './icons';
 import { Button } from './ui/button';
-import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon, CopyIcon } from './icons';
 
 /** Exactly ONE of `href` (anchor, target _blank) or `onClick` (action
  *  button — share popups via window.open inside the click gesture,
@@ -13,16 +28,13 @@ type SocialLink = {
   label?: string;
   /** `internal` links are only ever shown on surfaces that opt in (and must be
    *  gated server-side); with `groupByVisibility` they render after a divider. */
-  visibility?: "external" | "internal";
-} & (
-  | { href: string; onClick?: never }
-  | { onClick: () => void; href?: never }
-);
+  visibility?: 'external' | 'internal';
+} & ({ href: string; onClick?: never } | { onClick: () => void; href?: never });
 
 interface SocialIconRowProps {
   className?: string;
   links?: SocialLink[];
-  variant?: "accent" | "outline" | "transparent" | "destructive" | null | undefined;
+  variant?: 'accent' | 'outline' | 'transparent' | 'destructive' | null | undefined;
   /** Quiet metadata row for page-level identity/share slots: 32px ghost
    *  icon buttons (size="icon-sm", 16px glyphs), gap-2, w-fit container,
    *  variant defaulting to "transparent" (an explicit `variant` still wins).
@@ -39,7 +51,7 @@ interface SocialIconRowProps {
 const defaultLinks: SocialLink[] = [
   { platform: 'github', href: 'https://github.com/flamingo-stack', label: 'GitHub' },
   { platform: 'linkedin', href: 'https://linkedin.com/company/flamingo.run', label: 'LinkedIn' },
-  { platform: 'facebook', href: 'https://www.facebook.com/flamingoai.msp', label: 'Facebook' }
+  { platform: 'facebook', href: 'https://www.facebook.com/flamingoai.msp', label: 'Facebook' },
 ];
 
 function renderSocialIcon(platform: string) {
@@ -47,52 +59,58 @@ function renderSocialIcon(platform: string) {
 
   switch (normalizedPlatform) {
     case 'github':
-      return <GitHubIcon className="w-5 h-5" />;
+      return <GitHubIcon className="h-5 w-5" />;
     case 'twitter':
     case 'x':
-      return <XLogo className="w-5 h-5" />;
+      return <XLogo className="h-5 w-5" />;
     case 'reddit':
-      return <RedditIcon className="w-5 h-5" variant="white" />;
+      return <RedditIcon className="h-5 w-5" variant="white" />;
     case 'linkedin':
-      return <LinkedInIcon className="w-5 h-5" />;
+      return <LinkedInIcon className="h-5 w-5" />;
     case 'luma':
-      return <LumaIcon className="w-5 h-5" />;
+      return <LumaIcon className="h-5 w-5" />;
     case 'whatsapp':
-      return <WhatsAppIcon className="w-5 h-5" />;
+      return <WhatsAppIcon className="h-5 w-5" />;
     case 'email':
     case 'mail':
-      return <Mail className="w-5 h-5" />;
+      return <Mail className="h-5 w-5" />;
     case 'website':
     case 'web':
     case 'url':
-      return <GlobeIcon className="w-5 h-5" />;
+      return <GlobeIcon className="h-5 w-5" />;
     case 'slack':
-      return <SlackIcon className="w-5 h-5" injectedColor="white" />;
+      return <SlackIcon className="h-5 w-5" injectedColor="white" />;
     case 'discord':
-      return <MessageCircleIcon className="w-5 h-5" />;
+      return <MessageCircleIcon className="h-5 w-5" />;
     case 'telegram':
-      return <TelegramIcon className="w-5 h-5" />;
+      return <TelegramIcon className="h-5 w-5" />;
     case 'youtube':
     case 'yt':
-      return <YouTubeIcon className="w-5 h-5" />;
+      return <YouTubeIcon className="h-5 w-5" />;
     case 'instagram':
     case 'ig':
-      return <InstagramIcon className="w-5 h-5" />;
+      return <InstagramIcon className="h-5 w-5" />;
     case 'facebook':
     case 'fb':
-      return <FacebookIcon className="w-5 h-5" />;
+      return <FacebookIcon className="h-5 w-5" />;
     case 'copy':
       // CopyIcon's default fill is grey and would mismatch its row-mates —
       // force the themed foreground via the ODS token (white on the dark
       // theme, tracking the theme unlike the literal the reddit/slack cases
       // still carry).
-      return <CopyIcon className="w-5 h-5" color="var(--color-text-primary)" />;
+      return <CopyIcon className="h-5 w-5" color="var(--color-text-primary)" />;
     default:
-      return <GlobeIcon className="w-5 h-5" />;
+      return <GlobeIcon className="h-5 w-5" />;
   }
 }
 
-export function SocialIconRow({ className = '', links = defaultLinks, variant, compact = false, groupByVisibility = false }: SocialIconRowProps) {
+export function SocialIconRow({
+  className = '',
+  links = defaultLinks,
+  variant,
+  compact = false,
+  groupByVisibility = false,
+}: SocialIconRowProps) {
   // ── Compact design rationale ──────────────────────────────────────────
   // Page-level identity/share rows read as METADATA, not CTAs. The major
   // design systems converge on one recipe for this slot: a ~32px ghost icon
@@ -107,7 +125,7 @@ export function SocialIconRow({ className = '', links = defaultLinks, variant, c
   // currentColor. An explicit `variant` prop still wins (e.g. outline
   // chips). Non-compact keeps the legacy outline default + full-width
   // stretch untouched.
-  const resolvedVariant = variant !== undefined ? variant : (compact ? 'transparent' : 'outline');
+  const resolvedVariant = variant !== undefined ? variant : compact ? 'transparent' : 'outline';
 
   const renderButton = (link: SocialLink, index: number) => {
     const ariaLabel = link.label || link.platform;
@@ -146,13 +164,13 @@ export function SocialIconRow({ className = '', links = defaultLinks, variant, c
   // Two-group mode: external links, a thin divider, then internal links — but only
   // when both groups are present (otherwise it's just a flat row, no stray divider).
   if (groupByVisibility) {
-    const external = links.filter((l) => l.visibility !== 'internal');
-    const internal = links.filter((l) => l.visibility === 'internal');
+    const external = links.filter(l => l.visibility !== 'internal');
+    const internal = links.filter(l => l.visibility === 'internal');
     if (external.length > 0 && internal.length > 0) {
       return (
         <div className={rowClass}>
           {external.map((l, i) => renderButton(l, i))}
-          <span aria-hidden className="self-stretch w-px my-1 bg-ods-border shrink-0" />
+          <span aria-hidden className="my-1 w-px shrink-0 self-stretch bg-ods-border" />
           {internal.map((l, i) => renderButton(l, external.length + i))}
         </div>
       );

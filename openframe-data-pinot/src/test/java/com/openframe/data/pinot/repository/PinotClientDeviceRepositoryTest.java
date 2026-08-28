@@ -158,31 +158,28 @@ class PinotClientDeviceRepositoryTest {
         }
 
         @Test
-        @DisplayName("user-selected statuses are applied verbatim; the base guard neutralizes DELETED")
-        void statusFilterNeutralizesDeleted() {
+        @DisplayName("explicitly selecting DELETED lifts the base guard so DELETED rows are counted")
+        void statusFilterWithDeletedLiftsBaseGuard() {
             whenQueryReturnsEmptyRows();
             repository.getDeviceTypeFilterOptions(TENANT_ID, List.of("ACTIVE", "DELETED"),
                     List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             // The user's selection is applied verbatim (no status is silently dropped)...
             assertTrue(query.contains("status = 'ACTIVE'"), "was: " + query);
-            // ...but the always-present base guard ensures DELETED devices can never match,
-            // so including DELETED in the selection neither broadens nor returns DELETED rows.
-            assertTrue(query.contains("status != 'DELETED'"), "was: " + query);
+            assertTrue(query.contains("status = 'DELETED'"), "was: " + query);
+            // ...and explicitly requesting DELETED opts into counting those rows.
+            assertTrue(!query.contains("status != 'DELETED'"), "base guard should be lifted: " + query);
         }
 
         @Test
-        @DisplayName("a selection with no overlap with the allowed universe is preserved as an empty intersection")
-        void statusFilterPreservesEmptyIntersection() {
+        @DisplayName("selecting only DELETED counts exactly the DELETED devices")
+        void statusFilterDeletedOnly() {
             whenQueryReturnsEmptyRows();
-            // Only DELETED selected: base guard excludes it, so the query must contradict (return nothing)
-            // rather than dropping the status filter and broadening to all non-deleted devices.
             repository.getDeviceTypeFilterOptions(TENANT_ID, List.of("DELETED"),
                     List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
-            assertTrue(query.contains("status != 'DELETED'"), "was: " + query);
-            assertTrue(query.contains("status = 'DELETED'"),
-                    "selected DELETED must still be applied so the intersection is empty, not broadened: " + query);
+            assertTrue(!query.contains("status != 'DELETED'"), "base guard should be lifted: " + query);
+            assertTrue(query.contains("status = 'DELETED'"), "was: " + query);
         }
     }
 

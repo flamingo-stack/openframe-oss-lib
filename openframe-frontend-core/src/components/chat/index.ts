@@ -1,67 +1,60 @@
-'use client'
+'use client';
 
 // Chat components exports
-export * from './approval-request-message'
-export * from './approval-batch-message'
-export * from './escalation-offer-message'
-export * from './ticket-escalated-message'
-export * from './ticket-event-message'
-export * from './ai-assistant-info'
-export * from './context-compaction-display'
-export * from './expand-chevron'
-export * from './thinking-display'
-export * from './guide-display'
-export * from './ask-display'
-export * from './error-message-display'
-export * from './chat-container'
-export * from './chat-input'
-export * from './slash-command-suggestions'
-export * from './chat-message-enhanced'
-export * from './chat-message-list'
-export * from './chat-message-row'
-export * from './chat-message-skeleton'
+export * from './approval-request-message';
+export * from './approval-batch-message';
+export * from './escalation-offer-message';
+export * from './ticket-escalated-message';
+export * from './ticket-event-message';
+export * from './ai-assistant-info';
+export * from './context-compaction-display';
+export * from './expand-chevron';
+export * from './thinking-display';
+export * from './guide-display';
+export * from './ask-display';
+export * from './error-message-display';
+export * from './chat-container';
+export * from './chat-input';
+export * from './slash-command-suggestions';
+export * from './chat-message-enhanced';
+export * from './chat-message-list';
+export * from './chat-message-row';
+export * from './chat-message-skeleton';
 
-export * from './quick-action-chip'
-export * from './quick-action-marquee'
-export * from './quick-action-wall'
-export * from './chat-ticket-list'
-export * from './chat-typing-indicator'
-export * from './tool-execution-display'
-export * from './tool-call-blocks'
-export * from './mingo-onboarding-card'
-export * from './mingo-onboarding-card-skeleton'
-export * from './mingo-welcome'
-export * from './guide-welcome'
-export * from './msp-organization-card'
-export * from './msp-organization-card-skeleton'
-export * from './guide-mode-banner'
-export * from './mingo-chat-history'
-export * from './mingo-history-rail'
-export * from './mingo-chat-modals'
-export * from './chat-header-icon-button'
-export * from './chat-header-search-field'
-export * from './chat-panel-header'
-export * from './chat-composer'
-export * from './chat-context-picker'
-export * from './chat-context-memory-bar'
-export * from './context-items-list'
-export * from './chat-archive-page'
-export * from './model-display'
-export * from './chat-sidebar'
-export type { ChatRef } from './chat-ref.types'
-export { remarkCardLinks } from './remark-card-links'
-export { remarkMentionChips } from './remark-mention-chips'
+export * from './quick-action-chip';
+export * from './quick-action-marquee';
+export * from './quick-action-wall';
+export * from './chat-ticket-list';
+export * from './chat-typing-indicator';
+export * from './tool-execution-display';
+export * from './tool-call-blocks';
+export * from './mingo-onboarding-card';
+export * from './mingo-onboarding-card-skeleton';
+export * from './mingo-welcome';
+export * from './guide-welcome';
+export * from './msp-organization-card';
+export * from './msp-organization-card-skeleton';
+export * from './guide-mode-banner';
+export * from './mingo-chat-history';
+export * from './mingo-history-rail';
+export * from './mingo-chat-modals';
+export * from './chat-header-icon-button';
+export * from './chat-header-search-field';
+export * from './chat-panel-header';
+export * from './chat-composer';
+export * from './chat-context-picker';
+export * from './chat-context-memory-bar';
+export * from './context-items-list';
+export * from './chat-archive-page';
+export * from './model-display';
+export * from './chat-sidebar';
+export type { ChatRef } from './chat-ref.types';
+export { remarkCardLinks } from './remark-card-links';
+export { remarkMentionChips } from './remark-mention-chips';
 
 // Card-supporting UI migrated from hub `components/shared/*` + `components/blog/*`
-export {
-  NavLinkAnchorViaRuntime,
-  type NavLinkAnchorViaRuntimeProps,
-} from './nav-link-anchor-via-runtime'
-export {
-  SourceActionButton,
-  type SourceActionButtonProps,
-  type SourceActionDensity,
-} from './source-action-button'
+export { NavLinkAnchorViaRuntime, type NavLinkAnchorViaRuntimeProps } from './nav-link-anchor-via-runtime';
+export { SourceActionButton, type SourceActionButtonProps, type SourceActionDensity } from './source-action-button';
 export {
   ChatAttachmentAddButton,
   ChatAttachmentChipStrip,
@@ -70,26 +63,26 @@ export {
   type StagedAttachment,
   CHAT_ATTACHMENT_MIME_TYPES,
   CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER,
-} from './chat-attachment-bar'
+} from './chat-attachment-bar';
 
 // Entity-cards (12 refactored + 4 moved + supporting primitives)
-export * from './entity-cards'
+export * from './entity-cards';
 
 // Chat types and constants
-export * from './types'
+export * from './types';
 
 // Chat hooks
-export * from './hooks'
+export * from './hooks';
 
 // Chat stream module — master reducer + dialog store + React wrapper
 // (Phase 3 of the chat unification; ONE accumulation path for SSE + NATS
 // + history replay).
-export * from './stream'
+export * from './stream';
 
 // Chat utilities
-export * from './utils'
+export * from './utils';
 
 // EmbeddableChat — full chat orchestrator (lib-portable port of hub's
 // `<GlobalAskAI>`). Hosts mount it once at the root after providing a
 // <ChatRuntimeContext.Provider>.
-export { EmbeddableChat, type EmbeddableChatProps } from './embeddable-chat'
+export { EmbeddableChat, type EmbeddableChatHandle, type EmbeddableChatProps } from './embeddable-chat';
