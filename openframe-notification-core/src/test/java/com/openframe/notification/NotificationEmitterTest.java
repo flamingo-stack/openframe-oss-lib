@@ -4,6 +4,7 @@ import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationSettingGroup;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.notification.service.NotificationCommand;
@@ -120,7 +121,7 @@ class NotificationEmitterTest {
         @Override public Audience audience(TestSeed seed) { return audience; }
 
         @Override public Optional<NotificationEntityRef> entity(TestSeed seed) {
-            return NotificationEntityRef.ticket(seed.ticketId());
+            return NotificationEntityRef.of(NotificationEntityType.TICKET, seed.ticketId());
         }
 
         @Override public Attrs attrs(TestSeed seed) {

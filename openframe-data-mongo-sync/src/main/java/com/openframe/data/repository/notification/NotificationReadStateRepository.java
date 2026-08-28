@@ -12,6 +12,7 @@ import org.springframework.data.mongodb.repository.Update;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -72,6 +73,17 @@ public interface NotificationReadStateRepository
                                            @Param("recipientType") RecipientType recipientType,
                                            @Param("entityType") NotificationEntityType entityType,
                                            @Param("tenantId") String tenantId);
+
+    @Aggregation(pipeline = {
+            "{ '$match': { 'tenantId': ?4, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, "
+                    + "'status': 'UNREAD', 'entityId': { '$in': ?3 } } }",
+            "{ '$group': { '_id': '$entityId', 'count': { '$sum': 1 } } }"
+    })
+    List<EntityCount> unreadCountsByEntityIds(@Param("recipientId") String recipientId,
+                                              @Param("recipientType") RecipientType recipientType,
+                                              @Param("entityType") NotificationEntityType entityType,
+                                              @Param("entityIds") Collection<String> entityIds,
+                                              @Param("tenantId") String tenantId);
 
     @Query("{ 'tenantId': ?5, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, 'entityId': ?3, 'status': ?4 }")
     List<NotificationReadState> findByRecipientIdAndRecipientTypeAndEntity(String recipientId,

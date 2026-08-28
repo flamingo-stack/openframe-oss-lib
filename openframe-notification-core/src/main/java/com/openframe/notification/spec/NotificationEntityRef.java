@@ -17,15 +17,7 @@ public class NotificationEntityRef {
 
     // Empty, never an exception: the emitter swallows what a spec throws, so a blank id here would
     // cost the whole notification instead of just its badge.
-    public static Optional<NotificationEntityRef> ticket(String ticketId) {
-        return of(NotificationEntityType.TICKET, ticketId);
-    }
-
-    public static Optional<NotificationEntityRef> dialog(String dialogId) {
-        return of(NotificationEntityType.DIALOG, dialogId);
-    }
-
-    private static Optional<NotificationEntityRef> of(NotificationEntityType type, String id) {
+    public static Optional<NotificationEntityRef> of(NotificationEntityType type, String id) {
         if (isBlank(id)) {
             return Optional.empty();
         }

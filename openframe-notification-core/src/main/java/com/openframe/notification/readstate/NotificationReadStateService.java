@@ -152,6 +152,23 @@ public class NotificationReadStateService {
                                                   @NotNull NotificationEntityType entityType) {
         String tenantId = tenantIdProvider.getTenantId();
         List<EntityCount> rows = repository.unreadCountsByEntity(recipientId, recipientType, entityType, tenantId);
+        return countsById(rows);
+    }
+
+    public Map<String, Long> unreadCountsByEntity(@NotBlank String recipientId,
+                                                  @NotNull RecipientType recipientType,
+                                                  @NotNull NotificationEntityType entityType,
+                                                  @NotNull Collection<String> entityIds) {
+        if (entityIds.isEmpty()) {
+            return Map.of();
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        List<EntityCount> rows = repository.unreadCountsByEntityIds(
+                recipientId, recipientType, entityType, entityIds, tenantId);
+        return countsById(rows);
+    }
+
+    private Map<String, Long> countsById(List<EntityCount> rows) {
         Map<String, Long> counts = new HashMap<>(rows.size());
         for (EntityCount row : rows) {
             String entityId = row.entityId();
