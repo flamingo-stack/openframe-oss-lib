@@ -110,11 +110,7 @@ public class DeviceMapper extends BaseRestMapper {
             return List.of();
         }
         return options.stream()
-                .map(option -> DeviceFilterItem.builder()
-                        .value(option.getValue())
-                        .label(option.getLabel())
-                        .count(option.getCount())
-                        .build())
+                .map(option -> new DeviceFilterItem(option.getValue(), option.getLabel(), option.getCount()))
                 .collect(Collectors.toList());
     }
 
@@ -123,11 +119,7 @@ public class DeviceMapper extends BaseRestMapper {
             return List.of();
         }
         return options.stream()
-                .map(option -> TagFilterItem.builder()
-                        .key(option.getKey())
-                        .value(option.getValue())
-                        .count(option.getCount())
-                        .build())
+                .map(option -> new TagFilterItem(option.getKey(), option.getValue(), option.getCount()))
                 .collect(Collectors.toList());
     }
 }

@@ -7,6 +7,7 @@ import com.openframe.api.service.organization.OrganizationCommandService;
 import com.openframe.api.service.organization.OrganizationQueryService;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.service.OrganizationService;
+import com.openframe.external.web.ApiCaller;
 import com.openframe.external.dto.customer.CreateCustomerRequest;
 import com.openframe.external.dto.customer.CustomerResponse;
 import com.openframe.external.dto.customer.CustomersResponse;
@@ -55,14 +56,6 @@ public class CustomerController {
 
     @Operation(summary = "Get list of customers",
             description = "Retrieve a cursor-paginated list of customers with optional filtering and search")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved customers",
-                    content = @Content(schema = @Schema(implementation = CustomersResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request parameters or cursor",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @GetMapping
     @ResponseStatus(OK)
     public CustomersResponse getCustomers(
@@ -90,11 +83,10 @@ public class CustomerController {
             @RequestParam(required = false) String sortField,
             @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
             @RequestParam(required = false) String sortDirection,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting customers - category: {}, status: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}",
-                category, status, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
+        log.debug("Getting customers - category: {}, status: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}",
+                category, status, search, limit, cursor, sortField, sortDirection, caller.userId(), caller.apiKeyId());
 
         OrganizationFilterOptions filterOptions = OrganizationFilterOptions.builder()
                 .category(category)
@@ -119,8 +111,6 @@ public class CustomerController {
     @Operation(summary = "Get customer by id",
             description = "Retrieve a single customer by its id (the same value returned as 'id' in customer payloads)")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved customer",
-                    content = @Content(schema = @Schema(implementation = CustomerResponse.class))),
             @ApiResponse(responseCode = "404", description = "Customer not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
@@ -128,10 +118,9 @@ public class CustomerController {
     @ResponseStatus(OK)
     public CustomerResponse getCustomer(
             @Parameter(description = "Customer id", required = true) @PathVariable String id,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting customer by id: {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
+        log.debug("Getting customer by id: {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
 
         var organization = organizationService.getOrganizationByOrganizationId(id)
                 .orElseThrow(() -> new CustomerNotFoundException(id));
@@ -141,18 +130,15 @@ public class CustomerController {
     @Operation(summary = "Create a new customer")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Customer created successfully",
-                    content = @Content(schema = @Schema(implementation = CustomerResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request body or validation error",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+                    content = @Content(schema = @Schema(implementation = CustomerResponse.class)))
     })
     @PostMapping
     @ResponseStatus(CREATED)
     public CustomerResponse createCustomer(
             @Valid @RequestBody CreateCustomerRequest request,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Creating customer: {} - userId: {}, apiKeyId: {}", request.name(), userId, apiKeyId);
+        log.info("Creating customer: {} - userId: {}, apiKeyId: {}", request.name(), caller.userId(), caller.apiKeyId());
 
         var created = organizationCommandService.createOrganization(customerMapper.toCreateRequest(request));
         return customerMapper.toResponse(created);
@@ -161,8 +147,6 @@ public class CustomerController {
     @Operation(summary = "Update an existing customer",
             description = "Partially update a customer by id; only non-null fields are applied")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Customer updated successfully",
-                    content = @Content(schema = @Schema(implementation = CustomerResponse.class))),
             @ApiResponse(responseCode = "404", description = "Customer not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
@@ -171,10 +155,9 @@ public class CustomerController {
     public CustomerResponse updateCustomer(
             @Parameter(description = "Customer id", required = true) @PathVariable String id,
             @Valid @RequestBody UpdateCustomerRequest request,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Updating customer: {} - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
+        log.info("Updating customer: {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
 
         try {
             var updated = organizationCommandService.updateOrganization(id, customerMapper.toUpdateRequest(request));
@@ -190,10 +173,9 @@ public class CustomerController {
     @ResponseStatus(OK)
     public boolean canArchiveCustomer(
             @Parameter(description = "Customer id", required = true) @PathVariable String id,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Checking if customer {} can be archived - userId: {}, apiKeyId: {}", id, userId, apiKeyId);
+        log.debug("Checking if customer {} can be archived - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
         return organizationService.canArchiveOrganization(id);
     }
 
@@ -211,10 +193,9 @@ public class CustomerController {
     public void updateCustomerStatus(
             @Parameter(description = "Customer id", required = true) @PathVariable String id,
             @Valid @RequestBody UpdateCustomerStatusRequest request,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Updating customer {} status to {} - userId: {}, apiKeyId: {}", id, request.status(), userId, apiKeyId);
+        log.info("Updating customer {} status to {} - userId: {}, apiKeyId: {}", id, request.status(), caller.userId(), caller.apiKeyId());
         organizationCommandService.updateOrganizationStatus(id, customerMapper.toStatusRequest(request));
     }
 }

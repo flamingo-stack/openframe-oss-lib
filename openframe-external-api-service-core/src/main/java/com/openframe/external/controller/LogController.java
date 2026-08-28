@@ -2,6 +2,7 @@ package com.openframe.external.controller;
 
 import com.openframe.api.service.LogService;
 import com.openframe.core.dto.ErrorResponse;
+import com.openframe.external.web.ApiCaller;
 import com.openframe.external.dto.audit.LogsResponse;
 import com.openframe.external.dto.audit.LogFilterResponse;
 import com.openframe.external.dto.audit.LogDetailsResponse;
@@ -42,16 +43,6 @@ public class LogController {
     private final LogMapper logMapper;
 
     @Operation(summary = "Get logs", description = "Retrieve logs with optional filtering, search, and pagination")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved logs",
-                    content = @Content(schema = @Schema(implementation = LogsResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request parameters",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal server error",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @GetMapping
     @ResponseStatus(OK)
     public LogsResponse getLogs(
@@ -83,11 +74,10 @@ public class LogController {
             @RequestParam(required = false) String sortField,
             @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
             @RequestParam(required = false, defaultValue = "DESC") String sortDirection,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting logs - startDate: {}, endDate: {}, timestampFrom: {}, timestampTo: {}, toolTypes: {}, eventTypes: {}, severities: {}, customerIds: {}, deviceId: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}", 
-                startDate, endDate, timestampFrom, timestampTo, toolTypes, eventTypes, severities, customerIds, deviceId, search, limit, cursor, sortField, sortDirection, userId, apiKeyId);
+        log.debug("Getting logs - startDate: {}, endDate: {}, timestampFrom: {}, timestampTo: {}, toolTypes: {}, eventTypes: {}, severities: {}, customerIds: {}, deviceId: {}, search: {}, limit: {}, cursor: {}, sortField: {}, sortDirection: {} - userId: {}, apiKeyId: {}", 
+                startDate, endDate, timestampFrom, timestampTo, toolTypes, eventTypes, severities, customerIds, deviceId, search, limit, cursor, sortField, sortDirection, caller.userId(), caller.apiKeyId());
         
         LogFilterCriteria filterCriteria = LogFilterCriteria.builder()
                 .startDate(startDate)
@@ -110,16 +100,6 @@ public class LogController {
     }
 
     @Operation(summary = "Get log filters", description = "Retrieve available log filter options")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved log filters",
-                    content = @Content(schema = @Schema(implementation = LogFilterResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request parameters",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal server error",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @GetMapping("/filters")
     @ResponseStatus(OK)
     public LogFilterResponse getLogFilters(
@@ -135,11 +115,10 @@ public class LogController {
             @RequestParam(required = false) List<String> severities,
             @Parameter(description = "Customer ids to filter by")
             @RequestParam(required = false) List<String> customerIds,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting log filters - startDate: {}, endDate: {}, toolTypes: {}, eventTypes: {}, severities: {}, customerIds: {} - userId: {}, apiKeyId: {}", 
-                startDate, endDate, toolTypes, eventTypes, severities, customerIds, userId, apiKeyId);
+        log.debug("Getting log filters - startDate: {}, endDate: {}, toolTypes: {}, eventTypes: {}, severities: {}, customerIds: {} - userId: {}, apiKeyId: {}", 
+                startDate, endDate, toolTypes, eventTypes, severities, customerIds, caller.userId(), caller.apiKeyId());
         
         LogFilterCriteria filterCriteria = LogFilterCriteria.builder()
                 .startDate(startDate)
@@ -156,16 +135,8 @@ public class LogController {
     }
 
     @Operation(summary = "Get log details", description = "Retrieve detailed information for a specific log entry")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved log details",
-                    content = @Content(schema = @Schema(implementation = LogDetailsResponse.class))),
+    @ApiResponses({
             @ApiResponse(responseCode = "404", description = "Log entry not found",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request parameters",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/details")
@@ -181,11 +152,10 @@ public class LogController {
             @RequestParam Instant timestamp,
             @Parameter(description = "Tool event ID", required = true)
             @RequestParam String toolEventId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
 
-        log.info("Getting log details - ingestDay: {}, toolType: {}, eventType: {}, timestamp: {}, toolEventId: {} - userId: {}, apiKeyId: {}", 
-                ingestDay, toolType, eventType, timestamp, toolEventId, userId, apiKeyId);
+        log.debug("Getting log details - ingestDay: {}, toolType: {}, eventType: {}, timestamp: {}, toolEventId: {} - userId: {}, apiKeyId: {}", 
+                ingestDay, toolType, eventType, timestamp, toolEventId, caller.userId(), caller.apiKeyId());
         
         var logDetails = logService.findLogDetails(ingestDay, toolType, eventType, timestamp, toolEventId)
                 .orElseThrow(() -> new LogNotFoundException(

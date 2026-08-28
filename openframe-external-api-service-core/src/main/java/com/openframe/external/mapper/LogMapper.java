@@ -64,10 +64,7 @@ public class LogMapper extends BaseRestMapper {
         }
 
         List<CustomerFilterResponse> customers = filters.getOrganizations().stream()
-                .map(org -> CustomerFilterResponse.builder()
-                        .id(org.getId())
-                        .name(org.getName())
-                        .build())
+                .map(org -> new CustomerFilterResponse(org.getId(), org.getName()))
                 .collect(Collectors.toList());
 
         return LogFilterResponse.builder()
