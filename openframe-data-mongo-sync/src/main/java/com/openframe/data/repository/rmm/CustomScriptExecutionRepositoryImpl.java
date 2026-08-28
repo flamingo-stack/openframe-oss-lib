@@ -19,6 +19,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.Optional;
 import java.util.LinkedHashMap;
@@ -138,6 +139,18 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                 .and(FIELD_SCRIPT_ID).is(scriptId))
                 .withReadPreference(ReadPreference.primary());
         return Optional.ofNullable(mongoTemplate.findOne(query, ScriptExecution.class));
+    }
+
+    @Override
+    public List<ScriptExecution> findByMachineIdAndExecutionIdAndScriptIdIn(String machineId, String executionId, Collection<String> scriptIds) {
+        if (scriptIds == null || scriptIds.isEmpty()) {
+            return List.of();
+        }
+        Query query = new Query(Criteria.where(FIELD_MACHINE_ID).is(machineId)
+                .and(FIELD_EXECUTION_ID).is(executionId)
+                .and(FIELD_SCRIPT_ID).in(scriptIds))
+                .withReadPreference(ReadPreference.primary());
+        return mongoTemplate.find(query, ScriptExecution.class);
     }
 
     @Override
