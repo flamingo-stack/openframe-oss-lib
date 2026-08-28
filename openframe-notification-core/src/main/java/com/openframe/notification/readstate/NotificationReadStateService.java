@@ -87,12 +87,15 @@ public class NotificationReadStateService {
     }
 
     public long markAllAsRead(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
-        // Snapshot BEFORE the flip: under concurrency the ids can drift from what the flip matches,
-        // in both directions. Deliberate — events are best-effort (a throwing listener already loses
-        // one) and listeners must be idempotent; exactness would need a transaction.
         List<String> unreadIds = notificationIds(
                 repository.findByRecipientIdAndRecipientTypeAndStatus(recipientId, recipientType, ReadStatus.UNREAD));
-        long flipped = repository.markAllAsRead(recipientId, recipientType);
+        if (unreadIds.isEmpty()) {
+            return 0L;
+        }
+        // Flip the snapshot, not "everything unread": one arriving in between would turn read with
+        // nobody retracting its push. What turns read here is exactly what gets published.
+        String tenantId = tenantIdProvider.getTenantId();
+        long flipped = repository.markAsReadByIds(tenantId, recipientId, recipientType, unreadIds);
         publish(recipientId, recipientType, unreadIds, NotificationReadEvent.Transition.READ);
         return flipped;
     }
@@ -130,7 +133,11 @@ public class NotificationReadStateService {
     public long deleteAllRead(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
         List<String> readIds = notificationIds(
                 repository.findByRecipientIdAndRecipientTypeAndStatus(recipientId, recipientType, ReadStatus.READ));
-        long deleted = repository.softDeleteAllRead(recipientId, recipientType);
+        if (readIds.isEmpty()) {
+            return 0L;
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        long deleted = repository.softDeleteByIds(tenantId, recipientId, recipientType, readIds);
         publish(recipientId, recipientType, readIds, NotificationReadEvent.Transition.DELETED);
         return deleted;
     }

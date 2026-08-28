@@ -51,9 +51,12 @@ public interface NotificationReadStateRepository
     @Update("{ '$set': { 'status': 'DELETED' } }")
     long softDelete(String recipientId, RecipientType recipientType, String notificationId);
 
-    @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'status': 'READ' }")
+    @Query("{ 'tenantId': ?0, 'recipientId': ?1, 'recipientType': ?2, 'notificationId': { '$in': ?3 }, 'status': 'READ' }")
     @Update("{ '$set': { 'status': 'DELETED' } }")
-    long softDeleteAllRead(String recipientId, RecipientType recipientType);
+    long softDeleteByIds(String tenantId,
+                         String recipientId,
+                         RecipientType recipientType,
+                         Collection<String> notificationIds);
 
     @Aggregation(pipeline = {
             "{ '$match': { 'tenantId': ?2, 'recipientId': ?0, 'recipientType': ?1, 'status': 'UNREAD' } }",

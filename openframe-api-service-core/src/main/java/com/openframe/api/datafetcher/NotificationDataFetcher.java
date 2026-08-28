@@ -8,7 +8,6 @@ import com.openframe.api.dto.notification.NotificationFilter;
 import com.openframe.api.dto.notification.NotificationFilterInput;
 import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.notification.UnreadCategoryCount;
-import com.openframe.api.dto.notification.UnreadEntityCount;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -93,16 +92,6 @@ public class NotificationDataFetcher {
         RecipientType recipientType = r.type();
         Map<NotificationCategory, Long> counts = readStateService.unreadCountsByCategory(recipientId, recipientType);
         return notificationMapper.toCategoryCounts(counts);
-    }
-
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
-    @DgsQuery
-    public List<UnreadEntityCount> unreadCountsByEntity(@InputArgument NotificationEntityType entityType) {
-        Recipient r = currentRecipient();
-        String recipientId = r.id();
-        RecipientType recipientType = r.type();
-        Map<String, Long> counts = readStateService.unreadCountsByEntity(recipientId, recipientType, entityType);
-        return notificationMapper.toEntityCounts(counts);
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")

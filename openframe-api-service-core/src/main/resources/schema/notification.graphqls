@@ -2,8 +2,6 @@ extend type Query {
     notifications(filter: NotificationFilterInput, search: String, first: Int, after: String, last: Int, before: String, sort: SortInput): NotificationConnection!
     hasUnreadNotifications: Boolean!
     unreadCountsByCategory: [UnreadCategoryCount!]!
-    "Entities with nothing unread are absent — a missing id means zero, not \"not loaded\"."
-    unreadCountsByEntity(entityType: NotificationEntityType!): [UnreadEntityCount!]!
 }
 
 extend type Mutation {
@@ -20,10 +18,6 @@ enum NotificationEntityType {
     DIALOG
 }
 
-type UnreadEntityCount {
-    entityId: ID!
-    count: Int!
-}
 
 enum NotificationSeverity {
     INFO

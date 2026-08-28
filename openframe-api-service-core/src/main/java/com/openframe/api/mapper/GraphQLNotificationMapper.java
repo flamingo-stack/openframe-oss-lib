@@ -5,7 +5,6 @@ import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.notification.UnreadCategoryCount;
-import com.openframe.api.dto.notification.UnreadEntityCount;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
@@ -32,12 +31,6 @@ public class GraphQLNotificationMapper {
     public List<UnreadCategoryCount> toCategoryCounts(Map<NotificationCategory, Long> counts) {
         return counts.entrySet().stream()
                 .map(entry -> new UnreadCategoryCount(entry.getKey(), entry.getValue()))
-                .toList();
-    }
-
-    public List<UnreadEntityCount> toEntityCounts(Map<String, Long> counts) {
-        return counts.entrySet().stream()
-                .map(entry -> new UnreadEntityCount(entry.getKey(), entry.getValue()))
                 .toList();
     }
 
