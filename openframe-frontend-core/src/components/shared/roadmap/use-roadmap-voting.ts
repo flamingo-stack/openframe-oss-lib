@@ -17,6 +17,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useIsHydrated } from '../../../hooks/ui/use-is-hydrated';
+import { useHumanitySignals } from '../../../hooks/use-humanity-signals';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 
 export type VoteType = 'up' | 'down' | null;
@@ -55,6 +56,13 @@ function readStoredVotes(storageKey: string): VoteState {
 export function useRoadmapVoting(options: UseRoadmapVotingOptions = {}) {
   const voteApiEndpoint = options.voteApiEndpoint ?? DEFAULT_VOTE_ENDPOINT;
   const storageKey = options.storageKey ?? DEFAULT_STORAGE_KEY;
+
+  // Humanity signals ride every vote POST: no decoy field is rendered (a vote
+  // is not a form), so the honeypot key is always '' — but the mount-to-click
+  // elapsed-ms lets the server POSITIVELY affirm human timing and downgrade a
+  // BotID false positive (ad-blocker users block the BotID script and would
+  // otherwise 403 on votes). The server never BLOCKS a vote on these signals.
+  const { getSignals } = useHumanitySignals();
 
   const [votes, setVotes] = useState<VoteState>(NO_VOTES);
   // Which key `votes` was loaded from. `null` until the client has read
@@ -124,6 +132,7 @@ export function useRoadmapVoting(options: UseRoadmapVotingOptions = {}) {
               taskId,
               voteType: currentVote,
               action: 'remove',
+              ...getSignals(),
             }),
           }).catch((err: unknown) => console.error('[Voting] Error removing opposite vote:', err));
         }
@@ -142,7 +151,7 @@ export function useRoadmapVoting(options: UseRoadmapVotingOptions = {}) {
         const response = await contentFetch(voteApiEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId, voteType, action }),
+          body: JSON.stringify({ taskId, voteType, action, ...getSignals() }),
         });
 
         if (!response.ok) {
@@ -162,7 +171,7 @@ export function useRoadmapVoting(options: UseRoadmapVotingOptions = {}) {
         return { success: false, newVote: currentVote, action };
       }
     },
-    [votes, voteApiEndpoint],
+    [votes, voteApiEndpoint, getSignals],
   );
 
   const clearVotes = useCallback(() => {

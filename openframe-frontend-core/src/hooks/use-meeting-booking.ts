@@ -2,10 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import type {
-  BookingConfirmation,
-  MeetingAvailability,
-  MeetingBookingErrorCode,
+import {
+  MEETING_BOOKING_ERROR_CODES,
+  type BookingConfirmation,
+  type MeetingAvailability,
+  type MeetingBookingErrorCode,
 } from '../schemas/meeting-booking-schema';
 import { contentFetch } from '../utils/embed-content-fetch';
 import { MAX_MONTH_OFFSET } from '../utils/hubspot-meetings-convention';
@@ -31,9 +32,9 @@ import { MAX_MONTH_OFFSET } from '../utils/hubspot-meetings-convention';
  * it keeps rendering (with nothing selectable yet) while only the times column
  * — the part that genuinely has no answer — shows a placeholder.
  *
- * `staleTime` is deliberately short: HubSpot slots go stale in about a minute,
- * and a slot that is gone by the time it is clicked costs a booking. Fresh
- * enough to trust, cached enough not to blink.
+ * `staleTime` is ZERO: the host serves availability live (no-store), and a
+ * cached month re-shown while paging back is organizer-visible staleness. A
+ * slot gone by the time it is clicked costs a booking — always refetch.
  *
  * Booking: a mutation, guarded so a second submit can't start while one is in
  * flight (the transport never retries POST — this is the only double-booking
@@ -52,16 +53,10 @@ export interface BookingResult {
   message?: string;
 }
 
-const KNOWN_CODES: MeetingBookingErrorCode[] = [
-  'SLOT_TAKEN',
-  'VALIDATION',
-  'LINK_GONE',
-  'TEMPORARILY_UNAVAILABLE',
-  'MEETING_UNAVAILABLE',
-];
-
-/** ~half HubSpot's own slot volatility window — see the docblock. */
-const AVAILABILITY_STALE_MS = 30_000;
+/** Always refetch — availability is served live (no-store) by the host; a
+ *  cached month shown while paging back is exactly the staleness the server
+ *  layers were stripped to kill (2026-08-27). */
+const AVAILABILITY_STALE_MS = 0;
 
 /** Query key for one month of one link. Exported so a host can prefetch or
  *  invalidate a month it knows changed (e.g. after booking elsewhere). */
@@ -137,7 +132,7 @@ export function useMeetingBooking(options: {
         const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
         if (res.ok) return { ok: true, confirmation: data as unknown as BookingConfirmation };
         const rawCode = typeof data.code === 'string' ? data.code : '';
-        const code = (KNOWN_CODES as string[]).includes(rawCode)
+        const code = (MEETING_BOOKING_ERROR_CODES as readonly string[]).includes(rawCode)
           ? (rawCode as MeetingBookingErrorCode)
           : 'TEMPORARILY_UNAVAILABLE';
         return { ok: false, code, message: typeof data.error === 'string' ? data.error : undefined };

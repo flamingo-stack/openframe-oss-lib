@@ -39,6 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { useMeetingBooking } from '../../hooks/use-meeting-booking';
+import { useToast } from '../../hooks/use-toast';
 import {
   isSupportedFormField,
   type BookingConfirmation,
@@ -48,11 +49,30 @@ import {
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
-import { Button } from '../ui';
+import { Alert, AlertDescription, Button } from '../ui';
 import { BookingForm } from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';
 import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
+
+/**
+ * Visitor-facing copy per booking-error code. Everything except SLOT_TAKEN
+ * surfaces as an error TOAST at submit time, and ONLY as a toast (owner
+ * decision 2026-08-27 — no inline duplicate; hosts must mount the lib
+ * Toaster, as every hub platform does globally). SLOT_TAKEN renders above
+ * the calendar instead: its recovery flow returns the visitor there. An
+ * unrecognized code (newer host than widget) falls back to the VALIDATION
+ * copy — fail-safe, never blank.
+ */
+const BOOKING_ERROR_COPY: Record<Exclude<MeetingBookingErrorCode, 'SLOT_TAKEN'>, string> = {
+  INVALID_EMAIL:
+    'That email address was rejected by our scheduling system — please use a real, reachable address (work email works best).',
+  VALIDATION:
+    'Please double-check your details — especially that the email address is real and reachable — and try again.',
+  TEMPORARILY_UNAVAILABLE: 'Scheduling is briefly unavailable — please try again in a minute.',
+  MEETING_UNAVAILABLE: 'This meeting type has reached its booking limit for today — try another time or contact us.',
+  LINK_GONE: 'This meeting type is no longer available.',
+};
 
 export interface HubSpotMeetingSchedulerProps {
   /** Directory id of the meeting link (from the host's `/api/meetings` payload). */
@@ -285,6 +305,7 @@ export function HubSpotMeetingScheduler({
   const [bookingError, setBookingError] = useState<MeetingBookingErrorCode | null>(null);
 
   const { honeypotInputProps, getSignals, resetSignals } = useHumanitySignals();
+  const { toast } = useToast();
 
   // Reset the machine when the host switches links. Adjusted while rendering —
   // React's documented pattern for a prop-driven reset — so the swapped-in link
@@ -394,9 +415,17 @@ export function HubSpotMeetingScheduler({
         setStep('slot');
         resetSignals();
         void refetchAvailability();
+      } else {
+        // The error surface is the TOAST, full stop (host-mounted Toaster —
+        // every hub platform mounts it globally; embedders must too).
+        toast({
+          variant: 'error',
+          title: 'Booking failed',
+          description: BOOKING_ERROR_COPY[code] ?? BOOKING_ERROR_COPY.VALIDATION,
+        });
       }
     },
-    [book, onBooked, refetchAvailability, resetSignals],
+    [book, onBooked, refetchAvailability, resetSignals, toast],
   );
 
   const escapeHatch = fallbackUrl ? (
@@ -506,20 +535,6 @@ export function HubSpotMeetingScheduler({
                 }).format(new Date(selectedSlot))}{' '}
                 · {formatDurationCompact(durationMs / 1000)}
               </p>
-              {bookingError && bookingError !== 'SLOT_TAKEN' && (
-                <div className="flex flex-col items-start gap-[var(--spacing-system-xs)]">
-                  <p className="text-ods-error text-h6">
-                    {bookingError === 'TEMPORARILY_UNAVAILABLE'
-                      ? 'Scheduling is briefly unavailable — please try again in a minute.'
-                      : bookingError === 'MEETING_UNAVAILABLE'
-                        ? 'This meeting type has reached its booking limit for today — try another time or contact us.'
-                        : bookingError === 'LINK_GONE'
-                          ? 'This meeting type is no longer available.'
-                          : 'Please double-check your details and try again.'}
-                  </p>
-                  {escapeHatch}
-                </div>
-              )}
               <BookingForm
                 availability={availability}
                 meetingId={meetingId}
@@ -535,10 +550,15 @@ export function HubSpotMeetingScheduler({
           ) : (
             <div className="flex flex-col gap-[var(--spacing-system-m)] md:min-h-0 md:flex-1">
               {bookingError === 'SLOT_TAKEN' && (
-                <p className="px-[var(--spacing-system-l)] pt-[var(--spacing-system-l)] text-ods-error text-h6 lg:p-0">
-                  That time is no longer available — if you just submitted, check your email for a confirmation before
-                  rebooking.
-                </p>
+                <Alert
+                  variant="warning"
+                  className="mx-[var(--spacing-system-l)] mt-[var(--spacing-system-l)] w-auto lg:m-0 lg:w-full"
+                >
+                  <AlertDescription>
+                    That time was just taken — pick another slot below. (If you already submitted, check your email for
+                    a confirmation before rebooking.)
+                  </AlertDescription>
+                </Alert>
               )}
               {timezone && durationMs != null ? (
                 // The picker owns BOTH the loading and the empty month now —
