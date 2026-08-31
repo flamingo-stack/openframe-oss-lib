@@ -13,11 +13,13 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.query.BasicQuery;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +34,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String SORT_DESC = "DESC";
     private static final String ID_FIELD = "_id";
     private static final String DEFAULT_SORT_FIELD = "_id";
+    private static final String AND_OPERATOR = "$and";
 
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_STATUS_ID = "statusId";
@@ -145,45 +148,60 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
         Sort.Direction mongoSortDirection = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
 
+        Query pageQuery = query;
         if (cursor != null && !cursor.trim().isEmpty()) {
             try {
                 ObjectId cursorId = new ObjectId(cursor);
-                applyCursorCriteria(query, cursorId, sortField, isDesc);
+                Criteria cursorCriteria = buildCursorCriteria(cursorId, sortField, isDesc);
+                pageQuery = withCursorBound(query, cursorCriteria);
             } catch (IllegalArgumentException ex) {
                 log.warn("Invalid ObjectId cursor format: {}", cursor);
             }
         }
-        query.limit(limit);
+        pageQuery.limit(limit);
 
         if (ID_FIELD.equals(sortField)) {
-            query.with(Sort.by(mongoSortDirection, ID_FIELD));
+            pageQuery.with(Sort.by(mongoSortDirection, ID_FIELD));
         } else {
-            query.with(Sort.by(
+            pageQuery.with(Sort.by(
                     Sort.Order.by(sortField).with(mongoSortDirection),
                     Sort.Order.by(ID_FIELD).with(mongoSortDirection)
             ));
         }
 
-        return mongoTemplate.find(query, Ticket.class);
+        return mongoTemplate.find(pageQuery, Ticket.class);
     }
 
-    private void applyCursorCriteria(Query query, ObjectId cursorId, String sortField, boolean isDesc) {
+    // Not addCriteria: a second criterion per key ('_id' from tags, '$or' from search) throws.
+    private Query withCursorBound(Query base, Criteria cursorCriteria) {
+        Document baseQuery = base.getQueryObject();
+        Document merged = new Document(baseQuery);
+        List<Object> conjuncts = new ArrayList<>();
+        Object existing = merged.get(AND_OPERATOR);
+        if (existing instanceof List<?> existingConjuncts) {
+            conjuncts.addAll(existingConjuncts);
+        }
+        Document cursorBound = cursorCriteria.getCriteriaObject();
+        conjuncts.add(cursorBound);
+        merged.put(AND_OPERATOR, conjuncts);
+        Document fields = base.getFieldsObject();
+        return new BasicQuery(merged, fields);
+    }
+
+    private Criteria buildCursorCriteria(ObjectId cursorId, String sortField, boolean isDesc) {
         if (ID_FIELD.equals(sortField)) {
-            query.addCriteria(buildIdCriteria(cursorId, isDesc));
-            return;
+            return buildIdCriteria(cursorId, isDesc);
         }
 
         Ticket cursorDoc = mongoTemplate.findById(cursorId, Ticket.class);
         if (cursorDoc == null) {
             log.warn("Cursor document not found for id: {}", cursorId);
-            query.addCriteria(buildIdCriteria(cursorId, isDesc));
-            return;
+            return buildIdCriteria(cursorId, isDesc);
         }
 
         Object cursorSortValue = getSortFieldValue(cursorDoc, sortField);
         if (cursorSortValue == null) {
-            query.addCriteria(buildIdCriteria(cursorId, isDesc));
-            return;
+            return buildIdCriteria(cursorId, isDesc);
         }
 
         Criteria pastSortValue = isDesc
@@ -195,7 +213,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
                 buildIdCriteria(cursorId, isDesc)
         );
 
-        query.addCriteria(new Criteria().orOperator(pastSortValue, sameSortValuePastId));
+        return new Criteria().orOperator(pastSortValue, sameSortValuePastId);
     }
 
     private Criteria buildIdCriteria(ObjectId cursorId, boolean isDesc) {
