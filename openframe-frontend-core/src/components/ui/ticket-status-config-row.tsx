@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useId } from 'react';
 import { useDragAndDropEnabled } from '../../hooks/ui/use-drag-and-drop-enabled';
 import { cn } from '../../utils/cn';
 import type { SortableDragHandleProps } from '../features/sortable-list/use-sortable-item';
@@ -10,6 +10,7 @@ import { InfoCircleIcon } from '../icons-v2-generated/signs-and-symbols/info-cir
 import { Button } from './button';
 import { ColorPresetSelect, ColorPickerInput } from './color-preset-select';
 import { Input } from './input';
+import { Label } from './label';
 import type { TagProps } from './tag';
 import { TicketStatusTag } from './ticket-status-tag';
 import { TouchFriendlyTooltip } from './touch-friendly-tooltip';
@@ -63,6 +64,7 @@ export function TicketStatusConfigRow({
   // Standalone system rows render outside any SortableList, so the row answers
   // "is there a drag rail at all?" itself — same media gate the list uses.
   const dragAndDropEnabled = useDragAndDropEnabled();
+  const nameInputId = useId();
   const isSystem = variant === 'system';
   const isCustomColor = !isSystem && presetKey === undefined;
   const previewColor = isSystem ? undefined : color;
@@ -70,18 +72,40 @@ export function TicketStatusConfigRow({
   // Custom rows render as filled pills (no border); system rows take the
   // page-configured variant (outline/primary). text-h5 already uppercases.
   const previewVariant: SystemTagVariant | undefined = systemTagVariant ?? (isSystem ? undefined : 'primary');
-  const colClass = 'min-w-0 grow basis-[calc(50%-6px)] md:basis-0';
+
+  // The fields carry a visible label, so everything that sits beside the
+  // 44/48px field row (rail, chip, controls) drops below the label line by
+  // exactly its height: the h4 line + the label's mb-1.
+  const fieldRowOffset = 'mt-[calc(var(--font-line-space-h4-body)+0.25rem)]';
+
+  const chip = (
+    <TicketStatusTag
+      status={statusKey}
+      label={name || ' '}
+      color={previewColor}
+      variant={previewVariant}
+      showIcon={isSystem}
+      className="max-w-full"
+    />
+  );
 
   return (
     <div
       className={cn(
-        'flex w-full items-start gap-3 rounded-md border border-ods-border bg-ods-card md:gap-[var(--spacing-system-m)]',
+        // Transparent background — only the border outlines the row.
+        'flex w-full items-start gap-3 rounded-md border border-ods-border md:gap-[var(--spacing-system-m)]',
         'p-[var(--spacing-system-m)]',
-        isDragging && 'opacity-70 shadow-lg',
+        // The dragged row travels over its siblings, so it needs an opaque back.
+        isDragging && 'bg-ods-bg opacity-70 shadow-lg',
       )}
     >
       {dragAndDropEnabled && (
-        <div className="flex h-11 w-8 shrink-0 items-center justify-center text-ods-text-secondary md:h-12">
+        <div
+          className={cn(
+            'flex h-11 w-8 shrink-0 items-center justify-center text-ods-text-secondary md:h-12',
+            fieldRowOffset,
+          )}
+        >
           {isSystem ? (
             <DraggerIcon size={24} aria-hidden className="opacity-40" />
           ) : (
@@ -97,47 +121,67 @@ export function TicketStatusConfigRow({
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-4 md:flex-nowrap md:gap-[var(--spacing-system-m)]">
-        <div className={cn('flex flex-col gap-[var(--spacing-system-xxs)]', colClass)}>
+      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-[var(--spacing-system-mf)] md:gap-x-[var(--spacing-system-m)]">
+        {/* System rows keep the chip beside the name on every width, so the name
+            shares its row; a custom row's name owns the full first line on
+            mobile (there the chip drops down to ride the color row). */}
+        <div
+          className={cn(
+            'flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]',
+            isSystem ? 'grow basis-0' : 'grow basis-full md:basis-0',
+          )}
+        >
+          <Label variant="large" htmlFor={nameInputId}>
+            Status Name
+          </Label>
           <Input
+            id={nameInputId}
             value={name}
             onChange={e => onNameChange?.(e.target.value)}
             disabled={isSystem}
             readOnly={isSystem}
-            aria-label="Status name"
             maxLength={50}
           />
         </div>
 
-        {showColorPicker ? (
-          <div className={cn('flex', colClass)}>
-            <ColorPresetSelect value={color} presetKey={presetKey} onChange={onColorChange} />
+        {showColorPicker && (
+          <div className="flex min-w-0 grow basis-full flex-col gap-[var(--spacing-system-xxs)] md:basis-0">
+            <Label variant="large">Color</Label>
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <ColorPresetSelect value={color} presetKey={presetKey} onChange={onColorChange} />
+              </div>
+              {/* Mobile: the preview chip rides the color row. */}
+              <div className="shrink-0 md:hidden">{chip}</div>
+            </div>
           </div>
-        ) : (
-          <div aria-hidden className={cn('hidden md:block', colClass)} />
         )}
 
-        {showColorPicker && isCustomColor ? (
-          <div className={cn('flex', colClass)}>
+        {showColorPicker && isCustomColor && (
+          <div className="flex min-w-0 grow basis-full md:mt-[calc(var(--font-line-space-h4-body)+0.25rem)] md:basis-0">
             <ColorPickerInput value={color} onChange={next => onColorChange({ color: next, preset: undefined })} />
           </div>
-        ) : (
-          <div aria-hidden className={cn('hidden md:block', colClass)} />
         )}
 
-        <div className={cn('flex h-11 items-center justify-start md:h-12 md:justify-end', colClass)}>
-          <TicketStatusTag
-            status={statusKey}
-            label={name || ' '}
-            color={previewColor}
-            variant={previewVariant}
-            showIcon={isSystem}
-            className="max-w-full"
-          />
-        </div>
+        {isSystem ? (
+          <div className={cn('flex h-11 min-w-0 grow basis-0 items-center justify-end md:h-12', fieldRowOffset)}>
+            {chip}
+          </div>
+        ) : (
+          // Tablet: the chip takes a full row of its own, right-aligned;
+          // desktop (lg+) brings it back inline before the controls.
+          <div className="hidden min-w-0 items-center justify-end md:flex md:basis-full lg:mt-[calc(var(--font-line-space-h4-body)+0.25rem)] lg:h-12 lg:grow lg:basis-0">
+            {chip}
+          </div>
+        )}
       </div>
 
-      <div className="flex h-11 shrink-0 items-center justify-end gap-[var(--spacing-system-s)] md:h-12">
+      <div
+        className={cn(
+          'flex h-11 shrink-0 items-center justify-end gap-[var(--spacing-system-s)] md:h-12',
+          fieldRowOffset,
+        )}
+      >
         {!isSystem && moveButtons}
         {isSystem ? (
           <div className="flex w-11 justify-center md:w-12">
