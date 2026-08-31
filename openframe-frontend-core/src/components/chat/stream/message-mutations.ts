@@ -126,8 +126,6 @@ export function appendToTrailingAssistant(
       merged[merged.length - 1] = { type: 'text', text: tail.text + seg.text };
     } else if (seg.type === 'thinking' && tail?.type === 'thinking') {
       merged[merged.length - 1] = { type: 'thinking', text: tail.text + seg.text };
-    } else if (seg.type === 'guide' && tail?.type === 'guide') {
-      merged[merged.length - 1] = { type: 'guide', text: tail.text + seg.text };
     } else if (key) {
       // Block deltas must be IDEMPOTENT: an emit can be seen twice (live plus
       // the JetStream catch-up replay over hydrated history), so upsert on the

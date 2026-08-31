@@ -210,18 +210,18 @@ export const GuideWithEntityCards: Story = {
       ) : null,
     content: [
       {
-        type: 'guide',
+        type: 'text',
         text: "Here's how to create a monitoring policy (check) in OpenFrame:\n\n[card://onboarding_guide:first-check]\n\nStep-by-step:\n\n1. Go to Monitoring → Policies → Add Policy\n2. Write your osquery SQL query\n3. Save the policy",
       },
       {
         type: 'text',
-        text: 'A plain text segment renders its own marker identically:\n\n[card://onboarding_guide:add-devices]',
+        text: 'A second text segment renders its own marker identically:\n\n[card://onboarding_guide:add-devices]',
       },
     ] satisfies MessageSegment[],
   },
 };
 
-/** Every remaining segment type in one message — thinking, guide, tool execution, context compaction, error. */
+/** Every remaining segment type in one message — thinking, tool execution, context compaction, error. */
 export const AllSegmentTypes: Story = {
   args: {
     role: 'assistant',
@@ -233,10 +233,6 @@ export const AllSegmentTypes: Story = {
         text: 'The user wants Slack installed. Homebrew is present on the endpoint, so `brew install --cask slack` is the cleanest path.',
       },
       { type: 'text', text: 'Installing Slack now.' },
-      {
-        type: 'guide',
-        text: "Here's how to create a monitoring policy (check) in OpenFrame:\n\nStep-by-step:\n\n1. Go to Monitoring → Policies → Add Policy\n2. Give it a Name (something descriptive)\n3. Write your osquery SQL query — the query should return rows for devices that fail the check\n4. Set the interval — how often each device runs the check\n5. Save the policy",
-      },
       {
         type: 'tool_execution',
         data: {

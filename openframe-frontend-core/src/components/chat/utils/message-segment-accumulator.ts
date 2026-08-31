@@ -156,22 +156,6 @@ export class MessageSegmentAccumulator {
   }
 
   /**
-   * Append guide text to the current message.
-   * If the last segment is guide, append to it; otherwise start a new guide segment.
-   */
-  appendGuide(text: string): MessageSegment[] {
-    const lastSegment = this.segments[this.segments.length - 1];
-
-    if (lastSegment && lastSegment.type === 'guide') {
-      this.segments[this.segments.length - 1] = { type: 'guide', text: lastSegment.text + text };
-    } else {
-      this.segments.push({ type: 'guide', text });
-    }
-
-    return this.getSegments();
-  }
-
-  /**
    * Add a clarification (ask) card. Unlike the three delta streams an ask
    * arrives whole in one chunk, so it is always a NEW segment — never merged
    * into a trailing one. Consecutive cards stay separate segments; the renderer
@@ -325,15 +309,11 @@ export class MessageSegmentAccumulator {
     status: ChatApprovalStatus = 'pending',
     /** Structured label/value rows. The card prefers them over `explanation`
      *  (see `ApprovalRequestData.fields`). Optional because the agent's own
-     *  approvals carry prose; a Product Guide card is almost entirely fields —
-     *  dropping them here left it as a bare title. */
+     *  approvals carry prose. */
     fields?: ApprovalRequestField[],
-    /** Where the card came from; `'guide'` keeps it inline (see
-     *  `ApprovalRequestData.origin`). */
-    origin?: 'guide',
   ): MessageSegment[] {
     this.segments.push(
-      this.buildApprovalRequestSegment(requestId, { command, explanation, approvalType, fields, origin }, status),
+      this.buildApprovalRequestSegment(requestId, { command, explanation, approvalType, fields }, status),
     );
     return this.getSegments();
   }
@@ -344,7 +324,7 @@ export class MessageSegmentAccumulator {
    * Three paths produce these: `addApprovalRequest` (live stream and replay),
    * `flushPendingApprovals` (tracked-but-unresolved after a history replay) and
    * `processApprovalResult` (a result arriving for a tracked request). They used
-   * to hand-write the object each, which is how `fields` and `origin` reached
+   * to hand-write the object each, which is how `fields` reached
    * the card down one path and not the others — the same proposal rendering as a
    * bare title, or losing the marker that routes its buttons to the hub.
    */
@@ -361,7 +341,6 @@ export class MessageSegmentAccumulator {
         requestId,
         approvalType: approval.approvalType,
         ...(approval.fields && approval.fields.length > 0 ? { fields: approval.fields } : {}),
-        ...(approval.origin ? { origin: approval.origin } : {}),
       },
       status,
       onApprove: this.callbacks.onApprove,
@@ -389,9 +368,6 @@ export class MessageSegmentAccumulator {
     status: ChatApprovalStatus = 'pending',
     executions?: Record<string, ApprovalBatchExecutionState>,
     resolvedByName?: string | null,
-    /** Where the batch came from; `'guide'` keeps it inline and routes it to
-     *  the hub, exactly as for a single card (see `ApprovalBatchData.origin`). */
-    origin?: 'guide',
   ): MessageSegment[] {
     const existingIndex = this.segments.findIndex(
       (s): s is ApprovalBatchSegment => s.type === 'approval_batch' && s.data.approvalRequestId === approvalRequestId,
@@ -400,9 +376,6 @@ export class MessageSegmentAccumulator {
     if (existingIndex !== -1) {
       const existing = this.segments[existingIndex] as ApprovalBatchSegment;
       const mergedExecutions = executions ?? existing.data.executions;
-      // An upsert must not strip the marker: the flip to `approved` comes from
-      // a later event that carries no origin of its own.
-      const mergedOrigin = origin ?? existing.data.origin;
       this.segments[existingIndex] = {
         ...existing,
         data: {
@@ -410,7 +383,6 @@ export class MessageSegmentAccumulator {
           approvalType,
           toolCalls,
           ...(mergedExecutions ? { executions: mergedExecutions } : {}),
-          ...(mergedOrigin ? { origin: mergedOrigin } : {}),
         },
         status,
         resolvedByName: resolvedByName ?? existing.resolvedByName,
@@ -427,7 +399,6 @@ export class MessageSegmentAccumulator {
         approvalType,
         toolCalls,
         ...(executions ? { executions } : {}),
-        ...(origin ? { origin } : {}),
       },
       status,
       resolvedByName,
@@ -685,9 +656,6 @@ export class MessageSegmentAccumulator {
         case 'thinking':
           if (segment.text) this.appendThinking(segment.text);
           break;
-        case 'guide':
-          if (segment.text) this.appendGuide(segment.text);
-          break;
         case 'ask':
           this.addAsk(segment.question, segment.options);
           break;
@@ -703,7 +671,6 @@ export class MessageSegmentAccumulator {
             data.approvalType || '',
             status,
             data.fields,
-            data.origin,
           );
           break;
         }
@@ -716,7 +683,6 @@ export class MessageSegmentAccumulator {
             status,
             data.executions,
             resolvedByName,
-            data.origin,
           );
           break;
         }
