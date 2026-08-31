@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { FieldWrapper } from '../components/ui/field-wrapper'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { FieldWrapper } from '../components/ui/field-wrapper';
 import {
   Select,
   SelectContent,
@@ -9,7 +9,7 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-} from '../components/ui/select'
+} from '../components/ui/select';
 
 const meta = {
   title: 'UI/Select',
@@ -19,16 +19,16 @@ const meta = {
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ padding: '2rem', backgroundColor: 'var(--ods-bg)', maxWidth: '480px' }}>
         <Story />
       </div>
     ),
   ],
-} satisfies Meta<typeof Select>
+} satisfies Meta<typeof Select>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Default select with placeholder.
@@ -46,7 +46,7 @@ export const Default: Story = {
       </SelectContent>
     </Select>
   ),
-}
+};
 
 /**
  * Select with a pre-selected value.
@@ -64,7 +64,7 @@ export const WithValue: Story = {
       </SelectContent>
     </Select>
   ),
-}
+};
 
 /**
  * Disabled select.
@@ -81,7 +81,7 @@ export const Disabled: Story = {
       </SelectContent>
     </Select>
   ),
-}
+};
 
 /**
  * Select with grouped items and labels.
@@ -109,7 +109,7 @@ export const WithGroups: Story = {
       </SelectContent>
     </Select>
   ),
-}
+};
 
 /**
  * Select with a disabled item.
@@ -123,11 +123,13 @@ export const WithDisabledItem: Story = {
       <SelectContent>
         <SelectItem value="viewer">Viewer</SelectItem>
         <SelectItem value="editor">Editor</SelectItem>
-        <SelectItem value="admin" disabled>Admin (restricted)</SelectItem>
+        <SelectItem value="admin" disabled>
+          Admin (restricted)
+        </SelectItem>
       </SelectContent>
     </Select>
   ),
-}
+};
 
 /**
  * Select with many items to demonstrate scrolling.
@@ -140,20 +142,40 @@ export const ManyItems: Story = {
       </SelectTrigger>
       <SelectContent>
         {[
-          'UTC-12:00', 'UTC-11:00', 'UTC-10:00', 'UTC-09:00',
-          'UTC-08:00', 'UTC-07:00', 'UTC-06:00', 'UTC-05:00',
-          'UTC-04:00', 'UTC-03:00', 'UTC-02:00', 'UTC-01:00',
-          'UTC+00:00', 'UTC+01:00', 'UTC+02:00', 'UTC+03:00',
-          'UTC+04:00', 'UTC+05:00', 'UTC+06:00', 'UTC+07:00',
-          'UTC+08:00', 'UTC+09:00', 'UTC+10:00', 'UTC+11:00',
+          'UTC-12:00',
+          'UTC-11:00',
+          'UTC-10:00',
+          'UTC-09:00',
+          'UTC-08:00',
+          'UTC-07:00',
+          'UTC-06:00',
+          'UTC-05:00',
+          'UTC-04:00',
+          'UTC-03:00',
+          'UTC-02:00',
+          'UTC-01:00',
+          'UTC+00:00',
+          'UTC+01:00',
+          'UTC+02:00',
+          'UTC+03:00',
+          'UTC+04:00',
+          'UTC+05:00',
+          'UTC+06:00',
+          'UTC+07:00',
+          'UTC+08:00',
+          'UTC+09:00',
+          'UTC+10:00',
+          'UTC+11:00',
           'UTC+12:00',
-        ].map((tz) => (
-          <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+        ].map(tz => (
+          <SelectItem key={tz} value={tz}>
+            {tz}
+          </SelectItem>
         ))}
       </SelectContent>
     </Select>
   ),
-}
+};
 
 /**
  * Select with invalid state.
@@ -171,7 +193,7 @@ export const Invalid: Story = {
       </SelectContent>
     </Select>
   ),
-}
+};
 
 /**
  * Select with label using FieldWrapper.
@@ -191,7 +213,7 @@ export const WithLabel: Story = {
       </Select>
     </FieldWrapper>
   ),
-}
+};
 
 /**
  * Select with label and error message.
@@ -211,7 +233,7 @@ export const WithLabelAndError: Story = {
       </Select>
     </FieldWrapper>
   ),
-}
+};
 
 /**
  * Select with label and selected value.
@@ -231,7 +253,7 @@ export const WithLabelAndValue: Story = {
       </Select>
     </FieldWrapper>
   ),
-}
+};
 
 /**
  * All select variants displayed together for comparison.
@@ -302,4 +324,4 @@ export const AllVariants: Story = {
       </FieldWrapper>
     </div>
   ),
-}
+};

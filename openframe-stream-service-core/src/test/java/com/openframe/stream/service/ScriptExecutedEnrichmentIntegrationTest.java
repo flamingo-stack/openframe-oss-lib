@@ -15,6 +15,7 @@ import com.openframe.stream.deserializer.CommandResultDeserializer;
 import com.openframe.stream.deserializer.ScriptResultDeserializer;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import com.openframe.stream.service.rmm.RmmEnrichmentService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

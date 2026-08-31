@@ -1,33 +1,36 @@
-'use client'
+'use client';
 
-import React, { useEffect, useState } from 'react'
-import { cn } from '../../utils/cn'
-import { useDebounce } from '../../hooks/ui/use-debounce'
-import { Filter02Icon, SearchIcon } from '../icons-v2-generated'
-import { Button, Input, PageError } from '../ui'
-import { FilterModal, type FilterGroup, type SortConfig, type SortDirection } from '../ui/filter-modal'
-import type { TableFilters } from '../ui/table/types'
-import { ListPageContainer, type PageActionButton } from './page-container'
+import type React from 'react';
+import { useEffect, useState } from 'react';
+import { useDebounce } from '../../hooks/ui/use-debounce';
+import { cn } from '../../utils/cn';
+import { Filter02Icon, SearchIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
+import { PageError } from '../ui/error-state';
+import { FilterModal, type FilterGroup, type SortConfig, type SortDirection } from '../ui/filter-modal';
+import { Input } from '../ui/input';
+import type { TableFilters } from '../ui/table/types';
+import { ListPageContainer, type PageActionButton } from './page-container';
 
 export interface ListPageLayoutProps {
-  title: string
-  headerActions?: React.ReactNode
-  actions?: PageActionButton[]
-  searchPlaceholder: string
-  searchValue: string
-  onSearch: (term: string) => void
-  children: React.ReactNode
-  error?: string | null
-  className?: string
-  padding?: 'none' | 'sm' | 'md' | 'lg'
-  background?: 'default' | 'card' | 'transparent'
-  mobileFilterGroups?: FilterGroup[]
-  onMobileFilterChange?: (filters: TableFilters) => void
-  currentMobileFilters?: TableFilters
-  mobileSortConfig?: SortConfig
-  onMobileSort?: (column: string, direction: SortDirection) => void
-  mobileFilterTitle?: string
-  stickyHeader?: boolean
+  title: string;
+  headerActions?: React.ReactNode;
+  actions?: PageActionButton[];
+  searchPlaceholder: string;
+  searchValue: string;
+  onSearch: (term: string) => void;
+  children: React.ReactNode;
+  error?: string | null;
+  className?: string;
+  padding?: 'none' | 'sm' | 'md' | 'lg';
+  background?: 'default' | 'card' | 'transparent';
+  mobileFilterGroups?: FilterGroup[];
+  onMobileFilterChange?: (filters: TableFilters) => void;
+  currentMobileFilters?: TableFilters;
+  mobileSortConfig?: SortConfig;
+  onMobileSort?: (column: string, direction: SortDirection) => void;
+  mobileFilterTitle?: string;
+  stickyHeader?: boolean;
 }
 
 /**
@@ -109,28 +112,33 @@ export function ListPageLayout({
   mobileFilterTitle,
   stickyHeader = false,
 }: ListPageLayoutProps) {
-  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
-  const [localSearchValue, setLocalSearchValue] = useState(searchValue)
-  const debouncedSearchValue = useDebounce(localSearchValue, 500)
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [localSearchValue, setLocalSearchValue] = useState(searchValue);
+  const debouncedSearchValue = useDebounce(localSearchValue, 500);
 
-  // Sync local value when controlled value changes externally
-  useEffect(() => {
-    setLocalSearchValue(searchValue)
-  }, [searchValue])
+  // Sync local value when controlled value changes externally. Adjusted while
+  // rendering (React's documented prop-sync pattern) instead of from an effect:
+  // the input is rendered from `localSearchValue`, so an effect committed one
+  // frame still showing the pre-sync text and then re-rendered to replace it.
+  const [syncedSearchValue, setSyncedSearchValue] = useState(searchValue);
+  if (syncedSearchValue !== searchValue) {
+    setSyncedSearchValue(searchValue);
+    setLocalSearchValue(searchValue);
+  }
 
   // Call onSearch when debounced value changes
   useEffect(() => {
     if (debouncedSearchValue !== searchValue) {
-      onSearch(debouncedSearchValue)
+      onSearch(debouncedSearchValue);
     }
-  }, [debouncedSearchValue, onSearch, searchValue])
+  }, [debouncedSearchValue, onSearch, searchValue]);
 
   // Check if mobile filter is enabled (has filter groups or sort config)
-  const hasMobileFilter = (mobileFilterGroups && mobileFilterGroups.length > 0) ||
-    (mobileSortConfig && mobileSortConfig.columns.length > 0)
+  const hasMobileFilter =
+    (mobileFilterGroups && mobileFilterGroups.length > 0) || (mobileSortConfig && mobileSortConfig.columns.length > 0);
 
   if (error) {
-    return <PageError message={error} />
+    return <PageError message={error} />;
   }
 
   return (
@@ -144,17 +152,20 @@ export function ListPageLayout({
     >
       <div>
         {/* Search Bar with Mobile Filter Button */}
-        <div className={cn(
-          'flex gap-4 items-center',
-          !stickyHeader && 'w-full',
-          stickyHeader && 'sticky top-0 z-20 flex gap-[var(--spacing-system-m)] items-center bg-ods-bg -mx-[var(--spacing-system-l)] p-[var(--spacing-system-l)] -mt-[var(--spacing-system-l)]'
-        )}>
+        <div
+          className={cn(
+            'flex items-center gap-4',
+            !stickyHeader && 'w-full',
+            stickyHeader &&
+              'sticky top-0 z-20 -mx-[var(--spacing-system-l)] -mt-[var(--spacing-system-l)] flex items-center gap-[var(--spacing-system-m)] bg-ods-bg p-[var(--spacing-system-l)]',
+          )}
+        >
           <Input
             placeholder={searchPlaceholder}
-            onChange={(e) => setLocalSearchValue(e.target.value)}
+            onChange={e => setLocalSearchValue(e.target.value)}
             value={localSearchValue}
             className="flex-1"
-            startAdornment={<SearchIcon className="w-4 h-4 md:w-6 md:h-6" />}
+            startAdornment={<SearchIcon className="h-4 w-4 md:h-6 md:w-6" />}
           />
 
           {/* Mobile Filter Button - only visible on mobile when filter is enabled */}
@@ -189,11 +200,11 @@ export function ListPageLayout({
         {children}
       </div>
     </ListPageContainer>
-  )
+  );
 }
 
 // Re-export PageActionButton type for convenience
-export type { PageActionButton } from './page-container'
+export type { PageActionButton } from './page-container';
 
 /** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
-export default ListPageLayout
+export default ListPageLayout;

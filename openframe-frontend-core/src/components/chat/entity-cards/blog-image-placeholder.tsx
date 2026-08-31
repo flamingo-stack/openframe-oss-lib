@@ -1,15 +1,15 @@
-'use client'
+'use client';
 
-import React from 'react'
+import Image from '../../../embed-shims/next-image';
 
 interface BlogImagePlaceholderProps {
   /** Cover-image URL. The hub passes a `useOgPlaceholderUrl({ title, siteName })`
    *  result; embedders pass their own pre-resolved URL. When null, the
    *  component renders nothing. */
-  imageUrl: string | null
+  imageUrl: string | null;
   /** Used for the `alt` attribute. */
-  title: string
-  className?: string
+  title: string;
+  className?: string;
 }
 
 /**
@@ -26,27 +26,24 @@ interface BlogImagePlaceholderProps {
  * `bg-ods-bg` shows through cleanly. Same recovery pattern every
  * cover-image render path uses.
  */
-export function BlogImagePlaceholder({
-  imageUrl,
-  title,
-  className = '',
-}: BlogImagePlaceholderProps) {
-  if (!imageUrl) return null
+export function BlogImagePlaceholder({ imageUrl, title, className = '' }: BlogImagePlaceholderProps) {
+  if (!imageUrl) return null;
 
   return (
-    <span className={`relative block w-full h-full overflow-hidden bg-ods-bg ${className}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- this is a
-          dynamically-generated placeholder image with a query string;
-          next/image's loader configuration adds nothing here. */}
-      <img
+    <span className={`relative block h-full w-full overflow-hidden bg-ods-bg ${className}`}>
+      <Image
         src={imageUrl}
         alt={`Cover image for ${title}`}
-        className="block w-full h-full object-contain"
+        className="object-contain"
+        fill
+        sizes="(max-width: 768px) 100vw, 50vw"
+        unoptimized
         loading="lazy"
-        onError={(e) => {
-          (e.currentTarget as HTMLImageElement).style.display = 'none'
+        onError={e => {
+          const img = e.currentTarget;
+          img.style.display = 'none';
         }}
       />
     </span>
-  )
+  );
 }

@@ -1,6 +1,6 @@
 /**
  * MessageSegmentAccumulator - Manages accumulation of message segments
- * 
+ *
  * This class handles the logic for:
  * - Accumulating text segments (appending to existing text)
  * - Managing tool execution states (EXECUTING_TOOL -> EXECUTED_TOOL)
@@ -8,6 +8,7 @@
  * - Creating approval segments when results arrive
  */
 
+import { applyApprovalStatusToSegment, nextBatchExecution, withBatchExecution } from '../stream/message-mutations';
 import type {
   AskOptionData,
   MessageSegment,
@@ -23,30 +24,24 @@ import type {
   TicketEventData,
   TicketEventSegment,
   ContextCompactionSegment,
-  ErrorSegment,
   PendingApproval,
   PendingToolCallData,
   AccumulatorState,
   ChatApprovalStatus,
   ExecutingToolState,
-} from '../types'
-import {
-  applyApprovalStatusToSegment,
-  nextBatchExecution,
-  withBatchExecution,
-} from '../stream/message-mutations'
+} from '../types';
 
 export interface AccumulatorCallbacks {
   /** See `ApprovalResolutionHandler` (message.types) — the SSOT for the
    *  approve/reject signature incl. the boolean failure flag. */
-  onApprove?: ApprovalResolutionHandler
-  onReject?: ApprovalResolutionHandler
+  onApprove?: ApprovalResolutionHandler;
+  onReject?: ApprovalResolutionHandler;
   /** Escalation offers resolve through the ticket-escalation mutations, NOT
    *  the tool-approval endpoint, so they carry their own pair of handlers.
    *  Sharing `onApprove`/`onReject` would POST an offer id to the approval
    *  endpoint, which has no record of it. */
-  onEscalationApprove?: ApprovalResolutionHandler
-  onEscalationReject?: ApprovalResolutionHandler
+  onEscalationApprove?: ApprovalResolutionHandler;
+  onEscalationReject?: ApprovalResolutionHandler;
 }
 
 /**
@@ -54,14 +49,14 @@ export interface AccumulatorCallbacks {
  * or historical message processing
  */
 export class MessageSegmentAccumulator {
-  private segments: MessageSegment[] = []
-  private pendingApprovals: Map<string, PendingApproval> = new Map()
-  private executingTools: Map<string, ExecutingToolState> = new Map()
-  private callbacks: AccumulatorCallbacks = {}
+  private segments: MessageSegment[] = [];
+  private pendingApprovals: Map<string, PendingApproval> = new Map();
+  private executingTools: Map<string, ExecutingToolState> = new Map();
+  private callbacks: AccumulatorCallbacks = {};
 
   constructor(callbacks?: AccumulatorCallbacks) {
     if (callbacks) {
-      this.callbacks = callbacks
+      this.callbacks = callbacks;
     }
   }
 
@@ -69,7 +64,7 @@ export class MessageSegmentAccumulator {
    * Set callbacks for approval actions
    */
   setCallbacks(callbacks: AccumulatorCallbacks): void {
-    this.callbacks = callbacks
+    this.callbacks = callbacks;
   }
 
   /**
@@ -77,20 +72,20 @@ export class MessageSegmentAccumulator {
    * Used to continue building messages across page refreshes or reconnections
    */
   initializeWithState(state: {
-    existingSegments?: MessageSegment[]
-    pendingApprovals?: Map<string, PendingApproval>
-    executingTools?: Map<string, ExecutingToolState>
+    existingSegments?: MessageSegment[];
+    pendingApprovals?: Map<string, PendingApproval>;
+    executingTools?: Map<string, ExecutingToolState>;
   }): void {
     if (state.existingSegments) {
-      this.segments = [...state.existingSegments]
+      this.segments = [...state.existingSegments];
     }
 
     if (state.pendingApprovals) {
-      this.pendingApprovals = new Map(state.pendingApprovals)
+      this.pendingApprovals = new Map(state.pendingApprovals);
     }
 
     if (state.executingTools) {
-      this.executingTools = new Map(state.executingTools)
+      this.executingTools = new Map(state.executingTools);
     }
   }
 
@@ -98,7 +93,7 @@ export class MessageSegmentAccumulator {
    * Get current segments
    */
   getSegments(): MessageSegment[] {
-    return [...this.segments]
+    return [...this.segments];
   }
 
   /**
@@ -109,23 +104,23 @@ export class MessageSegmentAccumulator {
       segments: [...this.segments],
       pendingApprovals: new Map(this.pendingApprovals),
       executingTools: new Map(this.executingTools),
-    }
+    };
   }
 
   /**
    * Reset the accumulator to initial state
    */
   reset(): void {
-    this.segments = []
-    this.pendingApprovals.clear()
-    this.executingTools.clear()
+    this.segments = [];
+    this.pendingApprovals.clear();
+    this.executingTools.clear();
   }
 
   /**
    * Reset only segments (keep pending state for continued processing)
    */
   resetSegments(): void {
-    this.segments = []
+    this.segments = [];
   }
 
   /**
@@ -133,15 +128,15 @@ export class MessageSegmentAccumulator {
    * If the last segment is text, append to it; otherwise create a new text segment
    */
   appendText(text: string): MessageSegment[] {
-    const lastSegment = this.segments[this.segments.length - 1]
+    const lastSegment = this.segments[this.segments.length - 1];
 
     if (lastSegment && lastSegment.type === 'text') {
-      this.segments[this.segments.length - 1] = { type: 'text', text: lastSegment.text + text }
+      this.segments[this.segments.length - 1] = { type: 'text', text: lastSegment.text + text };
     } else {
-      this.segments.push({ type: 'text', text })
+      this.segments.push({ type: 'text', text });
     }
 
-    return this.getSegments()
+    return this.getSegments();
   }
 
   /**
@@ -149,31 +144,15 @@ export class MessageSegmentAccumulator {
    * If the last segment is thinking, append to it; otherwise start a new thinking segment.
    */
   appendThinking(text: string): MessageSegment[] {
-    const lastSegment = this.segments[this.segments.length - 1]
+    const lastSegment = this.segments[this.segments.length - 1];
 
     if (lastSegment && lastSegment.type === 'thinking') {
-      this.segments[this.segments.length - 1] = { type: 'thinking', text: lastSegment.text + text }
+      this.segments[this.segments.length - 1] = { type: 'thinking', text: lastSegment.text + text };
     } else {
-      this.segments.push({ type: 'thinking', text })
+      this.segments.push({ type: 'thinking', text });
     }
 
-    return this.getSegments()
-  }
-
-  /**
-   * Append guide text to the current message.
-   * If the last segment is guide, append to it; otherwise start a new guide segment.
-   */
-  appendGuide(text: string): MessageSegment[] {
-    const lastSegment = this.segments[this.segments.length - 1]
-
-    if (lastSegment && lastSegment.type === 'guide') {
-      this.segments[this.segments.length - 1] = { type: 'guide', text: lastSegment.text + text }
-    } else {
-      this.segments.push({ type: 'guide', text })
-    }
-
-    return this.getSegments()
+    return this.getSegments();
   }
 
   /**
@@ -183,8 +162,8 @@ export class MessageSegmentAccumulator {
    * is what pages through a run of them.
    */
   addAsk(question: string, options: AskOptionData[]): MessageSegment[] {
-    this.segments.push({ type: 'ask', question, options })
-    return this.getSegments()
+    this.segments.push({ type: 'ask', question, options });
+    return this.getSegments();
   }
 
   /**
@@ -200,17 +179,17 @@ export class MessageSegmentAccumulator {
    *     function don't all bucket under one key.
    */
   addToolExecution(segment: ToolExecutionSegment): MessageSegment[] {
-    const toolData = segment.data
-    const execId = toolData.toolExecutionRequestId
+    const toolData = segment.data;
+    const execId = toolData.toolExecutionRequestId;
 
     if (execId && this.applyExecutionToBatch(execId, toolData)) {
-      return this.getSegments()
+      return this.getSegments();
     }
 
-    const toolKey = execId || `${toolData.integratedToolType}-${toolData.toolFunction}`
+    const toolKey = execId || `${toolData.integratedToolType}-${toolData.toolFunction}`;
 
     // A tool only runs after its approval gate was granted. Resolve it here.
-    this.resolvePendingApprovalForExecution()
+    this.resolvePendingApprovalForExecution();
 
     if (toolData.type === 'EXECUTING_TOOL') {
       this.executingTools.set(toolKey, {
@@ -219,8 +198,8 @@ export class MessageSegmentAccumulator {
         toolTitle: toolData.toolTitle,
         toolExplanation: toolData.toolExplanation,
         parameters: toolData.parameters,
-      })
-      this.segments.push(segment)
+      });
+      this.segments.push(segment);
     } else if (toolData.type === 'EXECUTED_TOOL') {
       const existingIndex = this.segments.findIndex(
         (s): s is ToolExecutionSegment =>
@@ -230,15 +209,15 @@ export class MessageSegmentAccumulator {
             ? s.data.toolExecutionRequestId === execId
             : s.data.integratedToolType === toolData.integratedToolType &&
               s.data.toolFunction === toolData.toolFunction),
-      )
+      );
 
-      const executingTool = this.executingTools.get(toolKey)
+      const executingTool = this.executingTools.get(toolKey);
       // The backend omits `toolTitle` on EXECUTED_TOOL; restore it from the
       // paired EXECUTING segment (or its tracked state) so the completed
       // segment keeps the human-readable title instead of falling back to the
       // raw `toolFunction`.
       const existingExecuting =
-        existingIndex !== -1 ? (this.segments[existingIndex] as ToolExecutionSegment) : undefined
+        existingIndex !== -1 ? (this.segments[existingIndex] as ToolExecutionSegment) : undefined;
       const mergedSegment: ToolExecutionSegment = {
         type: 'tool_execution',
         data: {
@@ -247,19 +226,19 @@ export class MessageSegmentAccumulator {
           toolExplanation:
             toolData.toolExplanation ?? existingExecuting?.data.toolExplanation ?? executingTool?.toolExplanation,
           parameters: toolData.parameters || executingTool?.parameters,
-        }
-      }
+        },
+      };
 
       if (existingIndex !== -1) {
-        this.segments[existingIndex] = mergedSegment
+        this.segments[existingIndex] = mergedSegment;
       } else {
-        this.segments.push(mergedSegment)
+        this.segments.push(mergedSegment);
       }
 
-      this.executingTools.delete(toolKey)
+      this.executingTools.delete(toolKey);
     }
 
-    return this.getSegments()
+    return this.getSegments();
   }
 
   /**
@@ -268,23 +247,23 @@ export class MessageSegmentAccumulator {
    * Returns true when a batch was updated, false when no batch matches.
    */
   private applyExecutionToBatch(execId: string, toolData: ToolExecutionSegment['data']): boolean {
-    let matched = false
-    this.segments = this.segments.map((seg) => {
-      if (matched) return seg
-      if (seg.type !== 'approval_batch') return seg
-      const hasCall = seg.data.toolCalls.some((c) => c.toolExecutionRequestId === execId)
-      if (!hasCall) return seg
+    let matched = false;
+    this.segments = this.segments.map(seg => {
+      if (matched) return seg;
+      if (seg.type !== 'approval_batch') return seg;
+      const hasCall = seg.data.toolCalls.some(c => c.toolExecutionRequestId === execId);
+      if (!hasCall) return seg;
 
-      const prev: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId]
+      const prev: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId];
       // Shared rule (`nextBatchExecution` from message-mutations): the
       // never-downgrade guard + EXECUTED/EXECUTING ternary — one
       // implementation with the message-array projection.
-      const next = nextBatchExecution(prev, toolData)
-      matched = true
-      if (next === null) return seg
-      return withBatchExecution(seg, execId, next)
-    })
-    return matched
+      const next = nextBatchExecution(prev, toolData);
+      matched = true;
+      if (next === null) return seg;
+      return withBatchExecution(seg, execId, next);
+    });
+    return matched;
   }
 
   /**
@@ -304,10 +283,10 @@ export class MessageSegmentAccumulator {
    */
   private resolvePendingApprovalForExecution(): void {
     for (let i = this.segments.length - 1; i >= 0; i--) {
-      const seg = this.segments[i]
+      const seg = this.segments[i];
       if (seg.type === 'approval_request' && seg.status === 'pending') {
-        this.segments[i] = { ...seg, status: 'approved' }
-        return
+        this.segments[i] = { ...seg, status: 'approved' };
+        return;
       }
     }
   }
@@ -316,7 +295,7 @@ export class MessageSegmentAccumulator {
    * Track a pending approval request
    */
   trackApprovalRequest(requestId: string, data: PendingApproval): void {
-    this.pendingApprovals.set(requestId, data)
+    this.pendingApprovals.set(requestId, data);
   }
 
   /**
@@ -330,21 +309,13 @@ export class MessageSegmentAccumulator {
     status: ChatApprovalStatus = 'pending',
     /** Structured label/value rows. The card prefers them over `explanation`
      *  (see `ApprovalRequestData.fields`). Optional because the agent's own
-     *  approvals carry prose; a Product Guide card is almost entirely fields —
-     *  dropping them here left it as a bare title. */
+     *  approvals carry prose. */
     fields?: ApprovalRequestField[],
-    /** Where the card came from; `'guide'` keeps it inline (see
-     *  `ApprovalRequestData.origin`). */
-    origin?: 'guide'
   ): MessageSegment[] {
     this.segments.push(
-      this.buildApprovalRequestSegment(
-        requestId,
-        { command, explanation, approvalType, fields, origin },
-        status,
-      ),
-    )
-    return this.getSegments()
+      this.buildApprovalRequestSegment(requestId, { command, explanation, approvalType, fields }, status),
+    );
+    return this.getSegments();
   }
 
   /**
@@ -353,7 +324,7 @@ export class MessageSegmentAccumulator {
    * Three paths produce these: `addApprovalRequest` (live stream and replay),
    * `flushPendingApprovals` (tracked-but-unresolved after a history replay) and
    * `processApprovalResult` (a result arriving for a tracked request). They used
-   * to hand-write the object each, which is how `fields` and `origin` reached
+   * to hand-write the object each, which is how `fields` reached
    * the card down one path and not the others — the same proposal rendering as a
    * bare title, or losing the marker that routes its buttons to the hub.
    */
@@ -370,12 +341,11 @@ export class MessageSegmentAccumulator {
         requestId,
         approvalType: approval.approvalType,
         ...(approval.fields && approval.fields.length > 0 ? { fields: approval.fields } : {}),
-        ...(approval.origin ? { origin: approval.origin } : {}),
       },
       status,
       onApprove: this.callbacks.onApprove,
       onReject: this.callbacks.onReject,
-    }
+    };
   }
 
   /**
@@ -398,21 +368,14 @@ export class MessageSegmentAccumulator {
     status: ChatApprovalStatus = 'pending',
     executions?: Record<string, ApprovalBatchExecutionState>,
     resolvedByName?: string | null,
-    /** Where the batch came from; `'guide'` keeps it inline and routes it to
-     *  the hub, exactly as for a single card (see `ApprovalBatchData.origin`). */
-    origin?: 'guide',
   ): MessageSegment[] {
     const existingIndex = this.segments.findIndex(
-      (s): s is ApprovalBatchSegment =>
-        s.type === 'approval_batch' && s.data.approvalRequestId === approvalRequestId,
-    )
+      (s): s is ApprovalBatchSegment => s.type === 'approval_batch' && s.data.approvalRequestId === approvalRequestId,
+    );
 
     if (existingIndex !== -1) {
-      const existing = this.segments[existingIndex] as ApprovalBatchSegment
-      const mergedExecutions = executions ?? existing.data.executions
-      // An upsert must not strip the marker: the flip to `approved` comes from
-      // a later event that carries no origin of its own.
-      const mergedOrigin = origin ?? existing.data.origin
+      const existing = this.segments[existingIndex] as ApprovalBatchSegment;
+      const mergedExecutions = executions ?? existing.data.executions;
       this.segments[existingIndex] = {
         ...existing,
         data: {
@@ -420,14 +383,13 @@ export class MessageSegmentAccumulator {
           approvalType,
           toolCalls,
           ...(mergedExecutions ? { executions: mergedExecutions } : {}),
-          ...(mergedOrigin ? { origin: mergedOrigin } : {}),
         },
         status,
         resolvedByName: resolvedByName ?? existing.resolvedByName,
         onApprove: this.callbacks.onApprove,
         onReject: this.callbacks.onReject,
-      }
-      return this.getSegments()
+      };
+      return this.getSegments();
     }
 
     const segment: ApprovalBatchSegment = {
@@ -437,16 +399,15 @@ export class MessageSegmentAccumulator {
         approvalType,
         toolCalls,
         ...(executions ? { executions } : {}),
-        ...(origin ? { origin } : {}),
       },
       status,
       resolvedByName,
       onApprove: this.callbacks.onApprove,
       onReject: this.callbacks.onReject,
-    }
+    };
 
-    this.segments.push(segment)
-    return this.getSegments()
+    this.segments.push(segment);
+    return this.getSegments();
   }
 
   /**
@@ -456,10 +417,10 @@ export class MessageSegmentAccumulator {
   processApprovalResult(
     requestId: string,
     approved: boolean,
-    approvalType: string
+    approvalType: string,
   ): { segment: ApprovalRequestSegment; pendingData: PendingApproval | null } | null {
-    const pendingApproval = this.pendingApprovals.get(requestId)
-    const status: ChatApprovalStatus = approved ? 'approved' : 'rejected'
+    const pendingApproval = this.pendingApprovals.get(requestId);
+    const status: ChatApprovalStatus = approved ? 'approved' : 'rejected';
 
     const segment = this.buildApprovalRequestSegment(
       requestId,
@@ -469,15 +430,15 @@ export class MessageSegmentAccumulator {
         approvalType: pendingApproval?.approvalType || approvalType,
       },
       status,
-    )
+    );
 
-    this.segments.push(segment)
-    
+    this.segments.push(segment);
+
     if (pendingApproval) {
-      this.pendingApprovals.delete(requestId)
+      this.pendingApprovals.delete(requestId);
     }
-    
-    return { segment, pendingData: pendingApproval || null }
+
+    return { segment, pendingData: pendingApproval || null };
   }
 
   /**
@@ -494,11 +455,9 @@ export class MessageSegmentAccumulator {
     resolvedByName?: string | null,
   ): MessageSegment[] {
     const existingIndex = this.segments.findIndex(
-      (s): s is EscalationOfferSegment =>
-        s.type === 'escalation_offer' && s.data.offerId === offerId,
-    )
-    const existing =
-      existingIndex !== -1 ? (this.segments[existingIndex] as EscalationOfferSegment) : undefined
+      (s): s is EscalationOfferSegment => s.type === 'escalation_offer' && s.data.offerId === offerId,
+    );
+    const existing = existingIndex !== -1 ? (this.segments[existingIndex] as EscalationOfferSegment) : undefined;
 
     const segment: EscalationOfferSegment = {
       type: 'escalation_offer',
@@ -509,15 +468,15 @@ export class MessageSegmentAccumulator {
       resolvedByName: resolvedByName ?? existing?.resolvedByName,
       onApprove: this.callbacks.onEscalationApprove,
       onReject: this.callbacks.onEscalationReject,
-    }
+    };
 
     if (existingIndex !== -1) {
-      this.segments[existingIndex] = segment
-      return this.getSegments()
+      this.segments[existingIndex] = segment;
+      return this.getSegments();
     }
 
-    this.segments.push(segment)
-    return this.getSegments()
+    this.segments.push(segment);
+    return this.getSegments();
   }
 
   /**
@@ -525,16 +484,16 @@ export class MessageSegmentAccumulator {
    * (JetStream catch-up over hydrated history) can't stack a second notice.
    */
   addTicketEscalated(data: TicketEscalatedData): MessageSegment[] {
-    const segment: TicketEscalatedSegment = { type: 'ticket_escalated', data }
+    const segment: TicketEscalatedSegment = { type: 'ticket_escalated', data };
     const existingIndex = this.segments.findIndex(
-      (s) => s.type === 'ticket_escalated' && s.data.ticketId === data.ticketId,
-    )
+      s => s.type === 'ticket_escalated' && s.data.ticketId === data.ticketId,
+    );
     if (existingIndex !== -1) {
-      this.segments[existingIndex] = segment
-      return this.getSegments()
+      this.segments[existingIndex] = segment;
+      return this.getSegments();
     }
-    this.segments.push(segment)
-    return this.getSegments()
+    this.segments.push(segment);
+    return this.getSegments();
   }
 
   /**
@@ -556,17 +515,17 @@ export class MessageSegmentAccumulator {
       data,
       ...(streamSeq !== undefined ? { streamSeq } : {}),
       ...(occurredAt !== undefined ? { occurredAt } : {}),
-    }
+    };
     let existingIndex =
       streamSeq !== undefined
-        ? this.segments.findIndex((s) => s.type === 'ticket_event' && s.streamSeq === streamSeq)
-        : -1
+        ? this.segments.findIndex(s => s.type === 'ticket_event' && s.streamSeq === streamSeq)
+        : -1;
     if (existingIndex === -1) {
       for (let i = this.segments.length - 1; i >= 0; i--) {
-        const s = this.segments[i]
-        if (s.type !== 'ticket_event') continue
+        const s = this.segments[i];
+        if (s.type !== 'ticket_event') continue;
         // Both seqs known and unequal: proven distinct, never payload-match.
-        const seqsDistinguish = s.streamSeq !== undefined && streamSeq !== undefined
+        const seqsDistinguish = s.streamSeq !== undefined && streamSeq !== undefined;
         if (
           !seqsDistinguish &&
           s.data.kind === data.kind &&
@@ -576,9 +535,9 @@ export class MessageSegmentAccumulator {
           s.data.reason === data.reason &&
           s.data.targetStatusKind === data.targetStatusKind
         ) {
-          existingIndex = i
+          existingIndex = i;
         }
-        break
+        break;
       }
     }
     if (existingIndex !== -1) {
@@ -586,13 +545,14 @@ export class MessageSegmentAccumulator {
       // `createdAt`, while a catch-up redelivery only knows its (late) arrival
       // time — replacing wholesale would regress the card to arrival or, with
       // neither side stamped, to the bubble timestamp.
-      const existing = this.segments[existingIndex] as TicketEventSegment
-      const occurredAt = existing.occurredAt ?? segment.occurredAt
-      this.segments[existingIndex] = occurredAt !== undefined ? { ...segment, occurredAt } : segment
-      return this.getSegments()
+      const existing = this.segments[existingIndex] as TicketEventSegment;
+      const firstKnownOccurredAt = existing.occurredAt ?? segment.occurredAt;
+      this.segments[existingIndex] =
+        firstKnownOccurredAt !== undefined ? { ...segment, occurredAt: firstKnownOccurredAt } : segment;
+      return this.getSegments();
     }
-    this.segments.push(segment)
-    return this.getSegments()
+    this.segments.push(segment);
+    return this.getSegments();
   }
 
   /**
@@ -611,45 +571,45 @@ export class MessageSegmentAccumulator {
     // (`projectApprovalResolutionToMessages`) — anchor status flip AND
     // batch-row execution tick, so this flat-list path can never drift
     // from the projection again (it previously missed the row case).
-    this.segments = this.segments.map((segment) =>
+    this.segments = this.segments.map(segment =>
       applyApprovalStatusToSegment(segment, requestId, status, resolvedByName),
-    )
-    return this.getSegments()
+    );
+    return this.getSegments();
   }
 
   /**
    * Get pending approvals that haven't been resolved
    */
   getPendingApprovals(): Map<string, PendingApproval> {
-    return new Map(this.pendingApprovals)
+    return new Map(this.pendingApprovals);
   }
 
   /**
    * Check if there are any pending approvals
    */
   hasPendingApprovals(): boolean {
-    return this.pendingApprovals.size > 0
+    return this.pendingApprovals.size > 0;
   }
 
   /**
    * Create segments for all remaining pending approvals
    */
   flushPendingApprovals(): ApprovalRequestSegment[] {
-    const segments: ApprovalRequestSegment[] = []
+    const segments: ApprovalRequestSegment[] = [];
 
     this.pendingApprovals.forEach((approval, requestId) => {
-      segments.push(this.buildApprovalRequestSegment(requestId, approval, 'pending'))
-    })
+      segments.push(this.buildApprovalRequestSegment(requestId, approval, 'pending'));
+    });
 
-    return segments
+    return segments;
   }
 
   /**
    * Add a context compaction segment with 'started' status
    */
   addContextCompaction(): MessageSegment[] {
-    this.segments.push({ type: 'context_compaction', status: 'started' })
-    return this.getSegments()
+    this.segments.push({ type: 'context_compaction', status: 'started' });
+    return this.getSegments();
   }
 
   /**
@@ -657,57 +617,53 @@ export class MessageSegmentAccumulator {
    */
   completeContextCompaction(summary?: string): MessageSegment[] {
     const existingIndex = this.segments.findIndex(
-      (s): s is ContextCompactionSegment =>
-        s.type === 'context_compaction' && s.status === 'started'
-    )
+      (s): s is ContextCompactionSegment => s.type === 'context_compaction' && s.status === 'started',
+    );
 
     const completedSegment: ContextCompactionSegment = {
       type: 'context_compaction',
       status: 'completed',
       summary,
-    }
+    };
 
     if (existingIndex !== -1) {
-      this.segments[existingIndex] = completedSegment
+      this.segments[existingIndex] = completedSegment;
     } else {
-      this.segments.push(completedSegment)
+      this.segments.push(completedSegment);
     }
 
-    return this.getSegments()
+    return this.getSegments();
   }
 
   /**
    * Add an error segment
    */
   addError(title: string, details?: string): MessageSegment[] {
-    this.segments.push({ type: 'error', title, details })
-    return this.getSegments()
+    this.segments.push({ type: 'error', title, details });
+    return this.getSegments();
   }
 
   /**
    * Reset and replay a full segment array through the accumulator.
    */
   replaySegments(segments: MessageSegment[]): MessageSegment[] {
-    this.reset()
+    this.reset();
     for (const segment of segments) {
       switch (segment.type) {
         case 'text':
-          if (segment.text) this.appendText(segment.text)
-          break
+          if (segment.text) this.appendText(segment.text);
+          break;
         case 'thinking':
-          if (segment.text) this.appendThinking(segment.text)
-          break
-        case 'guide':
-          if (segment.text) this.appendGuide(segment.text)
-          break
+          if (segment.text) this.appendThinking(segment.text);
+          break;
         case 'ask':
-          this.addAsk(segment.question, segment.options)
-          break
+          this.addAsk(segment.question, segment.options);
+          break;
         case 'tool_execution':
-          this.addToolExecution(segment)
-          break
+          this.addToolExecution(segment);
+          break;
         case 'approval_request': {
-          const { data, status } = segment
+          const { data, status } = segment;
           this.addApprovalRequest(
             data.requestId || '',
             data.command,
@@ -715,12 +671,11 @@ export class MessageSegmentAccumulator {
             data.approvalType || '',
             status,
             data.fields,
-            data.origin,
-          )
-          break
+          );
+          break;
         }
         case 'approval_batch': {
-          const { data, status, resolvedByName } = segment
+          const { data, status, resolvedByName } = segment;
           this.addApprovalBatch(
             data.approvalRequestId,
             data.approvalType,
@@ -728,48 +683,47 @@ export class MessageSegmentAccumulator {
             status,
             data.executions,
             resolvedByName,
-            data.origin,
-          )
-          break
+          );
+          break;
         }
         case 'escalation_offer': {
-          const { data, status, resolvedByName } = segment
-          this.addEscalationOffer(data.offerId, data.text, data.origin, status, resolvedByName)
-          break
+          const { data, status, resolvedByName } = segment;
+          this.addEscalationOffer(data.offerId, data.text, data.origin, status, resolvedByName);
+          break;
         }
         case 'ticket_escalated':
-          this.addTicketEscalated(segment.data)
-          break
+          this.addTicketEscalated(segment.data);
+          break;
         case 'ticket_event':
-          this.addTicketEvent(segment.data, segment.streamSeq, segment.occurredAt)
-          break
+          this.addTicketEvent(segment.data, segment.streamSeq, segment.occurredAt);
+          break;
         case 'error':
-          this.addError(segment.title, segment.details)
-          break
+          this.addError(segment.title, segment.details);
+          break;
         case 'context_compaction':
           if (segment.status === 'started') {
-            this.addContextCompaction()
+            this.addContextCompaction();
           } else if (segment.status === 'completed') {
-            this.completeContextCompaction(segment.summary)
+            this.completeContextCompaction(segment.summary);
           }
-          break
+          break;
       }
     }
-    return this.getSegments()
+    return this.getSegments();
   }
 
   /**
    * Check if segments have any content
    */
   hasContent(): boolean {
-    return this.segments.length > 0
+    return this.segments.length > 0;
   }
 
   /**
    * Get the number of segments
    */
   get length(): number {
-    return this.segments.length
+    return this.segments.length;
   }
 }
 
@@ -777,5 +731,5 @@ export class MessageSegmentAccumulator {
  * Create a new accumulator instance with callbacks
  */
 export function createMessageSegmentAccumulator(callbacks?: AccumulatorCallbacks): MessageSegmentAccumulator {
-  return new MessageSegmentAccumulator(callbacks)
+  return new MessageSegmentAccumulator(callbacks);
 }

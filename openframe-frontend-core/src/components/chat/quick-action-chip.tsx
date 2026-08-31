@@ -1,9 +1,9 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { Tag } from '../ui/tag'
-import { EntityIcon, type EntityIconValue } from '../icon-display'
+import { type CSSProperties, type ReactNode, isValidElement } from 'react';
+import { cn } from '../../utils/cn';
+import { EntityIcon, type EntityIconValue } from '../icon-display';
+import { Tag } from '../ui/tag';
 
 // =============================================================================
 // Types
@@ -12,10 +12,10 @@ import { EntityIcon, type EntityIconValue } from '../icon-display'
 /** Accent tint for quick-action chip icons: a named brand token
  *  (`'pink'`/`'cyan'`) or ANY CSS color value coming from admin config
  *  (agent/persona `icon_props.color`). */
-export type QuickActionAccent = 'pink' | 'cyan' | (string & {})
+export type QuickActionAccent = 'pink' | 'cyan' | (string & {});
 
 /** THE built-in agent→accent pairs ({@link getAgentAccent} derives from it). */
-const AGENT_ACCENTS = { fae: 'pink', mingo: 'cyan' } as const
+const AGENT_ACCENTS = { fae: 'pink', mingo: 'cyan' } as const;
 
 /**
  * FALLBACK-ONLY agent→accent mapping (fae→pink, mingo→cyan) for the built-in
@@ -26,7 +26,7 @@ const AGENT_ACCENTS = { fae: 'pink', mingo: 'cyan' } as const
  * comparison elsewhere.
  */
 export function getAgentAccent(slug: string | null | undefined): QuickActionAccent | undefined {
-  return slug === 'fae' || slug === 'mingo' ? AGENT_ACCENTS[slug] : undefined
+  return slug === 'fae' || slug === 'mingo' ? AGENT_ACCENTS[slug] : undefined;
 }
 
 /** Admin-configured identity color (`icon_props.color` on the agent/persona
@@ -34,8 +34,8 @@ export function getAgentAccent(slug: string | null | undefined): QuickActionAcce
 export function accentFromIdentityIcon(
   icon: { props?: Record<string, unknown> | null } | null | undefined,
 ): QuickActionAccent | undefined {
-  const color = icon?.props?.color
-  return typeof color === 'string' && color.length > 0 ? color : undefined
+  const color = icon?.props?.color;
+  return typeof color === 'string' && color.length > 0 ? color : undefined;
 }
 
 /**
@@ -53,50 +53,39 @@ export function accentFromIdentityIcon(
  * onto the glyph last).
  */
 export interface QuickActionIconSpec extends EntityIconValue {
-  accent?: QuickActionAccent
+  accent?: QuickActionAccent;
   /** Glyph size in px. Defaults to 16 (the chip design's config-icon size);
    *  agent marks size via the icon box instead. */
-  size?: number
+  size?: number;
 }
 
 const ACCENT_CLASS: Record<string, string> = {
   pink: 'text-ods-flamingo-pink',
   cyan: 'text-ods-flamingo-cyan',
-}
+};
 
 /** A spec is a plain data object, never a React element — so any non-element,
  *  non-array object is a spec; strings, elements, fragments, and ReactNode
  *  ARRAYS stay ReactNode. */
-export function isQuickActionIconSpec(
-  icon: React.ReactNode | QuickActionIconSpec | undefined,
-): icon is QuickActionIconSpec {
-  return typeof icon === 'object' && icon !== null && !Array.isArray(icon) && !React.isValidElement(icon)
+export function isQuickActionIconSpec(icon: ReactNode | QuickActionIconSpec | undefined): icon is QuickActionIconSpec {
+  return typeof icon === 'object' && icon !== null && !Array.isArray(icon) && !isValidElement(icon);
 }
 
 /** Resolve a chip `icon` prop to a renderable node. Specs go through
  *  `<EntityIcon>`; ReactNodes pass through untouched. */
-export function renderQuickActionIcon(
-  icon: React.ReactNode | QuickActionIconSpec | undefined,
-): React.ReactNode {
+export function renderQuickActionIcon(icon: ReactNode | QuickActionIconSpec | undefined): ReactNode {
   if (!isQuickActionIconSpec(icon)) {
-    return icon
+    return icon;
   }
-  const spec = icon
-  if (!spec.name && !spec.url) return undefined
+  const spec = icon;
+  if (!spec.name && !spec.url) return undefined;
   // Named brand tokens tint via a text class on `currentColor`; any other
   // accent value is an admin-configured CSS color, delivered as the glyph's
   // DEFAULT `color` prop — an explicit per-action `props.color` (spread after)
   // still wins.
-  const accentClass = spec.accent ? ACCENT_CLASS[spec.accent] : undefined
-  const props =
-    spec.accent && !accentClass ? { color: spec.accent, ...(spec.props ?? {}) } : spec.props
-  return (
-    <EntityIcon
-      icon={{ name: spec.name, url: spec.url, props }}
-      size={spec.size ?? 16}
-      className={accentClass}
-    />
-  )
+  const accentClass = spec.accent ? ACCENT_CLASS[spec.accent] : undefined;
+  const props = spec.accent && !accentClass ? { color: spec.accent, ...(spec.props ?? {}) } : spec.props;
+  return <EntityIcon icon={{ name: spec.name, url: spec.url, props }} size={spec.size ?? 16} className={accentClass} />;
 }
 
 /**
@@ -107,8 +96,8 @@ export function renderQuickActionIcon(
  * so one utility styles both.
  */
 export interface QuickActionChipLozenge {
-  label: React.ReactNode
-  className?: string
+  label: ReactNode;
+  className?: string;
 }
 
 // =============================================================================
@@ -126,17 +115,14 @@ export interface QuickActionChipLozenge {
  */
 export interface QuickActionThemeSpec {
   /** Chip icon tint ({@link QuickActionAccent}: brand token or CSS color). */
-  accent: QuickActionAccent
+  accent: QuickActionAccent;
   /** Classification affix rendered inside the chip (category themes). */
-  lozenge?: QuickActionChipLozenge
+  lozenge?: QuickActionChipLozenge;
 }
 
 /** Resolve a chip label + optional lozenge to the Tag label node. */
-function composeChipLabel(
-  label: React.ReactNode,
-  lozenge: QuickActionChipLozenge | undefined,
-): React.ReactNode {
-  if (!lozenge) return label
+function composeChipLabel(label: ReactNode, lozenge: QuickActionChipLozenge | undefined): ReactNode {
+  if (!lozenge) return label;
   return (
     <>
       <span
@@ -146,7 +132,7 @@ function composeChipLabel(
           // against the caps' optical center (measured 9.1px above / 6.9px
           // below in the 32px Tag). Keep QuickActionChipSkeleton's lozenge bar
           // offset in lockstep.
-          'mr-2 inline-flex items-center rounded px-[5px] py-[3px] align-middle -translate-y-[1px] text-h6 font-bold uppercase',
+          'mr-2 inline-flex -translate-y-[1px] items-center rounded px-[5px] py-[3px] align-middle font-bold uppercase text-h6',
           lozenge.className,
         )}
         style={{ background: 'color-mix(in srgb, currentColor 14%, transparent)' }}
@@ -155,43 +141,43 @@ function composeChipLabel(
       </span>
       {label}
     </>
-  )
+  );
 }
 
 export interface QuickActionChipButtonProps {
-  label: React.ReactNode
+  label: ReactNode;
   /** Icon: a declarative {@link QuickActionIconSpec} (preferred — unified
    *  EntityIcon resolution) or a pre-rendered ReactNode. */
-  icon?: React.ReactNode | QuickActionIconSpec
+  icon?: ReactNode | QuickActionIconSpec;
   /** Caller-supplied {@link QuickActionThemeSpec}: supplies the icon accent
    *  when the icon spec doesn't carry its own, and the lozenge when `lozenge`
    *  is `true`. Explicit values always win over the theme. */
-  theme?: QuickActionThemeSpec
+  theme?: QuickActionThemeSpec;
   /** {@link QuickActionChipLozenge} at the label's leading edge (e.g. an
    *  IT/SEC classification affix). `true` renders the `theme`'s lozenge. */
-  lozenge?: QuickActionChipLozenge | boolean
+  lozenge?: QuickActionChipLozenge | boolean;
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
-  variant?: 'primary' | 'outline'
+  variant?: 'primary' | 'outline';
   /** Active single-select state (Figma "Feature Item" active): renders the
    *  Tag's `selected` variant (pink border + pink-secondary fill), overriding
    *  `variant`. Used by chip groups acting as tabs (OpenFrame categories). */
-  selected?: boolean
+  selected?: boolean;
   /** Accent for the `selected` skin: `'cyan'` uses the cyan twin, anything else
    *  (default) uses pink. Lets an agent's chip group match its own theme accent
    *  (fae pink / mingo cyan) instead of the fixed pink. */
-  selectedAccent?: QuickActionAccent
+  selectedAccent?: QuickActionAccent;
   /** Chip scale, forwarded to `Tag` — `'large'` is the Figma "Feature Item"
    *  48px chip (h3 bold label, 24px icon box). Default `'default'` (32px). */
-  size?: 'default' | 'large'
-  onSelect?: () => void
+  size?: 'default' | 'large';
+  onSelect?: () => void;
   /** Pointer/keyboard focus enters the chip — e.g. preview the full prompt. */
-  onHoverStart?: () => void
+  onHoverStart?: () => void;
   /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
-  onHoverEnd?: () => void
+  onHoverEnd?: () => void;
   /** `false` renders a plain non-focusable `<Tag>` (decorative use: marquee
    *  strips, table cells). Default `true`. */
-  interactive?: boolean
-  className?: string
+  interactive?: boolean;
+  className?: string;
 }
 
 // =============================================================================
@@ -201,21 +187,21 @@ export interface QuickActionChipButtonProps {
 export interface QuickActionChipSkeletonProps {
   /** Label placeholder width in `ch` of the chip's own font — vary per item
    *  for a realistic spread. Default 16. */
-  labelCh?: number
+  labelCh?: number;
   /** Reserve the leading-icon slot (default true — most chips carry one). */
-  icon?: boolean
+  icon?: boolean;
   /** Reserve the leading lozenge affix slot. */
-  lozenge?: boolean
+  lozenge?: boolean;
   /** Chip scale — MUST match the loaded chips' `size` or the swap jumps. */
-  size?: 'default' | 'large'
-  className?: string
+  size?: 'default' | 'large';
+  className?: string;
 }
 
 /** Pulse bar inside the chip skeleton — the standard `ui/skeleton` treatment
  *  (`animate-pulse bg-ods-border`), as a SPAN so it stays valid phrasing
  *  content inside the Tag's label span. */
-function ChipSkelBar({ className, style }: { className?: string; style?: React.CSSProperties }) {
-  return <span aria-hidden className={cn('animate-pulse rounded-md bg-ods-border', className)} style={style} />
+function ChipSkelBar({ className, style }: { className?: string; style?: CSSProperties }) {
+  return <span aria-hidden className={cn('animate-pulse rounded-md bg-ods-border', className)} style={style} />;
 }
 
 /**
@@ -226,7 +212,13 @@ function ChipSkelBar({ className, style }: { className?: string; style?: React.C
  * construction. Use anywhere quick actions stream in (chat empty states,
  * marketing walls, deck panels).
  */
-export function QuickActionChipSkeleton({ labelCh = 16, icon = true, lozenge = false, size = 'default', className }: QuickActionChipSkeletonProps) {
+export function QuickActionChipSkeleton({
+  labelCh = 16,
+  icon = true,
+  lozenge = false,
+  size = 'default',
+  className,
+}: QuickActionChipSkeletonProps) {
   return (
     <Tag
       variant="outline"
@@ -240,7 +232,7 @@ export function QuickActionChipSkeleton({ labelCh = 16, icon = true, lozenge = f
         </>
       }
     />
-  )
+  );
 }
 
 // =============================================================================
@@ -272,14 +264,13 @@ export function QuickActionChipButton({
 }: QuickActionChipButtonProps) {
   // The theme's accent only fills the gap — an icon spec's own accent
   // (admin-configured per-action color) always wins.
-  const themedIcon =
-    theme && isQuickActionIconSpec(icon) && !icon.accent ? { ...icon, accent: theme.accent } : icon
-  const resolvedLozenge = lozenge === true ? theme?.lozenge : lozenge === false ? undefined : lozenge
-  const resolvedIcon = renderQuickActionIcon(themedIcon)
-  const resolvedLabel = composeChipLabel(label, resolvedLozenge)
-  const tagVariant = selected ? (selectedAccent === 'cyan' ? 'selectedCyan' : 'selected') : variant
+  const themedIcon = theme && isQuickActionIconSpec(icon) && !icon.accent ? { ...icon, accent: theme.accent } : icon;
+  const resolvedLozenge = lozenge === true ? theme?.lozenge : lozenge === false ? undefined : lozenge;
+  const resolvedIcon = renderQuickActionIcon(themedIcon);
+  const resolvedLabel = composeChipLabel(label, resolvedLozenge);
+  const tagVariant = selected ? (selectedAccent === 'cyan' ? 'selectedCyan' : 'selected') : variant;
   if (!interactive) {
-    return <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} className={className} />
+    return <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} className={className} />;
   }
   return (
     <button
@@ -297,7 +288,7 @@ export function QuickActionChipButton({
     >
       <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} />
     </button>
-  )
+  );
 }
 
 // =============================================================================
@@ -313,30 +304,30 @@ export function QuickActionChipButton({
  */
 export interface QuickActionChip {
   /** Stable React key + menu-item id. */
-  id: string
-  label: string
+  id: string;
+  label: string;
   /** Pre-rendered node OR a declarative {@link QuickActionIconSpec} (resolved
    *  via the unified `<EntityIcon>` path). */
-  icon?: React.ReactNode | QuickActionIconSpec
+  icon?: ReactNode | QuickActionIconSpec;
   /** Caller-supplied {@link QuickActionThemeSpec} (accent + optional
    *  lozenge) — per-chip so mixed walls (interleaved IT/SEC streams) work.
    *  The lib ships no theme registry; consumers define their own specs. */
-  theme?: QuickActionThemeSpec
+  theme?: QuickActionThemeSpec;
   /** Classification affix at the label's leading edge; `true` = the theme's. */
-  lozenge?: QuickActionChipLozenge | boolean
+  lozenge?: QuickActionChipLozenge | boolean;
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
-  variant?: 'primary' | 'outline'
+  variant?: 'primary' | 'outline';
   /** Active single-select state — renders the accented `selected` skin
    *  (overrides `variant`). */
-  selected?: boolean
+  selected?: boolean;
   /** Accent for the `selected` skin (`'cyan'` = cyan twin, else pink). */
-  selectedAccent?: QuickActionAccent
-  onSelect?: () => void
+  selectedAccent?: QuickActionAccent;
+  onSelect?: () => void;
   /** Pointer/keyboard focus enters the chip — e.g. preview the full prompt in
    *  the composer. */
-  onHoverStart?: () => void
+  onHoverStart?: () => void;
   /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
-  onHoverEnd?: () => void
+  onHoverEnd?: () => void;
 }
 
 /**
@@ -353,11 +344,11 @@ export function QuickActionChipFromData({
   interactive = true,
   className,
 }: {
-  chip: QuickActionChip
-  defaultTheme?: QuickActionThemeSpec
-  defaultLozenge?: boolean
-  interactive?: boolean
-  className?: string
+  chip: QuickActionChip;
+  defaultTheme?: QuickActionThemeSpec;
+  defaultLozenge?: boolean;
+  interactive?: boolean;
+  className?: string;
 }) {
   return (
     <QuickActionChipButton
@@ -374,5 +365,5 @@ export function QuickActionChipFromData({
       interactive={interactive}
       className={className}
     />
-  )
+  );
 }

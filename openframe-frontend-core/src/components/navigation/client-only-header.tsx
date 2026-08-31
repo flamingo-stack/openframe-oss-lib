@@ -1,21 +1,18 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from 'react';
-import { Header, HeaderConfig } from './header';
+import type { ReactNode } from 'react';
+import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { Header, type HeaderConfig } from './header';
 import { HeaderSkeleton } from './header-skeleton';
 
 export interface ClientOnlyHeaderProps {
   config: HeaderConfig;
-  skeleton?: React.ReactNode;
+  skeleton?: ReactNode;
 }
 
 export function ClientOnlyHeader({ config, skeleton }: ClientOnlyHeaderProps) {
-  const [isClient, setIsClient] = useState(false);
+  const isClient = useIsHydrated();
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-  
   if (!isClient) {
     // Return custom skeleton or default skeleton while client-side JavaScript loads
     return skeleton || <HeaderSkeleton config={config} />;

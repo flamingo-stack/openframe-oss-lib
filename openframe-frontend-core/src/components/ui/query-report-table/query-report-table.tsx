@@ -1,16 +1,16 @@
-'use client'
+'use client';
 
-import { useMemo } from 'react'
-import { cn } from '../../../utils/cn'
-import { Button } from '../button'
-import { Download02Icon } from '../../icons-v2-generated/interface/download-02-icon'
-import { useHorizontalScrollbar } from '../../../hooks/ui/use-horizontal-scrollbar'
-import { TableEmptyState } from '../table/table-empty-state'
-import { QueryReportTableHeader } from './query-report-table-header'
-import { QueryReportTableRow } from './query-report-table-row'
-import { QueryReportTableSkeleton } from './query-report-table-skeleton'
-import { deriveColumns, exportToCSV } from './utils'
-import type { QueryReportTableProps } from './types'
+import { useMemo } from 'react';
+import { useHorizontalScrollbar } from '../../../hooks/ui/use-horizontal-scrollbar';
+import { cn } from '../../../utils/cn';
+import { Download02Icon } from '../../icons-v2-generated/interface/download-02-icon';
+import { Button } from '../button';
+import { TableEmptyState } from '../table/table-empty-state';
+import { QueryReportTableHeader } from './query-report-table-header';
+import { QueryReportTableRow } from './query-report-table-row';
+import { QueryReportTableSkeleton } from './query-report-table-skeleton';
+import type { QueryReportTableProps } from './types';
+import { deriveColumns, exportToCSV } from './utils';
 
 export function QueryReportTable({
   title,
@@ -27,20 +27,17 @@ export function QueryReportTable({
   headerActions,
   variant = 'default',
   className,
-  tableClassName
+  tableClassName,
 }: QueryReportTableProps) {
-  const isCompact = variant === 'compact'
-  const columns = useMemo(
-    () => deriveColumns(data, columnOrder),
-    [data, columnOrder]
-  )
+  const isCompact = variant === 'compact';
+  const columns = useMemo(() => deriveColumns(data, columnOrder), [data, columnOrder]);
 
   const handleExport = () => {
-    exportToCSV(data, columns, exportFilename)
-    onExport?.()
-  }
+    exportToCSV(data, columns, exportFilename);
+    onExport?.();
+  };
 
-  const tableMinWidth = columns.length * (columnWidth + 16) // columnWidth + gap
+  const tableMinWidth = columns.length * (columnWidth + 16); // columnWidth + gap
 
   const {
     scrollRef,
@@ -55,21 +52,19 @@ export function QueryReportTable({
     onThumbPointerDown,
     onThumbPointerMove,
     onThumbPointerUp,
-  } = useHorizontalScrollbar()
+  } = useHorizontalScrollbar();
 
   return (
-    <div className={cn('flex flex-col w-full', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-l)]', className)}>
+    <div className={cn('flex w-full flex-col', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-l)]', className)}>
       {/* Title bar — hidden in compact mode and when empty */}
       {!isCompact && (title || headerActions || (showExport && data.length > 0)) && (
         <div className="flex items-end justify-between pt-[var(--spacing-system-l)]">
-          <h2 className="text-h2 text-ods-text-primary">
-            {title}
-          </h2>
+          <h2 className="text-ods-text-primary text-h2">{title}</h2>
           <div className="flex items-center gap-[var(--spacing-system-s)]">
             {headerActions}
             {showExport && data.length > 0 && (
               <Button
-                className='bg-ods-card max-md:hidden'
+                className="bg-ods-card max-md:hidden"
                 variant="outline"
                 leftIcon={<Download02Icon size={18} className="text-ods-text-secondary" />}
                 onClick={handleExport}
@@ -92,9 +87,7 @@ export function QueryReportTable({
       )}
 
       {/* Empty state */}
-      {!loading && data.length === 0 && (
-        <TableEmptyState message={emptyMessage} />
-      )}
+      {!loading && data.length === 0 && <TableEmptyState message={emptyMessage} />}
 
       {/* Table content */}
       {!loading && data.length > 0 && (
@@ -103,7 +96,7 @@ export function QueryReportTable({
           {!isCompact && thumbRatio > 0 && (
             <div
               ref={trackRef}
-              className="relative h-2 rounded-full bg-ods-border cursor-pointer"
+              className="relative h-2 cursor-pointer rounded-full bg-ods-border"
               onClick={onTrackClick}
               onWheel={onTrackWheel}
             >
@@ -124,17 +117,9 @@ export function QueryReportTable({
 
           {/* Scrollable table container */}
           <div className="relative">
-            <div
-              ref={scrollRef}
-              className={cn('overflow-x-auto', tableClassName)}
-              onScroll={onScroll}
-            >
+            <div ref={scrollRef} className={cn('overflow-x-auto', tableClassName)} onScroll={onScroll}>
               <div style={{ minWidth: tableMinWidth }}>
-                <QueryReportTableHeader
-                  columns={columns}
-                  columnWidth={columnWidth}
-                  variant={variant}
-                />
+                <QueryReportTableHeader columns={columns} columnWidth={columnWidth} variant={variant} />
                 <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-xs)]')}>
                   {data.map((row, index) => (
                     <QueryReportTableRow
@@ -151,14 +136,14 @@ export function QueryReportTable({
 
             {/* Edge fades — hidden in compact mode */}
             {!isCompact && canScrollLeft && (
-              <div className="absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-ods-bg to-transparent pointer-events-none" />
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-ods-bg to-transparent" />
             )}
             {!isCompact && canScrollRight && (
-              <div className="absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-ods-bg to-transparent pointer-events-none" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-ods-bg to-transparent" />
             )}
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }

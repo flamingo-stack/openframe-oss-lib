@@ -1,10 +1,10 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useMemo } from 'react'
-import { InfoCircleIcon } from '../components/icons-v2-generated/signs-and-symbols'
-import { type ColumnDef, DataTable, type Row, useDataTable } from '../components/ui/data-table'
-import { EntityImage } from '../components/ui/entity-image'
-import { StackedRowsPanel } from '../components/ui/stacked-rows-panel'
-import { Tag } from '../components/ui/tag'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useMemo } from 'react';
+import { InfoCircleIcon } from '../components/icons-v2-generated/signs-and-symbols';
+import { type ColumnDef, DataTable, type Row, useDataTable } from '../components/ui/data-table';
+import { EntityImage } from '../components/ui/entity-image';
+import { StackedRowsPanel } from '../components/ui/stacked-rows-panel';
+import { Tag } from '../components/ui/tag';
 
 const meta = {
   title: 'UI/StackedRowsPanel',
@@ -22,10 +22,10 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof StackedRowsPanel>
+} satisfies Meta<typeof StackedRowsPanel>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /** Header card: a full-width title/description row followed by a columns row. */
 export const HeaderCard: Story = {
@@ -51,7 +51,7 @@ export const HeaderCard: Story = {
       },
     ],
   },
-}
+};
 
 /** Standard table: uniform multi-column rows (avatar + name/email, role, status tag). */
 export const StandardTable: Story = {
@@ -63,11 +63,11 @@ export const StandardTable: Story = {
           {
             key: 'user',
             content: (
-              <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0">
+              <div className="flex min-w-0 items-center gap-[var(--spacing-system-m)]">
                 <EntityImage alt="Jane Doe" fallbackText="Jane Doe" className="size-8 rounded-full" />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-ods-text-primary text-h4 truncate">Jane Doe</span>
-                  <span className="text-ods-text-secondary text-h6 truncate">jane.doe@example.com</span>
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate text-ods-text-primary text-h4">Jane Doe</span>
+                  <span className="truncate text-ods-text-secondary text-h6">jane.doe@example.com</span>
                 </div>
               </div>
             ),
@@ -82,11 +82,11 @@ export const StandardTable: Story = {
           {
             key: 'user',
             content: (
-              <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0">
+              <div className="flex min-w-0 items-center gap-[var(--spacing-system-m)]">
                 <EntityImage alt="John Roe" fallbackText="John Roe" className="size-8 rounded-full" />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-ods-text-primary text-h4 truncate">John Roe</span>
-                  <span className="text-ods-text-secondary text-h6 truncate">john.roe@example.com</span>
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate text-ods-text-primary text-h4">John Roe</span>
+                  <span className="truncate text-ods-text-secondary text-h6">john.roe@example.com</span>
                 </div>
               </div>
             ),
@@ -97,14 +97,14 @@ export const StandardTable: Story = {
       },
     ],
   },
-}
+};
 
 /** A single row rounds all four corners. */
 export const SingleRow: Story = {
   args: {
     rows: [{ id: 'only', columns: [{ key: 'only', value: 'High CPU Usage >85%', label: 'Policy' }] }],
   },
-}
+};
 
 /** Info-banner row: `leadingIcon` centers a 24px glyph against both text lines. */
 export const InfoBanner: Story = {
@@ -124,18 +124,18 @@ export const InfoBanner: Story = {
       },
     ],
   },
-}
+};
 
 interface DemoDevice {
-  id: string
-  name: string
-  status: 'NON-COMPLIANT' | 'COMPLIANT'
+  id: string;
+  name: string;
+  status: 'NON-COMPLIANT' | 'COMPLIANT';
 }
 
 const DEMO_DEVICES: DemoDevice[] = [
   { id: '1', name: "John's Device", status: 'NON-COMPLIANT' },
   { id: '2', name: 'Workstation-04', status: 'COMPLIANT' },
-]
+];
 
 function NestedDevicesTable() {
   const columns = useMemo<ColumnDef<DemoDevice>[]>(
@@ -145,8 +145,8 @@ function NestedDevicesTable() {
         header: 'DEVICE',
         cell: ({ row }: { row: Row<DemoDevice> }) => (
           <div className="flex flex-col">
-            <span className="text-ods-text-primary text-h4 truncate">{row.original.name}</span>
-            <span className="text-ods-text-secondary text-h6 truncate">Last Online: 2 hours ago</span>
+            <span className="truncate text-ods-text-primary text-h4">{row.original.name}</span>
+            <span className="truncate text-ods-text-secondary text-h6">Last Online: 2 hours ago</span>
           </div>
         ),
       },
@@ -160,21 +160,21 @@ function NestedDevicesTable() {
       },
     ],
     [],
-  )
+  );
 
   const table = useDataTable<DemoDevice>({
     data: DEMO_DEVICES,
     columns,
     getRowId: (row: DemoDevice) => row.id,
     enableSorting: false,
-  })
+  });
 
   return (
     <DataTable table={table}>
       <DataTable.Header />
       <DataTable.Body />
     </DataTable>
-  )
+  );
 }
 
 /** A panel row can host an arbitrary node — here a nested DataTable. */
@@ -183,4 +183,4 @@ export const WithNestedTable: Story = {
     title: 'Devices',
     rows: [{ id: 'devices', className: 'p-[var(--spacing-system-m)]', content: <NestedDevicesTable /> }],
   },
-}
+};

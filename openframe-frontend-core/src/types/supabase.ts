@@ -1,688 +1,671 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   public: {
     Tables: {
       announcement_assets: {
         Row: {
-          announcement_id: string | null
-          created_at: string | null
-          file_name: string
-          file_size: number
-          file_url: string
-          id: string
-          mime_type: string
-          upload_path: string
-        }
+          announcement_id: string | null;
+          created_at: string | null;
+          file_name: string;
+          file_size: number;
+          file_url: string;
+          id: string;
+          mime_type: string;
+          upload_path: string;
+        };
         Insert: {
-          announcement_id?: string | null
-          created_at?: string | null
-          file_name: string
-          file_size: number
-          file_url: string
-          id?: string
-          mime_type: string
-          upload_path: string
-        }
+          announcement_id?: string | null;
+          created_at?: string | null;
+          file_name: string;
+          file_size: number;
+          file_url: string;
+          id?: string;
+          mime_type: string;
+          upload_path: string;
+        };
         Update: {
-          announcement_id?: string | null
-          created_at?: string | null
-          file_name?: string
-          file_size?: number
-          file_url?: string
-          id?: string
-          mime_type?: string
-          upload_path?: string
-        }
+          announcement_id?: string | null;
+          created_at?: string | null;
+          file_name?: string;
+          file_size?: number;
+          file_url?: string;
+          id?: string;
+          mime_type?: string;
+          upload_path?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "announcement_assets_announcement_id_fkey"
-            columns: ["announcement_id"]
-            isOneToOne: false
-            referencedRelation: "announcements"
-            referencedColumns: ["id"]
+            foreignKeyName: 'announcement_assets_announcement_id_fkey';
+            columns: ['announcement_id'];
+            isOneToOne: false;
+            referencedRelation: 'announcements';
+            referencedColumns: ['id'];
           },
-        ]
-      }
+        ];
+      };
       announcements: {
         Row: {
-          background_color: string | null
-          created_at: string | null
-          created_by: string | null
-          description: string
-          icon_url: string | null
-          icon_name: string | null
-          id: string
-          is_active: boolean | null
-          title: string
-          updated_at: string | null
-        }
+          background_color: string | null;
+          created_at: string | null;
+          created_by: string | null;
+          description: string;
+          icon_url: string | null;
+          icon_name: string | null;
+          id: string;
+          is_active: boolean | null;
+          title: string;
+          updated_at: string | null;
+        };
         Insert: {
-          background_color?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          description: string
-          icon_url?: string | null
-          icon_name?: string | null
-          id?: string
-          is_active?: boolean | null
-          title: string
-          updated_at?: string | null
-        }
+          background_color?: string | null;
+          created_at?: string | null;
+          created_by?: string | null;
+          description: string;
+          icon_url?: string | null;
+          icon_name?: string | null;
+          id?: string;
+          is_active?: boolean | null;
+          title: string;
+          updated_at?: string | null;
+        };
         Update: {
-          background_color?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          description?: string
-          icon_url?: string | null
-          icon_name?: string | null
-          id?: string
-          is_active?: boolean | null
-          title?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-        ]
-      }
+          background_color?: string | null;
+          created_at?: string | null;
+          created_by?: string | null;
+          description?: string;
+          icon_url?: string | null;
+          icon_name?: string | null;
+          id?: string;
+          is_active?: boolean | null;
+          title?: string;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       slack_channels: {
         Row: {
-          channel_id: string
-          created_at: string | null
-          display_name: string | null
-          id: string
-          is_archived: boolean | null
-          is_private: boolean | null
-          member_count: number | null
-          name: string
-          purpose: string | null
-          topic: string | null
-          updated_at: string | null
-        }
+          channel_id: string;
+          created_at: string | null;
+          display_name: string | null;
+          id: string;
+          is_archived: boolean | null;
+          is_private: boolean | null;
+          member_count: number | null;
+          name: string;
+          purpose: string | null;
+          topic: string | null;
+          updated_at: string | null;
+        };
         Insert: {
-          channel_id: string
-          created_at?: string | null
-          display_name?: string | null
-          id?: string
-          is_archived?: boolean | null
-          is_private?: boolean | null
-          member_count?: number | null
-          name: string
-          purpose?: string | null
-          topic?: string | null
-          updated_at?: string | null
-        }
+          channel_id: string;
+          created_at?: string | null;
+          display_name?: string | null;
+          id?: string;
+          is_archived?: boolean | null;
+          is_private?: boolean | null;
+          member_count?: number | null;
+          name: string;
+          purpose?: string | null;
+          topic?: string | null;
+          updated_at?: string | null;
+        };
         Update: {
-          channel_id?: string
-          created_at?: string | null
-          display_name?: string | null
-          id?: string
-          is_archived?: boolean | null
-          is_private?: boolean | null
-          member_count?: number | null
-          name?: string
-          purpose?: string | null
-          topic?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
+          channel_id?: string;
+          created_at?: string | null;
+          display_name?: string | null;
+          id?: string;
+          is_archived?: boolean | null;
+          is_private?: boolean | null;
+          member_count?: number | null;
+          name?: string;
+          purpose?: string | null;
+          topic?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       slack_messages: {
         Row: {
-          channel_id: string
-          created_at: string | null
-          deleted_at: string | null
-          edited_timestamp: number | null
-          id: string
-          is_starred: boolean | null
-          message_id: string
-          message_type: string | null
-          parent_user_id: string | null
-          permalink: string | null
-          reply_count: number | null
-          subtype: string | null
-          text: string | null
-          thread_ts: string | null
-          timestamp: number | null
-          updated_at: string | null
-          user_id: string
-        }
+          channel_id: string;
+          created_at: string | null;
+          deleted_at: string | null;
+          edited_timestamp: number | null;
+          id: string;
+          is_starred: boolean | null;
+          message_id: string;
+          message_type: string | null;
+          parent_user_id: string | null;
+          permalink: string | null;
+          reply_count: number | null;
+          subtype: string | null;
+          text: string | null;
+          thread_ts: string | null;
+          timestamp: number | null;
+          updated_at: string | null;
+          user_id: string;
+        };
         Insert: {
-          channel_id: string
-          created_at?: string | null
-          deleted_at?: string | null
-          edited_timestamp?: number | null
-          id?: string
-          is_starred?: boolean | null
-          message_id: string
-          message_type?: string | null
-          parent_user_id?: string | null
-          permalink?: string | null
-          reply_count?: number | null
-          subtype?: string | null
-          text?: string | null
-          thread_ts?: string | null
-          timestamp?: number | null
-          updated_at?: string | null
-          user_id: string
-        }
+          channel_id: string;
+          created_at?: string | null;
+          deleted_at?: string | null;
+          edited_timestamp?: number | null;
+          id?: string;
+          is_starred?: boolean | null;
+          message_id: string;
+          message_type?: string | null;
+          parent_user_id?: string | null;
+          permalink?: string | null;
+          reply_count?: number | null;
+          subtype?: string | null;
+          text?: string | null;
+          thread_ts?: string | null;
+          timestamp?: number | null;
+          updated_at?: string | null;
+          user_id: string;
+        };
         Update: {
-          channel_id?: string
-          created_at?: string | null
-          deleted_at?: string | null
-          edited_timestamp?: number | null
-          id?: string
-          is_starred?: boolean | null
-          message_id?: string
-          message_type?: string | null
-          parent_user_id?: string | null
-          permalink?: string | null
-          reply_count?: number | null
-          subtype?: string | null
-          text?: string | null
-          thread_ts?: string | null
-          timestamp?: number | null
-          updated_at?: string | null
-          user_id?: string
-        }
+          channel_id?: string;
+          created_at?: string | null;
+          deleted_at?: string | null;
+          edited_timestamp?: number | null;
+          id?: string;
+          is_starred?: boolean | null;
+          message_id?: string;
+          message_type?: string | null;
+          parent_user_id?: string | null;
+          permalink?: string | null;
+          reply_count?: number | null;
+          subtype?: string | null;
+          text?: string | null;
+          thread_ts?: string | null;
+          timestamp?: number | null;
+          updated_at?: string | null;
+          user_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "slack_messages_channel_id_fkey"
-            columns: ["channel_id"]
-            isOneToOne: false
-            referencedRelation: "slack_channels"
-            referencedColumns: ["channel_id"]
+            foreignKeyName: 'slack_messages_channel_id_fkey';
+            columns: ['channel_id'];
+            isOneToOne: false;
+            referencedRelation: 'slack_channels';
+            referencedColumns: ['channel_id'];
           },
           {
-            foreignKeyName: "slack_messages_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "slack_users"
-            referencedColumns: ["user_id"]
+            foreignKeyName: 'slack_messages_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'slack_users';
+            referencedColumns: ['user_id'];
           },
-        ]
-      }
+        ];
+      };
       slack_users: {
         Row: {
-          avatar_hash: string | null
-          avatar_url: string | null
-          created_at: string | null
-          display_name: string | null
-          email: string | null
-          id: string
-          is_admin: boolean | null
-          is_bot: boolean | null
-          is_deleted: boolean | null
-          is_owner: boolean | null
-          real_name: string | null
-          status_emoji: string | null
-          status_text: string | null
-          timezone: string | null
-          title: string | null
-          updated_at: string | null
-          user_id: string
-          username: string
-        }
+          avatar_hash: string | null;
+          avatar_url: string | null;
+          created_at: string | null;
+          display_name: string | null;
+          email: string | null;
+          id: string;
+          is_admin: boolean | null;
+          is_bot: boolean | null;
+          is_deleted: boolean | null;
+          is_owner: boolean | null;
+          real_name: string | null;
+          status_emoji: string | null;
+          status_text: string | null;
+          timezone: string | null;
+          title: string | null;
+          updated_at: string | null;
+          user_id: string;
+          username: string;
+        };
         Insert: {
-          avatar_hash?: string | null
-          avatar_url?: string | null
-          created_at?: string | null
-          display_name?: string | null
-          email?: string | null
-          id?: string
-          is_admin?: boolean | null
-          is_bot?: boolean | null
-          is_deleted?: boolean | null
-          is_owner?: boolean | null
-          real_name?: string | null
-          status_emoji?: string | null
-          status_text?: string | null
-          timezone?: string | null
-          title?: string | null
-          updated_at?: string | null
-          user_id: string
-          username: string
-        }
+          avatar_hash?: string | null;
+          avatar_url?: string | null;
+          created_at?: string | null;
+          display_name?: string | null;
+          email?: string | null;
+          id?: string;
+          is_admin?: boolean | null;
+          is_bot?: boolean | null;
+          is_deleted?: boolean | null;
+          is_owner?: boolean | null;
+          real_name?: string | null;
+          status_emoji?: string | null;
+          status_text?: string | null;
+          timezone?: string | null;
+          title?: string | null;
+          updated_at?: string | null;
+          user_id: string;
+          username: string;
+        };
         Update: {
-          avatar_hash?: string | null
-          avatar_url?: string | null
-          created_at?: string | null
-          display_name?: string | null
-          email?: string | null
-          id?: string
-          is_admin?: boolean | null
-          is_bot?: boolean | null
-          is_deleted?: boolean | null
-          is_owner?: boolean | null
-          real_name?: string | null
-          status_emoji?: string | null
-          status_text?: string | null
-          timezone?: string | null
-          title?: string | null
-          updated_at?: string | null
-          user_id?: string
-          username?: string
-        }
-        Relationships: []
-      }
+          avatar_hash?: string | null;
+          avatar_url?: string | null;
+          created_at?: string | null;
+          display_name?: string | null;
+          email?: string | null;
+          id?: string;
+          is_admin?: boolean | null;
+          is_bot?: boolean | null;
+          is_deleted?: boolean | null;
+          is_owner?: boolean | null;
+          real_name?: string | null;
+          status_emoji?: string | null;
+          status_text?: string | null;
+          timezone?: string | null;
+          title?: string | null;
+          updated_at?: string | null;
+          user_id?: string;
+          username?: string;
+        };
+        Relationships: [];
+      };
       podcast_episodes: {
         Row: {
-          id: string
-          podbean_episode_id: string
-          podbean_podcast_id: string
-          title: string
-          description: string | null
-          cover_url: string | null
-          audio_url: string | null
-          main_video_url: string | null
-          media_type: string | null
-          duration_seconds: number | null
-          status: string | null
-          published_at: string | null
-          external_url: string | null
-          hosts: Json | null
-          is_deleted: boolean | null
-          last_synced_at: string | null
-          created_at: string | null
-          updated_at: string | null
-        }
+          id: string;
+          podbean_episode_id: string;
+          podbean_podcast_id: string;
+          title: string;
+          description: string | null;
+          cover_url: string | null;
+          audio_url: string | null;
+          main_video_url: string | null;
+          media_type: string | null;
+          duration_seconds: number | null;
+          status: string | null;
+          published_at: string | null;
+          external_url: string | null;
+          hosts: Json | null;
+          is_deleted: boolean | null;
+          last_synced_at: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
         Insert: {
-          id?: string
-          podbean_episode_id: string
-          podbean_podcast_id: string
-          title: string
-          description?: string | null
-          cover_url?: string | null
-          audio_url?: string | null
-          main_video_url?: string | null
-          media_type?: string | null
-          duration_seconds?: number | null
-          status?: string | null
-          published_at?: string | null
-          external_url?: string | null
-          hosts?: Json | null
-          is_deleted?: boolean | null
-          last_synced_at?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
+          id?: string;
+          podbean_episode_id: string;
+          podbean_podcast_id: string;
+          title: string;
+          description?: string | null;
+          cover_url?: string | null;
+          audio_url?: string | null;
+          main_video_url?: string | null;
+          media_type?: string | null;
+          duration_seconds?: number | null;
+          status?: string | null;
+          published_at?: string | null;
+          external_url?: string | null;
+          hosts?: Json | null;
+          is_deleted?: boolean | null;
+          last_synced_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
         Update: {
-          id?: string
-          podbean_episode_id?: string
-          podbean_podcast_id?: string
-          title?: string
-          description?: string | null
-          cover_url?: string | null
-          audio_url?: string | null
-          main_video_url?: string | null
-          media_type?: string | null
-          duration_seconds?: number | null
-          status?: string | null
-          published_at?: string | null
-          external_url?: string | null
-          hosts?: Json | null
-          is_deleted?: boolean | null
-          last_synced_at?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-        ]
-      }
+          id?: string;
+          podbean_episode_id?: string;
+          podbean_podcast_id?: string;
+          title?: string;
+          description?: string | null;
+          cover_url?: string | null;
+          audio_url?: string | null;
+          main_video_url?: string | null;
+          media_type?: string | null;
+          duration_seconds?: number | null;
+          status?: string | null;
+          published_at?: string | null;
+          external_url?: string | null;
+          hosts?: Json | null;
+          is_deleted?: boolean | null;
+          last_synced_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       webinars: {
         Row: {
-          id: string
-          livestorm_event_id: string
-          title: string
-          description: string | null
-          cover_url: string | null
-          start_at: string
-          end_at: string | null
-          timezone: string | null
-          registration_url: string | null
-          main_video_url: string | null
-          hosts: Json | null
-          is_deleted: boolean | null
-          last_synced_at: string | null
-          created_at: string | null
-          updated_at: string | null
-        }
+          id: string;
+          livestorm_event_id: string;
+          title: string;
+          description: string | null;
+          cover_url: string | null;
+          start_at: string;
+          end_at: string | null;
+          timezone: string | null;
+          registration_url: string | null;
+          main_video_url: string | null;
+          hosts: Json | null;
+          is_deleted: boolean | null;
+          last_synced_at: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
         Insert: {
-          id?: string
-          livestorm_event_id: string
-          title: string
-          description?: string | null
-          cover_url?: string | null
-          start_at: string
-          end_at?: string | null
-          timezone?: string | null
-          registration_url?: string | null
-          main_video_url?: string | null
-          hosts?: Json | null
-          is_deleted?: boolean | null
-          last_synced_at?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
+          id?: string;
+          livestorm_event_id: string;
+          title: string;
+          description?: string | null;
+          cover_url?: string | null;
+          start_at: string;
+          end_at?: string | null;
+          timezone?: string | null;
+          registration_url?: string | null;
+          main_video_url?: string | null;
+          hosts?: Json | null;
+          is_deleted?: boolean | null;
+          last_synced_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
         Update: {
-          id?: string
-          livestorm_event_id?: string
-          title?: string
-          description?: string | null
-          cover_url?: string | null
-          start_at?: string
-          end_at?: string | null
-          timezone?: string | null
-          registration_url?: string | null
-          main_video_url?: string | null
-          hosts?: Json | null
-          is_deleted?: boolean | null
-          last_synced_at?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-        ]
-      }
+          id?: string;
+          livestorm_event_id?: string;
+          title?: string;
+          description?: string | null;
+          cover_url?: string | null;
+          start_at?: string;
+          end_at?: string | null;
+          timezone?: string | null;
+          registration_url?: string | null;
+          main_video_url?: string | null;
+          hosts?: Json | null;
+          is_deleted?: boolean | null;
+          last_synced_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       walkthrough_videos: {
         Row: {
-          id: number
-          platform_id: string
-          title: string
-          status: string
-          youtube_url: string | null
-          main_video_url: string | null
-          main_video_thumbnail: string | null
-          video_summary: string | null
-          transcript: string | null
-          srt_content: string | null
-          transcript_words_data: Json | null
-          video_bites: Json
-          config: Json | null
-          custom_instructions: string | null
-          highlight_video_url: string | null
-          highlight_video_source: string | null
-          highlight_video_thumbnail: string | null
-          highlight_video_duration_ms: number | null
-          highlight_srt_content: string | null
-          author_id: string | null
-          position: 'left' | 'right'
-          created_at: string
-          updated_at: string
-        }
+          id: number;
+          platform_id: string;
+          title: string;
+          status: string;
+          youtube_url: string | null;
+          main_video_url: string | null;
+          main_video_thumbnail: string | null;
+          video_summary: string | null;
+          transcript: string | null;
+          srt_content: string | null;
+          transcript_words_data: Json | null;
+          video_bites: Json;
+          config: Json | null;
+          custom_instructions: string | null;
+          highlight_video_url: string | null;
+          highlight_video_source: string | null;
+          highlight_video_thumbnail: string | null;
+          highlight_video_duration_ms: number | null;
+          highlight_srt_content: string | null;
+          author_id: string | null;
+          position: 'left' | 'right';
+          created_at: string;
+          updated_at: string;
+        };
         Insert: {
-          id?: never
-          platform_id: string
-          title: string
-          status?: string
-          position?: 'left' | 'right'
-          youtube_url?: string | null
-          main_video_url?: string | null
-          main_video_thumbnail?: string | null
-          video_summary?: string | null
-          transcript?: string | null
-          srt_content?: string | null
-          transcript_words_data?: Json | null
-          video_bites?: Json
-          config?: Json | null
-          custom_instructions?: string | null
-          highlight_video_url?: string | null
-          highlight_video_source?: string | null
-          highlight_video_thumbnail?: string | null
-          highlight_video_duration_ms?: number | null
-          highlight_srt_content?: string | null
-          author_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
+          id?: never;
+          platform_id: string;
+          title: string;
+          status?: string;
+          position?: 'left' | 'right';
+          youtube_url?: string | null;
+          main_video_url?: string | null;
+          main_video_thumbnail?: string | null;
+          video_summary?: string | null;
+          transcript?: string | null;
+          srt_content?: string | null;
+          transcript_words_data?: Json | null;
+          video_bites?: Json;
+          config?: Json | null;
+          custom_instructions?: string | null;
+          highlight_video_url?: string | null;
+          highlight_video_source?: string | null;
+          highlight_video_thumbnail?: string | null;
+          highlight_video_duration_ms?: number | null;
+          highlight_srt_content?: string | null;
+          author_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
         Update: {
-          id?: never
-          platform_id?: string
-          title?: string
-          status?: string
-          youtube_url?: string | null
-          main_video_url?: string | null
-          main_video_thumbnail?: string | null
-          video_summary?: string | null
-          transcript?: string | null
-          srt_content?: string | null
-          transcript_words_data?: Json | null
-          video_bites?: Json
-          config?: Json | null
-          custom_instructions?: string | null
-          highlight_video_url?: string | null
-          highlight_video_source?: string | null
-          highlight_video_thumbnail?: string | null
-          highlight_video_duration_ms?: number | null
-          highlight_srt_content?: string | null
-          author_id?: string | null
-          position?: 'left' | 'right'
-          created_at?: string
-          updated_at?: string
-        }
+          id?: never;
+          platform_id?: string;
+          title?: string;
+          status?: string;
+          youtube_url?: string | null;
+          main_video_url?: string | null;
+          main_video_thumbnail?: string | null;
+          video_summary?: string | null;
+          transcript?: string | null;
+          srt_content?: string | null;
+          transcript_words_data?: Json | null;
+          video_bites?: Json;
+          config?: Json | null;
+          custom_instructions?: string | null;
+          highlight_video_url?: string | null;
+          highlight_video_source?: string | null;
+          highlight_video_thumbnail?: string | null;
+          highlight_video_duration_ms?: number | null;
+          highlight_srt_content?: string | null;
+          author_id?: string | null;
+          position?: 'left' | 'right';
+          created_at?: string;
+          updated_at?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "walkthrough_videos_platform_id_fkey"
-            columns: ["platform_id"]
-            isOneToOne: true
-            referencedRelation: "platforms"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
+            foreignKeyName: 'walkthrough_videos_platform_id_fkey';
+            columns: ['platform_id'];
+            isOneToOne: true;
+            referencedRelation: 'platforms';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       luma_events: {
         Row: {
-          id: string
-          luma_api_id: string
-          name: string
-          description: string | null
-          description_md: string | null
-          cover_url: string | null
-          event_url: string | null
-          start_at: string | null
-          end_at: string | null
-          duration_interval: string | null
-          timezone: string | null
-          geo_address: Json | null
-          geo_latitude: number | null
-          geo_longitude: number | null
-          location_name: string | null
-          location_full_address: string | null
-          visibility: string | null
-          meeting_url: string | null
-          registration_questions: Json | null
-          tags: string[] | null
-          guest_count: number | null
-          is_deleted: boolean | null
-          last_synced_at: string | null
-          created_at: string | null
-          updated_at: string | null
-        }
+          id: string;
+          luma_api_id: string;
+          name: string;
+          description: string | null;
+          description_md: string | null;
+          cover_url: string | null;
+          event_url: string | null;
+          start_at: string | null;
+          end_at: string | null;
+          duration_interval: string | null;
+          timezone: string | null;
+          geo_address: Json | null;
+          geo_latitude: number | null;
+          geo_longitude: number | null;
+          location_name: string | null;
+          location_full_address: string | null;
+          visibility: string | null;
+          meeting_url: string | null;
+          registration_questions: Json | null;
+          tags: string[] | null;
+          guest_count: number | null;
+          is_deleted: boolean | null;
+          last_synced_at: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
         Insert: {
-          id?: string
-          luma_api_id: string
-          name: string
-          description?: string | null
-          description_md?: string | null
-          cover_url?: string | null
-          event_url?: string | null
-          start_at?: string | null
-          end_at?: string | null
-          duration_interval?: string | null
-          timezone?: string | null
-          geo_address?: Json | null
-          geo_latitude?: number | null
-          geo_longitude?: number | null
-          location_name?: string | null
-          location_full_address?: string | null
-          visibility?: string | null
-          meeting_url?: string | null
-          registration_questions?: Json | null
-          tags?: string[] | null
-          guest_count?: number | null
-          is_deleted?: boolean | null
-          last_synced_at?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
+          id?: string;
+          luma_api_id: string;
+          name: string;
+          description?: string | null;
+          description_md?: string | null;
+          cover_url?: string | null;
+          event_url?: string | null;
+          start_at?: string | null;
+          end_at?: string | null;
+          duration_interval?: string | null;
+          timezone?: string | null;
+          geo_address?: Json | null;
+          geo_latitude?: number | null;
+          geo_longitude?: number | null;
+          location_name?: string | null;
+          location_full_address?: string | null;
+          visibility?: string | null;
+          meeting_url?: string | null;
+          registration_questions?: Json | null;
+          tags?: string[] | null;
+          guest_count?: number | null;
+          is_deleted?: boolean | null;
+          last_synced_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
         Update: {
-          id?: string
-          luma_api_id?: string
-          name?: string
-          description?: string | null
-          description_md?: string | null
-          cover_url?: string | null
-          event_url?: string | null
-          start_at?: string | null
-          end_at?: string | null
-          duration_interval?: string | null
-          timezone?: string | null
-          geo_address?: Json | null
-          geo_latitude?: number | null
-          geo_longitude?: number | null
-          location_name?: string | null
-          location_full_address?: string | null
-          visibility?: string | null
-          meeting_url?: string | null
-          registration_questions?: Json | null
-          tags?: string[] | null
-          guest_count?: number | null
-          is_deleted?: boolean | null
-          last_synced_at?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-        ]
-      }
+          id?: string;
+          luma_api_id?: string;
+          name?: string;
+          description?: string | null;
+          description_md?: string | null;
+          cover_url?: string | null;
+          event_url?: string | null;
+          start_at?: string | null;
+          end_at?: string | null;
+          duration_interval?: string | null;
+          timezone?: string | null;
+          geo_address?: Json | null;
+          geo_latitude?: number | null;
+          geo_longitude?: number | null;
+          location_name?: string | null;
+          location_full_address?: string | null;
+          visibility?: string | null;
+          meeting_url?: string | null;
+          registration_questions?: Json | null;
+          tags?: string[] | null;
+          guest_count?: number | null;
+          is_deleted?: boolean | null;
+          last_synced_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       vendor_github_stats: {
         Row: {
-          id: string
-          vendor_id: number
-          github_stars: number | null
-          github_forks: number | null
-          github_commits: number | null
-          github_license: string | null
-          github_last_commit: string | null
-          created_at: string | null
-          updated_at: string | null
-        }
+          id: string;
+          vendor_id: number;
+          github_stars: number | null;
+          github_forks: number | null;
+          github_commits: number | null;
+          github_license: string | null;
+          github_last_commit: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
         Insert: {
-          id?: string
-          vendor_id: number
-          github_stars?: number | null
-          github_forks?: number | null
-          github_commits?: number | null
-          github_license?: string | null
-          github_last_commit?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
+          id?: string;
+          vendor_id: number;
+          github_stars?: number | null;
+          github_forks?: number | null;
+          github_commits?: number | null;
+          github_license?: string | null;
+          github_last_commit?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
         Update: {
-          id?: string
-          vendor_id?: number
-          github_stars?: number | null
-          github_forks?: number | null
-          github_commits?: number | null
-          github_license?: string | null
-          github_last_commit?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-    }
+          id?: string;
+          vendor_id?: number;
+          github_stars?: number | null;
+          github_forks?: number | null;
+          github_commits?: number | null;
+          github_license?: string | null;
+          github_last_commit?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+    };
     Views: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Functions: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Enums: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+      [_ in never]: never;
+    };
+  };
+};
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DefaultSchema = Database[Extract<keyof Database, 'public'>];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    keyof (DefaultSchema['Tables'] & DefaultSchema['Views']) | { schema: keyof Database },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database;
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    ? keyof (Database[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+        Database[DefaultSchemaTableNameOrOptions['schema']]['Views'])
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
+  ? (Database[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+      Database[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+      Row: infer R;
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R;
       }
       ? R
       : never
-    : never
+    : never;
 
 export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables'] | { schema: keyof Database },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database;
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    ? keyof Database[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
+  ? Database[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+      Insert: infer I;
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I;
       }
       ? I
       : never
-    : never
+    : never;
 
 export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables'] | { schema: keyof Database },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database;
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    ? keyof Database[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
+  ? Database[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+      Update: infer U;
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U;
       }
       ? U
       : never
-    : never
+    : never;

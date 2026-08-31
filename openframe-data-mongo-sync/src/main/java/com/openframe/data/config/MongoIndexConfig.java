@@ -1,6 +1,6 @@
 package com.openframe.data.config;
 
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

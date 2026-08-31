@@ -18,7 +18,7 @@ export const DEV_SECTION_PARAM_KEYS = {
   releaseStatus: 'release_status',
   /** Delivery (bug-fix / enhancement) task-type filter. */
   deliveryTaskType: 'task_type',
-} as const
+} as const;
 
 /** Section keys that participate in `<section>-<id>` anchor IDs.
  *  The URL composer (`appendSearchAndHash` in hub `dev-section-url.ts`)
@@ -26,12 +26,12 @@ export const DEV_SECTION_PARAM_KEYS = {
  *  both call `devSectionAnchorId` so the DOM `id` and the URL hash stay
  *  in lockstep — adding a new section means adding the literal here
  *  ONCE, not at every render site. */
-export type DevSectionAnchorKind = 'roadmap' | 'delivery' | 'ticket'
+export type DevSectionAnchorKind = 'roadmap' | 'delivery' | 'ticket';
 
 /** Compose the canonical `<section>-<id>` anchor id used by the dev-center
  *  rows + URL composer. */
 export function devSectionAnchorId(section: DevSectionAnchorKind, id: string): string {
-  return `${section}-${id}`
+  return `${section}-${id}`;
 }
 
 /**
@@ -42,7 +42,7 @@ export function devSectionAnchorId(section: DevSectionAnchorKind, id: string): s
  * its sibling param keys) because producers span both worlds: the hub's
  * SERVER-side chat-ref builder and the client header cell.
  */
-export const TICKET_OPEN_PARAM = 'ticket'
+export const TICKET_OPEN_PARAM = 'ticket';
 
 /**
  * Build THE canonical ticket deep link — the ONE producer for every
@@ -68,7 +68,7 @@ export const TICKET_OPEN_PARAM = 'ticket'
  * composed with `&`.
  */
 export function buildTicketOpenHref(base: string, ticketExternalId: string): string {
-  const enc = encodeURIComponent(ticketExternalId)
-  const sep = base.includes('?') ? '&' : '?'
-  return `${base}${sep}${TICKET_OPEN_PARAM}=${enc}&${DEV_SECTION_PARAM_KEYS.search}=${enc}#${devSectionAnchorId('ticket', enc)}`
+  const enc = encodeURIComponent(ticketExternalId);
+  const sep = base.includes('?') ? '&' : '?';
+  return `${base}${sep}${TICKET_OPEN_PARAM}=${enc}&${DEV_SECTION_PARAM_KEYS.search}=${enc}#${devSectionAnchorId('ticket', enc)}`;
 }

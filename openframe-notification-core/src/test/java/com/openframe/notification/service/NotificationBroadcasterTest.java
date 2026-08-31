@@ -86,9 +86,9 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService, times(1)).createForAudience(
-                eq("notif-id-1"), eq(NotificationCategory.MINGO), anyString(), eq(RecipientType.USER), eq(Set.of("admin-1", "admin-2")));
+                eq("notif-id-1"), eq(NotificationCategory.MINGO), anyString(), any(), eq(RecipientType.USER), eq(Set.of("admin-1", "admin-2")));
         verify(readStateService, never()).createForAudience(
-                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.MACHINE), any());
+                anyString(), any(NotificationCategory.class), anyString(), any(), eq(RecipientType.MACHINE), any());
         verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.MINGO));
         verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class), eq(NotificationCategory.MINGO));
         verify(natsPublisher, never()).publishToMachine(anyString(), any(Notification.class), any(NotificationCategory.class));
@@ -103,6 +103,7 @@ class NotificationBroadcasterTest {
                 .context(genericContext("TICKET_ASSIGNED"))
                 .type(TestType.TICKET_ASSIGNED)
                 .attributes(java.util.Map.of("ticketId", "t-1", "assigneeUserId", "u-9"))
+                .applePushCategory("APPROVAL_REQUEST")
                 .audience(Audience.users("admin-1"))
                 .build();
 
@@ -114,6 +115,7 @@ class NotificationBroadcasterTest {
         assertThat(stored.getValue().getAttributes())
                 .containsEntry("ticketId", "t-1")
                 .containsEntry("assigneeUserId", "u-9");
+        assertThat(stored.getValue().getApplePushCategory()).isEqualTo("APPROVAL_REQUEST");
         assertThat(stored.getValue().getContext()).isNotNull();
     }
 
@@ -147,9 +149,9 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService, times(1)).createForAudience(
-                eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), eq(RecipientType.MACHINE), eq(Set.of("m-1", "m-2")));
+                eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), any(), eq(RecipientType.MACHINE), eq(Set.of("m-1", "m-2")));
         verify(readStateService, never()).createForAudience(
-                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
+                anyString(), any(NotificationCategory.class), anyString(), any(), eq(RecipientType.USER), any());
         verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
         verify(natsPublisher).publishToMachine(eq("m-2"), any(Notification.class), eq(NotificationCategory.TICKETS));
         verify(natsPublisher, never()).publishToUser(anyString(), any(Notification.class), any(NotificationCategory.class));
@@ -170,9 +172,9 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService).createForAudience(
-                eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), eq(RecipientType.USER), eq(Set.of("admin-1")));
+                eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), any(), eq(RecipientType.USER), eq(Set.of("admin-1")));
         verify(readStateService).createForAudience(
-                eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), eq(RecipientType.MACHINE), eq(Set.of("m-1")));
+                eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), any(), eq(RecipientType.MACHINE), eq(Set.of("m-1")));
         verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
         verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
     }
@@ -193,7 +195,7 @@ class NotificationBroadcasterTest {
         assertThat(result.getId()).isEqualTo("notif-id-1");
         verify(notificationRepository).save(any(Notification.class));
         verify(readStateService).createForAudience(
-                eq("notif-id-1"), eq(NotificationCategory.MINGO), anyString(), eq(RecipientType.USER), eq(Set.of("admin-1")));
+                eq("notif-id-1"), eq(NotificationCategory.MINGO), anyString(), any(), eq(RecipientType.USER), eq(Set.of("admin-1")));
         verifyNoInteractions(natsPublisher);
     }
 
@@ -248,14 +250,14 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService).createForAudience(
-                anyString(), eq(NotificationCategory.TICKETS), anyString(), eq(RecipientType.USER), any());
+                anyString(), eq(NotificationCategory.TICKETS), anyString(), any(), eq(RecipientType.USER), any());
     }
 
     @Test
     @DisplayName("Given createForAudience throws a non-dup-key RuntimeException, when broadcast is called, then the just-persisted Notification doc is deleted by id and the exception is re-thrown — invisible orphans are not left behind and NATS publish is skipped")
     void create_for_audience_failure_triggers_orphan_cleanup_and_skips_nats() {
         doThrow(new RuntimeException("mongo down")).when(readStateService).createForAudience(
-                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
+                anyString(), any(NotificationCategory.class), anyString(), any(), eq(RecipientType.USER), any());
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Approval")
                 .severity(NotificationSeverity.INFO)
@@ -410,7 +412,7 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService).createForAudience(
-                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), eq(Set.of("keeper")));
+                anyString(), any(NotificationCategory.class), anyString(), any(), eq(RecipientType.USER), eq(Set.of("keeper")));
         verify(natsPublisher, never()).publishToUser(eq("muter"), any(Notification.class), any(NotificationCategory.class));
         verify(channelDispatcher).dispatch(eq(Set.of("keeper")), any(Notification.class), any(NotificationCategory.class));
     }
@@ -431,7 +433,7 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService).createForAudience(
-                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), eq(Set.of("on")));
+                anyString(), any(NotificationCategory.class), anyString(), any(), eq(RecipientType.USER), eq(Set.of("on")));
     }
 
     @Test
@@ -450,7 +452,7 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService).createForAudience(
-                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), eq(Set.of("a1")));
+                anyString(), any(NotificationCategory.class), anyString(), any(), eq(RecipientType.USER), eq(Set.of("a1")));
     }
 
     @Test
@@ -467,7 +469,7 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService, never()).createForAudience(
-                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
+                anyString(), any(NotificationCategory.class), anyString(), any(), eq(RecipientType.USER), any());
         verify(notificationRepository, never()).save(any(Notification.class));
     }
 
@@ -485,7 +487,7 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService, never()).createForAudience(
-                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
+                anyString(), any(NotificationCategory.class), anyString(), any(), eq(RecipientType.USER), any());
         verify(notificationRepository, never()).save(any(Notification.class));
     }
 
@@ -526,9 +528,9 @@ class NotificationBroadcasterTest {
         broadcaster.broadcast(cmd);
 
         verify(readStateService, never()).createForAudience(
-                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
+                anyString(), any(NotificationCategory.class), anyString(), any(), eq(RecipientType.USER), any());
         verify(readStateService).createForAudience(
-                anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.MACHINE), eq(Set.of("m-1")));
+                anyString(), any(NotificationCategory.class), anyString(), any(), eq(RecipientType.MACHINE), eq(Set.of("m-1")));
         verify(channelDispatcher, never()).dispatch(any(), any(Notification.class), any(NotificationCategory.class));
     }
 

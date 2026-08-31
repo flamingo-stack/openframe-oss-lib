@@ -1,49 +1,46 @@
-"use client"
+'use client';
 
-import React from 'react';
-import { cn } from '../../utils/cn';
 import { cva, type VariantProps } from 'class-variance-authority';
+import type React from 'react';
+import { cn } from '../../utils/cn';
 
-const statusBadgeVariants = cva(
-  "inline-flex items-center justify-center rounded",
-  {
-    variants: {
-      // Two densities, not one style at two paddings. Both are the ODS h5
-      // label treatment (Azeret Mono 500, uppercase, -0.02em); they differ in
-      // scale. Putting BOTH on `text-h5` is what regressed the stamp: at
-      // 14/20 on desktop every inline badge grew ~40% and its box doubled,
-      // because the caption line-height replaced `leading-none`.
-      variant: {
-        // Standalone badge — the ODS caption composite, unmodified.
-        card: "px-3 py-1.5 text-h5",
-        // Dense inline stamp. Family, weight and casing come from the SAME h5
-        // tokens as `card`; only the scale is set here, because ODS has no
-        // step below the 12/14px caption and this stamp is 10px by design.
-        button:
-          "px-2 py-0.5 font-[family-name:var(--font-h5-family)] font-[number:var(--font-h5-weight)] text-badge uppercase tracking-[-0.02em]",
-      },
-      colorScheme: {
-        cyan: "bg-[var(--ods-flamingo-cyan-base)] text-ods-text-on-accent",
-        pink: "bg-[var(--ods-flamingo-pink-base)] text-ods-text-on-accent",
-        yellow: "bg-ods-accent text-ods-text-on-accent border border-[var(--ods-system-greys-black)]",
-        green: "bg-ods-success text-ods-text-on-accent",
-        purple: "bg-ods-flamingo-pink text-ods-text-on-accent",
-        success: "bg-ods-success-secondary text-ods-success",
-        error: "bg-ods-error-secondary text-ods-error",
-        warning: "bg-ods-warning-secondary text-ods-warning",
-        default: "bg-ods-bg-surface text-ods-text-primary",
-        // Border-only variants (no background) - for task type badges
-        accentBorder: "bg-transparent border-2 text-ods-accent border-ods-accent",
-        errorBorder: "bg-transparent border-2 text-ods-error border-ods-error",
-        whiteBorder: "bg-transparent border-2 text-ods-text-primary border-ods-text-primary",
-      },
+const statusBadgeVariants = cva('inline-flex items-center justify-center rounded', {
+  variants: {
+    // Two densities, not one style at two paddings. Both are the ODS h5
+    // label treatment (Azeret Mono 500, uppercase, -0.02em); they differ in
+    // scale. Putting BOTH on `text-h5` is what regressed the stamp: at
+    // 14/20 on desktop every inline badge grew ~40% and its box doubled,
+    // because the caption line-height replaced `leading-none`.
+    variant: {
+      // Standalone badge — the ODS caption composite, unmodified.
+      card: 'px-3 py-1.5 text-h5',
+      // Dense inline stamp. Family, weight and casing come from the SAME h5
+      // tokens as `card`; only the scale is set here, because ODS has no
+      // step below the 12/14px caption and this stamp is 10px by design.
+      button:
+        'px-2 py-0.5 font-[family-name:var(--font-h5-family)] font-[number:var(--font-h5-weight)] uppercase tracking-[-0.02em] text-badge',
     },
-    defaultVariants: {
-      variant: "card",
-      colorScheme: "default",
+    colorScheme: {
+      cyan: 'bg-[var(--ods-flamingo-cyan-base)] text-ods-text-on-accent',
+      pink: 'bg-[var(--ods-flamingo-pink-base)] text-ods-text-on-accent',
+      yellow: 'border border-[var(--ods-system-greys-black)] bg-ods-accent text-ods-text-on-accent',
+      green: 'bg-ods-success text-ods-text-on-accent',
+      purple: 'bg-ods-flamingo-pink text-ods-text-on-accent',
+      success: 'bg-ods-success-secondary text-ods-success',
+      error: 'bg-ods-error-secondary text-ods-error',
+      warning: 'bg-ods-warning-secondary text-ods-warning',
+      default: 'bg-ods-bg-surface text-ods-text-primary',
+      // Border-only variants (no background) - for task type badges
+      accentBorder: 'border-2 border-ods-accent bg-transparent text-ods-accent',
+      errorBorder: 'border-2 border-ods-error bg-transparent text-ods-error',
+      whiteBorder: 'border-2 border-ods-text-primary bg-transparent text-ods-text-primary',
     },
-  }
-);
+  },
+  defaultVariants: {
+    variant: 'card',
+    colorScheme: 'default',
+  },
+});
 
 /**
  * OpenFrame generation badge tint — the ONE ramp for the `gen` mode below.
@@ -67,8 +64,7 @@ export function generationTierFromLabel(label: string | null | undefined): numbe
 }
 
 export interface StatusBadgeProps
-  extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof statusBadgeVariants> {
+  extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof statusBadgeVariants> {
   text: string;
   /**
    * When true, renders `text` verbatim on a single line, bypassing the
@@ -88,16 +84,7 @@ export interface StatusBadgeProps
   gen?: number;
 }
 
-function StatusBadge({
-  text,
-  variant,
-  colorScheme,
-  className,
-  singleLine,
-  gen,
-  style,
-  ...props
-}: StatusBadgeProps) {
+function StatusBadge({ text, variant, colorScheme, className, singleLine, gen, style, ...props }: StatusBadgeProps) {
   // Generation mode: constant full-accent text, progressive-opacity accent bg,
   // SSOT casing (textTransform:none overrides the base `uppercase`). Inline
   // style so it wins over any colorScheme class regardless of CSS source order.
@@ -124,9 +111,11 @@ function StatusBadge({
     if (variant === 'button' && text.includes(' ')) {
       const words = text.split(' ');
       return (
-        <span className="flex flex-col items-center justify-center text-center gap-0">
+        <span className="flex flex-col items-center justify-center gap-0 text-center">
           {words.map((word, index) => (
-            <span key={index} className="block">{word}</span>
+            <span key={index} className="block">
+              {word}
+            </span>
           ))}
         </span>
       );
@@ -136,10 +125,7 @@ function StatusBadge({
 
   return (
     <span
-      className={cn(
-        statusBadgeVariants({ variant, colorScheme: gen != null ? undefined : colorScheme }),
-        className,
-      )}
+      className={cn(statusBadgeVariants({ variant, colorScheme: gen != null ? undefined : colorScheme }), className)}
       style={genStyle ? { ...genStyle, ...style } : style}
       {...props}
     >

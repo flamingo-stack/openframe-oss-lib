@@ -1,10 +1,10 @@
-'use client'
+'use client';
 
-import { useCallback, useMemo } from 'react'
-import { ChevronRight } from 'lucide-react'
-import { Button, DatePickerCalendar, Skeleton } from '../ui'
-import { cn } from '../../utils/cn'
-import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention'
+import { ChevronRight } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
+import { cn } from '../../utils/cn';
+import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention';
+import { Button, DatePickerCalendar, Skeleton } from '../ui';
 
 /**
  * SlotPicker — day layer + time-chip grid for the meeting scheduler.
@@ -45,17 +45,17 @@ import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention'
 
 export interface SlotPickerProps {
   /** Bookable slot start times (epoch ms) for the selected duration. */
-  slots: number[]
+  slots: number[];
   /** IANA zone every label renders in (parent resolves post-mount). */
-  timezone: string
-  monthOffset: number
-  onMonthOffsetChange: (offset: number) => void
-  selectedSlot: number | null
-  onSelectSlot: (startMs: number) => void
-  selectedDay: string | null
-  onSelectDay: (dayKey: string) => void
+  timezone: string;
+  monthOffset: number;
+  onMonthOffsetChange: (offset: number) => void;
+  selectedSlot: number | null;
+  onSelectSlot: (startMs: number) => void;
+  selectedDay: string | null;
+  onSelectDay: (dayKey: string) => void;
   /** Availability refetch in flight (month change) → per-region skeletons. */
-  isLoading?: boolean
+  isLoading?: boolean;
 }
 
 /** Stable per-zone day key for an instant, e.g. "2026-08-14" (exported — the
@@ -63,7 +63,7 @@ export interface SlotPickerProps {
 export function dayKeyInZone(ms: number, timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
     new Date(ms),
-  )
+  );
 }
 
 /**
@@ -72,17 +72,17 @@ export function dayKeyInZone(ms: number, timeZone: string): string {
  * date parts — never through an Intl zone — or a `displayTimezone` far from
  * the browser zone shifts cells by a day.
  */
-const pad2 = (n: number) => String(n).padStart(2, '0')
+const pad2 = (n: number) => String(n).padStart(2, '0');
 function calendarDayKey(day: Date): string {
-  return `${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`
+  return `${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`;
 }
 function dateFromDayKey(key: string): Date {
-  const [y, m, d] = key.split('-').map(Number)
-  return new Date(y, m - 1, d, 12)
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d, 12);
 }
 
 function timeLabelInZone(ms: number, timeZone: string): string {
-  return new Intl.DateTimeFormat(undefined, { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(ms))
+  return new Intl.DateTimeFormat(undefined, { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(ms));
 }
 
 /**
@@ -102,16 +102,16 @@ function timeLabelInZone(ms: number, timeZone: string): string {
  * 48px targets and the COLUMN widens to house it, rather than the buttons
  * shrinking to fit a narrower column.
  */
-const CALENDAR_W = 'md:w-[19rem] md:shrink-0 lg:w-[16rem]'
+const CALENDAR_W = 'md:w-[19rem] md:shrink-0 lg:w-[16rem]';
 
 /** Column heading ("Select Date & Time" / the chosen day) — body-weight
  *  primary, 4px above its content, mirrored by both skeletons. */
-const COLUMN_HEADING_CLASS = 'shrink-0 text-h4 text-ods-text-primary'
-const COLUMN_STACK = 'flex min-h-0 flex-col gap-[var(--spacing-system-xxs)]'
+const COLUMN_HEADING_CLASS = 'shrink-0 text-h4 text-ods-text-primary';
+const COLUMN_STACK = 'flex min-h-0 flex-col gap-[var(--spacing-system-xxs)]';
 
 /** Static label over the calendar. Exported so a host rendering its own
  *  chrome around the picker can stay in step with it. */
-export const SLOT_PICKER_HEADING = 'Select Date & Time'
+export const SLOT_PICKER_HEADING = 'Select Date & Time';
 
 /**
  * Chip grid: `auto-fill` over `minmax(5.5rem, 1fr)` — as many chips per row as
@@ -152,12 +152,12 @@ const CHIP_GRID_CLASS = cn(
   // chips grow the column, then the row, then the card, and `overflow-y-auto`
   // never gets a box smaller than its contents to scroll inside. That is the
   // exact failure that kept this card at 404px when it was told to be 318.
-  'flex-1 min-h-0',
-)
+  'min-h-0 flex-1',
+);
 /** The track sets the width; the chip fills it, so labels can't stagger it.
  *  The tighter inline padding is what lets the track hold a 12-hour label —
  *  the Button's own is sized for prose, not for a time. */
-const CHIP_CLASS = 'w-full px-[var(--spacing-system-xxs)]'
+const CHIP_CLASS = 'w-full px-[var(--spacing-system-xxs)]';
 
 /**
  * The two columns, at three widths.
@@ -188,37 +188,36 @@ const SLOT_ROW_CLASS = cn(
   // chips huddled against the left edge with half the card empty. The
   // calendar no longer needs protecting: its height is fixed, not derived.
   'md:min-h-0 md:flex-1 lg:gap-[var(--spacing-system-lf)]',
-)
+);
 
 /** Shared by both columns: self-padded until the panel takes over at `lg`.
  *  Widths are per-column — the calendar states one (`CALENDAR_W`) and the
  *  times take what is left, rather than a 50/50 split that would size the
  *  month by the card's width. */
-const COLUMN_BOX = 'p-[var(--spacing-system-l)] lg:p-0'
+const COLUMN_BOX = 'p-[var(--spacing-system-l)] lg:p-0';
 
 /** The rule between the two, wherever the layout puts it. */
-const COLUMN_DIVIDER = 'border-b border-ods-border md:border-b-0 md:border-r lg:border-0'
-
+const COLUMN_DIVIDER = 'border-b border-ods-border md:border-b-0 md:border-r lg:border-0';
 
 /** Deterministic month caption for a given offset (fixed en-US locale so
  *  the SSR and client first-paint markup agree byte-for-byte). */
 export function monthLabelFor(offset: number): string {
-  const now = new Date()
-  const month = new Date(now.getFullYear(), now.getMonth() + offset, 1)
-  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(month)
+  const now = new Date();
+  const month = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(month);
 }
 
 /** Nothing is bookable yet — used while a month is still loading. */
-const DISABLE_EVERY_DAY = () => true
-const NOOP = () => undefined
+const DISABLE_EVERY_DAY = () => true;
+const NOOP = () => undefined;
 
 interface DayCalendarProps {
-  monthOffset: number
-  onMonthOffsetChange: (offset: number) => void
-  selectedDay: string | null
-  onSelectDay: (dayKey: string) => void
+  monthOffset: number;
+  onMonthOffsetChange: (offset: number) => void;
+  selectedDay: string | null;
+  onSelectDay: (dayKey: string) => void;
   /** Days that ARE bookable; `null` while the month is still loading. */
-  slotsByDay: Map<string, number[]> | null
+  slotsByDay: Map<string, number[]> | null;
 }
 
 /**
@@ -230,20 +229,17 @@ interface DayCalendarProps {
  * visually it is just an inert month.
  */
 function DayCalendar({ monthOffset, onMonthOffsetChange, selectedDay, onSelectDay, slotsByDay }: DayCalendarProps) {
-  const now = new Date()
-  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const now = new Date();
+  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   // Day-0 of the FOLLOWING month = the last day of the last bookable one.
   // `DatePickerCalendar` takes day bounds, not month bounds, so an end date
   // pointing at the 1st would disable the rest of that month.
-  const endMonth = new Date(now.getFullYear(), now.getMonth() + MAX_MONTH_OFFSET + 1, 0)
-  const visibleMonth = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
+  const endMonth = new Date(now.getFullYear(), now.getMonth() + MAX_MONTH_OFFSET + 1, 0);
+  const visibleMonth = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
 
   // Stable identity: the calendar memoizes its matcher list on this value, so
   // a fresh closure per render would rebuild it every render.
-  const dayHasNoSlots = useCallback(
-    (day: Date) => !slotsByDay?.has(calendarDayKey(day)),
-    [slotsByDay],
-  )
+  const dayHasNoSlots = useCallback((day: Date) => !slotsByDay?.has(calendarDayKey(day)), [slotsByDay]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" aria-busy={slotsByDay === null}>
@@ -254,23 +250,23 @@ function DayCalendar({ monthOffset, onMonthOffsetChange, selectedDay, onSelectDa
         // refetches availability for the new offset), not just a view change
         // the calendar could own.
         month={visibleMonth}
-        onMonthChange={(month) => {
-          const offset = (month.getFullYear() - now.getFullYear()) * 12 + (month.getMonth() - now.getMonth())
-          onMonthOffsetChange(Math.max(0, Math.min(MAX_MONTH_OFFSET, offset)))
+        onMonthChange={month => {
+          const offset = (month.getFullYear() - now.getFullYear()) * 12 + (month.getMonth() - now.getMonth());
+          onMonthOffsetChange(Math.max(0, Math.min(MAX_MONTH_OFFSET, offset)));
         }}
         fromDate={startMonth}
         toDate={endMonth}
         selected={selectedDay ? dateFromDayKey(selectedDay) : undefined}
-        onSelect={(value) => {
-          const day = value as Date | undefined
-          if (!day) return
-          const key = calendarDayKey(day)
-          if (slotsByDay?.has(key)) onSelectDay(key)
+        onSelect={value => {
+          const day = value as Date | undefined;
+          if (!day) return;
+          const key = calendarDayKey(day);
+          if (slotsByDay?.has(key)) onSelectDay(key);
         }}
         disabledDays={slotsByDay === null ? DISABLE_EVERY_DAY : dayHasNoSlots}
       />
     </div>
-  )
+  );
 }
 
 /**
@@ -299,7 +295,7 @@ export function SlotPickerSkeleton({ monthOffset = 0 }: { monthOffset?: number }
         <TimeChipsSkeleton />
       </div>
     </div>
-  )
+  );
 }
 
 /** Same-footprint skeleton for the time-chip column. */
@@ -321,7 +317,7 @@ export function TimeChipsSkeleton() {
         ))}
       </div>
     </>
-  )
+  );
 }
 
 export function SlotPicker({
@@ -336,29 +332,29 @@ export function SlotPicker({
   isLoading = false,
 }: SlotPickerProps) {
   const slotsByDay = useMemo(() => {
-    const map = new Map<string, number[]>()
+    const map = new Map<string, number[]>();
     for (const ms of slots) {
-      const key = dayKeyInZone(ms, timezone)
-      const list = map.get(key) ?? []
-      list.push(ms)
-      map.set(key, list)
+      const key = dayKeyInZone(ms, timezone);
+      const list = map.get(key) ?? [];
+      list.push(ms);
+      map.set(key, list);
     }
-    for (const list of map.values()) list.sort((a, b) => a - b)
-    return map
-  }, [slots, timezone])
+    for (const list of map.values()) list.sort((a, b) => a - b);
+    return map;
+  }, [slots, timezone]);
 
   const visibleMonth = useMemo(() => {
-    const now = new Date()
-    return new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
-  }, [monthOffset])
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+  }, [monthOffset]);
 
-  const daySlots = selectedDay ? (slotsByDay.get(selectedDay) ?? []) : []
+  const daySlots = selectedDay ? (slotsByDay.get(selectedDay) ?? []) : [];
 
   // Whether the VISIBLE month has anything at all. HubSpot's monthOffset
   // payloads can carry near-term slots from outside the requested month, so
   // this asks about the grid on screen, not about the payload's size.
-  const monthPrefix = `${visibleMonth.getFullYear()}-${String(visibleMonth.getMonth() + 1).padStart(2, '0')}`
-  const monthHasSlots = [...slotsByDay.keys()].some((key) => key.startsWith(monthPrefix))
+  const monthPrefix = `${visibleMonth.getFullYear()}-${String(visibleMonth.getMonth() + 1).padStart(2, '0')}`;
+  const monthHasSlots = [...slotsByDay.keys()].some(key => key.startsWith(monthPrefix));
 
   return (
     <div className={SLOT_ROW_CLASS}>
@@ -389,8 +385,8 @@ export function SlotPicker({
               }).format(dateFromDayKey(selectedDay))}
             </p>
             <div className={CHIP_GRID_CLASS}>
-              {daySlots.map((ms) => {
-                const isSelected = selectedSlot === ms
+              {daySlots.map(ms => {
+                const isSelected = selectedSlot === ms;
                 return (
                   <Button
                     key={ms}
@@ -400,20 +396,18 @@ export function SlotPicker({
                   >
                     {timeLabelInZone(ms, timezone)}
                   </Button>
-                )
+                );
               })}
             </div>
           </>
         ) : monthHasSlots ? (
-          <p className="text-h6 text-ods-text-secondary">Pick a day to see available times.</p>
+          <p className="text-ods-text-secondary text-h6">Pick a day to see available times.</p>
         ) : (
           // A fully-booked month used to just SAY "try the next one" and leave
           // the visitor to find the chevron in the other column. The way out
           // of a dead end belongs in the dead end.
           <div className="flex flex-col items-start gap-[var(--spacing-system-s)]">
-            <p className="text-h6 text-ods-text-secondary">
-              No available times in {monthLabelFor(monthOffset)}.
-            </p>
+            <p className="text-ods-text-secondary text-h6">No available times in {monthLabelFor(monthOffset)}.</p>
             {monthOffset < MAX_MONTH_OFFSET && (
               <Button
                 variant="outline"
@@ -427,5 +421,5 @@ export function SlotPicker({
         )}
       </div>
     </div>
-  )
+  );
 }

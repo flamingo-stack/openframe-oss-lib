@@ -1,9 +1,9 @@
-'use client'
+'use client';
 
-import { cn } from '../../../utils/cn'
-import { SearchIcon } from '../../icons-v2-generated'
-import { NoData } from '../no-data'
-import type { TableEmptyStateProps } from './types'
+import { cn } from '../../../utils/cn';
+import { SearchIcon } from '../../icons-v2-generated';
+import { NoData } from '../no-data';
+import type { TableEmptyStateProps } from './types';
 
 /** @deprecated Use `DataTableEmpty` from `data-table` instead. */
 export function TableEmptyState({ message, icon, action, className }: TableEmptyStateProps) {
@@ -16,5 +16,5 @@ export function TableEmptyState({ message, icon, action, className }: TableEmpty
       onButtonClick={action?.onClick}
       className={cn('py-[var(--spacing-system-xxl)]', className)}
     />
-  )
+  );
 }

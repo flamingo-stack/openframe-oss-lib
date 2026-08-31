@@ -1,6 +1,6 @@
 package com.openframe.api.dto.rmm.script;
 
-import com.openframe.data.document.rmm.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;

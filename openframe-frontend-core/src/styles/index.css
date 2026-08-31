@@ -1,15 +1,15 @@
 /* Import the ODS design system files */
-@import "./ods-colors.css";
-@import "./ods-design-tokens.css";
-@import "./ods-interaction-states.css";
-@import "./ods-responsive-tokens.css";
-@import "./app-globals.css";
-@import "./chat-animations.css";
-@import "./ods-page-shell.css";
+@import './ods-colors.css';
+@import './ods-design-tokens.css';
+@import './ods-interaction-states.css';
+@import './ods-responsive-tokens.css';
+@import './app-globals.css';
+@import './chat-animations.css';
+@import './ods-page-shell.css';
 
 /* Vendor/library style overrides */
-@import "./vendor-react-easy-crop.css";
-@import "./vendor-react-scroll.css";
+@import './vendor-react-easy-crop.css';
+@import './vendor-react-scroll.css';
 
 @tailwind base;
 @tailwind components;

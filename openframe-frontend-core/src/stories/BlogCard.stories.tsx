@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { BlogCard } from '../components/chat/entity-cards'
-import { ChatColumnDecorator } from './__fixtures__/chat-card-decorator'
-import { blogPostSummary } from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { BlogCard } from '../components/chat/entity-cards';
+import { ChatColumnDecorator } from './__fixtures__/chat-card-decorator';
+import { blogPostSummary } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof BlogCard> = {
   title: 'Chat/EntityCards/BlogCard',
@@ -15,11 +15,17 @@ const meta: Meta<typeof BlogCard> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const ChatInlineSm: Story = {
   args: {
@@ -29,7 +35,7 @@ export const ChatInlineSm: Story = {
     target: '_blank',
     rel: 'noopener noreferrer',
   },
-}
+};
 
 export const ChatInlineWithVideoBadge: Story = {
   args: {
@@ -40,7 +46,7 @@ export const ChatInlineWithVideoBadge: Story = {
     rel: 'noopener noreferrer',
     hasEmbeddedVideo: true,
   },
-}
+};
 
 export const Default: Story = {
   args: {
@@ -58,4 +64,4 @@ export const Default: Story = {
       },
     },
   },
-}
+};

@@ -43,9 +43,9 @@ impl HostnameReportPublisher {
         };
 
         let machine_id = self.config_service.get_machine_id()?;
-        let message = serde_json::to_string(&HostnameReportMessage {
+        let message = HostnameReportMessage {
             hostname: hostname.clone(),
-        })?;
+        };
 
         let subject = format!("machine.{}.hostname", machine_id);
         self.nats_publisher.publish(&subject, &message).await?;

@@ -1,103 +1,102 @@
-"use client"
+'use client';
 
-import { MonitorIcon } from '../icons-v2-generated/devices/monitor-icon'
-import { Ellipsis01Icon } from '../icons-v2-generated/interface'
-import React from 'react'
-import { cn } from '../../utils/cn'
-import type { OSPlatformId } from '../../utils/os-platforms'
-import { OSTypeIcon } from '../features/os-type-badge'
-import { Tag, type TagProps } from './tag'
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import type { OSPlatformId } from '../../utils/os-platforms';
+import { OSTypeIcon } from '../features/os-type-badge';
+import { MonitorIcon } from '../icons-v2-generated/devices/monitor-icon';
+import { Ellipsis01Icon } from '../icons-v2-generated/interface';
+import { Tag, type TagProps } from './tag';
 
 export interface Device {
-  id?: string
-  machineId?: string
-  name: string
-  type?: 'desktop' | 'laptop' | 'mobile' | 'tablet' | 'server'
-  operatingSystem?: OSPlatformId | 'macos' | 'ios' | 'android'  // Support both OSPlatformId and legacy values
-  organization?: string
-  status?: 'active' | 'inactive' | 'offline' | 'warning' | 'error'
-  lastSeen?: string | Date
-  tags?: string[]
+  id?: string;
+  machineId?: string;
+  name: string;
+  type?: 'desktop' | 'laptop' | 'mobile' | 'tablet' | 'server';
+  operatingSystem?: OSPlatformId | 'macos' | 'ios' | 'android'; // Support both OSPlatformId and legacy values
+  organization?: string;
+  status?: 'active' | 'inactive' | 'offline' | 'warning' | 'error';
+  lastSeen?: string | Date;
+  tags?: string[];
   // Additional device properties
-  ipAddress?: string
-  macAddress?: string
-  version?: string
-  location?: string
+  ipAddress?: string;
+  macAddress?: string;
+  version?: string;
+  location?: string;
 }
 
 // Action button configuration
 export interface ActionButton {
-  label: string
-  onClick?: () => void
-  variant?: 'default' | 'outline' | 'secondary'
-  visible?: boolean
+  label: string;
+  onClick?: () => void;
+  variant?: 'default' | 'outline' | 'secondary';
+  visible?: boolean;
 }
 
 export interface DeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
-  device: Device
+  device: Device;
   actions?: {
     moreButton?: {
-      visible?: boolean
-      onClick?: () => void
-    }
+      visible?: boolean;
+      onClick?: () => void;
+    };
     detailsButton?: {
-      visible?: boolean
-      component?: React.ReactNode
-    }
-    customActions?: ActionButton[]
-  }
-  statusTag?: TagProps
-  onDeviceClick?: (device: Device) => void
+      visible?: boolean;
+      component?: React.ReactNode;
+    };
+    customActions?: ActionButton[];
+  };
+  statusTag?: TagProps;
+  onDeviceClick?: (device: Device) => void;
 }
 
 export function DeviceCard({
   device,
   actions = {
-    moreButton: { visible: true }
+    moreButton: { visible: true },
   },
   statusTag,
   onDeviceClick,
   className,
   ...props
 }: DeviceCardProps) {
-
   // Format date for last seen
   const formatLastSeen = (lastSeen?: string | Date) => {
-    if (!lastSeen) return null
-    
-    const date = typeof lastSeen === 'string' ? new Date(lastSeen) : lastSeen
+    if (!lastSeen) return null;
+
+    const date = typeof lastSeen === 'string' ? new Date(lastSeen) : lastSeen;
     // UTC getters so "last seen" is identical on server (UTC) and client
     // (local) — otherwise React #418 hydration mismatch.
-    const year = date.getUTCFullYear()
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
-    const day = String(date.getUTCDate()).padStart(2, '0')
-    const hours = String(date.getUTCHours()).padStart(2, '0')
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0')
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
 
-    return `${year}/${month}/${day}, ${hours}:${minutes}`
-  }
+    return `${year}/${month}/${day}, ${hours}:${minutes}`;
+  };
 
   return (
     <div
       onClick={onDeviceClick ? () => onDeviceClick(device) : undefined}
       className={cn(
-        "bg-ods-card rounded-[6px] border border-ods-border overflow-clip",
-        "flex flex-col gap-4 p-4",
-        onDeviceClick && "cursor-pointer",
-        className
+        'overflow-clip rounded-[6px] border border-ods-border bg-ods-card',
+        'flex flex-col gap-4 p-4',
+        onDeviceClick && 'cursor-pointer',
+        className,
       )}
       {...props}
     >
       {/* Row 1: Device icon | OS icon + Name + Organization | More button | Details button | Custom actions */}
-      <div className="flex gap-4 items-center w-full">
+      <div className="flex w-full items-center gap-4">
         {/* Device type icon */}
-        <div className="flex items-center justify-center p-2 rounded-[6px] border border-ods-border shrink-0">
+        <div className="flex shrink-0 items-center justify-center rounded-[6px] border border-ods-border p-2">
           <MonitorIcon className="text-ods-text-secondary" size={16} />
         </div>
 
         {/* OS icon + Device name + Organization (stacked) */}
-        <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <div className="flex gap-1 items-center">
+        <div className="flex min-w-0 flex-1 flex-col justify-center">
+          <div className="flex items-center gap-1">
             {device.operatingSystem && (
               <OSTypeIcon
                 osType={device.operatingSystem === 'macos' ? 'darwin' : device.operatingSystem}
@@ -105,12 +104,12 @@ export function DeviceCard({
                 className="shrink-0"
               />
             )}
-            <span className="text-h4 text-ods-text-primary truncate" title={device.name}>
+            <span className="truncate text-ods-text-primary text-h4" title={device.name}>
               {device.name}
             </span>
           </div>
           {device.organization && (
-            <span className="text-h6 text-ods-text-secondary truncate" title={device.organization}>
+            <span className="truncate text-ods-text-secondary text-h6" title={device.organization}>
               {device.organization}
             </span>
           )}
@@ -119,8 +118,11 @@ export function DeviceCard({
         {/* More button */}
         {actions.moreButton?.visible !== false && (
           <div
-            className="flex items-center justify-center p-3 rounded-[6px] shrink-0 border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors"
-            onClick={(e) => { e.stopPropagation(); actions.moreButton?.onClick?.() }}
+            className="flex shrink-0 cursor-pointer items-center justify-center rounded-[6px] border border-ods-border p-3 transition-colors hover:bg-ods-bg-hover"
+            onClick={e => {
+              e.stopPropagation();
+              actions.moreButton?.onClick?.();
+            }}
           >
             <Ellipsis01Icon className="text-ods-text-primary" />
           </div>
@@ -128,30 +130,32 @@ export function DeviceCard({
 
         {/* Details button */}
         {actions.detailsButton?.visible !== false && actions.detailsButton?.component && (
-          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="shrink-0" onClick={e => e.stopPropagation()}>
             {actions.detailsButton.component}
           </div>
         )}
 
         {/* Custom action buttons */}
-        {actions.customActions?.map((action, index) =>
-          action.visible !== false && (
-            <div
-              key={index}
-              className="flex items-center justify-center px-4 py-3 rounded-[6px] shrink-0 border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors"
-              onClick={(e) => { e.stopPropagation(); action.onClick?.() }}
-            >
-              <span className="text-h3 text-ods-text-primary text-nowrap">
-                {action.label}
-              </span>
-            </div>
-          )
+        {actions.customActions?.map(
+          (action, index) =>
+            action.visible !== false && (
+              <div
+                key={index}
+                className="flex shrink-0 cursor-pointer items-center justify-center rounded-[6px] border border-ods-border px-4 py-3 transition-colors hover:bg-ods-bg-hover"
+                onClick={e => {
+                  e.stopPropagation();
+                  action.onClick?.();
+                }}
+              >
+                <span className="text-nowrap text-ods-text-primary text-h3">{action.label}</span>
+              </div>
+            ),
         )}
       </div>
 
       {/* Row 2: Status badge | Last seen */}
-      {(statusTag || device.lastSeen) && 
-        <div className="flex gap-2 items-center w-full">
+      {(statusTag || device.lastSeen) && (
+        <div className="flex w-full items-center gap-2">
           {statusTag && (
             <Tag
               variant={statusTag.variant}
@@ -162,21 +166,21 @@ export function DeviceCard({
             />
           )}
           {device.lastSeen && (
-            <span className="flex-1 text-h6 text-ods-text-secondary truncate">
+            <span className="flex-1 truncate text-ods-text-secondary text-h6">
               Last Seen: {formatLastSeen(device.lastSeen)}
             </span>
           )}
         </div>
-      }
+      )}
 
       {/* Tags section */}
       {device.tags && device.tags.length > 0 && (
-        <div className="flex gap-2 items-center w-full flex-wrap">
+        <div className="flex w-full flex-wrap items-center gap-2">
           {device.tags.map((tag, index) => (
             <Tag key={index} variant="outline" label={tag} />
           ))}
         </div>
       )}
     </div>
-  )
+  );
 }

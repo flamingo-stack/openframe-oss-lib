@@ -12,7 +12,7 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
-import com.openframe.data.document.rmm.OsType;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
 import lombok.RequiredArgsConstructor;

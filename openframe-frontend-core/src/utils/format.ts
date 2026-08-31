@@ -11,23 +11,23 @@
 export function formatDate(
   date: Date | string,
   options: Intl.DateTimeFormatOptions = {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
   },
 ): string {
-  const dateObj = typeof date === "string" ? new Date(date) : date
-  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+
   // Check if the date is valid
   if (isNaN(dateObj.getTime())) {
-    console.warn("Invalid date provided to formatDate:", date)
-    return "Invalid Date"
+    console.warn('Invalid date provided to formatDate:', date);
+    return 'Invalid Date';
   }
-  
+
   // Pin to UTC by default so SSR (Vercel = UTC) and the client agree (React
   // #418 hydration mismatch). A caller can still override by passing its own
   // `timeZone` in `options`.
-  return dateObj.toLocaleDateString("en-US", { timeZone: "UTC", ...options })
+  return dateObj.toLocaleDateString('en-US', { timeZone: 'UTC', ...options });
 }
 
 /**
@@ -36,7 +36,7 @@ export function formatDate(
  * @returns Formatted number string
  */
 export function formatNumber(num: number): string {
-  return num.toLocaleString()
+  return num.toLocaleString();
 }
 
 /**
@@ -45,11 +45,11 @@ export function formatNumber(num: number): string {
  * @param currency - The currency code
  * @returns Formatted price string
  */
-export function formatPrice(price: number, currency = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
+export function formatPrice(price: number, currency = 'USD'): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
     currency,
-  }).format(price)
+  }).format(price);
 }
 
 /**
@@ -59,15 +59,15 @@ export function formatPrice(price: number, currency = "USD"): string {
  * @returns Formatted bytes string
  */
 export function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return "0 Bytes"
+  if (bytes === 0) return '0 Bytes';
 
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
 
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i]
+  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 /**
@@ -77,11 +77,11 @@ export function formatBytes(bytes: number, decimals = 2): string {
  * @example formatBytesShort(0) → "0 B"; formatBytesShort(1536) → "1.5 KB"
  */
 export function formatBytesShort(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
 /**
@@ -93,11 +93,11 @@ export function formatBytesShort(bytes: number): string {
  * @example formatFileSize(0) → "0 B"; formatFileSize(1500) → "1.5 KB"
  */
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
 /**
@@ -106,29 +106,29 @@ export function formatFileSize(bytes: number): string {
  * @returns Formatted number string (e.g., "1K", "2M", "3B")
  */
 export function formatLargeNumber(num: number): string {
-  if (num === 0) return "0"
-  
+  if (num === 0) return '0';
+
   // Handle negative numbers
-  const isNegative = num < 0
-  const absNum = Math.abs(num)
-  
-  let result: string
-  
+  const isNegative = num < 0;
+  const absNum = Math.abs(num);
+
+  let result: string;
+
   if (absNum >= 1_000_000_000) {
     // Billions
-    result = `${Math.floor(absNum / 1_000_000_000)}B`
+    result = `${Math.floor(absNum / 1_000_000_000)}B`;
   } else if (absNum >= 1_000_000) {
     // Millions
-    result = `${Math.floor(absNum / 1_000_000)}M`
+    result = `${Math.floor(absNum / 1_000_000)}M`;
   } else if (absNum >= 1_000) {
     // Thousands
-    result = `${Math.floor(absNum / 1_000)}K`
+    result = `${Math.floor(absNum / 1_000)}K`;
   } else {
     // Less than 1000, show as-is
-    result = Math.floor(absNum).toString()
+    result = Math.floor(absNum).toString();
   }
-  
-  return isNegative ? `-${result}` : result
+
+  return isNegative ? `-${result}` : result;
 }
 
 /**
@@ -162,11 +162,11 @@ export function formatAbbreviatedNumber(n: number): string {
  * the same output, no locale or timezone surface.
  */
 export function getFirstLastInitials(name?: string | null): string {
-  if (!name) return ''
-  const words = name.trim().split(/\s+/)
-  if (words.length === 0 || !words[0]) return ''
-  if (words.length === 1) return words[0].charAt(0).toUpperCase()
-  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase()
+  if (!name) return '';
+  const words = name.trim().split(/\s+/);
+  if (words.length === 0 || !words[0]) return '';
+  if (words.length === 1) return words[0].charAt(0).toUpperCase();
+  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
 }
 
 /**
@@ -179,18 +179,15 @@ export function getFirstLastInitials(name?: string | null): string {
  * Single source of truth: every "first-letter of each word, uppercase,
  * max 2 chars" computation across hub + lib MUST come through here.
  */
-export function nameInitials(
-  name: string | null | undefined,
-  fallback: string = 'E',
-): string {
-  const source = typeof name === 'string' ? name.trim() : ''
-  const words = source.length > 0 ? source.split(/\s+/) : []
+export function nameInitials(name: string | null | undefined, fallback: string = 'E'): string {
+  const source = typeof name === 'string' ? name.trim() : '';
+  const words = source.length > 0 ? source.split(/\s+/) : [];
   const letters = words
-    .map((w) => w[0])
+    .map(w => w[0])
     .filter(Boolean)
     .slice(0, 2)
-    .join('')
-  return (letters || fallback).toUpperCase()
+    .join('');
+  return (letters || fallback).toUpperCase();
 }
 
 /**
@@ -246,10 +243,7 @@ export function formatDurationCompact(seconds: number | null | undefined): strin
  *
  * Returns: "4:00 PM"
  */
-export function formatTimeWithTimezone(
-  date: Date | string | null | undefined,
-  timezone?: string | null
-): string {
+export function formatTimeWithTimezone(date: Date | string | null | undefined, timezone?: string | null): string {
   if (!date) return '';
 
   const dateObj = typeof date === 'string' ? new Date(date) : date;
@@ -276,7 +270,7 @@ export function formatTimeWithTimezone(
  */
 export function formatDurationFromRange(
   startAt: string | Date | null | undefined,
-  endAt: string | Date | null | undefined
+  endAt: string | Date | null | undefined,
 ): string {
   if (!startAt || !endAt) return '';
 
@@ -312,45 +306,42 @@ export function formatDurationFromRange(
  */
 export interface FormatDateUTCOptions {
   /** Returned for null/undefined/empty/unparseable input. Defaults to 'N/A'. */
-  fallback?: string
+  fallback?: string;
   /** 'UTC' (default) or 'local' — switch off the UTC anchor when audit
    *  stability matters less than local relevance (chat-card timestamps). */
-  timezone?: 'UTC' | 'local'
+  timezone?: 'UTC' | 'local';
 }
 
-export function formatDateUTC(
-  value: string | number | null | undefined,
-  options: FormatDateUTCOptions = {},
-): string {
-  const { fallback = 'N/A', timezone = 'UTC' } = options
+export function formatDateUTC(value: string | number | null | undefined, options: FormatDateUTCOptions = {}): string {
+  const { fallback = 'N/A', timezone = 'UTC' } = options;
 
-  if (value === null || value === undefined || value === '') return fallback
+  if (value === null || value === undefined || value === '') return fallback;
 
-  let ms: number
+  let ms: number;
   if (typeof value === 'number') {
-    ms = value
+    ms = value;
   } else {
     // String input — first try to interpret as a numeric epoch (Slack/GitHub
     // sometimes arrive that way). Number('') is 0, but we already ruled out
     // empty strings above.
-    const n = Number(value)
+    const n = Number(value);
     if (Number.isFinite(n) && n > 0 && /^-?\d+(\.\d+)?$/.test(value.trim())) {
-      ms = n
+      ms = n;
     } else {
       // ISO string — for date-only forms, anchor to UTC midnight to avoid
       // timezone-offset drift (preserves the original RAG-mapper contract).
-      ms = Date.parse(value.includes('T') ? value : value + 'T00:00:00Z')
+      ms = Date.parse(value.includes('T') ? value : value + 'T00:00:00Z');
     }
   }
 
-  if (!Number.isFinite(ms)) return fallback
+  if (!Number.isFinite(ms)) return fallback;
 
   return new Date(ms).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     timeZone: timezone === 'local' ? undefined : 'UTC',
-  })
+  });
 }
 
 /**
@@ -364,8 +355,8 @@ export function formatEntryMonthUTC(
   entryMonth: string | null | undefined,
   style: 'short' | 'long' = 'short',
 ): string | null {
-  if (!entryMonth) return null
-  return new Date(entryMonth).toLocaleDateString('en-US', { month: style, year: 'numeric', timeZone: 'UTC' })
+  if (!entryMonth) return null;
+  return new Date(entryMonth).toLocaleDateString('en-US', { month: style, year: 'numeric', timeZone: 'UTC' });
 }
 
 /**
@@ -377,7 +368,7 @@ export function formatLegalDate(dateInput: string): string {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date(dateInput))
+  }).format(new Date(dateInput));
 }
 
 /**
@@ -385,20 +376,20 @@ export function formatLegalDate(dateInput: string): string {
  * USD-rounded (no cents). Used on KPI cards + investor pages.
  */
 export function formatCurrency(value: number | null | undefined): string {
-  if (value == null) return 'N/A'
+  if (value == null) return 'N/A';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: 0,
-  }).format(value)
+  }).format(value);
 }
 
 /**
  * Format a percent value as `12.50%`. Returns `'N/A'` for null/undefined.
  */
 export function formatPercent(value: number | null | undefined): string {
-  if (value == null) return 'N/A'
-  return `${value.toFixed(2)}%`
+  if (value == null) return 'N/A';
+  return `${value.toFixed(2)}%`;
 }
 
 /**
@@ -409,14 +400,14 @@ export function formatWholeDollars(price: number, currency = 'USD'): string {
     style: 'currency',
     currency,
     maximumFractionDigits: 0,
-  }).format(price)
+  }).format(price);
 }
 
 // =============================================================================
 // Metric Formatting (for KPI cards / investor updates)
 // =============================================================================
 
-export type MetricFormat = 'number' | 'currency' | 'percentage' | 'months'
+export type MetricFormat = 'number' | 'currency' | 'percentage' | 'months';
 
 /**
  * Polarity determines whether an increase is good or bad.
@@ -424,7 +415,7 @@ export type MetricFormat = 'number' | 'currency' | 'percentage' | 'months'
  * - 'negative': higher is worse (burn rate, churn, CAC) → up = red, down = green
  * - 'neutral':  no judgment (headcount, runway) → always gray
  */
-export type TrendPolarity = 'positive' | 'negative' | 'neutral'
+export type TrendPolarity = 'positive' | 'negative' | 'neutral';
 
 /**
  * Format a metric value with compact notation ($1.2M, 150K, 12 months).
@@ -435,40 +426,40 @@ export function formatCompactMetric(
   options?: { prefix?: string; suffix?: string },
 ): string {
   if (value === 0 || value === null || value === undefined) {
-    if (format === 'currency') return `${options?.prefix || '$'}0`
-    if (format === 'percentage') return '0%'
-    if (format === 'months') return `0 ${options?.suffix || 'months'}`
-    return '0'
+    if (format === 'currency') return `${options?.prefix || '$'}0`;
+    if (format === 'percentage') return '0%';
+    if (format === 'months') return `0 ${options?.suffix || 'months'}`;
+    return '0';
   }
 
-  const absValue = Math.abs(value)
-  const sign = value < 0 ? '-' : ''
+  const absValue = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
 
   if (format === 'currency') {
-    const prefix = options?.prefix || '$'
+    const prefix = options?.prefix || '$';
     const compact = (val: number, divisor: number, suffix: string) => {
-      const divided = val / divisor
-      const formatted = divided % 1 === 0 ? divided.toFixed(0) : divided.toFixed(1)
-      return `${sign}${prefix}${formatted}${suffix}`
-    }
-    if (absValue >= 1_000_000_000) return compact(absValue, 1_000_000_000, 'B')
-    if (absValue >= 1_000_000) return compact(absValue, 1_000_000, 'M')
-    if (absValue >= 1_000) return `${sign}${prefix}${(absValue / 1_000).toFixed(0)}K`
-    return `${sign}${prefix}${absValue.toLocaleString()}`
+      const divided = val / divisor;
+      const formatted = divided % 1 === 0 ? divided.toFixed(0) : divided.toFixed(1);
+      return `${sign}${prefix}${formatted}${suffix}`;
+    };
+    if (absValue >= 1_000_000_000) return compact(absValue, 1_000_000_000, 'B');
+    if (absValue >= 1_000_000) return compact(absValue, 1_000_000, 'M');
+    if (absValue >= 1_000) return `${sign}${prefix}${(absValue / 1_000).toFixed(0)}K`;
+    return `${sign}${prefix}${absValue.toLocaleString()}`;
   }
 
   if (format === 'percentage') {
-    return `${sign}${absValue}%`
+    return `${sign}${absValue}%`;
   }
 
   if (format === 'months') {
-    const rounded = Math.round(value * 10) / 10
-    return `${rounded} ${options?.suffix || 'months'}`
+    const rounded = Math.round(value * 10) / 10;
+    return `${rounded} ${options?.suffix || 'months'}`;
   }
 
-  if (absValue >= 1_000_000) return `${sign}${(absValue / 1_000_000).toFixed(1)}M`
-  if (absValue >= 1_000) return `${sign}${(absValue / 1_000).toFixed(1)}K`
-  return value.toLocaleString()
+  if (absValue >= 1_000_000) return `${sign}${(absValue / 1_000_000).toFixed(1)}M`;
+  if (absValue >= 1_000) return `${sign}${(absValue / 1_000).toFixed(1)}K`;
+  return value.toLocaleString();
 }
 
 /**
@@ -483,24 +474,23 @@ export function getTrendColors(
     return {
       textClass: 'text-ods-text-secondary',
       badgeClass: 'bg-ods-border text-ods-text-secondary',
-    }
+    };
   }
 
   const isPositiveOutcome =
-    (direction === 'up' && polarity === 'positive') ||
-    (direction === 'down' && polarity === 'negative')
+    (direction === 'up' && polarity === 'positive') || (direction === 'down' && polarity === 'negative');
 
   if (isPositiveOutcome) {
     return {
       textClass: 'text-ods-success',
       badgeClass: 'bg-ods-success-secondary text-ods-success',
-    }
+    };
   }
 
   return {
     textClass: 'text-ods-error',
     badgeClass: 'bg-ods-error-secondary text-ods-error',
-  }
+  };
 }
 
 /**
@@ -512,24 +502,19 @@ export function getTrendColors(
  * `"2026-04-20"` renders as `"Apr 19"` west of UTC. DB values for cycle
  * period are stored as plain dates, so local-tz parsing is correct.
  */
-export function formatDateRange(
-  start: string | null | undefined,
-  end: string | null | undefined,
-): string {
-  if (!start || !end) return ''
+export function formatDateRange(start: string | null | undefined, end: string | null | undefined): string {
+  if (!start || !end) return '';
   const fmt = (s: string): string => {
-    const bareMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
-    const d = bareMatch
-      ? new Date(Number(bareMatch[1]), Number(bareMatch[2]) - 1, Number(bareMatch[3]))
-      : new Date(s)
-    if (Number.isNaN(d.getTime())) return s
+    const bareMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    const d = bareMatch ? new Date(Number(bareMatch[1]), Number(bareMatch[2]) - 1, Number(bareMatch[3])) : new Date(s);
+    if (Number.isNaN(d.getTime())) return s;
     return d.toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-    })
-  }
-  return `${fmt(start)} — ${fmt(end)}`
+    });
+  };
+  return `${fmt(start)} — ${fmt(end)}`;
 }
 
 /**
@@ -545,18 +530,18 @@ export function formatDateRange(
  * date-only fields).
  */
 export function formatDateTimeAt(dateString: string): string {
-  const date = new Date(dateString)
+  const date = new Date(dateString);
   const dateStr = date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-  })
+  });
   const timeStr = date.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-  })
-  return `${dateStr} at ${timeStr}`
+  });
+  return `${dateStr} at ${timeStr}`;
 }
 
 /**
@@ -569,10 +554,10 @@ export function formatDateTimeAt(dateString: string): string {
  * and `formatDurationMMSS(seconds)` (media timecode `MM:SS`).
  */
 export function formatDurationFromMs(ms: number | null | undefined): string {
-  if (!ms || isNaN(ms) || ms < 0) return '0ms'
-  if (ms < 1000) return `${ms}ms`
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
-  return `${(ms / 60000).toFixed(1)}m`
+  if (!ms || isNaN(ms) || ms < 0) return '0ms';
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${(ms / 60000).toFixed(1)}m`;
 }
 
 /**
@@ -583,14 +568,14 @@ export function formatDurationFromMs(ms: number | null | undefined): string {
  * use `formatDurationFromMs`.
  */
 export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds} seconds`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes`
+  if (seconds < 60) return `${seconds} seconds`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes`;
 
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
 
-  if (minutes === 0) return `${hours} hour${hours > 1 ? 's' : ''}`
-  return `${hours} hour${hours > 1 ? 's' : ''} ${minutes} minute${minutes > 1 ? 's' : ''}`
+  if (minutes === 0) return `${hours} hour${hours > 1 ? 's' : ''}`;
+  return `${hours} hour${hours > 1 ? 's' : ''} ${minutes} minute${minutes > 1 ? 's' : ''}`;
 }
 
 // =============================================================================
@@ -611,8 +596,8 @@ export function formatDuration(seconds: number): string {
 export function titleCaseFromSlug(text: string, separator: string = '-'): string {
   return text
     .split(separator)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
 }
 
 /**
@@ -623,7 +608,7 @@ export function titleCaseFromSlug(text: string, separator: string = '-'): string
  * Thin delegate over {@link titleCaseFromSlug} with an underscore separator.
  */
 export function formatUnderscoreText(text: string): string {
-  return titleCaseFromSlug(text, '_')
+  return titleCaseFromSlug(text, '_');
 }
 
 /**
@@ -642,12 +627,12 @@ export function stripHtml(html: string): string {
   // `js/incomplete-multi-character-sanitization`). `<[^<>]*>` rejects
   // `<` inside the tag body so each pass is itself ReDoS-safe (no
   // backtracking on `<<<<<...<>` inputs).
-  let noTags = html
-  let prev: string
+  let noTags = html;
+  let prev: string;
   do {
-    prev = noTags
-    noTags = noTags.replace(/<[^<>]*>/g, '')
-  } while (noTags !== prev)
+    prev = noTags;
+    noTags = noTags.replace(/<[^<>]*>/g, '');
+  } while (noTags !== prev);
 
   // Decode entities. `&amp;` MUST come LAST so we don't double-decode
   // sequences like `&amp;lt;` (which should render as the LITERAL text
@@ -663,7 +648,7 @@ export function stripHtml(html: string): string {
     .replace(/&apos;/g, "'")
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
-    .trim()
+    .trim();
 }
 
 /**
@@ -674,8 +659,8 @@ export function stripHtml(html: string): string {
 export function formatClassification(classification: string): string {
   const customMappings: Record<string, string> = {
     openframe_selected: 'OpenFrame Selected',
-  }
-  return customMappings[classification] || formatUnderscoreText(classification)
+  };
+  return customMappings[classification] || formatUnderscoreText(classification);
 }
 
 /**
@@ -687,8 +672,8 @@ export function formatPricingModel(pricingModel: string): string {
   const customMappings: Record<string, string> = {
     one_time: 'One-time Purchase',
     self_hosted: 'Self-hosted',
-  }
-  return customMappings[pricingModel] || formatUnderscoreText(pricingModel)
+  };
+  return customMappings[pricingModel] || formatUnderscoreText(pricingModel);
 }
 
 /**
@@ -696,11 +681,8 @@ export function formatPricingModel(pricingModel: string): string {
  * Handles HTML content (e.g. `<p>` tags from rich text editors),
  * plain text passthrough, and null/undefined values.
  */
-export function formatBioText(
-  aboutHtml: string | null | undefined,
-  fallback: string = '',
-): string {
-  if (!aboutHtml || !aboutHtml.trim()) return fallback
+export function formatBioText(aboutHtml: string | null | undefined, fallback: string = ''): string {
+  if (!aboutHtml || !aboutHtml.trim()) return fallback;
 
   if (aboutHtml.includes('<p')) {
     // `<p[^<>]*>` rejects `<` inside the tag so the automaton can't
@@ -708,12 +690,12 @@ export function formatBioText(
     const paragraphs = aboutHtml
       .split(/<p[^<>]*>/)
       .slice(1)
-      .map((part) => part.split('</p>')[0])
-      .map((text) => stripHtml(text).trim())
-      .filter((text) => text.length > 0)
+      .map(part => part.split('</p>')[0])
+      .map(text => stripHtml(text).trim())
+      .filter(text => text.length > 0);
 
-    if (paragraphs.length > 0) return paragraphs.join(' ')
+    if (paragraphs.length > 0) return paragraphs.join(' ');
   }
 
-  return stripHtml(aboutHtml).trim() || fallback
+  return stripHtml(aboutHtml).trim() || fallback;
 }

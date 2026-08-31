@@ -11,7 +11,7 @@
  *     (`title` / `url` / `targetPlatform` / `sourceRepo`). `resolveSourceRowCTA`
  *     then routes that `externalUrl` through the host's `composeContentUrl`
  *     seam and the card is clickable.
- *   - **Mingo / NATS transport** (`messageData: [{ type: 'GUIDE' | 'TEXT', text }]`)
+ *   - **Mingo / NATS transport** (`messageData: [{ type: 'TEXT', text }]`)
  *     — the body carries bare `[card://type:id]` markers and NOTHING else.
  *     `chat-message-enhanced.tsx` synthesizes a minimal `{ type, id, title: id,
  *     url: null }` ref so fetch-mode cards can still self-fetch their row, but
@@ -31,26 +31,26 @@
  * Pure — no React, no DOM. The caller owns `safeHref` validation.
  */
 
-import type { ComposeContentUrl } from '../../../utils/content-href'
-import { canonicalContentRefType } from '../../../utils/list-url'
+import type { ComposeContentUrl, ComposedContentUrl } from '../../../utils/content-href';
+import { canonicalContentRefType } from '../../../utils/list-url';
 
 export interface FetchedCardHrefInput {
   /** Canonical `documentType` for the seam (registry `contentRefType`). */
-  contentRefType: string
+  contentRefType: string;
   /** The marker's primary key — `ChatRef.id`, NOT the fetched row's id. */
-  id: string
+  id: string;
   /** The row the card fetched. Shape is per-type and opaque here; only
    *  `slug` and `platforms` are read, both defensively. */
-  item: unknown
+  item: unknown;
   /** Host seam. Absent (unwired runtime) → no fallback, same as today. */
-  composeContentUrl?: ComposeContentUrl
+  composeContentUrl?: ComposeContentUrl;
 }
 
 /** Read `item.slug` when it is a non-empty string. */
 function readSlug(item: unknown): string | null {
-  if (!item || typeof item !== 'object') return null
-  const slug = (item as { slug?: unknown }).slug
-  return typeof slug === 'string' && slug.trim() ? slug.trim() : null
+  if (!item || typeof item !== 'object') return null;
+  const slug = (item as { slug?: unknown }).slug;
+  return typeof slug === 'string' && slug.trim() ? slug.trim() : null;
 }
 
 /**
@@ -62,12 +62,12 @@ function readSlug(item: unknown): string | null {
  * otherwise say `86ad3qvv5`. Once the row loads, this is the real title.
  */
 export function readFetchedCardTitle(item: unknown): string | null {
-  if (!item || typeof item !== 'object') return null
+  if (!item || typeof item !== 'object') return null;
   for (const key of ['title', 'name'] as const) {
-    const value = (item as Record<string, unknown>)[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
+    const value = (item as Record<string, unknown>)[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
   }
-  return null
+  return null;
 }
 
 /** Read the row's platform-association array — the hub composer keys its
@@ -76,13 +76,13 @@ export function readFetchedCardTitle(item: unknown): string | null {
  *  `<canonicalType>_platforms` (e.g. `blog_post_platforms`), with a plain
  *  `platforms` fallback for shapes that use the generic key. */
 function readPlatforms(item: unknown, canonicalType: string): Array<{ name?: string }> | undefined {
-  if (!item || typeof item !== 'object') return undefined
-  const obj = item as Record<string, unknown>
+  if (!item || typeof item !== 'object') return undefined;
+  const obj = item as Record<string, unknown>;
   for (const key of [`${canonicalType}_platforms`, 'platforms']) {
-    const platforms = obj[key]
-    if (Array.isArray(platforms)) return platforms as Array<{ name?: string }>
+    const platforms = obj[key];
+    if (Array.isArray(platforms)) return platforms as Array<{ name?: string }>;
   }
-  return undefined
+  return undefined;
 }
 
 /**
@@ -90,14 +90,62 @@ function readPlatforms(item: unknown, canonicalType: string): Array<{ name?: str
  * when the host wired no seam (the caller then keeps the card unlinked, which
  * is the pre-existing behavior).
  */
+/**
+ * Where a fetch-mode card's destination came from. The loader needs the source,
+ * not just the string: only the `item` branch must leave the ref's own
+ * `targetPlatform` untouched.
+ */
+export type FetchedCardHrefChoice =
+  | { source: 'hostOverride'; href: string; targetPlatform: string | null }
+  | { source: 'item'; href: string; targetPlatform?: undefined }
+  | { source: 'composed'; href: string; targetPlatform: string | null };
+
+/**
+ * Decide a fetched card's destination between the two producers that can claim
+ * it. Pure, so the precedence is testable on its own — it used to live as
+ * inline ternaries in `ChatCardLoader`.
+ *
+ *   1. an EXPLICIT host override — the host said where this type lives in its
+ *      own app, which beats everything;
+ *   2. the fetched row's own url (`registry.fallbackHref`) — minted by the
+ *      content host for ITS surface, authoritative in the absence of (1);
+ *   3. the composer's synthesized href, unless the registry opted out
+ *      (`noComposedHref`) because the synthesis would be a 404.
+ *
+ * (2) beating (3) is why `noComposedHref` exists; (1) beating (2) is what keeps
+ * a re-homed type (an embedder serving hub tickets under `/help-center/tickets`)
+ * from following the content host's path into an unrelated route of its own.
+ */
+export function pickFetchedCardHref({
+  composed,
+  itemHref,
+  allowComposed,
+}: {
+  /** Result of {@link resolveFetchedCardHref}, or null when unresolvable. */
+  composed: ComposedContentUrl | null;
+  /** `registry.fallbackHref(item)` — the fetched row's own destination. */
+  itemHref: string | null;
+  /** False for registry entries flagged `noComposedHref`. */
+  allowComposed: boolean;
+}): FetchedCardHrefChoice | null {
+  if (composed?.hostOverride) {
+    return { source: 'hostOverride', href: composed.href, targetPlatform: composed.targetPlatform };
+  }
+  if (itemHref) return { source: 'item', href: itemHref };
+  if (composed && allowComposed) {
+    return { source: 'composed', href: composed.href, targetPlatform: composed.targetPlatform };
+  }
+  return null;
+}
+
 export function resolveFetchedCardHref({
   contentRefType,
   id,
   item,
   composeContentUrl,
-}: FetchedCardHrefInput): { href: string; targetPlatform: string | null } | null {
-  if (!composeContentUrl || !contentRefType || !id) return null
-  const canonicalType = canonicalContentRefType(contentRefType)
+}: FetchedCardHrefInput): ComposedContentUrl | null {
+  if (!composeContentUrl || !contentRefType || !id) return null;
+  const canonicalType = canonicalContentRefType(contentRefType);
   return composeContentUrl({
     // The card registry keys some entries by the legacy rail vocabulary
     // (`blog_post_existing`) because that is what `buildListUrl` expects.
@@ -108,5 +156,5 @@ export function resolveFetchedCardHref({
     identifier: id,
     slug: readSlug(item),
     platforms: readPlatforms(item, canonicalType),
-  })
+  });
 }

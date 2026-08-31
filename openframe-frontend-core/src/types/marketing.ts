@@ -12,16 +12,16 @@
 export interface MarketingCampaign {
   id: number;
   name: string;
-  description: string | null;  // Optional - ONLY used for blog_post + new mode OR from_scratch
+  description: string | null; // Optional - ONLY used for blog_post + new mode OR from_scratch
   platform: string;
   start_date: string | null;
   end_date: string | null;
-  goals: string[] | null;  // Optional - ONLY used for blog_post + new mode OR from_scratch
+  goals: string[] | null; // Optional - ONLY used for blog_post + new mode OR from_scratch
   // NEW: Content seed fields
   content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch' | null;
   content_source_id?: number | null;
   content_source_url?: string | null;
-  future_blog_social_account_id?: number | null;  // For blog_post + new mode - target account for AI-generated blog
+  future_blog_social_account_id?: number | null; // For blog_post + new mode - target account for AI-generated blog
   /** Editor-provided AI generation instructions (steers Generate Content / Image / Video / Workflow prompts) */
   custom_instructions?: string | null;
   created_by: string;
@@ -31,27 +31,27 @@ export interface MarketingCampaign {
 
 export interface CreateCampaignInput {
   name: string;
-  description?: string;  // Optional - ONLY for blog_post + new mode OR from_scratch
+  description?: string; // Optional - ONLY for blog_post + new mode OR from_scratch
   start_date?: string;
-  goals?: string[];  // Optional - ONLY for blog_post + new mode OR from_scratch
+  goals?: string[]; // Optional - ONLY for blog_post + new mode OR from_scratch
   // NEW: Content seed fields
   content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch';
   content_source_id?: number;
   content_source_url?: string;
-  future_blog_social_account_id?: number;  // For blog_post + new mode - target account for AI-generated blog
+  future_blog_social_account_id?: number; // For blog_post + new mode - target account for AI-generated blog
   custom_instructions?: string | null;
 }
 
 export interface UpdateCampaignInput {
   name?: string;
-  description?: string;  // Optional - ONLY for blog_post + new mode OR from_scratch
+  description?: string; // Optional - ONLY for blog_post + new mode OR from_scratch
   start_date?: string;
-  goals?: string[];  // Optional - ONLY for blog_post + new mode OR from_scratch
+  goals?: string[]; // Optional - ONLY for blog_post + new mode OR from_scratch
   // NEW: Content seed fields
   content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch' | null;
   content_source_id?: number | null;
   content_source_url?: string | null;
-  future_blog_social_account_id?: number | null;  // For blog_post + new mode - target account for AI-generated blog
+  future_blog_social_account_id?: number | null; // For blog_post + new mode - target account for AI-generated blog
   custom_instructions?: string | null;
 }
 
@@ -110,8 +110,25 @@ export interface CreateAIContentInput {
 // =============================================================================
 
 export type MediaType = 'image' | 'video' | 'figma_export';
-export type MediaProvider = 'dalle' | 'dalle-3' | 'sdxl' | 'replicate' | 'figma' | 'manual' | 'midjourney' | 'flux-pro' | 'flux-dev' | 'ideogram-v2' | 'recraft-v3' | 'kling-v2.5' | 'luma-ray2' | 'hailuo' | 'ltx-video' | 'stable-video-diffusion';
-export type MediaStatus = 'draft' | 'pending_review' | 'pending_approval' | 'approved' | 'rejected' | 'published' | 'generating';
+export type MediaProvider =
+  | 'dalle'
+  | 'dalle-3'
+  | 'sdxl'
+  | 'replicate'
+  | 'figma'
+  | 'manual'
+  | 'midjourney'
+  | 'flux-pro'
+  | 'flux-dev'
+  | 'ideogram-v2'
+  | 'recraft-v3'
+  | 'kling-v2.5'
+  | 'luma-ray2'
+  | 'hailuo'
+  | 'ltx-video'
+  | 'stable-video-diffusion';
+export type MediaStatus =
+  'draft' | 'pending_review' | 'pending_approval' | 'approved' | 'rejected' | 'published' | 'generating';
 
 export interface AIMedia {
   id: number;
@@ -310,9 +327,9 @@ export interface TrackAIUsageInput {
 
 export interface CampaignStats {
   totalCampaigns: number;
-  drafts: number;      // Campaigns with 0 workflow runs
-  active: number;      // Campaigns with ≥1 workflow run (not completed)
-  completed: number;   // Campaigns marked as completed
+  drafts: number; // Campaigns with 0 workflow runs
+  active: number; // Campaigns with ≥1 workflow run (not completed)
+  completed: number; // Campaigns marked as completed
 }
 
 export interface AIUsageSummary {
@@ -337,25 +354,26 @@ export interface CampaignWithDetails {
 
 export type ContentSourceType =
   | 'product_release'
-  | 'blog_post_seed'      // Generate new blog post (seed blog workflow)
-  | 'blog_post_existing'  // Use existing blog post
+  | 'blog_post_seed' // Generate new blog post (seed blog workflow)
+  | 'blog_post_existing' // Use existing blog post
   | 'case_study'
-  | 'customer_interview'  // Link to customer interview
-  | 'event'               // Luma events
-  | 'podcast'             // Podcast episodes
-  | 'webinar'             // Webinars
-  | 'investor_update'     // Investor updates
-  | 'onboarding_guide'    // Onboarding guides (lives on openframe platform)
-  | 'walkthrough_video'   // Per-platform floating demo video (no slug, no detail page; URL is the platform home)
-  | 'what_i_shipped'      // What I Shipped employee check-ins (lives on people-hub)
-  | 'how_i_work'          // How I Work employee AI-workflow sessions (lives on people-hub)
-  | 'faq'                 // FAQ Q&A pair (single-page /faqs index; deep-link by category anchor)
+  | 'customer_interview' // Link to customer interview
+  | 'event' // Luma events
+  | 'podcast' // Podcast episodes
+  | 'webinar' // Webinars
+  | 'investor_update' // Investor updates
+  | 'onboarding_guide' // Onboarding guides (lives on openframe platform)
+  | 'walkthrough_video' // Per-platform floating demo video (no slug, no detail page; URL is the platform home)
+  | 'what_i_shipped' // What I Shipped employee check-ins (lives on people-hub)
+  | 'how_i_work' // How I Work employee AI-workflow sessions (lives on people-hub)
+  | 'faq' // FAQ Q&A pair (single-page /faqs index; deep-link by category anchor)
+  | 'design_doc' // Internal design docs (product-hub admin; preview route only, no public page)
   | 'from_scratch';
 
 export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';
 
 export interface ContentSourceOption {
-  id: number | string;  // Events/podcasts/webinars use UUID strings
+  id: number | string; // Events/podcasts/webinars use UUID strings
   type: ContentSourceType;
   title: string;
   summary?: string;

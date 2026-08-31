@@ -1,8 +1,8 @@
 package com.openframe.api.datafetcher;
 
 import com.openframe.api.mapper.GraphQLDeviceMapper;
-import com.openframe.api.service.DeviceFilterService;
-import com.openframe.api.service.DeviceService;
+import com.openframe.api.service.device.DeviceFilterService;
+import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.device.Machine;
 import org.junit.jupiter.api.DisplayName;

@@ -1,39 +1,55 @@
-"use client"
+'use client';
 
-import * as React from "react";
+import { Loader2 } from 'lucide-react';
+import { type InputHTMLAttributes, type ReactNode, forwardRef } from 'react';
+import { cn } from '../../utils/cn';
+import { FieldWrapper } from './field-wrapper';
 
-import { Loader2 } from "lucide-react";
-import { cn } from "../../utils/cn";
-import { FieldWrapper } from "./field-wrapper";
-
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** When true, renders error border & ring */
   invalid?: boolean;
   /** Element displayed at the start (left) of the input */
-  startAdornment?: React.ReactNode;
+  startAdornment?: ReactNode;
   /** Element displayed at the end (right) of the input */
-  endAdornment?: React.ReactNode;
+  endAdornment?: ReactNode;
   /** Label text displayed above the input */
   label?: string;
+  /** Label scale forwarded to FieldWrapper ('large' = text-h4 for designs with body-scale field titles) */
+  labelVariant?: 'default' | 'large';
   /** Status message displayed below the input */
   error?: string;
   /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey).
       Only "error" and "warning" mark the field invalid (colored border). */
-  errorVariant?: "error" | "warning" | "success" | "muted";
+  errorVariant?: 'error' | 'warning' | 'success' | 'muted';
   /** When true, shows a loading spinner as end adornment */
   loading?: boolean;
 }
 
 const invalidBorderClasses = {
-  error: "border-ods-error hover:border-ods-error has-[:focus]:border-ods-error",
-  warning: "!border-ods-warning hover:!border-ods-warning has-[:focus]:!border-ods-warning",
+  error: 'border-ods-error hover:border-ods-error has-[:focus]:border-ods-error',
+  warning: '!border-ods-warning hover:!border-ods-warning has-[:focus]:!border-ods-warning',
 } as const;
 
-const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, invalid = false, startAdornment, endAdornment, label, error, errorVariant = "error", loading = false, ...props }, ref) => {
+const Input = forwardRef<HTMLInputElement, InputProps>(
+  (
+    {
+      className,
+      type,
+      invalid = false,
+      startAdornment,
+      endAdornment,
+      label,
+      labelVariant,
+      error,
+      errorVariant = 'error',
+      loading = false,
+      ...props
+    },
+    ref,
+  ) => {
     // success/muted are informational — they never paint the invalid border
-    const variantIsInvalid = errorVariant === "error" || errorVariant === "warning"
-    const isInvalid = invalid || (!!error && variantIsInvalid)
+    const variantIsInvalid = errorVariant === 'error' || errorVariant === 'warning';
+    const isInvalid = invalid || (!!error && variantIsInvalid);
 
     // Range inputs get a clean slider rendering — no label wrapper, borders, or adornments
     if (type === 'range') {
@@ -41,31 +57,33 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           type="range"
           className={cn(
-            "w-full cursor-pointer appearance-none rounded-full bg-white/30 h-1",
+            'h-1 w-full cursor-pointer appearance-none rounded-full bg-white/30',
             // Webkit (Chrome/Safari) thumb
-            "[&::-webkit-slider-thumb]:appearance-none",
-            "[&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3",
-            "[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white",
-            "[&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm",
+            '[&::-webkit-slider-thumb]:appearance-none',
+            '[&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3',
+            '[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white',
+            '[&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm',
             // Firefox thumb
-            "[&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3",
-            "[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white",
-            "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer",
+            '[&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3',
+            '[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white',
+            '[&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0',
             // Firefox track
-            "[&::-moz-range-track]:bg-transparent",
+            '[&::-moz-range-track]:bg-transparent',
             // Disabled
-            "disabled:cursor-not-allowed disabled:opacity-50",
-            className
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            className,
           )}
           ref={ref}
           {...props}
         />
-      )
+      );
       return label ? (
-        <FieldWrapper label={label} error={error} errorVariant={errorVariant}>
+        <FieldWrapper label={label} labelVariant={labelVariant} error={error} errorVariant={errorVariant}>
           {rangeInput}
         </FieldWrapper>
-      ) : rangeInput
+      ) : (
+        rangeInput
+      );
     }
 
     const content = (
@@ -73,16 +91,17 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         data-invalid={isInvalid || undefined}
         className={cn(
           // Layout & spacing
-          "flex w-full items-center gap-2 rounded-[6px] border px-3 h-11 md:h-12 cursor-text",
+          'flex h-11 w-full cursor-text items-center gap-2 rounded-[6px] border px-3 md:h-12',
           // Focus-within states
-          "has-[:focus-visible]:outline-none",
-          "group",
+          'has-[:focus-visible]:outline-none',
+          'group',
           // Animations & touch UX
-          "transition-colors duration-200",
+          'transition-colors duration-200',
           // Theme palette
-          "bg-ods-card border-ods-border has-[:focus]:border-ods-accent",
+          'border-ods-border bg-ods-card has-[:focus]:border-ods-accent',
           // Hover & active (not disabled)
-          !props.disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
+          !props.disabled &&
+            'hover:border-ods-border-hover hover:bg-ods-bg-hover active:border-ods-border-active active:bg-ods-bg-active',
           // Disabled. The adornments (and any icon inside them) carry their own
           // `text-ods-text-secondary`, so grey them from here — a disabled field
           // must read as one flat colour, not grey text next to a live icon.
@@ -90,15 +109,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           // descendant rule would also repaint whatever the caller renders INSIDE
           // an adornment, which is passed verbatim precisely so it can own its
           // colour (a `Tag` there went invisible against its own fill).
-          props.disabled && "!cursor-not-allowed bg-ods-bg",
-          "has-[:disabled]:[&>span]:text-ods-text-disabled has-[:disabled]:[&_svg]:text-ods-text-disabled",
+          props.disabled && '!cursor-not-allowed bg-ods-bg',
+          'has-[:disabled]:[&>span]:text-ods-text-disabled has-[:disabled]:[&_svg]:text-ods-text-disabled',
           // Invalid
-          isInvalid && invalidBorderClasses[variantIsInvalid ? (errorVariant as "error" | "warning") : "error"],
-          className
+          isInvalid && invalidBorderClasses[variantIsInvalid ? errorVariant : 'error'],
+          className,
         )}
       >
         {startAdornment && (
-          <span className="text-h6 flex-shrink-0 text-ods-text-secondary transition-colors duration-200 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
+          <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 text-h6 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
             {startAdornment}
           </span>
         )}
@@ -106,41 +125,39 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           type={type}
           className={cn(
             // Layout
-            "flex-1 min-w-0 bg-transparent border-none outline-none",
+            'min-w-0 flex-1 border-none bg-transparent outline-none',
             // Typography
-            "text-h4",
+            'text-h4',
             // Colors
-            "text-ods-text-primary placeholder:text-ods-text-secondary",
+            'text-ods-text-primary placeholder:text-ods-text-secondary',
             // File input adjustments
-            "file:border-0 file:bg-transparent",
+            'file:border-0 file:bg-transparent',
             // Disabled
-            "disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border",
+            'disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border',
             // Touch
-            "touch-manipulation",
+            'touch-manipulation',
             // Autofill override
-            "[&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_9999px_transparent_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-text-primary)] [&:-webkit-autofill]:[caret-color:var(--color-text-primary)] [&:-webkit-autofill]:[transition:background-color_9999s_ease-in-out_0s]"
+            '[&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_9999px_transparent_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-text-primary)] [&:-webkit-autofill]:[caret-color:var(--color-text-primary)] [&:-webkit-autofill]:[transition:background-color_9999s_ease-in-out_0s]',
           )}
           ref={ref}
           {...props}
         />
-        {loading && (
-          <Loader2 className="animate-spin flex-shrink-0 text-ods-text-secondary size-4 md:size-6" />
-        )}
+        {loading && <Loader2 className="size-4 flex-shrink-0 animate-spin text-ods-text-secondary md:size-6" />}
         {!loading && endAdornment && (
-          <span className="text-h6 flex-shrink-0 text-ods-text-secondary transition-colors duration-200 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
+          <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 text-h6 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
             {endAdornment}
           </span>
         )}
       </label>
-    )
+    );
 
     return (
-      <FieldWrapper label={label} error={error} errorVariant={errorVariant}>
+      <FieldWrapper label={label} labelVariant={labelVariant} error={error} errorVariant={errorVariant}>
         {content}
       </FieldWrapper>
-    )
-  }
-)
-Input.displayName = "Input"
+    );
+  },
+);
+Input.displayName = 'Input';
 
 export { Input };

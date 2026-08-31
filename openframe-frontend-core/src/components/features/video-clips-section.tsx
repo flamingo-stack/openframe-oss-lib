@@ -1,6 +1,5 @@
-"use client";
+'use client';
 
-import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { AIEnrichSection } from './ai-enrich';
 import type { AIRequiredField } from './ai-enrich';
@@ -51,17 +50,17 @@ export function VideoClipsSection({
   requiredFields,
   status,
   statusMessage,
-  disabledMessage = "Upload a video first",
+  disabledMessage = 'Upload a video first',
   showCancel = true,
   onCancel,
   isCancelling = false,
   hasResult = false,
-  title = "Video Clips",
-  description = "Extract marketing-ready video clips from the video",
+  title = 'Video Clips',
+  description = 'Extract marketing-ready video clips from the video',
   buttonLabel,
-  loadingLabel = "Extracting clips...",
+  loadingLabel = 'Extracting clips...',
 }: VideoClipsSectionProps) {
-  const defaultButtonLabel = hasResult ? "Regenerate Clips" : "Generate Clips";
+  const defaultButtonLabel = hasResult ? 'Regenerate Clips' : 'Generate Clips';
 
   return (
     <AIEnrichSection

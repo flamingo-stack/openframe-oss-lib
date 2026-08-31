@@ -4,12 +4,14 @@ import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationSettingGroup;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.AttrKey;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
+import com.openframe.notification.spec.NotificationEntityRef;
 import com.openframe.notification.spec.NotificationSeed;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
@@ -85,6 +87,7 @@ class NotificationEmitterTest {
         assertThat(sent.getAudience()).isSameAs(spec.audience);
         assertThat(sent.getCorrelationId()).isEqualTo("corr-1");
         assertThat(sent.getContext().getType()).isEqualTo("TEST_TYPE");
+        assertThat(sent.getApplePushCategory()).isEqualTo("TEST_CATEGORY");
     }
 
     @Test
@@ -117,6 +120,10 @@ class NotificationEmitterTest {
         @Override public NotificationSeverity getSeverity() { return NotificationSeverity.INFO; }
         @Override public Audience audience(TestSeed seed) { return audience; }
 
+        @Override public Optional<NotificationEntityRef> entity(TestSeed seed) {
+            return NotificationEntityRef.of(NotificationEntityType.TICKET, seed.ticketId());
+        }
+
         @Override public Attrs attrs(TestSeed seed) {
             return Attrs.of(Map.of("ticketId", seed.ticketId())).with(ASSIGNEE, seed.assigneeUserId());
         }
@@ -127,6 +134,10 @@ class NotificationEmitterTest {
 
         @Override public String composeDescription(TestSeed seed) {
             return "Assigned to " + seed.assigneeUserId();
+        }
+
+        @Override public Optional<String> getApplePushCategory() {
+            return Optional.of("TEST_CATEGORY");
         }
 
         @Override public NotificationContext buildLegacyContext(TestSeed seed) {

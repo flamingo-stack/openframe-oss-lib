@@ -16,10 +16,7 @@
 const DISMISS_COOKIE_MAX_AGE_SECONDS = 31_536_000;
 
 /** THE dismissal match rule. `undefined` id (nothing active) → not dismissed. */
-export function isDismissedCookieValue(
-  cookieValue: string | undefined,
-  id: string | undefined,
-): boolean {
+export function isDismissedCookieValue(cookieValue: string | undefined, id: string | undefined): boolean {
   return !!id && cookieValue === id;
 }
 
@@ -31,9 +28,7 @@ export function isDismissedCookieValue(
  */
 export function readDismissCookie(name: string): string | undefined {
   if (typeof document === 'undefined') return undefined;
-  const match = document.cookie
-    .split('; ')
-    .find((row) => row.startsWith(`${name}=`));
+  const match = document.cookie.split('; ').find(row => row.startsWith(`${name}=`));
   if (!match) return undefined;
   try {
     return decodeURIComponent(match.slice(name.length + 1));

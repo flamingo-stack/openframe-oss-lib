@@ -3,7 +3,7 @@ package com.openframe.data.repository.device;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
-import com.openframe.data.document.rmm.OsType;
+import com.openframe.data.document.rmm.script.OsType;
 
 import java.time.Instant;
 import java.util.Collection;
