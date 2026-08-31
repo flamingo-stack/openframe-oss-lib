@@ -9,7 +9,15 @@ extend type Mutation {
     markAllNotificationsAsRead: Int!
     deleteNotification(notificationId: ID!): Boolean!
     deleteAllReadNotifications: Int!
+    "Cards stay in the list as read; only the counts drop. The returned number spans categories — refetch, do not subtract it."
+    markNotificationsReadForEntity(entityType: NotificationEntityType!, entityId: ID!): Int!
 }
+
+enum NotificationEntityType {
+    TICKET
+    DIALOG
+}
+
 
 enum NotificationSeverity {
     INFO
