@@ -129,11 +129,20 @@ export function TicketStatusConfigRow({
           The trailing controls are a WRAP ITEM (ordered per breakpoint), not a
           full-height sibling column, so the lower rows span the full card width
           and the chip pins to the card's right edge on tablet/mobile. */}
-      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-[var(--spacing-system-mf)] md:gap-x-[var(--spacing-system-m)]">
+      <div
+        className={cn(
+          'min-w-0 flex-1 items-start gap-x-3 gap-y-[var(--spacing-system-m)] md:gap-x-[var(--spacing-system-m)]',
+          isSystem
+            ? 'flex flex-wrap'
+            : // Mobile custom rows are a strict two-column grid, per the mock:
+              // fields (name / color / hex, all one width) on the left, the
+              // controls and the chip stacked in the right column. From md up
+              // the same children flow as a wrapping flex row.
+              'grid grid-cols-[minmax(0,1fr)_auto] md:flex md:flex-wrap',
+        )}
+      >
         {/* System rows keep the chip beside the name on every width, so the name
-            shares its row; a custom row's name owns the first line on mobile
-            together with the controls (there the chip drops down to ride the
-            color row). */}
+            shares its row. */}
         <div className="order-1 flex min-w-0 grow basis-0 flex-col gap-[var(--spacing-system-xxs)]">
           <Label variant="large" htmlFor={nameInputId}>
             Status Name
@@ -151,13 +160,7 @@ export function TicketStatusConfigRow({
         {showColorPicker ? (
           <div className="order-3 flex min-w-0 grow basis-full flex-col gap-[var(--spacing-system-xxs)] md:order-2 md:basis-0">
             <Label variant="large">Color</Label>
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <ColorPresetSelect value={color} presetKey={presetKey} onChange={onColorChange} />
-              </div>
-              {/* Mobile: the preview chip rides the color row, pinned right. */}
-              <div className="shrink-0 md:hidden">{chip}</div>
-            </div>
+            <ColorPresetSelect value={color} presetKey={presetKey} onChange={onColorChange} />
             {/* Custom hex: a second field row inside the Color column, directly
                 under the select (per design). */}
             {isCustomColor && (
@@ -199,6 +202,9 @@ export function TicketStatusConfigRow({
             <div className="hidden min-w-0 basis-full items-center justify-end md:order-4 md:flex lg:hidden">
               {chip}
             </div>
+            {/* Mobile: the chip fills the second grid column beside the color
+                field, left-aligned with the controls above it. */}
+            <div className={cn('order-4 flex h-11 min-w-0 items-center md:hidden', fieldRowOffset)}>{chip}</div>
           </>
         )}
 
