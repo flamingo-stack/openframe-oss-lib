@@ -1,7 +1,9 @@
 'use client';
 
-import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
+import type { ReactNode } from 'react';
+import { useDragAndDropEnabled } from '../../hooks/ui/use-drag-and-drop-enabled';
 import { cn } from '../../utils/cn';
+import type { SortableDragHandleProps } from '../features/sortable-list/use-sortable-item';
 import { DraggerIcon } from '../icons-v2-generated/interface/dragger-icon';
 import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
 import { InfoCircleIcon } from '../icons-v2-generated/signs-and-symbols/info-circle-icon';
@@ -31,9 +33,14 @@ export interface TicketStatusConfigRowProps {
   onDelete?: () => void;
   deleteDisabled?: boolean;
   deleteDisabledReason?: string;
-  dragHandleProps?: DraggableSyntheticListeners;
-  dragHandleAttributes?: DraggableAttributes;
+  /** From `useSortableItem` (via `TicketStatusConfigList`'s render args). */
+  dragHandleProps?: SortableDragHandleProps;
   isDragging?: boolean;
+  /**
+   * The touch replacement for the drag handle (`SortableRowRenderArgs.moveButtons`).
+   * Rendered beside the delete button; the drag rail is hidden on touch anyway.
+   */
+  moveButtons?: ReactNode;
 }
 
 export function TicketStatusConfigRow({
@@ -50,9 +57,12 @@ export function TicketStatusConfigRow({
   deleteDisabled,
   deleteDisabledReason,
   dragHandleProps,
-  dragHandleAttributes,
   isDragging,
+  moveButtons,
 }: TicketStatusConfigRowProps) {
+  // Standalone system rows render outside any SortableList, so the row answers
+  // "is there a drag rail at all?" itself — same media gate the list uses.
+  const dragAndDropEnabled = useDragAndDropEnabled();
   const isSystem = variant === 'system';
   const isCustomColor = !isSystem && presetKey === undefined;
   const previewColor = isSystem ? undefined : color;
@@ -70,21 +80,22 @@ export function TicketStatusConfigRow({
         isDragging && 'opacity-70 shadow-lg',
       )}
     >
-      <div className="flex h-11 w-8 shrink-0 items-center justify-center text-ods-text-secondary md:h-12">
-        {isSystem ? (
-          <DraggerIcon size={24} aria-hidden className="opacity-40" />
-        ) : (
-          <button
-            type="button"
-            aria-label="Drag to reorder"
-            className="flex size-6 cursor-grab items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ods-focus active:cursor-grabbing"
-            {...dragHandleAttributes}
-            {...dragHandleProps}
-          >
-            <DraggerIcon size={24} />
-          </button>
-        )}
-      </div>
+      {dragAndDropEnabled && (
+        <div className="flex h-11 w-8 shrink-0 items-center justify-center text-ods-text-secondary md:h-12">
+          {isSystem ? (
+            <DraggerIcon size={24} aria-hidden className="opacity-40" />
+          ) : (
+            <button
+              type="button"
+              aria-label="Drag to reorder"
+              className="flex size-6 cursor-grab items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ods-focus active:cursor-grabbing"
+              {...dragHandleProps}
+            >
+              <DraggerIcon size={24} />
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-4 md:flex-nowrap md:gap-[var(--spacing-system-m)]">
         <div className={cn('flex flex-col gap-[var(--spacing-system-xxs)]', colClass)}>
@@ -126,17 +137,20 @@ export function TicketStatusConfigRow({
         </div>
       </div>
 
-      <div className="flex h-11 w-12 shrink-0 items-center justify-center md:h-12">
+      <div className="flex h-11 shrink-0 items-center justify-end gap-[var(--spacing-system-s)] md:h-12">
+        {!isSystem && moveButtons}
         {isSystem ? (
-          <TouchFriendlyTooltip content={systemTooltip}>
-            <button
-              type="button"
-              aria-label={systemTooltip ?? 'System status'}
-              className="flex size-6 items-center justify-center text-ods-text-secondary outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
-            >
-              <InfoCircleIcon size={24} />
-            </button>
-          </TouchFriendlyTooltip>
+          <div className="flex w-11 justify-center md:w-12">
+            <TouchFriendlyTooltip content={systemTooltip}>
+              <button
+                type="button"
+                aria-label={systemTooltip ?? 'System status'}
+                className="flex size-6 items-center justify-center text-ods-text-secondary outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
+              >
+                <InfoCircleIcon size={24} />
+              </button>
+            </TouchFriendlyTooltip>
+          </div>
         ) : (
           <TouchFriendlyTooltip content={deleteDisabled ? deleteDisabledReason : undefined}>
             <span className="inline-flex">
