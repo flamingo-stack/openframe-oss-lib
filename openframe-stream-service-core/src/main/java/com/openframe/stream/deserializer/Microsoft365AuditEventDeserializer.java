@@ -24,8 +24,11 @@ import java.util.Set;
  * {@code auditLogs/directoryAudits}. Events are hand-built by the poller (not CDC), arrive
  * pre-enriched with tenant/organization fields in the payload and carry no agent reference —
  * hence {@link com.openframe.data.model.enums.DataEnrichmentServiceType#PRE_ENRICHED}.
- * {@code toolEventId} is the Graph audit record id, so replays from the poller's cursor
- * overlap window upsert idempotently.
+ * {@code toolEventId} is {@code <graphAuditId>-<organizationId>} — the same shape as the poller's
+ * Kafka key. The org suffix matters: one Graph audit fans out once per organization linked to the
+ * connection, and toolEventId is part of the storage primary key (organizationId is not), so bare
+ * audit ids would make the per-organization copies overwrite each other. Replays from the
+ * poller's cursor overlap window still upsert idempotently (same suffix on every replay).
  * {@code connectionId}/{@code connectionName} (multi-connection orgs) are passed through into details.
  */
 @Slf4j
@@ -56,13 +59,14 @@ public class Microsoft365AuditEventDeserializer implements KafkaMessageDeseriali
         long eventTimestamp = getEventTimestamp(after)
                 .orElse(debeziumMessage.getPayload().getTimestamp());
         String category = textField(after, "category").orElse(UNKNOWN);
+        String toolEventId = perOrganizationToolEventId(after);
 
         return DeserializedDebeziumMessage.builder()
                 .payload(debeziumMessage.getPayload())
                 .agentId(null)
                 .ingestDay(DAY_FORMATTER.format(Instant.ofEpochMilli(eventTimestamp)))
                 .sourceEventType(category)
-                .toolEventId(textField(after, "auditId").orElse(null))
+                .toolEventId(toolEventId)
                 .unifiedEventType(resolveEventType(after, category))
                 .message(textField(after, "activityDisplayName").orElse(null))
                 .integratedToolType(messageType.getIntegratedToolType())
@@ -76,6 +80,15 @@ public class Microsoft365AuditEventDeserializer implements KafkaMessageDeseriali
                 .organizationName(textField(after, "organizationName").orElse(null))
                 .userId(textPath(after.path("initiatedBy").path("user"), "userPrincipalName"))
                 .build();
+    }
+
+    private String perOrganizationToolEventId(JsonNode after) {
+        String auditId = textField(after, "auditId").orElse(null);
+        String organizationId = textField(after, "organizationId").orElse(null);
+        if (auditId == null || organizationId == null) {
+            return auditId;
+        }
+        return auditId + "-" + organizationId;
     }
 
     private UnifiedEventType resolveEventType(JsonNode after, String category) {

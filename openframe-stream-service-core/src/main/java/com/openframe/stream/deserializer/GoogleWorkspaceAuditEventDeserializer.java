@@ -30,9 +30,10 @@ import java.util.Optional;
  * {@code organizationId}, {@code organizationName}) and multi-connection fields
  * ({@code connectionId}, {@code connectionName}) — hence
  * {@link com.openframe.data.model.enums.DataEnrichmentServiceType#PRE_ENRICHED}. {@code toolEventId}
- * is {@code uniqueQualifier + "-" + eventIndex}: Reports API activities are uniquely identified by
- * {@code uniqueQualifier}, but a single activity can carry multiple events, so the pair keeps
- * replays from the poller's cursor overlap window upsert idempotent per event. Events carry no
+ * is {@code uniqueQualifier + "-" + eventIndex + "-" + organizationId}: Reports API activities are
+ * uniquely identified by {@code uniqueQualifier}, a single activity can carry multiple events, and
+ * one event fans out once per linked organization — the triple keeps replays idempotent per event
+ * AND keeps the per-organization copies from colliding on the storage primary key. Events carry no
  * agent reference.
  * {@code connectionId}/{@code connectionName} (multi-connection orgs) are passed through into details.
  * <p>
@@ -106,10 +107,20 @@ public class GoogleWorkspaceAuditEventDeserializer implements KafkaMessageDeseri
         return mapped == UnifiedEventType.UNKNOWN ? UnifiedEventType.GWS_AUDIT_OTHER : mapped;
     }
 
+    // Org-suffixed for the same reason as the poller's Kafka key: one Reports API record fans out
+    // once per organization linked to the connection, and toolEventId is part of the storage
+    // primary key (organizationId is not) — bare ids would make per-organization copies overwrite
+    // each other.
     private String buildToolEventId(JsonNode after) {
-        return textField(after, "uniqueQualifier")
+        String base = textField(after, "uniqueQualifier")
                 .map(uniqueQualifier -> uniqueQualifier + "-" + textField(after, "eventIndex").orElse("0"))
                 .orElse(null);
+        if (base == null) {
+            return null;
+        }
+        return textField(after, "organizationId")
+                .map(organizationId -> base + "-" + organizationId)
+                .orElse(base);
     }
 
     private Optional<Long> getEventTimestamp(JsonNode after) {

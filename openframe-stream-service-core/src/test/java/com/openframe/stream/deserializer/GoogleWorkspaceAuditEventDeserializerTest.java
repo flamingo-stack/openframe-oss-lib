@@ -62,7 +62,9 @@ class GoogleWorkspaceAuditEventDeserializerTest {
     void mapsAuditFieldsToDeserializedMessage() {
         DeserializedDebeziumMessage result = deserialize(AUDIT_EVENT_JSON);
 
-        assertEquals("1234567890-0", result.getToolEventId());
+        // Org-suffixed: the fan-out publishes one copy per linked organization and toolEventId is
+        // the storage idempotency key — bare ids would collapse the copies to one surviving org.
+        assertEquals("1234567890-0-org-uuid-1", result.getToolEventId());
         assertEquals(Instant.parse("2026-07-30T10:00:00Z").toEpochMilli(), result.getEventTimestamp());
         assertEquals("2026-07-30", result.getIngestDay());
         assertEquals("CREATE_USER", result.getMessage());

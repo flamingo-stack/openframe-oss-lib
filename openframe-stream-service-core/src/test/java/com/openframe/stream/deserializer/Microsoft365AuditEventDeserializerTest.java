@@ -63,13 +63,25 @@ class Microsoft365AuditEventDeserializerTest {
     void mapsAuditFieldsToDeserializedMessage() {
         DeserializedDebeziumMessage result = deserialize(AUDIT_EVENT_JSON);
 
-        assertEquals("Directory_abc_123", result.getToolEventId());
+        // Suffixed with organizationId: the same Graph audit fans out once per linked
+        // organization, and toolEventId is the storage idempotency key — without the suffix the
+        // per-organization copies collide and only one organization's row survives.
+        assertEquals("Directory_abc_123-org-uuid-1", result.getToolEventId());
         assertEquals(Instant.parse("2026-07-30T10:00:00Z").toEpochMilli(), result.getEventTimestamp());
         assertEquals("2026-07-30", result.getIngestDay());
         assertEquals("Add user", result.getMessage());
         assertEquals("UserManagement", result.getSourceEventType());
         assertEquals(UnifiedEventType.M365_USER_MANAGEMENT, result.getUnifiedEventType());
         assertEquals(IntegratedToolType.MICROSOFT_365, result.getIntegratedToolType());
+    }
+
+    @Test
+    void toolEventId_withoutOrganizationId_staysBareAuditId() {
+        String json = AUDIT_EVENT_JSON.replace("\"organizationId\": \"org-uuid-1\",", "");
+
+        DeserializedDebeziumMessage result = deserialize(json);
+
+        assertEquals("Directory_abc_123", result.getToolEventId());
     }
 
     @Test
