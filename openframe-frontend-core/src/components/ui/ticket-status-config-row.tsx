@@ -121,6 +121,11 @@ export function TicketStatusConfigRow({
         </div>
       )}
 
+      {/* Every row spans the same equal column slots — two on tablet
+          (name + color for custom, name + chip for system), four on desktop
+          (name, color, a reserved slot, chip zone) with invisible spacers
+          standing in for the cells a row doesn't use — so the name field is one
+          width on every row and the columns align across the whole list. */}
       <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-[var(--spacing-system-mf)] md:gap-x-[var(--spacing-system-m)]">
         {/* System rows keep the chip beside the name on every width, so the name
             shares its row; a custom row's name owns the full first line on
@@ -144,7 +149,7 @@ export function TicketStatusConfigRow({
           />
         </div>
 
-        {showColorPicker && (
+        {showColorPicker ? (
           <div className="flex min-w-0 grow basis-full flex-col gap-[var(--spacing-system-xxs)] md:basis-0">
             <Label variant="large">Color</Label>
             <div className="flex min-w-0 items-center gap-3">
@@ -154,25 +159,35 @@ export function TicketStatusConfigRow({
               {/* Mobile: the preview chip rides the color row. */}
               <div className="shrink-0 md:hidden">{chip}</div>
             </div>
+            {/* Custom hex: a second field row inside the Color column, directly
+                under the select (per design). */}
+            {isCustomColor && (
+              <div className="mt-[var(--spacing-system-xxs)] flex min-w-0">
+                <ColorPickerInput value={color} onChange={next => onColorChange({ color: next, preset: undefined })} />
+              </div>
+            )}
           </div>
+        ) : (
+          <div aria-hidden className="hidden min-w-0 grow basis-0 lg:block" />
         )}
 
-        {showColorPicker && isCustomColor && (
-          <div className="flex min-w-0 grow basis-full md:mt-[calc(var(--font-line-space-h4-body)+0.25rem)] md:basis-0">
-            <ColorPickerInput value={color} onChange={next => onColorChange({ color: next, preset: undefined })} />
-          </div>
-        )}
+        {/* Reserved desktop column slot (the mock's "No activity Indicator" zone). */}
+        <div aria-hidden className="hidden min-w-0 grow basis-0 lg:block" />
 
         {isSystem ? (
           <div className={cn('flex h-11 min-w-0 grow basis-0 items-center justify-end md:h-12', fieldRowOffset)}>
             {chip}
           </div>
         ) : (
-          // Tablet: the chip takes a full row of its own, right-aligned;
-          // desktop (lg+) brings it back inline before the controls.
-          <div className="hidden min-w-0 items-center justify-end md:flex md:basis-full lg:mt-[calc(var(--font-line-space-h4-body)+0.25rem)] lg:h-12 lg:grow lg:basis-0">
-            {chip}
-          </div>
+          <>
+            {/* Desktop (lg+): the chip rides the first row, in its own column
+                before the controls. */}
+            <div className={cn('hidden h-12 min-w-0 grow basis-0 items-center justify-end lg:flex', fieldRowOffset)}>
+              {chip}
+            </div>
+            {/* Tablet: the chip takes a full row of its own, right-aligned. */}
+            <div className="hidden min-w-0 basis-full items-center justify-end md:flex lg:hidden">{chip}</div>
+          </>
         )}
       </div>
 
