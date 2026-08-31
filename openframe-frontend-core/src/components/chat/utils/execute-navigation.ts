@@ -31,7 +31,12 @@
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
 import { NEW_TAB_FEATURES, stripSameOriginToPath } from './chat-nav-resolution';
-import { computeIsNewTab } from './nav-anchor-props';
+import { computeIsNewTab, isSameOriginAbsoluteHref } from './nav-anchor-props';
+
+/** Absolute `http(s)` URL pointing at an origin that is not ours. */
+function isForeignOriginHref(href: string): boolean {
+  return /^https?:\/\//i.test(href) && !isSameOriginAbsoluteHref(href);
+}
 
 /** Minimal mouse-event surface — structural so chip buttons / tiles can call it
  *  without casting `React.MouseEvent`. */
@@ -78,7 +83,12 @@ function runNavigation(
     else window.open(href, '_blank', NEW_TAB_FEATURES);
     return;
   }
-  const target = stripSameOriginToPath(href);
+  // A FOREIGN href that the host's `decideNewTab` routed same-tab must reach the
+  // router whole: stripping its origin pushes `/webinars/x` onto OUR origin and
+  // 404s. Same-origin absolutes still get stripped, so an in-app soft nav stays
+  // one. (`stripSameOriginToPath` itself strips unconditionally on purpose — the
+  // hub is one app across several origins and depends on that.)
+  const target = isForeignOriginHref(href) ? href : stripSameOriginToPath(href);
   // Same-page hash target (e.g. a chat card deep-linking to `/faqs#faq-item-49`):
   // route through the UNIFIED same-page-hash primitive FIRST. A host router /
   // `router.push` performs `pushState`, which the HTML spec says does NOT fire a
@@ -138,4 +148,24 @@ export function executeNavigationImperative({
   fallbackNavigate,
 }: ExecuteNavigationImperativeArgs): void {
   runNavigation(runtime, href, undefined, targetPlatform, fallbackNavigate);
+}
+
+/**
+ * @deprecated Call {@link executeNavigation} directly. Kept only so external
+ * embedders' imports keep resolving; no lib code path goes through it.
+ */
+export function handleChatNavClick(
+  event: NavClickEvent,
+  runtime: ChatRuntime | null | undefined,
+  { href, path, targetPlatform }: ChatNavClickInput,
+  fallbackNavigate?: (path: string) => void,
+): boolean {
+  return executeNavigation({ event, runtime, href, path, targetPlatform, fallbackNavigate });
+}
+
+/** @deprecated Argument shape of the deprecated {@link handleChatNavClick}. */
+export interface ChatNavClickInput {
+  href: string;
+  path?: string | null;
+  targetPlatform?: string | null;
 }
