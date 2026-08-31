@@ -5,6 +5,7 @@ import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/ad
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/utils/prevent-unhandled';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useDragAndDropEnabled } from '../../../hooks/ui/use-drag-and-drop-enabled';
 import { useHorizontalScrollbar } from '../../../hooks/ui/use-horizontal-scrollbar';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { autoScrollBothWays } from '../../../utils/auto-scroll-ancestors';
@@ -169,7 +170,16 @@ export function Board({
   // Publishing it from an effect instead committed one whole frame with the card
   // still held in its pending position after the host had already caught up.
   const pendingMove = reportedMove && !hasMoveSettled(columns, reportedMove) ? reportedMove : null;
-  const view = useMemo(() => (pendingMove ? applyPendingMove(columns, pendingMove) : columns), [columns, pendingMove]);
+  // On touch/narrow viewports no card is draggable and no lane is a drop
+  // target: the HTML5 drag events Pragmatic builds on never fire under touch,
+  // so instead of shipping a drag that half-works, none is initialized at all.
+  // Card moves there go through the ticket itself (its dialog), not the board.
+  const dragAndDropEnabled = useDragAndDropEnabled();
+  const view = useMemo(() => {
+    const base = pendingMove ? applyPendingMove(columns, pendingMove) : columns;
+    if (dragAndDropEnabled) return base;
+    return base.map(column => ({ ...column, dragDisabled: true, dropDisabled: true }));
+  }, [columns, pendingMove, dragAndDropEnabled]);
   // EVERYTHING downstream reads `view`, never `columns`: it is what is on
   // screen, so it is also what a drag, a keyboard move and a drop are about.
   // `columns` is only ever consulted to ask whether the host has caught up.
