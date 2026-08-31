@@ -25,15 +25,11 @@ public class NotificationSourceIndexConfig {
     private static final String INDEX_NAME_PREFIX = "notifications_";
     private static final String INDEX_NAME_SUFFIX = "_idx";
 
-    // Left behind by auto-index-creation for the removed Notification.correlationId.
-    private static final String STALE_CORRELATION_INDEX = "correlationId_1";
-
     private final MongoTemplate mongoTemplate;
     private final ObjectProvider<NotificationTypeSpec<?>> specs;
 
     @PostConstruct
     public void initIndexes() {
-        dropStaleIndex(STALE_CORRELATION_INDEX);
         specs.stream()
                 .filter(UpdatableNotificationSpec.class::isInstance)
                 .map(spec -> (UpdatableNotificationSpec<?>) spec)
@@ -51,14 +47,5 @@ public class NotificationSourceIndexConfig {
                 .partial(PartialIndexFilter.of(Criteria.where(path).exists(true)));
         mongoTemplate.indexOps(COLLECTION).ensureIndex(index);
         log.info("Ensured notification source-id index '{}' on '{}'", name, path);
-    }
-
-    private void dropStaleIndex(String indexName) {
-        try {
-            mongoTemplate.indexOps(COLLECTION).dropIndex(indexName);
-            log.info("Dropped stale index '{}' from collection '{}'", indexName, COLLECTION);
-        } catch (Exception ex) {
-            log.debug("Index '{}' not found on collection '{}', skipping", indexName, COLLECTION);
-        }
     }
 }
