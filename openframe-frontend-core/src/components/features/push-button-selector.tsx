@@ -2,7 +2,8 @@
 
 import { Check } from 'lucide-react';
 import type React from 'react';
-import { Badge } from '../ui';
+import { useEffect, useRef } from 'react';
+import { Badge, Input } from '../ui';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 export interface SelectableOption {
@@ -27,6 +28,28 @@ export interface SectionDefinition {
   description?: string; // Optional description shown under section label
 }
 
+/** SERVER-SIDE search: the selector renders the input; the PARENT owns the
+ *  query state and re-fetches `options` (never a client-side .filter of a
+ *  pre-fetched list). While `isLoading`, the input stays mounted (typing
+ *  must not lose focus to a skeleton swap). */
+export interface PushButtonSelectorSearch {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  ariaLabel?: string;
+}
+
+/** Lazy paging: the option list becomes a FIXED-HEIGHT scroll viewport with
+ *  an IntersectionObserver sentinel near the bottom — the selector calls
+ *  `onLoadMore` as the user scrolls; the parent appends to `options`. */
+export interface PushButtonSelectorLazyLoad {
+  hasMore: boolean;
+  isFetchingMore: boolean;
+  onLoadMore: () => void;
+  /** CSS height of the scroll viewport (default '336px' ≈ 6 rows). */
+  maxHeight?: string;
+}
+
 interface PushButtonSelectorProps {
   options: SelectableOption[];
   selectedIds: string[];
@@ -41,6 +64,14 @@ interface PushButtonSelectorProps {
   error?: string | null;
   skeletonCount?: number;
   sections?: SectionDefinition[]; // Optional sections for grouping options
+  /** Built-in server-side search input (see PushButtonSelectorSearch). */
+  search?: PushButtonSelectorSearch;
+  /** Built-in fixed-height scroll + infinite paging (see PushButtonSelectorLazyLoad). */
+  lazyLoad?: PushButtonSelectorLazyLoad;
+  /** Rendered inside the list when `options` is empty and not loading. */
+  emptyMessage?: React.ReactNode;
+  /** Rendered under the list (result counts, hints). */
+  footer?: React.ReactNode;
 }
 
 // Skeleton component matching external pattern from announcement-form.tsx
@@ -94,21 +125,82 @@ export function PushButtonSelector({
   error = null,
   skeletonCount = 3,
   sections,
+  search,
+  lazyLoad,
+  emptyMessage,
+  footer,
 }: PushButtonSelectorProps) {
-  // LOADING STATE
+  // Lazy-load sentinel: observe within the scroll viewport so onLoadMore
+  // fires as the user approaches the bottom. Hooks run unconditionally
+  // (before the early returns) per the rules of hooks. Pass a STABLE
+  // onLoadMore (react-query's fetchNextPage is) — an inline arrow re-arms
+  // the observer each render (harmless, just wasteful).
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const lazyHasMore = lazyLoad?.hasMore ?? false;
+  const lazyFetching = lazyLoad?.isFetchingMore ?? false;
+  const onLoadMore = lazyLoad?.onLoadMore;
+  const optionCount = options.length;
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root = scrollRef.current;
+    if (!sentinel || !root || !onLoadMore || !lazyHasMore) return undefined;
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(e => e.isIntersecting) && !lazyFetching) {
+          onLoadMore();
+        }
+      },
+      { root, rootMargin: '80px' },
+    );
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+    };
+    // optionCount: re-arm when the list grows (the sentinel moves).
+  }, [lazyHasMore, lazyFetching, onLoadMore, optionCount]);
+
+  const searchInput = search ? (
+    <Input
+      value={search.value}
+      onChange={e => search.onChange(e.target.value)}
+      placeholder={search.placeholder}
+      aria-label={search.ariaLabel ?? search.placeholder ?? 'Search'}
+    />
+  ) : null;
+
+  // LOADING STATE — with a search input, the input STAYS mounted (a skeleton
+  // swap mid-keystroke would drop focus); only the list skeletons.
   if (isLoading) {
     return (
       <div className={className}>
-        <PushButtonSelectorSkeleton count={skeletonCount} hasTitle={!!title} />
+        {search ? (
+          <div className="space-y-4">
+            {title && <h3 className="text-ods-text-primary text-h5">{title}</h3>}
+            {searchInput}
+            <PushButtonSelectorSkeleton count={skeletonCount} />
+          </div>
+        ) : (
+          <PushButtonSelectorSkeleton count={skeletonCount} hasTitle={!!title} />
+        )}
       </div>
     );
   }
 
-  // ERROR STATE
+  // ERROR STATE — same rule as loading: a mounted search input survives so
+  // the user can adjust the query to retry.
   if (error) {
     return (
       <div className={className}>
-        <PushButtonSelectorError message={error} title={title} />
+        {search ? (
+          <div className="space-y-4">
+            {title && <h3 className="text-ods-text-primary text-h5">{title}</h3>}
+            {searchInput}
+            <PushButtonSelectorError message={error} />
+          </div>
+        ) : (
+          <PushButtonSelectorError message={error} title={title} />
+        )}
       </div>
     );
   }
@@ -252,12 +344,44 @@ export function PushButtonSelector({
     );
   };
 
+  const listContent = (
+    <>
+      {options.length === 0 && emptyMessage !== undefined ? (
+        <div className="text-ods-text-secondary text-h6">{emptyMessage}</div>
+      ) : (
+        renderOptionsContent()
+      )}
+      {lazyLoad ? (
+        <>
+          <div ref={sentinelRef} />
+          {lazyLoad.isFetchingMore ? (
+            <div className="py-2 text-center text-ods-text-secondary text-h6">Loading more…</div>
+          ) : null}
+        </>
+      ) : null}
+    </>
+  );
+
   return (
     <TooltipProvider delayDuration={150}>
       <div className={`space-y-4 ${className}`}>
         {title && <h3 className="text-ods-text-primary text-h5">{title}</h3>}
 
-        {renderOptionsContent()}
+        {searchInput}
+
+        {lazyLoad ? (
+          <div
+            ref={scrollRef}
+            className="space-y-4 overflow-y-auto rounded-lg border border-ods-border p-2"
+            style={{ height: lazyLoad.maxHeight ?? '336px' }}
+          >
+            {listContent}
+          </div>
+        ) : (
+          listContent
+        )}
+
+        {footer}
 
         {/* Selection Summary */}
         {selectionSummary && validSelectedIds.length > 0 && (
