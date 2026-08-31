@@ -73,7 +73,6 @@ public class NotificationBroadcaster {
                 .attributes(command.getAttributes())
                 .applePushCategory(command.getApplePushCategory())
                 .context(command.getContext())
-                .correlationId(command.getCorrelationId())
                 .build();
         Notification saved = notificationRepository.save(notification);
         log.debug("Persisted notification {} (admins={}, machines={})",
@@ -154,22 +153,41 @@ public class NotificationBroadcaster {
     }
 
     /**
-     * Persists an in-place change to an already-broadcast notification and re-publishes it (UPDATED)
-     * to its original recipients so live clients upsert the existing card by id. Read-state rows are
-     * left untouched — only the notification content changes.
+     * Rewrites the content of an already-broadcast notification, located by one of its stored
+     * attributes, and re-publishes it (UPDATED) to its original recipients so live clients upsert
+     * the existing card by id. Returns the notification id, or empty when there is nothing to
+     * update. Read-state rows are left untouched.
      */
-    public void update(Notification updated) {
+    public Optional<String> update(NotificationCommand command, String attributeKey, String attributeValue) {
         if (!notificationsEnabled) {
             log.debug("Notifications feature disabled — update skipped");
-            return;
+            return Optional.empty();
         }
 
-        Notification saved = notificationRepository.save(updated);
+        Optional<Notification> found = notificationRepository.findByAttribute(attributeKey, attributeValue);
+        if (found.isEmpty()) {
+            log.debug("No notification carries {}={} — nothing to update", attributeKey, attributeValue);
+            return Optional.empty();
+        }
+
+        Notification saved = notificationRepository.save(withContentOf(found.get(), command));
         NotificationCategory category = saved.getCategory();
 
         natsPublisher.ifPresentOrElse(
                 publisher -> republishToRecipients(publisher, saved, category),
                 () -> log.debug("NATS publisher disabled — notification {} updated in DB only", saved.getId()));
+        return Optional.of(saved.getId());
+    }
+
+    // Content only. Type, category and severity are fixed per notification type, and the entity
+    // lives on the read-state rows written at broadcast — rewriting either here would desync the
+    // per-entity unread counts from the card they belong to.
+    private Notification withContentOf(Notification stored, NotificationCommand command) {
+        stored.setTitle(command.getTitle());
+        stored.setDescription(command.getDescription());
+        stored.setAttributes(command.getAttributes());
+        stored.setContext(command.getContext());
+        return stored;
     }
 
     private void republishToRecipients(NotificationNatsPublisher publisher, Notification saved, NotificationCategory category) {

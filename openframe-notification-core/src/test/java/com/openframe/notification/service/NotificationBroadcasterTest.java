@@ -44,6 +44,9 @@ import static org.mockito.Mockito.when;
 
 class NotificationBroadcasterTest {
 
+    private static final String SOURCE_KEY = "approvalRequestId";
+    private static final String SOURCE_VALUE = "ar-1";
+
     private enum TestType implements com.openframe.notification.spec.NotificationType { TICKET_ASSIGNED }
 
     private NotificationRepository notificationRepository;
@@ -342,29 +345,55 @@ class NotificationBroadcasterTest {
     }
 
     @Test
-    @DisplayName("Given an updated notification, when update is called, then it persists and re-publishes UPDATED to each recipient on their own subject — user on the user subject, machine on the machine subject")
-    void update_republishes_to_each_recipient_on_the_right_subject() {
-        Notification updated = updatedNotification();
+    @DisplayName("Given a stored notification carrying the source attribute, when update is called, then its content is rewritten, it is persisted and UPDATED is re-published to each recipient on their own subject")
+    void update_rewrites_content_and_republishes_to_each_recipient() {
+        Notification stored = storedApprovalNotification();
         when(readStateService.findRecipients("notif-id-1")).thenReturn(java.util.List.of(
                 recipient("admin-1", RecipientType.USER, ReadStatus.UNREAD),
                 recipient("m-1", RecipientType.MACHINE, ReadStatus.UNREAD)));
 
-        broadcaster.update(updated);
+        Optional<String> updatedId = broadcaster.update(resolvedCommand(), SOURCE_KEY, SOURCE_VALUE);
 
-        verify(notificationRepository).save(updated);
+        assertThat(updatedId).contains("notif-id-1");
+        assertThat(stored.getTitle()).isEqualTo("Approval required");
+        assertThat(stored.getAttributes()).containsEntry("resolution", "APPROVED");
+        verify(notificationRepository).save(stored);
         verify(natsPublisher).publishUpdateToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
         verify(natsPublisher).publishUpdateToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
     }
 
     @Test
+    @DisplayName("Given a stored notification, when update rewrites it, then category and type keep their original values — the read-state rows were written against them and moving them would desync the per-entity unread counts")
+    void update_leaves_type_and_category_alone() {
+        Notification stored = storedApprovalNotification();
+
+        broadcaster.update(resolvedCommand(), SOURCE_KEY, SOURCE_VALUE);
+
+        assertThat(stored.getCategory()).isEqualTo(NotificationCategory.TICKETS);
+        assertThat(stored.getType()).isEqualTo("TICKET_APPROVAL_REQUEST");
+    }
+
+    @Test
+    @DisplayName("Given no notification carries the source attribute, when update is called, then nothing is persisted or published and the result is empty — the notification may never have been created")
+    void update_is_a_noop_when_nothing_carries_the_attribute() {
+        when(notificationRepository.findByAttribute(SOURCE_KEY, SOURCE_VALUE)).thenReturn(Optional.empty());
+
+        Optional<String> updatedId = broadcaster.update(resolvedCommand(), SOURCE_KEY, SOURCE_VALUE);
+
+        assertThat(updatedId).isEmpty();
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verifyNoInteractions(natsPublisher);
+    }
+
+    @Test
     @DisplayName("Given a recipient who DELETED the card, when update re-publishes, then that recipient is skipped while the others still get it — re-publishing UPDATED would resurrect a card the user removed")
     void update_does_not_resurrect_a_deleted_card() {
-        Notification updated = updatedNotification();
+        storedApprovalNotification();
         when(readStateService.findRecipients("notif-id-1")).thenReturn(java.util.List.of(
                 recipient("deleter", RecipientType.USER, ReadStatus.DELETED),
                 recipient("reader", RecipientType.USER, ReadStatus.READ)));
 
-        broadcaster.update(updated);
+        broadcaster.update(resolvedCommand(), SOURCE_KEY, SOURCE_VALUE);
 
         verify(natsPublisher, never()).publishUpdateToUser(eq("deleter"), any(Notification.class), any(NotificationCategory.class));
         verify(natsPublisher).publishUpdateToUser(eq("reader"), any(Notification.class), any(NotificationCategory.class));
@@ -373,24 +402,24 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given the publish throws for one recipient, when update re-publishes, then the remaining recipients still receive it — one bad send does not poison the loop")
     void update_publish_failure_for_one_recipient_does_not_skip_others() {
-        Notification updated = updatedNotification();
+        storedApprovalNotification();
         doThrow(new RuntimeException("nats reject")).when(natsPublisher)
                 .publishUpdateToUser(eq("a"), any(Notification.class), any(NotificationCategory.class));
         when(readStateService.findRecipients("notif-id-1")).thenReturn(java.util.List.of(
                 recipient("a", RecipientType.USER, ReadStatus.UNREAD),
                 recipient("b", RecipientType.USER, ReadStatus.UNREAD)));
 
-        broadcaster.update(updated);
+        broadcaster.update(resolvedCommand(), SOURCE_KEY, SOURCE_VALUE);
 
         verify(natsPublisher).publishUpdateToUser(eq("b"), any(Notification.class), any(NotificationCategory.class));
     }
 
     @Test
-    @DisplayName("Given the notifications feature flag is disabled, when update is called, then nothing is persisted or published — update stays dormant like broadcast")
+    @DisplayName("Given the notifications feature flag is disabled, when update is called, then nothing is looked up, persisted or published — update stays dormant like broadcast")
     void update_is_a_noop_when_the_feature_is_disabled() {
         NotificationBroadcaster disabled = newBroadcaster(Optional.of(natsPublisher), false);
 
-        disabled.update(updatedNotification());
+        assertThat(disabled.update(resolvedCommand(), SOURCE_KEY, SOURCE_VALUE)).isEmpty();
 
         verifyNoInteractions(notificationRepository, readStateService, natsPublisher);
     }
@@ -546,8 +575,27 @@ class NotificationBroadcasterTest {
         return GenericContext.builder().type(type).payload("{}").build();
     }
 
-    private static Notification updatedNotification() {
-        return Notification.builder().id("notif-id-1").category(NotificationCategory.TICKETS).build();
+    private Notification storedApprovalNotification() {
+        Notification stored = Notification.builder()
+                .id("notif-id-1")
+                .category(NotificationCategory.TICKETS)
+                .type("TICKET_APPROVAL_REQUEST")
+                .title("Approval required")
+                .attributes(java.util.Map.of(SOURCE_KEY, SOURCE_VALUE, "resolution", "PENDING"))
+                .build();
+        when(notificationRepository.findByAttribute(SOURCE_KEY, SOURCE_VALUE)).thenReturn(Optional.of(stored));
+        return stored;
+    }
+
+    private static NotificationCommand resolvedCommand() {
+        return NotificationCommand.builder()
+                .title("Approval required")
+                .description("Restart the agent")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("APPROVAL"))
+                .attributes(java.util.Map.of(SOURCE_KEY, SOURCE_VALUE, "resolution", "APPROVED"))
+                .audience(Audience.users("admin-1"))
+                .build();
     }
 
     private static NotificationSettings settings(String userId, boolean enabled,

@@ -22,7 +22,6 @@ public final class NotificationCommand {
     private final String description;
     private final NotificationSeverity severity;
     private final NotificationContext context;
-    private final String correlationId;
     private final Audience audience;
     // Null until the caller is the spec-driven emitter; legacy dispatchers don't set them.
     private final NotificationType type;
@@ -37,7 +36,6 @@ public final class NotificationCommand {
                         String description,
                         NotificationSeverity severity,
                         NotificationContext context,
-                        String correlationId,
                         Audience audience,
                         NotificationType type,
                         Map<String, String> attributes,
@@ -58,7 +56,6 @@ public final class NotificationCommand {
         this.description = description;
         this.severity = severity;
         this.context = context;
-        this.correlationId = correlationId;
         this.audience = audience;
         this.type = type;
         this.attributes = attributes == null ? null : Map.copyOf(attributes);

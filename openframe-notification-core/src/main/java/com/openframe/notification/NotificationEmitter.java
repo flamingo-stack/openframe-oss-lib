@@ -13,11 +13,13 @@ import com.openframe.notification.spec.NotificationSeed;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
 import com.openframe.notification.spec.NotificationTypeSpec;
+import com.openframe.notification.spec.UpdatableNotificationSpec;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -27,17 +29,13 @@ public class NotificationEmitter {
     private final NotificationTypeRegistry registry;
     private final NotificationBroadcaster broadcaster;
 
-    public void notify(NotificationRequest request) {
-        notify(request, null);
-    }
-
     // Never throws: a notification bug must not fail the business flow that emitted it.
-    public void notify(NotificationRequest request, String correlationId) {
+    public void notify(NotificationRequest request) {
         NotificationSeed seed = request.getSeed();
         NotificationType type = seed.type();
         try {
             NotificationTypeSpec<?> spec = registry.require(type);
-            NotificationCommand command = buildCommand(spec, seed, correlationId);
+            NotificationCommand command = buildCommand(spec, seed);
             broadcaster.broadcast(command);
         } catch (RuntimeException ex) {
             log.error("Notification emission failed for type {} — swallowed, business flow unaffected",
@@ -45,11 +43,38 @@ public class NotificationEmitter {
         }
     }
 
+    /**
+     * Re-projects the seed onto the notification already broadcast for the same source document and
+     * returns its id, or empty when there is none. Accepts only types whose spec declares itself an
+     * {@link UpdatableNotificationSpec}. Never throws, for the same reason {@link #notify} does not.
+     */
+    public Optional<String> update(NotificationRequest request) {
+        NotificationSeed seed = request.getSeed();
+        NotificationType type = seed.type();
+        try {
+            NotificationTypeSpec<?> spec = registry.require(type);
+            if (!(spec instanceof UpdatableNotificationSpec<?> updatable)) {
+                throw new IllegalStateException("Spec for type " + type.name() + " is not updatable");
+            }
+            NotificationCommand command = buildCommand(spec, seed);
+            String attributeKey = updatable.sourceIdAttr().getName();
+            String attributeValue = command.getAttributes().get(attributeKey);
+            if (attributeValue == null) {
+                throw new IllegalStateException("Spec for type " + type.name()
+                        + " declares source id attribute '" + attributeKey + "' but does not emit it");
+            }
+            return broadcaster.update(command, attributeKey, attributeValue);
+        } catch (RuntimeException ex) {
+            log.error("Notification update failed for type {} — swallowed, business flow unaffected",
+                    type.name(), ex);
+            return Optional.empty();
+        }
+    }
+
     // The cast is the wiring check: a seed whose type() routes to a spec built for another
     // seed class fails loudly here, not with a mystery deep inside the spec.
     private static <S extends NotificationSeed> NotificationCommand buildCommand(NotificationTypeSpec<S> spec,
-                                                                                 NotificationSeed seed,
-                                                                                 String correlationId) {
+                                                                                 NotificationSeed seed) {
         Class<S> seedClass = spec.getSeedClass();
         S typed = seedClass.cast(seed);
 
@@ -76,7 +101,6 @@ public class NotificationEmitter {
                 .description(description)
                 .severity(severity)
                 .context(legacyContext)
-                .correlationId(correlationId)
                 .audience(audience)
                 .build();
     }

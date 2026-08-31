@@ -45,12 +45,5 @@ public class Notification implements TenantScoped {
 
     private NotificationContext context;
 
-    /**
-     * Optional source-event correlation key (e.g. an approval-request id) used to locate and
-     * update a previously-pushed notification in place. Null for one-shot notifications.
-     */
-    @Indexed
-    private String correlationId;
-
     private String tenantId;
 }

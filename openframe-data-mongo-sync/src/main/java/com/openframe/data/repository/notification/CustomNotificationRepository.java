@@ -1,9 +1,15 @@
 package com.openframe.data.repository.notification;
 
+import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.RecipientType;
 import org.springframework.data.domain.Sort;
 
+import java.util.Optional;
+
 public interface CustomNotificationRepository {
+
+    /** Looks a notification up by one of its stored attributes; see UpdatableNotificationSpec. */
+    Optional<Notification> findByAttribute(String attributeKey, String attributeValue);
 
     NotificationPage findPageForRecipient(String recipientId, RecipientType recipientType,
                                           Boolean readFilter, String search,
