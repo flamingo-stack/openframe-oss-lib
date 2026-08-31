@@ -1,48 +1,46 @@
 package com.openframe.client.service.rmm;
 
-import com.openframe.data.document.rmm.ExecutionSource;
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.document.rmm.ScheduleScriptExecution;
-import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
-import com.openframe.data.document.rmm.Script;
-import com.openframe.data.document.rmm.ScriptEnvVar;
-import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
+import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
+import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
+import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
+import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/**
- * Dispatches ONE fire of a schedule: resolves what to run and where, records it, and fans it
- * out over core NATS. Split out of the orchestrator so the "run the scripts" mechanics live
- * apart from the "when to run + advance the cadence" bookkeeping.
- *
- * <p>A single fire produces (in order): one {@link ScheduleScriptExecution} header row
- * (a snapshot of the whole attempt), one {@link ScriptExecution} leaf row per (script, machine)
- * in {@code RUNNING} (persisted before publish so the watchdog can reap it), and one batched
- * {@link ScriptScheduleExecutionMessage} per machine on
- * {@code machine.{machineId}.script-schedule-execution}. Everything shares one
- * {@code executionId}, stamped with {@code scheduleId}; {@code scriptId} disambiguates leaves
- * and result frames. A fire with no scripts, no assigned devices, or no runnable (ACTIVE)
- * scripts dispatches nothing — logged, not fatal.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -53,14 +51,77 @@ public class ScheduleFireDispatcher {
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
     private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    private final MachineRepository machineRepository;
+    private final DeviceOnlineDispatchRepository dispatchRepository;
+    private final ScriptDeliveryRetryStore retryStore;
+
+    public void dispatch(ScheduleScript schedule, Instant now) {
+        List<String> targets = targetResolver.resolveTargetMachineIds(schedule);
+        if (targets == null || targets.isEmpty()) {
+            dispatch(schedule, targets, now);
+            return;
+        }
+
+        Set<String> offline = offlineTargets(schedule.getTenantId(), targets);
+        if (!offline.isEmpty()) {
+            handleOfflineTargets(schedule, offline, now);
+        }
+
+        List<String> online = targets.stream().filter(id -> !offline.contains(id)).toList();
+        dispatch(schedule, online, now);
+    }
+
+    private boolean isRetryOnReconnect(ScheduleScript schedule) {
+        return schedule.getTrigger() == ScheduleScriptTrigger.DATE_TIME
+                && schedule.getOfflineBehavior() == ScheduleOfflineBehavior.RETRY_ON_RECONNECT
+                && schedule.getReconnectWindowSeconds() != null
+                && schedule.getReconnectWindowSeconds() > 0;
+    }
+
+    private Set<String> offlineTargets(String tenantId, List<String> targets) {
+        return machineRepository.findByTenantIdAndMachineIdIn(tenantId, new HashSet<>(targets)).stream()
+                .filter(machine -> machine.getStatus() == DeviceStatus.OFFLINE)
+                .map(Machine::getMachineId)
+                .collect(Collectors.toSet());
+    }
+
+    private void handleOfflineTargets(ScheduleScript schedule, Set<String> offline, Instant now) {
+        if (isRetryOnReconnect(schedule)) {
+            armReconnectRetry(schedule, new ArrayList<>(offline), now);
+        } else {
+            log.info("Skipping {} offline device(s) for schedule scheduleId={} tenantId={} (offlineBehavior=SKIP)",
+                    offline.size(), schedule.getId(), schedule.getTenantId());
+        }
+    }
 
     /**
-     * Dispatch one fire of {@code schedule} to <b>all</b> its current target devices (the
-     * time-driven runner path). Targets are resolved per the schedule's selection mode — explicit
-     * assignments for SPECIFIC, the live criteria match for CRITERIA
+     * Arm (or refresh) one reconnect-retry sentinel per offline device. Keyed by
+     * (tenant, schedule, machine) — a later fire supersedes any stale sentinel by resetting it to
+     * NEW with a fresh window, so the collection never grows unbounded.
      */
-    public void dispatch(ScriptSchedule schedule, Instant now) {
-        dispatch(schedule, targetResolver.resolveTargetMachineIds(schedule), now);
+    private void armReconnectRetry(ScheduleScript schedule, List<String> machineIds, Instant now) {
+        Instant expiresAt = now.plusSeconds(schedule.getReconnectWindowSeconds());
+        for (String machineId : machineIds) {
+            DeviceFirstOnlineDispatch row = dispatchRepository
+                    .findByTenantIdAndMachineIdAndScheduleId(schedule.getTenantId(), machineId, schedule.getId())
+                    .orElseGet(() -> DeviceFirstOnlineDispatch.builder()
+                            .tenantId(schedule.getTenantId())
+                            .machineId(machineId)
+                            .scheduleId(schedule.getId())
+                            .build());
+            row.setStatus(DeviceOnlineDispatchStatus.NEW);
+            row.setFirstSeenAt(now);
+            row.setExpiresAt(expiresAt);
+            row.setDispatchedAt(null);
+            try {
+                dispatchRepository.save(row);
+            } catch (DuplicateKeyException raced) {
+                log.debug("reconnect-retry sentinel armed concurrently: machineId={} scheduleId={}",
+                        machineId, schedule.getId());
+            }
+        }
+        log.info("Armed reconnect-retry for {} offline device(s) scheduleId={} tenantId={} expiresAt={}",
+                machineIds.size(), schedule.getId(), schedule.getTenantId(), expiresAt);
     }
 
     /**
@@ -69,7 +130,7 @@ public class ScheduleFireDispatcher {
      * The caller is responsible for the machines being genuinely assigned. No-op (logged) when
      * there is nothing to run.
      */
-    public void dispatch(ScriptSchedule schedule, List<String> machineIds, Instant now) {
+    public void dispatch(ScheduleScript schedule, List<String> machineIds, Instant now) {
         List<String> scriptIds = schedule.getScriptIds();
         if (scriptIds == null || scriptIds.isEmpty() || machineIds == null || machineIds.isEmpty()) {
             log.info("Schedule scheduleId={} has no scripts or no target devices — nothing dispatched",
@@ -94,7 +155,7 @@ public class ScheduleFireDispatcher {
                 fire.scheduleId(), fire.executionId(), scripts.size(), machineIds.size());
     }
 
-    private static Map<String, ScheduledScriptCustomParams> customParamsByScriptId(ScriptSchedule schedule) {
+    private static Map<String, ScheduledScriptCustomParams> customParamsByScriptId(ScheduleScript schedule) {
         List<ScheduledScriptCustomParams> customParams = schedule.getScriptCustomParams();
         if (customParams == null || customParams.isEmpty()) {
             return Map.of();
@@ -140,7 +201,7 @@ public class ScheduleFireDispatcher {
                         .timeoutSeconds(script.getDefaultTimeoutSeconds())
                         .initiatedBy(fire.initiatedBy())
                         .source(ExecutionSource.SCHEDULED)
-                        .status(ExecutionStatus.RUNNING)
+                        .status(ExecutionStatus.QUEUED)
                         .dispatchedAt(fire.now())
                         .statusChangedAt(fire.now())
                         .build()))
@@ -169,18 +230,21 @@ public class ScheduleFireDispatcher {
                 })
                 .toList();
 
-        fire.machineIds().forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
-                ScriptScheduleExecutionMessage.builder()
-                        .executionId(fire.executionId())
-                        .scheduleId(fire.scheduleId())
-                        .machineId(machineId)
-                        .initiatedBy(fire.initiatedBy())
-                        .scripts(items)
-                        .build()));
+        fire.machineIds().forEach(machineId -> {
+            ScriptScheduleExecutionMessage message = ScriptScheduleExecutionMessage.builder()
+                    .executionId(fire.executionId())
+                    .scheduleId(fire.scheduleId())
+                    .machineId(machineId)
+                    .initiatedBy(fire.initiatedBy())
+                    .scripts(items)
+                    .build();
+            scriptScheduleNatsPublisher.publish(machineId, message);
+            retryStore.store(fire.executionId(), machineId, message);
+        });
     }
 
     /** Everything one fire needs, bundled so the persist/publish steps take a single arg. */
-    private record Fire(ScriptSchedule schedule, String executionId, List<Script> scripts,
+    private record Fire(ScheduleScript schedule, String executionId, List<Script> scripts,
                         List<String> machineIds, Instant now) {
         String tenantId() {
             return schedule.getTenantId();

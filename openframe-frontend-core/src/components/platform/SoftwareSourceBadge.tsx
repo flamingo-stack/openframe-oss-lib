@@ -32,14 +32,9 @@
  * ```
  */
 
-import React from 'react'
-import {
-  PackageIcon,
-  WindowsIcon,
-  MacOSIcon,
-  LinuxIcon
-} from '../icons'
-import { cn } from '../../utils/common'
+import type React from 'react';
+import { cn } from '../../utils/common';
+import { PackageIcon, WindowsIcon, MacOSIcon, LinuxIcon } from '../icons';
 
 export type SoftwareSource =
   | 'apps'
@@ -59,51 +54,48 @@ export type SoftwareSource =
   | 'portage_packages'
   | 'chocolatey_packages'
   | 'programs'
-  | 'pkg_packages'
+  | 'pkg_packages';
 
 export interface SoftwareSourceBadgeProps {
   /** Software source type from Fleet MDM */
-  source: SoftwareSource
+  source: SoftwareSource;
   /** Additional CSS classes */
-  className?: string
+  className?: string;
 }
 
 /**
  * Maps source types to human-readable labels and icons
  */
 const sourceConfig: Record<SoftwareSource, { label: string; icon: React.ReactNode }> = {
-  apps: { label: 'App', icon: <MacOSIcon className="w-4 h-4" /> },
-  chrome_extensions: { label: 'Chrome', icon: <PackageIcon className="w-4 h-4" /> },
-  firefox_addons: { label: 'Firefox', icon: <PackageIcon className="w-4 h-4" /> },
-  safari_extensions: { label: 'Safari', icon: <PackageIcon className="w-4 h-4" /> },
-  ie_extensions: { label: 'IE', icon: <PackageIcon className="w-4 h-4" /> },
-  vscode_extensions: { label: 'VS Code', icon: <PackageIcon className="w-4 h-4" /> },
-  atom_packages: { label: 'Atom', icon: <PackageIcon className="w-4 h-4" /> },
-  homebrew_packages: { label: 'Homebrew', icon: <MacOSIcon className="w-4 h-4" /> },
-  npm_packages: { label: 'NPM', icon: <PackageIcon className="w-4 h-4" /> },
-  python_packages: { label: 'Python', icon: <PackageIcon className="w-4 h-4" /> },
-  apt_sources: { label: 'APT', icon: <LinuxIcon className="w-4 h-4" /> },
-  deb_packages: { label: 'DEB', icon: <LinuxIcon className="w-4 h-4" /> },
-  rpm_packages: { label: 'RPM', icon: <LinuxIcon className="w-4 h-4" /> },
-  yum_sources: { label: 'YUM', icon: <LinuxIcon className="w-4 h-4" /> },
-  portage_packages: { label: 'Portage', icon: <LinuxIcon className="w-4 h-4" /> },
-  chocolatey_packages: { label: 'Chocolatey', icon: <WindowsIcon className="w-4 h-4" /> },
-  programs: { label: 'Windows', icon: <WindowsIcon className="w-4 h-4" /> },
-  pkg_packages: { label: 'PKG', icon: <PackageIcon className="w-4 h-4" /> }
-}
+  apps: { label: 'App', icon: <MacOSIcon className="h-4 w-4" /> },
+  chrome_extensions: { label: 'Chrome', icon: <PackageIcon className="h-4 w-4" /> },
+  firefox_addons: { label: 'Firefox', icon: <PackageIcon className="h-4 w-4" /> },
+  safari_extensions: { label: 'Safari', icon: <PackageIcon className="h-4 w-4" /> },
+  ie_extensions: { label: 'IE', icon: <PackageIcon className="h-4 w-4" /> },
+  vscode_extensions: { label: 'VS Code', icon: <PackageIcon className="h-4 w-4" /> },
+  atom_packages: { label: 'Atom', icon: <PackageIcon className="h-4 w-4" /> },
+  homebrew_packages: { label: 'Homebrew', icon: <MacOSIcon className="h-4 w-4" /> },
+  npm_packages: { label: 'NPM', icon: <PackageIcon className="h-4 w-4" /> },
+  python_packages: { label: 'Python', icon: <PackageIcon className="h-4 w-4" /> },
+  apt_sources: { label: 'APT', icon: <LinuxIcon className="h-4 w-4" /> },
+  deb_packages: { label: 'DEB', icon: <LinuxIcon className="h-4 w-4" /> },
+  rpm_packages: { label: 'RPM', icon: <LinuxIcon className="h-4 w-4" /> },
+  yum_sources: { label: 'YUM', icon: <LinuxIcon className="h-4 w-4" /> },
+  portage_packages: { label: 'Portage', icon: <LinuxIcon className="h-4 w-4" /> },
+  chocolatey_packages: { label: 'Chocolatey', icon: <WindowsIcon className="h-4 w-4" /> },
+  programs: { label: 'Windows', icon: <WindowsIcon className="h-4 w-4" /> },
+  pkg_packages: { label: 'PKG', icon: <PackageIcon className="h-4 w-4" /> },
+};
 
-export const SoftwareSourceBadge: React.FC<SoftwareSourceBadgeProps> = ({
-  source,
-  className
-}) => {
-  const config = sourceConfig[source] || { label: source, icon: <PackageIcon className="w-4 h-4" /> }
+export const SoftwareSourceBadge: React.FC<SoftwareSourceBadgeProps> = ({ source, className }) => {
+  const config = sourceConfig[source] || { label: source, icon: <PackageIcon className="h-4 w-4" /> };
 
   return (
     <span className={cn('inline-flex items-center gap-2 text-ods-text-primary', className)}>
       {config.icon}
       {config.label}
     </span>
-  )
-}
+  );
+};
 
-SoftwareSourceBadge.displayName = 'SoftwareSourceBadge'
+SoftwareSourceBadge.displayName = 'SoftwareSourceBadge';

@@ -1,5 +1,20 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { AlertTriangle, Bell, ChevronDown, ChevronRight, Download, ExternalLink as ExternalLinkIcon, Heart, Menu, MessageSquare, Plus, Search, Settings, ShoppingCart, Trash2, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Bell,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  ExternalLink as ExternalLinkIcon,
+  Heart,
+  Menu,
+  MessageSquare,
+  Plus,
+  Search,
+  Settings,
+  ShoppingCart,
+  Trash2,
+} from 'lucide-react';
 import React from 'react';
 import { Button } from '../components/ui/button';
 
@@ -99,19 +114,19 @@ export const FullWidth: Story = {
 
 export const SplitIcon: Story = {
   args: { children: 'Save', splitIcon: <ChevronDown /> },
-}
+};
 
 export const SplitIconOutline: Story = {
   args: { children: 'Open', variant: 'outline', splitIcon: <ExternalLinkIcon /> },
-}
+};
 
 export const SplitIconAsLink: Story = {
   args: { children: 'Documentation', href: '/docs', splitIcon: <ExternalLinkIcon /> },
-}
+};
 
 export const SplitIconSmall: Story = {
   args: { children: 'Save', size: 'small', splitIcon: <ChevronDown /> },
-}
+};
 
 // === As link ===
 
@@ -128,25 +143,37 @@ export const ExternalLink: Story = {
 export const AllVariants: Story = {
   args: { children: 'Button' },
   render: () => {
-    const variants = ['accent', 'outline', 'transparent', 'destructive', 'warning'] as const
-    const labels: Record<typeof variants[number], string> = {
+    const variants = ['accent', 'outline', 'transparent', 'destructive', 'warning'] as const;
+    const labels: Record<(typeof variants)[number], string> = {
       accent: 'Accent',
       outline: 'Outline',
       transparent: 'Transparent',
       destructive: 'Destructive',
       warning: 'Warning',
-    }
+    };
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto', gap: '1rem', alignItems: 'center', justifyItems: 'start' }}>
-        {variants.map((variant) => (
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto auto auto',
+          gap: '1rem',
+          alignItems: 'center',
+          justifyItems: 'start',
+        }}
+      >
+        {variants.map(variant => (
           <React.Fragment key={variant}>
             <Button variant={variant}>{labels[variant]}</Button>
-            <Button variant={variant} disabled>{labels[variant]}</Button>
-            <Button variant={variant} loading>{labels[variant]}</Button>
+            <Button variant={variant} disabled>
+              {labels[variant]}
+            </Button>
+            <Button variant={variant} loading>
+              {labels[variant]}
+            </Button>
           </React.Fragment>
         ))}
       </div>
-    )
+    );
   },
 };
 
@@ -179,10 +206,18 @@ export const WithIconsShowcase: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-start' }}>
       <Button leftIcon={<Plus />}>Add Item</Button>
-      <Button variant="outline" rightIcon={<ChevronRight />}>Continue</Button>
-      <Button leftIcon={<Download />} rightIcon={<ChevronRight />}>Download All</Button>
-      <Button variant="destructive" leftIcon={<Trash2 />}>Delete</Button>
-      <Button variant="outline" leftIcon={<Search />}>Search</Button>
+      <Button variant="outline" rightIcon={<ChevronRight />}>
+        Continue
+      </Button>
+      <Button leftIcon={<Download />} rightIcon={<ChevronRight />}>
+        Download All
+      </Button>
+      <Button variant="destructive" leftIcon={<Trash2 />}>
+        Delete
+      </Button>
+      <Button variant="outline" leftIcon={<Search />}>
+        Search
+      </Button>
     </div>
   ),
 };
@@ -202,10 +237,18 @@ export const NotificationCounters: Story = {
   args: { children: 'Counter' },
   render: () => (
     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-      <Button variant="outline" leftIcon={<Bell />}>3</Button>
-      <Button variant="outline" leftIcon={<MessageSquare />}>12</Button>
-      <Button variant="accent" leftIcon={<ShoppingCart />}>5</Button>
-      <Button variant="transparent" leftIcon={<Heart />}>99</Button>
+      <Button variant="outline" leftIcon={<Bell />}>
+        3
+      </Button>
+      <Button variant="outline" leftIcon={<MessageSquare />}>
+        12
+      </Button>
+      <Button variant="accent" leftIcon={<ShoppingCart />}>
+        5
+      </Button>
+      <Button variant="transparent" leftIcon={<Heart />}>
+        99
+      </Button>
     </div>
   ),
 };

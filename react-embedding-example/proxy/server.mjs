@@ -16,14 +16,13 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import httpProxy from 'http-proxy'
 import { CONTENT_PREFIX } from './content-prefix.mjs'
-import { hubTarget, rewrite, injectHeaders } from './inject.mjs'
+import { hubTarget, rewrite } from './inject.mjs'
 
 const env = process.env
 const PORT = Number(env.PORT) || 4173
 const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist')
 
 const proxy = httpProxy.createProxyServer({ target: hubTarget(env), changeOrigin: true })
-proxy.on('proxyReq', (proxyReq) => injectHeaders(proxyReq, env))
 proxy.on('error', (err, _req, res) => {
   res.writeHead(502, { 'content-type': 'text/plain' })
   res.end(`proxy error: ${err.message}`)

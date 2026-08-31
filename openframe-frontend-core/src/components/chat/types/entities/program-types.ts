@@ -17,10 +17,7 @@
  */
 
 import type { ReactNode } from 'react';
-import {
-  toStripProfile,
-  type VideoBiteStripProfile,
-} from '../../../features/video-bites-shared';
+import { toStripProfile, type VideoBiteStripProfile } from '../../../features/video-bites-shared';
 
 // ============================================================================
 // HOST TYPES

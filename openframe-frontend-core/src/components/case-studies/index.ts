@@ -1,4 +1,1 @@
-export {
-  ShareExperienceSection,
-  type ShareExperienceSectionProps,
-} from './share-experience-section'
+export { ShareExperienceSection, type ShareExperienceSectionProps } from './share-experience-section';

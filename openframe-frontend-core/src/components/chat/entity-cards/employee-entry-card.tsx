@@ -1,53 +1,60 @@
-import React from 'react'
-import { AdminContentCard } from './admin-content-card'
-import { getProxiedImageUrl } from '../../../utils/image-proxy-stub'
+import type React from 'react';
+import Image from '../../../embed-shims/next-image';
+import { getProxiedImageUrl } from '../../../utils/image-proxy-stub';
+import { AdminContentCard } from './admin-content-card';
 
 /** The fields every people-hub employee entry shares. Entity-specific bindings
  *  (`WhatIShippedCard`, `HowIWorkCard`) map their own date column to `dateLabel`
  *  and pass the rest through unchanged. */
 export interface EmployeeEntryCardData {
-  title?: string | null
-  summary?: string | null
-  status?: string | null
-  featured_image?: string | null
-  main_video_thumbnail?: string | null
-  author?: { full_name?: string | null; avatar_url?: string | null } | null
+  title?: string | null;
+  summary?: string | null;
+  status?: string | null;
+  featured_image?: string | null;
+  main_video_thumbnail?: string | null;
+  author?: { full_name?: string | null; avatar_url?: string | null } | null;
 }
 
 export interface EmployeeEntryCardProps {
-  entry: EmployeeEntryCardData
+  entry: EmployeeEntryCardData;
   /** Already-formatted date shown in the meta row. Bindings own the format so
    *  the UTC-pin convention stays in `utils/format`, not in the card. */
-  dateLabel?: string | null
+  dateLabel?: string | null;
   /** Extra badges rendered after the status badge (e.g. discipline / level). */
-  extraBadges?: React.ReactNode
+  extraBadges?: React.ReactNode;
   /** Fallback title when the entry has none — names the entity in the empty case. */
-  untitledLabel?: string
+  untitledLabel?: string;
   /** OG fallback cover. Caller computes it (hub: `useOgPlaceholderUrl`; related
    *  rail: `extras.buildOgPlaceholderUrl`). */
-  placeholderUrl?: string | null
+  placeholderUrl?: string | null;
   /** Owner action row (dashboard). Omit for a read-only card. */
-  actions?: React.ReactNode
+  actions?: React.ReactNode;
   /** When provided, the WHOLE card becomes a link (related-rail click-through).
    *  Don't combine with `actions` (nested interactive). */
-  anchorProps?: React.AnchorHTMLAttributes<HTMLAnchorElement>
-  className?: string
+  anchorProps?: React.AnchorHTMLAttributes<HTMLAnchorElement>;
+  className?: string;
 }
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
   published: 'bg-ods-success-secondary text-ods-success',
   draft: 'bg-ods-warning-secondary text-ods-warning',
   archived: 'bg-ods-border text-ods-text-secondary',
-}
+  // Design-doc lifecycle (product-hub) — same ODS pairs, no new palette.
+  in_review: 'bg-ods-warning-secondary text-ods-warning',
+  approved: 'bg-ods-success-secondary text-ods-success',
+  building: 'bg-ods-success-secondary text-ods-success',
+  shipped: 'bg-ods-success-secondary text-ods-success',
+  abandoned: 'bg-ods-border text-ods-text-secondary',
+};
 
 /** Shared badge treatment so an entity's own badges (discipline, level) sit
  *  flush with the status badge instead of re-deriving the classes per card. */
 export function EmployeeEntryBadge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="px-2 py-1 rounded text-xs font-medium bg-ods-card border border-ods-border text-ods-text-secondary">
+    <span className="rounded border border-ods-border bg-ods-card px-2 py-1 text-xs font-medium text-ods-text-secondary">
       {children}
     </span>
-  )
+  );
 }
 
 /**
@@ -80,8 +87,8 @@ export function EmployeeEntryCard({
           <>
             {entry.status ? (
               <span
-                className={`px-2 py-1 rounded text-xs font-medium ${
-                  STATUS_BADGE_CLASS[entry.status] ?? 'bg-ods-card border border-ods-border text-ods-text-secondary'
+                className={`rounded px-2 py-1 text-xs font-medium ${
+                  STATUS_BADGE_CLASS[entry.status] ?? 'border border-ods-border bg-ods-card text-ods-text-secondary'
                 }`}
               >
                 {entry.status}
@@ -93,9 +100,16 @@ export function EmployeeEntryCard({
       }
       meta={
         <>
-          <span className="flex items-center gap-2 min-w-0">
+          <span className="flex min-w-0 items-center gap-2">
             {entry.author?.avatar_url ? (
-              <img src={getProxiedImageUrl(entry.author.avatar_url) ?? entry.author.avatar_url} alt="" className="h-5 w-5 rounded-full object-cover shrink-0" />
+              <Image
+                src={getProxiedImageUrl(entry.author.avatar_url) ?? entry.author.avatar_url}
+                alt=""
+                className="h-5 w-5 shrink-0 rounded-full object-cover"
+                width={20}
+                height={20}
+                unoptimized
+              />
             ) : null}
             <span className="truncate">{entry.author?.full_name ?? ''}</span>
           </span>
@@ -105,14 +119,14 @@ export function EmployeeEntryCard({
       actions={actions}
       className={className}
     />
-  )
+  );
   return anchorProps ? (
     <a {...anchorProps} className="block h-full">
       {card}
     </a>
   ) : (
     card
-  )
+  );
 }
 
 /** Loading skeleton matching EmployeeEntryCard's AdminContentCard shape (3:2 cover
@@ -123,17 +137,19 @@ export function EmployeeEntryCardSkeleton({ className }: { className?: string })
   // `bg-ods-bg` placeholder blocks, flex-grow body with an `mt-auto` avatar+name
   // row. Shape mirrors EmployeeEntryCard's AdminContentCard (rounded-2xl, 3:2 cover).
   return (
-    <div className={`group bg-ods-card border border-ods-border rounded-2xl overflow-hidden h-full flex flex-col animate-pulse ${className ?? ''}`}>
+    <div
+      className={`group flex h-full animate-pulse flex-col overflow-hidden rounded-2xl border border-ods-border bg-ods-card ${className ?? ''}`}
+    >
       <div className="aspect-[3/2] bg-ods-bg" />
-      <div className="p-4 flex flex-col flex-grow space-y-3">
-        <div className="h-5 w-3/4 bg-ods-bg rounded" />
-        <div className="h-3 w-full bg-ods-bg/60 rounded" />
-        <div className="h-3 w-4/5 bg-ods-bg/60 rounded" />
+      <div className="flex flex-grow flex-col space-y-3 p-4">
+        <div className="h-5 w-3/4 rounded bg-ods-bg" />
+        <div className="h-3 w-full rounded bg-ods-bg/60" />
+        <div className="h-3 w-4/5 rounded bg-ods-bg/60" />
         <div className="mt-auto flex items-center gap-2">
           <div className="h-8 w-8 rounded-full bg-ods-bg" />
-          <div className="h-3 w-24 bg-ods-bg/60 rounded" />
+          <div className="h-3 w-24 rounded bg-ods-bg/60" />
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,90 +1,39 @@
-'use client'
+'use client';
 
-import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { DraggerIcon } from '../icons-v2-generated/interface/dragger-icon'
-import { TrashIcon } from '../icons-v2-generated/interface/trash-icon'
-import { InfoCircleIcon } from '../icons-v2-generated/signs-and-symbols/info-circle-icon'
-import { Button } from './button'
-import { ColorPresetSelect, ColorPickerInput } from './color-preset-select'
-import { Input } from './input'
-import { type TagProps } from './tag'
-import { TicketStatusTag } from './ticket-status-tag'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
+import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
+import { cn } from '../../utils/cn';
+import { DraggerIcon } from '../icons-v2-generated/interface/dragger-icon';
+import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
+import { InfoCircleIcon } from '../icons-v2-generated/signs-and-symbols/info-circle-icon';
+import { Button } from './button';
+import { ColorPresetSelect, ColorPickerInput } from './color-preset-select';
+import { Input } from './input';
+import type { TagProps } from './tag';
+import { TicketStatusTag } from './ticket-status-tag';
+import { TouchFriendlyTooltip } from './touch-friendly-tooltip';
 
-type SystemTagVariant = Extract<TagProps['variant'], 'outline' | 'primary'>
+type SystemTagVariant = Extract<TagProps['variant'], 'outline' | 'primary'>;
 
 export interface TicketStatusConfigRowProps {
-  variant: 'system' | 'custom'
+  variant: 'system' | 'custom';
   /**
    * Canonical ticket-status key for system rows (e.g. 'ACTIVE', 'RESOLVED'),
    * or the row's unique id for custom rows. Forwarded to TicketStatusTag.
    */
-  statusKey: string
-  name: string
-  onNameChange?: (value: string) => void
-  color?: string
-  presetKey?: string
-  onColorChange?: (next: { color: string; preset?: string }) => void
-  systemTooltip?: string
-  systemTagVariant?: SystemTagVariant
-  onDelete?: () => void
-  deleteDisabled?: boolean
-  deleteDisabledReason?: string
-  dragHandleProps?: DraggableSyntheticListeners
-  dragHandleAttributes?: DraggableAttributes
-  isDragging?: boolean
-}
-
-let dismissOpenTooltip: (() => void) | null = null
-
-function WithLeftTooltip({ content, children }: { content?: string; children: React.ReactElement }) {
-  const [open, setOpen] = React.useState(false)
-  const isTouchRef = React.useRef(false)
-  const close = React.useCallback(() => setOpen(false), [])
-
-  if (!content) return children
-
-  const toggleFromTouch = () => {
-    setOpen(prev => {
-      const next = !prev
-      if (next) {
-        if (dismissOpenTooltip && dismissOpenTooltip !== close) dismissOpenTooltip()
-        dismissOpenTooltip = close
-      } else if (dismissOpenTooltip === close) {
-        dismissOpenTooltip = null
-      }
-      return next
-    })
-  }
-
-  return (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip open={open} onOpenChange={setOpen}>
-        <TooltipTrigger
-          asChild
-          onPointerDown={e => {
-            isTouchRef.current = e.pointerType === 'touch'
-            if (!isTouchRef.current) return
-            e.preventDefault()
-            toggleFromTouch()
-          }}
-          onFocus={e => {
-            if (isTouchRef.current) e.preventDefault()
-          }}
-          onClick={e => {
-            if (isTouchRef.current) e.preventDefault()
-          }}
-        >
-          {children}
-        </TooltipTrigger>
-        <TooltipContent side="left" className="max-w-xs">
-          {content}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
+  statusKey: string;
+  name: string;
+  onNameChange?: (value: string) => void;
+  color?: string;
+  presetKey?: string;
+  onColorChange?: (next: { color: string; preset?: string }) => void;
+  systemTooltip?: string;
+  systemTagVariant?: SystemTagVariant;
+  onDelete?: () => void;
+  deleteDisabled?: boolean;
+  deleteDisabledReason?: string;
+  dragHandleProps?: DraggableSyntheticListeners;
+  dragHandleAttributes?: DraggableAttributes;
+  isDragging?: boolean;
 }
 
 export function TicketStatusConfigRow({
@@ -104,14 +53,14 @@ export function TicketStatusConfigRow({
   dragHandleAttributes,
   isDragging,
 }: TicketStatusConfigRowProps) {
-  const isSystem = variant === 'system'
-  const isCustomColor = !isSystem && presetKey === undefined
-  const previewColor = isSystem ? undefined : color
-  const showColorPicker = !isSystem && onColorChange && color !== undefined
+  const isSystem = variant === 'system';
+  const isCustomColor = !isSystem && presetKey === undefined;
+  const previewColor = isSystem ? undefined : color;
+  const showColorPicker = !isSystem && onColorChange && color !== undefined;
   // Custom rows render as filled pills (no border); system rows take the
   // page-configured variant (outline/primary). text-h5 already uppercases.
-  const previewVariant: SystemTagVariant | undefined = systemTagVariant ?? (isSystem ? undefined : 'primary')
-  const colClass = 'min-w-0 grow basis-[calc(50%-6px)] md:basis-0'
+  const previewVariant: SystemTagVariant | undefined = systemTagVariant ?? (isSystem ? undefined : 'primary');
+  const colClass = 'min-w-0 grow basis-[calc(50%-6px)] md:basis-0';
 
   return (
     <div
@@ -179,7 +128,7 @@ export function TicketStatusConfigRow({
 
       <div className="flex h-11 w-12 shrink-0 items-center justify-center md:h-12">
         {isSystem ? (
-          <WithLeftTooltip content={systemTooltip}>
+          <TouchFriendlyTooltip content={systemTooltip}>
             <button
               type="button"
               aria-label={systemTooltip ?? 'System status'}
@@ -187,9 +136,9 @@ export function TicketStatusConfigRow({
             >
               <InfoCircleIcon size={24} />
             </button>
-          </WithLeftTooltip>
+          </TouchFriendlyTooltip>
         ) : (
-          <WithLeftTooltip content={deleteDisabled ? deleteDisabledReason : undefined}>
+          <TouchFriendlyTooltip content={deleteDisabled ? deleteDisabledReason : undefined}>
             <span className="inline-flex">
               <Button
                 type="button"
@@ -200,12 +149,12 @@ export function TicketStatusConfigRow({
                 onClick={deleteDisabled ? undefined : onDelete}
                 className={cn('size-11 md:size-12', deleteDisabled && 'pointer-events-none')}
               >
-                <TrashIcon className="text-ods-error"/>
+                <TrashIcon className="text-ods-error" />
               </Button>
             </span>
-          </WithLeftTooltip>
+          </TouchFriendlyTooltip>
         )}
       </div>
     </div>
-  )
+  );
 }

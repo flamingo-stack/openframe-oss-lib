@@ -3,6 +3,7 @@ package com.openframe.client.integration;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.integration.support.CommandResultIntegrationTestApplication;
+import com.openframe.client.listener.rmm.CommandResultListener;
 import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
@@ -38,7 +39,7 @@ import static org.mockito.Mockito.verify;
 /**
  * End-to-end (NATS) integration test for the command-result path: a message
  * published by the agent over core NATS on {@code machine.<id>.command-execution.result}
- * must be consumed by {@link com.openframe.client.listener.CommandResultListener},
+ * must be consumed by {@link CommandResultListener},
  * transformed into a {@link CommonDebeziumMessage} and forwarded to the
  * {@link EventLogsPublisher} boundary with the {@code message-type} header.
  *

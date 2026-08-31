@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import * as React from 'react'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Board,
   columnFromTicketStatus,
@@ -7,16 +7,16 @@ import {
   type BoardChange,
   type BoardColumnDef,
   type BoardTicket,
-} from '../components/features/board'
+} from '../components/features/board';
 
 const meta: Meta<typeof Board> = {
   title: 'Features/Board',
   component: Board,
   parameters: { layout: 'fullscreen' },
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 // ---------------------------------------------------------------------------
 // Seed data
@@ -27,7 +27,18 @@ const ASSIGNEES = [
   { id: 'u2', initials: 'MP', name: 'Marcus Park' },
   { id: 'u3', initials: 'JD', name: 'Jamie Diaz' },
   { id: 'u4', initials: 'AK', name: 'Aiden Kim' },
-] as const
+] as const;
+
+const TITLES = [
+  'How to install Teams',
+  'Disk space critical',
+  'VPN connection drops',
+  'Two-factor reset',
+  'New laptop onboarding',
+  'Email rules sync issue',
+];
+
+const PRIORITIES: BoardTicket['priority'][] = ['low', 'medium', 'high', 'urgent'];
 
 const baseTicket = (i: number, status: string, overrides: Partial<BoardTicket> = {}): BoardTicket => ({
   id: `ticket-${status}-${i}`,
@@ -40,27 +51,31 @@ const baseTicket = (i: number, status: string, overrides: Partial<BoardTicket> =
   assignees: [ASSIGNEES[i % ASSIGNEES.length]],
   tags: i % 2 === 0 ? ['hardware-failure', 'software-bug', 'urgent'] : undefined,
   ...overrides,
-})
-
-const TITLES = [
-  'How to install Teams',
-  'Disk space critical',
-  'VPN connection drops',
-  'Two-factor reset',
-  'New laptop onboarding',
-  'Email rules sync issue',
-]
-
-const PRIORITIES: BoardTicket['priority'][] = ['low', 'medium', 'high', 'urgent']
+});
 
 function buildSeedColumns(): BoardColumnDef[] {
   return [
-    columnFromTicketStatus('ACTIVE', Array.from({ length: 5 }, (_, i) => baseTicket(i, 'ACTIVE'))),
-    columnFromTicketStatus('TECH_REQUIRED', Array.from({ length: 7 }, (_, i) => baseTicket(i, 'TECH_REQUIRED'))),
-    columnFromTicketStatus('ON_HOLD', Array.from({ length: 3 }, (_, i) => baseTicket(i, 'ON_HOLD'))),
-    columnFromTicketStatus('RESOLVED', Array.from({ length: 4 }, (_, i) => baseTicket(i, 'RESOLVED'))),
-    columnFromTicketStatus('ARCHIVED', Array.from({ length: 2 }, (_, i) => baseTicket(i, 'ARCHIVED'))),
-  ]
+    columnFromTicketStatus(
+      'ACTIVE',
+      Array.from({ length: 5 }, (_, i) => baseTicket(i, 'ACTIVE')),
+    ),
+    columnFromTicketStatus(
+      'TECH_REQUIRED',
+      Array.from({ length: 7 }, (_, i) => baseTicket(i, 'TECH_REQUIRED')),
+    ),
+    columnFromTicketStatus(
+      'ON_HOLD',
+      Array.from({ length: 3 }, (_, i) => baseTicket(i, 'ON_HOLD')),
+    ),
+    columnFromTicketStatus(
+      'RESOLVED',
+      Array.from({ length: 4 }, (_, i) => baseTicket(i, 'RESOLVED')),
+    ),
+    columnFromTicketStatus(
+      'ARCHIVED',
+      Array.from({ length: 2 }, (_, i) => baseTicket(i, 'ARCHIVED')),
+    ),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -68,25 +83,25 @@ function buildSeedColumns(): BoardColumnDef[] {
 // ---------------------------------------------------------------------------
 
 function applyChange(columns: BoardColumnDef[], change: BoardChange): BoardColumnDef[] {
-  const next = columns.map(c => ({ ...c, tickets: [...c.tickets] }))
-  const fromCol = next.find(c => c.id === change.fromColumnId)
-  const toCol = next.find(c => c.id === change.toColumnId)
-  if (!fromCol || !toCol) return columns
+  const next = columns.map(c => ({ ...c, tickets: [...c.tickets] }));
+  const fromCol = next.find(c => c.id === change.fromColumnId);
+  const toCol = next.find(c => c.id === change.toColumnId);
+  if (!fromCol || !toCol) return columns;
 
-  const fromIndex = fromCol.tickets.findIndex(t => t.id === change.ticketId)
-  if (fromIndex < 0) return columns
-  const [moved] = fromCol.tickets.splice(fromIndex, 1)
+  const fromIndex = fromCol.tickets.findIndex(t => t.id === change.ticketId);
+  if (fromIndex < 0) return columns;
+  const [moved] = fromCol.tickets.splice(fromIndex, 1);
 
-  let insertAt: number
+  let insertAt: number;
   if (change.afterTicketId) {
-    insertAt = toCol.tickets.findIndex(t => t.id === change.afterTicketId) + 1
+    insertAt = toCol.tickets.findIndex(t => t.id === change.afterTicketId) + 1;
   } else if (change.beforeTicketId) {
-    insertAt = toCol.tickets.findIndex(t => t.id === change.beforeTicketId)
+    insertAt = toCol.tickets.findIndex(t => t.id === change.beforeTicketId);
   } else {
-    insertAt = 0
+    insertAt = 0;
   }
-  toCol.tickets.splice(insertAt, 0, moved)
-  return next
+  toCol.tickets.splice(insertAt, 0, moved);
+  return next;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +111,7 @@ function applyChange(columns: BoardColumnDef[], change: BoardChange): BoardColum
 /** Five canonical-status columns with seeded tickets and full DnD wired up. */
 export const Default: Story = {
   render: function Render() {
-    const [columns, setColumns] = React.useState(buildSeedColumns())
+    const [columns, setColumns] = useState(buildSeedColumns());
     return (
       <div className="h-[80vh] bg-ods-bg">
         <Board
@@ -106,34 +121,38 @@ export const Default: Story = {
           onAddTicket={id => console.log('add to', id)}
         />
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * Mixed system + custom columns matching the OpenFrame Tickets layout:
- * AI-Assistance and Tech Required are system columns (default surface, joined
+ * AI Handling and Tech Required are system columns (default surface, joined
  * with no gap), middle columns are custom (tinted by color), Resolved is a
  * system column whose `RESOLVED` status gives the green-checkmark tag.
  *
- * DnD restrictions: AI-Assistance refuses drops (tickets enter via the AI
+ * DnD restrictions: AI Handling refuses drops (tickets enter via the AI
  * pipeline, not by dragging), but tickets in it can still be dragged out.
  * Resolved tickets are pinned (`dragDisabled`).
  */
 export const SystemAndCustom: Story = {
   render: function Render() {
-    const [columns, setColumns] = React.useState<BoardColumnDef[]>([
+    const [columns, setColumns] = useState<BoardColumnDef[]>([
       {
-        id: 'ai-assistance',
-        label: 'AI-Assistance',
+        id: 'ai-handling',
+        label: 'AI Handling',
         color: '#f357bb',
         system: true,
         dropDisabled: true,
         tickets: Array.from({ length: 4 }, (_, i) => baseTicket(i, 'AI_ASSISTANCE')),
       },
-      columnFromTicketStatus('TECH_REQUIRED', Array.from({ length: 5 }, (_, i) => baseTicket(i, 'TECH_REQUIRED')), {
-        system: true,
-      }),
+      columnFromTicketStatus(
+        'TECH_REQUIRED',
+        Array.from({ length: 5 }, (_, i) => baseTicket(i, 'TECH_REQUIRED')),
+        {
+          system: true,
+        },
+      ),
       {
         id: 'todo',
         label: 'TODO',
@@ -158,23 +177,27 @@ export const SystemAndCustom: Story = {
         color: '#c14de1',
         tickets: Array.from({ length: 3 }, (_, i) => baseTicket(i, 'TESTING')),
       },
-      columnFromTicketStatus('RESOLVED', Array.from({ length: 6 }, (_, i) => baseTicket(i, 'RESOLVED')), {
-        system: true,
-        dragDisabled: true,
-      }),
-    ])
+      columnFromTicketStatus(
+        'RESOLVED',
+        Array.from({ length: 6 }, (_, i) => baseTicket(i, 'RESOLVED')),
+        {
+          system: true,
+          dragDisabled: true,
+        },
+      ),
+    ]);
     return (
       <div className="h-[80vh] bg-ods-bg">
         <Board columns={columns} onChange={c => setColumns(prev => applyChange(prev, c))} />
       </div>
-    )
+    );
   },
-}
+};
 
 /** Custom columns ("Backlog", "In Review", "Blocked", "Done") proving column color is decoupled from TicketStatus. */
 export const CustomColumns: Story = {
   render: function Render() {
-    const [columns, setColumns] = React.useState<BoardColumnDef[]>([
+    const [columns, setColumns] = useState<BoardColumnDef[]>([
       {
         id: 'backlog',
         label: 'Backlog',
@@ -199,19 +222,19 @@ export const CustomColumns: Story = {
         color: '#888888',
         tickets: Array.from({ length: 5 }, (_, i) => baseTicket(i, 'DONE')),
       },
-    ])
+    ]);
     return (
       <div className="h-[80vh] bg-ods-bg">
         <Board columns={columns} onChange={c => setColumns(prev => applyChange(prev, c))} />
       </div>
-    )
+    );
   },
-}
+};
 
 /** Third column starts collapsed; toggle persists via in-memory state. */
 export const Collapsible: Story = {
   render: function Render() {
-    const [columns, setColumns] = React.useState(buildSeedColumns())
+    const [columns, setColumns] = useState(buildSeedColumns());
     return (
       <div className="h-[80vh] bg-ods-bg">
         <Board
@@ -219,95 +242,97 @@ export const Collapsible: Story = {
           collapseStorageKey="storybook-board-collapse-demo"
           onChange={c => setColumns(prev => applyChange(prev, c))}
         />
-        <p className="px-4 pt-2 text-h6 text-ods-text-secondary">
+        <p className="px-4 pt-2 text-ods-text-secondary text-h6">
           Click the chevron in any column header to collapse. State persists to localStorage.
         </p>
       </div>
-    )
+    );
   },
-}
+};
 
 /** One column starts with 10 of 50; onLoadMore appends 10 more after a 600ms delay. */
 export const Pagination: Story = {
   render: function Render() {
-    const TOTAL = 50
-    const PAGE = 10
+    const TOTAL = 50;
+    const PAGE = 10;
     // Built once: rebuilding per render hands every card a new object, which
     // defeats the memoization the board relies on to stay smooth under a drag.
-    const allTickets = React.useMemo(() => Array.from({ length: TOTAL }, (_, i) => baseTicket(i, 'ACTIVE')), [])
-    const loadedRef = React.useRef(PAGE)
+    const allTickets = useMemo(() => Array.from({ length: TOTAL }, (_, i) => baseTicket(i, 'ACTIVE')), []);
+    const loadedRef = useRef(PAGE);
 
-    const [columns, setColumns] = React.useState<BoardColumnDef[]>([
+    const [columns, setColumns] = useState<BoardColumnDef[]>([
       columnFromTicketStatus('ACTIVE', allTickets.slice(0, PAGE), { total: TOTAL, hasMore: true }),
-      columnFromTicketStatus('TECH_REQUIRED', Array.from({ length: 4 }, (_, i) => baseTicket(i, 'TECH_REQUIRED'))),
-      columnFromTicketStatus('RESOLVED', Array.from({ length: 2 }, (_, i) => baseTicket(i, 'RESOLVED'))),
-    ])
+      columnFromTicketStatus(
+        'TECH_REQUIRED',
+        Array.from({ length: 4 }, (_, i) => baseTicket(i, 'TECH_REQUIRED')),
+      ),
+      columnFromTicketStatus(
+        'RESOLVED',
+        Array.from({ length: 2 }, (_, i) => baseTicket(i, 'RESOLVED')),
+      ),
+    ]);
 
     const handleLoadMore = (columnId: string) => {
-      setColumns(prev => prev.map(c => (c.id === columnId ? { ...c, isLoadingMore: true } : c)))
+      setColumns(prev => prev.map(c => (c.id === columnId ? { ...c, isLoadingMore: true } : c)));
       setTimeout(() => {
         // APPEND the next page. Re-slicing the seed from 0 also threw away every
         // drop the person had made, and a drag that auto-scrolls a lane to its
         // bottom loads a page mid-drag — so the card silently snapped back to
         // where it started, moments after landing where it was dropped.
-        const from = loadedRef.current
-        loadedRef.current = Math.min(from + PAGE, TOTAL)
-        const page = allTickets.slice(from, loadedRef.current)
+        const from = loadedRef.current;
+        loadedRef.current = Math.min(from + PAGE, TOTAL);
+        const page = allTickets.slice(from, loadedRef.current);
         setColumns(prev =>
           prev.map(c =>
             c.id === columnId
               ? { ...c, tickets: [...c.tickets, ...page], hasMore: loadedRef.current < TOTAL, isLoadingMore: false }
               : c,
           ),
-        )
-      }, 600)
-    }
+        );
+      }, 600);
+    };
 
     return (
       <div className="h-[80vh] bg-ods-bg">
-        <Board
-          columns={columns}
-          onChange={c => setColumns(prev => applyChange(prev, c))}
-          onLoadMore={handleLoadMore}
-        />
+        <Board columns={columns} onChange={c => setColumns(prev => applyChange(prev, c))} onLoadMore={handleLoadMore} />
       </div>
-    )
+    );
   },
-}
+};
 
 /** All columns start in `isLoading` state and resolve to seeded data after 1s. */
 export const InitialLoading: Story = {
   render: function Render() {
-    const [columns, setColumns] = React.useState<BoardColumnDef[]>(() =>
+    const [columns, setColumns] = useState<BoardColumnDef[]>(() =>
       groupTicketsByStatus([], ['ACTIVE', 'TECH_REQUIRED', 'ON_HOLD', 'RESOLVED']).map(c => ({
         ...c,
         isLoading: true,
       })),
-    )
+    );
 
-    React.useEffect(() => {
-      const t = setTimeout(() => setColumns(buildSeedColumns()), 1000)
-      return () => clearTimeout(t)
-    }, [])
+    useEffect(() => {
+      const t = setTimeout(() => setColumns(buildSeedColumns()), 1000);
+      return () => clearTimeout(t);
+    }, []);
 
     return (
       <div className="h-[80vh] bg-ods-bg">
         <Board columns={columns} onChange={c => setColumns(prev => applyChange(prev, c))} />
       </div>
-    )
+    );
   },
-}
+};
 
 /** Empty columns to verify the drop placeholder. */
 export const Empty: Story = {
   render: function Render() {
-    const [columns, setColumns] = React.useState<BoardColumnDef[]>(
+    const [columns, setColumns] = useState<BoardColumnDef[]>(
       groupTicketsByStatus([], ['ACTIVE', 'TECH_REQUIRED', 'RESOLVED']),
-    )
+    );
     return (
       <div className="h-[80vh] bg-ods-bg">
         <Board columns={columns} onChange={c => setColumns(prev => applyChange(prev, c))} />
       </div>
-    )
+    );
   },
-}
+};

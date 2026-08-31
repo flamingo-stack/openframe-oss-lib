@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * RelatedContentSection
@@ -35,59 +35,51 @@
  * cards are imported via DEEP module paths (not the chat barrel) so this
  * chunk never reaches `@tanstack/react-query`.
  *
- * LOCKSTEP NOTE: this file's per-type card/skeleton dispatch is the SIZED
- * sibling of the chat-side `CHAT_CARD_REGISTRY` (`../chat/entity-cards/
- * dispatch.tsx`), which renders compact `size='sm'` cards wired to the chat
- * runtime. Two dispatchers by design — when registering a new fetch-mode
- * content type, add it BOTH there and here (cards + skeleton + list URL).
+ * The per-type card + skeleton dispatch lives in `./card-registry`
+ * (`RELATED_CARD_REGISTRY`): ONE entry per content type, each carrying that
+ * type's own row type and the `unknown` → row decode, so a fetched row reaches
+ * its card concretely typed. This file only picks the entry and builds the
+ * shared render context.
+ *
+ * LOCKSTEP NOTE: that registry is the SIZED sibling of the chat-side
+ * `CHAT_CARD_REGISTRY` (`../chat/entity-cards/dispatch.tsx`), which renders
+ * compact `size='sm'` cards wired to the chat runtime. Two dispatchers by
+ * design — when registering a new fetch-mode content type, add it BOTH there
+ * and in `./card-registry` (card + skeleton + list URL).
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import type React from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSelfFetch } from '../../hooks/use-self-fetch';
+import type { ContentRef, ContentRefWithReason } from '../../types/content-ref';
 import {
   CONTENT_REF_GROUPS,
   getContentRefLabelOrTitleCase,
   orderContentRefTypes,
   type ContentRefGroupConfig,
 } from '../../utils/content-ref-groups';
-import type { ContentRef, ContentRefWithReason } from '../../types/content-ref';
-import { useSelfFetch } from '../../hooks/use-self-fetch';
-import { Pagination } from '../pagination';
 import { extractItems, extractItemId } from '../../utils/extract-items';
 import { buildListUrl as libBuildListUrl, canonicalContentRefType } from '../../utils/list-url';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
-import { decideNewTab } from '../chat/utils/decide-new-tab';
-// DEEP card imports — NOT the `../chat` barrel (the barrel statically reaches
-// @tanstack/react-query via embeddable-chat + its hooks). Deep paths keep this
-// component's SOURCE graph react-query-free. Note: tsup's shared-chunk
-// splitting may still colocate the cards with chat hooks in one dist chunk
-// (react-query is a required peerDep, so resolution always succeeds) — the
-// guarantee that matters here is the RUNTIME one: nothing on this path ever
-// instantiates a QueryClient, so embedders need NO QueryClientProvider.
-import { BlogCard, BlogCardSkeleton } from '../chat/entity-cards/blog-card';
-import { WhatIShippedCard, WhatIShippedCardSkeleton } from '../chat/entity-cards/what-i-shipped-card';
-import { HowIWorkCard, HowIWorkCardSkeleton } from '../chat/entity-cards/how-i-work-card';
-import { CaseStudyCard, CaseStudyCardSkeleton } from '../chat/entity-cards/case-study-card';
-import { CustomerInterviewCard, CustomerInterviewCardSkeleton } from '../chat/entity-cards/customer-interview-card';
-import { ProductReleaseCard, ProductReleaseCardSkeleton } from '../chat/entity-cards/product-release-card';
-import { buildProductReleaseCardProps } from '../chat/entity-cards/product-release-card-defaults';
-import { ProgramCard, ProgramCardSkeleton } from '../chat/entity-cards/program-card';
-import { InvestorUpdateCard, InvestorUpdateCardSkeleton } from '../chat/entity-cards/investor-update-card';
-import { OnboardingGuideCard, OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-guide-card';
-import { RoadmapCard, RoadmapCardSkeleton } from '../chat/entity-cards/roadmap-card';
 // Type-only — erased at build, no runtime dependency on the dispatch module.
 import type { ChatCardDispatchExtras } from '../chat/entity-cards/dispatch';
+import { decideNewTab } from '../chat/utils/decide-new-tab';
+import { Pagination } from '../pagination';
+// The per-type card dispatch — one registry entry per content type, each
+// carrying its OWN row type — plus the DEEP card imports that keep this
+// chunk's source graph free of @tanstack/react-query (the `../chat` barrel
+// reaches it via embeddable-chat; deep paths don't). `CardSize` and
+// `CardLinkAnchorProps` are declared alongside the registry, its primary
+// consumer, and re-exported below so the subpath barrel is unchanged.
+import {
+  RELATED_CARD_REGISTRY,
+  rowString,
+  type CardLinkAnchorProps,
+  type CardSize,
+  type RelatedCardRegistryEntry,
+} from './card-registry';
 
-type CardSize = 'lg' | 'default' | 'sm';
-
-/** Anchor prop bundle the per-card link surface receives — same shape the
- *  hub's `useNavLink` returns and the chat dispatcher's anchor builders
- *  produce. `null` = non-anchor mode (no URL). */
-export interface CardLinkAnchorProps {
-  href: string;
-  target?: '_blank';
-  rel?: 'noopener noreferrer';
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
-}
+export type { CardLinkAnchorProps };
 
 /** Render-prop component injection for the navigation decision — keeps hook
  *  calls legal (hooks live INSIDE the injected component; `CardForType`
@@ -105,14 +97,14 @@ export type CardLinkProvider = React.ComponentType<CardLinkProviderProps>;
  *  stay same-tab, cross-origin pops a new tab (pure `decideNewTab` with no
  *  platform context — `currentSource: ''` falls through to the origin
  *  check). No router integration, no hooks. */
-function DefaultLinkPropsProvider({ href, targetPlatform, children }: CardLinkProviderProps): React.ReactElement | null {
+function DefaultLinkPropsProvider({
+  href,
+  targetPlatform,
+  children,
+}: CardLinkProviderProps): React.ReactElement | null {
   if (!href) return children(null);
   const newTab = decideNewTab({ href, targetPlatform, currentSource: '' });
-  return children(
-    newTab
-      ? { href, target: '_blank', rel: 'noopener noreferrer' }
-      : { href },
-  );
+  return children(newTab ? { href, target: '_blank', rel: 'noopener noreferrer' } : { href });
 }
 
 /** Default href resolution: trust the ref's stored url/targetPlatform as the
@@ -126,73 +118,67 @@ function defaultResolveHref(ref: ContentRef): { href: string | null; targetPlatf
  *  Absent (every non-hub embed) → the type renders nothing (its list URL
  *  hits `/api/admin`, unreachable outside the hub anyway). */
 export interface AdminCampaignCardSlot {
+  /**
+   * The host's own campaign card. Its `campaign` prop is a HOST row type this
+   * lib cannot name (the hub's `MarketingCampaign`), and React props are
+   * CONTRAVARIANT, so this is the one seam in the rail with no honest type.
+   * All three alternatives were compiled against the hub's real
+   * `CampaignCardAdmin`:
+   *
+   *   - `unknown` — the host can no longer inject: TS2322, "Type
+   *     '{ campaign: unknown }' is not assignable to
+   *     '{ campaign: MarketingCampaign }'".
+   *   - `never` — every host component assigns, but the rail can no longer
+   *     hand it a row: TS2769, "Type 'unknown' is not assignable to 'never'".
+   *   - a generic on the slot's OWNER (`AdminCampaignCardSlot<TCampaign>`
+   *     threaded through `RelatedContentSectionProps`) — inference from the
+   *     host's card works, but the render still fails: TS2769, "'TCampaign'
+   *     could be instantiated with an arbitrary type". The rail holds an
+   *     unvalidated row; only the HOST knows how to narrow it.
+   *
+   * Typing this means changing the injection contract (a host-supplied
+   * `render(row: unknown)` closure instead of a component), which is a
+   * breaking change for every embedder that passes `{ Card, Skeleton }`.
+   * Everything the rail renders ITSELF now goes through the per-type
+   * `RELATED_CARD_REGISTRY`; this is the only `any` left.
+   */
   Card: React.ComponentType<{ campaign: any }>;
   Skeleton: React.ComponentType<{ size?: 'default' | 'sm' }>;
 }
 
 /**
  * Per-type skeleton dispatch — returns the SAME colocated skeleton the
- * resolved card renders, sized to match (zero layout shift on resolve).
- * The chat-side `CHAT_CARD_REGISTRY` already does this via
- * `entry.skeleton()`; this surface exposes the same discipline to the
- * related-content rail.
+ * resolved card renders, sized to match (zero layout shift on resolve). One
+ * lookup through `RELATED_CARD_REGISTRY`, exactly the way the chat-side
+ * `CHAT_CARD_REGISTRY` does it via `entry.skeleton()`.
+ *
+ * `marketing_campaign` is the one type with no registry entry: BOTH its card
+ * and its skeleton are host-injected (`AdminCampaignCardSlot`), so there is no
+ * lib component to register.
  */
 function renderSkeletonForType(
   type: string,
   size: CardSize,
   adminCampaignCard?: AdminCampaignCardSlot,
 ): React.ReactNode {
-  // Most card skeletons accept only `{default, sm}`. `'lg'` collapses to
-  // `'default'`. ProductReleaseCardSkeleton uses lg/sm pair.
-  const legacySize: 'default' | 'sm' = size === 'sm' ? 'sm' : 'default';
-  switch (type) {
-    case 'blog_post_existing':
-      return <BlogCardSkeleton size={legacySize} />;
-    case 'case_study':
-      return <CaseStudyCardSkeleton size={legacySize} />;
-    case 'customer_interview':
-      return <CustomerInterviewCardSkeleton size={legacySize} />;
-    case 'product_release':
-      return <ProductReleaseCardSkeleton size={size === 'sm' ? 'sm' : 'lg'} />;
-    case 'podcast':
-    case 'webinar':
-    case 'event':
-      return <ProgramCardSkeleton size={legacySize} />;
-    case 'investor_update':
-      return <InvestorUpdateCardSkeleton size={legacySize} />;
-    case 'onboarding_guide':
-      // The rich catalog variant (hero + author grid, clamped description) —
-      // the step-numbered 'default' variant is for the guide detail page's
-      // "More in section" rail, not this full-width row.
-      return <OnboardingGuideCardSkeleton size={size === 'sm' ? 'sm' : 'catalog'} />;
-    case 'what_i_shipped':
-      // Matches the WhatIShippedCard (AdminContentCard 3:2) shape.
-      return <WhatIShippedCardSkeleton />;
-    case 'how_i_work':
-      // Same shared employee-entry shape as What I Shipped.
-      return <HowIWorkCardSkeleton />;
-    case 'marketing_campaign':
-      return adminCampaignCard ? <adminCampaignCard.Skeleton size={legacySize} /> : null;
-    case 'roadmap_item':
-    case 'delivery_item':
-    case 'internal_task':
-      return <RoadmapCardSkeleton size={legacySize} />;
-    default:
-      return null;
+  if (type === 'marketing_campaign') {
+    return adminCampaignCard ? <adminCampaignCard.Skeleton size={size === 'sm' ? 'sm' : 'default'} /> : null;
   }
+  const entry: RelatedCardRegistryEntry | undefined = RELATED_CARD_REGISTRY[type];
+  return entry ? entry.skeleton(size) : null;
 }
 
 /**
- * Per-type card dispatch — renders the right card with the right size.
- * Sized cards (`'lg'` / `'default'`) are unique to this rail — the chat
- * dispatcher only renders `'sm'`, so we go directly through the per-type
- * cards here.
+ * Per-type card dispatch — ONE lookup through `RELATED_CARD_REGISTRY`, whose
+ * entries each pair a skeleton with a card renderer that closes over that
+ * type's OWN row type. Sized cards (`'lg'` / `'default'`) are unique to this
+ * rail; the chat dispatcher only renders `'sm'`.
  *
  * PURE FUNCTION COMPONENT WITH ZERO HOOK CALLS: the placeholder comes from a
  * plain `extras.buildOgPlaceholderUrl` call (the chat `dispatch.tsx`
  * pattern) and the anchor-prop bundle arrives via the `LinkProvider`
  * render-prop from the parent — so per-card hook legality is owned by the
- * injected provider component, not by this switch.
+ * injected provider component, not by this dispatcher.
  *
  * `href` comes from the host's `resolveHref(ref)` (hub: live
  * `buildContentURL` recomposition; default: the ref's stored url).
@@ -208,7 +194,11 @@ function CardForType({
   adminCampaignCard,
 }: {
   type: string;
-  item: any;
+  /** One fetched row, still unvalidated. Its shape is decided at RUNTIME by
+   *  `type` (each group fetches from its own per-type list API), so it stays
+   *  `unknown` right up to the registry entry for that type — which owns the
+   *  `unknown` → row-type decode and hands its card a concretely typed row. */
+  item: unknown;
   size: CardSize;
   href: string;
   targetPlatform: string | null;
@@ -216,124 +206,41 @@ function CardForType({
   extras?: ChatCardDispatchExtras;
   adminCampaignCard?: AdminCampaignCardSlot;
 }): React.ReactNode {
-  // Most card variants accept only `{default, sm}`. `'lg'` collapses to
-  // `'default'` for those. ProductReleaseCard uses its own lg/sm pair.
-  const legacySize: 'default' | 'sm' = size === 'sm' ? 'sm' : 'default';
-  // OG placeholder URL — injected into the pure-presentation cards so they
-  // render a branded fallback when the row's featured image is null. Plain
-  // function call (NOT a hook). Title is the universal field across all card
-  // item shapes used here.
-  const placeholderUrl =
-    extras?.buildOgPlaceholderUrl?.((item?.title as string | undefined) ?? '') ?? undefined;
-
-  // Top-level target/rel for cards that take them as separate props
-  // (BlogCard, CaseStudyCard, …). ProductReleaseCard takes the bundle as a
-  // single `anchorProps={...}` and uses `linkProps` directly. When the host
-  // didn't surface a URL, `linkProps` is null and the card stays in
-  // non-anchor mode.
-  const anchorAttrs: Pick<CardLinkAnchorProps, 'target' | 'rel'> = linkProps
-    ? { target: linkProps.target, rel: linkProps.rel }
-    : {};
-
-  switch (type) {
-    case 'blog_post_existing':
-      return <BlogCard post={item} size={legacySize} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />;
-    case 'case_study':
-      return <CaseStudyCard study={item} size={legacySize} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />;
-    case 'customer_interview':
-      return <CustomerInterviewCard interview={item} size={legacySize} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />;
-    case 'product_release': {
-      // Anchor-prop pattern: build product-release lg-variant props from the
-      // shared `buildProductReleaseCardProps` so this rail and the /releases
-      // catalog page render byte-identically. The card wraps in
-      // `<a {...anchorProps}>` ONLY when `anchorProps.href` is set — pass
-      // `undefined` (not an empty object) when href is empty so the card
-      // stays in non-anchor mode without rendering a dead <a> tag.
-      const releaseSize = size === 'sm' ? 'sm' : 'lg';
-      const buildReleaseProps = extras?.buildProductReleaseCardProps ?? buildProductReleaseCardProps;
-      const releaseProps = buildReleaseProps(item);
-      return (
-        <ProductReleaseCard
-          size={releaseSize}
-          title={item.title}
-          summary={item.summary}
-          version={item.version}
-          {...releaseProps}
-          anchorProps={linkProps ?? undefined}
-        />
-      );
-    }
-    case 'podcast':
-      return extras?.programConfigs?.podcast
-        ? <ProgramCard config={extras.programConfigs.podcast} item={item} size={legacySize} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />
-        : null;
-    case 'webinar':
-      return extras?.programConfigs?.webinar
-        ? <ProgramCard config={extras.programConfigs.webinar} item={item} size={legacySize} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />
-        : null;
-    case 'event':
-      return extras?.programConfigs?.event
-        ? <ProgramCard config={extras.programConfigs.event} item={item} size={legacySize} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />
-        : null;
-    case 'investor_update':
-      return <InvestorUpdateCard update={item} size={legacySize} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />;
-    case 'onboarding_guide':
-      // Catalog variant (see skeleton note) — full-width rich card with a
-      // line-clamped description instead of the step-numbered rail card.
-      return <OnboardingGuideCard guide={item} size={size === 'sm' ? 'sm' : 'catalog'} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />;
-    case 'what_i_shipped':
-      // THE single What I Shipped card — same lib component the people-hub
-      // dashboard renders, so the card is identical in the rail and the
-      // dashboard. `anchorProps` makes the whole card a click-through link
-      // (rail is read-only — no owner actions).
-      return (
-        <WhatIShippedCard
-          entry={item}
-          placeholderUrl={placeholderUrl}
-          // Only pass anchorProps when there's a REAL href — a fallback object
-          // with `href: undefined` is still truthy and would make WhatIShippedCard
-          // wrap the card in a dead <a> (no URL). Mirrors the ProductReleaseCard
-          // `linkProps ?? undefined` pattern above.
-          anchorProps={
-            linkProps ??
-            (href ? ({ href, ...anchorAttrs } as React.AnchorHTMLAttributes<HTMLAnchorElement>) : undefined)
-          }
-        />
-      );
-    case 'how_i_work':
-      // THE single How I Work card — same lib component the people-hub dashboard
-      // renders. Same `anchorProps` contract as What I Shipped above (a real
-      // href only; a fallback object would wrap the card in a dead <a>).
-      return (
-        <HowIWorkCard
-          entry={item}
-          placeholderUrl={placeholderUrl}
-          anchorProps={
-            linkProps ??
-            (href ? ({ href, ...anchorAttrs } as React.AnchorHTMLAttributes<HTMLAnchorElement>) : undefined)
-          }
-        />
-      );
-    case 'marketing_campaign':
-      return adminCampaignCard ? <adminCampaignCard.Card campaign={item} /> : null;
-    case 'roadmap_item':
-    case 'delivery_item':
-    case 'internal_task':
-      return (
-        <RoadmapCard
-          item={item}
-          href={href ?? ''}
-          targetPlatform={targetPlatform}
-          userVote={null}
-          onVote={() => {}}
-          size={legacySize}
-          cardType={type as 'roadmap_item' | 'delivery_item' | 'internal_task'}
-          {...anchorAttrs}
-        />
-      );
-    default:
-      return null;
+  // Host-injected admin slot — the only type with no registry entry, because
+  // both its card and its skeleton come from the host (see
+  // `AdminCampaignCardSlot`). Handled before the lookup so the registry stays
+  // a pure lib-card table.
+  if (type === 'marketing_campaign') {
+    return adminCampaignCard ? <adminCampaignCard.Card campaign={item} /> : null;
   }
+
+  const entry: RelatedCardRegistryEntry | undefined = RELATED_CARD_REGISTRY[type];
+  if (!entry) return null;
+
+  return entry.render(item, {
+    size,
+    // Most card variants accept only `{default, sm}`. `'lg'` collapses to
+    // `'default'` for those. ProductReleaseCard uses its own lg/sm pair.
+    legacySize: size === 'sm' ? 'sm' : 'default',
+    href,
+    targetPlatform,
+    linkProps,
+    // Top-level target/rel for cards that take them as separate props
+    // (BlogCard, CaseStudyCard, …). ProductReleaseCard takes the bundle as a
+    // single `anchorProps={...}` and uses `linkProps` directly. When the host
+    // didn't surface a URL, `linkProps` is null and the card stays in
+    // non-anchor mode.
+    anchorAttrs: linkProps ? { target: linkProps.target, rel: linkProps.rel } : {},
+    // OG placeholder URL — injected into the pure-presentation cards so they
+    // render a branded fallback when the row's featured image is null. Plain
+    // function call (NOT a hook). Title is the universal field across all card
+    // row shapes used here.
+    // `item?.title as string | undefined` claimed a string without checking one:
+    // a numeric title reached `buildOgPlaceholderUrl` as a number. `rowString`
+    // makes the claim true.
+    placeholderUrl: extras?.buildOgPlaceholderUrl?.(rowString(item, 'title') ?? '') ?? undefined,
+    extras,
+  });
 }
 
 // =============================================================================
@@ -344,12 +251,8 @@ function CardForType({
 // react-query: no retry/backoff, no focus refetch, no cross-mount cache.
 // =============================================================================
 
-function useGroupItems(
-  type: string,
-  refs: ContentRef[],
-  buildUrl: (type: string, ids: string[]) => string | null,
-) {
-  const ids = refs.map((r) => r.id);
+function useGroupItems(type: string, refs: ContentRef[], buildUrl: (type: string, ids: string[]) => string | null) {
+  const ids = refs.map(r => r.id);
   const url = ids.length > 0 ? buildUrl(type, ids) : null;
   const { data, isLoading } = useSelfFetch<unknown>(url);
   const items = data != null ? extractItems(data) : null;
@@ -376,12 +279,14 @@ function gridClassFor(columns: 2 | 3): string {
  *  `getContentRefLabelOrTitleCase(type)` instead so cross-surface labels
  *  stay consistent between this rail and the investor-email builder. */
 function resolveGroupConfig(type: string): ContentRefGroupConfig {
-  return CONTENT_REF_GROUPS[type] ?? {
-    label: type,
-    order: 999,
-    layout: 'grid',
-    gridSize: 'default',
-  };
+  return (
+    CONTENT_REF_GROUPS[type] ?? {
+      label: type,
+      order: 999,
+      layout: 'grid',
+      gridSize: 'default',
+    }
+  );
 }
 
 /** Items per page within one type group. Groups larger than this paginate
@@ -431,7 +336,7 @@ function ContentGroup({
   // refetch) can never strand the view past the last page, and RESET when the
   // ref set actually changes (shrink→grow must not return to a stale page).
   const [page, setPage] = useState(1);
-  const refsKey = refs.map((r) => r.id).join('|');
+  const refsKey = refs.map(r => r.id).join('|');
   const prevRefsKeyRef = useRef(refsKey);
   useEffect(() => {
     if (prevRefsKeyRef.current !== refsKey) {
@@ -442,9 +347,7 @@ function ContentGroup({
   const totalGroupPages = Math.max(1, Math.ceil(refs.length / GROUP_PAGE_SIZE));
   const safePage = Math.min(page, totalGroupPages);
   const visibleGroupRefs =
-    refs.length > GROUP_PAGE_SIZE
-      ? refs.slice((safePage - 1) * GROUP_PAGE_SIZE, safePage * GROUP_PAGE_SIZE)
-      : refs;
+    refs.length > GROUP_PAGE_SIZE ? refs.slice((safePage - 1) * GROUP_PAGE_SIZE, safePage * GROUP_PAGE_SIZE) : refs;
   const groupPagination =
     totalGroupPages > 1 ? (
       <Pagination currentPage={safePage} totalPages={totalGroupPages} onPageChange={setPage} />
@@ -454,7 +357,7 @@ function ContentGroup({
   // paint render identical skeletons (useSelfFetch starts isLoading=true on
   // both sides), and once items exist they are never replaced by skeletons.
   if (isLoading && !items) {
-    const skeletons = visibleGroupRefs.map((r) => (
+    const skeletons = visibleGroupRefs.map(r => (
       <div key={r.id}>{renderSkeletonForType(type, cardSize, adminCampaignCard)}</div>
     ));
     return (
@@ -479,12 +382,17 @@ function ContentGroup({
   // newer cross-platform ones).
   // Shared extractor (NOT raw `.id`) — some API shapes key items differently
   // (e.g. external_id types); raw access would silently drop valid items.
-  const itemById = new Map(
-    (items as any[]).map((it) => [extractItemId(type, it) ?? String((it as any)?.id), it]),
-  );
+  const rowKey = (it: unknown): string => {
+    const extracted = extractItemId(type, it);
+    if (extracted !== null) return extracted;
+    // Fallback for shapes `extractItemId` doesn't recognise — same
+    // `String(it?.id)` the untyped version produced.
+    return String(typeof it === 'object' && it !== null ? (it as { id?: unknown }).id : undefined);
+  };
+  const itemById = new Map(items.map(it => [rowKey(it), it]));
 
   const cards = visibleGroupRefs
-    .map((contentRef) => {
+    .map(contentRef => {
       const itemId = String(contentRef.id);
       const item = itemById.get(itemId);
       if (!item) return null;
@@ -497,7 +405,7 @@ function ContentGroup({
       return (
         <div key={itemId}>
           <LinkProvider href={href || null} targetPlatform={targetPlatform}>
-            {(linkProps) => (
+            {linkProps => (
               <CardForType
                 type={type}
                 item={item}
@@ -535,11 +443,7 @@ function ContentGroup({
   return (
     <div className="space-y-4">
       {heading}
-      {isListLayout ? (
-        <div className="space-y-4">{cards}</div>
-      ) : (
-        <div className={gridClassFor(columns)}>{cards}</div>
-      )}
+      {isListLayout ? <div className="space-y-4">{cards}</div> : <div className={gridClassFor(columns)}>{cards}</div>}
       {groupPagination}
     </div>
   );
@@ -732,7 +636,7 @@ export function RelatedContentSection({
   // is forwarded above); the client filter stays as an idempotent guard and
   // IS the mechanism in controlled mode (original behavior).
   const exclude = new Set(excludeTypes || []);
-  const visibleRefs = exclude.size > 0 ? refs.filter((r) => !exclude.has(r.type)) : refs;
+  const visibleRefs = exclude.size > 0 ? refs.filter(r => !exclude.has(r.type)) : refs;
   // Zero refs (still loading in suggestion mode, or genuinely empty). Default:
   // no empty shell. Opt-in (`showWhenEmpty`): render the title + an empty-state
   // line so the section is always present (e.g. people-hub "What I Shipped").
@@ -748,7 +652,7 @@ export function RelatedContentSection({
       const skeletonType = includeTypes?.[0] ?? entityType ?? 'blog_post_existing';
       return (
         <div className="space-y-8">
-          <h2 className="text-h2 text-ods-text-primary">{title}</h2>
+          <h2 className="text-ods-text-primary text-h2">{title}</h2>
           <div className={gridClassFor(columns)}>
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i}>{renderSkeletonForType(skeletonType, 'default', adminCampaignCard)}</div>
@@ -784,16 +688,16 @@ export function RelatedContentSection({
     // rail-vocab aliases ('blog_post_existing') are also legal inputs; a raw
     // comparison would silently lose the same-type-first hoist for aliases.
     const canonicalEntityType = canonicalContentRefType(entityType);
-    const sameType = orderedTypes.filter((t) => canonicalContentRefType(t) === canonicalEntityType);
+    const sameType = orderedTypes.filter(t => canonicalContentRefType(t) === canonicalEntityType);
     if (sameType.length > 0) {
-      orderedTypes = [...sameType, ...orderedTypes.filter((t) => canonicalContentRefType(t) !== canonicalEntityType)];
+      orderedTypes = [...sameType, ...orderedTypes.filter(t => canonicalContentRefType(t) !== canonicalEntityType)];
     }
   }
 
   return (
     <div className="space-y-8">
-      <h2 className="text-h2 text-ods-text-primary">{title}</h2>
-      {orderedTypes.map((type) => (
+      <h2 className="text-ods-text-primary text-h2">{title}</h2>
+      {orderedTypes.map(type => (
         <ContentGroup
           key={type}
           type={type}
@@ -805,9 +709,7 @@ export function RelatedContentSection({
           extras={extras}
           adminCampaignCard={adminCampaignCard}
           heading={
-            <h3 className="text-h5 font-semibold text-ods-text-secondary">
-              {getContentRefLabelOrTitleCase(type)}
-            </h3>
+            <h3 className="font-semibold text-ods-text-secondary text-h5">{getContentRefLabelOrTitleCase(type)}</h3>
           }
         />
       ))}

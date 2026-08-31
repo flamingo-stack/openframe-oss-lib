@@ -1,26 +1,22 @@
-'use client'
+'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   acquireClient as acquireSharedClient,
   releaseClient as releaseSharedClient,
   startConnectionLifecycle,
   type JetStreamSubscriptionHandle,
   type NatsClient,
-  type SharedConnection,
-} from '../../../nats'
-import {
-  type UseJetStreamDialogSubscriptionOptions,
-  type UseJetStreamDialogSubscriptionReturn,
-} from '../types'
+} from '../../../nats';
+import type { UseJetStreamDialogSubscriptionOptions, UseJetStreamDialogSubscriptionReturn } from '../types';
 
-const DEFAULT_STREAM_NAME = 'CHAT_CHUNKS'
+const DEFAULT_STREAM_NAME = 'CHAT_CHUNKS';
 /**
  * How long the page must have been out of sight before coming back counts as an
  * absence worth resyncing for. Alt-tabbing must not churn the consumer; a
  * window that sat in the tray must not come back showing a stale conversation.
  */
-export const RESYNC_AFTER_HIDDEN_MS = 10_000
+export const RESYNC_AFTER_HIDDEN_MS = 10_000;
 /**
  * How long resync requests are gathered before one is acted on.
  *
@@ -37,7 +33,7 @@ export const RESYNC_AFTER_HIDDEN_MS = 10_000
  * the last of them covers both. The cost is a second of latency on a path whose
  * next step is a network round trip.
  */
-const RESYNC_COALESCE_MS = 1_000
+const RESYNC_COALESCE_MS = 1_000;
 /**
  * Floor between two reported recoveries. Every recovery costs the caller a
  * history refetch, and a consumer that cannot hold its sequence — gap, reset,
@@ -45,7 +41,7 @@ const RESYNC_COALESCE_MS = 1_000
  * every open client. Recoveries are a repair signal, not a data feed: one per
  * window is enough to close the gap.
  */
-const RECOVERY_REPORT_FLOOR_MS = 5_000
+const RECOVERY_REPORT_FLOOR_MS = 5_000;
 
 /**
  * Subscribe to a chat dialog stream via a JetStream **ephemeral OrderedConsumer**.
@@ -79,135 +75,148 @@ export function useJetStreamDialogSubscription({
   inactiveThresholdMs,
   resyncSignal = 0,
 }: UseJetStreamDialogSubscriptionOptions): UseJetStreamDialogSubscriptionReturn {
-  const [isConnected, setIsConnected] = useState(false)
-  const [isSubscribed, setIsSubscribed] = useState(false)
-  const [reconnectionCount, setReconnectionCount] = useState(0)
+  const [isConnected, setIsConnected] = useState(false);
+  const [subscriptionLive, setIsSubscribed] = useState(false);
+  const [reconnectionCount, setReconnectionCount] = useState(0);
   // Kept apart from reconnectionCount because only the latter drives the
   // subscription effect: nats.ws has already rebuilt the consumer by the time
   // it reports a recovery, so tearing ours down and recreating it would be
   // churn — and churn that can feed itself, since each new consumer can report
   // its own recoveries. Callers see the two summed (see the return).
-  const [recoveryCount, setRecoveryCount] = useState(0)
-  const [currentStreamSeq, setCurrentStreamSeq] = useState<number | null>(null)
+  const [recoveryCount, setRecoveryCount] = useState(0);
+  // The highest sequence seen, TAGGED with the dialog it belongs to. The tag is
+  // what makes the per-dialog reset implicit — a sequence from another
+  // conversation simply stops matching — so the dialog-change effect below no
+  // longer has to publish `null` from its body. It also closes the window that
+  // reset relied on being empty: a straggling message from the previous
+  // dialog's consumer now carries that dialog's id and cannot be read as this
+  // one's offset.
+  const [seqEntry, setSeqEntry] = useState<{ dialogId: string | null | undefined; seq: number } | null>(null);
+  const currentStreamSeq = seqEntry && seqEntry.dialogId === dialogId ? seqEntry.seq : null;
 
-  const lastRecoveryReportRef = useRef(0)
-  const resyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastResyncSignalRef = useRef(resyncSignal)
-  const clientRef = useRef<NatsClient | null>(null)
-  const subscriptionRef = useRef<JetStreamSubscriptionHandle | null>(null)
-  const highestStreamSeqRef = useRef<number | null>(null)
+  // `subscriptionLive` only says "the async subscribe call resolved". Whether a
+  // subscription can exist AT ALL is a fact about the inputs, and masking with
+  // it here is what lets the subscription effect drop its `setIsSubscribed(false)`
+  // early-return branch — a synchronous setState in an effect body that ran on
+  // every disconnect and every dialog change.
+  const isSubscribed = subscriptionLive && enabled && Boolean(dialogId) && isConnected;
 
-  const onEventRef = useRef(onEvent)
+  const lastRecoveryReportRef = useRef(0);
+  const resyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastResyncSignalRef = useRef(resyncSignal);
+  // Latest `resyncSignal` for the dialog-change effect, which re-baselines on
+  // it but must NOT re-run when it moves — that is the resync effect's job.
+  const resyncSignalRef = useRef(resyncSignal);
   useEffect(() => {
-    onEventRef.current = onEvent
-  }, [onEvent])
+    resyncSignalRef.current = resyncSignal;
+  });
+  const clientRef = useRef<NatsClient | null>(null);
+  const subscriptionRef = useRef<JetStreamSubscriptionHandle | null>(null);
+  const highestStreamSeqRef = useRef<number | null>(null);
 
-  const onConnectRef = useRef(onConnect)
+  const onEventRef = useRef(onEvent);
   useEffect(() => {
-    onConnectRef.current = onConnect
-  }, [onConnect])
+    onEventRef.current = onEvent;
+  }, [onEvent]);
 
-  const onDisconnectRef = useRef(onDisconnect)
+  const onConnectRef = useRef(onConnect);
   useEffect(() => {
-    onDisconnectRef.current = onDisconnect
-  }, [onDisconnect])
+    onConnectRef.current = onConnect;
+  }, [onConnect]);
 
-  const onSubscribedRef = useRef(onSubscribed)
+  const onDisconnectRef = useRef(onDisconnect);
   useEffect(() => {
-    onSubscribedRef.current = onSubscribed
-  }, [onSubscribed])
+    onDisconnectRef.current = onDisconnect;
+  }, [onDisconnect]);
 
-  const onBeforeReconnectRef = useRef(onBeforeReconnect)
+  const onSubscribedRef = useRef(onSubscribed);
   useEffect(() => {
-    onBeforeReconnectRef.current = onBeforeReconnect
-  }, [onBeforeReconnect])
+    onSubscribedRef.current = onSubscribed;
+  }, [onSubscribed]);
 
-  const getNatsWsUrlRef = useRef(getNatsWsUrl)
+  const onBeforeReconnectRef = useRef(onBeforeReconnect);
   useEffect(() => {
-    getNatsWsUrlRef.current = getNatsWsUrl
-  }, [getNatsWsUrl])
+    onBeforeReconnectRef.current = onBeforeReconnect;
+  }, [onBeforeReconnect]);
 
-  const reconnectionBackoffRef = useRef(reconnectionBackoff)
+  const getNatsWsUrlRef = useRef(getNatsWsUrl);
   useEffect(() => {
-    reconnectionBackoffRef.current = reconnectionBackoff
-  }, [reconnectionBackoff])
+    getNatsWsUrlRef.current = getNatsWsUrl;
+  }, [getNatsWsUrl]);
 
-  const optStartSeqRef = useRef<number | null | undefined>(optStartSeq)
+  const reconnectionBackoffRef = useRef(reconnectionBackoff);
   useEffect(() => {
-    optStartSeqRef.current = optStartSeq
-  }, [optStartSeq])
+    reconnectionBackoffRef.current = reconnectionBackoff;
+  }, [reconnectionBackoff]);
 
-  const inactiveThresholdRef = useRef<number | undefined>(inactiveThresholdMs)
+  const optStartSeqRef = useRef<number | null | undefined>(optStartSeq);
   useEffect(() => {
-    inactiveThresholdRef.current = inactiveThresholdMs
-  }, [inactiveThresholdMs])
+    optStartSeqRef.current = optStartSeq;
+  }, [optStartSeq]);
 
-  const hadConnectionBeforeRef = useRef(false)
-
-  const clientConfigRef = useRef(clientConfig)
+  const inactiveThresholdRef = useRef<number | undefined>(inactiveThresholdMs);
   useEffect(() => {
-    clientConfigRef.current = clientConfig
-  }, [clientConfig])
+    inactiveThresholdRef.current = inactiveThresholdMs;
+  }, [inactiveThresholdMs]);
 
-  const currentWsUrlRef = useRef<string>('')
+  const hadConnectionBeforeRef = useRef(false);
+
+  const clientConfigRef = useRef(clientConfig);
+  useEffect(() => {
+    clientConfigRef.current = clientConfig;
+  }, [clientConfig]);
+
+  const currentWsUrlRef = useRef<string>('');
 
   // Resolve the URL synchronously each render so the effect depends on the URL string
   // itself, not the (often inline-allocated) getNatsWsUrl callback identity. Otherwise
   // every silent token rotation that rebuilds getNatsWsUrl in the caller would tear
   // the WS down and reacquire even though the resolved URL hasn't changed.
-  const wsUrl = getNatsWsUrl()
+  const wsUrl = getNatsWsUrl();
 
   useEffect(() => {
     if (!enabled || !wsUrl) {
       if (currentWsUrlRef.current && clientRef.current) {
-        releaseSharedClient(currentWsUrlRef.current)
-        clientRef.current = null
-        currentWsUrlRef.current = ''
-        setIsConnected(false)
+        releaseSharedClient(currentWsUrlRef.current);
+        clientRef.current = null;
+        currentWsUrlRef.current = '';
+        setIsConnected(false);
       }
-      return
+      return undefined;
     }
 
-    if (
-      wsUrl === currentWsUrlRef.current &&
-      clientRef.current &&
-      clientRef.current.isConnected()
-    ) {
-      return
+    if (wsUrl === currentWsUrlRef.current && clientRef.current && clientRef.current.isConnected()) {
+      return undefined;
     }
 
-    if (
-      currentWsUrlRef.current &&
-      currentWsUrlRef.current !== wsUrl &&
-      clientRef.current
-    ) {
-      releaseSharedClient(currentWsUrlRef.current)
-      clientRef.current = null
-      setIsConnected(false)
+    if (currentWsUrlRef.current && currentWsUrlRef.current !== wsUrl && clientRef.current) {
+      releaseSharedClient(currentWsUrlRef.current);
+      clientRef.current = null;
+      setIsConnected(false);
     }
 
-    currentWsUrlRef.current = wsUrl
-    const cfg = clientConfigRef.current
+    currentWsUrlRef.current = wsUrl;
+    const cfg = clientConfigRef.current;
     const sharedConn = acquireSharedClient(wsUrl, {
       name: cfg.name ?? 'openframe-frontend-jetstream',
       user: cfg.user ?? 'machine',
       pass: cfg.pass ?? '',
-    })
-    const client = sharedConn.client
+    });
+    const client = sharedConn.client;
 
-    clientRef.current = client
-    setIsConnected(client.isConnected())
+    clientRef.current = client;
+    setIsConnected(client.isConnected());
 
     const tearDownSubscription = () => {
       if (subscriptionRef.current) {
         try {
-          subscriptionRef.current.unsubscribe()
+          subscriptionRef.current.unsubscribe();
         } catch {
           // ignore
         }
-        subscriptionRef.current = null
+        subscriptionRef.current = null;
       }
-    }
+    };
 
     const lifecycle = startConnectionLifecycle({
       conn: sharedConn,
@@ -219,42 +228,42 @@ export function useJetStreamDialogSubscription({
       // Violation when CONSUMER.CREATE is denied) without closing the WebSocket.
       // Retrying on 'error' would loop onBeforeReconnect on every -ERR; let the
       // subscribe effect surface those via its own rejected promise instead.
-      shouldRetryOn: (status) => status === 'closed' || status === 'disconnected',
+      shouldRetryOn: status => status === 'closed' || status === 'disconnected',
       onStatusChange: (status, evt) => {
         if (status === 'connected') {
-          setIsConnected(true)
+          setIsConnected(true);
           if (hadConnectionBeforeRef.current) {
-            setReconnectionCount((c) => c + 1)
+            setReconnectionCount(c => c + 1);
           }
-          hadConnectionBeforeRef.current = true
-          onConnectRef.current?.()
+          hadConnectionBeforeRef.current = true;
+          onConnectRef.current?.();
         }
         if (status === 'error') {
-          console.warn('[JetStream] NATS protocol error:', evt.data)
-          return
+          console.warn('[JetStream] NATS protocol error:', evt.data);
+          return;
         }
         if (status === 'closed' || status === 'disconnected') {
-          setIsConnected(false)
-          setIsSubscribed(false)
-          tearDownSubscription()
-          onDisconnectRef.current?.()
+          setIsConnected(false);
+          setIsSubscribed(false);
+          tearDownSubscription();
+          onDisconnectRef.current?.();
         }
       },
-    })
+    });
 
     return () => {
-      lifecycle.stop()
-      setIsConnected(false)
-      setIsSubscribed(false)
-      tearDownSubscription()
+      lifecycle.stop();
+      setIsConnected(false);
+      setIsSubscribed(false);
+      tearDownSubscription();
 
       if (clientRef.current && currentWsUrlRef.current) {
-        releaseSharedClient(currentWsUrlRef.current)
-        clientRef.current = null
-        currentWsUrlRef.current = ''
+        releaseSharedClient(currentWsUrlRef.current);
+        clientRef.current = null;
+        currentWsUrlRef.current = '';
       }
-    }
-  }, [enabled, wsUrl])
+    };
+  }, [enabled, wsUrl]);
 
   // Reset the highest-seen sequence whenever the dialog changes so a new dialog
   // starts from optStartSeq (or DeliverPolicy.New) rather than the previous
@@ -264,12 +273,13 @@ export function useJetStreamDialogSubscription({
   // `highestStreamSeq + 1` as its start sequence (skipping messages /
   // ignoring optStartSeq).
   useEffect(() => {
-    highestStreamSeqRef.current = null
+    highestStreamSeqRef.current = null;
     // A host's signal counts per dialog (it can carry a per-conversation term),
     // so the baseline has to move with the dialog or a switch to one with a
     // LOWER count would swallow every later resync for it.
-    lastResyncSignalRef.current = resyncSignal
-    setCurrentStreamSeq(null)
+    lastResyncSignalRef.current = resyncSignalRef.current;
+    // (The published sequence resets itself — it is tagged with its dialog id
+    // where it is declared above.)
     // A resync gathered for the previous dialog must not land on this one: the
     // counter says nothing about which conversation it meant, so callers would
     // refetch the wrong one. The dialog change supersedes it — the new dialog
@@ -277,15 +287,14 @@ export function useJetStreamDialogSubscription({
     // which is the same rule.
     return () => {
       if (resyncTimerRef.current !== null) {
-        clearTimeout(resyncTimerRef.current)
-        resyncTimerRef.current = null
+        clearTimeout(resyncTimerRef.current);
+        resyncTimerRef.current = null;
       }
-    }
+    };
     // `resyncSignal` is read as the new baseline, not depended on: reacting to
     // it here would reset the baseline on the very change meant to trigger a
     // resync, and the effect below owns that.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dialogId])
+  }, [dialogId]);
 
   // Coming back into view after a real absence is treated exactly like a
   // reconnect, because the page cannot tell the difference from the inside.
@@ -302,32 +311,32 @@ export function useJetStreamDialogSubscription({
   // the timer rather than dropping is what makes that safe: a request is only
   // ever folded into the one that follows it, never discarded.
   const requestResync = useCallback(() => {
-    if (resyncTimerRef.current !== null) clearTimeout(resyncTimerRef.current)
+    if (resyncTimerRef.current !== null) clearTimeout(resyncTimerRef.current);
     resyncTimerRef.current = setTimeout(() => {
-      resyncTimerRef.current = null
-      setReconnectionCount((c) => c + 1)
-    }, RESYNC_COALESCE_MS)
-  }, [])
+      resyncTimerRef.current = null;
+      setReconnectionCount(c => c + 1);
+    }, RESYNC_COALESCE_MS);
+  }, []);
 
   useEffect(() => {
-    if (!enabled) return
-    let hiddenSince = document.visibilityState === 'hidden' ? Date.now() : 0
+    if (!enabled) return undefined;
+    let hiddenSince = document.visibilityState === 'hidden' ? Date.now() : 0;
 
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        hiddenSince = Date.now()
-        return
+        hiddenSince = Date.now();
+        return;
       }
-      const awayMs = hiddenSince === 0 ? 0 : Date.now() - hiddenSince
-      hiddenSince = 0
+      const awayMs = hiddenSince === 0 ? 0 : Date.now() - hiddenSince;
+      hiddenSince = 0;
       if (awayMs >= RESYNC_AFTER_HIDDEN_MS) {
-        requestResync()
+        requestResync();
       }
-    }
+    };
 
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
-  }, [enabled, requestResync])
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [enabled, requestResync]);
 
   useEffect(() => {
     // Held, not consumed, while disabled: it fires once on enable instead.
@@ -336,12 +345,12 @@ export function useJetStreamDialogSubscription({
     // subscription describes a gap in the history the caller is fetching right
     // now. Dropping it would leave that fetch's result stale with nothing left
     // to say so.
-    if (!enabled) return
+    if (!enabled) return;
     // The mount value is a baseline, not a signal.
-    if (resyncSignal <= lastResyncSignalRef.current) return
-    lastResyncSignalRef.current = resyncSignal
-    requestResync()
-  }, [enabled, resyncSignal, requestResync])
+    if (resyncSignal <= lastResyncSignalRef.current) return;
+    lastResyncSignalRef.current = resyncSignal;
+    requestResync();
+  }, [enabled, resyncSignal, requestResync]);
 
   // Subscription lifecycle: (re)create the ephemeral JetStream consumer whenever
   // we transition into a connected state for a dialog, and whenever the dialog
@@ -350,53 +359,53 @@ export function useJetStreamDialogSubscription({
     if (!enabled || !dialogId || !isConnected) {
       if (subscriptionRef.current) {
         try {
-          subscriptionRef.current.unsubscribe()
+          subscriptionRef.current.unsubscribe();
         } catch {
           // ignore
         }
-        subscriptionRef.current = null
+        subscriptionRef.current = null;
       }
-      setIsSubscribed(false)
-      return
+      // No `setIsSubscribed(false)` here: `isSubscribed` already masks on
+      // exactly these three inputs (see its declaration).
+      return undefined;
     }
 
-    const client = clientRef.current
-    if (!client) return
+    const client = clientRef.current;
+    if (!client) return undefined;
 
-    const abortController = new AbortController()
-    const decoder = new TextDecoder()
-    const filterSubject = `chat.${dialogId}.${topic}`
+    const abortController = new AbortController();
+    const decoder = new TextDecoder();
+    const filterSubject = `chat.${dialogId}.${topic}`;
 
-    const resumeSeq = highestStreamSeqRef.current
-    const initialOptStart = optStartSeqRef.current
-    const startSeq =
-      resumeSeq != null ? resumeSeq + 1 : initialOptStart != null ? initialOptStart + 1 : undefined
+    const resumeSeq = highestStreamSeqRef.current;
+    const initialOptStart = optStartSeqRef.current;
+    const startSeq = resumeSeq != null ? resumeSeq + 1 : initialOptStart != null ? initialOptStart + 1 : undefined;
 
-    let cancelled = false
+    let cancelled = false;
 
     void (async () => {
       try {
         const handle = await client.subscribeJetStreamOrdered(
-          (msg) => {
-            if (cancelled) return
-            const streamSeq = msg.info.streamSequence
+          msg => {
+            if (cancelled) return;
+            const streamSeq = msg.info.streamSequence;
             if (typeof streamSeq === 'number') {
-              if (
-                highestStreamSeqRef.current == null ||
-                streamSeq > highestStreamSeqRef.current
-              ) {
-                highestStreamSeqRef.current = streamSeq
-                setCurrentStreamSeq(streamSeq)
+              if (highestStreamSeqRef.current == null || streamSeq > highestStreamSeqRef.current) {
+                highestStreamSeqRef.current = streamSeq;
+                // Tagged with the dialog this consumer was created for, so a
+                // message that arrives after a dialog switch cannot be read as
+                // the new conversation's offset.
+                setSeqEntry({ dialogId, seq: streamSeq });
               }
             }
-            const cb = onEventRef.current
-            if (!cb) return
+            const cb = onEventRef.current;
+            if (!cb) return;
             try {
-              const parsed = JSON.parse(decoder.decode(msg.data)) as Record<string, unknown>
+              const parsed = JSON.parse(decoder.decode(msg.data)) as Record<string, unknown>;
               if (typeof streamSeq === 'number') {
-                ;(parsed as { streamSeq?: number }).streamSeq = streamSeq
+                (parsed as { streamSeq?: number }).streamSeq = streamSeq;
               }
-              cb(parsed, topic)
+              cb(parsed, topic);
             } catch {
               // Ignore malformed payloads.
             }
@@ -411,48 +420,48 @@ export function useJetStreamDialogSubscription({
             inactiveThresholdMs: inactiveThresholdRef.current,
             signal: abortController.signal,
             onRecovered: () => {
-              if (cancelled) return
-              const now = Date.now()
-              if (now - lastRecoveryReportRef.current < RECOVERY_REPORT_FLOOR_MS) return
-              lastRecoveryReportRef.current = now
-              setRecoveryCount((c) => c + 1)
+              if (cancelled) return;
+              const now = Date.now();
+              if (now - lastRecoveryReportRef.current < RECOVERY_REPORT_FLOOR_MS) return;
+              lastRecoveryReportRef.current = now;
+              setRecoveryCount(c => c + 1);
             },
           },
-        )
+        );
 
         if (cancelled) {
           try {
-            handle.unsubscribe()
+            handle.unsubscribe();
           } catch {
             // ignore
           }
-          return
+          return;
         }
 
-        subscriptionRef.current = handle
-        setIsSubscribed(true)
-        onSubscribedRef.current?.()
+        subscriptionRef.current = handle;
+        setIsSubscribed(true);
+        onSubscribedRef.current?.();
       } catch {
         if (!cancelled) {
-          setIsSubscribed(false)
+          setIsSubscribed(false);
         }
       }
-    })()
+    })();
 
     return () => {
-      cancelled = true
-      abortController.abort()
+      cancelled = true;
+      abortController.abort();
       if (subscriptionRef.current) {
         try {
-          subscriptionRef.current.unsubscribe()
+          subscriptionRef.current.unsubscribe();
         } catch {
           // ignore
         }
-        subscriptionRef.current = null
+        subscriptionRef.current = null;
       }
-      setIsSubscribed(false)
-    }
-  }, [enabled, dialogId, isConnected, streamName, topic, reconnectionCount])
+      setIsSubscribed(false);
+    };
+  }, [enabled, dialogId, isConnected, streamName, topic, reconnectionCount]);
 
   // One counter for every way the tail comes back — reconnect, consumer
   // recreation, post-absence resync — because callers do the same thing for all
@@ -464,5 +473,5 @@ export function useJetStreamDialogSubscription({
     isSubscribed,
     reconnectionCount: reconnectionCount + recoveryCount,
     currentStreamSeq,
-  }
+  };
 }

@@ -24,6 +24,7 @@ public final class NotificationCommand {
     // Null until the caller is the spec-driven emitter; legacy dispatchers don't set them.
     private final NotificationType type;
     private final Map<String, String> attributes;
+    private final String applePushCategory;
 
     @Builder
     NotificationCommand(String title,
@@ -33,7 +34,8 @@ public final class NotificationCommand {
                         String correlationId,
                         Audience audience,
                         NotificationType type,
-                        Map<String, String> attributes) {
+                        Map<String, String> attributes,
+                        String applePushCategory) {
         if (isBlank(title)) {
             throw new IllegalArgumentException("title must not be blank");
         }
@@ -51,5 +53,6 @@ public final class NotificationCommand {
         this.audience = audience;
         this.type = type;
         this.attributes = attributes == null ? null : Map.copyOf(attributes);
+        this.applePushCategory = applePushCategory;
     }
 }

@@ -1,16 +1,16 @@
-'use client'
+'use client';
 
-import { createContext, useContext } from 'react'
-import type { BoardColumnDef } from './types'
+import { createContext, useContext } from 'react';
+import type { BoardColumnDef } from './types';
 
 /** The move that was reported, so we can show it and recognise it arriving. */
 export interface PendingMove {
-  ticketId: string
+  ticketId: string;
   /** The lane it came from — what tells a lane change apart from a reorder. */
-  fromColumnId: string
-  toColumnId: string
+  fromColumnId: string;
+  toColumnId: string;
   /** The card it was dropped after, or `null` for the head of the lane. */
-  afterTicketId: string | null
+  afterTicketId: string | null;
 }
 
 /**
@@ -35,26 +35,26 @@ export interface PendingMove {
  * render.
  */
 export function applyPendingMove(columns: BoardColumnDef[], move: PendingMove): BoardColumnDef[] {
-  const ticket = columns.flatMap(column => column.tickets).find(t => t.id === move.ticketId)
-  if (!ticket || !columns.some(column => column.id === move.toColumnId)) return columns
+  const ticket = columns.flatMap(column => column.tickets).find(t => t.id === move.ticketId);
+  if (!ticket || !columns.some(column => column.id === move.toColumnId)) return columns;
 
   return columns.map(column => {
-    const without = column.tickets.filter(t => t.id !== move.ticketId)
+    const without = column.tickets.filter(t => t.id !== move.ticketId);
     if (column.id !== move.toColumnId) {
-      return without.length === column.tickets.length ? column : { ...column, tickets: without }
+      return without.length === column.tickets.length ? column : { ...column, tickets: without };
     }
-    return { ...column, tickets: insertAfter(without, ticket, move.afterTicketId) }
-  })
+    return { ...column, tickets: insertAfter(without, ticket, move.afterTicketId) };
+  });
 }
 
 function insertAfter<T extends { id: string }>(tickets: T[], ticket: T, afterId: string | null): T[] {
-  if (afterId === null) return [ticket, ...tickets]
-  const after = tickets.findIndex(t => t.id === afterId)
+  if (afterId === null) return [ticket, ...tickets];
+  const after = tickets.findIndex(t => t.id === afterId);
   // The card it was dropped after is gone — archived, or moved by someone else
   // while this drag was in the air. The end of the lane is the honest answer,
   // and the host's own reply overrides it a moment later anyway.
-  const at = after < 0 ? tickets.length : after + 1
-  return [...tickets.slice(0, at), ticket, ...tickets.slice(at)]
+  const at = after < 0 ? tickets.length : after + 1;
+  return [...tickets.slice(0, at), ticket, ...tickets.slice(at)];
 }
 
 /**
@@ -65,11 +65,11 @@ function insertAfter<T extends { id: string }>(tickets: T[], ticket: T, afterId:
  * Only the one card cares, which is why this is an id and not a flag on every
  * card.
  */
-export const LandingCardContext = createContext<string | null>(null)
+export const LandingCardContext = createContext<string | null>(null);
 
 /** True while this card is under the preview travelling into its slot. */
 export function useIsLanding(ticketId: string): boolean {
-  return useContext(LandingCardContext) === ticketId
+  return useContext(LandingCardContext) === ticketId;
 }
 
 /**
@@ -105,12 +105,12 @@ export function useIsLanding(ticketId: string): boolean {
  * says it is — which is the correct thing to show once a move has failed.
  */
 export function hasMoveSettled(columns: readonly BoardColumnDef[], move: PendingMove): boolean {
-  const tickets = columns.find(c => c.id === move.toColumnId)?.tickets
-  if (!tickets) return false
-  const index = tickets.findIndex(t => t.id === move.ticketId)
-  if (index < 0) return false
+  const tickets = columns.find(c => c.id === move.toColumnId)?.tickets;
+  if (!tickets) return false;
+  const index = tickets.findIndex(t => t.id === move.ticketId);
+  if (index < 0) return false;
   if (move.fromColumnId === move.toColumnId) {
-    return (tickets[index - 1]?.id ?? null) === move.afterTicketId
+    return (tickets[index - 1]?.id ?? null) === move.afterTicketId;
   }
-  return !columns.find(c => c.id === move.fromColumnId)?.tickets.some(t => t.id === move.ticketId)
+  return !columns.find(c => c.id === move.fromColumnId)?.tickets.some(t => t.id === move.ticketId);
 }

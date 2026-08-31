@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import {
   DndContext,
@@ -10,28 +10,28 @@ import {
   closestCenter,
   useSensor,
   useSensors,
-} from '@dnd-kit/core'
+} from '@dnd-kit/core';
 import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import * as React from 'react'
-import { cn } from '../../../utils/cn'
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { type CSSProperties, type ReactNode, useMemo } from 'react';
+import { cn } from '../../../utils/cn';
 
 export interface SortableRowRenderArgs {
-  dragHandleProps: DraggableSyntheticListeners
-  dragHandleAttributes: DraggableAttributes
-  isDragging: boolean
+  dragHandleProps: DraggableSyntheticListeners;
+  dragHandleAttributes: DraggableAttributes;
+  isDragging: boolean;
 }
 
 export interface TicketStatusConfigListProps<T extends { id: string }> {
-  items: T[]
-  onReorder: (oldIndex: number, newIndex: number) => void
-  renderRow: (item: T, args: SortableRowRenderArgs) => React.ReactNode
-  className?: string
+  items: T[];
+  onReorder: (oldIndex: number, newIndex: number) => void;
+  renderRow: (item: T, args: SortableRowRenderArgs) => ReactNode;
+  className?: string;
 }
 
 export function TicketStatusConfigList<T extends { id: string }>({
@@ -43,18 +43,18 @@ export function TicketStatusConfigList<T extends { id: string }>({
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
+  );
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    const oldIndex = items.findIndex(i => i.id === active.id)
-    const newIndex = items.findIndex(i => i.id === over.id)
-    if (oldIndex === -1 || newIndex === -1) return
-    onReorder(oldIndex, newIndex)
-  }
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = items.findIndex(i => i.id === active.id);
+    const newIndex = items.findIndex(i => i.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    onReorder(oldIndex, newIndex);
+  };
 
-  const sortableIds = React.useMemo(() => items.map(i => i.id), [items])
+  const sortableIds = useMemo(() => items.map(i => i.id), [items]);
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -68,26 +68,20 @@ export function TicketStatusConfigList<T extends { id: string }>({
         </div>
       </SortableContext>
     </DndContext>
-  )
+  );
 }
 
-function SortableRow({
-  id,
-  children,
-}: {
-  id: string
-  children: (args: SortableRowRenderArgs) => React.ReactNode
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+function SortableRow({ id, children }: { id: string; children: (args: SortableRowRenderArgs) => ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     // Raise the actively dragged row above its siblings — without this the
     // stacking follows DOM order, so a row dragged DOWN slides UNDER the rows
     // below it while a row dragged up correctly renders on top.
     zIndex: isDragging ? 1 : undefined,
-  }
+  };
 
   return (
     <div ref={setNodeRef} style={style}>
@@ -97,5 +91,5 @@ function SortableRow({
         isDragging,
       })}
     </div>
-  )
+  );
 }

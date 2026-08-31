@@ -1,6 +1,6 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import org.springframework.data.domain.Sort;
 

@@ -2,19 +2,14 @@ package com.openframe.notification.spec;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.Set;
-import java.util.TreeSet;
 
-import static java.util.stream.Collectors.toUnmodifiableSet;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-@Slf4j
 public final class Attrs {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -23,12 +18,6 @@ public final class Attrs {
 
     private Attrs(Map<String, String> values) {
         this.values = values;
-    }
-
-    public static Attrs validated(NotificationTypeSpec spec, Map<String, String> raw) {
-        rejectMissingRequiredKeys(spec, raw);
-        Map<String, String> declared = dropUndeclaredKeys(spec, raw);
-        return new Attrs(declared);
     }
 
     public static Attrs of(Map<String, String> values) {
@@ -80,46 +69,5 @@ public final class Attrs {
 
     public Map<String, String> asMap() {
         return values;
-    }
-
-    private static void rejectMissingRequiredKeys(NotificationTypeSpec spec, Map<String, String> raw) {
-        for (AttrKey key : spec.getRequiredKeys()) {
-            String name = key.getName();
-            String value = raw.get(name);
-            if (isBlank(value)) {
-                String type = spec.getType().name();
-                throw new IllegalArgumentException(
-                        type + ": required attribute '" + name + "' is missing or blank");
-            }
-        }
-    }
-
-    // Undeclared keys are dropped, not rejected: a producer may start emitting a fact before the
-    // catalog consumes it. The WARN is what keeps a typo in an optional key from hiding forever.
-    private static Map<String, String> dropUndeclaredKeys(NotificationTypeSpec spec, Map<String, String> raw) {
-        Set<String> declared = declaredKeyNames(spec);
-        Map<String, String> kept = new HashMap<>();
-        Set<String> dropped = new TreeSet<>();
-        for (Map.Entry<String, String> entry : raw.entrySet()) {
-            String key = entry.getKey();
-            if (declared.contains(key)) {
-                kept.put(key, entry.getValue());
-            } else {
-                dropped.add(key);
-            }
-        }
-        if (!dropped.isEmpty()) {
-            String type = spec.getType().name();
-            log.warn("{}: ignoring undeclared attribute(s) {}", type, dropped);
-        }
-        return Map.copyOf(kept);
-    }
-
-    private static Set<String> declaredKeyNames(NotificationTypeSpec spec) {
-        Set<String> required = spec.getRequiredKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
-        Set<String> optional = spec.getOptionalKeys().stream().map(AttrKey::getName).collect(toUnmodifiableSet());
-        Set<String> declared = new TreeSet<>(required);
-        declared.addAll(optional);
-        return declared;
     }
 }

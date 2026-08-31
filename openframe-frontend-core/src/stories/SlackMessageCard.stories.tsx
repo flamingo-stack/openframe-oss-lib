@@ -1,10 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { SlackMessageCard } from '../components/chat/entity-cards'
-import {
-  ChatColumnDecorator,
-  makeAnchorProps,
-} from './__fixtures__/chat-card-decorator'
-import { slackMessageItem } from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { SlackMessageCard } from '../components/chat/entity-cards';
+import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator';
+import { slackMessageItem } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof SlackMessageCard> = {
   title: 'Chat/EntityCards/SlackMessageCard',
@@ -18,11 +15,17 @@ const meta: Meta<typeof SlackMessageCard> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Compact: Story = {
   args: {
@@ -30,7 +33,7 @@ export const Compact: Story = {
     variant: 'compact',
     anchorProps: makeAnchorProps(slackMessageItem.url ?? '#'),
   },
-}
+};
 
 export const RowVariant: Story = {
   args: {
@@ -38,4 +41,4 @@ export const RowVariant: Story = {
     variant: 'row',
     anchorProps: makeAnchorProps(slackMessageItem.url ?? '#'),
   },
-}
+};

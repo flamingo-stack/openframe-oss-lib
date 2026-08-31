@@ -56,6 +56,7 @@ use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
 use crate::services::github_download_service::GithubDownloadService;
+use crate::services::hostname_report_publisher::HostnameReportPublisher;
 use crate::services::initial_authentication_processor::InitialAuthenticationProcessor;
 use crate::services::installed_agent_message_publisher::InstalledAgentMessagePublisher;
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
@@ -87,6 +88,7 @@ use crate::services::{
     InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
     UpdateStateService,
 };
+use crate::services::{MachineIdService, MACHINE_ID_HEADER};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -168,6 +170,7 @@ pub struct Client {
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
+    hostname_report_publisher: HostnameReportPublisher,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
     update_handler_service: UpdateHandlerService,
@@ -208,8 +211,21 @@ impl Client {
         let config_service = AgentConfigurationService::new(directory_manager.clone())
             .context("Failed to initialize device configuration service")?;
 
+        let machine_id_service = MachineIdService::new(&directory_manager);
+        let machine_id = machine_id_service
+            .get_or_create()
+            .context("Failed to get or create machine ID")?;
+
+        let mut default_headers = reqwest::header::HeaderMap::new();
+        default_headers.insert(
+            MACHINE_ID_HEADER,
+            reqwest::header::HeaderValue::from_str(&machine_id)
+                .context("Invalid machine ID for header")?,
+        );
+
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(HTTP_CLIENT_TIMEOUT_SECS))
+            .default_headers(default_headers.clone())
             // disable TLS verification for dev mode only
             .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
             .no_proxy()
@@ -220,6 +236,7 @@ impl Client {
 
         let download_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(DOWNLOAD_CLIENT_TIMEOUT_SECS))
+            .default_headers(default_headers)
             .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
             .no_proxy()
             .pool_max_idle_per_host(0)
@@ -242,7 +259,7 @@ impl Client {
         // Initialize registration service
         let registration_service = AgentRegistrationService::new(
             registration_client,
-            device_data_fetcher,
+            device_data_fetcher.clone(),
             config_service.clone(),
             initial_configuration_service.clone(),
         );
@@ -295,6 +312,7 @@ impl Client {
             auth_service.clone(),
             tls_config_provider,
             deactivation_service.clone(),
+            machine_id_service.clone(),
         );
 
         // Initialize tool agent file client
@@ -539,6 +557,12 @@ impl Client {
         let machine_heartbeat_run_manager =
             MachineHeartbeatRunManager::new(machine_heartbeat_publisher);
 
+        let hostname_report_publisher = HostnameReportPublisher::new(
+            nats_message_publisher.clone(),
+            config_service.clone(),
+            device_data_fetcher.clone(),
+        );
+
         // Initialize update handler service
         let update_handler_service = UpdateHandlerService::new(
             update_state_service.clone(),
@@ -569,6 +593,7 @@ impl Client {
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
+            hostname_report_publisher,
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
             update_handler_service,
@@ -639,6 +664,9 @@ impl Client {
 
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();
+
+        // One-shot hostname report: client startup covers both machine and client restarts.
+        self.hostname_report_publisher.publish().await;
 
         //Start tool installation message listener in background
         self.tool_installation_message_listener.start().await?;

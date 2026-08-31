@@ -11,9 +11,9 @@ import { BellIcon } from '../icons-v2-generated/interface/bell-icon';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui';
 import { HeaderButton } from './header-button';
 import { HeaderGlobalSearch } from './header-global-search';
-import { TicketAlertsButton } from './ticket-alerts-button';
 import { HeaderMingoButton } from './header-mingo-button';
 import { HeaderOrganizationFilter } from './header-organization-filter';
+import { TicketAlertsButton } from './ticket-alerts-button';
 import { TopNavigation } from './top-navigation';
 
 export interface AppHeaderProps {
@@ -115,7 +115,7 @@ export interface AppHeaderProps {
  */
 export type HeaderLoadingCell = 'icon' | 'icon-md' | 'icon-lg' | 'wide';
 
-export const AppHeader = React.memo(function AppHeader({
+export const AppHeader = React.memo(function AppHeaderImpl({
   showSearch,
   onSearch,
   showOrganizations,
@@ -187,7 +187,7 @@ export const AppHeader = React.memo(function AppHeader({
           <HeaderButton
             onClick={onToggleMobileMenu}
             isActive={isMobileMenuOpen}
-            icon={isMobileMenuOpen ? <XmarkIcon className="w-6 h-6" /> : <Menu01Icon className="w-6 h-6" />}
+            icon={isMobileMenuOpen ? <XmarkIcon className="h-6 w-6" /> : <Menu01Icon className="h-6 w-6" />}
             aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={isMobileMenuOpen}
             className="border-r border-ods-border"
@@ -198,7 +198,7 @@ export const AppHeader = React.memo(function AppHeader({
         !isMdUp && (
           <>
             <OpenFrameLogo
-              className="w-6 h-6 shrink-0"
+              className="h-6 w-6 shrink-0"
               upperPathColor="var(--color-text-primary)"
               lowerPathColor="var(--color-accent-primary)"
             />
@@ -213,7 +213,7 @@ export const AppHeader = React.memo(function AppHeader({
           {/* Mobile: Search button */}
           {showSearch && (
             <HeaderButton
-              icon={<SearchIcon className="w-6 h-6" />}
+              icon={<SearchIcon className="h-6 w-6" />}
               aria-label="Search"
               className={cn('md:hidden', cellDivider, dimmedClass)}
               disabled={disabled}
@@ -264,7 +264,7 @@ export const AppHeader = React.memo(function AppHeader({
                       alt={userName || 'User'}
                       size="sm"
                       variant="round"
-                      className="shrink-0 w-8 h-8 md:w-10 md:h-10"
+                      className="h-8 w-8 shrink-0 md:h-10 md:w-10"
                     />
                   }
                   aria-label="User"
@@ -280,10 +280,10 @@ export const AppHeader = React.memo(function AppHeader({
                 align="end"
                 // z-[104] — above the in-layout AppLayoutDrawer panel (z-[103]) so the
                 // user menu stays clickable while the Mingo AI drawer is open
-                className="w-[280px] p-0 bg-ods-bg border-ods-border rounded-[6px] overflow-hidden z-[104]"
+                className="z-[104] w-[280px] overflow-hidden rounded-[6px] border-ods-border bg-ods-bg p-0"
               >
                 {/* User info header section */}
-                <div className="bg-ods-card border-b border-ods-border p-3 flex items-center gap-2">
+                <div className="flex items-center gap-2 border-b border-ods-border bg-ods-card p-3">
                   <SquareAvatar
                     src={userAvatarUrl || undefined}
                     alt={userName || 'User'}
@@ -291,30 +291,30 @@ export const AppHeader = React.memo(function AppHeader({
                     variant="round"
                     className="shrink-0"
                   />
-                  <div className="flex-1 min-w-0">
-                    {userName && <div className="text-h4 text-ods-text-primary truncate">{userName}</div>}
-                    {userEmail && <div className="text-h6 text-ods-text-secondary truncate">{userEmail}</div>}
+                  <div className="min-w-0 flex-1">
+                    {userName && <div className="truncate text-ods-text-primary text-h4">{userName}</div>}
+                    {userEmail && <div className="truncate text-ods-text-secondary text-h6">{userEmail}</div>}
                   </div>
                 </div>
 
                 {/* Menu items */}
                 <DropdownMenuItem
                   onClick={onProfile}
-                  className="bg-ods-card border-b border-ods-border rounded-none px-3 py-3 hover:bg-ods-card/80 focus:bg-ods-card/80 cursor-pointer"
+                  className="cursor-pointer rounded-none border-b border-ods-border bg-ods-card px-3 py-3 hover:bg-ods-card/80 focus:bg-ods-card/80"
                 >
                   <div className="flex items-center gap-2">
-                    <UserIcon className="h-6 w-6 text-ods-text-primary shrink-0" />
-                    <span className="text-h4 text-ods-text-primary">Profile Settings</span>
+                    <UserIcon className="h-6 w-6 shrink-0 text-ods-text-primary" />
+                    <span className="text-ods-text-primary text-h4">Profile Settings</span>
                   </div>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
                   onClick={onLogout}
-                  className="bg-ods-card rounded-none px-3 py-3 hover:bg-ods-card/80 focus:bg-ods-card/80 cursor-pointer"
+                  className="cursor-pointer rounded-none bg-ods-card px-3 py-3 hover:bg-ods-card/80 focus:bg-ods-card/80"
                 >
                   <div className="flex items-center gap-2">
-                    <LogOutIcon className="text-ods-error shrink-0" size={24} />
-                    <span className="text-h4 text-ods-text-primary">Log Out</span>
+                    <LogOutIcon className="shrink-0 text-ods-error" size={24} />
+                    <span className="text-ods-text-primary text-h4">Log Out</span>
                   </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -352,7 +352,7 @@ function NotificationsHeaderButton({ fallbackUnreadCount, disabled, dimmedClass 
 
   return (
     <HeaderButton
-      icon={isActive ? <XmarkIcon className="w-6 h-6" /> : <BellIcon className="w-6 h-6" />}
+      icon={isActive ? <XmarkIcon className="h-6 w-6" /> : <BellIcon className="h-6 w-6" />}
       // Shared dot primitive on the cell — same markup every indicator
       // cell renders (see HeaderButton.showUnreadDot / <UnreadDot>).
       showUnreadDot={!isActive && hasUnread}
@@ -377,12 +377,7 @@ const CELL_VISIBILITY: Record<Exclude<HeaderLoadingCell, 'wide'>, string | undef
 /** One trailing action cell placeholder — mirrors the live cells' 48/56px box. */
 function HeaderCellSkeleton({ className }: { className?: string }) {
   return (
-    <div
-      className={cn(
-        'flex h-full w-14 shrink-0 items-center justify-center border-l border-ods-border',
-        className,
-      )}
-    >
+    <div className={cn('flex h-full w-14 shrink-0 items-center justify-center border-l border-ods-border', className)}>
       <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
     </div>
   );

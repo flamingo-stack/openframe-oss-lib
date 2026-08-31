@@ -1,24 +1,28 @@
-'use client'
+'use client';
 
 /**
- * Client-side persistence for embed-surface proxy credentials
- * (`CHAT_PROXY_SECRET` + impersonation email). Used by every embedded
+ * Client-side persistence for embed-surface proxy credentials (a
+ * PLATFORM API KEY + impersonation email). Used by every embedded
  * surface — the chat widget AND the ticket center AND any future
  * embedded React component that needs to identify itself as the
  * impersonated customer.
  *
  * When set, the surface attaches the creds as
- *   `Authorization: Bearer <secret>` + `X-Chat-Act-As: <email>`
+ *   `Authorization: Bearer <platform API key>` + `X-Chat-Act-As: <email>`
  * on every call to `/api/docs/chat`, `/api/chat/*`, and any other route
  * gated by `requireChatAuth` — proving to the server that this session
- * is acting on behalf of <email>.
+ * is acting on behalf of <email>. The key is minted in the hub's
+ * `/admin/api-keys` and is platform-bound (`fpk_<platform>_…`): a
+ * SERVICE key may act as any email; a PERSONAL key only as its owner.
  *
- * **Naming history:** the wire-side header names are still `X-Chat-*`
- * and the env var is `CHAT_PROXY_SECRET`. Those are server contracts;
- * renaming them would require a coordinated deploy + customer-side
- * env-var migration. The CLIENT-side helpers were renamed `Embed*` so
- * non-chat surfaces (e.g. ticket center) don't have to import a
- * chat-prefixed symbol just to send the same headers.
+ * **Naming history:** the stored field is still named `secret` and the
+ * wire-side header names are `X-Chat-*`. Those are client/server
+ * contracts predating the per-platform key migration (the old shared
+ * `CHAT_PROXY_SECRET` env is removed hub-side); renaming them would
+ * break persisted state + the wire shape for zero behavior change. The
+ * CLIENT-side helpers were renamed `Embed*` so non-chat surfaces (e.g.
+ * ticket center) don't have to import a chat-prefixed symbol just to
+ * send the same headers.
  *
  * Persists to **`localStorage`** so the bearer token + act-as identity
  * survive tab close, new-tab opens, and browser restarts — the
@@ -26,43 +30,47 @@
  * cycle was rejected as a dev-experience tradeoff that wasn't worth
  * the security gain. An XSS sink on this origin can read the value
  * indefinitely (vs only-this-tab with sessionStorage), but `/debug`
- * is admin-gated behind the platform's `askAI.enabled` flag and the
- * impersonation header it sets is server-validated against
- * `CHAT_PROXY_SECRET` anyway. Explicit "Clear" button on the creds
- * bar is the supported logout path; closing the tab is no longer.
+ * is admin-gated behind the platform's `askAI.enabled` flag, the key
+ * is server-verified (hash-at-rest, platform-bound, revocable in
+ * `/admin/api-keys`), and the act-as reach is bounded by the key's
+ * tier. Explicit "Clear" button on the creds bar is the supported
+ * logout path; closing the tab is no longer.
  *
  * Namespaced under `<platform>.chat.proxy-auth.v1` (the storage key is
  * unchanged from the old chat-prefixed helper — that's a storage
  * contract; renaming it would log everyone out).
  */
 
-import { createLocalStorageAdapter } from './local-storage-adapter'
-import { getAppType } from './app-config'
+import { getAppType } from './app-config';
+import { createLocalStorageAdapter } from './local-storage-adapter';
 
 export interface EmbedProxyAuth {
-  secret: string
-  email: string
+  secret: string;
+  email: string;
   /** Optional identity passthrough — empty/omitted = not sent. Server
    *  parses these as `X-Chat-{First,Last}-Name` / `X-Chat-Avatar-Url` and
    *  threads them through `resolveChatProxyIdentity`'s returned user. */
-  firstName?: string
-  lastName?: string
-  avatarUrl?: string
+  firstName?: string;
+  lastName?: string;
+  avatarUrl?: string;
 }
 
 function isValidPersistedAuth(value: unknown): value is EmbedProxyAuth {
-  if (!value || typeof value !== 'object') return false
-  const v = value as Record<string, unknown>
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
   if (
-    typeof v.secret !== 'string' || v.secret.trim().length === 0 ||
-    typeof v.email !== 'string' || v.email.trim().length === 0
-  ) return false
+    typeof v.secret !== 'string' ||
+    v.secret.trim().length === 0 ||
+    typeof v.email !== 'string' ||
+    v.email.trim().length === 0
+  )
+    return false;
   // Optional fields: when present must be strings. Empty string is treated
   // as absent later (in `getEmbedProxyAuth`).
-  if (v.firstName != null && typeof v.firstName !== 'string') return false
-  if (v.lastName != null && typeof v.lastName !== 'string') return false
-  if (v.avatarUrl != null && typeof v.avatarUrl !== 'string') return false
-  return true
+  if (v.firstName != null && typeof v.firstName !== 'string') return false;
+  if (v.lastName != null && typeof v.lastName !== 'string') return false;
+  if (v.avatarUrl != null && typeof v.avatarUrl !== 'string') return false;
+  return true;
 }
 
 const adapter = createLocalStorageAdapter<EmbedProxyAuth>({
@@ -78,14 +86,14 @@ const adapter = createLocalStorageAdapter<EmbedProxyAuth>({
   // tradeoff prior `sessionStorage` setup demanded — rejected. See
   // file-level doc comment for the security tradeoff rationale.
   backend: 'local',
-})
+});
 
 /** Trim + null-coerce an optional identity field so consumers can do
  *  `auth.firstName ?? ''` without worrying about whitespace-only strings. */
 function normalizeOptional(value: string | undefined): string | undefined {
-  if (!value) return undefined
-  const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : undefined
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 /**
@@ -94,15 +102,15 @@ function normalizeOptional(value: string | undefined): string | undefined {
  * callers treat that as "fall back to cookie auth".
  */
 export function getEmbedProxyAuth(): EmbedProxyAuth | null {
-  const persisted = adapter.load()
-  if (!persisted) return null
+  const persisted = adapter.load();
+  if (!persisted) return null;
   return {
     secret: persisted.secret,
     email: persisted.email.trim().toLowerCase(),
     firstName: normalizeOptional(persisted.firstName),
     lastName: normalizeOptional(persisted.lastName),
     avatarUrl: normalizeOptional(persisted.avatarUrl),
-  }
+  };
 }
 
 /**
@@ -110,8 +118,8 @@ export function getEmbedProxyAuth(): EmbedProxyAuth | null {
  * this to pre-fill the email field on mount.
  */
 export function getPersistedProxyEmail(): string | null {
-  const persisted = adapter.load()
-  return persisted?.email.trim().toLowerCase() ?? null
+  const persisted = adapter.load();
+  return persisted?.email.trim().toLowerCase() ?? null;
 }
 
 /** Save the proxy creds. Secret + email are required; identity-passthrough
@@ -123,12 +131,12 @@ export function setEmbedProxyAuth(value: EmbedProxyAuth): void {
     firstName: normalizeOptional(value.firstName),
     lastName: normalizeOptional(value.lastName),
     avatarUrl: normalizeOptional(value.avatarUrl),
-  })
+  });
 }
 
 /** Drop the persisted creds. */
 export function clearEmbedProxyAuth(): void {
-  adapter.clear()
+  adapter.clear();
 }
 
 /**
@@ -146,18 +154,18 @@ export function applyProxyAuth(
   url: string,
   baseHeaders: Record<string, string> = { 'Content-Type': 'application/json' },
 ): { url: string; headers: Record<string, string> } {
-  const auth = getEmbedProxyAuth()
-  const headers = { ...baseHeaders }
+  const auth = getEmbedProxyAuth();
+  const headers = { ...baseHeaders };
   if (auth?.secret) {
-    headers.Authorization = `Bearer ${auth.secret}`
+    headers.Authorization = `Bearer ${auth.secret}`;
   }
   if (auth?.email) {
-    headers['X-Chat-Act-As'] = auth.email
+    headers['X-Chat-Act-As'] = auth.email;
   }
   // Optional identity passthrough — only attached when present so the
   // server's "required vs optional" header shape stays exact.
-  if (auth?.firstName) headers['X-Chat-First-Name'] = auth.firstName
-  if (auth?.lastName) headers['X-Chat-Last-Name'] = auth.lastName
-  if (auth?.avatarUrl) headers['X-Chat-Avatar-Url'] = auth.avatarUrl
-  return { url, headers }
+  if (auth?.firstName) headers['X-Chat-First-Name'] = auth.firstName;
+  if (auth?.lastName) headers['X-Chat-Last-Name'] = auth.lastName;
+  if (auth?.avatarUrl) headers['X-Chat-Avatar-Url'] = auth.avatarUrl;
+  return { url, headers };
 }

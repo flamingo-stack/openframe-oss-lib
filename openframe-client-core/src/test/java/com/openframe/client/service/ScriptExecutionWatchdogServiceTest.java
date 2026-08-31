@@ -1,10 +1,12 @@
 package com.openframe.client.service;
 
+import com.openframe.client.metrics.ScriptExecutionWatchdogMetrics;
 import com.openframe.client.service.rmm.watchdog.ScheduleJobExecutionWatchdogService;
 import com.openframe.client.service.rmm.watchdog.ScriptExecutionWatchdogService;
-import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,11 +28,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * The watchdog stuck-threshold is per-execution: each row is reaped only once it
- * outlives its own {@code timeoutSeconds + grace}; rows without a timeout use the
- * fixed fallback. These tests lock that behaviour (grace = 120s, fallback = 600s).
- */
 @ExtendWith(MockitoExtension.class)
 class ScriptExecutionWatchdogServiceTest {
 
@@ -47,7 +44,8 @@ class ScriptExecutionWatchdogServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ScriptExecutionWatchdogService(repository, headerWatchdogService);
+        service = new ScriptExecutionWatchdogService(repository, headerWatchdogService,
+                new ScriptExecutionWatchdogMetrics(new SimpleMeterRegistry()));
         ReflectionTestUtils.setField(service, "graceSeconds", GRACE);
         ReflectionTestUtils.setField(service, "fallbackThresholdSeconds", FALLBACK);
     }
@@ -150,19 +148,20 @@ class ScriptExecutionWatchdogServiceTest {
     }
 
     @Test
-    @DisplayName("reaping SCHEDULE leaves finalizes each distinct fire header once; ad-hoc (scheduleId=null) leaves trigger no header finalize")
-    void reapedScheduleLeaves_finalizeHeaderOncePerFire() {
+    @DisplayName("reaped rows are handed to the header finalizer once, as a batch (dedup/finalize is the header service's job)")
+    void reapedRows_delegatedToHeaderFinalizer() {
         ScriptExecution fireLeafA = scheduleLeaf("t-1", "sch-1", "exec-1", "m-1", 200);
-        ScriptExecution fireLeafB = scheduleLeaf("t-1", "sch-1", "exec-1", "m-2", 200);  // same fire, other machine
-        ScriptExecution adhoc = running(60, 200);                                        // scheduleId == null
+        ScriptExecution fireLeafB = scheduleLeaf("t-1", "sch-1", "exec-1", "m-2", 200);
+        ScriptExecution adhoc = running(60, 200);
         when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
                 .thenReturn(List.of(fireLeafA, fireLeafB, adhoc));
 
         service.markStuckExecutionsAsFailed();
 
         verify(repository).saveAll(any());
-        // (t-1, exec-1) collapses to a single finalize; the ad-hoc leaf produces none.
-        verify(headerWatchdogService).finalizeIfSettled("t-1", "exec-1");
+        ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
+        verify(headerWatchdogService).finalizeAffectedHeaders(captor.capture());
+        assertThat(captor.getValue()).containsExactlyInAnyOrder(fireLeafA, fireLeafB, adhoc);
         verifyNoMoreInteractions(headerWatchdogService);
     }
 

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { buildListUrl, canonicalContentRefType } from '../list-url'
+import { describe, expect, it } from 'vitest';
+import { buildListUrl, canonicalContentRefType } from '../list-url';
 
 /**
  * Byte-parity gate for the shared `buildListUrl`.
@@ -48,68 +48,58 @@ const BASELINE: Record<string, string> = {
   profit_loss: '/api/financials/profit-loss?ids=a,b',
   balance_sheet: '/api/financials/balance-sheet?ids=a,b',
   cash_flow: '/api/financials/cash-flow?ids=a,b',
-}
+};
 
 describe('buildListUrl — byte parity with the hub mappers', () => {
   it.each(Object.entries(BASELINE))('%s → exact prior listApi output', (type, expected) => {
-    expect(buildListUrl(type, ['a', 'b'])).toBe(expected)
-  })
+    expect(buildListUrl(type, ['a', 'b'])).toBe(expected);
+  });
 
   it('canonicalContentRefType: aliases resolve, prototype keys do not', () => {
-    expect(canonicalContentRefType('blog_post_existing')).toBe('blog_post')
-    expect(canonicalContentRefType('roadmap_item')).toBe('roadmap_item')
+    expect(canonicalContentRefType('blog_post_existing')).toBe('blog_post');
+    expect(canonicalContentRefType('roadmap_item')).toBe('roadmap_item');
     // A bare `ALIASES[key]` read returned `Object` here, which downstream
     // interpolated into a URL path.
-    expect(canonicalContentRefType('constructor')).toBe('constructor')
-    expect(canonicalContentRefType('__proto__')).toBe('__proto__')
-    expect(canonicalContentRefType('toString')).toBe('toString')
-  })
+    expect(canonicalContentRefType('constructor')).toBe('constructor');
+    expect(canonicalContentRefType('__proto__')).toBe('__proto__');
+    expect(canonicalContentRefType('toString')).toBe('toString');
+  });
 
   it('un-aliases blog_post_existing → blog_post (mirrors hub LEGACY_TYPE_ALIASES)', () => {
-    expect(buildListUrl('blog_post_existing', ['a', 'b'])).toBe(BASELINE.blog_post)
-  })
+    expect(buildListUrl('blog_post_existing', ['a', 'b'])).toBe(BASELINE.blog_post);
+  });
 
   it('builds marketing_campaign via the literal admin case', () => {
-    expect(buildListUrl('marketing_campaign', ['a', 'b'])).toBe(
-      '/api/admin/marketing/campaigns?ids=a,b&pageSize=2',
-    )
-  })
-})
+    expect(buildListUrl('marketing_campaign', ['a', 'b'])).toBe('/api/admin/marketing/campaigns?ids=a,b&pageSize=2');
+  });
+});
 
 describe('buildListUrl — base prefix (embedder reverse-proxy)', () => {
   it('prepends a non-empty base to every builder', () => {
-    expect(buildListUrl('roadmap_item', ['a', 'b'], '/content')).toBe(
-      '/content/api/roadmap?task_ids=a,b',
-    )
-    expect(buildListUrl('blog_post', ['a', 'b'], '/content')).toBe(
-      '/content/api/blog/posts?ids=a,b&pageSize=2',
-    )
+    expect(buildListUrl('roadmap_item', ['a', 'b'], '/content')).toBe('/content/api/roadmap?task_ids=a,b');
+    expect(buildListUrl('blog_post', ['a', 'b'], '/content')).toBe('/content/api/blog/posts?ids=a,b&pageSize=2');
     expect(buildListUrl('webinar', ['a', 'b'], '/content')).toBe(
       '/content/api/programs/webinars?ids=a,b&limit=2&filter=all',
-    )
+    );
     expect(buildListUrl('marketing_campaign', ['a', 'b'], '/content')).toBe(
       '/content/api/admin/marketing/campaigns?ids=a,b&pageSize=2',
-    )
-  })
+    );
+  });
 
   it('default base is empty (hub-relative)', () => {
-    expect(buildListUrl('product_release', ['a', 'b'])).toBe(
-      buildListUrl('product_release', ['a', 'b'], ''),
-    )
-  })
-})
+    expect(buildListUrl('product_release', ['a', 'b'])).toBe(buildListUrl('product_release', ['a', 'b'], ''));
+  });
+});
 
 describe('buildListUrl — pageSize / limit track ids.length', () => {
   it('single id', () => {
-    expect(buildListUrl('blog_post', ['x'])).toBe('/api/blog/posts?ids=x&pageSize=1')
-    expect(buildListUrl('case_study', ['x'])).toBe('/api/case-studies?ids=x&limit=1')
-  })
+    expect(buildListUrl('blog_post', ['x'])).toBe('/api/blog/posts?ids=x&pageSize=1');
+    expect(buildListUrl('case_study', ['x'])).toBe('/api/case-studies?ids=x&limit=1');
+  });
   it('three ids', () => {
-    expect(buildListUrl('onboarding_guide', ['a', 'b', 'c'])).toBe(
-      '/api/onboarding-guides?ids=a,b,c&limit=3',
-    )
-  })
-})
+    expect(buildListUrl('onboarding_guide', ['a', 'b', 'c'])).toBe('/api/onboarding-guides?ids=a,b,c&limit=3');
+  });
+});
 
 // Mirrors the hub's `entity-list-api.buildListBasePath` (probe an id, strip the
 // query) — that fn is unchanged hub code, so proving the bare path each builder
@@ -130,36 +120,34 @@ describe('buildListUrl — base-path derivation (covers hub buildListBasePath)',
     investor_update: '/api/investor-updates',
     marketing_campaign: '/api/admin/marketing/campaigns',
     hubspot_ticket_self: '/api/tickets',
-  }
+  };
   it.each(Object.entries(BASE_PATHS))('%s → %s', (type, base) => {
-    const url = buildListUrl(type, ['__probe__'])
-    expect(url).not.toBeNull()
-    const q = url!.indexOf('?')
-    expect(q < 0 ? url : url!.slice(0, q)).toBe(base)
-  })
-})
+    const url = buildListUrl(type, ['__probe__']);
+    // Throwing rather than `expect(...).not.toBeNull()` — this names the
+    // missing endpoint AND narrows `url` for the two reads below.
+    if (url === null) throw new Error(`buildListUrl("${type}") returned null — expected a list endpoint`);
+    const q = url.indexOf('?');
+    expect(q < 0 ? url : url.slice(0, q)).toBe(base);
+  });
+});
 
 describe('buildListUrl — null (no list endpoint)', () => {
   it('empty ids → null', () => {
-    expect(buildListUrl('roadmap_item', [])).toBeNull()
-    expect(buildListUrl('marketing_campaign', [])).toBeNull()
-  })
+    expect(buildListUrl('roadmap_item', [])).toBeNull();
+    expect(buildListUrl('marketing_campaign', [])).toBeNull();
+  });
 
   // Only the two genuinely un-fetchable types are ABSENT keys — their
   // absence IS the null. `deleted_data` is a tombstone for a row that no
   // longer exists; `video` ids are body-embed content hashes with no
   // backing table row. Guards against accidentally adding a builder.
-  it.each([
-    'deleted_data',
-    'video',
-    'unknown_type',
-  ])('%s → null', (type) => {
-    expect(buildListUrl(type, ['a', 'b'])).toBeNull()
-  })
+  it.each(['deleted_data', 'video', 'unknown_type'])('%s → null', type => {
+    expect(buildListUrl(type, ['a', 'b'])).toBeNull();
+  });
 
   it('prototype keys do not dispatch (hasOwnProperty guard)', () => {
-    expect(buildListUrl('constructor', ['a', 'b'])).toBeNull()
-    expect(buildListUrl('__proto__', ['a', 'b'])).toBeNull()
-    expect(buildListUrl('hasOwnProperty', ['a', 'b'])).toBeNull()
-  })
-})
+    expect(buildListUrl('constructor', ['a', 'b'])).toBeNull();
+    expect(buildListUrl('__proto__', ['a', 'b'])).toBeNull();
+    expect(buildListUrl('hasOwnProperty', ['a', 'b'])).toBeNull();
+  });
+});

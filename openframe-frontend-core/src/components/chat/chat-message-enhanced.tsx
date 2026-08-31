@@ -1,29 +1,30 @@
-"use client"
+'use client';
 
-import React, { forwardRef, memo, useEffect, useMemo, useRef } from "react"
-import { cn } from "../../utils/cn"
-import { isToday } from "../../utils/date-utils"
-import { formatDate, formatTime } from "../../utils/format-date"
-import { SquareAvatar } from "../ui/square-avatar"
-import { ToolExecutionDisplay } from "./tool-execution-display"
-import { ApprovalRequestMessage } from "./approval-request-message"
-import { ApprovalBatchMessage } from "./approval-batch-message"
-import { EscalationOfferMessage } from "./escalation-offer-message"
-import { TicketEscalatedMessage } from "./ticket-escalated-message"
-import { TicketEventMessage } from "./ticket-event-message"
-import { ErrorMessageDisplay } from "./error-message-display"
-import { ContextCompactionDisplay } from "./context-compaction-display"
-import { ThinkingDisplay } from "./thinking-display"
-import { GuideDisplay } from "./guide-display"
-import { AskDisplay } from "./ask-display"
-import { SimpleMarkdownRenderer } from "../ui/markdown/simple-markdown-renderer"
-import type { ChatRef } from "./chat-ref.types"
-import { remarkCardLinks } from "./remark-card-links"
-import { remarkStripCitations } from "./remark-strip-citations"
-import { remarkMentionChips } from "./remark-mention-chips"
-import { BlockCard, type BlockCardProps } from "./entity-cards/block-card"
-import { ChatContextChipStrip } from "./chat-context-picker"
-import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
+import React, { forwardRef, memo, useEffect, useMemo, useRef } from 'react';
+import { cn } from '../../utils/cn';
+import { isToday } from '../../utils/date-utils';
+import { formatDate, formatTime } from '../../utils/format-date';
+import type { MdRenderProps } from '../ui/markdown/base-components';
+import { SimpleMarkdownRenderer } from '../ui/markdown/simple-markdown-renderer';
+import { SquareAvatar } from '../ui/square-avatar';
+import { ApprovalBatchMessage } from './approval-batch-message';
+import { ApprovalRequestMessage } from './approval-request-message';
+import { AskDisplay } from './ask-display';
+import { ChatContextChipStrip } from './chat-context-picker';
+import type { ChatRef } from './chat-ref.types';
+import { ContextCompactionDisplay } from './context-compaction-display';
+import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
+import { ErrorMessageDisplay } from './error-message-display';
+import { EscalationOfferMessage } from './escalation-offer-message';
+import { GuideDisplay } from './guide-display';
+import { remarkCardLinks } from './remark-card-links';
+import { remarkMentionChips } from './remark-mention-chips';
+import { remarkStripCitations } from './remark-strip-citations';
+import { ThinkingDisplay } from './thinking-display';
+import { TicketEscalatedMessage } from './ticket-escalated-message';
+import { TicketEventMessage } from './ticket-event-message';
+import { ToolExecutionDisplay } from './tool-execution-display';
+import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedProps } from './types';
 
 /** Inline `@marker:id` mention token in the message body (sibling of the
  *  `[card://]` grammar) — used to filter out items rendered inline from the
@@ -34,7 +35,7 @@ import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedPro
  *  from display entirely. The id is capture group 2 (group 1 is the boundary).
  *  Marker `[a-zA-Z]+` (markers are mostly lowercase but not all — e.g.
  *  `scheduledScript`); id is the mention-token charset. */
-const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-zA-Z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g
+const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-zA-Z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g;
 
 /**
  * Same regex shape as `remarkCardLinks` — kept in lockstep so the
@@ -42,21 +43,21 @@ const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-zA-Z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9
  * grammar widens (today: snake_case OR kebab-case; closer `]` OR `)`),
  * both files must update.
  */
-const CARD_MARKER_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g
+const CARD_MARKER_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g;
 
 /** Timestamp label: today's messages show time only ("2:47 PM"),
  *  older messages prepend a locale-formatted date ("05/05/2026 2:47 PM"
  *  in en-US, "05.05.2026 14:47" in european locales). */
 function formatMessageTimestamp(timestamp: Date): string {
-  const time = formatTime(timestamp)
-  return isToday(timestamp) ? time : `${formatDate(timestamp)} ${time}`
+  const time = formatTime(timestamp);
+  return isToday(timestamp) ? time : `${formatDate(timestamp)} ${time}`;
 }
 
 function normalizeContent(content: MessageContent): MessageSegment[] {
   if (typeof content === 'string') {
-    return content ? [{ type: 'text', text: content }] : []
+    return content ? [{ type: 'text', text: content }] : [];
   }
-  return content
+  return content;
 }
 
 /**
@@ -66,28 +67,52 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
  * (an `ask` index missing from this map is a tail member).
  */
 function groupAskRuns(segments: MessageSegment[]): Map<number, AskSegment[]> {
-  const runs = new Map<number, AskSegment[]>()
-  let headIndex = -1
+  const runs = new Map<number, AskSegment[]>();
+  let headIndex = -1;
   segments.forEach((segment, index) => {
     if (segment.type !== 'ask') {
-      headIndex = -1
-      return
+      headIndex = -1;
+      return;
     }
     if (headIndex === -1) {
-      headIndex = index
-      runs.set(index, [segment])
-      return
+      headIndex = index;
+      runs.set(index, [segment]);
+      return;
     }
-    runs.get(headIndex)?.push(segment)
-  })
-  return runs
+    runs.get(headIndex)?.push(segment);
+  });
+  return runs;
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, approvalVariant, authorType: authorTypeProp, assistantIcon, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, onAskSelect, NavLinkAnchor, ...props }, ref) => {
-    const isUser = role === 'user'
-    const isError = role === 'error'
-    const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
+  (
+    {
+      className,
+      role,
+      content,
+      name,
+      avatar,
+      isTyping = false,
+      timestamp,
+      showAvatar = true,
+      assistantType,
+      approvalVariant,
+      authorType: authorTypeProp,
+      assistantIcon,
+      contextItems,
+      resolveContextIcon,
+      renderContextItem,
+      renderMention,
+      renderEntityCard,
+      onAskSelect,
+      NavLinkAnchor,
+      ...props
+    },
+    ref,
+  ) => {
+    const isUser = role === 'user';
+    const isError = role === 'error';
+    const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae');
 
     // Inline-card rendering uses a HOST-PROVIDED `renderEntityCard` function
     // (v6.1 §B.2.7 — DRY duplications #2). The OSS-lib stays data-agnostic:
@@ -101,11 +126,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // (Logic MED-4). When the host's `renderEntityCard` is unset OR returns
     // null, the override falls back to the bare cardId. Never renders the
     // literal `[card://...]` URL.
-    const hasMarkerSupport = !!renderEntityCard
+    const hasMarkerSupport = !!renderEntityCard;
 
-    const segments = useMemo(() => normalizeContent(content), [content])
+    const segments = useMemo(() => normalizeContent(content), [content]);
 
-    const askRuns = useMemo(() => groupAskRuns(segments), [segments])
+    const askRuns = useMemo(() => groupAskRuns(segments), [segments]);
 
     // Inline `@marker:id` mentions: the composer commits these tokens when the
     // user picks context via the `@`-flow, and the ASSISTANT routinely echoes
@@ -113,28 +138,28 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // token and delegates rendering to the host's `renderMention` (mirror of
     // `renderEntityCard`): the host returns a SELF-FETCHING chip per entity
     // type. Enabled whenever the host opts in by supplying `renderMention`.
-    const hasMentionSupport = !!renderMention
+    const hasMentionSupport = !!renderMention;
 
     // Ids that appear as `@marker:id` in the body → rendered inline, so they are
     // excluded from the chip strip below (no duplicate inline + strip).
     const inlineMentionIds = useMemo(() => {
-      const ids = new Set<string>()
-      if (!hasMentionSupport) return ids
+      const ids = new Set<string>();
+      if (!hasMentionSupport) return ids;
       for (const seg of segments) {
-        if (seg.type !== 'text' || !seg.text || !seg.text.includes('@')) continue
-        for (const mm of seg.text.matchAll(MENTION_MARKER_REGEX)) ids.add(mm[2])
+        if (seg.type !== 'text' || !seg.text || !seg.text.includes('@')) continue;
+        for (const mm of seg.text.matchAll(MENTION_MARKER_REGEX)) ids.add(mm[2]);
       }
-      return ids
-    }, [hasMentionSupport, segments])
+      return ids;
+    }, [hasMentionSupport, segments]);
 
     // Chip strip = only context NOT already shown inline (e.g. `+`-added items).
     const stripContextItems = useMemo(
       () =>
         inlineMentionIds.size > 0 && contextItems
-          ? contextItems.filter((it) => !inlineMentionIds.has(it.id))
+          ? contextItems.filter(it => !inlineMentionIds.has(it.id))
           : contextItems,
       [contextItems, inlineMentionIds],
-    )
+    );
 
     // Markdown plugins per message: card markers (assistant) + mention tokens
     // (user). Each is gated independently so neither fires without its data.
@@ -144,7 +169,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         ...(hasMentionSupport ? [remarkMentionChips] : []),
       ],
       [hasMarkerSupport, hasMentionSupport],
-    )
+    );
 
     // Cross-render cache of rendered inline-card nodes, keyed by `type:id`.
     // A fetch-mode card lives inside the assistant message, which re-renders on
@@ -157,7 +182,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // render fn identity changes.
     const renderedCardNodeCache = useRef(
       new Map<string, { render: ((ref: ChatRef) => React.ReactNode) | undefined; node: React.ReactNode }>(),
-    )
+    );
 
     /**
      * Per-message rendering plan for `[card://type:id]` markers.
@@ -187,44 +212,42 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
      * tokens render in the trailing chunk — block stays in position.
      */
     const renderingPlan = useMemo(() => {
-      if (!hasMarkerSupport) return null
-      const render = renderEntityCard
-      const inlineByKey = new Map<string, React.ReactNode>()
-      type SegmentPart =
-        | { kind: 'text'; text: string }
-        | { kind: 'block'; key: string; node: React.ReactNode }
-      const partsBySegment = new Map<number, SegmentPart[]>()
-      const usedKeys = new Set<string>()
-      if (!render) return { inlineByKey, partsBySegment, usedKeys }
-      const cache = renderedCardNodeCache.current
+      if (!hasMarkerSupport) return null;
+      const render = renderEntityCard;
+      const inlineByKey = new Map<string, React.ReactNode>();
+      type SegmentPart = { kind: 'text'; text: string } | { kind: 'block'; key: string; node: React.ReactNode };
+      const partsBySegment = new Map<number, SegmentPart[]>();
+      const usedKeys = new Set<string>();
+      if (!render) return { inlineByKey, partsBySegment, usedKeys };
+      const cache = renderedCardNodeCache.current;
       // Card keys already emitted as a hoisted block (`b-<key>`). The same
       // marker can legitimately appear twice in one message (LLM references
       // the same entity twice); we hoist the FIRST occurrence and skip the
       // duplicates so two siblings never collide on the same React key.
-      const emittedBlockKeys = new Set<string>()
+      const emittedBlockKeys = new Set<string>();
       segments.forEach((segment, segIdx) => {
         // Both markdown-bearing segment types take part: a `guide` body is
         // authored by the same LLM and carries the same `[card://]` markers,
         // so skipping it here left its markers with no `inlineByKey` entry and
         // no hoisted card — the `<a card://>` override silently degraded them
         // to a bare title / id.
-        if (segment.type !== 'text' && segment.type !== 'guide') return
-        const text = segment.text
-        const parts: SegmentPart[] = []
-        let cursor = 0
-        CARD_MARKER_REGEX.lastIndex = 0
-        let match: RegExpExecArray | null
+        if (segment.type !== 'text' && segment.type !== 'guide') return;
+        const text = segment.text;
+        const parts: SegmentPart[] = [];
+        let cursor = 0;
+        CARD_MARKER_REGEX.lastIndex = 0;
+        let match: RegExpExecArray | null;
         while ((match = CARD_MARKER_REGEX.exec(text)) !== null) {
-          const cardType = match[1]
-          const cardId = match[2]
-          const key = `${cardType}:${cardId}`
-          usedKeys.add(key)
+          const cardType = match[1];
+          const cardId = match[2];
+          const key = `${cardType}:${cardId}`;
+          usedKeys.add(key);
           // Reuse the cached node when the render fn didn't change —
           // returning the SAME element reference across renders is what
           // stops React from re-mounting the card (and closing its open
           // menu / re-fetching) on every stream chunk. Also dedups the same
           // key emitted twice within one message.
-          let entry = cache.get(key)
+          let entry = cache.get(key);
           if (!entry || entry.render !== render) {
             // The marker is the ONLY data on the wire: cards hydrate by id
             // from the host's per-object APIs, so a minimal {type, id}
@@ -245,31 +268,33 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               id: cardId,
               title: cardId,
               url: null,
-            }
-            entry = { render, node: render(refForRender) }
-            cache.set(key, entry)
+            };
+            entry = { render, node: render(refForRender) };
+            cache.set(key, entry);
           }
-          const rendered = entry.node
+          const rendered = entry.node;
           if (React.isValidElement(rendered) && rendered.type === BlockCard) {
-            const props = rendered.props as BlockCardProps
-            const markerEnd = match.index + match[0].length
+            const cardProps = rendered.props as BlockCardProps;
+            const markerEnd = match.index + match[0].length;
             // Text chunk INCLUDING the marker — the inline pill renders
             // at the marker position via the `<a>` override.
-            parts.push({ kind: 'text', text: text.slice(cursor, markerEnd) })
+            parts.push({ kind: 'text', text: text.slice(cursor, markerEnd) });
             // Hoist the block payload only on the FIRST occurrence of this key
             // — a repeated marker still gets its inline pill (text + override
             // above) but must not push a second `b-<key>` sibling.
             if (!emittedBlockKeys.has(key)) {
-              emittedBlockKeys.add(key)
-              parts.push({ kind: 'block', key, node: props.children })
+              emittedBlockKeys.add(key);
+              parts.push({ kind: 'block', key, node: cardProps.children });
             }
-            cursor = markerEnd
+            cursor = markerEnd;
             inlineByKey.set(
               key,
-              props.inline != null
-                ? props.inline
-                : <span className="text-ods-text-primary font-medium">{cardId}</span>,
-            )
+              cardProps.inline != null ? (
+                cardProps.inline
+              ) : (
+                <span className="font-medium text-ods-text-primary">{cardId}</span>
+              ),
+            );
           } else if (rendered != null) {
             // Hoist fetch-mode entity cards (roadmap/blog/case-study/release/…)
             // OUT of the markdown as stable-keyed block siblings — exactly like
@@ -285,29 +310,29 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             // Hoist only the FIRST occurrence; a duplicate marker is dropped
             // entirely (no inline pill for hoisted cards) so we never push a
             // second sibling colliding on the same `b-<key>` React key.
-            parts.push({ kind: 'text', text: text.slice(cursor, match.index) })
+            parts.push({ kind: 'text', text: text.slice(cursor, match.index) });
             if (!emittedBlockKeys.has(key)) {
-              emittedBlockKeys.add(key)
-              parts.push({ kind: 'block', key, node: rendered })
+              emittedBlockKeys.add(key);
+              parts.push({ kind: 'block', key, node: rendered });
             }
-            cursor = match.index + match[0].length
+            cursor = match.index + match[0].length;
           }
         }
         // Trailing text after the last block marker (or the entire
         // segment when no block markers fired).
         if (cursor < text.length) {
-          parts.push({ kind: 'text', text: text.slice(cursor) })
+          parts.push({ kind: 'text', text: text.slice(cursor) });
         }
         // Only register the split plan when at least one block marker
         // fired — otherwise the segment renders as one SimpleMarkdown-
         // Renderer call (existing behaviour preserved for the
         // overwhelming majority of segments that have no block cards).
-        if (parts.some((p) => p.kind === 'block')) {
-          partsBySegment.set(segIdx, parts)
+        if (parts.some(p => p.kind === 'block')) {
+          partsBySegment.set(segIdx, parts);
         }
-      })
-      return { inlineByKey, partsBySegment, usedKeys }
-    }, [hasMarkerSupport, renderEntityCard, segments])
+      });
+      return { inlineByKey, partsBySegment, usedKeys };
+    }, [hasMarkerSupport, renderEntityCard, segments]);
 
     // Drop cached nodes for markers no longer present so the cache can't grow
     // unbounded as a long message's markers change. Deliberately an EFFECT,
@@ -316,14 +341,14 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // React throws away, would evict nodes the committed tree still uses and
     // remount the cards it was built to preserve).
     useEffect(() => {
-      const cache = renderedCardNodeCache.current
-      const usedKeys = renderingPlan?.usedKeys
-      if (!usedKeys) return
-      if (cache.size <= usedKeys.size) return
+      const cache = renderedCardNodeCache.current;
+      const usedKeys = renderingPlan?.usedKeys;
+      if (!usedKeys) return;
+      if (cache.size <= usedKeys.size) return;
       for (const k of [...cache.keys()]) {
-        if (!usedKeys.has(k)) cache.delete(k)
+        if (!usedKeys.has(k)) cache.delete(k);
       }
-    }, [renderingPlan])
+    }, [renderingPlan]);
 
     // The plan is read through a REF inside the `<a>` override, not captured
     // in the override's closure. `renderingPlan` is rebuilt on every text
@@ -333,47 +358,47 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // its per-block `StreamingBlockRenderer` memoization for the WHOLE
     // message, on every token. The ref keeps the override identity stable
     // while still reading the current plan at call time.
-    const renderingPlanRef = useRef(renderingPlan)
-    renderingPlanRef.current = renderingPlan
+    const renderingPlanRef = useRef(renderingPlan);
+    renderingPlanRef.current = renderingPlan;
 
     const cardComponentOverrides = useMemo(() => {
-      if (!hasMarkerSupport && !hasMentionSupport) return undefined
+      if (!hasMarkerSupport && !hasMentionSupport) return undefined;
       return {
         // Override `<a>` to detect `card://` URLs emitted by `remarkCardLinks`.
         // The render result was pre-computed in `renderingPlan` so block-level
         // payloads (e.g. video player cards) can be hoisted out of the
         // paragraph as siblings — the inline pill stays at the marker
         // position. Other href schemes pass through unchanged.
-        a: ({ href, children, className: linkClassName, ...rest }: any) => {
+        a: ({ href, children, className: linkClassName, ...rest }: MdRenderProps<'a'>) => {
           // Inline entity mention `@marker:id`, emitted as a `mention://marker:id`
           // link by `remarkMentionChips`. Delegate to the host's `renderMention`
           // (mirror of the `card://` → `renderEntityCard` path): the host returns
           // a self-fetching chip for that entity type. Null/unknown → raw token.
           if (typeof href === 'string' && href.startsWith('mention://')) {
-            const stripped = href.slice('mention://'.length)
-            const sepIdx = stripped.indexOf(':')
-            const marker = sepIdx === -1 ? stripped : stripped.slice(0, sepIdx)
-            const id = sepIdx === -1 ? '' : stripped.slice(sepIdx + 1)
-            const node = renderMention?.({ marker, id })
-            if (node != null) return <>{node}</>
-            return <span className="text-ods-text-secondary opacity-60">{children}</span>
+            const stripped = href.slice('mention://'.length);
+            const sepIdx = stripped.indexOf(':');
+            const marker = sepIdx === -1 ? stripped : stripped.slice(0, sepIdx);
+            const id = sepIdx === -1 ? '' : stripped.slice(sepIdx + 1);
+            const node = renderMention?.({ marker, id });
+            if (node != null) return <>{node}</>;
+            return <span className="text-ods-text-secondary opacity-60">{children}</span>;
           }
           if (typeof href === 'string' && href.startsWith('card://')) {
-            const stripped = href.slice('card://'.length)
-            const sepIdx = stripped.lastIndexOf(':')
+            const stripped = href.slice('card://'.length);
+            const sepIdx = stripped.lastIndexOf(':');
             if (sepIdx !== -1) {
-              const cardType = stripped.slice(0, sepIdx)
-              const cardId = stripped.slice(sepIdx + 1)
-              const key = `${cardType}:${cardId}`
-              const inline = renderingPlanRef.current?.inlineByKey.get(key)
-              if (inline != null) return inline
+              const cardType = stripped.slice(0, sepIdx);
+              const cardId = stripped.slice(sepIdx + 1);
+              const key = `${cardType}:${cardId}`;
+              const inline = renderingPlanRef.current?.inlineByKey.get(key);
+              if (inline != null) return inline;
               // No rendered card for this marker (the host's renderer
               // returned null — no card type registered for `cardType`, or
               // the id resolved to nothing). Render the raw `cardId` as a
               // dim span so the marker never LOOKS like a real card: a
               // hallucinated id must stay visibly broken, never dressed up
               // with borrowed data.
-              return <span className="text-ods-text-secondary opacity-60">{cardId}</span>
+              return <span className="text-ods-text-secondary opacity-60">{cardId}</span>;
             }
           }
           // Unified click rule — delegated to the host's `NavLinkAnchor`
@@ -393,29 +418,25 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           // flamingo hero-demo with mock content), fall back to a plain
           // `<a href>`. No cross-origin sniffing here — the OSS-lib does
           // not own routing decisions; the host does.
-          if (
-            typeof href === 'string' &&
-            NavLinkAnchor &&
-            !href.startsWith('#')
-          ) {
+          if (typeof href === 'string' && NavLinkAnchor && !href.startsWith('#')) {
             return (
               <NavLinkAnchor href={href} className={linkClassName} {...rest}>
                 {children}
               </NavLinkAnchor>
-            )
+            );
           }
           return (
             <a href={href} className={linkClassName} {...rest}>
               {children}
             </a>
-          )
+          );
         },
-      }
+      };
       // DEPS ARE DELIBERATELY MINIMAL — every one of them is stable across a
       // streaming turn (booleans + host-stable fn/component identities, both
       // enforced by this file's `memo` comparator). The rendering plan is
       // read through a ref above precisely so it does NOT appear here.
-    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor])
+    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor]);
 
     /**
      * Body of a markdown-bearing segment (`text` / `guide`).
@@ -437,7 +458,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
      * only the LAST text chunk — the earlier chunks are already final.
      */
     const renderSegmentBody = (segIndex: number, text: string, isStreaming: boolean) => {
-      const parts = renderingPlan?.partsBySegment.get(segIndex)
+      const parts = renderingPlan?.partsBySegment.get(segIndex);
       if (!parts || parts.length === 0) {
         return (
           <SimpleMarkdownRenderer
@@ -447,7 +468,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             componentOverrides={cardComponentOverrides}
             streaming={isStreaming}
           />
-        )
+        );
       }
       return parts.map((part, pIdx) => {
         if (part.kind === 'text') {
@@ -460,19 +481,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               componentOverrides={cardComponentOverrides}
               streaming={isStreaming && pIdx === parts.length - 1}
             />
-          )
+          );
         }
         return (
           <div key={`b-${part.key}`} className="my-3">
             {part.node}
           </div>
-        )
-      })
-    }
+        );
+      });
+    };
 
     const getAvatarProps = () => {
-      const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")
-      const isMingo = assistantType === 'mingo'
+      const displayName = name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
+      const isMingo = assistantType === 'mingo';
 
       return {
         src: avatar || undefined,
@@ -481,43 +502,32 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         // (passing pre-joined initials like "PS" would collapse to one letter,
         // since getFirstLastInitials treats it as a single word).
         fallback: displayName,
-        size: "sm" as const,
-        variant: "round" as const,
+        size: 'sm' as const,
+        variant: 'round' as const,
         // User avatar: compact 20×20 with 2px padding and a subtle gray fill
         // (`bg-ods-card`) so the `border-ods-border` ring stays visible — the
         // brand fill reads poorly for a user. Assistant/Fae keep their brand
         // fill. Initials are smaller + muted gray for the user placeholder.
-        ...(isUser ? { initialsClassName: "text-[9px] text-ods-text-secondary" } : {}),
+        ...(isUser ? { initialsClassName: 'text-[9px] text-ods-text-secondary' } : {}),
         className: cn(
-          "flex-shrink-0",
-          isUser
-            ? "h-5 w-5 p-0.5 bg-ods-card"
-            : isMingo
-              ? "bg-ods-flamingo-cyan"
-              : "bg-ods-flamingo-pink"
-        )
-      }
-    }
-    
-    const avatarProps = getAvatarProps()
+          'flex-shrink-0',
+          isUser ? 'h-5 w-5 bg-ods-card p-0.5' : isMingo ? 'bg-ods-flamingo-cyan' : 'bg-ods-flamingo-pink',
+        ),
+      };
+    };
 
-    const isSystem = authorType === 'system'
+    const avatarProps = getAvatarProps();
+
+    const isSystem = authorType === 'system';
 
     return (
-      <div
-        ref={ref}
-        className={cn(
-          "relative py-[var(--spacing-system-s)]",
-          className
-        )}
-        {...props}
-      >
+      <div ref={ref} className={cn('relative py-[var(--spacing-system-s)]', className)} {...props}>
         {/* Message Content — full panel width.
             Avatar is INLINE in the name row below (2025-2026 chat
             pattern — Claude.ai, ChatGPT, Gemini, Perplexity).
             Legacy hanging-avatar layout (`absolute -left-16`) wasted
             64px of gutter and clipped in narrow panels. */}
-        <div className="flex flex-col gap-[var(--spacing-system-xxs)] min-w-0">
+        <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
           {/* Avatar + Name + Timestamp Row.
               Sizing rationale (per design-token measurements):
                 - Name uses `text-h3` = 14px mobile / 18px desktop.
@@ -542,67 +552,74 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                   arrived. With no user avatar we hide the block entirely (just
                   the name), instead of an initials placeholder. TEMPORARY —
                   restore the user placeholder when user avatars ship. */}
-            {showAvatar && !isSystem && !(isUser && !avatar) && (
-              !isUser && assistantIcon && !avatar ? (
+            {showAvatar &&
+              !isSystem &&
+              !(isUser && !avatar) &&
+              (!isUser && assistantIcon && !avatar ? (
                 // Host-supplied brand icon (e.g. Mingo): render it directly,
                 // no filled pill — the icon carries its own brand accent.
-                <div className="flex items-center justify-center flex-shrink-0">
-                  {assistantIcon}
-                </div>
+                <div className="flex flex-shrink-0 items-center justify-center">{assistantIcon}</div>
               ) : (
                 <SquareAvatar {...avatarProps} />
-              )
-            )}
-            <span className={cn(
-              "text-h3 !font-mono !font-medium flex-1",
-              authorType === 'system' ? "text-ods-open-yellow" :
-              authorType === 'admin' ? "text-ods-open-yellow" :
-              authorType === 'mingo' ? "text-ods-flamingo-cyan" :
-              authorType === 'fae' ? "text-ods-flamingo-pink" :
-              "text-ods-text-secondary"
-            )}>
-              {name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")}{!isSystem && ':'}
+              ))}
+            <span
+              className={cn(
+                'flex-1 !font-mono !font-medium text-h3',
+                authorType === 'system'
+                  ? 'text-ods-open-yellow'
+                  : authorType === 'admin'
+                    ? 'text-ods-open-yellow'
+                    : authorType === 'mingo'
+                      ? 'text-ods-flamingo-cyan'
+                      : authorType === 'fae'
+                        ? 'text-ods-flamingo-pink'
+                        : 'text-ods-text-secondary',
+              )}
+            >
+              {name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae')}
+              {!isSystem && ':'}
             </span>
             {timestamp && (
-              <span className="text-h6 text-ods-text-secondary shrink-0 whitespace-nowrap">
+              <span className="shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
                 {formatMessageTimestamp(timestamp)}
               </span>
             )}
           </div>
-          
+
           {/* Message segments — hidden for system messages without content */}
-          {(!isSystem || segments.length > 0) && <div className="flex flex-col gap-2">
-            {segments.map((segment, index) => {
+          {(!isSystem || segments.length > 0) && (
+            <div className="flex flex-col gap-2">
+              {segments.map((segment, index) => {
                 // The engine's streaming path (atomic-block memoization +
                 // fence tail-completion + aria-live) applies ONLY to the
                 // actively streaming segment: last segment of a message that
                 // is still typing. On completion `isTyping` flips false and
                 // the engine does one authoritative whole-document parse.
-                const segmentIsStreaming = index === segments.length - 1 && !!isTyping
+                const segmentIsStreaming = index === segments.length - 1 && !!isTyping;
                 if (segment.type === 'text') {
                   return (
                     <div
                       key={index}
                       className={cn(
-                        "min-w-0 w-full break-words text-h4",
-                        isError ? "text-ods-error" : "text-ods-text-primary",
+                        'w-full min-w-0 break-words text-h4',
+                        isError ? 'text-ods-error' : 'text-ods-text-primary',
                       )}
                     >
                       {renderSegmentBody(index, segment.text, segmentIsStreaming)}
                     </div>
-                  )
+                  );
                 } else if (segment.type === 'guide') {
                   return (
                     <GuideDisplay key={index}>
                       {renderSegmentBody(index, segment.text, segmentIsStreaming)}
                     </GuideDisplay>
-                  )
+                  );
                 } else if (segment.type === 'ask') {
                   // Only the run's head draws — the tail segments are pages of
                   // the card already rendered above them.
-                  const run = askRuns.get(index)
-                  if (!run) return null
-                  return <AskDisplay key={index} cards={run} onSelect={onAskSelect} />
+                  const run = askRuns.get(index);
+                  if (!run) return null;
+                  return <AskDisplay key={index} cards={run} onSelect={onAskSelect} />;
                 } else if (segment.type === 'tool_execution') {
                   return (
                     <ToolExecutionDisplay
@@ -611,7 +628,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       assistantType={assistantType}
                       variant={approvalVariant}
                     />
-                  )
+                  );
                 } else if (segment.type === 'approval_request') {
                   return (
                     <ApprovalRequestMessage
@@ -624,7 +641,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       assistantType={assistantType}
                       variant={approvalVariant}
                     />
-                  )
+                  );
                 } else if (segment.type === 'approval_batch') {
                   return (
                     <ApprovalBatchMessage
@@ -637,7 +654,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       assistantType={assistantType}
                       variant={approvalVariant}
                     />
-                  )
+                  );
                 } else if (segment.type === 'escalation_offer') {
                   return (
                     <EscalationOfferMessage
@@ -648,39 +665,27 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       onApprove={segment.onApprove}
                       onReject={segment.onReject}
                     />
-                  )
+                  );
                 } else if (segment.type === 'ticket_escalated') {
-                  return <TicketEscalatedMessage key={index} data={segment.data} timestamp={timestamp} />
+                  return <TicketEscalatedMessage key={index} data={segment.data} timestamp={timestamp} />;
                 } else if (segment.type === 'ticket_event') {
-                  return <TicketEventMessage key={index} data={segment.data} timestamp={timestamp} />
+                  // The card's own event time; the bubble timestamp is the
+                  // turn's FIRST row and lags every later lifecycle event.
+                  return (
+                    <TicketEventMessage key={index} data={segment.data} timestamp={segment.occurredAt ?? timestamp} />
+                  );
                 } else if (segment.type === 'error') {
-                  return (
-                    <ErrorMessageDisplay
-                      key={index}
-                      title={segment.title}
-                      details={segment.details}
-                    />
-                  )
+                  return <ErrorMessageDisplay key={index} title={segment.title} details={segment.details} />;
                 } else if (segment.type === 'context_compaction') {
-                  return (
-                    <ContextCompactionDisplay
-                      key={index}
-                      status={segment.status}
-                    />
-                  )
+                  return <ContextCompactionDisplay key={index} status={segment.status} />;
                 } else if (segment.type === 'thinking') {
-                  const isStreaming = index === segments.length - 1 && isTyping
-                  return (
-                    <ThinkingDisplay
-                      key={index}
-                      text={segment.text}
-                      isStreaming={isStreaming}
-                    />
-                  )
+                  const isStreaming = index === segments.length - 1 && isTyping;
+                  return <ThinkingDisplay key={index} text={segment.text} isStreaming={isStreaming} />;
                 }
-                return null
+                return null;
               })}
-          </div>}
+            </div>
+          )}
 
           {/* Attached entity-context chips (user bubbles). Read-only — no
               remove affordance once the message is sent (Figma 31:28709). */}
@@ -694,11 +699,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           )}
         </div>
       </div>
-    )
-  }
-)
+    );
+  },
+);
 
-ChatMessageEnhanced.displayName = "ChatMessageEnhanced"
+ChatMessageEnhanced.displayName = 'ChatMessageEnhanced';
 
 const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextProps) => {
   return (
@@ -728,9 +733,9 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // streaming chunks instead of re-rendering every ask card per chunk.
     prevProps.onAskSelect === nextProps.onAskSelect &&
     prevProps.NavLinkAnchor === nextProps.NavLinkAnchor
-  )
-})
+  );
+});
 
-MemoizedChatMessageEnhanced.displayName = "MemoizedChatMessageEnhanced"
+MemoizedChatMessageEnhanced.displayName = 'MemoizedChatMessageEnhanced';
 
-export { MemoizedChatMessageEnhanced as ChatMessageEnhanced }
+export { MemoizedChatMessageEnhanced as ChatMessageEnhanced };

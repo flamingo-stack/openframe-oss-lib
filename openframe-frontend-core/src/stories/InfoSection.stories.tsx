@@ -35,7 +35,7 @@ const assigneeOptions = [
 ];
 
 const statusOptions = [
-  { id: 's1', name: 'AI Assistance', color: '#3a3a3a' },
+  { id: 's1', name: 'AI Handling', color: '#3a3a3a' },
   { id: 's2', name: 'Tech Required', color: '#f59e0b' },
   { id: 's3', name: 'Resolved', color: '#5ea62e' },
 ];
@@ -60,7 +60,12 @@ export const TicketDetails: Story = {
       {
         id: 'status',
         label: 'Status',
-        value: { type: 'status', status: 'AI_ASSISTANCE', options: statusOptions, onSelect: id => alert(`Status: ${id}`) },
+        value: {
+          type: 'status',
+          status: 'AI_ASSISTANCE',
+          options: statusOptions,
+          onSelect: id => alert(`Status: ${id}`),
+        },
       },
     ],
   },

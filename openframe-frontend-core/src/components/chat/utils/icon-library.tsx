@@ -28,54 +28,51 @@
  * misconfigured row still renders.
  */
 
-import type { ComponentType, CSSProperties } from 'react'
-
-import { getIconComponent } from './icon-registry'
-import * as IconsV2 from '../../icons-v2-generated'
-import { ClickupLogoGreyIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-grey-icon'
-import { GithubIcon } from '../../icons-v2-generated/brand-logos/github-icon'
-import { HubspotLogoGreyIcon } from '../../icons-v2-generated/brand-logos/hubspot-logo-grey-icon'
-import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon'
-import { ChatsIcon } from '../../icons-v2-generated/communication/chats-icon'
-import { BookIcon } from '../../icons-v2-generated/school/book-icon'
-import { GraduationCapIcon } from '../../icons-v2-generated/school/graduation-cap-icon'
-import { BracketCurlyIcon } from '../../icons-v2-generated/coding/bracket-curly-icon'
-import { BugIcon } from '../../icons-v2-generated/coding/bug-icon'
-import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon'
-import { BriefcaseIcon } from '../../icons-v2-generated/map-and-travel/briefcase-icon'
-import { CompassIcon } from '../../icons-v2-generated/map-and-travel/compass-icon'
-import { FileIcon } from '../../icons-v2-generated/documents/file-icon'
-import { LayersIcon } from '../../icons-v2-generated/design/layers-icon'
-import { NewspaperIcon } from '../../icons-v2-generated/documents/newspaper-icon'
-import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/rocket-02-icon'
-import { HeadphoneIcon } from '../../icons-v2-generated/audio-and-visual/headphone-icon'
-import { VideoRecorderIcon } from '../../icons-v2-generated/audio-and-visual/video-recorder-icon'
-import { SearchIcon } from '../../icons-v2-generated/interface/search-icon'
-import { TicketIcon } from '../../icons-v2-generated/shopping/ticket-icon'
-import { OpenFrameLogo } from '../../icons/openframe-logo'
-import { OpenmspLogo } from '../../icons/openmsp-logo'
-import { FlamingoLogo } from '../../icons/flamingo-logo'
-import { Megaphone, Bell, Info, Star, Package as PackageGlyph } from 'lucide-react'
+import { Megaphone, Bell, Info, Star, Package as PackageGlyph } from 'lucide-react';
+import type { ComponentType, CSSProperties } from 'react';
+import * as IconsV2 from '../../icons-v2-generated';
+import { HeadphoneIcon } from '../../icons-v2-generated/audio-and-visual/headphone-icon';
+import { VideoRecorderIcon } from '../../icons-v2-generated/audio-and-visual/video-recorder-icon';
+import { ClickupLogoGreyIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-grey-icon';
+import { GithubIcon } from '../../icons-v2-generated/brand-logos/github-icon';
+import { HubspotLogoGreyIcon } from '../../icons-v2-generated/brand-logos/hubspot-logo-grey-icon';
+import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon';
+import { BracketCurlyIcon } from '../../icons-v2-generated/coding/bracket-curly-icon';
+import { BugIcon } from '../../icons-v2-generated/coding/bug-icon';
+import { ChatsIcon } from '../../icons-v2-generated/communication/chats-icon';
+import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon';
+import { LayersIcon } from '../../icons-v2-generated/design/layers-icon';
+import { FileIcon } from '../../icons-v2-generated/documents/file-icon';
+import { NewspaperIcon } from '../../icons-v2-generated/documents/newspaper-icon';
+import { SearchIcon } from '../../icons-v2-generated/interface/search-icon';
+import { BriefcaseIcon } from '../../icons-v2-generated/map-and-travel/briefcase-icon';
+import { CompassIcon } from '../../icons-v2-generated/map-and-travel/compass-icon';
+import { BookIcon } from '../../icons-v2-generated/school/book-icon';
+import { GraduationCapIcon } from '../../icons-v2-generated/school/graduation-cap-icon';
+import { TicketIcon } from '../../icons-v2-generated/shopping/ticket-icon';
+import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/rocket-02-icon';
+import { FlamingoLogo } from '../../icons/flamingo-logo';
+import { OpenFrameLogo } from '../../icons/openframe-logo';
+import { OpenmspLogo } from '../../icons/openmsp-logo';
+import { getIconComponent } from './icon-registry';
 
 /** Shape used by every icon registered here (matches `icons-v2-generated`). */
 export type IconComponent = ComponentType<{
-  size?: number
-  className?: string
-  color?: string
-}>
+  size?: number;
+  className?: string;
+  color?: string;
+}>;
 
 /** Wrap a brand logo (className/SVG-sized) so it satisfies the `size`-prop
  *  `IconComponent` contract — drives size via `style` (CSS wins over
  *  the logo's hardcoded width/height), keeping the logo's own brand fill. */
-function sizedLogo(
-  Logo: ComponentType<{ className?: string; style?: CSSProperties }>,
-): IconComponent {
+function sizedLogo(Logo: ComponentType<{ className?: string; style?: CSSProperties }>): IconComponent {
   return function SizedLogo({ size = 16, className }) {
-    return <Logo className={className} style={{ width: size, height: size }} />
-  }
+    return <Logo className={className} style={{ width: size, height: size }} />;
+  };
 }
-const OpenmspLogoIcon = sizedLogo(OpenmspLogo)
-const FlamingoLogoIcon = sizedLogo(FlamingoLogo)
+const OpenmspLogoIcon = sizedLogo(OpenmspLogo);
+const FlamingoLogoIcon = sizedLogo(FlamingoLogo);
 
 /**
  * `OpenFrameLogo` from `components/icons/` predates the v2 set and:
@@ -88,18 +85,10 @@ const FlamingoLogoIcon = sizedLogo(FlamingoLogo)
  *      surface. We pin both paths to `currentColor` so the glyph tints
  *      to whatever the card icon slot is (`ods-text-secondary` ≈ #888).
  */
-function LogoOpenframeIcon({
-  size = 16,
-  className,
-  color,
-}: {
-  size?: number
-  className?: string
-  color?: string
-}) {
+function LogoOpenframeIcon({ size = 16, className, color }: { size?: number; className?: string; color?: string }) {
   // Forward `color` (from `icon_props.color`) like every other resolver-backed
   // glyph; default to `currentColor` so the logo tints to its slot.
-  const tint = color ?? 'currentColor'
+  const tint = color ?? 'currentColor';
   return (
     <OpenFrameLogo
       className={className}
@@ -107,7 +96,7 @@ function LogoOpenframeIcon({
       upperPathColor={tint}
       style={{ width: size, height: size }}
     />
-  )
+  );
 }
 
 /**
@@ -171,7 +160,7 @@ export const ICON_ALIASES: Record<string, IconComponent> = {
   'message-square': ChatsIcon,
   'message-circle': ChatsIcon,
   'bracket-curly': BracketCurlyIcon,
-}
+};
 
 /**
  * Generic resolution against the FULL `icons-v2-generated` set.
@@ -192,22 +181,20 @@ export const ICON_ALIASES: Record<string, IconComponent> = {
  * actually exists in the namespace (the namespace is the source of
  * truth, so we never guess wrong).
  */
-function resolveFromLibrary(
-  iconName: string,
-): IconComponent | undefined {
-  const tokens = iconName.trim().toLowerCase().replace(/_/g, '-').split('-')
-  if (tokens.some((t) => t.length === 0)) return undefined
-  const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+function resolveFromLibrary(iconName: string): IconComponent | undefined {
+  const tokens = iconName.trim().toLowerCase().replace(/_/g, '-').split('-');
+  if (tokens.some(t => t.length === 0)) return undefined;
+  const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
   const candidates = [
     `${tokens.map(cap).join('')}Icon`,
-    `${tokens.map((t) => (t === 'ai' ? 'AI' : cap(t))).join('')}Icon`,
-  ]
-  const registry = IconsV2 as unknown as Record<string, IconComponent | undefined>
+    `${tokens.map(t => (t === 'ai' ? 'AI' : cap(t))).join('')}Icon`,
+  ];
+  const registry = IconsV2 as unknown as Record<string, IconComponent | undefined>;
   for (const name of candidates) {
-    const Icon = registry[name]
-    if (Icon) return Icon
+    const Icon = registry[name];
+    if (Icon) return Icon;
   }
-  return undefined
+  return undefined;
 }
 
 /**
@@ -233,19 +220,19 @@ export function resolveIcon(
 ): IconComponent {
   if (opts?.variant === 'brand') {
     // Brand variant — delegate to the registry resolver (same glyph as before).
-    return getIconComponent(iconName) as IconComponent
+    return getIconComponent(iconName) as IconComponent;
   }
-  if (!iconName) return FileIcon
-  return ICON_ALIASES[iconName] ?? resolveFromLibrary(iconName) ?? FileIcon
+  if (!iconName) return FileIcon;
+  return ICON_ALIASES[iconName] ?? resolveFromLibrary(iconName) ?? FileIcon;
 }
 
 /** One selectable icon in the admin slash-command picker. */
 export interface IconOption {
   /** Stored `icon_name` value — a kebab-case `icons-v2-generated` key (or a
    *  curated alias) that `resolveIcon` displays in the chat. */
-  key: string
+  key: string;
   /** Human-friendly label shown in the picker dropdown. */
-  label: string
+  label: string;
 }
 
 /**
@@ -445,4 +432,4 @@ export const ICON_OPTIONS: ReadonlyArray<IconOption> = [
   { key: 'globe-01', label: 'Globe' },
   { key: 'scale-balanced', label: 'Balance' },
   { key: 'certified-01', label: 'Certified' },
-]
+];

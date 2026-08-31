@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import { cn } from '../../../utils/cn'
-import { SearchIcon } from '../../icons-v2-generated'
-import { NoData, type NoDataProps } from '../no-data'
+import { cn } from '../../../utils/cn';
+import { SearchIcon } from '../../icons-v2-generated';
+import { NoData, type NoDataProps } from '../no-data';
 
 export interface DataTableEmptyProps extends NoDataProps {}
 
@@ -22,5 +22,5 @@ export function DataTableEmpty({ className, ...props }: DataTableEmptyProps) {
       {...props}
       className={cn('py-[var(--spacing-system-xxl)]', className)}
     />
-  )
+  );
 }

@@ -1,10 +1,9 @@
-import React from 'react'
-import { cn } from "../../utils/cn"
-import { UnifiedSkeleton, TextSkeleton } from './unified-skeleton'
+import { cn } from '../../utils/cn';
+import { UnifiedSkeleton, TextSkeleton } from './unified-skeleton';
 
 interface WizardLayoutSkeletonProps {
-  steps?: number
-  className?: string
+  steps?: number;
+  className?: string;
 }
 
 export function WizardLayoutSkeleton({ steps = 6, className }: WizardLayoutSkeletonProps) {
@@ -18,16 +17,16 @@ export function WizardLayoutSkeleton({ steps = 6, className }: WizardLayoutSkele
       </div>
 
       {/* Header */}
-      <div className="space-y-2 max-w-2xl">
+      <div className="max-w-2xl space-y-2">
         <TextSkeleton.Heading className="w-2/3" />
         <TextSkeleton.Body className="w-1/2" />
       </div>
 
       {/* Bottom navigation buttons */}
-      <div className="flex justify-between mt-10">
+      <div className="mt-10 flex justify-between">
         <UnifiedSkeleton className="h-10 w-24 rounded" />
         <UnifiedSkeleton className="h-10 w-32 rounded" />
       </div>
     </div>
-  )
-} 
+  );
+}

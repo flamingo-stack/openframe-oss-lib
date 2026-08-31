@@ -1,7 +1,7 @@
 'use client';
 
 import * as PopoverPrimitive from '@radix-ui/react-popover';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../../utils/cn';
 import { ClockHistoryIcon } from '../../icons-v2-generated/date-and-time/clock-history-icon';
 import {
@@ -42,30 +42,33 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
   const coordination = useAppLayoutDrawerCoordination();
 
   const isOpen = ctx?.isOpen ?? false;
+  // Latest-refs the stable handle below reads. Refreshed in an unconditional
+  // effect, not the render body: `close()` is only ever invoked by the
+  // coordinator in response to ANOTHER panel opening, which is always past a
+  // commit, and a render attempt React discards must not be able to leave the
+  // handle pointing at a `close` callback that never took effect.
   const isOpenRef = useRef(isOpen);
-  isOpenRef.current = isOpen;
   const closeRef = useRef(ctx?.close);
-  closeRef.current = ctx?.close;
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+    closeRef.current = ctx?.close;
+  });
+
   // Stable handle: the same object must be registered AND passed as `self`
   // to notifyDrawerDidOpen so the coordinator can skip it when closing the
-  // other panels.
-  const selfHandleRef = useRef<AppLayoutDrawerHandle | null>(null);
-  if (!selfHandleRef.current) {
-    selfHandleRef.current = {
-      close: () => {
-        if (isOpenRef.current) closeRef.current?.();
-      },
-    };
-  }
+  // other panels. Built once by `useState`'s lazy initialiser; it closes over
+  // the refs above, which never change identity.
+  const [selfHandle] = useState<AppLayoutDrawerHandle>(() => ({
+    close: () => {
+      if (isOpenRef.current) closeRef.current?.();
+    },
+  }));
 
   useEffect(() => {
-    if (isOpen) coordination?.notifyDrawerDidOpen(selfHandleRef.current ?? undefined);
-  }, [isOpen, coordination]);
+    if (isOpen) coordination?.notifyDrawerDidOpen(selfHandle);
+  }, [isOpen, coordination, selfHandle]);
 
-  useEffect(() => {
-    if (!selfHandleRef.current) return;
-    return coordination?.registerDrawer(selfHandleRef.current);
-  }, [coordination]);
+  useEffect(() => coordination?.registerDrawer(selfHandle), [coordination, selfHandle]);
 
   if (!ctx) return null;
 
@@ -92,15 +95,12 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
           icon={
             <>
               <ClockHistoryIcon
-                className={cn(
-                  'h-6 w-6',
-                  isPaused ? 'text-ods-text-secondary' : isActive && 'text-ods-accent',
-                )}
+                className={cn('h-6 w-6', isPaused ? 'text-ods-text-secondary' : isActive && 'text-ods-accent')}
               />
               {isActive && (
                 <span
                   className={cn(
-                    'hidden md:inline text-h5 md:text-h4 !font-mono',
+                    'hidden !font-mono text-h5 md:inline md:text-h4',
                     isPaused ? 'text-ods-text-secondary' : 'text-ods-text-primary',
                   )}
                 >

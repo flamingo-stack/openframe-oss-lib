@@ -1,9 +1,10 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.data.document.rmm.CommandExecution;
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.document.rmm.ScriptShell;
+import com.openframe.api.service.rmm.command.CommandExecutionService;
+import com.openframe.data.document.rmm.command.CommandExecution;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;

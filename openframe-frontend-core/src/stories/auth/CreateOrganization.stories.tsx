@@ -1,12 +1,12 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import {
   AuthShell,
   type AuthSsoProvider,
   CreateOrganizationForm,
   type CreateOrganizationFormProps,
-} from '../../components/features/auth'
-import { TabSelector } from '../../components/ui/tab-selector'
+} from '../../components/features/auth';
+import { TabSelector } from '../../components/ui/tab-selector';
 
 const meta = {
   title: 'Auth/Create Organization',
@@ -21,20 +21,20 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof CreateOrganizationForm>
+} satisfies Meta<typeof CreateOrganizationForm>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /** Full page: Sign Up / Login tabs + Create Organization form + marketing panel. */
 function CreateOrganizationPage(initial: Partial<CreateOrganizationFormProps>) {
-  const [tab, setTab] = useState('signup')
-  const [email, setEmail] = useState(initial.email ?? '')
-  const [organizationName, setOrganizationName] = useState(initial.organizationName ?? '')
-  const [domain, setDomain] = useState(initial.domain ?? '')
-  const [agreedToTerms, setAgreedToTerms] = useState(initial.agreedToTerms ?? false)
+  const [tab, setTab] = useState('signup');
+  const [email, setEmail] = useState(initial.email ?? '');
+  const [organizationName, setOrganizationName] = useState(initial.organizationName ?? '');
+  const [domain, setDomain] = useState(initial.domain ?? '');
+  const [agreedToTerms, setAgreedToTerms] = useState(initial.agreedToTerms ?? false);
 
-  const isValid = !!email.trim() && !!organizationName.trim() && !!domain.trim() && agreedToTerms
+  const isValid = !!email.trim() && !!organizationName.trim() && !!domain.trim() && agreedToTerms;
 
   const tabs = (
     <TabSelector
@@ -46,12 +46,10 @@ function CreateOrganizationPage(initial: Partial<CreateOrganizationFormProps>) {
         { id: 'login', label: 'Login' },
       ]}
     />
-  )
+  );
 
   return (
-    <AuthShell
-      tabs={tabs}
-    >
+    <AuthShell tabs={tabs}>
       {tab === 'signup' ? (
         <CreateOrganizationForm
           {...initial}
@@ -67,20 +65,18 @@ function CreateOrganizationPage(initial: Partial<CreateOrganizationFormProps>) {
           onSubmit={() => {}}
         />
       ) : (
-        <div className="flex min-h-[240px] items-center justify-center rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xl)] text-h4 text-ods-text-secondary">
+        <div className="flex min-h-[240px] items-center justify-center rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xl)] text-ods-text-secondary text-h4">
           Login — coming in the next step
         </div>
       )}
     </AuthShell>
-  )
+  );
 }
 
 /** Empty fields, terms unchecked, submit disabled. */
 export const Empty: Story = {
-  render: () => (
-    <CreateOrganizationPage domainSuffix=".openframe.ai" termsUrl="#terms" privacyPolicyUrl="#privacy" />
-  ),
-}
+  render: () => <CreateOrganizationPage domainSuffix=".openframe.ai" termsUrl="#terms" privacyPolicyUrl="#privacy" />,
+};
 
 /** Valid input, terms accepted, submit enabled. */
 export const Filled: Story = {
@@ -95,7 +91,7 @@ export const Filled: Story = {
       privacyPolicyUrl="#privacy"
     />
   ),
-}
+};
 
 /**
  * Error state: long messages under the fields wrap up to two lines.
@@ -115,9 +111,9 @@ export const ErrorState: Story = {
       }}
     />
   ),
-}
+};
 
-const SSO_PROVIDERS: AuthSsoProvider[] = ['openframe', 'google', 'microsoft']
+const SSO_PROVIDERS: AuthSsoProvider[] = ['openframe', 'google', 'microsoft'];
 
 /** SSO configured: fields disabled, submit replaced by provider buttons. */
 export const SSO: Story = {
@@ -132,4 +128,4 @@ export const SSO: Story = {
       privacyPolicyUrl="#privacy"
     />
   ),
-}
+};
