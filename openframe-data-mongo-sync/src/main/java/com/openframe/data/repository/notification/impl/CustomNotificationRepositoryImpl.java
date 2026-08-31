@@ -44,13 +44,18 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
 
     @Override
     public Optional<Notification> findByAttribute(String attributeKey, String attributeValue) {
-        if (isBlank(attributeKey) || isBlank(attributeValue)) {
+        if (isBlankLookup(attributeKey, attributeValue)) {
             return Optional.empty();
         }
-        Criteria criteria = Criteria.where(ATTRIBUTES_PREFIX + attributeKey).is(attributeValue);
+        String path = ATTRIBUTES_PREFIX + attributeKey;
+        Criteria criteria = Criteria.where(path).is(attributeValue);
         Query query = Query.query(criteria);
         Notification found = mongoTemplate.findOne(query, Notification.class);
         return Optional.ofNullable(found);
+    }
+
+    private boolean isBlankLookup(String attributeKey, String attributeValue) {
+        return isBlank(attributeKey) || isBlank(attributeValue);
     }
 
     @Override

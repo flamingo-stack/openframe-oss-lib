@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -152,42 +153,44 @@ public class NotificationBroadcaster {
         }
     }
 
-    /**
-     * Rewrites the content of an already-broadcast notification, located by one of its stored
-     * attributes, and re-publishes it (UPDATED) to its original recipients so live clients upsert
-     * the existing card by id. Returns the notification id, or empty when there is nothing to
-     * update. Read-state rows are left untouched.
-     */
+    // Rewrites an already-broadcast notification located by one of its stored attributes and
+    // re-publishes it (UPDATED) so live clients upsert the existing card by id. Read-state rows are
+    // left untouched. Empty when no notification carries that value — it may never have been created.
     public Optional<String> update(NotificationCommand command, String attributeKey, String attributeValue) {
         if (!notificationsEnabled) {
             log.debug("Notifications feature disabled — update skipped");
             return Optional.empty();
         }
 
-        Optional<Notification> found = notificationRepository.findByAttribute(attributeKey, attributeValue);
-        if (found.isEmpty()) {
-            log.debug("No notification carries {}={} — nothing to update", attributeKey, attributeValue);
-            return Optional.empty();
-        }
-
-        Notification saved = notificationRepository.save(withContentOf(found.get(), command));
-        NotificationCategory category = saved.getCategory();
-
-        natsPublisher.ifPresentOrElse(
-                publisher -> republishToRecipients(publisher, saved, category),
-                () -> log.debug("NATS publisher disabled — notification {} updated in DB only", saved.getId()));
-        return Optional.of(saved.getId());
+        return notificationRepository.findByAttribute(attributeKey, attributeValue)
+                .map(stored -> rewriteContent(stored, command))
+                .map(this::persistAndRepublish);
     }
 
     // Content only. Type, category and severity are fixed per notification type, and the entity
     // lives on the read-state rows written at broadcast — rewriting either here would desync the
     // per-entity unread counts from the card they belong to.
-    private Notification withContentOf(Notification stored, NotificationCommand command) {
-        stored.setTitle(command.getTitle());
-        stored.setDescription(command.getDescription());
-        stored.setAttributes(command.getAttributes());
-        stored.setContext(command.getContext());
+    private Notification rewriteContent(Notification stored, NotificationCommand command) {
+        String title = command.getTitle();
+        String description = command.getDescription();
+        Map<String, String> attributes = command.getAttributes();
+        NotificationContext context = command.getContext();
+        stored.setTitle(title);
+        stored.setDescription(description);
+        stored.setAttributes(attributes);
+        stored.setContext(context);
         return stored;
+    }
+
+    private String persistAndRepublish(Notification rewritten) {
+        Notification saved = notificationRepository.save(rewritten);
+        NotificationCategory category = saved.getCategory();
+        String notificationId = saved.getId();
+
+        natsPublisher.ifPresentOrElse(
+                publisher -> republishToRecipients(publisher, saved, category),
+                () -> log.debug("NATS publisher disabled — notification {} updated in DB only", notificationId));
+        return notificationId;
     }
 
     private void republishToRecipients(NotificationNatsPublisher publisher, Notification saved, NotificationCategory category) {

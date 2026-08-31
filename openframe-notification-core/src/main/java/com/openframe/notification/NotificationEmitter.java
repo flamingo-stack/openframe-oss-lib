@@ -6,6 +6,7 @@ import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.notification.service.NotificationCommand;
+import com.openframe.notification.spec.AttrKey;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
 import com.openframe.notification.spec.NotificationEntityRef;
@@ -43,30 +44,29 @@ public class NotificationEmitter {
         }
     }
 
-    /**
-     * Re-projects the seed onto the notification already broadcast for the same source document and
-     * returns its id, or empty when there is none. Accepts only types whose spec declares itself an
-     * {@link UpdatableNotificationSpec}. Never throws, for the same reason {@link #notify} does not.
-     */
+    // Re-projects the seed onto the notification already broadcast for the same source document.
+    // Never throws, for the same reason notify() does not.
     public Optional<String> update(NotificationRequest request) {
         NotificationSeed seed = request.getSeed();
         NotificationType type = seed.type();
+        String typeName = type.name();
         try {
             NotificationTypeSpec<?> spec = registry.require(type);
             if (!(spec instanceof UpdatableNotificationSpec<?> updatable)) {
-                throw new IllegalStateException("Spec for type " + type.name() + " is not updatable");
+                throw new IllegalStateException("Spec for type " + typeName + " is not updatable");
             }
             NotificationCommand command = buildCommand(spec, seed);
-            String attributeKey = updatable.sourceIdAttr().getName();
-            String attributeValue = command.getAttributes().get(attributeKey);
+            AttrKey sourceIdAttr = updatable.sourceIdAttr();
+            String attributeKey = sourceIdAttr.getName();
+            Map<String, String> attributes = command.getAttributes();
+            String attributeValue = attributes.get(attributeKey);
             if (attributeValue == null) {
-                throw new IllegalStateException("Spec for type " + type.name()
+                throw new IllegalStateException("Spec for type " + typeName
                         + " declares source id attribute '" + attributeKey + "' but does not emit it");
             }
             return broadcaster.update(command, attributeKey, attributeValue);
         } catch (RuntimeException ex) {
-            log.error("Notification update failed for type {} — swallowed, business flow unaffected",
-                    type.name(), ex);
+            log.error("Notification update failed for type {} — swallowed, business flow unaffected", typeName, ex);
             return Optional.empty();
         }
     }

@@ -13,11 +13,8 @@ import org.springframework.data.mongodb.core.index.Index;
 import org.springframework.data.mongodb.core.index.PartialIndexFilter;
 import org.springframework.data.mongodb.core.query.Criteria;
 
-/**
- * Indexes the attribute every {@link UpdatableNotificationSpec} looks its notification up by.
- * Declared here rather than on the document because the key is a map sub-path chosen by each spec,
- * which no annotation can express.
- */
+// Declared here rather than on the document: the key is a map sub-path each spec chooses, which no
+// annotation can express.
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
@@ -28,7 +25,7 @@ public class NotificationSourceIndexConfig {
     private static final String INDEX_NAME_PREFIX = "notifications_";
     private static final String INDEX_NAME_SUFFIX = "_idx";
 
-    /** Left behind by auto-index-creation for the removed Notification.correlationId. */
+    // Left behind by auto-index-creation for the removed Notification.correlationId.
     private static final String STALE_CORRELATION_INDEX = "correlationId_1";
 
     private final MongoTemplate mongoTemplate;
@@ -45,7 +42,7 @@ public class NotificationSourceIndexConfig {
                 .forEach(this::ensureSourceIdIndex);
     }
 
-    /** Partial: only approval-style notifications carry a source id, and they are the minority. */
+    // Partial: only approval-style notifications carry a source id, and they are the minority.
     private void ensureSourceIdIndex(String attributeKey) {
         String path = ATTRIBUTES_PREFIX + attributeKey;
         String name = INDEX_NAME_PREFIX + attributeKey + INDEX_NAME_SUFFIX;

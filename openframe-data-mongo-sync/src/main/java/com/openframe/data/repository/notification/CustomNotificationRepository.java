@@ -8,7 +8,6 @@ import java.util.Optional;
 
 public interface CustomNotificationRepository {
 
-    /** Looks a notification up by one of its stored attributes; see UpdatableNotificationSpec. */
     Optional<Notification> findByAttribute(String attributeKey, String attributeValue);
 
     NotificationPage findPageForRecipient(String recipientId, RecipientType recipientType,
