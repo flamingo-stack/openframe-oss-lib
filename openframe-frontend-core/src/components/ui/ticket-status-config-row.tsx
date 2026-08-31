@@ -125,17 +125,16 @@ export function TicketStatusConfigRow({
           (name + color for custom, name + chip for system), four on desktop
           (name, color, a reserved slot, chip zone) with invisible spacers
           standing in for the cells a row doesn't use — so the name field is one
-          width on every row and the columns align across the whole list. */}
+          width on every row and the columns align across the whole list.
+          The trailing controls are a WRAP ITEM (ordered per breakpoint), not a
+          full-height sibling column, so the lower rows span the full card width
+          and the chip pins to the card's right edge on tablet/mobile. */}
       <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-[var(--spacing-system-mf)] md:gap-x-[var(--spacing-system-m)]">
         {/* System rows keep the chip beside the name on every width, so the name
-            shares its row; a custom row's name owns the full first line on
-            mobile (there the chip drops down to ride the color row). */}
-        <div
-          className={cn(
-            'flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]',
-            isSystem ? 'grow basis-0' : 'grow basis-full md:basis-0',
-          )}
-        >
+            shares its row; a custom row's name owns the first line on mobile
+            together with the controls (there the chip drops down to ride the
+            color row). */}
+        <div className="order-1 flex min-w-0 grow basis-0 flex-col gap-[var(--spacing-system-xxs)]">
           <Label variant="large" htmlFor={nameInputId}>
             Status Name
           </Label>
@@ -150,13 +149,13 @@ export function TicketStatusConfigRow({
         </div>
 
         {showColorPicker ? (
-          <div className="flex min-w-0 grow basis-full flex-col gap-[var(--spacing-system-xxs)] md:basis-0">
+          <div className="order-3 flex min-w-0 grow basis-full flex-col gap-[var(--spacing-system-xxs)] md:order-2 md:basis-0">
             <Label variant="large">Color</Label>
             <div className="flex min-w-0 items-center gap-3">
               <div className="min-w-0 flex-1">
                 <ColorPresetSelect value={color} presetKey={presetKey} onChange={onColorChange} />
               </div>
-              {/* Mobile: the preview chip rides the color row. */}
+              {/* Mobile: the preview chip rides the color row, pinned right. */}
               <div className="shrink-0 md:hidden">{chip}</div>
             </div>
             {/* Custom hex: a second field row inside the Color column, directly
@@ -168,65 +167,79 @@ export function TicketStatusConfigRow({
             )}
           </div>
         ) : (
-          <div aria-hidden className="hidden min-w-0 grow basis-0 lg:block" />
+          <div aria-hidden className="hidden min-w-0 grow basis-0 lg:order-2 lg:block" />
         )}
 
         {/* Reserved desktop column slot (the mock's "No activity Indicator" zone). */}
-        <div aria-hidden className="hidden min-w-0 grow basis-0 lg:block" />
+        <div aria-hidden className="hidden min-w-0 grow basis-0 lg:order-3 lg:block" />
 
         {isSystem ? (
-          <div className={cn('flex h-11 min-w-0 grow basis-0 items-center justify-end md:h-12', fieldRowOffset)}>
+          <div
+            className={cn(
+              'order-2 flex h-11 min-w-0 grow basis-0 items-center justify-end md:h-12 lg:order-4',
+              fieldRowOffset,
+            )}
+          >
             {chip}
           </div>
         ) : (
           <>
             {/* Desktop (lg+): the chip rides the first row, in its own column
                 before the controls. */}
-            <div className={cn('hidden h-12 min-w-0 grow basis-0 items-center justify-end lg:flex', fieldRowOffset)}>
+            <div
+              className={cn(
+                'hidden h-12 min-w-0 grow basis-0 items-center justify-end lg:order-4 lg:flex',
+                fieldRowOffset,
+              )}
+            >
               {chip}
             </div>
-            {/* Tablet: the chip takes a full row of its own, right-aligned. */}
-            <div className="hidden min-w-0 basis-full items-center justify-end md:flex lg:hidden">{chip}</div>
+            {/* Tablet: the chip takes a full row of its own, pinned to the
+                card's right edge (the controls above no longer narrow it). */}
+            <div className="hidden min-w-0 basis-full items-center justify-end md:order-4 md:flex lg:hidden">
+              {chip}
+            </div>
           </>
         )}
-      </div>
 
-      <div
-        className={cn(
-          'flex h-11 shrink-0 items-center justify-end gap-[var(--spacing-system-s)] md:h-12',
-          fieldRowOffset,
-        )}
-      >
-        {!isSystem && moveButtons}
-        {isSystem ? (
-          <div className="flex w-11 justify-center md:w-12">
-            <TouchFriendlyTooltip content={systemTooltip}>
-              <button
-                type="button"
-                aria-label={systemTooltip ?? 'System status'}
-                className="flex size-6 items-center justify-center text-ods-text-secondary outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
-              >
-                <InfoCircleIcon size={24} />
-              </button>
+        <div
+          className={cn(
+            'flex h-11 shrink-0 items-center justify-end gap-[var(--spacing-system-s)] md:h-12 lg:order-5',
+            isSystem ? 'order-3' : 'order-2 md:order-3',
+            fieldRowOffset,
+          )}
+        >
+          {!isSystem && moveButtons}
+          {isSystem ? (
+            <div className="flex w-11 justify-center md:w-12">
+              <TouchFriendlyTooltip content={systemTooltip}>
+                <button
+                  type="button"
+                  aria-label={systemTooltip ?? 'System status'}
+                  className="flex size-6 items-center justify-center text-ods-text-secondary outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
+                >
+                  <InfoCircleIcon size={24} />
+                </button>
+              </TouchFriendlyTooltip>
+            </div>
+          ) : (
+            <TouchFriendlyTooltip content={deleteDisabled ? deleteDisabledReason : undefined}>
+              <span className="inline-flex">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Delete status"
+                  disabled={deleteDisabled}
+                  onClick={deleteDisabled ? undefined : onDelete}
+                  className={cn('size-11 md:size-12', deleteDisabled && 'pointer-events-none')}
+                >
+                  <TrashIcon className="text-ods-error" />
+                </Button>
+              </span>
             </TouchFriendlyTooltip>
-          </div>
-        ) : (
-          <TouchFriendlyTooltip content={deleteDisabled ? deleteDisabledReason : undefined}>
-            <span className="inline-flex">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                aria-label="Delete status"
-                disabled={deleteDisabled}
-                onClick={deleteDisabled ? undefined : onDelete}
-                className={cn('size-11 md:size-12', deleteDisabled && 'pointer-events-none')}
-              >
-                <TrashIcon className="text-ods-error" />
-              </Button>
-            </span>
-          </TouchFriendlyTooltip>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
