@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { useIsInActionsMenuHeader } from './actions-menu-header-context';
 import { Label } from './label';
 
 export interface TabSelectorItem {
@@ -54,6 +55,11 @@ export function TabSelector({
   scrollable = false,
   className,
 }: TabSelectorProps) {
+  // Inside an ActionsMenu header row the selector renders FLUSH - no border,
+  // radius, padding or gap of its own; the menu's row border and rounding are
+  // the frame (the mobile "..." menu design). The same node a page renders in
+  // its title bar adapts by context, with no re-styling at the call site.
+  const flush = useIsInActionsMenuHeader();
   return (
     <div
       className={cn('flex flex-col gap-[var(--spacing-system-xxs)]', disabled && 'opacity-50', className)}
@@ -67,8 +73,13 @@ export function TabSelector({
       )}
       <div
         className={cn(
-          'flex h-11 gap-[var(--spacing-system-xxs)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] md:h-12',
-          scrollable ? 'overflow-x-auto' : 'w-full',
+          'flex h-11 bg-ods-bg md:h-12',
+          flush
+            ? 'w-full'
+            : cn(
+                'gap-[var(--spacing-system-xxs)] rounded-md border border-ods-border p-[var(--spacing-system-xxs)]',
+                scrollable ? 'overflow-x-auto' : 'w-full',
+              ),
         )}
       >
         {items.map(item => {
@@ -86,7 +97,10 @@ export function TabSelector({
                 // Bold on BOTH states (text-h3 = DM Sans bold) — a medium↔bold
                 // flip between the active and inactive tabs read as inconsistent
                 // weight (and nudged label widths on every switch).
-                'flex items-center justify-center gap-[var(--spacing-system-xs)] whitespace-nowrap rounded-xs p-[var(--spacing-system-xsf)] transition-colors duration-200 text-h4',
+                'flex items-center justify-center gap-[var(--spacing-system-xs)] whitespace-nowrap p-[var(--spacing-system-xsf)] transition-colors duration-200 text-h4',
+                // Flush segments meet the menu's edges square; the menu's own
+                // rounding clips the outer corners.
+                flush ? 'rounded-none' : 'rounded-xs',
                 // scrollable: intrinsic widths must sum past the container or
                 // nothing ever overflows (flex-1's basis-0 defeats the scroll).
                 scrollable ? 'flex-none shrink-0 basis-auto' : 'flex-1',

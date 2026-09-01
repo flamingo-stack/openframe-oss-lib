@@ -7,6 +7,7 @@ import React, { useCallback } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { Chevron02RightIcon, Ellipsis01Icon } from '../icons-v2-generated';
+import { ActionsMenuHeaderContext } from './actions-menu-header-context';
 import { Button } from './button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './dropdown-menu';
 import { useReportOverlayOpen } from './overlay-open-registry';
@@ -310,7 +311,14 @@ export const ActionsMenu: React.FC<ActionsMenuProps> = ({ groups, className = ''
     <div
       className={`relative max-h-[var(--radix-popper-available-height)] min-w-[256px] overflow-y-auto rounded-md border border-ods-border bg-ods-bg shadow-lg ${className}`}
     >
-      {header && <div className="border-b border-ods-border">{header}</div>}
+      {header && (
+        // The context strips the frame off controls that carry one (the view
+        // TabSelector): inside the menu, the row border and the menu's own
+        // rounding ARE the frame — see `actions-menu-header-context.ts`.
+        <ActionsMenuHeaderContext.Provider value={true}>
+          <div className="border-b border-ods-border">{header}</div>
+        </ActionsMenuHeaderContext.Provider>
+      )}
       {groups.map((group, groupIndex) => {
         const groupKey = group.id || group.items.map(i => i.id).join('|');
         return (
