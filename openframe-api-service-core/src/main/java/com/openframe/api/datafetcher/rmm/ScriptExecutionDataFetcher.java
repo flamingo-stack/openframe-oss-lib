@@ -18,8 +18,8 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
-import com.openframe.api.service.rmm.ScriptExecutionFilterService;
-import com.openframe.api.service.rmm.ScriptExecutionService;
+import com.openframe.api.service.rmm.script.ScriptExecutionFilterService;
+import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import graphql.relay.Relay;
@@ -65,6 +65,11 @@ public class ScriptExecutionDataFetcher {
     public String scriptExecutionNodeId(DgsDataFetchingEnvironment dfe) {
         ScriptExecutionResponse execution = dfe.getSource();
         return RELAY.toGlobalId("ScriptExecution", execution.getId());
+    }
+
+    @DgsQuery
+    public ScriptExecutionResponse scriptExecution(@InputArgument @NotBlank String id) {
+        return scriptExecutionService.get(decodeId(id));
     }
 
     @DgsQuery

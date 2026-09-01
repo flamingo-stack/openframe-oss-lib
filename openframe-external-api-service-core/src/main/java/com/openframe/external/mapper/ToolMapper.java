@@ -32,6 +32,15 @@ public class ToolMapper {
                 .platformCategory(tool.getPlatformCategory())
                 .enabled(tool.isEnabled())
                 .credentials(toToolCredentialsResponse(tool.getCredentials()))
+                .layer(tool.getLayer())
+                .layerOrder(tool.getLayerOrder())
+                .layerColor(tool.getLayerColor())
+                .metricsPath(tool.getMetricsPath())
+                .healthCheckEndpoint(tool.getHealthCheckEndpoint())
+                .healthCheckInterval(tool.getHealthCheckInterval())
+                .connectionTimeout(tool.getConnectionTimeout())
+                .readTimeout(tool.getReadTimeout())
+                .allowedEndpoints(tool.getAllowedEndpoints() != null ? List.of(tool.getAllowedEndpoints()) : null)
                 .build();
     }
 
@@ -53,18 +62,10 @@ public class ToolMapper {
 
     public ToolFilterResponse toToolFilterResponse(ToolFilters filters) {
         if (filters == null) {
-            return ToolFilterResponse.builder()
-                    .types(List.of())
-                    .categories(List.of())
-                    .platformCategories(List.of())
-                    .build();
+            return new ToolFilterResponse(List.of(), List.of(), List.of());
         }
 
-        return ToolFilterResponse.builder()
-                .types(filters.getTypes())
-                .categories(filters.getCategories())
-                .platformCategories(filters.getPlatformCategories())
-                .build();
+        return new ToolFilterResponse(filters.getTypes(), filters.getCategories(), filters.getPlatformCategories());
     }
 
     private List<ToolUrlResponse> toToolUrlResponseList(List<ToolUrl> toolUrls) {
@@ -80,32 +81,20 @@ public class ToolMapper {
         if (toolUrl == null) {
             return null;
         }
-        return ToolUrlResponse.builder()
-                .url(toolUrl.getUrl())
-                .port(toolUrl.getPort())
-                .type(toolUrl.getType() != null ? toolUrl.getType().name() : null)
-                .build();
+        return new ToolUrlResponse(toolUrl.getUrl(), toolUrl.getPort(), toolUrl.getType() != null ? toolUrl.getType().name() : null);
     }
 
     private ToolCredentialsResponse toToolCredentialsResponse(ToolCredentials credentials) {
         if (credentials == null) {
             return null;
         }
-        return ToolCredentialsResponse.builder()
-                .username(credentials.getUsername())
-                .password(credentials.getPassword())
-                .apiKey(toToolApiKeyResponse(credentials.getApiKey()))
-                .build();
+        return new ToolCredentialsResponse(credentials.getUsername(), credentials.getPassword(), toToolApiKeyResponse(credentials.getApiKey()));
     }
 
     private ToolApiKeyResponse toToolApiKeyResponse(ToolApiKey apiKey) {
         if (apiKey == null) {
             return null;
         }
-        return ToolApiKeyResponse.builder()
-                .key(apiKey.getKey())
-                .type(apiKey.getType() != null ? apiKey.getType().name() : null)
-                .keyName(apiKey.getKeyName())
-                .build();
+        return new ToolApiKeyResponse(apiKey.getKey(), apiKey.getType() != null ? apiKey.getType().name() : null, apiKey.getKeyName());
     }
 }

@@ -21,9 +21,9 @@ pub mod tool_uninstall_message;
 pub mod tool_version_overrides;
 
 pub use execution::{
-    CommandMessage, ExecutionMessage, ExecutionRequest, PrivilegeLevel, RmmResult, ScriptEnvVar,
-    ScriptMessage, ScriptScheduleExecutionItem, ScriptScheduleExecutionMessage, ScriptShell,
-    ScriptSpec,
+    is_ack_subject, CommandMessage, ExecutionAck, ExecutionMessage, ExecutionRequest,
+    PrivilegeLevel, RmmResult, ScriptEnvVar, ScriptMessage, ScriptScheduleExecutionItem,
+    ScriptScheduleExecutionMessage, ScriptShell, ScriptSpec, EXECUTION_ACK_KIND,
 };
 
 pub use agent_configuration::AgentConfiguration;

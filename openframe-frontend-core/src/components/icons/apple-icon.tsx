@@ -1,17 +1,11 @@
-import React from 'react'
-
 interface AppleIconProps {
-  width?: number | string
-  height?: number | string
-  className?: string
+  width?: number | string;
+  height?: number | string;
+  className?: string;
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function AppleIcon({
-  width = 24,
-  height = 24,
-  className = "text-current"
-  }: AppleIconProps) {
+export function AppleIcon({ width = 24, height = 24, className = 'text-current' }: AppleIconProps) {
   return (
     <svg
       width={width}
@@ -26,5 +20,5 @@ export function AppleIcon({
         fill="currentColor"
       />
     </svg>
-  )
+  );
 }

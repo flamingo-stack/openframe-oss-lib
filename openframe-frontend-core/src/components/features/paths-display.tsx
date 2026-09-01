@@ -1,51 +1,51 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon'
-import { cn } from '../../utils/cn'
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
 
 export interface PathsDisplayProps {
   /**
    * Array of file/folder paths to display
    */
-  paths: readonly string[] | string[]
+  paths: readonly string[] | string[];
 
   /**
    * Callback when a path is copied
    */
-  onCopyPath?: (path: string) => void
+  onCopyPath?: (path: string) => void;
 
   /**
    * Optional title above the paths list
    */
-  title?: string
+  title?: string;
 
   /**
    * Optional description text
    */
-  description?: string
+  description?: string;
 
   /**
    * Additional CSS classes for the container
    */
-  className?: string
+  className?: string;
 
   /**
    * Whether to show copy buttons (default: true)
    */
-  showCopyButtons?: boolean
+  showCopyButtons?: boolean;
 
   /**
    * Size of the copy icon (default: 'w-6 h-6')
    */
-  copyIconSize?: string
+  copyIconSize?: string;
 
   /**
    * Optional icon rendered at the start of every row, before the path text.
    * Useful for showing a platform logo next to a command (e.g. the Windows
    * logo beside "Run PowerShell as Local Administrator").
    */
-  leadingIcon?: React.ReactNode
+  leadingIcon?: React.ReactNode;
 }
 
 /**
@@ -85,36 +85,21 @@ export function PathsDisplay({
   className,
   showCopyButtons = true,
   copyIconSize = 'w-6 h-6',
-  leadingIcon
+  leadingIcon,
 }: PathsDisplayProps) {
   if (!paths || paths.length === 0) {
-    return null
+    return null;
   }
 
   return (
     <div className={cn('flex flex-col gap-3', className)}>
-      {title && (
-        <div className="text-h4 text-ods-text-primary">
-          {title}
-        </div>
-      )}
-      {description && (
-        <div className="text-h6 text-ods-text-secondary">
-          {description}
-        </div>
-      )}
-      <div className="bg-ods-bg border border-ods-border rounded-[6px] overflow-hidden">
-        {paths.map((path) => (
-          <div
-            key={path}
-            className="flex items-center gap-4 p-4 border-b border-ods-border last:border-b-0"
-          >
-            {leadingIcon && (
-              <span className="shrink-0 text-ods-text-primary">{leadingIcon}</span>
-            )}
-            <span className="flex-1 min-w-0 text-h4 text-ods-text-primary truncate">
-              {path}
-            </span>
+      {title && <div className="text-ods-text-primary text-h4">{title}</div>}
+      {description && <div className="text-ods-text-secondary text-h6">{description}</div>}
+      <div className="overflow-hidden rounded-[6px] border border-ods-border bg-ods-bg">
+        {paths.map(path => (
+          <div key={path} className="flex items-center gap-4 border-b border-ods-border p-4 last:border-b-0">
+            {leadingIcon && <span className="shrink-0 text-ods-text-primary">{leadingIcon}</span>}
+            <span className="min-w-0 flex-1 truncate text-ods-text-primary text-h4">{path}</span>
             {showCopyButtons && onCopyPath && (
               <button
                 type="button"
@@ -129,7 +114,7 @@ export function PathsDisplay({
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -140,24 +125,22 @@ export const OPENFRAME_PATHS = {
     'C:\\Program Files\\OpenFrame',
     'C:\\ProgramData\\OpenFrame',
     'C:\\ProgramData\\OpenFrameInstall',
-    'C:\\Program Files\\Orbit'
+    'C:\\Program Files\\Orbit',
   ],
   darwin: [
     '/Library/LaunchDaemons/com.openframe.client.plist',
-    '/Library/Application Support/OpenFrame/meshcentral-agent/'
+    '/Library/Application Support/OpenFrame/meshcentral-agent/',
   ],
-  linux: [
-    '/opt/openframe/'
-  ]
-} as const
+  linux: ['/opt/openframe/'],
+} as const;
 
-export type OpenFramePathsPlatform = keyof typeof OPENFRAME_PATHS
+export type OpenFramePathsPlatform = keyof typeof OPENFRAME_PATHS;
 
 /**
  * Get OpenFrame paths for a specific platform
  */
 export function getOpenFramePaths(platform: OpenFramePathsPlatform): string[] {
-  return [...OPENFRAME_PATHS[platform]]
+  return [...OPENFRAME_PATHS[platform]];
 }
 
 /**
@@ -170,12 +153,12 @@ export const OPENFRAME_DOCTOR_COMMANDS: Record<OpenFramePathsPlatform, string> =
   windows:
     "Set-Location ~; Invoke-WebRequest -Uri 'github.com/openframe-client' -OutFile 'openframe-client.exe'; .\\openframe-client.exe doctor",
   darwin: 'cd ~; wget github.com/openframe-client; openframe-client doctor',
-  linux: 'cd ~; wget github.com/openframe-client; openframe-client doctor'
-} as const
+  linux: 'cd ~; wget github.com/openframe-client; openframe-client doctor',
+} as const;
 
 /**
  * Get the OpenFrame doctor command for a specific platform
  */
 export function getOpenFrameDoctorCommand(platform: OpenFramePathsPlatform): string {
-  return OPENFRAME_DOCTOR_COMMANDS[platform]
+  return OPENFRAME_DOCTOR_COMMANDS[platform];
 }

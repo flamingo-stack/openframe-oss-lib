@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Chat runtime context — single seam for embedding the chat panel in a
@@ -33,9 +33,9 @@
  * will pay an avoidable re-render cost across the entire chat tree.
  */
 
-import { createContext, useContext, type ReactNode } from 'react'
+import { createContext, useContext } from 'react';
 
-import type { ComposeContentUrl } from '../utils/content-href'
+import type { ComposeContentUrl } from '../utils/content-href';
 
 /**
  * Runtime config consumed by the chat panel.
@@ -43,18 +43,18 @@ import type { ComposeContentUrl } from '../utils/content-href'
 export interface ChatRuntime {
   endpoints: {
     /** POST streaming chat. Hub: '/api/docs/chat'. */
-    chatStreamUrl: string
+    chatStreamUrl: string;
     /** POST agent approve/reject. Hub: '/api/chat/agent/confirm-tool'. */
-    approvalToolUrl: string
+    approvalToolUrl: string;
     /** Customer-ticket agent endpoints (Help Center). OPTIONAL — when unset,
      *  the ticket hooks fall back to the bare hub paths
      *  (`/api/chat/agent/{find-ticket,ticket-action,list-engagements}`).
      *  Embedders behind a reverse proxy set these to their proxied paths
      *  (e.g. `/content/api/chat/agent/...`) so tickets route through the SAME
      *  endpoint config + proxy as every other endpoint. */
-    findTicketUrl?: string
-    ticketActionUrl?: string
-    listEngagementsUrl?: string
+    findTicketUrl?: string;
+    ticketActionUrl?: string;
+    listEngagementsUrl?: string;
     /** Ticket live-stream + read-receipt endpoints (Help Center
      *  realtime). OPTIONAL — unset → bare hub paths under the DEDICATED
      *  ticket surface (`/api/tickets/{stream,read}` — deliberately NOT
@@ -63,10 +63,10 @@ export interface ChatRuntime {
      *  `TicketLiveProvider`. The unread summary has NO endpoint — it
      *  arrives as `ticket-summary` frames on the stream and in
      *  `ticket-read` responses. */
-    ticketStreamUrl?: string
-    ticketReadUrl?: string
+    ticketStreamUrl?: string;
+    ticketReadUrl?: string;
     /** GET slash-command catalog. Hub: '/api/docs/commands'. */
-    commandsUrl: string
+    commandsUrl: string;
     /** GET server-side conversation history (`?conversationId=<id>`) — the
      *  chat panel's mount-time hydration read against the server transcript
      *  store (localStorage keeps only the server-issued conversation id).
@@ -74,21 +74,21 @@ export interface ChatRuntime {
      *  same-origin hosts AND for reverse-proxy embedders (the proxied chat
      *  prefix covers it). Set explicitly only when the history route lives
      *  elsewhere. */
-    chatHistoryUrl?: string
+    chatHistoryUrl?: string;
     /** GET RAG-search endpoint behind `<DocSearchBar>` (the in-source search
      *  bar mounted by `<DocViewer>` / `<DocsHubPage>` when `showAIChat` is on).
      *  Hub: '/api/docs/search'. OPTIONAL — falls back to the hub path so
      *  same-origin Next.js hosts don't need to set it. Cross-origin embedders
      *  set their proxied path so the search bar routes through the same
      *  reverse proxy as everything else. Same pattern as `findTicketUrl`. */
-    docsSearchUrl?: string
+    docsSearchUrl?: string;
     /** POST internal-link resolver. The in-source markdown renderer (lib or
      *  custom) calls `<DocViewer>`'s `handlers.onResolveLink(href, currentPath)`
      *  for relative hrefs like `./getting-started/intro.md` — that callback
      *  posts to this URL with `{ link, currentPath, source }` and expects a
      *  `ResolveLinkResult` back. Hub: '/api/docs/resolve-link'. OPTIONAL — same
      *  fall-back chain as `docsSearchUrl`: prop override → runtime → default. */
-    docsResolveLinkUrl?: string
+    docsResolveLinkUrl?: string;
     /** GET per-platform empty-state config (admin-edited in
      *  `/admin/chat-config`): `{ greeting, enabledRagTableIds, suggestedQueries }`.
      *  Hub: '/api/docs/empty-state'. OPTIONAL — the in-app (host-mode) chat
@@ -98,7 +98,7 @@ export interface ChatRuntime {
      *  the greeting / quick-action chips / RAG-source filter at runtime. When
      *  unset, the chat falls back to the explicit `emptyStateGreeting` /
      *  `suggestedQueries` / `enabledRagTableIds` props (or in-code defaults). */
-    emptyStateUrl?: string
+    emptyStateUrl?: string;
     /** Build the per-agent display-config URL for an OpenFrame AI agent
      *  (Fae/Mingo). OPTIONAL. The returned endpoint MUST be byte-compatible
      *  with the empty-state wire shape ({ greeting, suggestedQueries,
@@ -107,12 +107,12 @@ export interface ChatRuntime {
      *  `emptyStateUrl` to render the selected agent's greeting + suggested
      *  prompts (the "agent mode" URL override). Hub: `(slug) =>
      *  '/api/ai-agents/' + encodeURIComponent(slug)`. */
-    aiAgentConfigUrl?: (slug: string) => string
+    aiAgentConfigUrl?: (slug: string) => string;
     /** Build entity-card list URL for a content type + ids. Hub delegates
      *  to the rag-table-config registry; embedded app provides its own
      *  per-type URL builder against the reverse proxy. Returns null when
      *  the type has no list endpoint (caller skips rendering). */
-    buildListUrl: (type: string, ids: string[]) => string | null
+    buildListUrl: (type: string, ids: string[]) => string | null;
     /** Chat-attachment endpoints — added for the v2 attachment feature.
      *
      *  Three concerns:
@@ -130,20 +130,20 @@ export interface ChatRuntime {
      *      (tickets / contact form / any embedded surface that needs
      *      to identify the proxied customer), so the name has no
      *      "chat" prefix even though the consuming hook still does. */
-    attachmentUploadUrl: string
-    attachmentViewUrlPrefix: string
-    identityUrl: string
+    attachmentUploadUrl: string;
+    attachmentViewUrlPrefix: string;
+    identityUrl: string;
     /** Optional URL prefix for the image proxy (`<prefix>?url=<external>`).
      *  When unset, lib's `getProxiedImageUrl` returns the original URL
      *  unchanged. Hub default: '/api/image-proxy'. Embedders that don't
      *  host an image-proxy route leave this undefined → images load
      *  directly cross-origin (CORS-permitting). */
-    imageProxyUrlPrefix?: string
+    imageProxyUrlPrefix?: string;
     /** Optional list of hostnames that should bypass the image proxy
      *  (rendered direct). Hub uses ['openmsp.ai']; embedders typically
      *  leave it unset. Matches the `skipDomains` parameter of
      *  `getProxiedImageUrl`. */
-    imageProxySkipDomains?: string[]
+    imageProxySkipDomains?: string[];
     /** Optional base URL for the branded og-placeholder image route — the
      *  DEFAULT cover-image fallback for entity cards with no image. The lib
      *  appends `?title=…` (+ `w`/`h` for square slots) itself, so this is
@@ -160,7 +160,7 @@ export interface ChatRuntime {
      *  back to the relative `/api/og-placeholder`. So an embedder that already
      *  proxies images needs NO og-placeholder wiring. See
      *  `resolveOgPlaceholderBase` / `buildOgPlaceholderUrl` in `../utils`. */
-    ogPlaceholderUrl?: string
+    ogPlaceholderUrl?: string;
     /** Base URL prefix for the captions route (`/api/captions` — the native
      *  `<track>` VTT endpoint every video surface uses since captions stopped
      *  being burned into video pixels). Plain path base, no query params.
@@ -168,15 +168,15 @@ export interface ChatRuntime {
      *  unset ⇒ the same-origin relative `/api/captions` (the hub). Consumed via
      *  `getEntityCaptionUrls` / `rebaseCaptionsUrl` in
      *  `components/features/captions-url.ts`. */
-    captionsUrlPrefix?: string
+    captionsUrlPrefix?: string;
     /** Supabase storage origin (e.g. `https://xyz.supabase.co`) — used
      *  by `useVideoWarmup` to scope the `<link rel="preload" as="video">`
      *  hint to MP4s the deployment actually hosts. Hub wires it via
      *  `getSupabaseStorageOrigin()`; embedders without a Supabase
      *  storage origin leave it unset (preload is then skipped; Mux/
      *  YouTube preconnect still fires). */
-    supabaseStorageOrigin?: string
-  }
+    supabaseStorageOrigin?: string;
+  };
   navigation: {
     /** ONE knob, two behaviors:
      *  - 'host' = use the host page's existing click-routing untouched.
@@ -184,32 +184,32 @@ export interface ChatRuntime {
      *  - 'embed' = guest inside another app: short-circuit at the top
      *    of click handlers to force new-tab + absolutize via
      *    resolveExternalNavigation. */
-    mode: 'host' | 'embed'
+    mode: 'host' | 'embed';
     /** Embed-only fallback origin for relative URLs whose target platform
      *  can't be inferred. Used by resolveExternalNavigation when
      *  `targetPlatform` is null — without this, a relative `/foo` href would
      *  window.open against the embedder's origin, which is WRONG.
      *  Set to your content host (e.g. 'https://hub.openframe.ai').
      *  Required by the embedded app whenever mode='embed'. */
-    defaultContentOrigin?: string
+    defaultContentOrigin?: string;
     /** Override for opening external URLs. MUST BE SYNCHRONOUS —
      *  Safari/Firefox block popups opened outside a direct user gesture.
      *  Default: window.open(href, '_blank', 'noopener,noreferrer'). */
-    openExternal?: (href: string) => void
+    openExternal?: (href: string) => void;
     /** Optional in-app navigation callback (host-mode only).
      *  Returns `true` if the host handled the click in-app
      *  (router.push + docNav.navigate); returns `false`, `undefined`,
      *  or `void` → lib falls back to window.location.assign(href).
      *  Hub wires this via HubRuntimeProvider's HubNavigationWiring;
      *  embedders not in Next.js leave it undefined. */
-    navigate?: (input: { href: string; path?: string | null; targetPlatform?: string | null }) => boolean | void
+    navigate?: (input: { href: string; path?: string | null; targetPlatform?: string | null }) => boolean | void;
     /** Optional new-tab decision callback. Returns true → lib opens in
      *  new tab; false → same tab via `navigate`. Hub wires the existing
      *  `decideNewTab` logic from use-nav-link.tsx (re-imports the pure
      *  helper from lib). Embedders may omit; lib defaults to:
      *  same-origin/same-platform → same tab, else new tab. */
-    decideNewTab?: (args: { href: string; targetPlatform?: string | null }) => boolean
-  }
+    decideNewTab?: (args: { href: string; targetPlatform?: string | null }) => boolean;
+  };
   /** Optional content-URL composer. Returns the platform-aware href +
    *  target-platform tuple for a content entity. Hub wires this to its
    *  `buildContentURL(type, slug, extractPrimaryPlatform(platforms))`
@@ -229,7 +229,7 @@ export interface ChatRuntime {
    *  views pass the slug; chat rows pass the id + `externalUrl`, whose path
    *  yields the slug for in-app routing) + optional `platforms` /
    *  `externalUrl` / `targetPlatform`. */
-  composeContentUrl?: ComposeContentUrl
+  composeContentUrl?: ComposeContentUrl;
   /** Per-`documentType` doc-viewer targets — the UNIFIED, DYNAMIC replacement for
    *  the single `chipBasePlatform` prop. Maps a doc-table documentType
    *  (`'markdown'`, `'data_room_doc'`, …) → `{ platform, basePath }` for the PUBLIC
@@ -239,7 +239,7 @@ export interface ChatRuntime {
    *  data_room_doc→company-hub/data-room) instead of one static fallback. The hub
    *  may keep using `chipBasePlatform` (one doc source per platform); embedders that
    *  surface multiple doc sources wire this. Threaded into `resolveSourceRowCTA`. */
-  docPlatformTargets?: Record<string, { platform: string; basePath: string }>
+  docPlatformTargets?: Record<string, { platform: string; basePath: string }>;
   /** Chat source / platform identifier — OPTIONAL. The hub sets it from
    *  `currentPlatform()`; EMBEDDERS leave it unset and stay platform-agnostic.
    *
@@ -251,7 +251,7 @@ export interface ChatRuntime {
    *  client legitimately needs to know its platform a priori — i.e. the hub,
    *  where several platforms share related origins so "same platform" can't be
    *  inferred from a URL alone. */
-  source?: string
+  source?: string;
   // NOTE: No `user` field. The chat's display identity (greeting
   // first-name, etc.) comes from the SERVER-resolved auth via
   // `useChatIdentity()` — the same identity the server uses to
@@ -261,7 +261,7 @@ export interface ChatRuntime {
   // alice@example.com. Single source of truth: the server.
 }
 
-export const ChatRuntimeContext = createContext<ChatRuntime | null>(null)
+export const ChatRuntimeContext = createContext<ChatRuntime | null>(null);
 
 /**
  * Returns the active runtime, or null when no provider is mounted.
@@ -270,7 +270,7 @@ export const ChatRuntimeContext = createContext<ChatRuntime | null>(null)
  * use `useRequiredChatRuntime` (below).
  */
 export function useChatRuntime(): ChatRuntime | null {
-  return useContext(ChatRuntimeContext)
+  return useContext(ChatRuntimeContext);
 }
 
 /**
@@ -282,7 +282,7 @@ export function useChatRuntime(): ChatRuntime | null {
  * or supply `<ChatRuntimeContext.Provider value={mockedRuntime}>`.
  */
 export function useRequiredChatRuntime(): ChatRuntime {
-  const v = useContext(ChatRuntimeContext)
+  const v = useContext(ChatRuntimeContext);
   if (!v) {
     throw new Error(
       '[chat-runtime] hook called outside a <ChatRuntimeContext.Provider>. ' +
@@ -291,7 +291,7 @@ export function useRequiredChatRuntime(): ChatRuntime {
         'Fix: ensure the rendering subtree descends from the runtime provider. ' +
         'In tests/Storybook: wrap with <HubRuntimeProvider> or supply ' +
         'a <ChatRuntimeContext.Provider value={mockedRuntime}>.',
-    )
+    );
   }
-  return v
+  return v;
 }

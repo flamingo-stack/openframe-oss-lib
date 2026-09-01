@@ -97,7 +97,7 @@ export function AnnouncementBarView({
     : undefined;
 
   return (
-    <div className={cn('flex w-full max-w-full min-h-11 items-center', className)} style={style}>
+    <div className={cn('flex min-h-11 w-full max-w-full items-center', className)} style={style}>
       {/* Content row — the tap target below `md`, where the CTA is hidden.
           Its vertical padding never drives the height; the 44px strip does. */}
       <div
@@ -132,7 +132,7 @@ export function AnnouncementBarView({
             for empty space while making the button the sole handler when hit. */}
         {actionBlock && (
           <div
-            className="ml-[var(--spacing-system-m)] sr-only shrink-0 focus-within:not-sr-only md:not-sr-only md:flex"
+            className="sr-only ml-[var(--spacing-system-m)] shrink-0 focus-within:not-sr-only md:not-sr-only md:flex"
             onClick={e => e.stopPropagation()}
           >
             {actionBlock}

@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<ProductReleasesListPage>` — the full `/releases` list page: `DevSectionPage
@@ -8,29 +8,29 @@
  * `runtime.composeContentUrl`.
  */
 
-import type { ReactNode } from 'react'
-import type { ProductRelease, ProductReleaseListResponse } from '../../types/product-release'
-import { DevSectionPage } from '../shared/dev-section'
-import { ProductReleasesView, type ProductReleaseCardExtras } from '../shared/product-release'
+import type { ReactNode } from 'react';
+import type { ProductRelease, ProductReleaseListResponse } from '../../types/product-release';
+import { DevSectionPage } from '../shared/dev-section';
+import { ProductReleasesView, type ProductReleaseCardExtras } from '../shared/product-release';
 
 export interface ProductReleasesListPageProps {
   /** GET list endpoint (the api route). Default `/api/releases`. */
-  releasesEndpoint?: string
+  releasesEndpoint?: string;
   /** Fallback detail-href prefix when `composeContentUrl` is not wired. Default `/releases`. */
-  basePath?: string
+  basePath?: string;
   /** Derive the per-card prop bundle (defaults to the lib's rich builder). */
-  buildCardProps?: (release: ProductRelease) => ProductReleaseCardExtras
+  buildCardProps?: (release: ProductRelease) => ProductReleaseCardExtras;
   /** Optional SSR hydrate for the first page (hub server-fetch). */
-  initialData?: ProductReleaseListResponse
+  initialData?: ProductReleaseListResponse;
   /** Back-button config. Pass `false` to hide. Default `{ href: '/' }`. */
-  backButton?: { label?: string; href?: string } | false
-  title?: string
-  subtitle?: string
+  backButton?: { label?: string; href?: string } | false;
+  title?: string;
+  subtitle?: string;
   /** Optional slot rendered below the list, inside the page chrome. */
-  belowContent?: ReactNode
+  belowContent?: ReactNode;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container (forwarded to `DevSectionPage`). */
-  shell?: boolean
+  shell?: boolean;
 }
 
 export function ProductReleasesListPage({
@@ -54,5 +54,5 @@ export function ProductReleasesListPage({
       />
       {belowContent}
     </DevSectionPage>
-  )
+  );
 }

@@ -1,11 +1,22 @@
 /**
  * ODS Color Token Utility Functions
- * 
+ *
  * Provides runtime utilities for working with ODS color tokens
  */
 
 import { pickReadableTextColor } from './color-analysis';
 import { colorTokens as odsTokens } from './ods-color-tokens-stub';
+
+/** The token map, viewed as a flat key→value lookup. Nested groups (`text`)
+ *  are not addressable by a flat key, so `lookupToken` returns only string
+ *  leaves — previously an `any` index could hand a caller the nested OBJECT,
+ *  which then stringified to "[object Object]" in `applyColorToken`. */
+const TOKEN_MAP: Readonly<Record<string, unknown>> = odsTokens;
+
+function lookupToken(tokenKey: string): string | undefined {
+  const value = TOKEN_MAP[tokenKey];
+  return typeof value === 'string' ? value : undefined;
+}
 
 export type Platform = 'openmsp' | 'openframe' | 'flamingo';
 export type ColorCategory = 'open' | 'flamingo' | 'system' | 'attention';
@@ -17,10 +28,10 @@ export type ColorVariant = 'base' | 'hover' | 'active' | 'focus' | 'disabled';
 export function getODSToken(
   category: ColorCategory,
   color: string,
-  variant: ColorVariant = 'base'
+  variant: ColorVariant = 'base',
 ): string | undefined {
   const tokenKey = `${category}-${color}-${variant}`;
-  return (odsTokens as any)[tokenKey];
+  return lookupToken(tokenKey);
 }
 
 /**
@@ -28,13 +39,13 @@ export function getODSToken(
  */
 export function getPlatformAccentColor(platform?: Platform): string {
   const currentPlatform = platform || getCurrentPlatform();
-  
+
   const platformColors = {
-    'openmsp': 'var(--ods-open-yellow-base)',         // CSS variable instead of hex
-    'openframe': 'var(--ods-open-yellow-base)',       // CSS variable instead of hex
-    'flamingo': 'var(--ods-flamingo-pink-base)'       // CSS variable instead of hex
+    openmsp: 'var(--ods-open-yellow-base)', // CSS variable instead of hex
+    openframe: 'var(--ods-open-yellow-base)', // CSS variable instead of hex
+    flamingo: 'var(--ods-flamingo-pink-base)', // CSS variable instead of hex
   };
-  
+
   return platformColors[currentPlatform];
 }
 
@@ -46,13 +57,13 @@ export function getCurrentPlatform(): Platform {
   if (typeof window === 'undefined') {
     return (process.env.NEXT_PUBLIC_APP_TYPE as Platform) || 'openmsp';
   }
-  
+
   // Client-side: check DOM attribute first, fallback to environment
   const domPlatform = document.documentElement.getAttribute('data-app-type');
   if (domPlatform) {
     return domPlatform as Platform;
   }
-  
+
   return (process.env.NEXT_PUBLIC_APP_TYPE as Platform) || 'openmsp';
 }
 
@@ -61,17 +72,19 @@ export function getCurrentPlatform(): Platform {
  */
 export function switchPlatformTheme(platform: Platform): void {
   if (typeof window === 'undefined') return;
-  
+
   const root = document.documentElement;
   root.setAttribute('data-app-type', platform);
-  
+
   // Note: Cannot modify process.env at runtime in production
   // This would only work in development/test environments
-  
+
   // Dispatch custom event for components to react to platform changes
-  window.dispatchEvent(new CustomEvent('platformThemeChanged', {
-    detail: { platform }
-  }));
+  window.dispatchEvent(
+    new CustomEvent('platformThemeChanged', {
+      detail: { platform },
+    }),
+  );
 }
 
 /**
@@ -79,51 +92,48 @@ export function switchPlatformTheme(platform: Platform): void {
  */
 export function getSemanticColor(semanticName: string, platform?: Platform): string | undefined {
   if (typeof window === 'undefined') return undefined;
-  
+
   const currentPlatform = platform || getCurrentPlatform();
-  
+
   // Switch platform temporarily to get the color
   const originalPlatform = getCurrentPlatform();
   if (currentPlatform !== originalPlatform) {
     switchPlatformTheme(currentPlatform);
   }
-  
+
   const testElement = document.createElement('div');
   document.body.appendChild(testElement);
-  
+
   const computedStyle = getComputedStyle(testElement);
   const colorValue = computedStyle.getPropertyValue(`--color-${semanticName}`);
-  
+
   document.body.removeChild(testElement);
-  
+
   // Restore original platform
   if (currentPlatform !== originalPlatform) {
     switchPlatformTheme(originalPlatform);
   }
-  
+
   return colorValue.trim() || undefined;
 }
 
 /**
  * Converts an ODS token to its corresponding Tailwind class
  */
-export function tokenToTailwindClass(
-  tokenKey: string,
-  type: 'bg' | 'text' | 'border' = 'bg'
-): string | undefined {
+export function tokenToTailwindClass(tokenKey: string, type: 'bg' | 'text' | 'border' = 'bg'): string | undefined {
   // Map common tokens to Tailwind classes
   const tokenMappings: Record<string, string> = {
     // Accent colors
     'accent-primary': 'accent',
     'accent-hover': 'accent-hover',
     'accent-active': 'accent-active',
-    
+
     // Background colors
-    'bg': 'bg',
+    bg: 'bg',
     'bg-card': 'card',
     'bg-hover': 'bg-hover',
     'bg-active': 'bg-active',
-    
+
     // Text colors
     'text-primary': 'text-primary',
     'text-secondary': 'text-secondary',
@@ -131,22 +141,22 @@ export function tokenToTailwindClass(
     'text-disabled': 'text-disabled',
     'text-on-accent': 'text-on-accent',
     'text-on-dark': 'text-on-dark',
-    
+
     // Border colors
     'border-default': 'border',
     'border-hover': 'border-hover',
     'border-focus': 'border-focus',
-    
+
     // Status colors
-    'success': 'success',
-    'error': 'error',
-    'warning': 'warning',
-    'info': 'info'
+    success: 'success',
+    error: 'error',
+    warning: 'warning',
+    info: 'info',
   };
-  
+
   const mappedToken = tokenMappings[tokenKey];
   if (!mappedToken) return undefined;
-  
+
   return `${type}-ods-${mappedToken}`;
 }
 
@@ -155,13 +165,13 @@ export function tokenToTailwindClass(
  */
 export function getTokensByCategory(category: ColorCategory): Record<string, string> {
   const tokens: Record<string, string> = {};
-  
+
   Object.entries(odsTokens).forEach(([key, value]) => {
     if (key.startsWith(`${category}-`)) {
       tokens[key] = value as string;
     }
   });
-  
+
   return tokens;
 }
 
@@ -177,17 +187,17 @@ export function isValidODSToken(tokenKey: string): boolean {
  */
 export function getPlatformConfig(platform?: Platform) {
   const currentPlatform = platform || getCurrentPlatform();
-  
+
   return {
     platform: currentPlatform,
     accentColor: getPlatformAccentColor(currentPlatform),
     isDarkTheme: currentPlatform !== 'flamingo',
     isLightTheme: currentPlatform === 'flamingo',
     brandName: {
-      'openmsp': 'OpenMSP',
-      'openframe': 'OpenFrame',
-      'flamingo': 'Flamingo'
-    }[currentPlatform]
+      openmsp: 'OpenMSP',
+      openframe: 'OpenFrame',
+      flamingo: 'Flamingo',
+    }[currentPlatform],
   };
 }
 
@@ -196,35 +206,30 @@ export function getPlatformConfig(platform?: Platform) {
  */
 export function generatePlatformCSS(platform: Platform): string {
   const accentColor = getPlatformAccentColor(platform);
-  const tokens = getTokensByCategory('system');
-  
+
   let css = `[data-app-type="${platform}"] {\n`;
   css += `  --color-accent-primary: ${accentColor};\n`;
-  
+
   // Add platform-specific overrides
   if (platform === 'flamingo') {
     css += `  --color-bg: var(--ods-system-greys-white);\n`;
     css += `  --color-text-primary: var(--ods-system-greys-background);\n`;
   }
-  
+
   if (platform === 'openframe') {
     css += `  --color-bg: var(--ods-system-greys-darker);\n`;
   }
-  
+
   css += `}\n`;
-  
+
   return css;
 }
 
 /**
  * Applies a color token as a CSS custom property
  */
-export function applyColorToken(
-  element: HTMLElement,
-  property: string,
-  tokenKey: string
-): void {
-  const tokenValue = (odsTokens as any)[tokenKey];
+export function applyColorToken(element: HTMLElement, property: string, tokenKey: string): void {
+  const tokenValue = lookupToken(tokenKey);
   if (tokenValue) {
     element.style.setProperty(`--${property}`, tokenValue);
   }
@@ -233,41 +238,29 @@ export function applyColorToken(
 /**
  * Creates a color interpolation between two ODS tokens
  */
-export function interpolateColors(
-  startToken: string,
-  endToken: string,
-  progress: number
-): string {
-  const startColor = (odsTokens as any)[startToken];
-  const endColor = (odsTokens as any)[endToken];
-  
+export function interpolateColors(startToken: string, endToken: string, progress: number): string {
+  const startColor = lookupToken(startToken);
+  const endColor = lookupToken(endToken);
+
   if (!startColor || !endColor) {
     return startColor || endColor || '#000000';
   }
-  
-  // Simple hex color interpolation
-  const hexToRgb = (hex: string) => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16)
-    } : { r: 0, g: 0, b: 0 };
-  };
-  
-  const rgbToHex = (r: number, g: number, b: number) => {
-    return "#" + ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
-  };
-  
-  const start = hexToRgb(startColor);
-  const end = hexToRgb(endColor);
-  
+
+  // Was a pair of local `hexToRgb`/`rgbToHex` copies that shadowed the exported
+  // ones below. They were not just duplicates — the local `rgbToHex` used the
+  // `(1 << 24)` trick, which produces garbage for a channel outside 0-255, while
+  // the exported one clamps and pads. Black-on-unparseable is kept because that
+  // is what the local `hexToRgb` did; the exported one returns null.
+  const BLACK = { r: 0, g: 0, b: 0 };
+  const start = hexToRgb(startColor) ?? BLACK;
+  const end = hexToRgb(endColor) ?? BLACK;
+
   const interpolated = {
     r: start.r + (end.r - start.r) * progress,
     g: start.g + (end.g - start.g) * progress,
-    b: start.b + (end.b - start.b) * progress
+    b: start.b + (end.b - start.b) * progress,
   };
-  
+
   return rgbToHex(interpolated.r, interpolated.g, interpolated.b);
 }
 
@@ -277,17 +270,16 @@ export function interpolateColors(
 export function usePlatformColors(platform?: Platform) {
   const currentPlatform = platform || getCurrentPlatform();
   const config = getPlatformConfig(currentPlatform);
-  
+
   return {
     platform: currentPlatform,
     accentColor: config.accentColor,
     isDarkTheme: config.isDarkTheme,
     isLightTheme: config.isLightTheme,
     brandName: config.brandName,
-    getToken: (category: ColorCategory, color: string, variant?: ColorVariant) =>
-      getODSToken(category, color, variant),
+    getToken: (category: ColorCategory, color: string, variant?: ColorVariant) => getODSToken(category, color, variant),
     switchTheme: (newPlatform: Platform) => switchPlatformTheme(newPlatform),
-    getSemanticColor: (semanticName: string) => getSemanticColor(semanticName, currentPlatform)
+    getSemanticColor: (semanticName: string) => getSemanticColor(semanticName, currentPlatform),
   };
 }
 
@@ -297,7 +289,7 @@ export function usePlatformColors(platform?: Platform) {
  * light-or-dark decision formula (WCAG relative luminance) for the whole lib.
  */
 export function getReadableTextColor(hex: string): string {
-  return pickReadableTextColor(hex) === 'dark' ? '#212121' : '#fafafa'
+  return pickReadableTextColor(hex) === 'dark' ? '#212121' : '#fafafa';
 }
 
 // Hex <-> RGB <-> HSL. Hex is #rrggbb lowercase; hexToRgb returns null on invalid.
@@ -386,7 +378,12 @@ export function hslToRgb(h: number, s: number, l: number): { r: number; g: numbe
   };
 }
 
-export default {
+/**
+ * Namespace object for consumers that prefer a single import over 13 named
+ * ones. The named exports above stay the primary entry point — they are what
+ * tree-shakes.
+ */
+const odsColorUtils = {
   getODSToken,
   getPlatformAccentColor,
   getCurrentPlatform,
@@ -399,5 +396,7 @@ export default {
   generatePlatformCSS,
   applyColorToken,
   interpolateColors,
-  usePlatformColors
+  usePlatformColors,
 };
+
+export default odsColorUtils;

@@ -1,8 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import {
-  QuickActionMarquee,
-  type QuickActionMarqueeItem,
-} from '../components/chat/quick-action-marquee'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { QuickActionMarquee, type QuickActionMarqueeItem } from '../components/chat/quick-action-marquee';
 
 // fae-row items (config glyphs tinted pink) and mingo-row items (tinted cyan) —
 // mirrors the Figma fae/mingo marquee rows.
@@ -13,7 +10,7 @@ const FAE_ITEMS: ReadonlyArray<QuickActionMarqueeItem> = [
   { id: 'remote-connection', label: 'Remote connection', icon: { name: 'rocket', accent: 'pink' } },
   { id: 'run-scripts', label: 'Run scripts', icon: { name: 'bracket-curly', accent: 'pink' } },
   { id: 'device-software', label: 'Device software', icon: { name: 'package', accent: 'pink' } },
-]
+];
 
 const MINGO_ITEMS: ReadonlyArray<QuickActionMarqueeItem> = [
   { id: 'roi', label: 'Calculate ROI', icon: { name: 'mingo' } },
@@ -22,7 +19,7 @@ const MINGO_ITEMS: ReadonlyArray<QuickActionMarqueeItem> = [
   { id: 'docs', label: 'Read docs', icon: { name: 'book', accent: 'cyan' } },
   { id: 'chat', label: 'Start a chat', icon: { name: 'chats', accent: 'cyan' } },
   { id: 'news', label: "What's new", icon: { name: 'newspaper', accent: 'cyan' } },
-]
+];
 
 const meta: Meta<typeof QuickActionMarquee> = {
   title: 'Chat/QuickActionMarquee',
@@ -44,43 +41,43 @@ const meta: Meta<typeof QuickActionMarquee> = {
     onSelect: { control: false },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div className="bg-ods-bg py-8">
         <Story />
       </div>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof QuickActionMarquee>
+export default meta;
+type Story = StoryObj<typeof QuickActionMarquee>;
 
 /** Single fae row scrolling left, interactive chips. */
 export const Default: Story = {
   args: {
     items: FAE_ITEMS,
-    onSelect: (item) => console.log('select', item.id),
+    onSelect: item => console.log('select', item.id),
   },
-}
+};
 
 /** The two Figma rows: fae (left) over mingo (right, reversed). */
 export const TwoRows: Story = {
   render: () => (
     <div className="flex flex-col gap-[var(--spacing-system-mf)]">
-      <QuickActionMarquee items={FAE_ITEMS} direction="left" onSelect={(i) => console.log(i.id)} />
-      <QuickActionMarquee items={MINGO_ITEMS} direction="right" onSelect={(i) => console.log(i.id)} />
+      <QuickActionMarquee items={FAE_ITEMS} direction="left" onSelect={i => console.log(i.id)} />
+      <QuickActionMarquee items={MINGO_ITEMS} direction="right" onSelect={i => console.log(i.id)} />
     </div>
   ),
-}
+};
 
 /** Reversed scroll direction. */
 export const ScrollRight: Story = {
   args: {
     items: MINGO_ITEMS,
     direction: 'right',
-    onSelect: (item) => console.log('select', item.id),
+    onSelect: item => console.log('select', item.id),
   },
-}
+};
 
 /**
  * No `onSelect` → chips render as plain, non-focusable tags (decorative
@@ -90,7 +87,7 @@ export const Decorative: Story = {
   args: {
     items: FAE_ITEMS,
   },
-}
+};
 
 /**
  * Fewer than 12 items — the track is auto-repeated up to the `minChips`
@@ -100,9 +97,9 @@ export const Decorative: Story = {
 export const FewItems: Story = {
   args: {
     items: FAE_ITEMS.slice(0, 2),
-    onSelect: (item) => console.log('select', item.id),
+    onSelect: item => console.log('select', item.id),
   },
-}
+};
 
 /** Faster scroll (`speed={120}` px/s) and hover-pause disabled. */
 export const FastNoPause: Story = {
@@ -110,6 +107,6 @@ export const FastNoPause: Story = {
     items: FAE_ITEMS,
     speed: 120,
     pauseOnHover: false,
-    onSelect: (item) => console.log('select', item.id),
+    onSelect: item => console.log('select', item.id),
   },
-}
+};

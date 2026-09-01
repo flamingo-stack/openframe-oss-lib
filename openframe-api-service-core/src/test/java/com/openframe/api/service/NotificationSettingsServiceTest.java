@@ -2,6 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.NotificationSettingsView;
 import com.openframe.api.dto.NotificationTypeSetting;
+import com.openframe.api.dto.NotificationTypeSettingInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSettings;
@@ -17,6 +18,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -60,9 +62,62 @@ class NotificationSettingsServiceTest {
 
         NotificationSettingsView view = service.get("user-1");
 
-        assertThat(view.getTypeSettings()).contains(
-                new NotificationTypeSetting(NotificationSettingGroup.MINGO_MESSAGES, false),
-                new NotificationTypeSetting(NotificationSettingGroup.TICKET_ASSIGNED, true));
+        assertThat(view.getTypeSettings())
+                .extracting(NotificationTypeSetting::getGroup, NotificationTypeSetting::isEnabled)
+                .contains(tuple(NotificationSettingGroup.MINGO_MESSAGES, false),
+                        tuple(NotificationSettingGroup.TICKET_ASSIGNED, true));
+    }
+
+    @Test
+    @DisplayName("Given any read, when the groups come back, then each one carries its checkbox caption in declaration order — the modal renders the response as-is instead of mapping the enum client-side")
+    void every_group_carries_its_label_in_render_order() {
+        when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
+
+        NotificationSettingsView view = service.get("user-1");
+
+        assertThat(view.getTypeSettings())
+                .extracting(NotificationTypeSetting::getGroup, NotificationTypeSetting::getLabel)
+                .containsExactly(
+                        tuple(NotificationSettingGroup.TICKET_ASSIGNED, "Ticket assigned"),
+                        tuple(NotificationSettingGroup.TICKET_CREATED, "Ticket created"),
+                        tuple(NotificationSettingGroup.TICKET_STATUS_CHANGED, "Ticket status changed"),
+                        tuple(NotificationSettingGroup.CUSTOMER_REPLIED, "Customer replied"),
+                        tuple(NotificationSettingGroup.ADMIN_REPLIED, "Admin replied"),
+                        tuple(NotificationSettingGroup.MINGO_MESSAGES, "New messages from Mingo"),
+                        tuple(NotificationSettingGroup.APPROVAL_TICKET, "Approval required ticket"),
+                        tuple(NotificationSettingGroup.APPROVAL_MINGO, "Approval required Mingo"));
+    }
+
+    @Test
+    @DisplayName("Given the ticket-created checkbox is muted, when settings are read, then only that group comes back disabled — a client opening a ticket is silenceable on its own, without touching the other ticket checkboxes")
+    void ticket_created_group_mutes_independently() {
+        when(repository.findByUserId("user-1")).thenReturn(Optional.of(NotificationSettings.builder()
+                .userId("user-1").enabled(true)
+                .mutedGroups(Set.of(NotificationSettingGroup.TICKET_CREATED))
+                .build()));
+
+        NotificationSettingsView view = service.get("user-1");
+
+        assertThat(view.getTypeSettings())
+                .extracting(NotificationTypeSetting::getGroup, NotificationTypeSetting::isEnabled)
+                .contains(tuple(NotificationSettingGroup.TICKET_CREATED, false),
+                        tuple(NotificationSettingGroup.TICKET_ASSIGNED, true),
+                        tuple(NotificationSettingGroup.TICKET_STATUS_CHANGED, true));
+    }
+
+    @Test
+    @DisplayName("Given the ticket-created checkbox is turned off, when settings are updated, then it is the entry persisted as muted — the new group survives a write round-trip like any other")
+    void ticket_created_group_persists_through_update() {
+        when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
+
+        service.update("user-1", true, List.of(
+                new NotificationTypeSettingInput(NotificationSettingGroup.TICKET_CREATED, false),
+                new NotificationTypeSettingInput(NotificationSettingGroup.TICKET_ASSIGNED, true)));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Set<NotificationSettingGroup>> muted = ArgumentCaptor.forClass(Set.class);
+        verify(repository).saveSettings(eq("user-1"), eq(true), muted.capture());
+        assertThat(muted.getValue()).containsExactly(NotificationSettingGroup.TICKET_CREATED);
     }
 
     @Test
@@ -72,8 +127,8 @@ class NotificationSettingsServiceTest {
                 .userId("user-1").enabled(false).build()));
 
         NotificationSettingsView view = service.update("user-1", false, List.of(
-                new NotificationTypeSetting(NotificationSettingGroup.APPROVAL_MINGO, false),
-                new NotificationTypeSetting(NotificationSettingGroup.TICKET_ASSIGNED, true)));
+                new NotificationTypeSettingInput(NotificationSettingGroup.APPROVAL_MINGO, false),
+                new NotificationTypeSettingInput(NotificationSettingGroup.TICKET_ASSIGNED, true)));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Set<NotificationSettingGroup>> muted = ArgumentCaptor.forClass(Set.class);
@@ -88,7 +143,7 @@ class NotificationSettingsServiceTest {
         when(repository.findByUserId("user-1")).thenReturn(Optional.empty());
 
         service.update("user-1", true,
-                List.of(new NotificationTypeSetting(NotificationSettingGroup.MINGO_MESSAGES, true)));
+                List.of(new NotificationTypeSettingInput(NotificationSettingGroup.MINGO_MESSAGES, true)));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Set<NotificationSettingGroup>> muted = ArgumentCaptor.forClass(Set.class);
@@ -109,8 +164,8 @@ class NotificationSettingsServiceTest {
     @Test
     @DisplayName("Given a typeSettings entry without a group, when updating, then BadRequestException — an override must name its checkbox")
     void groupless_override_is_rejected() {
-        List<NotificationTypeSetting> broken =
-                List.of(new NotificationTypeSetting(null, false));
+        List<NotificationTypeSettingInput> broken =
+                List.of(new NotificationTypeSettingInput(null, false));
 
         assertThatThrownBy(() -> service.update("user-1", true, broken))
                 .isInstanceOf(BadRequestException.class);

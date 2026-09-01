@@ -1,20 +1,14 @@
-// Stub API hooks
-import { useState, useEffect } from 'react';
+// Stub API hooks — no fetching yet. Kept so consuming apps can wire the call
+// sites before the real implementation lands.
+const NO_CATEGORIES: readonly never[] = Object.freeze([]);
+const NO_VENDORS: readonly never[] = Object.freeze([]);
 
 export function useCategories() {
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  return { categories, loading, error };
+  return { categories: NO_CATEGORIES, loading: false, error: null };
 }
 
 export function useVendors() {
-  const [vendors, setVendors] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  return { vendors, loading, error };
+  return { vendors: NO_VENDORS, loading: false, error: null };
 }
 
 export function useSubcategoryCountByCategory() {

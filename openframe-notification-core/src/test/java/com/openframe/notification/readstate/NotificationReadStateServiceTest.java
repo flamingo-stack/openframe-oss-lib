@@ -13,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -66,7 +69,7 @@ class NotificationReadStateServiceTest {
     void mark_all_as_read_publishes_one_bulk_event() {
         when(repository.findByRecipientIdAndRecipientTypeAndStatus(ALICE, U, ReadStatus.UNREAD))
                 .thenReturn(List.of(row(ALICE, U, "n-1", ReadStatus.UNREAD), row(ALICE, U, "n-2", ReadStatus.UNREAD)));
-        when(repository.markAllAsRead(ALICE, U)).thenReturn(2L);
+        when(repository.markAsReadByIds(any(), eq(ALICE), eq(U), anyCollection())).thenReturn(2L);
 
         assertThat(service.markAllAsRead(ALICE, U)).isEqualTo(2L);
 
@@ -80,7 +83,6 @@ class NotificationReadStateServiceTest {
     void mark_all_as_read_with_nothing_unread_stays_silent() {
         when(repository.findByRecipientIdAndRecipientTypeAndStatus(ALICE, U, ReadStatus.UNREAD))
                 .thenReturn(List.of());
-        when(repository.markAllAsRead(ALICE, U)).thenReturn(0L);
 
         assertThat(service.markAllAsRead(ALICE, U)).isZero();
 
@@ -104,7 +106,7 @@ class NotificationReadStateServiceTest {
     void delete_all_read_publishes_one_bulk_event() {
         when(repository.findByRecipientIdAndRecipientTypeAndStatus(ALICE, U, ReadStatus.READ))
                 .thenReturn(List.of(row(ALICE, U, "n-3", ReadStatus.READ)));
-        when(repository.softDeleteAllRead(ALICE, U)).thenReturn(1L);
+        when(repository.softDeleteByIds(any(), eq(ALICE), eq(U), anyCollection())).thenReturn(1L);
 
         assertThat(service.deleteAllRead(ALICE, U)).isEqualTo(1L);
 

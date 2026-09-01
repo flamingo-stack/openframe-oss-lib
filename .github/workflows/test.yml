@@ -102,17 +102,52 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          # Caches ~/.npm so a run does not re-download the whole tree.
+          # Keyed on package.json, NOT package-lock.json: this repo ignores
+          # lockfiles (.gitignore), so none is committed and pointing the key at
+          # one fails the step outright with "paths were not resolved".
+          cache: npm
+          cache-dependency-path: ${{ matrix.path }}/package.json
 
+      # `install`, not `ci`: `npm ci` requires a committed lockfile and this
+      # repo has none. The consequence is that CI resolves dependencies afresh
+      # and can test a different tree than a developer has — worth fixing, but
+      # by committing lockfiles, which is a repo-wide policy call.
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
         run: npm install
 
+      # Config smoke first: it is ~1s and a broken eslint config makes every
+      # lint result below meaningless rather than failing honestly.
+      - name: Lint Config Smoke
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm run lint:config-smoke
+
+      # No `continue-on-error` — a failing tsc MUST block the merge.
       - name: Type Check
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
         run: npm run type-check
-        continue-on-error: true
+
+      - name: Lint
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm run lint
+
+      # Separate step, not folded into Lint: it needs a TypeScript program and
+      # an 8 GB heap, and it is the slowest check in the job. Keeping it apart
+      # makes a failure legible at a glance and lets the fast pass fail early.
+      - name: Lint (type-aware)
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm run lint:types
+
+      - name: Format
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm run format
 
       - name: Test
         if: steps.should_run.outputs.run == 'true'
@@ -139,6 +174,56 @@ jobs:
         run: |
           npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
           npm publish --tag "pr-${{ github.event.pull_request.number }}" --ignore-scripts
+
+
+  # `lint:cycles` gets its OWN job, purely for wall-clock. It is graph-wide —
+  # a cycle is a property of the whole import graph, so it cannot be cached or
+  # narrowed to a diff — and on this runner it takes longer than every other
+  # step in `test-node` put together. Run sequentially it made a PR's checks
+  # ~16 min; run in parallel the two jobs overlap and the wall clock is roughly
+  # this job alone. The price is a second `npm install`: about a minute of
+  # machine time, none of it wall time.
+  #
+  # Keep it a REQUIRED check (it is in `all-checks` below). It sat misconfigured
+  # and reporting zero for months while a real cycle was in the tree, so a
+  # cheaper-looking arrangement that quietly drops it is the one thing to avoid.
+  test-node-cycles:
+    name: Test Node Cycles (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    needs: [changes]
+    env:
+      NPM_CONFIG_FETCH_TIMEOUT: 30000
+      NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 15000
+      NPM_CONFIG_LOGLEVEL: http
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.changes.outputs.node_matrix) }}
+
+    steps:
+      - name: Check if should run
+        id: should_run
+        run: echo "run=${{ fromJSON(needs.changes.outputs.changes || '{}')[matrix.name] == 'true' }}" >> $GITHUB_OUTPUT
+
+      - uses: actions/checkout@v4
+        if: steps.should_run.outputs.run == 'true'
+
+      - name: Setup Node.js
+        if: steps.should_run.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.path }}/package.json
+
+      - name: Install Dependencies
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm install
+
+      - name: Lint (import cycles)
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm run lint:cycles
 
 
   test-rust:
@@ -228,7 +313,7 @@ jobs:
 
   all-checks:
     name: "All Checks"
-    needs: [changes, test-java, test-node, test-rust]
+    needs: [changes, test-java, test-node, test-node-cycles, test-rust]
     runs-on: ubuntu-latest
     if: |
       always() && 

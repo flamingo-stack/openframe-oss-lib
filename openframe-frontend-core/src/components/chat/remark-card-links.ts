@@ -21,9 +21,9 @@
  * `customer-interview` if a future config switches conventions).
  */
 
-import type { Plugin } from "unified"
-import type { Root, Text, Link } from "mdast"
-import { visit, SKIP } from "unist-util-visit"
+import type { Root, Text, Link } from 'mdast';
+import type { Plugin } from 'unified';
+import { visit, SKIP } from 'unist-util-visit';
 
 // Closing bracket is `]` per spec, but tolerate `)` as well — the LLM
 // occasionally drifts to `)` after long dashed UUID ids (bracket-balancing
@@ -32,52 +32,52 @@ import { visit, SKIP } from "unist-util-visit"
 // treat trailing `)` as `]`. `[card://type:id)` is not valid markdown
 // syntax anywhere else (regular links use `[text](url)`, not `[text)`),
 // so widening the closer has zero false-positive risk.
-const CARD_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g
+const CARD_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g;
 
 export const remarkCardLinks: Plugin<[], Root> = () => {
   return (tree: Root) => {
-    visit(tree, "text", (node: Text, index, parent) => {
-      if (!parent || typeof index !== "number") return
-      const text = node.value
-      if (!text || !text.includes("[card://")) return
+    visit(tree, 'text', (node: Text, index, parent) => {
+      if (!parent || typeof index !== 'number') return undefined;
+      const text = node.value;
+      if (!text || !text.includes('[card://')) return undefined;
 
       // Walk the regex and split the text into a sequence of text + link nodes.
       // The link's `children` carry the original literal so unresolved-marker
       // fallbacks (host renderer produced nothing) render the literal text
       // instead of a broken anchor.
-      const parts: Array<Text | Link> = []
-      let lastIndex = 0
+      const parts: Array<Text | Link> = [];
+      let lastIndex = 0;
       // Reset the regex lastIndex for each invocation — `g` flag carries state.
-      CARD_REGEX.lastIndex = 0
-      let match: RegExpExecArray | null
+      CARD_REGEX.lastIndex = 0;
+      let match: RegExpExecArray | null;
       while ((match = CARD_REGEX.exec(text)) !== null) {
-        const matchStart = match.index
+        const matchStart = match.index;
         if (matchStart > lastIndex) {
-          parts.push({ type: "text", value: text.slice(lastIndex, matchStart) })
+          parts.push({ type: 'text', value: text.slice(lastIndex, matchStart) });
         }
-        const cardType = match[1]
-        const cardId = match[2]
+        const cardType = match[1];
+        const cardId = match[2];
         parts.push({
-          type: "link",
+          type: 'link',
           url: `card://${cardType}:${cardId}`,
           // Keep the raw marker as the visible text so unknown-ref renderers
           // can fall back to title-only formatting (the chat-side override
           // looks up refs by url and replaces children when found).
-          children: [{ type: "text", value: match[0] }],
-        })
-        lastIndex = matchStart + match[0].length
+          children: [{ type: 'text', value: match[0] }],
+        });
+        lastIndex = matchStart + match[0].length;
       }
-      if (lastIndex === 0) return // no matches
+      if (lastIndex === 0) return undefined; // no matches
 
       if (lastIndex < text.length) {
-        parts.push({ type: "text", value: text.slice(lastIndex) })
+        parts.push({ type: 'text', value: text.slice(lastIndex) });
       }
 
       // Replace the original text node in-place. Skip past the inserted nodes
       // so the visitor doesn't recurse into them (the new text leaves can't
       // contain the marker by construction; skipping is a safety net).
-      parent.children.splice(index, 1, ...parts)
-      return [SKIP, index + parts.length]
-    })
-  }
-}
+      parent.children.splice(index, 1, ...parts);
+      return [SKIP, index + parts.length];
+    });
+  };
+};

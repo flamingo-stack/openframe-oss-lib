@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.openframe.data.cassandra.model.CommandResult;
 import com.openframe.data.cassandra.repository.CommandResultRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.stream.handler.rmm.CommandResultCassandraMessageHandler;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

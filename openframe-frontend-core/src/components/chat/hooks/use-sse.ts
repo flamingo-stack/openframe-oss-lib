@@ -1,9 +1,9 @@
-'use client'
+'use client';
 
-import { useState, useCallback, useRef } from 'react'
-import type { MessageSegment } from '../types/message.types'
-import type { WireCommandOverride } from '../utils/slash-dispatch-utils'
-import type { ChatAttachment } from '../utils/chat-attachment-markdown'
+import { useState, useCallback, useRef } from 'react';
+import type { MessageSegment } from '../types/message.types';
+import type { ChatAttachment } from '../utils/chat-attachment-markdown';
+import type { WireCommandOverride } from '../utils/slash-dispatch-utils';
 
 /**
  * Stream function signature. The optional `signal` is created fresh per
@@ -17,7 +17,7 @@ import type { ChatAttachment } from '../utils/chat-attachment-markdown'
  * future per-call wire fields don't bloat the signature.
  */
 export interface StreamFnExtraOptions {
-  commandOverride?: WireCommandOverride
+  commandOverride?: WireCommandOverride;
   /** Out-of-band signal for the post-approval / post-reject
    *  server-driven turn. When set, the streamFn routes to
    *  `/api/chat/agent/confirm-tool` instead of `/api/docs/chat` and
@@ -29,9 +29,9 @@ export interface StreamFnExtraOptions {
    *  frames into a NEW assistant turn. The CLIENT does not orchestrate
    *  the auto-continuation; it just renders frames. */
   approvalAction?: {
-    proposalId: string
-    action: 'approve' | 'reject'
-  }
+    proposalId: string;
+    action: 'approve' | 'reject';
+  };
   /** Chat-attachment payload riding alongside the user's text — the
    *  staged attachments produced by `useChatAttachments`. Server-side,
    *  `runDocsChat` strips the embedded `/api/storage/view/chat-attachments/...`
@@ -41,97 +41,91 @@ export interface StreamFnExtraOptions {
    *  Wire format: `storagePath` + `viewToken` only — NEVER a `url`
    *  field. Server validates against `ChatAttachmentSchema` and rejects
    *  malformed shapes. */
-  pendingAttachments?: ChatAttachment[]
+  pendingAttachments?: ChatAttachment[];
 }
 export type StreamFn = (
   message: string,
   signal?: AbortSignal,
   extra?: StreamFnExtraOptions,
-) => AsyncGenerator<MessageSegment>
+) => AsyncGenerator<MessageSegment>;
 
 interface UseSSEOptions {
-  useMock?: boolean
-  debugMode?: boolean
+  useMock?: boolean;
+  debugMode?: boolean;
   /** Custom stream function — when provided, bypasses the mock fallback */
-  streamFn?: StreamFn
+  streamFn?: StreamFn;
 }
 
-export function useSSE({ useMock = true, debugMode = false, streamFn }: UseSSEOptions = {}) {
-  const [isStreaming, setIsStreaming] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
-
-  // Lib-side mock fallback — useDocChat ALWAYS sets `useMock: false`,
-  // so this path is unreachable in production usage. Kept as a clear
-  // error so any future caller that flips `useMock: true` without
-  // providing a `streamFn` gets a loud signal instead of a silent
-  // misroute. Hub-side wrappers that need the mock can supply their
-  // own streamFn from a MockChatService.
-  const fallbackStream = useCallback(async function* (): AsyncGenerator<MessageSegment> {
-    throw new Error(
-      '[useSSE] No streamFn provided and `useMock: true` is no longer wired into the lib. ' +
-        'Supply a `streamFn` (see `createDocStreamFn` in use-embedded-chat) or migrate the ' +
-        'mock to your host code.',
-    )
-  }, [])
+export function useSSE({ streamFn }: UseSSEOptions = {}) {
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const streamMessage = useCallback(
-    async function* (
-      message: string,
-      extra?: StreamFnExtraOptions,
-    ): AsyncGenerator<MessageSegment> {
-      setIsStreaming(true)
-      setError(null)
+    async function* (message: string, extra?: StreamFnExtraOptions): AsyncGenerator<MessageSegment> {
+      setIsStreaming(true);
+      setError(null);
 
       // Create a fresh AbortController for this stream. abort() targets it via
       // the ref; the signal is passed THROUGH to streamFn so the underlying
       // fetch (and Anthropic upstream) terminates on Stop.
-      const ctrl = new AbortController()
-      abortControllerRef.current = ctrl
+      const ctrl = new AbortController();
+      abortControllerRef.current = ctrl;
 
       try {
-        const generator = streamFn
-          ? streamFn(message, ctrl.signal, extra)
-          : fallbackStream()
+        // Lib-side mock fallback — useDocChat ALWAYS sets `useMock: false`,
+        // so this path is unreachable in production usage. Kept as a clear
+        // error so any future caller that flips `useMock: true` without
+        // providing a `streamFn` gets a loud signal instead of a silent
+        // misroute. Hub-side wrappers that need the mock can supply their
+        // own streamFn from a MockChatService.
+        if (!streamFn) {
+          throw new Error(
+            '[useSSE] No streamFn provided and `useMock: true` is no longer wired into the lib. ' +
+              'Supply a `streamFn` (see `createDocStreamFn` in use-embedded-chat) or migrate the ' +
+              'mock to your host code.',
+          );
+        }
+        const generator = streamFn(message, ctrl.signal, extra);
 
         for await (const chunk of generator) {
           // Check if aborted
           if (ctrl.signal.aborted) {
-            break
+            break;
           }
-          yield chunk
+          yield chunk;
         }
       } catch (err) {
         // AbortError on user-initiated stop is expected — surface as a no-error
         // path so the consumer's catch doesn't render a red error message.
-        if ((err as any)?.name === 'AbortError' || ctrl.signal.aborted) {
-          return
+        if ((err instanceof Error && err.name === 'AbortError') || ctrl.signal.aborted) {
+          return;
         }
-        const errorMessage = err instanceof Error ? err.message : 'An error occurred'
-        setError(errorMessage)
-        throw err
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+        setError(errorMessage);
+        throw err;
       } finally {
-        setIsStreaming(false)
+        setIsStreaming(false);
         // Only clear the ref if it still points at this controller (defensive
         // — a rapid send-stop-send sequence might have already replaced it).
         if (abortControllerRef.current === ctrl) {
-          abortControllerRef.current = null
+          abortControllerRef.current = null;
         }
       }
     },
-    [streamFn, fallbackStream],
-  )
+    [streamFn],
+  );
 
   const abort = useCallback(() => {
     if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
+      abortControllerRef.current.abort();
     }
-    setIsStreaming(false)
-  }, [])
+    setIsStreaming(false);
+  }, []);
 
   const reset = useCallback(() => {
     // Reset state if needed
-  }, [])
+  }, []);
 
   return {
     streamMessage,
@@ -139,5 +133,5 @@ export function useSSE({ useMock = true, debugMode = false, streamFn }: UseSSEOp
     error,
     abort,
     reset,
-  }
+  };
 }

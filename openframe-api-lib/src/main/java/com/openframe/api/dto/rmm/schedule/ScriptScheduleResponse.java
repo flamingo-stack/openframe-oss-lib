@@ -1,11 +1,12 @@
 package com.openframe.api.dto.rmm.schedule;
 
-import com.openframe.data.document.rmm.OsType;
-import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
-import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
-import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Builder;
 import lombok.Data;
@@ -36,7 +37,11 @@ public class ScriptScheduleResponse {
 
     private ScheduleDeviceCriteria deviceCriteria;
 
-    private ScriptScheduleTrigger trigger;
+    private ScheduleScriptTrigger trigger;
+
+    private ScheduleOfflineBehavior offlineBehavior;
+
+    private Long reconnectWindowSeconds;
 
     private Instant startAt;
     private Long repeat;

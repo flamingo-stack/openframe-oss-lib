@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Customer-scoped ticket list — wraps `POST /api/chat/agent/find-ticket`.
@@ -19,22 +19,22 @@
  * after every mutation so all slots refresh together.
  */
 
-import { useQuery } from '@tanstack/react-query'
-import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
-import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
-import type { TicketData } from '../types'
+import { useQuery } from '@tanstack/react-query';
+import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import type { TicketData } from '../types';
 
-const FIND_TICKET_ENDPOINT = '/api/chat/agent/find-ticket'
-const DEFAULT_PAGE_SIZE = 20
+const FIND_TICKET_ENDPOINT = '/api/chat/agent/find-ticket';
+const DEFAULT_PAGE_SIZE = 20;
 
 interface FindTicketResponse {
-  tickets?: TicketData[]
-  count?: number
-  totalCount?: number
-  page?: number
-  pageSize?: number
-  totalPages?: number
-  scope?: 'self' | 'all'
+  tickets?: TicketData[];
+  count?: number;
+  totalCount?: number;
+  page?: number;
+  pageSize?: number;
+  totalPages?: number;
+  scope?: 'self' | 'all';
 }
 
 export interface UseTicketsListFilters {
@@ -48,66 +48,65 @@ export interface UseTicketsListFilters {
    *  conditional fell through to `!hasResults` → EmptyState flashed
    *  before the tickets fetch fired. Drilling `customerEmail` in
    *  from the parent makes the loading state monotonic. */
-  customerEmail: string
+  customerEmail: string;
   /** Free-text query — server runs FTS on `search_vector`. Empty → no
    *  search filter (self-scoped "list all my tickets"). */
-  search?: string
+  search?: string;
   /** Canonical 'open' | 'closed'. Server maps to the underlying mirror
    *  status column. Empty / 'all' → no status filter. */
-  status?: string
+  status?: string;
   /** 1-based page number. Defaults to 1. */
-  page?: number
+  page?: number;
   /** Items per page (server caps at 100). Defaults to 20. */
-  pageSize?: number
+  pageSize?: number;
 }
 
 export interface UseTicketsListReturn {
-  tickets: TicketData[]
-  isLoading: boolean
-  isFetching: boolean
-  error: Error | null
-  refetch: () => void
+  tickets: TicketData[];
+  isLoading: boolean;
+  isFetching: boolean;
+  error: Error | null;
+  refetch: () => void;
   /** Wall-clock timestamp of the last successful fetch; null while
    *  loading the first time. */
-  lastUpdatedAt: number | null
+  lastUpdatedAt: number | null;
   /** Total ticket count across all pages (NOT just the current page).
    *  Drives the `<UnifiedPagination>` total-pages calculation. */
-  totalCount: number
+  totalCount: number;
   /** 1-based current page (echoed from the server response so the URL
    *  and the rendered set always agree). */
-  page: number
+  page: number;
   /** Page size in use — echoed from the server (capped at 100). */
-  pageSize: number
+  pageSize: number;
   /** Pre-computed `Math.ceil(totalCount / pageSize)` clamped to ≥1 so
    *  the pagination renders "1 / 1" instead of "1 / 0" on empty
    *  result sets. */
-  totalPages: number
+  totalPages: number;
 }
 
 export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListReturn {
   // Endpoint from the runtime config (like every other endpoint) so embedders
   // behind a reverse proxy route it through `/content/*`; falls back to the bare
   // hub path when unconfigured.
-  const findTicketEndpoint =
-    useRequiredChatRuntime().endpoints.findTicketUrl ?? FIND_TICKET_ENDPOINT
-  const customerEmail = filters.customerEmail
-  const search = (filters.search ?? '').trim()
-  const status = (filters.status ?? '').trim().toLowerCase()
-  const statusFilter = status && status !== 'all' ? status : ''
-  const page = Math.max(1, Math.floor(filters.page ?? 1) || 1)
-  const pageSize = Math.max(1, Math.min(100, Math.floor(filters.pageSize ?? DEFAULT_PAGE_SIZE) || DEFAULT_PAGE_SIZE))
+  const findTicketEndpoint = useRequiredChatRuntime().endpoints.findTicketUrl ?? FIND_TICKET_ENDPOINT;
+  const customerEmail = filters.customerEmail;
+  const search = (filters.search ?? '').trim();
+  const status = (filters.status ?? '').trim().toLowerCase();
+  const statusFilter = status && status !== 'all' ? status : '';
+  const page = Math.max(1, Math.floor(filters.page ?? 1) || 1);
+  const pageSize = Math.max(1, Math.min(100, Math.floor(filters.pageSize ?? DEFAULT_PAGE_SIZE) || DEFAULT_PAGE_SIZE));
 
   // `customerEmail` is the source of truth — parent (HelpCenterList)
   // already gates on `identity.user?.email` being truthy before
   // mounting the consumer of this hook. An empty string here means
   // the consumer was mounted incorrectly (developer error); the
   // query stays disabled.
-  const enabled = !!customerEmail
+  const enabled = !!customerEmail;
 
   // Identity-keyed cache: admin swaps proxy creds in /debug mid-session
   // → new key from the parent → new cache slot → no flash of the
   // previous identity's data.
-  const identityKey = customerEmail || 'anon'
+  const identityKey = customerEmail || 'anon';
 
   const query = useQuery({
     queryKey: ['tickets', 'self', identityKey, search, statusFilter, page, pageSize],
@@ -128,25 +127,25 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
         query: search,
         page,
         pageSize,
-      }
-      if (statusFilter) body.status = statusFilter
+      };
+      if (statusFilter) body.status = statusFilter;
       const response = await embedAuthedFetch(findTicketEndpoint, {
         method: 'POST',
         body: JSON.stringify(body),
-      })
+      });
       if (!response.ok) {
-        const text = await response.text().catch(() => '')
-        throw new Error(`find-ticket failed: ${response.status} ${text.slice(0, 200)}`)
+        const text = await response.text().catch(() => '');
+        throw new Error(`find-ticket failed: ${response.status} ${text.slice(0, 200)}`);
       }
-      return (await response.json()) as FindTicketResponse
+      return (await response.json()) as FindTicketResponse;
     },
-  })
+  });
 
-  const data = query.data
-  const totalCount = data?.totalCount ?? data?.count ?? (data?.tickets?.length ?? 0)
-  const echoedPage = data?.page ?? page
-  const echoedPageSize = data?.pageSize ?? pageSize
-  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(totalCount / echoedPageSize))
+  const data = query.data;
+  const totalCount = data?.totalCount ?? data?.count ?? data?.tickets?.length ?? 0;
+  const echoedPage = data?.page ?? page;
+  const echoedPageSize = data?.pageSize ?? pageSize;
+  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(totalCount / echoedPageSize));
 
   return {
     tickets: data?.tickets ?? [],
@@ -171,19 +170,16 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
     //   - Background refetch with existing data: data !== undefined → no load
     //   - Filter-change refetch landing on empty results: data?.tickets===[]
     //     + isFetching → bridge skeleton (the `||` branch)
-    isLoading:
-      enabled &&
-      (data === undefined ||
-        (query.isFetching && (data?.tickets ?? []).length === 0)),
+    isLoading: enabled && (data === undefined || (query.isFetching && (data?.tickets ?? []).length === 0)),
     isFetching: query.isFetching,
-    error: (query.error as Error | null) ?? null,
+    error: query.error ?? null,
     refetch: () => {
-      void query.refetch()
+      void query.refetch();
     },
     lastUpdatedAt: query.dataUpdatedAt || null,
     totalCount,
     page: echoedPage,
     pageSize: echoedPageSize,
     totalPages,
-  }
+  };
 }

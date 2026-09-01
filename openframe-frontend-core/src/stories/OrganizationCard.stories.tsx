@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { Trash2, DollarSign, Server } from 'lucide-react'
-import { OrganizationCard, type Organization } from '../components/ui/organization-card'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Trash2, DollarSign, Server } from 'lucide-react';
+import { OrganizationCard, type Organization } from '../components/ui/organization-card';
 
 const meta = {
   title: 'UI/OrganizationCard',
@@ -8,7 +8,8 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'A card component for displaying organizations with logo, description, stats, and optional link navigation.',
+        component:
+          'A card component for displaying organizations with logo, description, stats, and optional link navigation.',
       },
     },
   },
@@ -35,10 +36,10 @@ const meta = {
       description: 'Show action button in top-right',
     },
   },
-} satisfies Meta<typeof OrganizationCard>
+} satisfies Meta<typeof OrganizationCard>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 const baseOrg: Organization = {
   id: '1',
@@ -48,7 +49,7 @@ const baseOrg: Organization = {
   totalDevices: 142,
   activeDevices: 138,
   mrrUsd: 12500,
-}
+};
 
 /**
  * Default organization card.
@@ -57,7 +58,7 @@ export const Default: Story = {
   args: {
     organization: baseOrg,
   },
-}
+};
 
 /**
  * Card with an organization logo image.
@@ -71,7 +72,7 @@ export const WithImage: Story = {
     href: '/organizations/details/1',
     deviceCount: 142,
   },
-}
+};
 
 /**
  * Card as a clickable link.
@@ -81,7 +82,7 @@ export const WithLink: Story = {
     organization: baseOrg,
     href: '/organizations/details/1',
   },
-}
+};
 
 /**
  * Card with device count badge.
@@ -92,7 +93,7 @@ export const WithDeviceCount: Story = {
     href: '/organizations/details/1',
     deviceCount: 142,
   },
-}
+};
 
 /**
  * Card with footer stats.
@@ -106,7 +107,7 @@ export const WithFooterStats: Story = {
       { icon: <DollarSign className="h-4 w-4 text-ods-text-secondary" />, value: '$12,500', label: 'MRR' },
     ],
   },
-}
+};
 
 /**
  * Card with action button.
@@ -118,10 +119,10 @@ export const WithActionButton: Story = {
     actionButton: {
       icon: <Trash2 className="h-4 w-4" />,
       label: 'Remove',
-      onClick: (org) => console.log('Remove:', org.id),
+      onClick: org => console.log('Remove:', org.id),
     },
   },
-}
+};
 
 /**
  * Card with primary action button variant.
@@ -133,11 +134,11 @@ export const WithPrimaryAction: Story = {
     actionButton: {
       icon: <Server className="h-4 w-4" />,
       label: 'Deploy',
-      onClick: (org) => console.log('Deploy:', org.id),
+      onClick: org => console.log('Deploy:', org.id),
       variant: 'primary',
     },
   },
-}
+};
 
 /**
  * Minimal card with just a name.
@@ -149,7 +150,7 @@ export const Minimal: Story = {
       name: 'Startup Inc',
     },
   },
-}
+};
 
 /**
  * Card without description.
@@ -165,7 +166,7 @@ export const NoDescription: Story = {
     href: '/organizations/details/3',
     deviceCount: 57,
   },
-}
+};
 
 /**
  * Card with custom footer.
@@ -175,9 +176,9 @@ export const WithCustomFooter: Story = {
     organization: baseOrg,
     href: '/organizations/details/1',
     customFooter: (
-      <div className="flex items-center gap-2 pt-2 border-t border-ods-border">
+      <div className="flex items-center gap-2 border-t border-ods-border pt-2">
         <span className="text-sm text-ods-text-secondary">Custom footer content</span>
       </div>
     ),
   },
-}
+};

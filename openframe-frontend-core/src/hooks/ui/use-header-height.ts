@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 
 /**
  * Returns the combined height (px) of the sticky page header and announcement
@@ -20,53 +20,53 @@ export function useHeaderHeight(
      * document-wide MutationObserver + forced reflow).
      * @default true
      */
-    enabled?: boolean
-  } = {}
+    enabled?: boolean;
+  } = {},
 ): number {
-  const { enabled = true } = options
-  const [height, setHeight] = useState(defaultHeight)
+  const { enabled = true } = options;
+  const [height, setHeight] = useState(defaultHeight);
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled) return undefined;
 
     const measure = () => {
-      let total = 0
-      const header = document.querySelector('header')
-      if (header) total += header.offsetHeight
-      const bar = document.querySelector('[data-announcement-bar]')
-      if (bar instanceof HTMLElement) total += bar.offsetHeight
-      setHeight(total > 0 ? total : defaultHeight)
-    }
+      let total = 0;
+      const header = document.querySelector('header');
+      if (header) total += header.offsetHeight;
+      const bar = document.querySelector('[data-announcement-bar]');
+      if (bar instanceof HTMLElement) total += bar.offsetHeight;
+      setHeight(total > 0 ? total : defaultHeight);
+    };
 
-    measure()
+    measure();
 
-    const resizeObserver = new ResizeObserver(measure)
-    const header = document.querySelector('header')
-    if (header) resizeObserver.observe(header)
-    const bar = document.querySelector('[data-announcement-bar]')
-    if (bar) resizeObserver.observe(bar)
+    const resizeObserver = new ResizeObserver(measure);
+    const header = document.querySelector('header');
+    if (header) resizeObserver.observe(header);
+    const bar = document.querySelector('[data-announcement-bar]');
+    if (bar) resizeObserver.observe(bar);
 
-    const mutationObserver = new MutationObserver((mutations) => {
+    const mutationObserver = new MutationObserver(mutations => {
       for (const mutation of mutations) {
         if (mutation.type === 'childList' || mutation.type === 'attributes') {
-          measure()
-          const newBar = document.querySelector('[data-announcement-bar]')
-          if (newBar) resizeObserver.observe(newBar)
+          measure();
+          const newBar = document.querySelector('[data-announcement-bar]');
+          if (newBar) resizeObserver.observe(newBar);
         }
       }
-    })
+    });
     mutationObserver.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
       attributeFilter: ['data-announcement-bar'],
-    })
+    });
 
     return () => {
-      resizeObserver.disconnect()
-      mutationObserver.disconnect()
-    }
-  }, [defaultHeight, enabled])
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    };
+  }, [defaultHeight, enabled]);
 
-  return height
+  return height;
 }

@@ -1,16 +1,16 @@
 // Utils exports - client-side only
-export { cn } from './cn'
+export { cn } from './cn';
 // Platform→domain SSOT lives in `../platform-domains` (single definition). Re-exported
 // here so existing `/utils` callers keep working; the new resolver/helpers
 // (getPlatformByHostname/hostOf/expandWwwApex/…) are exposed via the `/platform-domains`
 // subpath ONLY (one import surface for the new API).
-export { getPlatformProductionUrl, getAllPlatformBaseDomains } from '../platform-domains'
+export { getPlatformProductionUrl, getAllPlatformBaseDomains } from '../platform-domains';
 // Number / currency / byte / date formatters live in `./format` (single
 // source of truth). Re-exported here so existing callers that pull from
 // the barrel keep working without changing imports.
-export { formatDate, formatNumber, formatPrice, formatBytes } from './format'
+export { formatDate, formatNumber, formatPrice, formatBytes } from './format';
 // SVG path constants — re-exported here (server-safe) because icons-v2 has "use client"
-export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon'
+export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon';
 export {
   getPlatformAccentColor,
   getCurrentPlatform,
@@ -23,35 +23,43 @@ export {
   rgbToHex,
   deriveHoverColor,
   deriveActiveColor,
-} from './ods-color-utils'
-export { delay, generateRandomString, truncateString, deepClone, getSlackCommunityJoinUrl, serializeJsonLd } from './common'
-export { getBaseUrl } from '../utils/cn'
+} from './ods-color-utils';
+export {
+  errorMessage,
+  delay,
+  generateRandomString,
+  truncateString,
+  deepClone,
+  getSlackCommunityJoinUrl,
+  serializeJsonLd,
+} from './common';
+export { getBaseUrl } from '../utils/cn';
 // SEO title length budget — server-safe constant (SSOT). Consumed by the hub
 // (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
-export { SEO_TITLE_MAX_LENGTH } from './seo-title'
-export { SEO_DESCRIPTION_MAX_LENGTH } from './seo-description'
+export { SEO_TITLE_MAX_LENGTH } from './seo-title';
+export { SEO_DESCRIPTION_MAX_LENGTH } from './seo-description';
 
 // Brand silhouette SVG registry (CSS mask-image tinting) — centralized so
 // consumers (e.g. company-hub deck) don't ship their own copies of the marks.
-export * from './brand-marks'
-export * from './platform-config'
-export * from './os-platforms'
-export * from './access-code-client'
+export * from './brand-marks';
+export * from './platform-config';
+export * from './os-platforms';
+export * from './access-code-client';
 // Validation utilities
-export * from './validation-utils'
+export * from './validation-utils';
 // Note: format and date-utils are imported via cn.ts to avoid duplicates
 // AI confidence utilities
-export * from './confidence-helpers'
+export * from './confidence-helpers';
 // Release date formatting utilities
-export * from './date-formatters'
+export * from './date-formatters';
 // Product-release card helpers (lifted from the hub so every embedder gets the
 // rich card metadata): badge-color mapping + cover-image fallback resolution.
-export * from './release-badge'
-export * from './release-cover'
+export * from './release-badge';
+export * from './release-cover';
 // OG-placeholder fallback image — the lib-owned DEFAULT URL builder (replaces
 // the old per-embedder `ChatRuntime.resolvePlaceholderUrl` callback). Driven by
 // the runtime's base API URL; embedders override via `endpoints.ogPlaceholderUrl`.
-export * from './og-placeholder'
+export * from './og-placeholder';
 // Dev-center URL param keys — the ONE source for the `?search=` / `?status=` / … keys the
 // chrome registry writes and the list views read; re-exported so embedders (and the hub's
 // dev-section-url helper) build deep-links with the same keys instead of a bare literal.
@@ -61,7 +69,7 @@ export {
   type DevSectionAnchorKind,
   TICKET_OPEN_PARAM,
   buildTicketOpenHref,
-} from './dev-sections/dev-section-param-keys'
+} from './dev-sections/dev-section-param-keys';
 // Dynamic icon registry — single source of truth lives at
 // components/chat/utils/icon-registry. Re-exported here so existing
 // `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin
@@ -72,32 +80,32 @@ export {
   ICON_REGISTRY,
   getIconComponent,
   normalizeIconKey,
-} from '../components/chat/utils/icon-registry'
-export { getPlatformIconComponent as getPlatformLogo } from './platform-config'
+} from '../components/chat/utils/icon-registry';
+export { getPlatformIconComponent as getPlatformLogo } from './platform-config';
 // Tool type utilities
-export * from './tool-utils'
+export * from './tool-utils';
 // Shell type utilities
-export * from './shell-utils'
+export * from './shell-utils';
 // Video-bite element identity (id stamping + the ONE matching predicate) —
 // isomorphic; used by the admin bites editor AND the hub's Mux sweep/writers.
-export * from './video-bite-id'
+export * from './video-bite-id';
 // OS type utilities
-export * from './os-utils'
+export * from './os-utils';
 // Phone utilities
-export * from './country-phone-utils'
+export * from './country-phone-utils';
 // Generic domain detection
-export * from './generic-domain-utils'
+export * from './generic-domain-utils';
 
 // Color analysis (canvas-based image color extraction)
-export * from './color-analysis'
+export * from './color-analysis';
 
 // Announcement dismissal store (cookie SSOT; server-safe name/match helpers)
-export * from './announcement-storage'
+export * from './announcement-storage';
 // cookie id-match dismissal store (walkthrough video widget)
-export * from './dismiss-cookie'
-export * from './dismissal-storage'
+export * from './dismiss-cookie';
+export * from './dismissal-storage';
 // walkthrough deep-link query param (widget default + host URL minters)
-export * from './walkthrough-deep-link'
+export * from './walkthrough-deep-link';
 
 // Image-proxy URL builder (pure, runtime-configurable)
 export {
@@ -106,7 +114,7 @@ export {
   urlPathLooksLikeSvg,
   shouldProxyImage,
   generateImageSizes,
-} from './image-proxy'
+} from './image-proxy';
 
 // Number / byte / duration / time / UTC date / initials / metric /
 // trend / range / text helpers — single canonical home for every
@@ -145,7 +153,7 @@ export {
   formatBioText,
   formatClassification,
   formatPricingModel,
-} from './format'
+} from './format';
 
 // Date / time helpers (relative, absolute, range checks, UTC timestamp)
 export {
@@ -158,31 +166,23 @@ export {
   createUTCTimestamp,
   formatTicketRelativeTime,
   formatTicketFullTimestamp,
-} from './date-utils'
+} from './date-utils';
 
 // Chat source-icons + labels (server-safe — lives here in src/utils/
 // instead of src/components/chat/utils/ so server-side hub callers like
 // doc-chat-utils can use them without tripping the 'use client' boundary)
-export {
-  SOURCE_ICON_NAMES,
-  getSourceIconName,
-  SOURCE_LABELS_BY_TABLE,
-  getSourceLabel,
-} from './source-icons'
+export { SOURCE_ICON_NAMES, getSourceIconName, SOURCE_LABELS_BY_TABLE, getSourceLabel } from './source-icons';
 
 // Embed-surface auth — generic across chat AND ticket center (and any
 // future embedded React component that needs to identify as the proxied
-// customer). Wire headers / env vars / storage key are unchanged
-// (`X-Chat-*`, `CHAT_PROXY_SECRET`, `chat.proxy-auth.v1`) — those are
-// server / deployment contracts. The CLIENT-side rename frees non-chat
-// surfaces from importing a chat-prefixed symbol. Old chat-prefixed
-// aliases are kept as @deprecated re-exports at
-// `components/chat/utils/chat-authed-fetch.ts` + `chat-proxy-auth-storage.ts`.
-export {
-  embedAuthedFetch,
-  setEmbedAuthAdapter,
-  type EmbedAuthAdapter,
-} from './embed-authed-fetch'
+// customer). The bearer is a PLATFORM API KEY (minted in the hub's
+// /admin/api-keys; the old shared CHAT_PROXY_SECRET env is removed
+// hub-side). Wire headers / storage key are unchanged (`X-Chat-*`,
+// `chat.proxy-auth.v1`) — those are server / deployment contracts. The
+// CLIENT-side rename frees non-chat surfaces from importing a
+// chat-prefixed symbol; the old chat-prefixed aliases are DELETED —
+// these Embed* exports are the only names.
+export { embedAuthedFetch, setEmbedAuthAdapter, type EmbedAuthAdapter } from './embed-authed-fetch';
 // THE common SSE client (fetch-based, standard `event:`/`data:` frames,
 // silence-based liveness, never-terminating capped backoff). Consumed by
 // the lib's `TicketLiveProvider` AND the hub's workflow/invocation stream
@@ -194,7 +194,7 @@ export {
   type SseSubscription,
   type SseSubscriptionOptions,
   type SseTransportStatus,
-} from './sse-subscription'
+} from './sse-subscription';
 export {
   type EmbedProxyAuth,
   getEmbedProxyAuth,
@@ -202,15 +202,12 @@ export {
   clearEmbedProxyAuth,
   getPersistedProxyEmail,
   applyProxyAuth,
-} from './embed-proxy-auth-storage'
+} from './embed-proxy-auth-storage';
 
 // SSE leading-frame reader for the chat-agent `confirm-tool` route.
 // Used by the ticket center to drain the single `decision_resolved`
 // frame the server emits when `messages: []` is in the request body.
-export {
-  readLeadingDecisionFrame,
-  type DecisionResolvedFrame,
-} from './sse-decision-frame'
+export { readLeadingDecisionFrame, type DecisionResolvedFrame } from './sse-decision-frame';
 
 // Pure text/wire helpers that originated under components/chat/utils/
 // but are needed by SERVER-SIDE hub callers (doc-chat-utils,
@@ -228,19 +225,19 @@ export {
   CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED,
   CHAT_ATTACHMENT_MARKDOWN_PATTERN,
   stripChatAttachmentMarkdown,
-} from '../components/chat/utils/chat-attachment-markdown'
+} from '../components/chat/utils/chat-attachment-markdown';
 export {
   AUTO_CONTINUATION_DIRECTIVE_PREFIX,
   buildAutoContinuationDirective,
   type BuildAutoContinuationOptions,
-} from '../components/chat/utils/auto-continuation-directive'
-export { flattenAssistantContent } from '../components/chat/utils/flatten-assistant-content'
+} from '../components/chat/utils/auto-continuation-directive';
+export { flattenAssistantContent } from '../components/chat/utils/flatten-assistant-content';
 export {
   SCROLL_ANCHOR,
   type ScrollAnchor,
   SCROLL_ANCHOR_WIRE_KEY,
   parseScrollAnchor,
-} from '../components/chat/utils/scroll-anchor'
+} from '../components/chat/utils/scroll-anchor';
 export {
   type WireCommandOverride,
   parseWireCommandOverride,
@@ -249,31 +246,31 @@ export {
   type CommandOverride,
   extractEntityIdFilter,
   buildDiscussAddendum,
-} from '../components/chat/utils/slash-dispatch-utils'
+} from '../components/chat/utils/slash-dispatch-utils';
 
 // ClickUp taxonomy constants + label resolver — server-safe so the
 // delivery aggregator + sync engine can read CUSTOM_ITEM_ID.BUG/.REQUEST
 // without going through the 'use client' chat barrel (which erases the
 // values to undefined when imported from server code).
-export { CUSTOM_ITEM_ID, getTaskTypeLabel } from '../components/chat/utils/clickup-task-type-utils'
+export { CUSTOM_ITEM_ID, getTaskTypeLabel } from '../components/chat/utils/clickup-task-type-utils';
 
 // Status color scheme + clickup URL helpers (pure, server-safe)
-export { type ColorScheme, getStatusColorScheme } from '../components/chat/utils/agent-status-message'
-export { clickupTaskUrl } from '../components/chat/utils/external-app-urls'
+export { type ColorScheme, getStatusColorScheme } from '../components/chat/utils/agent-status-message';
+export { clickupTaskUrl } from '../components/chat/utils/external-app-urls';
 
 // Cross-origin URL detection (pure — used by server-side rag-mappers
 // + content-url-builder for cross-origin same-tab decisions)
-export { isCrossOriginUrl } from '../components/chat/utils/is-cross-origin-url'
+export { isCrossOriginUrl } from '../components/chat/utils/is-cross-origin-url';
 
 // React-version-aware `fetchpriority` prop builder — spread into `<img>`
 // / `<iframe>` so the rendered DOM attribute is correct under React 18
 // (lowercase) AND React 19 (camelCase) without console warnings.
-export { fetchPriorityProp, type FetchPriorityValue } from './fetch-priority'
+export { fetchPriorityProp, type FetchPriorityValue } from './fetch-priority';
 
 // Dev-center section registry (Roadmap / Delivery / Releases / Onboarding) —
 // server-safe (no JSX, no contexts/* imports); imported by route-page
 // `metadata` exports + the shared `<DevSectionView>` chrome.
-export * from './dev-sections'
+export * from './dev-sections';
 
 // Canonical "smooth scroll element into view with sticky-chrome
 // offset" helper. Single source of truth across the lib + hub for
@@ -282,10 +279,7 @@ export * from './dev-sections'
 // pre-computed pixel value avoids the mid-animation jitter that
 // `element.scrollIntoView()` produces when layout shifts during the
 // scroll).
-export {
-  type ScrollElementIntoViewOptions,
-  scrollElementIntoView,
-} from './scroll-into-view'
+export { type ScrollElementIntoViewOptions, scrollElementIntoView } from './scroll-into-view';
 
 // Same-page hash navigation — owns pushState + synthetic hashchange +
 // anchoring-proof scroll. Pair of `scrollElementIntoView`. Used by the
@@ -297,7 +291,7 @@ export {
   STICKY_HEADER_OFFSET_PX,
   HUB_HEADER_OFFSET_PX,
   type NavigateSamePageHashOptions,
-} from './same-page-hash-nav'
+} from './same-page-hash-nav';
 
 // GitHub-compatible anchor resolution. Doc TOCs are authored against
 // GitHub's slugger (`## 📚 Table of Contents` → `#-table-of-contents`)
@@ -305,21 +299,21 @@ export {
 // that without changing the id shape the "On this page" rail and every
 // shared URL already depend on. Consumers resolving a hash want
 // `getHashTargetElement` (above), which applies this as its last pass.
-export { findAnchorElementByNormalizedId, normalizeAnchorId } from './anchor-id'
+export { findAnchorElementByNormalizedId, normalizeAnchorId } from './anchor-id';
 
 // Shared list-API URL builder — the single source for the per-type chat
 // entity-card fetch shapes. The hub's 12 RAG mapper `listApi` closures
 // delegate here (byte-parity test guards the migration); embedders wire
 // `endpoints.buildListUrl = (t, ids) => buildListUrl(t, ids, '/content')`.
 // Pure + server-safe (the hub imports it server-side from this barrel).
-export { buildListUrl, canonicalContentRefType } from './list-url'
+export { buildListUrl, canonicalContentRefType } from './list-url';
 
 // FAQ anchor SSOTs — section (`faq-<slug>`) AND item (`faq-item-<id>`)
 // formats plus the parser, all rendered by `FaqSection`/`FaqAccordion`
 // and recognised by the hub's RAG mapper. One algo per kind, one parser,
 // zero drift across page + chat + future consumers.
-export { faqSectionSlug, faqItemAnchor, parseFaqHash } from './faq-anchor'
-export type { FaqHashTarget } from './faq-anchor'
+export { faqSectionSlug, faqItemAnchor, parseFaqHash } from './faq-anchor';
+export type { FaqHashTarget } from './faq-anchor';
 
 // Content-ref group registry (labels/order/layout per rail type) + list-API
 // response normalizers + the shared suggestion-fetch URL composer — all
@@ -332,9 +326,10 @@ export {
   type ContentRefGroupConfig,
   type ContentRefLayout,
   type ContentRefGridSize,
-} from './content-ref-groups'
-export { extractItems, extractItemId } from './extract-items'
-export { buildSuggestionUrl, type SuggestionUrlOptions } from './suggestion-url'
+} from './content-ref-groups';
+export { extractItems, extractItemId } from './extract-items';
+export { FullscreenSwitchController, type FullscreenSwitchOptions } from './fullscreen-switch';
+export { buildSuggestionUrl, type SuggestionUrlOptions } from './suggestion-url';
 
 // Embedder-configurable content-URL composer for the existing
 // `runtime.composeContentUrl` seam — relative href for host-served types,
@@ -345,27 +340,28 @@ export {
   buildDefaultHref,
   type ContentHrefOptions,
   type ComposeContentUrl,
-} from './content-href'
+  type ComposedContentUrl,
+} from './content-href';
 
 // Invisible bot-protection signals (honeypot + timing) — pure + server-safe so
 // the hub's per-route `verifyHuman` gate imports the SAME `evaluateHumanitySignals`
 // decision fn the lib forms feed. Also exported via the granular subpath
 // `./utils/humanity-signals` for server-only consumers.
-export * from './humanity-signals'
+export * from './humanity-signals';
 
 // Doc-source viewer utilities (path parsing, tree building, section extraction,
 // embed-URL conversion) — single home for all doc-viewer pure helpers across
 // hub + lib consumers (knowledge-base, data-room, and future sources).
-export * from './doc-path-utils'
-export * from './doc-tree-nav'
-export * from './tree-builder'
-export * from './markdown-heading-id'
-export * from './markdown-section-extractor'
-export * from './markdown-to-plain'
-export * from './embed-url-converters'
+export * from './doc-path-utils';
+export * from './doc-tree-nav';
+export * from './tree-builder';
+export * from './markdown-heading-id';
+export * from './markdown-section-extractor';
+export * from './markdown-to-plain';
+export * from './embed-url-converters';
 
 // HubSpot meeting-link naming convention — the executable SSOT (parser,
 // validator, label + name-split helpers, MAX_MONTH_OFFSET). Pure + server-safe.
-export * from './hubspot-meetings-convention'
-export * from './page-header-constants'
-export * from './first-touch-attribution'
+export * from './hubspot-meetings-convention';
+export * from './page-header-constants';
+export * from './first-touch-attribution';

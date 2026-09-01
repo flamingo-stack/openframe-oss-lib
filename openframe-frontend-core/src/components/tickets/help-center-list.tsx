@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<HelpCenterList />` — the full Help Center surface (the openframe
@@ -26,62 +26,62 @@
  * no list, no fetch.
  */
 
-import { useCallback, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { useSearchParams, useRouter, usePathname } from '../../embed-shims'
-import { Button } from '../ui'
-import { EmptyState } from '../empty-state'
-import { DevSectionPage } from '../shared/dev-section'
-import { DevCardRowSkeletonList } from '../shared/dev-section/dev-card-row'
-import { UnifiedPagination } from '../unified-pagination'
-import { useChatIdentity } from '../chat/hooks/use-chat-identity'
-import { useScrollToHash } from '../../hooks/use-scroll-to-hash'
-import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
-import { DEV_SECTION_PARAM_KEYS, devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys'
-import { toast as defaultToast } from '../../hooks/use-toast'
-import { useTicketsList } from './hooks/use-tickets-list'
-import { useTicketActions } from './hooks/use-ticket-actions'
-import { HelpCenterCard } from './help-center-card'
-import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form'
-import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types'
-import { isOptimistic, TICKET_OPEN_PARAM } from './types'
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
+import { useSearchParams, useRouter, usePathname } from '../../embed-shims';
+import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
+import { toast as defaultToast } from '../../hooks/use-toast';
+import { DEV_SECTION_PARAM_KEYS, devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
+import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
+import { useChatIdentity } from '../chat/hooks/use-chat-identity';
+import { EmptyState } from '../empty-state';
+import { DevSectionPage } from '../shared/dev-section';
+import { DevCardRowSkeletonList } from '../shared/dev-section/dev-card-row';
+import { Button } from '../ui';
+import { UnifiedPagination } from '../unified-pagination';
+import { HelpCenterCard } from './help-center-card';
+import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form';
+import { useTicketActions } from './hooks/use-ticket-actions';
+import { useTicketsList } from './hooks/use-tickets-list';
+import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types';
+import { isOptimistic, TICKET_OPEN_PARAM } from './types';
 
 export interface HelpCenterListProps {
   /** Toast override (test-friendly). Defaults to the lib's shared
    *  toast singleton. */
-  toast?: typeof defaultToast
+  toast?: typeof defaultToast;
   /** Back-button forwarded to the internal `DevSectionPage` chrome (same shape
    *  as `DevSectionPage` / `LegalDocumentPage`: `{ label?, href? }`, or `false`
    *  to hide). Omit ⇒ `DevSectionPage`'s default (`Back to home` → `/`), which
    *  embedders whose home isn't `/` MUST override. */
-  backButton?: { label?: string; href?: string } | false
+  backButton?: { label?: string; href?: string } | false;
   /** Override the hero title (forwarded to `DevSectionPage.title`). Defaults to
    *  the `tickets` section copy ("Help Center"). Set this to brand the surface
    *  for an embed that wants its own label (e.g. "Support Tickets"). */
-  title?: string
+  title?: string;
   /** Render the standalone `<PageShell>` (forwarded to the internal
    *  `DevSectionPage`). Default true. Pass false when the host layout already
    *  provides the page container (avoids a nested `<main>`). */
-  shell?: boolean
+  shell?: boolean;
 }
 
 export function HelpCenterList({ toast = defaultToast, backButton, title, shell }: HelpCenterListProps = {}) {
-  const identity = useChatIdentity()
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const pathname = usePathname()
+  const identity = useChatIdentity();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const search = searchParams.get(DEV_SECTION_PARAM_KEYS.search) || ''
-  const status = searchParams.get('status') || 'all'
+  const search = searchParams.get(DEV_SECTION_PARAM_KEYS.search) || '';
+  const status = searchParams.get('status') || 'all';
   // Deep-link: `?ticket=<external_id>` auto-opens that ticket's drawer on load.
   // Same GET-param plumbing as `?search=` — read here, drilled to the authed
   // child which expands the matching row once it's in the fetched list.
-  const ticketParam = searchParams.get(TICKET_OPEN_PARAM) || ''
+  const ticketParam = searchParams.get(TICKET_OPEN_PARAM) || '';
   // 1-based page from the URL. `<UnifiedPagination>` writes `?page=N`
   // on navigation; we read it here and re-fetch on change. Invalid
   // values fall back to page 1.
-  const rawPage = Number(searchParams.get('page'))
-  const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1
+  const rawPage = Number(searchParams.get('page'));
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
 
   // Identity gate FIRST — anon visitors skip every fetch + hook below.
   // `useChatIdentity` has a brief `isLoading` window on first render
@@ -102,7 +102,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
       >
         <DevCardRowSkeletonList />
       </DevSectionPage>
-    )
+    );
   }
   if (identity.authTier === 'anon' || !identity.user?.email) {
     return (
@@ -114,7 +114,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
           showCTA={false}
         />
       </DevSectionPage>
-    )
+    );
   }
 
   // Identity is loaded + has an email (gated above). Resolve the
@@ -126,8 +126,8 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
   const sessionName =
     [identity.user?.firstName, identity.user?.lastName].filter(Boolean).join(' ').trim() ||
     identity.user?.email?.split('@')[0] ||
-    'Customer'
-  const sessionEmail = identity.user!.email!
+    'Customer';
+  const sessionEmail = identity.user.email;
 
   return (
     <HelpCenterListAuthed
@@ -145,24 +145,24 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
       title={title}
       shell={shell}
     />
-  )
+  );
 }
 
 interface AuthedProps {
-  search: string
-  status: string
-  page: number
+  search: string;
+  status: string;
+  page: number;
   /** `?ticket=<external_id>` deep-link target — auto-opens that drawer. */
-  ticketParam: string
-  searchParams: ReturnType<typeof useSearchParams>
-  router: ReturnType<typeof useRouter>
-  pathname: string
-  toast: typeof defaultToast
-  sessionName: string
-  sessionEmail: string
-  backButton?: { label?: string; href?: string } | false
-  title?: string
-  shell?: boolean
+  ticketParam: string;
+  searchParams: ReturnType<typeof useSearchParams>;
+  router: ReturnType<typeof useRouter>;
+  pathname: string;
+  toast: typeof defaultToast;
+  sessionName: string;
+  sessionEmail: string;
+  backButton?: { label?: string; href?: string } | false;
+  title?: string;
+  shell?: boolean;
 }
 
 function HelpCenterListAuthed({
@@ -180,9 +180,9 @@ function HelpCenterListAuthed({
   title,
   shell,
 }: AuthedProps) {
-  const queryClient = useQueryClient()
-  const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([])
-  const [supportSystemDown, setSupportSystemDown] = useState(false)
+  const queryClient = useQueryClient();
+  const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([]);
+  const [supportSystemDown, setSupportSystemDown] = useState(false);
 
   // SINGLE source of truth for "which ticket is open" = the `?ticket=<external_id>`
   // URL param (same model as `?search=` / `?status=`). Click-to-open and the
@@ -192,14 +192,14 @@ function HelpCenterListAuthed({
   // sharing a URL all flow through the same param.
   const setOpenTicket = useCallback(
     (externalId: string | null) => {
-      const params = new URLSearchParams(searchParams.toString())
-      if (externalId) params.set(TICKET_OPEN_PARAM, externalId)
-      else params.delete(TICKET_OPEN_PARAM)
-      const qs = params.toString()
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+      const params = new URLSearchParams(searchParams.toString());
+      if (externalId) params.set(TICKET_OPEN_PARAM, externalId);
+      else params.delete(TICKET_OPEN_PARAM);
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
     [searchParams, router, pathname],
-  )
+  );
 
   const { tickets, isLoading, isFetching, error, refetch, totalPages } = useTicketsList({
     // `sessionEmail` is drilled in from the parent — see the same
@@ -217,27 +217,26 @@ function HelpCenterListAuthed({
     // covers hosts without a stream. Disclosed trade-off: a bare
     // status/pipeline change with no accompanying reply has no live
     // path until the next event/focus/reconnect.
-  })
+  });
 
   // Open state DERIVED from the URL param. `?ticket=` carries the user-facing
   // `external_id`; map it to the internal row id the card matches on. Resolves
   // to null until the ticket lands in the fetched list (deep-link cold load) and
   // auto-collapses if the open ticket disappears (e.g. TICKET_NOT_FOUND removal).
-  const expandedTicketId =
-    (ticketParam && tickets.find((t) => t.external_id === ticketParam)?.id) || null
+  const expandedTicketId = (ticketParam && tickets.find(t => t.external_id === ticketParam)?.id) || null;
 
   // Optimistic cache management. Kept LOCAL (not in the query cache) so
   // a refetch (e.g. URL-filter change) doesn't blow away pending
   // placeholders. Merged view is `[...optimistic, ...server]` so
   // placeholders sit at the top until they're explicitly removed.
   const prependOptimistic = useCallback((placeholder: OptimisticTicket) => {
-    setOptimisticTickets((prev) => [placeholder, ...prev])
-  }, [])
+    setOptimisticTickets(prev => [placeholder, ...prev]);
+  }, []);
   const removeOptimistic = useCallback((placeholderId: string) => {
-    setOptimisticTickets((prev) => prev.filter((t) => t.id !== placeholderId))
+    setOptimisticTickets(prev => prev.filter(t => t.id !== placeholderId));
     // No drawer-collapse needed: optimistic placeholders have no `external_id`,
     // so they can never be the URL-derived open ticket.
-  }, [])
+  }, []);
   const removeTicketFromCache = useCallback(
     (ticketId: string) => {
       // Every cache slot under the ['tickets'] prefix — the queryKey
@@ -250,20 +249,17 @@ function HelpCenterListAuthed({
       // TICKET_NOT_FOUND path; the prod regression that landed
       // 2026-05-29 surfaced the same shape mismatch in the
       // close/reopen optimistic-update path. Project, filter, reassemble.
-      queryClient.setQueriesData<TicketsCacheSlot | undefined>(
-        { queryKey: ['tickets'] },
-        (prev) => {
-          if (!prev || !Array.isArray(prev.tickets)) return prev
-          const nextTickets = prev.tickets.filter((t) => t.id !== ticketId)
-          if (nextTickets.length === prev.tickets.length) return prev
-          return { ...prev, tickets: nextTickets }
-        },
-      )
+      queryClient.setQueriesData<TicketsCacheSlot | undefined>({ queryKey: ['tickets'] }, prev => {
+        if (!prev || !Array.isArray(prev.tickets)) return prev;
+        const nextTickets = prev.tickets.filter(t => t.id !== ticketId);
+        if (nextTickets.length === prev.tickets.length) return prev;
+        return { ...prev, tickets: nextTickets };
+      });
       // The drawer auto-collapses on its own: once the ticket leaves the list,
       // the URL-derived `expandedTicketId` finds no match → null. No state to clear.
     },
     [queryClient],
-  )
+  );
 
   const actions = useTicketActions({
     prependOptimistic,
@@ -271,7 +267,7 @@ function HelpCenterListAuthed({
     removeTicketFromCache,
     toast,
     onSupportSystemDown: () => setSupportSystemDown(true),
-  })
+  });
 
   // Toggle = write the URL param (open) or clear it (close). The clicked card's
   // internal id maps to its `external_id` for the param; optimistic rows (no
@@ -279,14 +275,14 @@ function HelpCenterListAuthed({
   // path — a click, a deep link, and a shared URL are indistinguishable.
   const toggleRow = useCallback(
     (id: string) => {
-      const t = tickets.find((x) => x.id === id)
-      if (!t?.external_id) return
-      setOpenTicket(t.external_id === ticketParam ? null : t.external_id)
+      const t = tickets.find(x => x.id === id);
+      if (!t?.external_id) return;
+      setOpenTicket(t.external_id === ticketParam ? null : t.external_id);
     },
     [tickets, ticketParam, setOpenTicket],
-  )
+  );
 
-  const merged: AnyTicket[] = [...optimisticTickets, ...tickets]
+  const merged: AnyTicket[] = [...optimisticTickets, ...tickets];
 
   // Deep-link hash dispatch — `/tickets#ticket-<external_id>` from a
   // chat card (or any other in-app link). The `?ticket=<external_id>`
@@ -295,9 +291,9 @@ function HelpCenterListAuthed({
   // (`/tickets?ticket=X#ticket-X`) — drawer opens AND row scrolls into
   // view. Shared `useScrollToHash` polls until the row mounts (handles
   // the SWR fetch race), uses the canonical `scrollElementIntoView` tween.
-  useScrollToHash(tickets, { headerOffset: STICKY_HEADER_OFFSET_PX })
-  const hasActiveFilters = search !== '' || (status !== '' && status !== 'all')
-  const hasResults = merged.length > 0
+  useScrollToHash(tickets, { headerOffset: STICKY_HEADER_OFFSET_PX });
+  const hasActiveFilters = search !== '' || (status !== '' && status !== 'all');
+  const hasResults = merged.length > 0;
 
   // Form is the canonical lib `<ContactForm>` (NOT a new ticket-specific
   // form) — we hide every contact-only field, supply the customer's
@@ -313,15 +309,13 @@ function HelpCenterListAuthed({
       sessionEmail={sessionEmail}
       supportSystemDown={supportSystemDown}
     />
-  )
+  );
 
   const body = (
-    <div className="w-full flex flex-col gap-[40px]">
+    <div className="flex w-full flex-col gap-[40px]">
       {error && (
-        <div className="bg-ods-card border border-ods-border rounded-[6px] p-[40px] text-center w-full flex flex-col items-center gap-3">
-          <p className="text-ods-error text-h6">
-            Couldn&rsquo;t load your tickets. {error.message}
-          </p>
+        <div className="flex w-full flex-col items-center gap-3 rounded-[6px] border border-ods-border bg-ods-card p-[40px] text-center">
+          <p className="text-ods-error text-h6">Couldn&rsquo;t load your tickets. {error.message}</p>
           <Button type="button" variant="accent" onClick={() => refetch()}>
             Retry
           </Button>
@@ -348,10 +342,10 @@ function HelpCenterListAuthed({
                 showCTA
                 ctaText="Reset filters"
                 onCtaClick={() => {
-                  const params = new URLSearchParams(searchParams.toString())
-                  params.delete('search')
-                  params.delete('status')
-                  router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.delete('search');
+                  params.delete('status');
+                  router.replace(`${pathname}?${params.toString()}`, { scroll: false });
                 }}
               />
             ) : (
@@ -371,8 +365,8 @@ function HelpCenterListAuthed({
             // hidden) instead of bubbling up to the window. `clip`
             // keeps the visual clip but NOT the scroll-container
             // status, so click-to-scroll actually moves the page.
-            <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-clip w-full">
-              {merged.map((ticket) => (
+            <div className="w-full overflow-clip rounded-[6px] border border-ods-border bg-ods-card">
+              {merged.map(ticket => (
                 <HelpCenterCard
                   key={ticket.id}
                   id={devSectionAnchorId('ticket', ticket.external_id)}
@@ -399,15 +393,13 @@ function HelpCenterListAuthed({
           page + totalPages. Hidden when there's at most one page so
           the list doesn't reserve vertical space when it isn't
           actionable. */}
-      {!error && totalPages > 1 && (
-        <UnifiedPagination currentPage={page} totalPages={totalPages} />
-      )}
+      {!error && totalPages > 1 && <UnifiedPagination currentPage={page} totalPages={totalPages} />}
     </div>
-  )
+  );
 
   return (
     <DevSectionPage sectionKey="tickets" backButton={backButton} title={title} shell={shell} preControls={form}>
       {body}
     </DevSectionPage>
-  )
+  );
 }

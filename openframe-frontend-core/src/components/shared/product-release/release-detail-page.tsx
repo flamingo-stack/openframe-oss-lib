@@ -1,43 +1,44 @@
-"use client";
+'use client';
 
-import { useState, useEffect, Fragment, ComponentType, type ReactNode } from 'react';
+import { AlertTriangle, ExternalLink, BookMarked, Sparkles, TrendingUp, Wrench } from 'lucide-react';
+import { useState, useEffect, Fragment, type ComponentType, type ReactNode } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
-import { Card, CardContent } from '../../ui/card';
-// PageShell (wide) — match the related-content/FAQ rail container the hub
-// renders below this view (was ArticleDetailLayout, 1280px — narrower than
-// the rail, see hub detail-container alignment decision 2026-06-10).
-import { PageShell } from '../../layout/article-detail-layout';
-import { PageLayout } from '../../layout/page-layout';
-import { FadePreview } from '../../ui/fade-preview';
-import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
-import { RichMarkdownRenderer } from '../../ui/markdown';
-import { EntityTagBadges } from '../../features/entity-tag-badges';
-import { EntityMetadataAuthorCell } from '../../chat/entity-cards/entity-author-card';
+import type { TagAssoc } from '../../../types/blog';
 import type { EntityAuthor } from '../../../types/entity-author';
-import { MediaGalleryStrip } from '../media-gallery-strip';
-import { GitHubIcon } from '../../icons/github-icon';
-import { AlertTriangle, ExternalLink, BookMarked, Sparkles, TrendingUp, Wrench } from 'lucide-react';
+import type { ChangelogEntry } from '../../../types/product-release';
+import type { VideoTeaser } from '../../../types/video-processing';
 import { formatReleaseDate } from '../../../utils/date-formatters';
 import { contentFetch } from '../../../utils/embed-content-fetch';
-import { Video } from '../../features/video';
-import { type CaptionSrtFields } from '../../features/captions-url';
+import { EntityMetadataAuthorCell } from '../../chat/entity-cards/entity-author-card';
+import type { CaptionSrtFields } from '../../features/captions-url';
+import { EntityTagBadges } from '../../features/entity-tag-badges';
 import { useCaptions } from '../../features/use-captions';
-import { DetailPageSkeleton } from '../detail-page-skeleton';
-import type { ChangelogEntry } from '../../../types/product-release';
-import type { TagAssoc } from '../../../types/blog';
-import type { VideoTeaser } from '../../../types/video-processing';
+import { Video } from '../../features/video';
 import {
   DEFAULT_VIDEO_BITES_TITLE,
   toStripProfile,
   type VideoBiteStripProfile,
 } from '../../features/video-bites-shared';
+import { GitHubIcon } from '../../icons/github-icon';
+// PageShell (wide) — match the related-content/FAQ rail container the hub
+// renders below this view (was ArticleDetailLayout, 1280px — narrower than
+// the rail, see hub detail-container alignment decision 2026-06-10).
+import { PageShell } from '../../layout/article-detail-layout';
+import { PageLayout } from '../../layout/page-layout';
+import { Card, CardContent } from '../../ui/card';
+import { FadePreview } from '../../ui/fade-preview';
+import { RichMarkdownRenderer } from '../../ui/markdown';
+import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
+import { DetailPageSkeleton } from '../detail-page-skeleton';
+import { MediaGalleryStrip } from '../media-gallery-strip';
 
 // Types for injectable components
 export interface MarkdownRendererProps {
   content: string;
 }
 
+import type { DeliveryResponse } from '../../../types/delivery';
 // Canonical RoadmapItem shape lives in chat entity types — see
 // `src/components/chat/types/entities/roadmap-item.ts`. The product-release
 // detail page previously declared a structural placeholder
@@ -46,7 +47,6 @@ export interface MarkdownRendererProps {
 // type fixes the collision while keeping the same import path for
 // downstream consumers of `./release-detail-page`.
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
-import type { DeliveryResponse } from '../../../types/delivery';
 // Re-export both types for source-compat with consumers importing
 // through this module. Canonical sources:
 //   - RoadmapItem  → `../../chat/types/entities/roadmap-item`
@@ -54,6 +54,11 @@ import type { DeliveryResponse } from '../../../types/delivery';
 //     truth, shared with the lib `<DeliveryLists>` / `<DeliveryTable>`
 //     components and the new types barrel).
 export type { RoadmapItem, DeliveryResponse };
+
+/** Wire shape of `${roadmapApiEndpoint}?task_ids=…` — `{ items, count }`. */
+interface RoadmapTasksResponse {
+  items?: RoadmapItem[];
+}
 
 export interface RoadmapSectionProps {
   items: RoadmapItem[];
@@ -145,7 +150,7 @@ export function ReleaseDetailPage({
   deliveryApiEndpoint = '/api/delivery',
   backButton,
   relatedContent,
-  shell = true
+  shell = true,
 }: ReleaseDetailPageProps) {
   const router = useRouter();
   const captions = useCaptions();
@@ -174,6 +179,12 @@ export function ReleaseDetailPage({
   const [deliveryLoading, setDeliveryLoading] = useState(false);
 
   useEffect(() => {
+    // `release` is a fresh object identity whenever `useRelease` resolves or
+    // refetches, so this effect can re-run with two request pairs open at once.
+    // Gate every write so a superseded run cannot paint the previous release's
+    // roadmap/delivery rows, or drop a loading flag the live run still needs.
+    let cancelled = false;
+
     async function fetchLinkedTasks() {
       if (!release) return;
 
@@ -184,8 +195,12 @@ export function ReleaseDetailPage({
           setRoadmapLoading(true);
           const roadmapIds = roadmapTasksData.map(t => t.clickup_task_id).join(',');
           const roadmapResponse = await contentFetch(`${roadmapApiEndpoint}?task_ids=${roadmapIds}`);
-          const roadmapData = await roadmapResponse.json();
-          setRoadmapTasks(roadmapData.items || []);
+          // A failed request answers with the `{ error, code }` envelope, not
+          // with `items` — read it only on 2xx so an outage renders an empty
+          // section instead of feeding the error body to the table.
+          const roadmapData = roadmapResponse.ok ? ((await roadmapResponse.json()) as RoadmapTasksResponse) : null;
+          if (cancelled) return;
+          setRoadmapTasks(roadmapData?.items ?? []);
           setRoadmapLoading(false);
         }
 
@@ -195,18 +210,34 @@ export function ReleaseDetailPage({
           setDeliveryLoading(true);
           const deliveryIds = deliveryTasksData.map(t => t.clickup_task_id).join(',');
           const deliveryResponse = await contentFetch(`${deliveryApiEndpoint}?task_ids=${deliveryIds}`);
-          const deliveryResponseData = await deliveryResponse.json();
-          setDeliveryData(deliveryResponseData);
+          // Same guard as the roadmap fetch — plus both lists are normalized to
+          // arrays, because the render reads `.completed.length` unconditionally
+          // and an envelope missing either key used to throw during render.
+          const deliveryPayload = deliveryResponse.ok
+            ? ((await deliveryResponse.json()) as Partial<DeliveryResponse>)
+            : null;
+          if (cancelled) return;
+          setDeliveryData(
+            deliveryPayload
+              ? { completed: deliveryPayload.completed ?? [], inProgress: deliveryPayload.inProgress ?? [] }
+              : null,
+          );
           setDeliveryLoading(false);
         }
       } catch (err) {
+        if (cancelled) return;
         console.error('Error fetching linked tasks:', err);
         setRoadmapLoading(false);
         setDeliveryLoading(false);
       }
     }
 
-    fetchLinkedTasks();
+    // Never rejects — try/catch, every write gated on `cancelled`.
+    void fetchLinkedTasks();
+
+    return () => {
+      cancelled = true;
+    };
   }, [release, RoadmapSection, DeliverySection, roadmapApiEndpoint, deliveryApiEndpoint]);
 
   // Don't show loading skeleton if we have initialData
@@ -218,16 +249,16 @@ export function ReleaseDetailPage({
       // `pt-[var(--spacing-system-l)]`) so content doesn't jump on load.
       <div className="pt-[var(--spacing-system-l)]">
         <DetailPageSkeleton bare metadataColumns={4} showImageGallery={true} />
-      </div>
+      </div>,
     );
   }
 
   if (error || !release) {
     return renderShell(
-      <div className="text-center py-16">
-        <h1 className="text-h1 text-ods-text-primary mb-4">Release Not Found</h1>
-        <p className="text-h4 text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
-      </div>
+      <div className="py-16 text-center">
+        <h1 className="mb-4 text-ods-text-primary text-h1">Release Not Found</h1>
+        <p className="text-ods-text-secondary text-h4">The release you&apos;re looking for doesn&apos;t exist.</p>
+      </div>,
     );
   }
 
@@ -241,12 +272,14 @@ export function ReleaseDetailPage({
   const releaseDate = release.release_date as string;
   const releaseType = release.release_type as string;
   const releaseStatus = release.release_status as string;
-  const releaseMedia = release.release_media as Array<{ id?: string; media_type: string; media_url: string; title?: string }> | undefined;
+  const releaseMedia = release.release_media as
+    Array<{ id?: string; media_type: string; media_url: string; title?: string }> | undefined;
   // Field-cast per this file's loose-release idiom (release_type etc. above)
   // — but to the SHARED EntityAuthor, never an inline shadow author shape.
   const author = release.author as EntityAuthor | undefined;
   const githubReleases = release.github_releases as Array<{ id: string; github_release_url: string }> | undefined;
-  const knowledgeBaseLinks = release.knowledge_base_links as Array<{ id?: string; kb_article_path: string }> | string[] | undefined;
+  const knowledgeBaseLinks = release.knowledge_base_links as
+    Array<{ id?: string; kb_article_path: string }> | string[] | undefined;
   const migrationGuideUrl = release.migration_guide_url as string | undefined;
   const documentationUrl = release.documentation_url as string | undefined;
   const youtubeUrl = release.youtube_url as string | undefined;
@@ -260,7 +293,8 @@ export function ReleaseDetailPage({
   // so embedders get correctly proxied `<track>` URLs with zero per-host code.
   const entityCaptions = captions.forEntity('product_release', release as unknown as CaptionSrtFields);
   const captionsUrl = (release.captionsUrl as string | undefined) ?? entityCaptions.captionsUrl;
-  const highlightCaptionsUrl = (release.highlightCaptionsUrl as string | undefined) ?? entityCaptions.highlightCaptionsUrl;
+  const highlightCaptionsUrl =
+    (release.highlightCaptionsUrl as string | undefined) ?? entityCaptions.highlightCaptionsUrl;
   const breakingChanges = release.breaking_changes as ChangelogEntry[] | undefined;
   const featuresAdded = release.features_added as ChangelogEntry[] | undefined;
   const bugFixed = release.bugs_fixed as ChangelogEntry[] | undefined;
@@ -268,53 +302,39 @@ export function ReleaseDetailPage({
 
   return renderShell(
     <PageLayout
-        title={releaseTitle}
-        subtitle={`Version: ${releaseVersion}`}
-        titleSize="h1"
-        titleWrap
-        backButton={
-          showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined
-        }
-      >
+      title={releaseTitle}
+      subtitle={`Version: ${releaseVersion}`}
+      titleSize="h1"
+      titleWrap
+      backButton={showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined}
+    >
       <div className="space-y-6 md:space-y-8">
         {/* Tags — flat product_release_tags[] from entity_tags */}
         <EntityTagBadges tags={release.product_release_tags as TagAssoc[] | undefined} />
 
         {/* Metadata Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 border border-ods-border rounded-md overflow-hidden w-full">
+        <div className="grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border md:grid-cols-4">
           {/* Release Type */}
-          <div className="bg-ods-card border-b md:border-b-0 md:border-r border-ods-border p-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r">
             <div className="flex flex-col gap-0">
-              <p className="text-h4 text-ods-text-primary">
-                {releaseType.toLocaleUpperCase()}
-              </p>
-              <p className="text-h6 text-ods-text-secondary">
-                Release Type
-              </p>
+              <p className="text-ods-text-primary text-h4">{releaseType.toLocaleUpperCase()}</p>
+              <p className="text-ods-text-secondary text-h6">Release Type</p>
             </div>
           </div>
 
           {/* Release Status */}
-          <div className="bg-ods-card border-b md:border-b-0 md:border-r border-ods-border p-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r">
             <div className="flex flex-col gap-0">
-              <p className="text-h4 text-ods-text-primary">
-                {releaseStatus.toLocaleUpperCase()}
-              </p>
-              <p className="text-h6 text-ods-text-secondary">
-                Release Status
-              </p>
+              <p className="text-ods-text-primary text-h4">{releaseStatus.toLocaleUpperCase()}</p>
+              <p className="text-ods-text-secondary text-h6">Release Status</p>
             </div>
           </div>
 
           {/* Release Date */}
-          <div className="bg-ods-card border-b md:border-b-0 md:border-r border-ods-border p-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r">
             <div className="flex flex-col gap-0">
-              <p className="text-h4 text-ods-text-primary">
-                {formatReleaseDate(releaseDate)}
-              </p>
-              <p className="text-h6 text-ods-text-secondary">
-                Release Date
-              </p>
+              <p className="text-ods-text-primary text-h4">{formatReleaseDate(releaseDate)}</p>
+              <p className="text-ods-text-secondary text-h6">Release Date</p>
             </div>
           </div>
 
@@ -334,7 +354,7 @@ export function ReleaseDetailPage({
 
         {/* Summary */}
         {releaseSummary && (
-          <div className="text-h4 text-ods-text-primary">
+          <div className="text-ods-text-primary text-h4">
             <p>{releaseSummary}</p>
           </div>
         )}
@@ -363,14 +383,7 @@ export function ReleaseDetailPage({
               SSoT for every video surface — single source of truth across YouTube,
               HLS, and MP4 paths.
             */}
-            {youtubeUrl && (
-              <Video
-                kind="youtube"
-                url={youtubeUrl}
-                title={`${releaseTitle} - Video`}
-                layout="native"
-              />
-            )}
+            {youtubeUrl && <Video kind="youtube" url={youtubeUrl} title={`${releaseTitle} - Video`} layout="native" />}
             {!youtubeUrl && mainVideoUrl && (
               <Video
                 url={mainVideoUrl}
@@ -392,7 +405,7 @@ export function ReleaseDetailPage({
 
         {/* Content */}
         {releaseContent && (
-          <div className="text-h4 text-ods-text-primary">
+          <div className="text-ods-text-primary text-h4">
             <MarkdownRenderer content={releaseContent} />
           </div>
         )}
@@ -404,8 +417,10 @@ export function ReleaseDetailPage({
               <div className="flex items-center gap-3">
                 <AlertTriangle className="h-6 w-6 text-ods-error" />
                 <div>
-                  <h3 className="text-h3 text-ods-error">Breaking Changes</h3>
-                  <p className="text-ods-text-secondary">This release contains breaking changes. Review carefully before upgrading.</p>
+                  <h3 className="text-ods-error text-h3">Breaking Changes</h3>
+                  <p className="text-ods-text-secondary">
+                    This release contains breaking changes. Review carefully before upgrading.
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -453,19 +468,13 @@ export function ReleaseDetailPage({
 
         {/* Related Roadmap Items */}
         {RoadmapSection && (roadmapLoading || roadmapTasks.length > 0) && (
-          <div className="space-y-4 w-full">
-            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
-              Related Roadmap Items
-            </p>
+          <div className="w-full space-y-4">
+            <p className="tracking-[-0.28px] text-ods-text-secondary text-h5">Related Roadmap Items</p>
             <RoadmapSection
               items={roadmapTasks}
               isLoading={roadmapLoading}
-              onItemUpdate={(updatedItem) => {
-                setRoadmapTasks(prevTasks =>
-                  prevTasks.map(task =>
-                    task.id === updatedItem.id ? updatedItem : task
-                  )
-                );
+              onItemUpdate={updatedItem => {
+                setRoadmapTasks(prevTasks => prevTasks.map(task => (task.id === updatedItem.id ? updatedItem : task)));
               }}
             />
           </div>
@@ -475,60 +484,50 @@ export function ReleaseDetailPage({
             delivery tasks, so the list gets the same `FadePreview`
             progressive disclosure as the changelog sections above: first
             row visible, rest fade-masked behind "Show N more". */}
-        {DeliverySection && (deliveryLoading || (deliveryData && (deliveryData.completed.length > 0 || deliveryData.inProgress.length > 0))) && (
-          <div className="w-full space-y-4">
-            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
-              Related Enhancements and Bug-fixes
-            </p>
-            {(() => {
-              const deliveryCount = deliveryData
-                ? deliveryData.completed.length + deliveryData.inProgress.length
-                : 0;
-              return deliveryLoading ? (
-                <DeliverySection data={deliveryData} isLoading={deliveryLoading} />
-              ) : (
-                <FadePreview
-                  hiddenCount={deliveryCount - 1}
-                  collapsedHeight={300}
-                  resetKey={deliveryCount}
-                >
-                  {/* space-y-4 restores the completed/in-progress table gap the
+        {DeliverySection &&
+          (deliveryLoading ||
+            (deliveryData && (deliveryData.completed.length > 0 || deliveryData.inProgress.length > 0))) && (
+            <div className="w-full space-y-4">
+              <p className="tracking-[-0.28px] text-ods-text-secondary text-h5">Related Enhancements and Bug-fixes</p>
+              {(() => {
+                const deliveryCount = deliveryData ? deliveryData.completed.length + deliveryData.inProgress.length : 0;
+                return deliveryLoading ? (
+                  <DeliverySection data={deliveryData} isLoading={deliveryLoading} />
+                ) : (
+                  <FadePreview hiddenCount={deliveryCount - 1} collapsedHeight={300} resetKey={deliveryCount}>
+                    {/* space-y-4 restores the completed/in-progress table gap the
                       parent's space-y used to provide before the fade wrapper. */}
-                  <div className="space-y-4">
-                    <DeliverySection data={deliveryData} isLoading={false} />
-                  </div>
-                </FadePreview>
-              );
-            })()}
-          </div>
-        )}
+                    <div className="space-y-4">
+                      <DeliverySection data={deliveryData} isLoading={false} />
+                    </div>
+                  </FadePreview>
+                );
+              })()}
+            </div>
+          )}
 
         {/* Related Links */}
         {(githubReleases?.length || knowledgeBaseLinks?.length || migrationGuideUrl || documentationUrl) && (
-          <div className="space-y-1 w-full">
-            <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
-              Related Links
-            </p>
-            <Card className="bg-ods-card border-ods-border p-6">
+          <div className="w-full space-y-1">
+            <p className="tracking-[-0.28px] text-ods-text-secondary text-h5">Related Links</p>
+            <Card className="border-ods-border bg-ods-card p-6">
               <div className="space-y-4">
                 {/* GitHub Releases */}
                 {githubReleases && githubReleases.length > 0 && (
                   <>
-                    {githubReleases.map((ghRelease) => (
+                    {githubReleases.map(ghRelease => (
                       <div key={ghRelease.id} className="flex items-start gap-1">
                         <GitHubIcon className="shrink-0" width={24} height={24} color="var(--color-text-secondary)" />
-                        <span className="text-h4 text-ods-text-primary">
-                          Github Release
-                        </span>
+                        <span className="text-ods-text-primary text-h4">Github Release</span>
                         <a
                           href={ghRelease.github_release_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-h4 text-ods-accent hover:underline"
+                          className="text-ods-accent text-h4 hover:underline"
                         >
                           {ghRelease.github_release_url.split('/').pop()}
                         </a>
-                        <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
+                        <ExternalLink className="h-6 w-6 shrink-0 text-ods-accent" />
                       </div>
                     ))}
                   </>
@@ -537,22 +536,24 @@ export function ReleaseDetailPage({
                 {/* Knowledge Base Links */}
                 {knowledgeBaseLinks && knowledgeBaseLinks.length > 0 && (
                   <>
-                    {knowledgeBaseLinks.map((linkObj) => {
+                    {knowledgeBaseLinks.map(linkObj => {
                       const path = typeof linkObj === 'string' ? linkObj : linkObj.kb_article_path;
                       const linkId = typeof linkObj === 'string' ? path : linkObj.id || path;
                       return (
                         <div key={linkId} className="flex items-start gap-1">
-                          <BookMarked className="h-6 w-6 text-ods-text-secondary shrink-0" />
-                          <span className="text-h4 text-ods-text-primary">
-                            Knowledge Base
-                          </span>
+                          <BookMarked className="h-6 w-6 shrink-0 text-ods-text-secondary" />
+                          <span className="text-ods-text-primary text-h4">Knowledge Base</span>
                           <Link
-                            href={path.startsWith('http') ? path : `/knowledge-base${path.startsWith('/') ? '' : '/'}${path}`}
-                            className="text-h4 text-ods-accent hover:underline"
+                            href={
+                              path.startsWith('http')
+                                ? path
+                                : `/knowledge-base${path.startsWith('/') ? '' : '/'}${path}`
+                            }
+                            className="text-ods-accent text-h4 hover:underline"
                           >
                             {path.replace(/^\//, '').split('/').pop()?.replace(/-/g, ' ') || 'View Article'}
                           </Link>
-                          <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
+                          <ExternalLink className="h-6 w-6 shrink-0 text-ods-accent" />
                         </div>
                       );
                     })}
@@ -562,32 +563,32 @@ export function ReleaseDetailPage({
                 {/* Migration Guide */}
                 {migrationGuideUrl && (
                   <div className="flex items-start gap-1">
-                    <BookMarked className="h-6 w-6 text-ods-text-secondary shrink-0" />
+                    <BookMarked className="h-6 w-6 shrink-0 text-ods-text-secondary" />
                     <a
                       href={migrationGuideUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-h4 text-ods-accent hover:underline"
+                      className="text-ods-accent text-h4 hover:underline"
                     >
                       📖 Migration Guide
                     </a>
-                    <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
+                    <ExternalLink className="h-6 w-6 shrink-0 text-ods-accent" />
                   </div>
                 )}
 
                 {/* Documentation */}
                 {documentationUrl && (
                   <div className="flex items-start gap-1">
-                    <BookMarked className="h-6 w-6 text-ods-text-secondary shrink-0" />
+                    <BookMarked className="h-6 w-6 shrink-0 text-ods-text-secondary" />
                     <a
                       href={documentationUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-h4 text-ods-accent hover:underline"
+                      className="text-ods-accent text-h4 hover:underline"
                     >
                       📚 Documentation
                     </a>
-                    <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
+                    <ExternalLink className="h-6 w-6 shrink-0 text-ods-accent" />
                   </div>
                 )}
               </div>
@@ -613,6 +614,6 @@ export function ReleaseDetailPage({
        * A keyed Fragment emits no DOM, so output is byte-identical either way.
        */}
       <Fragment key="related-content">{relatedContent}</Fragment>
-      </PageLayout>
+    </PageLayout>,
   );
 }

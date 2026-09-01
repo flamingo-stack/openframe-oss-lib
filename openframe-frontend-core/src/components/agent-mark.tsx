@@ -1,5 +1,5 @@
-import { MingoIcon } from './icons';
 import { FAE_AVATAR_DATA_URI } from '../assets/fae-avatar';
+import { MingoIcon } from './icons';
 
 export type AgentName = 'fae' | 'mingo';
 
@@ -19,7 +19,9 @@ export interface AgentMarkProps {
  * library. Just the glyph — the caller sizes/boxes it. Both branches are decorative.
  */
 export function AgentMark({ agent, className = '', faeAvatarSrc = FAE_AVATAR_DATA_URI }: AgentMarkProps) {
-  return agent === 'mingo'
-    ? <MingoIcon className={className} aria-hidden="true" focusable="false" />
-    : <img src={faeAvatarSrc} alt="" className={className} />;
+  return agent === 'mingo' ? (
+    <MingoIcon className={className} aria-hidden="true" focusable="false" />
+  ) : (
+    <img src={faeAvatarSrc} alt="" className={className} />
+  );
 }

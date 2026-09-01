@@ -1,32 +1,31 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../../utils/cn'
+import { cn } from '../../../utils/cn';
 
 /** @deprecated Use `data-table` instead. */
 export interface TableTimestampCellProps {
   /**
    * The timestamp to display (can be a Date, ISO string, or formatted string)
    */
-  timestamp: string | Date
+  timestamp: string | Date;
   /**
    * The ID to display below the timestamp
    */
-  id: string
+  id: string;
   /**
    * Optional label for the ID (e.g., "Log ID", "Chat ID")
    * If not provided, just shows the ID
    */
-  idLabel?: string
+  idLabel?: string;
   /**
    * Optional additional CSS classes for the container
    */
-  className?: string
+  className?: string;
   /**
    * Format the timestamp automatically if it's an ISO string or Date
    * @default true
    */
-  formatTimestamp?: boolean
+  formatTimestamp?: boolean;
 }
 
 /**
@@ -36,25 +35,25 @@ export interface TableTimestampCellProps {
  */
 function formatTimestampValue(timestamp: string | Date): string {
   if (timestamp instanceof Date) {
-    return timestamp.toLocaleString()
+    return timestamp.toLocaleString();
   }
 
   // If it looks like an ISO string, format it
   if (typeof timestamp === 'string') {
     // Check if already formatted (contains typical formatting chars)
     if (timestamp.includes(',') || (timestamp.includes('/') && timestamp.includes(':'))) {
-      return timestamp
+      return timestamp;
     }
 
     // Try to parse and format ISO strings
-    const date = new Date(timestamp)
+    const date = new Date(timestamp);
     if (!isNaN(date.getTime())) {
-      return date.toLocaleString()
+      return date.toLocaleString();
     }
   }
 
   // Return as-is if we can't parse it
-  return String(timestamp)
+  return String(timestamp);
 }
 
 /** @deprecated Use `data-table` instead. */
@@ -63,20 +62,14 @@ export function TableTimestampCell({
   id,
   idLabel,
   className,
-  formatTimestamp = true
+  formatTimestamp = true,
 }: TableTimestampCellProps) {
-  const displayTimestamp = formatTimestamp
-    ? formatTimestampValue(timestamp)
-    : String(timestamp)
+  const displayTimestamp = formatTimestamp ? formatTimestampValue(timestamp) : String(timestamp);
 
   return (
-    <div className={cn("flex flex-col justify-center shrink-0", className)}>
-      <span className="text-h4 text-ods-text-primary truncate">
-        {displayTimestamp}
-      </span>
-      <span className="text-h6 text-ods-text-secondary truncate">
-        {idLabel ? `${idLabel}: ${id}` : id}
-      </span>
+    <div className={cn('flex shrink-0 flex-col justify-center', className)}>
+      <span className="truncate text-ods-text-primary text-h4">{displayTimestamp}</span>
+      <span className="truncate text-ods-text-secondary text-h6">{idLabel ? `${idLabel}: ${id}` : id}</span>
     </div>
-  )
+  );
 }

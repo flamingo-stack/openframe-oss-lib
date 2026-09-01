@@ -1,5 +1,6 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { useState } from "react";
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import type { ComponentType } from 'react';
 import {
   DateFilterMenu,
   type DateFilterResult,
@@ -8,45 +9,45 @@ import {
   DatePickerInputSimple,
   type DatePickerBaseProps,
   type DateRange,
-} from "../components/ui/date-picker";
-import type { SortDirection } from "../components/ui/sort-column-item";
+} from '../components/ui/date-picker';
+import type { SortDirection } from '../components/ui/sort-column-item';
 
 // Using a simplified type for Storybook since DatePicker uses discriminated union
 type DatePickerStoryProps = DatePickerBaseProps & {
-  mode?: "single" | "range";
+  mode?: 'single' | 'range';
 };
 
 const meta: Meta<DatePickerStoryProps> = {
-  title: "UI/DatePicker",
-  component: DatePicker as React.ComponentType<DatePickerStoryProps>,
+  title: 'UI/DatePicker',
+  component: DatePicker as ComponentType<DatePickerStoryProps>,
   parameters: {
-    layout: "centered",
+    layout: 'centered',
     docs: {
       description: {
         component:
-          "DatePicker component with single date and date range selection modes. Follows ODS design system with dark theme styling.",
+          'DatePicker component with single date and date range selection modes. Follows ODS design system with dark theme styling.',
       },
     },
   },
-  tags: ["autodocs"],
+  tags: ['autodocs'],
   argTypes: {
     mode: {
-      control: "select",
-      options: ["single", "range"],
-      description: "Selection mode: single date or date range",
+      control: 'select',
+      options: ['single', 'range'],
+      description: 'Selection mode: single date or date range',
     },
     placeholder: {
-      control: "text",
-      description: "Placeholder text when no date is selected",
+      control: 'text',
+      description: 'Placeholder text when no date is selected',
     },
     disabled: {
-      control: "boolean",
-      description: "Whether the picker is disabled",
+      control: 'boolean',
+      description: 'Whether the picker is disabled',
     },
     numberOfMonths: {
-      control: "select",
+      control: 'select',
       options: [1, 2],
-      description: "Number of months to display in the calendar",
+      description: 'Number of months to display in the calendar',
     },
   },
 };
@@ -60,14 +61,7 @@ type Story = StoryObj<DatePickerStoryProps>;
 export const Single: Story = {
   render: function Render() {
     const [date, setDate] = useState<Date | undefined>();
-    return (
-      <DatePicker
-        mode="single"
-        placeholder="Select date"
-        value={date}
-        onChange={setDate}
-      />
-    );
+    return <DatePicker mode="single" placeholder="Select date" value={date} onChange={setDate} />;
   },
 };
 
@@ -77,14 +71,7 @@ export const Single: Story = {
 export const SingleWithValue: Story = {
   render: function Render() {
     const [date, setDate] = useState<Date | undefined>(new Date());
-    return (
-      <DatePicker
-        mode="single"
-        placeholder="Select date"
-        value={date}
-        onChange={setDate}
-      />
-    );
+    return <DatePicker mode="single" placeholder="Select date" value={date} onChange={setDate} />;
   },
 };
 
@@ -94,14 +81,7 @@ export const SingleWithValue: Story = {
 export const Range: Story = {
   render: function Render() {
     const [range, setRange] = useState<DateRange | undefined>();
-    return (
-      <DatePicker
-        mode="range"
-        placeholder="Select date range"
-        value={range}
-        onChange={setRange}
-      />
-    );
+    return <DatePicker mode="range" placeholder="Select date range" value={range} onChange={setRange} />;
   },
 };
 
@@ -118,14 +98,7 @@ export const RangeWithValue: Story = {
       from: today,
       to: nextWeek,
     });
-    return (
-      <DatePicker
-        mode="range"
-        placeholder="Select date range"
-        value={range}
-        onChange={setRange}
-      />
-    );
+    return <DatePicker mode="range" placeholder="Select date range" value={range} onChange={setRange} />;
   },
 };
 
@@ -136,18 +109,12 @@ export const RangeTwoMonths: Story = {
   render: function Render() {
     const [range, setRange] = useState<DateRange | undefined>();
     return (
-      <DatePicker
-        mode="range"
-        placeholder="Select date range"
-        value={range}
-        onChange={setRange}
-        numberOfMonths={2}
-      />
+      <DatePicker mode="range" placeholder="Select date range" value={range} onChange={setRange} numberOfMonths={2} />
     );
   },
   decorators: [
-    (Story) => (
-      <div style={{ width: "auto", minWidth: "640px" }}>
+    Story => (
+      <div style={{ width: 'auto', minWidth: '640px' }}>
         <Story />
       </div>
     ),
@@ -159,9 +126,7 @@ export const RangeTwoMonths: Story = {
  */
 export const Disabled: Story = {
   render: function Render() {
-    return (
-      <DatePicker mode="single" placeholder="Select date" disabled />
-    );
+    return <DatePicker mode="single" placeholder="Select date" disabled />;
   },
 };
 
@@ -171,15 +136,7 @@ export const Disabled: Story = {
 export const WithLabel: Story = {
   render: function Render() {
     const [date, setDate] = useState<Date | undefined>();
-    return (
-      <DatePicker
-        mode="single"
-        placeholder="Select date"
-        value={date}
-        onChange={setDate}
-        label="Start Date"
-      />
-    );
+    return <DatePicker mode="single" placeholder="Select date" value={date} onChange={setDate} label="Start Date" />;
   },
 };
 
@@ -188,14 +145,7 @@ export const WithLabel: Story = {
  */
 export const WithLabelAndError: Story = {
   render: function Render() {
-    return (
-      <DatePicker
-        mode="single"
-        placeholder="Select date"
-        label="Start Date"
-        error="Please select a valid date"
-      />
-    );
+    return <DatePicker mode="single" placeholder="Select date" label="Start Date" error="Please select a valid date" />;
   },
 };
 
@@ -205,15 +155,7 @@ export const WithLabelAndError: Story = {
 export const RangeWithLabel: Story = {
   render: function Render() {
     const [range, setRange] = useState<DateRange | undefined>();
-    return (
-      <DatePicker
-        mode="range"
-        placeholder="Select date range"
-        value={range}
-        onChange={setRange}
-        label="Period"
-      />
-    );
+    return <DatePicker mode="range" placeholder="Select date range" value={range} onChange={setRange} label="Period" />;
   },
 };
 
@@ -224,19 +166,13 @@ export const CustomFormat: Story = {
   render: function Render() {
     const [date, setDate] = useState<Date | undefined>(new Date());
     const formatDate = (d: Date) =>
-      d.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
+      d.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
       });
     return (
-      <DatePicker
-        mode="single"
-        placeholder="Select date"
-        value={date}
-        onChange={setDate}
-        formatDate={formatDate}
-      />
+      <DatePicker mode="single" placeholder="Select date" value={date} onChange={setDate} formatDate={formatDate} />
     );
   },
 };
@@ -274,13 +210,7 @@ export const WithConstraints: Story = {
 export const InputStyle: Story = {
   render: function Render() {
     const [date, setDate] = useState<Date | undefined>();
-    return (
-      <DatePickerInput
-        placeholder="Select date"
-        value={date}
-        onChange={setDate}
-      />
-    );
+    return <DatePickerInput placeholder="Select date" value={date} onChange={setDate} />;
   },
 };
 
@@ -291,13 +221,8 @@ export const InputWithLabel: Story = {
   render: function Render() {
     const [date, setDate] = useState<Date | undefined>();
     return (
-      <div style={{ width: "320px" }}>
-        <DatePickerInput
-          placeholder="Select date"
-          value={date}
-          onChange={setDate}
-          label="Event Date"
-        />
+      <div style={{ width: '320px' }}>
+        <DatePickerInput placeholder="Select date" value={date} onChange={setDate} label="Event Date" />
       </div>
     );
   },
@@ -309,12 +234,8 @@ export const InputWithLabel: Story = {
 export const InputWithLabelAndError: Story = {
   render: function Render() {
     return (
-      <div style={{ width: "320px" }}>
-        <DatePickerInput
-          placeholder="Select date"
-          label="Event Date"
-          error="Date is required"
-        />
+      <div style={{ width: '320px' }}>
+        <DatePickerInput placeholder="Select date" label="Event Date" error="Date is required" />
       </div>
     );
   },
@@ -328,16 +249,16 @@ export const InputWithTimeEmpty: Story = {
     const [date, setDate] = useState<Date | undefined>();
 
     const formatDateTime = () => {
-      if (!date) return "No date selected";
-      const dateStr = date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      if (!date) return 'No date selected';
+      const dateStr = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
-      const timeStr = date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
+      const timeStr = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
         hour12: true,
       });
       return `${dateStr} at ${timeStr}`;
@@ -345,21 +266,16 @@ export const InputWithTimeEmpty: Story = {
 
     return (
       <div className="flex flex-col gap-4">
-        <DatePickerInput
-          placeholder="Select date and time"
-          value={date}
-          onChange={setDate}
-          showTime
-        />
-        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+        <DatePickerInput placeholder="Select date and time" value={date} onChange={setDate} showTime />
+        <div className="rounded-lg border border-ods-border bg-ods-bg p-3 text-[14px] text-ods-text-secondary">
           <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
   },
   decorators: [
-    (Story) => (
-      <div style={{ width: "560px" }}>
+    Story => (
+      <div style={{ width: '560px' }}>
         <Story />
       </div>
     ),
@@ -374,16 +290,16 @@ export const InputWithTime: Story = {
     const [date, setDate] = useState<Date | undefined>(new Date());
 
     const formatDateTime = () => {
-      if (!date) return "No date selected";
-      const dateStr = date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      if (!date) return 'No date selected';
+      const dateStr = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
-      const timeStr = date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
+      const timeStr = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
         hour12: true,
       });
       return `${dateStr} at ${timeStr}`;
@@ -391,21 +307,16 @@ export const InputWithTime: Story = {
 
     return (
       <div className="flex flex-col gap-4">
-        <DatePickerInput
-          placeholder="Select date"
-          value={date}
-          onChange={setDate}
-          showTime
-        />
-        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+        <DatePickerInput placeholder="Select date" value={date} onChange={setDate} showTime />
+        <div className="rounded-lg border border-ods-border bg-ods-bg p-3 text-[14px] text-ods-text-secondary">
           <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
   },
   decorators: [
-    (Story) => (
-      <div style={{ width: "560px" }}>
+    Story => (
+      <div style={{ width: '560px' }}>
         <Story />
       </div>
     ),
@@ -420,16 +331,16 @@ export const InputWithTime24Hour: Story = {
     const [date, setDate] = useState<Date | undefined>(new Date());
 
     const formatDateTime = () => {
-      if (!date) return "No date selected";
-      const dateStr = date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      if (!date) return 'No date selected';
+      const dateStr = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
-      const timeStr = date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
+      const timeStr = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
         hour12: false,
       });
       return `${dateStr} at ${timeStr}`;
@@ -437,22 +348,16 @@ export const InputWithTime24Hour: Story = {
 
     return (
       <div className="flex flex-col gap-4">
-        <DatePickerInput
-          placeholder="Select date"
-          value={date}
-          onChange={setDate}
-          showTime
-          use24HourFormat
-        />
-        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+        <DatePickerInput placeholder="Select date" value={date} onChange={setDate} showTime use24HourFormat />
+        <div className="rounded-lg border border-ods-border bg-ods-bg p-3 text-[14px] text-ods-text-secondary">
           <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
   },
   decorators: [
-    (Story) => (
-      <div style={{ width: "480px" }}>
+    Story => (
+      <div style={{ width: '480px' }}>
         <Story />
       </div>
     ),
@@ -469,40 +374,40 @@ export const AllVariants: Story = {
     const [inputDate, setInputDate] = useState<Date | undefined>(new Date());
 
     const formatSingleDate = (date: Date | undefined) => {
-      if (!date) return "No date selected";
-      return date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      if (!date) return 'No date selected';
+      return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
     };
 
     const formatRangeDate = (range: DateRange | undefined) => {
-      if (!range?.from) return "No range selected";
-      const fromStr = range.from.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
+      if (!range?.from) return 'No range selected';
+      const fromStr = range.from.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
       });
       if (!range.to) return `${fromStr} - ...`;
-      const toStr = range.to.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      const toStr = range.to.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
       return `${fromStr} - ${toStr}`;
     };
 
     const formatDateTime = () => {
-      if (!inputDate) return "No date selected";
-      const dateStr = inputDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      if (!inputDate) return 'No date selected';
+      const dateStr = inputDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
-      const timeStr = inputDate.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
+      const timeStr = inputDate.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
         hour12: true,
       });
       return `${dateStr} at ${timeStr}`;
@@ -511,69 +416,40 @@ export const AllVariants: Story = {
     return (
       <div
         style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "1.5rem",
-          width: "560px",
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.5rem',
+          width: '560px',
         }}
       >
         <div>
-          <label className="text-[14px] text-ods-text-secondary mb-2 block">
-            Single Date Picker
-          </label>
-          <DatePicker
-            mode="single"
-            placeholder="Select date"
-            value={singleDate}
-            onChange={setSingleDate}
-          />
-          <div className="text-[12px] text-ods-text-secondary mt-2">
-            Selected: {formatSingleDate(singleDate)}
-          </div>
+          <label className="mb-2 block text-[14px] text-ods-text-secondary">Single Date Picker</label>
+          <DatePicker mode="single" placeholder="Select date" value={singleDate} onChange={setSingleDate} />
+          <div className="mt-2 text-[12px] text-ods-text-secondary">Selected: {formatSingleDate(singleDate)}</div>
         </div>
 
         <div>
-          <label className="text-[14px] text-ods-text-secondary mb-2 block">
-            Date Range Picker
-          </label>
-          <DatePicker
-            mode="range"
-            placeholder="Select date range"
-            value={rangeDate}
-            onChange={setRangeDate}
-          />
-          <div className="text-[12px] text-ods-text-secondary mt-2">
-            Selected: {formatRangeDate(rangeDate)}
-          </div>
+          <label className="mb-2 block text-[14px] text-ods-text-secondary">Date Range Picker</label>
+          <DatePicker mode="range" placeholder="Select date range" value={rangeDate} onChange={setRangeDate} />
+          <div className="mt-2 text-[12px] text-ods-text-secondary">Selected: {formatRangeDate(rangeDate)}</div>
         </div>
 
         <div>
-          <label className="text-[14px] text-ods-text-secondary mb-2 block">
-            Date Picker with Time
-          </label>
-          <DatePickerInput
-            placeholder="Select date"
-            value={inputDate}
-            onChange={setInputDate}
-            showTime
-          />
-          <div className="text-[12px] text-ods-text-secondary mt-2">
-            Selected: {formatDateTime()}
-          </div>
+          <label className="mb-2 block text-[14px] text-ods-text-secondary">Date Picker with Time</label>
+          <DatePickerInput placeholder="Select date" value={inputDate} onChange={setInputDate} showTime />
+          <div className="mt-2 text-[12px] text-ods-text-secondary">Selected: {formatDateTime()}</div>
         </div>
 
         <div>
-          <label className="text-[14px] text-ods-text-secondary mb-2 block">
-            Disabled
-          </label>
+          <label className="mb-2 block text-[14px] text-ods-text-secondary">Disabled</label>
           <DatePicker mode="single" placeholder="Select date" disabled />
         </div>
       </div>
     );
   },
   decorators: [
-    (Story) => (
-      <div style={{ width: "560px" }}>
+    Story => (
+      <div style={{ width: '560px' }}>
         <Story />
       </div>
     ),
@@ -592,16 +468,16 @@ export const SimpleInputWithTime: Story = {
     const [date, setDate] = useState<Date | undefined>(new Date());
 
     const formatDateTime = () => {
-      if (!date) return "No date selected";
-      const dateStr = date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      if (!date) return 'No date selected';
+      const dateStr = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
-      const timeStr = date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
+      const timeStr = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
         hour12: true,
       });
       return `${dateStr} at ${timeStr}`;
@@ -609,22 +485,16 @@ export const SimpleInputWithTime: Story = {
 
     return (
       <div className="flex flex-col gap-4">
-        <DatePickerInputSimple
-          placeholder="Select date"
-          value={date}
-          onChange={setDate}
-          showTime
-          timeInterval={30}
-        />
-        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+        <DatePickerInputSimple placeholder="Select date" value={date} onChange={setDate} showTime timeInterval={30} />
+        <div className="rounded-lg border border-ods-border bg-ods-bg p-3 text-[14px] text-ods-text-secondary">
           <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
   },
   decorators: [
-    (Story) => (
-      <div style={{ width: "480px" }}>
+    Story => (
+      <div style={{ width: '480px' }}>
         <Story />
       </div>
     ),
@@ -639,16 +509,16 @@ export const SimpleInputWithTime15Min: Story = {
     const [date, setDate] = useState<Date | undefined>(new Date());
 
     const formatDateTime = () => {
-      if (!date) return "No date selected";
-      const dateStr = date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      if (!date) return 'No date selected';
+      const dateStr = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
-      const timeStr = date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
+      const timeStr = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
         hour12: true,
       });
       return `${dateStr} at ${timeStr}`;
@@ -656,22 +526,16 @@ export const SimpleInputWithTime15Min: Story = {
 
     return (
       <div className="flex flex-col gap-4">
-        <DatePickerInputSimple
-          placeholder="Select date"
-          value={date}
-          onChange={setDate}
-          showTime
-          timeInterval={15}
-        />
-        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+        <DatePickerInputSimple placeholder="Select date" value={date} onChange={setDate} showTime timeInterval={15} />
+        <div className="rounded-lg border border-ods-border bg-ods-bg p-3 text-[14px] text-ods-text-secondary">
           <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
   },
   decorators: [
-    (Story) => (
-      <div style={{ width: "480px" }}>
+    Story => (
+      <div style={{ width: '480px' }}>
         <Story />
       </div>
     ),
@@ -686,16 +550,16 @@ export const SimpleInputWithTime24Hour: Story = {
     const [date, setDate] = useState<Date | undefined>(new Date());
 
     const formatDateTime = () => {
-      if (!date) return "No date selected";
-      const dateStr = date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      if (!date) return 'No date selected';
+      const dateStr = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
-      const timeStr = date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
+      const timeStr = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
         hour12: false,
       });
       return `${dateStr} at ${timeStr}`;
@@ -711,15 +575,15 @@ export const SimpleInputWithTime24Hour: Story = {
           timeInterval={30}
           use24HourFormat
         />
-        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+        <div className="rounded-lg border border-ods-border bg-ods-bg p-3 text-[14px] text-ods-text-secondary">
           <span className="text-ods-text-primary">Selected:</span> {formatDateTime()}
         </div>
       </div>
     );
   },
   decorators: [
-    (Story) => (
-      <div style={{ width: "480px" }}>
+    Story => (
+      <div style={{ width: '480px' }}>
         <Story />
       </div>
     ),
@@ -735,28 +599,24 @@ export const SimpleInputDateOnly: Story = {
 
     return (
       <div className="flex flex-col gap-4">
-        <DatePickerInputSimple
-          placeholder="Select date"
-          value={date}
-          onChange={setDate}
-        />
-        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
-          <span className="text-ods-text-primary">Selected:</span>{" "}
+        <DatePickerInputSimple placeholder="Select date" value={date} onChange={setDate} />
+        <div className="rounded-lg border border-ods-border bg-ods-bg p-3 text-[14px] text-ods-text-secondary">
+          <span className="text-ods-text-primary">Selected:</span>{' '}
           {date
-            ? date.toLocaleDateString("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                year: "numeric",
+            ? date.toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
               })
-            : "No date selected"}
+            : 'No date selected'}
         </div>
       </div>
     );
   },
   decorators: [
-    (Story) => (
-      <div style={{ width: "320px" }}>
+    Story => (
+      <div style={{ width: '320px' }}>
         <Story />
       </div>
     ),
@@ -767,11 +627,9 @@ export const SimpleInputDateOnly: Story = {
 // DateFilterMenu Stories (sort + calendar filter popover from Figma)
 // ============================================================================
 
-const fmtSort = (sort: SortDirection) =>
-  sort === "asc" ? "Ascending" : "Descending";
+const fmtSort = (sort: SortDirection) => (sort === 'asc' ? 'Ascending' : 'Descending');
 
-const fmtDay = (d: Date) =>
-  d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const fmtDay = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 /**
  * DateFilterMenu — calendar-icon trigger opens a popover with a sort selector,
@@ -785,23 +643,23 @@ export const FilterMenuRange: Story = {
     const [applied, setApplied] = useState<DateFilterResult | null>(null);
 
     const summary = () => {
-      if (!applied) return "Nothing applied yet";
+      if (!applied) return 'Nothing applied yet';
       const { sort, range } = applied;
       const r = range?.from
         ? range.to
           ? `${fmtDay(range.from)} - ${fmtDay(range.to)}`
           : fmtDay(range.from)
-        : "all dates";
+        : 'all dates';
       return `Sort ${fmtSort(sort)} · ${r}`;
     };
 
     return (
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          <span className="text-h4 text-ods-text-primary">Last activity</span>
+          <span className="text-ods-text-primary text-h4">Last activity</span>
           <DateFilterMenu mode="range" onApply={setApplied} />
         </div>
-        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+        <div className="rounded-lg border border-ods-border bg-ods-bg p-3 text-[14px] text-ods-text-secondary">
           <span className="text-ods-text-primary">Applied:</span> {summary()}
         </div>
       </div>
@@ -819,16 +677,14 @@ export const FilterMenuSingle: Story = {
     return (
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          <span className="text-h4 text-ods-text-primary">Date &amp; time</span>
+          <span className="text-ods-text-primary text-h4">Date &amp; time</span>
           <DateFilterMenu mode="single" sort="asc" onApply={setApplied} />
         </div>
-        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
-          <span className="text-ods-text-primary">Applied:</span>{" "}
+        <div className="rounded-lg border border-ods-border bg-ods-bg p-3 text-[14px] text-ods-text-secondary">
+          <span className="text-ods-text-primary">Applied:</span>{' '}
           {applied
-            ? `Sort ${fmtSort(applied.sort)} · ${
-                applied.date ? fmtDay(applied.date) : "all dates"
-              }`
-            : "Nothing applied yet"}
+            ? `Sort ${fmtSort(applied.sort)} · ${applied.date ? fmtDay(applied.date) : 'all dates'}`
+            : 'Nothing applied yet'}
         </div>
       </div>
     );
@@ -844,58 +700,49 @@ export const FilterMenuWithTable: Story = {
   render: function Render() {
     type Row = { id: string; activity: Date };
     const rows: Row[] = [
-      { id: "Acme Corp", activity: new Date(2026, 4, 2) },
-      { id: "Globex", activity: new Date(2026, 4, 6) },
-      { id: "Initech", activity: new Date(2026, 4, 11) },
-      { id: "Umbrella", activity: new Date(2026, 4, 18) },
-      { id: "Stark Ind.", activity: new Date(2026, 4, 24) },
+      { id: 'Acme Corp', activity: new Date(2026, 4, 2) },
+      { id: 'Globex', activity: new Date(2026, 4, 6) },
+      { id: 'Initech', activity: new Date(2026, 4, 11) },
+      { id: 'Umbrella', activity: new Date(2026, 4, 18) },
+      { id: 'Stark Ind.', activity: new Date(2026, 4, 24) },
     ];
 
     const [filter, setFilter] = useState<DateFilterResult>({
-      sort: "desc",
+      sort: 'desc',
       range: undefined,
     });
 
     const visible = rows
-      .filter((row) => {
+      .filter(row => {
         const { from, to } = filter.range ?? {};
         if (from && row.activity < from) return false;
         if (to && row.activity > to) return false;
         return true;
       })
       .sort((a, b) =>
-        filter.sort === "asc"
+        filter.sort === 'asc'
           ? a.activity.getTime() - b.activity.getTime()
-          : b.activity.getTime() - a.activity.getTime()
+          : b.activity.getTime() - a.activity.getTime(),
       );
 
     return (
       <div className="flex flex-col gap-3" style={{ width: 360 }}>
         <div className="flex items-center justify-between">
-          <span className="text-h4 text-ods-text-primary">Organizations</span>
-          <DateFilterMenu
-            mode="range"
-            sort={filter.sort}
-            range={filter.range}
-            onApply={setFilter}
-          />
+          <span className="text-ods-text-primary text-h4">Organizations</span>
+          <DateFilterMenu mode="range" sort={filter.sort} range={filter.range} onApply={setFilter} />
         </div>
-        <div className="rounded-lg border border-ods-border overflow-hidden">
-          {visible.map((row) => (
+        <div className="overflow-hidden rounded-lg border border-ods-border">
+          {visible.map(row => (
             <div
               key={row.id}
-              className="flex items-center justify-between px-3 py-2 border-b border-ods-border last:border-b-0"
+              className="flex items-center justify-between border-b border-ods-border px-3 py-2 last:border-b-0"
             >
-              <span className="text-ods-text-primary text-[14px]">{row.id}</span>
-              <span className="text-ods-text-secondary text-[14px]">
-                {fmtDay(row.activity)}
-              </span>
+              <span className="text-[14px] text-ods-text-primary">{row.id}</span>
+              <span className="text-[14px] text-ods-text-secondary">{fmtDay(row.activity)}</span>
             </div>
           ))}
           {visible.length === 0 && (
-            <div className="px-3 py-4 text-center text-ods-text-secondary text-[14px]">
-              No results in range
-            </div>
+            <div className="px-3 py-4 text-center text-[14px] text-ods-text-secondary">No results in range</div>
           )}
         </div>
       </div>

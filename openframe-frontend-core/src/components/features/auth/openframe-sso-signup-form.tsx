@@ -1,45 +1,45 @@
-'use client'
+'use client';
 
-import type * as React from 'react'
-import { cn } from '../../../utils/cn'
-import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
-import { Button } from '../../ui/button'
-import { Input } from '../../ui/input'
-import { PasswordInput } from '../../ui/password-input'
+import type { KeyboardEvent } from 'react';
+import { useDeferredError } from '../../../hooks/ui/use-deferred-error';
+import { cn } from '../../../utils/cn';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { PasswordInput } from '../../ui/password-input';
 
 export interface OpenFrameSsoSignUpFormProps {
   /** Controlled field values */
-  email: string
-  firstName: string
-  lastName: string
-  password: string
-  confirmPassword: string
-  onEmailChange: (value: string) => void
-  onFirstNameChange: (value: string) => void
-  onLastNameChange: (value: string) => void
-  onPasswordChange: (value: string) => void
-  onConfirmPasswordChange: (value: string) => void
+  email: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+  confirmPassword: string;
+  onEmailChange: (value: string) => void;
+  onFirstNameChange: (value: string) => void;
+  onLastNameChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onConfirmPasswordChange: (value: string) => void;
   /** Primary submit ("Continue") */
-  onSubmit: () => void
-  onForgotPassword: () => void
+  onSubmit: () => void;
+  onForgotPassword: () => void;
   /** Locks the email field, e.g. when it was verified on a previous step. */
-  emailReadOnly?: boolean
-  submitDisabled?: boolean
-  loading?: boolean
-  disabled?: boolean
+  emailReadOnly?: boolean;
+  submitDisabled?: boolean;
+  loading?: boolean;
+  disabled?: boolean;
   errors?: {
-    email?: string
-    firstName?: string
-    lastName?: string
-    password?: string
-    confirmPassword?: string
-  }
-  title?: string
-  subtitle?: string
-  emailLabel?: string
-  submitLabel?: string
-  forgotPasswordLabel?: string
-  className?: string
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
+  };
+  title?: string;
+  subtitle?: string;
+  emailLabel?: string;
+  submitLabel?: string;
+  forgotPasswordLabel?: string;
+  className?: string;
 }
 
 /**
@@ -71,20 +71,20 @@ export function OpenFrameSsoSignUpForm({
   forgotPasswordLabel = 'Forgot Password?',
   className,
 }: OpenFrameSsoSignUpFormProps) {
-  const fieldsDisabled = disabled || loading
+  const fieldsDisabled = disabled || loading;
 
   // Validation messages are deferred while the user is typing (shown on blur or after a pause).
-  const emailErr = useDeferredError(errors?.email, email)
-  const firstNameErr = useDeferredError(errors?.firstName, firstName)
-  const lastNameErr = useDeferredError(errors?.lastName, lastName)
-  const passwordErr = useDeferredError(errors?.password, password)
-  const confirmErr = useDeferredError(errors?.confirmPassword, confirmPassword)
+  const emailErr = useDeferredError(errors?.email, email);
+  const firstNameErr = useDeferredError(errors?.firstName, firstName);
+  const lastNameErr = useDeferredError(errors?.lastName, lastName);
+  const passwordErr = useDeferredError(errors?.password, password);
+  const confirmErr = useDeferredError(errors?.confirmPassword, confirmPassword);
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldsDisabled && !submitDisabled) {
-      onSubmit()
+      onSubmit();
     }
-  }
+  };
 
   return (
     <div
@@ -95,8 +95,8 @@ export function OpenFrameSsoSignUpForm({
     >
       {/* Header */}
       <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-        <h1 className="text-h2 text-ods-text-primary tracking-[-0.64px]">{title}</h1>
-        <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
+        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{title}</h1>
+        <p className="text-ods-text-secondary text-h4">{subtitle}</p>
       </div>
 
       <Input
@@ -107,7 +107,7 @@ export function OpenFrameSsoSignUpForm({
         error={emailErr.error}
         disabled={fieldsDisabled || emailReadOnly}
         onBlur={emailErr.onBlur}
-        onChange={(event) => onEmailChange(event.target.value)}
+        onChange={event => onEmailChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
 
@@ -119,7 +119,7 @@ export function OpenFrameSsoSignUpForm({
         error={firstNameErr.error}
         disabled={fieldsDisabled}
         onBlur={firstNameErr.onBlur}
-        onChange={(event) => onFirstNameChange(event.target.value)}
+        onChange={event => onFirstNameChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
       <Input
@@ -129,7 +129,7 @@ export function OpenFrameSsoSignUpForm({
         error={lastNameErr.error}
         disabled={fieldsDisabled}
         onBlur={lastNameErr.onBlur}
-        onChange={(event) => onLastNameChange(event.target.value)}
+        onChange={event => onLastNameChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
       <PasswordInput
@@ -139,7 +139,7 @@ export function OpenFrameSsoSignUpForm({
         error={passwordErr.error}
         disabled={fieldsDisabled}
         onBlur={passwordErr.onBlur}
-        onChange={(event) => onPasswordChange(event.target.value)}
+        onChange={event => onPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
       <PasswordInput
@@ -149,7 +149,7 @@ export function OpenFrameSsoSignUpForm({
         error={confirmErr.error}
         disabled={fieldsDisabled}
         onBlur={confirmErr.onBlur}
-        onChange={(event) => onConfirmPasswordChange(event.target.value)}
+        onChange={event => onConfirmPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
 
@@ -178,5 +178,5 @@ export function OpenFrameSsoSignUpForm({
         </Button>
       </div>
     </div>
-  )
+  );
 }

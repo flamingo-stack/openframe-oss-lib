@@ -14,6 +14,10 @@
  * pass whatever entity-type discriminator their reverse-proxied
  * `/api/captions/...` route expects.
  */
+/** Same-origin default — for hosts that serve the route themselves (the hub).
+ *  Cross-origin embedders set `endpoints.captionsUrlPrefix` instead. */
+const DEFAULT_CAPTIONS_PATH = '/api/captions';
+
 export function getCaptionsUrl(
   entityType: string,
   entityId: string | number,
@@ -24,13 +28,13 @@ export function getCaptionsUrl(
      * entity's highlight_srt_content (AI highlight reel captions); omitted
      * means the main video's srt_content.
      */
-    variant?: 'highlight'
+    variant?: 'highlight';
   },
 ): string | undefined {
-  if (!srtContent) return undefined
-  const hash = `${srtContent.length}-${srtContent.slice(0, 8).replace(/\s/g, '')}`
-  const variant = options?.variant ? `&variant=${options.variant}` : ''
-  return `${DEFAULT_CAPTIONS_PATH}/${entityType}/${entityId}?v=${hash}${variant}`
+  if (!srtContent) return undefined;
+  const hash = `${srtContent.length}-${srtContent.slice(0, 8).replace(/\s/g, '')}`;
+  const variant = options?.variant ? `&variant=${options.variant}` : '';
+  return `${DEFAULT_CAPTIONS_PATH}/${entityType}/${entityId}?v=${hash}${variant}`;
 }
 
 /** The slice of `ChatRuntime.endpoints` this module needs. */
@@ -39,15 +43,11 @@ export interface CaptionsEndpoints {
    *  params) — e.g. `/content/api/captions` in a proxied embedder. Unset ⇒
    *  the same-origin relative default `/api/captions` (the hub). Wired by
    *  hosts exactly like every other endpoint on `ChatRuntime.endpoints`. */
-  captionsUrlPrefix?: string
+  captionsUrlPrefix?: string;
 }
 
-/** Same-origin default — for hosts that serve the route themselves (the hub).
- *  Cross-origin embedders set `endpoints.captionsUrlPrefix` instead. */
-const DEFAULT_CAPTIONS_PATH = '/api/captions'
-
 function resolveCaptionsBase(endpoints?: CaptionsEndpoints | null): string {
-  return endpoints?.captionsUrlPrefix || DEFAULT_CAPTIONS_PATH
+  return endpoints?.captionsUrlPrefix || DEFAULT_CAPTIONS_PATH;
 }
 
 /** Rebase an already-built relative `/api/captions/...` URL (e.g. one the hub
@@ -57,10 +57,10 @@ export function rebaseCaptionsUrl<T extends string | null | undefined>(
   endpoints: CaptionsEndpoints | null | undefined,
   url: T,
 ): T | string {
-  if (!url || !url.startsWith(`${DEFAULT_CAPTIONS_PATH}/`)) return url
-  const base = resolveCaptionsBase(endpoints)
-  if (base === DEFAULT_CAPTIONS_PATH) return url
-  return `${base}${url.slice(DEFAULT_CAPTIONS_PATH.length)}`
+  if (!url || !url.startsWith(`${DEFAULT_CAPTIONS_PATH}/`)) return url;
+  const base = resolveCaptionsBase(endpoints);
+  if (base === DEFAULT_CAPTIONS_PATH) return url;
+  return `${base}${url.slice(DEFAULT_CAPTIONS_PATH.length)}`;
 }
 
 /**
@@ -76,8 +76,8 @@ export function buildCaptionsUrl(
   srtContent?: string | null,
   options?: { variant?: 'highlight' },
 ): string | undefined {
-  const rel = getCaptionsUrl(entityType, entityId, srtContent, options)
-  return rel ? (rebaseCaptionsUrl(endpoints, rel) as string) : undefined
+  const rel = getCaptionsUrl(entityType, entityId, srtContent, options);
+  return rel ? rebaseCaptionsUrl(endpoints, rel) : undefined;
 }
 
 /** The two SRT columns every video entity carries — main video + highlight
@@ -85,14 +85,14 @@ export function buildCaptionsUrl(
  *  (`?variant=highlight` is the only difference), so consumers never derive
  *  the two URLs by hand. */
 export interface CaptionSrtFields {
-  id: string | number
-  srt_content?: string | null
-  highlight_srt_content?: string | null
+  id: string | number;
+  srt_content?: string | null;
+  highlight_srt_content?: string | null;
 }
 
 export interface EntityCaptionUrls {
-  captionsUrl?: string
-  highlightCaptionsUrl?: string
+  captionsUrl?: string;
+  highlightCaptionsUrl?: string;
 }
 
 /**
@@ -107,13 +107,13 @@ export function getEntityCaptionUrls(
   entityType: string,
   entity: CaptionSrtFields | null | undefined,
 ): EntityCaptionUrls {
-  if (!entity) return {}
+  if (!entity) return {};
   return {
     captionsUrl: buildCaptionsUrl(endpoints, entityType, entity.id, entity.srt_content),
     highlightCaptionsUrl: buildCaptionsUrl(endpoints, entityType, entity.id, entity.highlight_srt_content, {
       variant: 'highlight',
     }),
-  }
+  };
 }
 
 /**
@@ -130,11 +130,11 @@ export function getEntityCaptionUrlsById(
   entityType: string,
   entityId: string | number,
 ): Required<EntityCaptionUrls> {
-  const base = resolveCaptionsBase(endpoints)
+  const base = resolveCaptionsBase(endpoints);
   return {
     captionsUrl: `${base}/${entityType}/${entityId}`,
     highlightCaptionsUrl: `${base}/${entityType}/${entityId}?variant=highlight`,
-  }
+  };
 }
 
 /**
@@ -144,5 +144,5 @@ export function getEntityCaptionUrlsById(
  * exists exactly once.
  */
 export function captionsEntityTypeForDocType(docType: string): string {
-  return docType === 'podcast' ? 'podcast_episode' : docType
+  return docType === 'podcast' ? 'podcast_episode' : docType;
 }

@@ -1,7 +1,18 @@
 // Unified Platform Types
 // Used across announcements, blog posts, and platform configuration
 
-export type PlatformName = 'openmsp' | 'tmcg' | 'flamingo' | 'flamingo-teaser' | 'universal' | 'marketing-hub' | 'product-hub' | 'revenue-hub' | 'people-hub' | 'openframe' | 'company-hub';
+export type PlatformName =
+  | 'openmsp'
+  | 'tmcg'
+  | 'flamingo'
+  | 'flamingo-teaser'
+  | 'universal'
+  | 'marketing-hub'
+  | 'product-hub'
+  | 'revenue-hub'
+  | 'people-hub'
+  | 'openframe'
+  | 'company-hub';
 
 // Database Platform Model (from platforms table)
 export interface PlatformRecord {
@@ -32,10 +43,10 @@ export interface PlatformRecord {
 
 // Platform Configuration for API
 export interface PlatformConfig {
-  id: string;  // UUID from database (required)
-  value: string;  // same as name
-  label: string;  // same as display_name
-  name: string;   // same as name
+  id: string; // UUID from database (required)
+  value: string; // same as name
+  label: string; // same as display_name
+  name: string; // same as name
   display_name: string;
   default_color: string;
   default_icon: string;
@@ -61,4 +72,4 @@ export interface PlatformStats {
   announcement_count: number;
   blog_post_count: number;
   is_active: boolean;
-} 
+}

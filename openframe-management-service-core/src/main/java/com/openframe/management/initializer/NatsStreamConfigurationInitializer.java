@@ -68,6 +68,12 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .subjects(List.of("machine.*.hostname"))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
+                    .build(),
+            StreamConfiguration.builder()
+                    .name("EXECUTION_ACKNOWLEDGE")
+                    .subjects(List.of("machine.*.execution.acknowledge"))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
                     .build()
     );
 

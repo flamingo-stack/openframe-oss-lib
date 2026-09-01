@@ -40,7 +40,7 @@ export const Default: Story = {
   render: function DefaultList(args) {
     const [selected, setSelected] = useState<string[]>(args.selectedIds);
     return (
-      <div className="w-[400px] border border-ods-border rounded-md overflow-hidden">
+      <div className="w-[400px] overflow-hidden rounded-md border border-ods-border">
         <FilterList {...args} selectedIds={selected} onChange={setSelected} />
       </div>
     );
@@ -60,7 +60,7 @@ export const SingleSelect: Story = {
   render: function SingleList(args) {
     const [selected, setSelected] = useState<string[]>(args.selectedIds);
     return (
-      <div className="w-[400px] border border-ods-border rounded-md overflow-hidden">
+      <div className="w-[400px] overflow-hidden rounded-md border border-ods-border">
         <FilterList {...args} selectedIds={selected} onChange={setSelected} />
       </div>
     );
@@ -83,7 +83,7 @@ export const NoMeta: Story = {
   render: function NoMetaList(args) {
     const [selected, setSelected] = useState<string[]>(args.selectedIds);
     return (
-      <div className="w-[400px] border border-ods-border rounded-md overflow-hidden">
+      <div className="w-[400px] overflow-hidden rounded-md border border-ods-border">
         <FilterList {...args} selectedIds={selected} onChange={setSelected} />
       </div>
     );
@@ -106,7 +106,7 @@ export const WithDisabledItem: Story = {
   render: function DisabledList(args) {
     const [selected, setSelected] = useState<string[]>(args.selectedIds);
     return (
-      <div className="w-[400px] border border-ods-border rounded-md overflow-hidden">
+      <div className="w-[400px] overflow-hidden rounded-md border border-ods-border">
         <FilterList {...args} selectedIds={selected} onChange={setSelected} />
       </div>
     );
@@ -118,20 +118,12 @@ export const WithDisabledItem: Story = {
  */
 export const ItemStates: StoryObj = {
   render: () => (
-    <div className="w-[400px] flex flex-col gap-4">
-      <div className="border border-ods-border rounded-md overflow-hidden">
-        <FilterListItem
-          title="Organization Name"
-          meta={['Category', '100 devices']}
-          selected={false}
-        />
+    <div className="flex w-[400px] flex-col gap-4">
+      <div className="overflow-hidden rounded-md border border-ods-border">
+        <FilterListItem title="Organization Name" meta={['Category', '100 devices']} selected={false} />
       </div>
-      <div className="border border-ods-border rounded-md overflow-hidden">
-        <FilterListItem
-          title="Organization Name"
-          meta={['Category', '100 devices']}
-          selected={true}
-        />
+      <div className="overflow-hidden rounded-md border border-ods-border">
+        <FilterListItem title="Organization Name" meta={['Category', '100 devices']} selected={true} />
       </div>
     </div>
   ),
@@ -160,7 +152,7 @@ export const LongTitles: Story = {
   render: function LongList(args) {
     const [selected, setSelected] = useState<string[]>(args.selectedIds);
     return (
-      <div className="w-[400px] border border-ods-border rounded-md overflow-hidden">
+      <div className="w-[400px] overflow-hidden rounded-md border border-ods-border">
         <FilterList {...args} selectedIds={selected} onChange={setSelected} />
       </div>
     );
