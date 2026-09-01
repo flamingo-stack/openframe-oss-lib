@@ -61,7 +61,6 @@ public class SsoTenantRegistrationService {
     private void preProcessRegistration(SsoTenantRegistrationInitRequest request) {
         TenantRegistrationRequest preReq = TenantRegistrationRequest.builder()
                 .email(request.getEmail())
-                .accessCode(request.getAccessCode())
                 .tenantDomain(request.getTenantDomain())
                 .build();
         registrationProcessor.preProcessTenantRegistration(preReq);
@@ -79,7 +78,6 @@ public class SsoTenantRegistrationService {
                 provider,
                 request.getRedirectTo(),
                 request.isAuthMobile(),
-                request.getAccessCode(),
                 boundedAttribution(request.getAttribution()),
                 issuedAt,
                 issuedAt + COOKIE_TTL_SECONDS

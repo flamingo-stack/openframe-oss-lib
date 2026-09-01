@@ -114,7 +114,6 @@ public class SsoLoginController {
     @GetMapping(path = "/login/sso/complete")
     public void completeSsoRegistration(@RequestParam("tenantName") String tenantName,
                                         @RequestParam("tenantDomain") String tenantDomain,
-                                        @RequestParam(value = "accessCode", required = false) String accessCode,
                                         Authentication authentication,
                                         HttpServletRequest httpRequest,
                                         HttpServletResponse httpResponse) throws IOException {
@@ -130,7 +129,6 @@ public class SsoLoginController {
 
             TenantRegistrationRequest reg = TenantRegistrationRequest.builder()
                     .email(email.toLowerCase(Locale.ROOT))
-                    .accessCode(accessCode)
                     .firstName(names[0] != null ? names[0] : "")
                     .lastName(names[1] != null ? names[1] : "")
                     .password(UUID.randomUUID().toString())
