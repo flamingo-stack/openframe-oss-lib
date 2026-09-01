@@ -1,6 +1,7 @@
 package com.openframe.authz.dto;
 
 import com.openframe.core.validation.TenantDomain;
+import com.openframe.core.validation.ValidEmail;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
@@ -8,15 +9,16 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Initial payload to start SSO-based tenant registration. Carries no email: the identity comes
- * from whatever account the user authenticates with at the provider — there is nothing typed
- * beforehand to compare against. Older frontends still sending an {@code email} query parameter
- * are tolerated; it is simply ignored.
+ * Initial payload to start SSO-based tenant registration.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class SsoTenantRegistrationInitRequest {
+
+    @ValidEmail
+    @NotBlank(message = "Email is required")
+    private String email;
 
     @NotBlank(message = "Organization name is required")
     @Pattern(
