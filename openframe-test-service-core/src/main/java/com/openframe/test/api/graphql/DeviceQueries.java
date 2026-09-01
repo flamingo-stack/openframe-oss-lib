@@ -78,6 +78,7 @@ public class DeviceQueries {
                         metadata
                         connectedAt
                         lastSyncAt
+                        vulnerabilitiesUpdatedAt
                         disconnectedAt
                     }
                     installedAgents {
