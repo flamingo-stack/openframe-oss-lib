@@ -10,6 +10,7 @@ import com.openframe.authz.service.sso.SsoLoginService;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.web.AuthErrorResponder;
+import com.openframe.authz.web.Redirects;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.WebUtils;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -38,8 +40,6 @@ import static com.openframe.authz.web.AuthStateUtils.clearCookie;
 import static com.openframe.authz.web.AuthStateUtils.clearOtherSsoFlowCookies;
 import static com.openframe.authz.web.Redirects.foundAtRoot;
 import static com.openframe.authz.web.Redirects.seeOther;
-import static java.net.URLEncoder.encode;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.springframework.util.StringUtils.hasText;
 
 /**
@@ -141,14 +141,7 @@ public class SsoLoginController {
             var tenant = registrationService.registerTenant(reg);
 
             clearCookie(httpResponse, COOKIE_SSO_LOGIN);
-            String path = "/oauth/continue?tenantId=" + encode(tenant.getId(), UTF_8);
-            if (hasText(payload.redirectTo())) {
-                path += "&redirectTo=" + encode(payload.redirectTo(), UTF_8);
-            }
-            if (payload.authMobile()) {
-                path += "&authMobile=true";
-            }
-            foundAtRoot(httpResponse, path);
+            foundAtRoot(httpResponse, Redirects.oauthContinuePath(tenant.getId(), payload.redirectTo(), payload.authMobile()));
         } catch (Exception e) {
             authErrorResponder.send(httpResponse, httpRequest, "sso-login-complete", e,
                     "Registration failed. Please try again.");
@@ -164,15 +157,11 @@ public class SsoLoginController {
     }
 
     private SsoLoginCookiePayload requireLoginFlowCookie(HttpServletRequest request) {
-        Cookie[] cookies = request.getCookies();
-        if (cookies != null) {
-            for (Cookie c : cookies) {
-                if (COOKIE_SSO_LOGIN.equals(c.getName())) {
-                    return ssoCookieCodec.decodeLogin(c.getValue())
-                            .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please sign in again."));
-                }
-            }
+        Cookie cookie = WebUtils.getCookie(request, COOKIE_SSO_LOGIN);
+        if (cookie == null) {
+            throw new IllegalStateException("SSO session expired. Please sign in again.");
         }
-        throw new IllegalStateException("SSO session expired. Please sign in again.");
+        return ssoCookieCodec.decodeLogin(cookie.getValue())
+                .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please sign in again."));
     }
 }

@@ -7,6 +7,8 @@ import com.openframe.authz.service.validation.SsoProviderValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import static com.openframe.authz.security.SsoRegistrationConstants.FLOW_COOKIE_TTL_SECONDS;
+import static com.openframe.authz.security.SsoRegistrationConstants.providerAuthorizationPath;
 import static com.openframe.authz.security.SsoRegistrationConstants.ONBOARDING_TENANT_ID;
 import static java.time.Instant.now;
 import static java.util.UUID.randomUUID;
@@ -20,8 +22,6 @@ import static java.util.UUID.randomUUID;
 @Service
 @RequiredArgsConstructor
 public class SsoLoginService {
-
-    private static final int COOKIE_TTL_SECONDS = 600;
 
     private final SsoProviderValidator ssoProviderValidator;
     private final SsoCookieCodec ssoCookieCodec;
@@ -39,10 +39,10 @@ public class SsoLoginService {
                 request.getRedirectTo(),
                 request.isAuthMobile(),
                 issuedAt,
-                issuedAt + COOKIE_TTL_SECONDS
+                issuedAt + FLOW_COOKIE_TTL_SECONDS
         );
         String token = ssoCookieCodec.encodeLogin(payload);
-        String redirectPath = "/oauth2/authorization/" + provider + "?tenant=" + ONBOARDING_TENANT_ID;
-        return new SsoAuthorizeData(token, COOKIE_TTL_SECONDS, provider, state, redirectPath);
+        String redirectPath = providerAuthorizationPath(provider, ONBOARDING_TENANT_ID);
+        return new SsoAuthorizeData(token, FLOW_COOKIE_TTL_SECONDS, provider, state, redirectPath);
     }
 }
