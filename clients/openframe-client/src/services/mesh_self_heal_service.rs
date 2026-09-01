@@ -29,8 +29,10 @@ const HEALTHY_MARKER: &str = "Received CoreOk from server";
 const POLL_INTERVAL: Duration = Duration::from_secs(30);
 /// How long an unresolved failure (no healthy connect logged since) may stand before we act.
 const STUCK_DURATION: Duration = Duration::from_secs(10 * 60);
-/// The agent reconnects hourly on token expiry and logs both routine chatter and a healthy marker each time (measured fleet-wide: median gap between healthy markers is 55m), so this much of either missing means it is wedged, dead, or holding no session.
+/// A live agent logs routine chatter far more often than hourly, so this much total silence means it is wedged or dead.
 const SILENCE_DURATION: Duration = Duration::from_secs(90 * 60);
+/// The agent reconnects hourly on token expiry and logs a healthy marker each time, but missing a single beat is normal and self-recovers (measured fleet-wide: median gap 55m, with a large cluster of healthy machines at ~110m), so allow two before assuming it holds no session.
+const DISCONNECTED_DURATION: Duration = Duration::from_secs(3 * 60 * 60);
 /// Base wait between heal attempts (restart, no-op, or failure), doubled per consecutive failed heal, so a server-side outage can't spin.
 const ACTION_COOLDOWN: Duration = Duration::from_secs(60 * 60);
 /// Cap on the exponential cooldown backoff, so heals that never restore health settle to a slow retry instead of hammering hourly forever.
@@ -134,6 +136,7 @@ impl MeshSelfHealService {
         let mut last_healthy: Option<Instant> = None;
         let mut watching_since = Instant::now();
         let mut failed_heals: u32 = 0;
+        let mut was_suspended = false;
 
         loop {
             let sleep_started = Instant::now();
@@ -141,7 +144,16 @@ impl MeshSelfHealService {
 
             // Tenant gone: agent is stopped and /generate-msh returns 410 — don't hammer it.
             if self.deactivation.is_suspended() {
+                was_suspended = true;
                 continue;
+            }
+
+            // Reactivation: every timer aged through the suspension, so restart them rather than heal an agent that is only now coming back.
+            if std::mem::take(&mut was_suspended) {
+                stuck_since = None;
+                last_activity = Instant::now();
+                last_healthy = None;
+                watching_since = Instant::now();
             }
 
             // The sleep alone overran by far ⇒ the host was suspended (Instant counts suspend on Windows) — discard timers measured across it.
@@ -424,7 +436,7 @@ fn parse_msh_field(msh: &str, key: &str) -> Option<String> {
 /// Positive-health check: healthy means a recent healthy marker, not merely the absence of a failing one, so an agent whose log stays busy without ever connecting is still caught.
 /// Before the first marker is ever seen, the watcher's own uptime supplies the grace window, so a fresh start can't fire immediately.
 fn is_disconnected(since_last_healthy: Option<Duration>, watched_for: Duration) -> bool {
-    since_last_healthy.unwrap_or(watched_for) >= SILENCE_DURATION
+    since_last_healthy.unwrap_or(watched_for) >= DISCONNECTED_DURATION
 }
 
 /// Exponential backoff on heals that keep failing to restore a session, capped so the retry stays regular instead of drifting to never.
