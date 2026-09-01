@@ -185,6 +185,48 @@ public class OAuthBffController {
                 });
     }
 
+    /**
+     * Fully native Apple signup: for an identity the exchange answered
+     * {@code registration_required} to, this creates the tenant (identity from the verified
+     * token, org name + domain from the app) and immediately runs the regular exchange with the
+     * SAME authorization code — discovery never spent it, so replay protection still holds and
+     * the app is signed up and signed in with one request. Errors carry the actual reason
+     * (domain taken, account exists) as 400 {"error": …}.
+     */
+    @PostMapping("/apple/native-register")
+    public Mono<ResponseEntity<Object>> appleNativeRegister(@RequestBody AppleNativeRegisterRequest body,
+                                                            ServerHttpRequest request) {
+        if (!mobileAuthEnabled) {
+            return Mono.just(ResponseEntity.status(404).build());
+        }
+        if (!hasText(body.identityToken()) || !hasText(body.authorizationCode())
+                || !hasText(body.tenantName()) || !hasText(body.tenantDomain())) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+        return oauthBffService.appleNativeRegisterTenant(
+                        body.identityToken(), body.nonce(), body.tenantName(), body.tenantDomain(),
+                        body.firstName(), body.lastName(), request)
+                .flatMap(tenantId -> oauthBffService.appleNativeExchange(
+                                tenantId, body.identityToken(), body.authorizationCode(),
+                                body.nonce(), body.firstName(), body.lastName(), request)
+                        .map(tokens -> (ResponseEntity<Object>) (ResponseEntity<?>) buildNoContentWithCookies(tokens, true)))
+                .onErrorResume(IllegalArgumentException.class, e ->
+                        Mono.just(ResponseEntity.badRequest().body(Map.of("error", e.getMessage()))))
+                .onErrorResume(e -> {
+                    log.warn("Apple native registration failed: {}", e.getMessage());
+                    return Mono.just(ResponseEntity.status(401).build());
+                });
+    }
+
+    public record AppleNativeRegisterRequest(String identityToken,
+                                             String authorizationCode,
+                                             String nonce,
+                                             String firstName,
+                                             String lastName,
+                                             String tenantName,
+                                             String tenantDomain) {
+    }
+
     public record AppleNativeExchangeRequest(String tenantId,
                                              String identityToken,
                                              String authorizationCode,
