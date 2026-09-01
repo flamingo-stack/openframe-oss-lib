@@ -31,7 +31,7 @@ const POLL_INTERVAL: Duration = Duration::from_secs(30);
 const STUCK_DURATION: Duration = Duration::from_secs(10 * 60);
 /// The agent reconnects hourly on token expiry and logs both routine chatter and a healthy marker each time (measured fleet-wide: median gap between healthy markers is 55m), so this much of either missing means it is wedged, dead, or holding no session.
 const SILENCE_DURATION: Duration = Duration::from_secs(90 * 60);
-/// Minimum wait between heal attempts (restart, no-op, or failure), so a server-side outage can't spin.
+/// Base wait between heal attempts (restart, no-op, or failure), doubled per consecutive failed heal, so a server-side outage can't spin.
 const ACTION_COOLDOWN: Duration = Duration::from_secs(60 * 60);
 /// Cap on the exponential cooldown backoff, so heals that never restore health settle to a slow retry instead of hammering hourly forever.
 const MAX_COOLDOWN_BACKOFF_SHIFT: u32 = 3;
