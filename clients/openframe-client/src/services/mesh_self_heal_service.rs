@@ -37,6 +37,8 @@ const DISCONNECTED_DURATION: Duration = Duration::from_secs(3 * 60 * 60);
 const ACTION_COOLDOWN: Duration = Duration::from_secs(60 * 60);
 /// Cap on the exponential cooldown backoff, so heals that never restore health settle to a slow retry instead of hammering hourly forever.
 const MAX_COOLDOWN_BACKOFF_SHIFT: u32 = 3;
+/// After this many heals without a healthy marker, stop healing on the marker's absence alone: either the agent needs a reinstall or the marker itself has changed, and a rename must not turn into a fleet-wide restart loop.
+const MAX_DISCONNECT_HEALS: u32 = 5;
 /// Timeout for the /generate-msh fetch so an unresponsive server can't block the heal loop.
 const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
 /// How far back to look for markers when seeding health state at startup.
@@ -205,8 +207,8 @@ impl MeshSelfHealService {
 
             let stuck = stuck_since.is_some_and(|t| t.elapsed() >= STUCK_DURATION);
             let silent = last_activity.elapsed() >= SILENCE_DURATION;
-            let disconnected =
-                is_disconnected(last_healthy.map(|t| t.elapsed()), watching_since.elapsed());
+            let disconnected = failed_heals < MAX_DISCONNECT_HEALS
+                && is_disconnected(last_healthy.map(|t| t.elapsed()), watching_since.elapsed());
             let msh_missing_serverid = self.current_msh_missing_serverid().await;
 
             let reason = if msh_missing_serverid {
@@ -241,7 +243,9 @@ impl MeshSelfHealService {
                 last_activity = Instant::now();
                 // Deliberately not resetting last_healthy: the restart has to earn its success by producing a healthy marker, or the next pass escalates.
                 failed_heals = failed_heals.saturating_add(1);
-                if failed_heals > 1 {
+                if failed_heals == MAX_DISCONNECT_HEALS {
+                    error!("mesh self-heal: {failed_heals} heals have not restored a server session — no longer healing on a missing healthy marker alone; the agent likely needs a reinstall");
+                } else if failed_heals > 1 {
                     warn!(
                         "mesh self-heal: {failed_heals} consecutive heals have not restored a server session — backing off to {}s",
                         cooldown_for(failed_heals).as_secs()
