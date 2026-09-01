@@ -90,12 +90,16 @@ type ScriptSchedule implements Node {
     deviceCriteria: ScheduleDeviceCriteria
     """What fires this schedule: DATE_TIME (time-driven, uses startAt/repeat) or DEVICE_ONLINE (event-driven, fires when an assigned device comes online). Never null."""
     trigger: ScriptScheduleTrigger!
+    """How a DATE_TIME schedule reads its time: SERVER (absolute startAt) or DEVICE_LOCAL (localRunAt re-based into each device's own timezone). Never null; defaults to SERVER."""
+    timeReference: ScheduleTimeReference!
     """What to do when a target device is offline at the scheduled time: SKIP (log and move on) or RETRY_ON_RECONNECT (run on reconnect). Never null; defaults to SKIP."""
     offlineBehavior: ScheduleOfflineBehavior!
     """Max seconds to wait for an offline device to reconnect before abandoning the run. Set only when offlineBehavior is RETRY_ON_RECONNECT; null for SKIP."""
     reconnectWindowSeconds: Long
-    """First scheduled run as an absolute UTC instant (the dashboard's Date + Time). Null if the schedule has no timing set (always null for DEVICE_ONLINE)."""
+    """First scheduled run as an absolute UTC instant (the dashboard's Date + Time). Null if the schedule has no timing set (always null for DEVICE_ONLINE and DEVICE_LOCAL)."""
     startAt: Instant
+    """For a DEVICE_LOCAL schedule: the wall-clock to run at (the picked Date + Time with no zone offset applied), re-based into each device's own timezone at run time. Null for SERVER and DEVICE_ONLINE."""
+    localRunAt: Instant
     """Recurrence interval in seconds. Null for a one-shot schedule that fires once at startAt."""
     repeat: Long
     """Next instant the runner will fire this schedule. Null when not scheduled (no timing, archived, or a one-shot that already fired)."""
@@ -155,6 +159,11 @@ type ScriptSchedule implements Node {
 enum ScriptScheduleTrigger {
     DATE_TIME
     DEVICE_ONLINE
+}
+
+enum ScheduleTimeReference {
+    SERVER
+    DEVICE_LOCAL
 }
 
 enum ScheduleOfflineBehavior {
@@ -240,13 +249,17 @@ input CreateScriptScheduleInput {
     "Optional per-script custom args / env overrides. Sparse; each scriptId must be in scriptIds."
     scriptCustomParams: [ScheduledScriptCustomParamsInput!]
     trigger: ScriptScheduleTrigger!
+    "How a DATE_TIME schedule reads its time: SERVER (absolute startAt) or DEVICE_LOCAL (localRunAt, re-based per device). Null defaults to SERVER."
+    timeReference: ScheduleTimeReference
     "What to do when a target device is offline at the scheduled time. Null defaults to SKIP (current behaviour)."
     offlineBehavior: ScheduleOfflineBehavior
     "Max seconds to wait for an offline device to reconnect. Set only when offlineBehavior is RETRY_ON_RECONNECT; null/ignored for SKIP."
     reconnectWindowSeconds: Long
-    "First scheduled run as an absolute UTC instant. Required when trigger is DATE_TIME (must fall on a 30-minute boundary, xx:00 or xx:30); must be null when trigger is DEVICE_ONLINE."
+    "First scheduled run as an absolute UTC instant. Required when trigger is DATE_TIME with SERVER time (must fall on a 30-minute boundary, xx:00 or xx:30); must be null for DEVICE_ONLINE and DEVICE_LOCAL."
     startAt: Instant
-    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …); the runner ticks on that grid. Null means run once at startAt."
+    "The wall-clock to run at for a DEVICE_LOCAL schedule: the picked Date + Time with NO zone offset applied (local 09:00 → 2026-09-10T09:00:00Z). Required when timeReference is DEVICE_LOCAL, must be null otherwise. Must fall on a 30-minute boundary."
+    localRunAt: Instant
+    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …); the runner ticks on that grid. Null means run once at startAt. Not supported for DEVICE_LOCAL (one-shot only)."
     repeat: Long
 }
 
@@ -263,15 +276,19 @@ input UpdateScriptScheduleInput {
     "Optional per-script custom args / env overrides. PUT semantics: fully replaces the stored custom params (null/empty clears them). Each scriptId must be in scriptIds."
     scriptCustomParams: [ScheduledScriptCustomParamsInput!]
     trigger: ScriptScheduleTrigger!
+    "How a DATE_TIME schedule reads its time: SERVER (absolute startAt) or DEVICE_LOCAL (localRunAt, re-based per device). Null defaults to SERVER."
+    timeReference: ScheduleTimeReference
     "What to do when a target device is offline at the scheduled time. Null defaults to SKIP (current behaviour)."
     offlineBehavior: ScheduleOfflineBehavior
     "Max seconds to wait for an offline device to reconnect. Set only when offlineBehavior is RETRY_ON_RECONNECT; null/ignored for SKIP."
     reconnectWindowSeconds: Long
-    "How this schedule targets devices — SPECIFIC (an explicit machine set) or CRITERIA (a live rule). Null defaults to SPECIFIC, matching legacy documents. Flipping between modes leaves the join rows/rule untouched; whichever mode is active is what the resolver reads."
+    "How this schedule targets devices — SPECIFIC (an explicit machine set) or CRITERIA (a live rule). Null defaults to SPECIFIC, matching legacy documents. DEVICE_LOCAL schedules must stay SPECIFIC. Flipping between modes leaves the join rows/rule untouched; whichever mode is active is what the resolver reads."
     selectionMode: ScheduleDeviceSelectionMode
-    "First scheduled run (absolute UTC instant). Required when trigger is DATE_TIME (must fall on a 30-minute boundary, xx:00 or xx:30); must be null when trigger is DEVICE_ONLINE. Changing it reschedules the next run."
+    "First scheduled run (absolute UTC instant). Required when trigger is DATE_TIME with SERVER time (must fall on a 30-minute boundary, xx:00 or xx:30); must be null for DEVICE_ONLINE and DEVICE_LOCAL. Changing it reschedules the next run."
     startAt: Instant
-    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …). Null clears recurrence (one-shot)."
+    "The wall-clock to run at for a DEVICE_LOCAL schedule: the picked Date + Time with NO zone offset applied. Required when timeReference is DEVICE_LOCAL, must be null otherwise. Changing it reschedules the one-shot. Must fall on a 30-minute boundary."
+    localRunAt: Instant
+    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …). Null clears recurrence (one-shot). Not supported for DEVICE_LOCAL."
     repeat: Long
 }
 

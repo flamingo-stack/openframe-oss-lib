@@ -60,11 +60,16 @@ public class ScheduleScript implements TenantScoped {
     private ScheduleScriptTrigger trigger = ScheduleScriptTrigger.DATE_TIME;
 
     @Builder.Default
+    private ScheduleTimeReference timeReference = ScheduleTimeReference.SERVER;
+
+    @Builder.Default
     private ScheduleOfflineBehavior offlineBehavior = ScheduleOfflineBehavior.SKIP;
 
     private Long reconnectWindowSeconds;
 
     private Instant startAt;
+
+    private Instant localRunAt;
 
     private Long repeat;
 
