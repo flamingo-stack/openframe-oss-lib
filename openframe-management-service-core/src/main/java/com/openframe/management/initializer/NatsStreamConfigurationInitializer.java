@@ -70,6 +70,12 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
             StreamConfiguration.builder()
+                    .name("MACHINE_TIMEZONE")
+                    .subjects(List.of("machine.*.timezone"))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
+                    .build(),
+            StreamConfiguration.builder()
                     .name("EXECUTION_ACKNOWLEDGE")
                     .subjects(List.of("machine.*.execution.acknowledge"))
                     .storageType(StorageType.File)
