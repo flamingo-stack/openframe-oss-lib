@@ -82,12 +82,14 @@ function PushButtonSelectorSkeleton({ count = 3, hasTitle }: { count?: number; h
       <div className="space-y-3">
         {Array.from({ length: count }, (_, i) => (
           <div key={i} className="animate-pulse rounded-lg border border-ods-border bg-ods-skeleton p-4">
+            {/* Geometry MUST match a loaded option row (p-4 + two 20px text
+                lines) — a shorter skeleton makes the whole list jump on load. */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded bg-ods-skeleton" />
                 <div>
-                  <div className="mb-1 h-4 w-20 rounded bg-ods-skeleton" />
-                  <div className="h-3 w-32 rounded bg-ods-skeleton" />
+                  <div className="mb-2 h-4 w-24 rounded bg-ods-skeleton" />
+                  <div className="h-4 w-36 rounded bg-ods-skeleton" />
                 </div>
               </div>
               <div className="h-6 w-6 rounded border-2 border-ods-border bg-ods-skeleton" />
@@ -169,38 +171,27 @@ export function PushButtonSelector({
     />
   ) : null;
 
-  // LOADING STATE — with a search input, the input STAYS mounted (a skeleton
-  // swap mid-keystroke would drop focus); only the list skeletons.
-  if (isLoading) {
+  // Framed mode (search and/or lazyLoad): loading and error are NOT early
+  // returns — the frame (title, search input, fixed-height viewport, footer)
+  // must stay pixel-identical across loading/loaded/empty/error, with only
+  // the viewport CONTENT swapping. An early-return skeleton dropped the
+  // bordered viewport + footer and rendered shorter rows, so the whole
+  // section collapsed and jumped on every debounced search.
+  const framed = !!search || !!lazyLoad;
+
+  // LOADING / ERROR STATES — legacy (unframed) consumers keep the historical
+  // whole-component swap, byte-identical.
+  if (isLoading && !framed) {
     return (
       <div className={className}>
-        {search ? (
-          <div className="space-y-4">
-            {title && <h3 className="text-ods-text-primary text-h5">{title}</h3>}
-            {searchInput}
-            <PushButtonSelectorSkeleton count={skeletonCount} />
-          </div>
-        ) : (
-          <PushButtonSelectorSkeleton count={skeletonCount} hasTitle={!!title} />
-        )}
+        <PushButtonSelectorSkeleton count={skeletonCount} hasTitle={!!title} />
       </div>
     );
   }
-
-  // ERROR STATE — same rule as loading: a mounted search input survives so
-  // the user can adjust the query to retry.
-  if (error) {
+  if (error && !framed) {
     return (
       <div className={className}>
-        {search ? (
-          <div className="space-y-4">
-            {title && <h3 className="text-ods-text-primary text-h5">{title}</h3>}
-            {searchInput}
-            <PushButtonSelectorError message={error} />
-          </div>
-        ) : (
-          <PushButtonSelectorError message={error} title={title} />
-        )}
+        <PushButtonSelectorError message={error} title={title} />
       </div>
     );
   }
@@ -344,7 +335,14 @@ export function PushButtonSelector({
     );
   };
 
-  const listContent = (
+  // ~82px per row: enough skeleton rows to fill the fixed viewport, so the
+  // loading state occupies the SAME height as the loaded list.
+  const framedSkeletonCount = lazyLoad ? Math.max(skeletonCount, 4) : skeletonCount;
+  const listContent = isLoading ? (
+    <PushButtonSelectorSkeleton count={framedSkeletonCount} />
+  ) : error ? (
+    <PushButtonSelectorError message={error} />
+  ) : (
     <>
       {options.length === 0 && emptyMessage !== undefined ? (
         <div className="text-ods-text-secondary text-h6">{emptyMessage}</div>
@@ -384,7 +382,7 @@ export function PushButtonSelector({
         {footer}
 
         {/* Selection Summary */}
-        {selectionSummary && validSelectedIds.length > 0 && (
+        {!isLoading && !error && selectionSummary && validSelectedIds.length > 0 && (
           <div className="rounded-lg border border-ods-success bg-ods-success-secondary p-4">
             <div className="mb-2 flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-ods-success"></div>
