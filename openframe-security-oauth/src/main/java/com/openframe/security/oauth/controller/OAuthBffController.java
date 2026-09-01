@@ -2,6 +2,7 @@ package com.openframe.security.oauth.controller;
 
 import com.openframe.security.cookie.CookieService;
 import com.openframe.security.oauth.dto.TokenResponse;
+import com.openframe.security.oauth.exception.AppleNativeRegistrationRequiredException;
 import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
 import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
@@ -17,6 +18,7 @@ import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 import static com.openframe.security.oauth.SecurityConstants.*;
 import static org.springframework.http.HttpHeaders.LOCATION;
@@ -154,21 +156,32 @@ public class OAuthBffController {
      * auth cookies) — so the app's existing token-storage path is reused unchanged.
      */
     @PostMapping("/apple/native-exchange")
-    public Mono<ResponseEntity<Void>> appleNativeExchange(@RequestBody AppleNativeExchangeRequest body,
-                                                          ServerHttpRequest request) {
+    public Mono<ResponseEntity<Object>> appleNativeExchange(@RequestBody AppleNativeExchangeRequest body,
+                                                            ServerHttpRequest request) {
         if (!mobileAuthEnabled) {
             return Mono.just(ResponseEntity.status(404).build());
         }
-        if (!hasText(body.tenantId()) || !hasText(body.identityToken()) || !hasText(body.authorizationCode())) {
+        if (!hasText(body.identityToken()) || !hasText(body.authorizationCode())) {
             return Mono.just(ResponseEntity.badRequest().build());
         }
-        return oauthBffService.appleNativeExchange(
-                        body.tenantId(), body.identityToken(), body.authorizationCode(),
-                        body.nonce(), body.firstName(), body.lastName(), request)
-                .map(tokens -> buildNoContentWithCookies(tokens, true))
+        // tenantId is optional: without it the tenant is resolved from the VERIFIED identity
+        // token on the authorization server — the only option for Hide My Email users, who
+        // don't know their relay address and so can't go through email discovery. An identity
+        // with no account answers 409 {"error": "registration_required"} so the app can branch
+        // into signup instead of showing a failed sign-in.
+        Mono<String> tenantId = hasText(body.tenantId())
+                ? Mono.just(body.tenantId())
+                : oauthBffService.appleNativeDiscoverTenant(body.identityToken(), body.nonce(), request);
+        return tenantId
+                .flatMap(tid -> oauthBffService.appleNativeExchange(
+                                tid, body.identityToken(), body.authorizationCode(),
+                                body.nonce(), body.firstName(), body.lastName(), request)
+                        .map(tokens -> (ResponseEntity<Object>) (ResponseEntity<?>) buildNoContentWithCookies(tokens, true)))
+                .onErrorResume(AppleNativeRegistrationRequiredException.class, e ->
+                        Mono.just(ResponseEntity.status(409).body(Map.of("error", "registration_required"))))
                 .onErrorResume(e -> {
                     log.warn("Apple native exchange failed: {}", e.getMessage());
-                    return Mono.just(ResponseEntity.status(401).<Void>build());
+                    return Mono.just(ResponseEntity.status(401).build());
                 });
     }
 
