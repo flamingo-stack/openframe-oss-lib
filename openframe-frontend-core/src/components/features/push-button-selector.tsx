@@ -2,7 +2,9 @@
 
 import { Check } from 'lucide-react';
 import type React from 'react';
-import { Badge } from '../ui';
+import { useEffect, useRef } from 'react';
+import { UnifiedSkeleton } from '../loading';
+import { Badge, Input } from '../ui';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 export interface SelectableOption {
@@ -27,6 +29,28 @@ export interface SectionDefinition {
   description?: string; // Optional description shown under section label
 }
 
+/** SERVER-SIDE search: the selector renders the input; the PARENT owns the
+ *  query state and re-fetches `options` (never a client-side .filter of a
+ *  pre-fetched list). While `isLoading`, the input stays mounted (typing
+ *  must not lose focus to a skeleton swap). */
+export interface PushButtonSelectorSearch {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  ariaLabel?: string;
+}
+
+/** Lazy paging: the option list becomes a FIXED-HEIGHT scroll viewport with
+ *  an IntersectionObserver sentinel near the bottom — the selector calls
+ *  `onLoadMore` as the user scrolls; the parent appends to `options`. */
+export interface PushButtonSelectorLazyLoad {
+  hasMore: boolean;
+  isFetchingMore: boolean;
+  onLoadMore: () => void;
+  /** CSS height of the scroll viewport (default '336px' ≈ 6 rows). */
+  maxHeight?: string;
+}
+
 interface PushButtonSelectorProps {
   options: SelectableOption[];
   selectedIds: string[];
@@ -41,25 +65,37 @@ interface PushButtonSelectorProps {
   error?: string | null;
   skeletonCount?: number;
   sections?: SectionDefinition[]; // Optional sections for grouping options
+  /** Built-in server-side search input (see PushButtonSelectorSearch). */
+  search?: PushButtonSelectorSearch;
+  /** Built-in fixed-height scroll + infinite paging (see PushButtonSelectorLazyLoad). */
+  lazyLoad?: PushButtonSelectorLazyLoad;
+  /** Rendered inside the list when `options` is empty and not loading. */
+  emptyMessage?: React.ReactNode;
+  /** Rendered under the list (result counts, hints). */
+  footer?: React.ReactNode;
 }
 
-// Skeleton component matching external pattern from announcement-form.tsx
+// Composed from the app-wide UnifiedSkeleton system (components/loading) —
+// the same base every other loading surface uses (bg-ods-skeleton pulse,
+// prefers-reduced-motion support, role="status" a11y). Each skeleton row
+// mirrors a LOADED option row exactly (bg-ods-bg card, p-4, icon + two
+// 20px-tall text lines + selection box) so the list never jumps on load.
 function PushButtonSelectorSkeleton({ count = 3, hasTitle }: { count?: number; hasTitle?: boolean }) {
   return (
-    <div className="space-y-3">
-      {hasTitle && <div className="h-5 w-20 animate-pulse rounded bg-ods-skeleton" />}
+    <div className="space-y-3" role="status" aria-label="Loading options">
+      {hasTitle && <UnifiedSkeleton className="h-5 w-20" aria-label="Loading title" />}
       <div className="space-y-3">
         {Array.from({ length: count }, (_, i) => (
-          <div key={i} className="animate-pulse rounded-lg border border-ods-border bg-ods-skeleton p-4">
-            <div className="flex items-center justify-between">
+          <div key={i} className="rounded-lg border border-ods-border bg-ods-bg p-4">
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded bg-ods-skeleton" />
+                <UnifiedSkeleton className="h-8 w-8" aria-label="Loading icon" />
                 <div>
-                  <div className="mb-1 h-4 w-20 rounded bg-ods-skeleton" />
-                  <div className="h-3 w-32 rounded bg-ods-skeleton" />
+                  <UnifiedSkeleton variant="text" className="mb-2 h-4 w-24" aria-label="Loading name" />
+                  <UnifiedSkeleton variant="text" className="h-4 w-36" aria-label="Loading description" />
                 </div>
               </div>
-              <div className="h-6 w-6 rounded border-2 border-ods-border bg-ods-skeleton" />
+              <UnifiedSkeleton className="h-6 w-6" aria-label="Loading selection state" />
             </div>
           </div>
         ))}
@@ -94,18 +130,68 @@ export function PushButtonSelector({
   error = null,
   skeletonCount = 3,
   sections,
+  search,
+  lazyLoad,
+  emptyMessage,
+  footer,
 }: PushButtonSelectorProps) {
-  // LOADING STATE
-  if (isLoading) {
+  // Lazy-load sentinel: observe within the scroll viewport so onLoadMore
+  // fires as the user approaches the bottom. Hooks run unconditionally
+  // (before the early returns) per the rules of hooks. Pass a STABLE
+  // onLoadMore (react-query's fetchNextPage is) — an inline arrow re-arms
+  // the observer each render (harmless, just wasteful).
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const lazyHasMore = lazyLoad?.hasMore ?? false;
+  const lazyFetching = lazyLoad?.isFetchingMore ?? false;
+  const onLoadMore = lazyLoad?.onLoadMore;
+  const optionCount = options.length;
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root = scrollRef.current;
+    if (!sentinel || !root || !onLoadMore || !lazyHasMore) return undefined;
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(e => e.isIntersecting) && !lazyFetching) {
+          onLoadMore();
+        }
+      },
+      { root, rootMargin: '80px' },
+    );
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+    };
+    // optionCount: re-arm when the list grows (the sentinel moves).
+  }, [lazyHasMore, lazyFetching, onLoadMore, optionCount]);
+
+  const searchInput = search ? (
+    <Input
+      value={search.value}
+      onChange={e => search.onChange(e.target.value)}
+      placeholder={search.placeholder}
+      aria-label={search.ariaLabel ?? search.placeholder ?? 'Search'}
+    />
+  ) : null;
+
+  // Framed mode (search and/or lazyLoad): loading and error are NOT early
+  // returns — the frame (title, search input, fixed-height viewport, footer)
+  // must stay pixel-identical across loading/loaded/empty/error, with only
+  // the viewport CONTENT swapping. An early-return skeleton dropped the
+  // bordered viewport + footer and rendered shorter rows, so the whole
+  // section collapsed and jumped on every debounced search.
+  const framed = !!search || !!lazyLoad;
+
+  // LOADING / ERROR STATES — legacy (unframed) consumers keep the historical
+  // whole-component swap, byte-identical.
+  if (isLoading && !framed) {
     return (
       <div className={className}>
         <PushButtonSelectorSkeleton count={skeletonCount} hasTitle={!!title} />
       </div>
     );
   }
-
-  // ERROR STATE
-  if (error) {
+  if (error && !framed) {
     return (
       <div className={className}>
         <PushButtonSelectorError message={error} title={title} />
@@ -252,15 +338,54 @@ export function PushButtonSelector({
     );
   };
 
+  // ~82px per row: enough skeleton rows to fill the fixed viewport, so the
+  // loading state occupies the SAME height as the loaded list.
+  const framedSkeletonCount = lazyLoad ? Math.max(skeletonCount, 4) : skeletonCount;
+  const listContent = isLoading ? (
+    <PushButtonSelectorSkeleton count={framedSkeletonCount} />
+  ) : error ? (
+    <PushButtonSelectorError message={error} />
+  ) : (
+    <>
+      {options.length === 0 && emptyMessage !== undefined ? (
+        <div className="text-ods-text-secondary text-h6">{emptyMessage}</div>
+      ) : (
+        renderOptionsContent()
+      )}
+      {lazyLoad ? (
+        <>
+          <div ref={sentinelRef} />
+          {lazyLoad.isFetchingMore ? (
+            <div className="py-2 text-center text-ods-text-secondary text-h6">Loading more…</div>
+          ) : null}
+        </>
+      ) : null}
+    </>
+  );
+
   return (
     <TooltipProvider delayDuration={150}>
       <div className={`space-y-4 ${className}`}>
         {title && <h3 className="text-ods-text-primary text-h5">{title}</h3>}
 
-        {renderOptionsContent()}
+        {searchInput}
+
+        {lazyLoad ? (
+          <div
+            ref={scrollRef}
+            className="space-y-4 overflow-y-auto rounded-lg border border-ods-border p-2"
+            style={{ height: lazyLoad.maxHeight ?? '336px' }}
+          >
+            {listContent}
+          </div>
+        ) : (
+          listContent
+        )}
+
+        {footer}
 
         {/* Selection Summary */}
-        {selectionSummary && validSelectedIds.length > 0 && (
+        {!isLoading && !error && selectionSummary && validSelectedIds.length > 0 && (
           <div className="rounded-lg border border-ods-success bg-ods-success-secondary p-4">
             <div className="mb-2 flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-ods-success"></div>
