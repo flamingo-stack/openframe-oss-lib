@@ -1,5 +1,6 @@
 package com.openframe.authz.controller;
 
+import com.openframe.authz.dto.RegistrationAttribution;
 import com.openframe.authz.dto.SsoLoginInitRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
@@ -114,6 +115,7 @@ public class SsoLoginController {
     @GetMapping(path = "/login/sso/complete")
     public void completeSsoRegistration(@RequestParam("tenantName") String tenantName,
                                         @RequestParam("tenantDomain") String tenantDomain,
+                                        @ModelAttribute RegistrationAttribution attribution,
                                         Authentication authentication,
                                         HttpServletRequest httpRequest,
                                         HttpServletResponse httpResponse) throws IOException {
@@ -136,6 +138,7 @@ public class SsoLoginController {
                     .tenantName(tenantName)
                     .tenantDomain(tenantDomain.toLowerCase(Locale.ROOT))
                     .emailPreVerified(OidcUserUtils.emailVerifiedClaimAllows(user))
+                    .attribution(attribution)
                     .build();
 
             var tenant = registrationService.registerTenant(reg);
