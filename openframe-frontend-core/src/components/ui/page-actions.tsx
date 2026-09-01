@@ -205,9 +205,11 @@ export interface PageActionsProps {
   actions: PageActionButton[];
   menuActions?: ActionsMenuGroup[];
   /**
-   * Desktop-only slot rendered before the action buttons (e.g. a `TabSelector`
-   * for view-mode toggles). Hidden on mobile and never merged into the "…" menu.
-   * Honored by the `icon-buttons` and `menu-primary` variants.
+   * Slot rendered before the action buttons (e.g. a `TabSelector` for
+   * view-mode toggles). Honored by the `icon-buttons` and `menu-primary`
+   * variants. On mobile, `icon-buttons` hides it; `menu-primary` surfaces it
+   * as the header row INSIDE the "…" menu (the tickets design — the view
+   * switcher must stay reachable where the header has no room for it).
    */
   selector?: React.ReactNode;
   className?: string;
@@ -466,8 +468,11 @@ function MenuPrimaryVariant({
       <div className={cn('flex md:hidden', className)}>
         {loading ? (
           <MobileTriggerSkeleton />
-        ) : hasMobileMenuItems ? (
-          <ActionsMenuDropdown groups={mobileMenuGroups} />
+        ) : hasMobileMenuItems || selector ? (
+          // The selector rides into the menu as its header row: on mobile the
+          // title row has no room for it, and hiding it entirely (what
+          // `icon-buttons` does) would leave no way to switch views at all.
+          <ActionsMenuDropdown groups={mobileMenuGroups} header={selector} />
         ) : null}
       </div>
     </>
