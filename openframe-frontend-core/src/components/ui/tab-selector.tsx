@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { useIsInActionsMenuHeader } from './actions-menu-header-context';
 import { Label } from './label';
 
 export interface TabSelectorItem {
@@ -54,6 +55,13 @@ export function TabSelector({
   scrollable = false,
   className,
 }: TabSelectorProps) {
+  // Inside an ActionsMenu header row the selector renders FLUSH - no border,
+  // no row rounding (the menu's row border and rounding are the frame) and a
+  // fixed 40px height, while the inner 4px padding, the segment gap and the
+  // segment radius stay, per the mobile "..." menu mock. The same node a page
+  // renders in its title bar adapts by context, with no re-styling at the
+  // call site.
+  const flush = useIsInActionsMenuHeader();
   return (
     <div
       className={cn('flex flex-col gap-[var(--spacing-system-xxs)]', disabled && 'opacity-50', className)}
@@ -67,8 +75,10 @@ export function TabSelector({
       )}
       <div
         className={cn(
-          'flex h-11 gap-[var(--spacing-system-xxs)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] md:h-12',
-          scrollable ? 'overflow-x-auto' : 'w-full',
+          'flex gap-[var(--spacing-system-xxs)] bg-ods-bg p-[var(--spacing-system-xxs)]',
+          flush
+            ? 'h-10 w-full'
+            : cn('h-11 rounded-md border border-ods-border md:h-12', scrollable ? 'overflow-x-auto' : 'w-full'),
         )}
       >
         {items.map(item => {
