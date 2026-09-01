@@ -7,8 +7,9 @@ import { createContext, useContext } from 'react';
  *
  * The header hosts controls that elsewhere carry their own frame — the view
  * `TabSelector` above all — and the menu design renders them FLUSH: no border,
- * no radius, no inner padding, segments edge to edge, with the menu's own row
- * border and rounding doing the framing. The context lets such a control adapt
+ * no radius, a fixed 40px height, with the menu's own row border and rounding
+ * doing the framing (the inner 4px padding and the segment gap/radius stay).
+ * The context lets such a control adapt
  * itself, so the same node a page puts in its title bar needs no re-styling to
  * appear inside the mobile "…" menu.
  *
