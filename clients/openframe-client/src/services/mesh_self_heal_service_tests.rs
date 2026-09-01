@@ -32,6 +32,47 @@ fn healthy_marker_matches_core_ok() {
     assert!(CORE_OK.contains(HEALTHY_MARKER));
 }
 
+#[test]
+fn busy_log_without_a_healthy_marker_still_counts_as_disconnected() {
+    // The blind spot this branch exists for: chatty agent, no failure marker, no session.
+    assert!(is_disconnected(
+        Some(DISCONNECTED_DURATION),
+        Duration::from_secs(0)
+    ));
+    assert!(!is_disconnected(
+        Some(DISCONNECTED_DURATION - Duration::from_secs(1)),
+        Duration::from_secs(0)
+    ));
+}
+
+#[test]
+fn watcher_uptime_is_the_grace_window_before_any_marker() {
+    assert!(!is_disconnected(None, Duration::from_secs(0)));
+    assert!(!is_disconnected(
+        None,
+        DISCONNECTED_DURATION - Duration::from_secs(1)
+    ));
+    assert!(is_disconnected(None, DISCONNECTED_DURATION));
+}
+
+#[test]
+fn a_recent_healthy_marker_outranks_a_long_watch() {
+    assert!(!is_disconnected(
+        Some(Duration::from_secs(0)),
+        DISCONNECTED_DURATION * 10
+    ));
+}
+
+#[test]
+fn cooldown_backs_off_then_caps() {
+    assert_eq!(cooldown_for(0), ACTION_COOLDOWN);
+    assert_eq!(cooldown_for(1), ACTION_COOLDOWN * 2);
+    assert_eq!(cooldown_for(3), ACTION_COOLDOWN * 8);
+    let capped = ACTION_COOLDOWN * 2u32.pow(MAX_COOLDOWN_BACKOFF_SHIFT);
+    assert_eq!(cooldown_for(MAX_COOLDOWN_BACKOFF_SHIFT), capped);
+    assert_eq!(cooldown_for(u32::MAX), capped);
+}
+
 #[tokio::test]
 async fn tail_seed_reports_last_marker() {
     let dir = tempfile::tempdir().unwrap();
