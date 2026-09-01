@@ -50,7 +50,7 @@ class ResizeObserverStub {
   unobserve() {}
   disconnect() {}
 }
-window.ResizeObserver = window.ResizeObserver ?? (ResizeObserverStub as unknown as typeof ResizeObserver);
+window.ResizeObserver = window.ResizeObserver ?? ResizeObserverStub;
 
 const ticket = (id: string) => ({ id, title: `Ticket ${id}`, ticketNumber: `#${id}`, status: 'ACTIVE' });
 
