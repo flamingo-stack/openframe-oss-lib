@@ -20,8 +20,6 @@ public class SsoTenantRegistrationInitRequest {
     @NotBlank(message = "Email is required")
     private String email;
 
-    private String accessCode;
-
     @NotBlank(message = "Organization name is required")
     @Pattern(
             regexp = "^[\\p{L}\\p{M}0-9&.,'’\"()\\- ]{2,100}$",

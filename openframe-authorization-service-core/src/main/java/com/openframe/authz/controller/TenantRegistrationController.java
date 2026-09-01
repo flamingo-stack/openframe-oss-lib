@@ -43,6 +43,15 @@ public class TenantRegistrationController {
         return registrationService.registerTenant(request);
     }
 
+    /**
+     * @deprecated Superseded by the unified email-less flow: the signup page starts
+     * {@code /oauth/login/sso} and finishes with {@code /oauth/login/sso/complete} — registration
+     * is just the unknown-identity branch of login, and pre-processing runs at complete time with
+     * the provider-asserted email. Kept while the web frontend and the app shell still call it.
+     * TODO(CU-86ak52ttd): remove together with SsoTenantRegistrationService, TenantRegSsoHandler
+     * and the of_sso_reg cookie once both are migrated.
+     */
+    @Deprecated
     @GetMapping(path = "/register/sso")
     public void startSsoRegistration(@Valid @ModelAttribute SsoTenantRegistrationInitRequest request,
                                      HttpServletRequest httpRequest,
