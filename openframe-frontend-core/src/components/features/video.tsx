@@ -35,6 +35,7 @@ import type React from 'react';
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useAuthedAssetSrc } from '../../hooks/use-authed-asset-src';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { Button } from '../ui/button';
 import { useIosNativeVideoFullscreen } from './use-ios-native-video-fullscreen';
 import { saveDataEnabled } from './use-video-warmup';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
@@ -281,29 +282,26 @@ export function extractYouTubeId(url: string): string | null {
 }
 
 // =============================================================================
-// Playback-failure handling — recovery affordance + measurability seam
+// Playback-failure handling
 // =============================================================================
 //
-// A stalled or errored player used to leave the user on an endless spinner or a
-// blank frame with no way out and no signal anyone could count. Every failure
-// now surfaces a retry affordance (see `VideoErrorOverlay`) AND is reported
-// here, so the impact stays measurable after the fix.
-//
-// Two report channels, both fire-and-forget and both safe when the host wires
-// neither: a `window` CustomEvent any analytics layer can subscribe to with no
-// prop plumbing, and a direct PostHog capture when the host exposes
-// `window.posthog` (the surfaces this ships to already load it).
+// A stalled or errored player leaves the user on an endless spinner with no way
+// out. Every failure surfaces a retry (`VideoErrorOverlay`) and is reported on
+// a `window` CustomEvent the host subscribes to — no vendor analytics global is
+// touched from here; this package ships to consumers that load different (or
+// no) analytics.
 
 export type VideoFailureKind = 'file' | 'youtube';
-/** `error`: hard media error. `stall`: buffering that never cleared.
- *  `timeout`: the YouTube embed never reported playback. */
-export type VideoFailureReason = 'error' | 'stall' | 'timeout';
+/** `stall`: buffering that never cleared while playback was expected. */
+export type VideoFailureReason = 'error' | 'stall';
 
 export interface VideoPlaybackFailureDetail {
   kind: VideoFailureKind;
   /** File URL or YouTube video id — enough to group failures by source. */
   src: string;
   reason: VideoFailureReason;
+  /** YouTube IFrame API error code, when the embed reported one. */
+  errorCode?: number;
 }
 
 export const VIDEO_PLAYBACK_FAILED_EVENT = 'flamingo:video-playback-failed';
@@ -312,8 +310,6 @@ function reportPlaybackFailure(detail: VideoPlaybackFailureDetail): void {
   if (typeof window === 'undefined') return;
   try {
     window.dispatchEvent(new CustomEvent(VIDEO_PLAYBACK_FAILED_EVENT, { detail }));
-    const ph = (window as unknown as { posthog?: { capture?: (event: string, props?: unknown) => void } }).posthog;
-    ph?.capture?.('video_playback_failed', detail);
   } catch {
     // Analytics must never break playback recovery.
   }
@@ -324,14 +320,8 @@ function reportPlaybackFailure(detail: VideoPlaybackFailureDetail): void {
 // `error` callback alone misses: a video that played, then stalled mid-way.
 const VIDEO_STALL_TIMEOUT_MS = 15_000;
 
-// The YouTube iframe autoplays on activation and posts PLAYING within a second
-// or two when healthy. No PLAYING within this window means the embed failed
-// (network, or an owner who disabled embedding — YouTube error 150/153).
-const YT_READINESS_TIMEOUT_MS = 12_000;
-
-/** Shared failure surface — replaces the spinner/blank frame with a reachable
- *  recovery. `watchOnYouTubeId` adds the one recovery that survives a disabled
- *  embed: opening the video on YouTube itself. */
+/** `watchOnYouTubeId` adds the one recovery that survives an embed the owner
+ *  disabled: opening the video on YouTube itself. */
 function VideoErrorOverlay({
   onRetry,
   watchOnYouTubeId,
@@ -340,25 +330,21 @@ function VideoErrorOverlay({
   watchOnYouTubeId?: string;
 }): React.ReactElement {
   return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-[var(--spacing-system-sf)] bg-ods-bg p-[var(--spacing-system-lf)] text-center">
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-[var(--spacing-system-sf)] bg-ods-overlay p-[var(--spacing-system-lf)] text-center">
       <p className="text-ods-text-secondary text-h6">This video failed to play.</p>
       <div className="flex items-center gap-[var(--spacing-system-sf)]">
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-lg border border-ods-border bg-ods-card px-[var(--spacing-system-mf)] py-[var(--spacing-system-xsf)] text-ods-text-primary transition-colors text-h6 hover:border-ods-border-hover"
-        >
+        <Button variant="outline" size="small" onClick={onRetry}>
           Try again
-        </button>
+        </Button>
         {watchOnYouTubeId ? (
-          <a
+          <Button
+            variant="transparent"
+            size="small"
             href={`https://www.youtube.com/watch?v=${watchOnYouTubeId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg px-[var(--spacing-system-mf)] py-[var(--spacing-system-xsf)] text-ods-accent transition-colors text-h6 hover:text-ods-accent-hover"
+            openInNewTab
           >
             Watch on YouTube
-          </a>
+          </Button>
         ) : null}
       </div>
     </div>
@@ -1187,10 +1173,8 @@ function FilePlayer({
     );
   }
 
-  // ── Playback health ────────────────────────────────────────────────────────
-  // Turn an endless spinner / blank frame into a retry. Only chrome-bearing
-  // surfaces (a user actively watching) monitor health — decorative first-frame
-  // and hover previews stay silent (they pass `chromeless`).
+  // Only chrome-bearing surfaces (a user actively watching) monitor health —
+  // decorative first-frame and hover previews pass `chromeless` and stay silent.
   const monitorHealth = !chromeless;
   const [playbackFailed, setPlaybackFailed] = useState(false);
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1211,9 +1195,7 @@ function FilePlayer({
     [clearStallTimer, url],
   );
 
-  // Buffering (`waiting`/`stalled`) while playback is expected arms the stall
-  // watchdog; any progress (`playing`/`timeupdate`) or a deliberate pause/end
-  // disarms it. A manually paused or finished video is never a stall.
+  // A manually paused or finished video is never a stall.
   const armStallTimer = useCallback(() => {
     if (!monitorHealth) return;
     const el = hoverPlayerRef.current;
@@ -1225,8 +1207,8 @@ function FilePlayer({
     }, VIDEO_STALL_TIMEOUT_MS);
   }, [monitorHealth, failPlayback]);
 
-  // Real progress means the player is alive — clear any pending stall AND drop a
-  // shown error, so a stall that self-heals dismisses its own overlay.
+  // Progress means the player is alive — a stall that self-heals clears its own
+  // overlay.
   const handlePlaybackProgress = useCallback(() => {
     clearStallTimer();
     setPlaybackFailed(false);
@@ -1237,15 +1219,29 @@ function FilePlayer({
     failPlayback('error');
   }, [monitorHealth, failPlayback]);
 
-  // Recover in place — `load()` re-fetches the manifest/segment (an errored HLS
-  // pipeline needs a full re-init, which `play()` alone can't do), then resume.
+  // `load()` re-inits the HLS pipeline (`play()` alone can't) but rewinds to
+  // zero — stash the position and seek back on `loadedmetadata`, since an
+  // earlier assignment is dropped while the fresh source has no seekable range.
   const retryPlayback = useCallback(() => {
     setPlaybackFailed(false);
     clearStallTimer();
     const el = hoverPlayerRef.current;
+    if (!el) return;
+    const resumeAt = typeof el.currentTime === 'number' ? el.currentTime : 0;
     try {
-      el?.load?.();
-      (el?.play?.() as Promise<void> | undefined)?.catch?.(() => {
+      el.load?.();
+      if (resumeAt > 0 && el.addEventListener && el.removeEventListener) {
+        const seekBack = () => {
+          el.removeEventListener?.('loadedmetadata', seekBack);
+          try {
+            el.currentTime = resumeAt;
+          } catch {
+            /* source shorter than the stashed position — start from the top */
+          }
+        };
+        el.addEventListener('loadedmetadata', seekBack);
+      }
+      (el.play?.() as Promise<void> | undefined)?.catch?.(() => {
         /* a re-rejected play surfaces again via the error/stall handlers */
       });
     } catch {
@@ -1352,10 +1348,8 @@ function FilePlayer({
       </div>
     );
   }
-  // A relative wrapper so the unmute badge and the error overlay can dock:
-  // controlled-hover and handoff surfaces (autoPlayUnmuted / startMuted) need it
-  // for the badge; every monitored surface needs it for the error overlay. The
-  // bare `player` return is left only for chromeless previews (not monitored).
+  // A relative wrapper so the unmute badge and the error overlay can dock. The
+  // bare `player` return is left only for chromeless previews (never monitored).
   if (hoverControlled || autoPlayUnmuted || startMuted || monitorHealth) {
     return (
       <div className="relative h-full w-full">
@@ -1443,6 +1437,9 @@ const YT_PLAYING_BLUR_DELAY_MS = 1000;
 interface YouTubeInfoDeliveryMessage {
   event?: string;
   info?: { playerState?: number };
+  /** `onError` carries its code as a bare number in `info`, not an object:
+   *  `{"event":"onError","info":150}` (101/150 = embedding disabled). */
+  errorCode?: number;
 }
 
 /**
@@ -1462,6 +1459,7 @@ function toYouTubeMessage(parsed: unknown): YouTubeInfoDeliveryMessage | null {
   return {
     event: typeof event === 'string' ? event : undefined,
     info: { playerState: typeof playerState === 'number' ? playerState : undefined },
+    errorCode: typeof info === 'number' ? info : undefined,
   };
 }
 
@@ -1475,8 +1473,9 @@ function YouTubeFacadeInner({
   suspended,
 }: YouTubeFacadeInnerProps): React.ReactElement {
   const [activated, setActivated] = useState(Boolean(autoActivate));
-  // Playback failed to start (no PLAYING within the readiness window). Retry
-  // remounts the iframe via `reloadNonce`; the nonce also re-arms the watchdog.
+  // The embed reported a hard player error (see the `onError` branch below).
+  // Retry remounts the iframe via `reloadNonce` — a fresh element, since there
+  // is no way to re-init a cross-origin player from outside.
   const [failed, setFailed] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -1591,22 +1590,10 @@ function YouTubeFacadeInner({
 
     let blurTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // Readiness watchdog — a healthy embed reaches PLAYING within a second or
-    // two of the autoplay activation. If it never does, the iframe is a blank
-    // frame (network failure, or an owner who disabled embedding); surface the
-    // error state instead. Cleared the moment PLAYING arrives.
-    let readinessTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-      readinessTimer = null;
-      setFailed(true);
-      reportPlaybackFailure({ kind: 'youtube', src: videoId, reason: 'timeout' });
-    }, YT_READINESS_TIMEOUT_MS);
-    function clearReadiness() {
-      if (readinessTimer !== null) {
-        clearTimeout(readinessTimer);
-        readinessTimer = null;
-      }
-    }
-
+    // No "never reached PLAYING within N seconds" watchdog on purpose: an embed
+    // whose unmuted autoplay Safari/iOS blocked, or one whose jsapi channel is
+    // dead, is healthy and silent — a timeout would tear those down, and retry
+    // would re-arm it. Only an explicit `onError` is a definitive failure.
     function handleMessage(event: MessageEvent) {
       if (event.origin !== YT_NOCOOKIE_ORIGIN) return;
       if (typeof event.data !== 'string') return;
@@ -1617,12 +1604,9 @@ function YouTubeFacadeInner({
         return;
       }
       if (!payload) return;
-      // An explicit player error (embedding disabled, unavailable video —
-      // codes 100/101/150/153) never reaches PLAYING; fail fast on it.
       if (payload.event === 'onError') {
-        clearReadiness();
         setFailed(true);
-        reportPlaybackFailure({ kind: 'youtube', src: videoId, reason: 'error' });
+        reportPlaybackFailure({ kind: 'youtube', src: videoId, reason: 'error', errorCode: payload.errorCode });
         return;
       }
       if (payload.event !== 'infoDelivery') return;
@@ -1630,7 +1614,6 @@ function YouTubeFacadeInner({
       if (typeof state !== 'number') return;
 
       if (state === YT_STATE_PLAYING) {
-        clearReadiness();
         if (blurTimer !== null) return;
         blurTimer = setTimeout(() => {
           blurTimer = null;
@@ -1648,7 +1631,6 @@ function YouTubeFacadeInner({
       iframe.removeEventListener('load', subscribe);
       window.removeEventListener('message', handleMessage);
       if (blurTimer !== null) clearTimeout(blurTimer);
-      clearReadiness();
     };
   }, [activated, failed, reloadNonce, videoId]);
 
