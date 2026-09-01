@@ -313,6 +313,9 @@ export const TicketCard = memo(function TicketCardImpl({
     e.preventDefault();
     lift(ticket.id);
   };
+  // Advertised only where it works: the touch board provides no lift, and a
+  // drag-disabled card cannot be lifted either.
+  const keyShortcuts = dragDisabled || !lift ? undefined : 'Space';
 
   // Both roles live on the same element, and both keep their state HERE. That is
   // the point of the whole drag stack: hovering this card re-renders this card,
@@ -497,7 +500,7 @@ export const TicketCard = memo(function TicketCardImpl({
           onClick={handleClick}
           onKeyDown={handleKeyDown}
           aria-label={ticket.title}
-          aria-keyshortcuts="Space"
+          aria-keyshortcuts={keyShortcuts}
           className="absolute inset-0 z-0 rounded-md focus-visible:outline-none"
         />
         <div className={cn('pointer-events-none', innerWrapperClass)}>{body}</div>
@@ -513,7 +516,7 @@ export const TicketCard = memo(function TicketCardImpl({
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         aria-label={ticket.title}
-        aria-keyshortcuts="Space"
+        aria-keyshortcuts={keyShortcuts}
         className="absolute inset-0 z-0 cursor-pointer rounded-md focus-visible:outline-none"
       />
       <div className={cn('pointer-events-none', innerWrapperClass)}>{body}</div>
