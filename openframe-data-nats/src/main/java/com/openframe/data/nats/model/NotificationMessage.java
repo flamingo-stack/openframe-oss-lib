@@ -1,7 +1,6 @@
 package com.openframe.data.nats.model;
 
 import com.openframe.data.document.notification.NotificationCategory;
-import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationSeverity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,9 +25,7 @@ public class NotificationMessage {
     private String description;
     private Instant createdAt;
     private NotificationCategory category;
-    private NotificationContext context;
     private NotificationEventType eventType;
-    // Additive next to context; null until the emitter sets them.
     private String type;
     private Map<String, String> attributes;
 

@@ -1,6 +1,5 @@
 package com.openframe.notification.support;
 
-import com.openframe.data.config.NotificationContextMongoConfig;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.impl.CustomNotificationReadStateRepositoryImpl;
 import com.openframe.data.repository.notification.impl.CustomNotificationRepositoryImpl;
@@ -18,8 +17,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 @Import({
         CustomNotificationRepositoryImpl.class,
         CustomNotificationReadStateRepositoryImpl.class,
-        NotificationReadStateService.class,
-        NotificationContextMongoConfig.class
+        NotificationReadStateService.class
 })
 public class ReadStateIntegrationTestApplication {
 }

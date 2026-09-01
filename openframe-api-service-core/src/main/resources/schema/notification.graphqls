@@ -34,24 +34,10 @@ type Notification implements Node {
     createdAt: Instant!
     read: Boolean!
     category: NotificationCategory!
-    """
-    Nullable during the context→attributes migration: rows written before it lack context once the
-    typed context types are retired, and clients on `attributes` never read it.
-    """
-    context: NotificationContext
-    "Spec-driven notification type; null on rows written by the legacy dispatcher path."
+    "Spec-driven notification type."
     type: String
-    "Flat string map of the notification's facts, snapshotted at emission. Null on legacy rows."
+    "Flat string map of the notification's facts, snapshotted at emission."
     attributes: JSON
-}
-
-interface NotificationContext {
-    type: String!
-}
-
-type GenericContext implements NotificationContext {
-    type: String!
-    payload: String
 }
 
 enum NotificationCategory {
