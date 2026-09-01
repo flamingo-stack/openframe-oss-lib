@@ -37,7 +37,10 @@ public class AppleTokenRevocationScheduler {
         int failed = 0;
         for (AppleUserToken token : tokenRepository.findAll()) {
             boolean userGone = authUserRepository.findById(token.getUserId())
-                    .map(user -> user.getStatus() == UserStatus.DELETED)
+                    // SELF_DELETED is the case Apple's guideline is actually about — the user
+                    // deleting their own account — so both terminal states revoke.
+                    .map(user -> user.getStatus() == UserStatus.DELETED
+                            || user.getStatus() == UserStatus.SELF_DELETED)
                     .orElse(true);
             if (!userGone) {
                 continue;
