@@ -36,11 +36,11 @@ fn healthy_marker_matches_core_ok() {
 fn busy_log_without_a_healthy_marker_still_counts_as_disconnected() {
     // The blind spot this branch exists for: chatty agent, no failure marker, no session.
     assert!(is_disconnected(
-        Some(DISCONNECTED_DURATION),
+        Some(SILENCE_DURATION),
         Duration::from_secs(0)
     ));
     assert!(!is_disconnected(
-        Some(DISCONNECTED_DURATION - Duration::from_secs(1)),
+        Some(SILENCE_DURATION - Duration::from_secs(1)),
         Duration::from_secs(0)
     ));
 }
@@ -50,16 +50,16 @@ fn watcher_uptime_is_the_grace_window_before_any_marker() {
     assert!(!is_disconnected(None, Duration::from_secs(0)));
     assert!(!is_disconnected(
         None,
-        DISCONNECTED_DURATION - Duration::from_secs(1)
+        SILENCE_DURATION - Duration::from_secs(1)
     ));
-    assert!(is_disconnected(None, DISCONNECTED_DURATION));
+    assert!(is_disconnected(None, SILENCE_DURATION));
 }
 
 #[test]
 fn a_recent_healthy_marker_outranks_a_long_watch() {
     assert!(!is_disconnected(
         Some(Duration::from_secs(0)),
-        DISCONNECTED_DURATION * 10
+        SILENCE_DURATION * 10
     ));
 }
 

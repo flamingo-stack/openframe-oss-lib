@@ -29,10 +29,8 @@ const HEALTHY_MARKER: &str = "Received CoreOk from server";
 const POLL_INTERVAL: Duration = Duration::from_secs(30);
 /// How long an unresolved failure (no healthy connect logged since) may stand before we act.
 const STUCK_DURATION: Duration = Duration::from_secs(10 * 60);
-/// A healthy agent logs roughly hourly, so this much total silence means it is wedged or dead.
+/// The agent reconnects hourly on token expiry and logs both routine chatter and a healthy marker each time (measured fleet-wide: median gap between healthy markers is 55m), so this much of either missing means it is wedged, dead, or holding no session.
 const SILENCE_DURATION: Duration = Duration::from_secs(90 * 60);
-/// A connected agent re-emits the healthy marker regularly, so this much time without one means it holds no server session even while its log stays busy.
-const DISCONNECTED_DURATION: Duration = Duration::from_secs(6 * 60 * 60);
 /// Minimum wait between heal attempts (restart, no-op, or failure), so a server-side outage can't spin.
 const ACTION_COOLDOWN: Duration = Duration::from_secs(60 * 60);
 /// Cap on the exponential cooldown backoff, so heals that never restore health settle to a slow retry instead of hammering hourly forever.
@@ -426,7 +424,7 @@ fn parse_msh_field(msh: &str, key: &str) -> Option<String> {
 /// Positive-health check: healthy means a recent healthy marker, not merely the absence of a failing one, so an agent whose log stays busy without ever connecting is still caught.
 /// Before the first marker is ever seen, the watcher's own uptime supplies the grace window, so a fresh start can't fire immediately.
 fn is_disconnected(since_last_healthy: Option<Duration>, watched_for: Duration) -> bool {
-    since_last_healthy.unwrap_or(watched_for) >= DISCONNECTED_DURATION
+    since_last_healthy.unwrap_or(watched_for) >= SILENCE_DURATION
 }
 
 /// Exponential backoff on heals that keep failing to restore a session, capped so the retry stays regular instead of drifting to never.
