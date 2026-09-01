@@ -57,7 +57,7 @@ export function DataTableHeader({
   const headerGroup = table.getHeaderGroups()[0];
   if (!headerGroup) return null;
 
-  // Below lg only filterable columns (and explicit opt-ins) are visible — the same
+  // Below lg only the interactive columns are visible — the same
   // `keepsCellOnTablet` predicate the cells themselves use, so the two cannot drift.
   // If a table has none, every cell is hidden there, the flex row has no height, and
   // an absolutely-positioned rightSlot has nothing to sit in — so that slot goes
@@ -118,10 +118,24 @@ type ColumnMeta = AnyHeader['column']['columnDef']['meta'];
 /**
  * Whether a column's header stays visible below `lg`, where the row is narrow
  * enough that only the controls a user can act on earn their space: the filter
- * dropdowns, plus anything explicitly opted in via `meta.alwaysShowHeader`.
+ * dropdowns, the sort toggles, plus anything explicitly opted in via
+ * `meta.alwaysShowHeader`.
+ *
+ * `meta.sortable` counts for the same reason `meta.filter` does, and used not
+ * to: the sort arrow lives INSIDE the header cell, so hiding the cell below `lg`
+ * did not merely hide a label — it removed the only way to reorder the table on
+ * every screen narrower than a desktop. A consumer wanting it back had no legal
+ * move: `meta.width` is neutralized here by a doubled-class rule, so the escape
+ * was a specificity fight, and the one consumer who tried it ended up
+ * re-implementing this whole decision in `max-lg:[&&&]:` classes.
+ *
+ * A sortable column whose CELLS are hidden below `lg` (`meta.hideAt`) still
+ * keeps its toggle, exactly as a filterable one does: reordering by a column
+ * this width has no room to print is as useful as filtering by one, and the two
+ * rules staying identical is what keeps this predicate a single sentence.
  */
 function keepsCellOnTablet(meta: ColumnMeta): boolean {
-  return Boolean(meta?.filter) || meta?.alwaysShowHeader === true;
+  return Boolean(meta?.filter) || meta?.sortable === true || meta?.alwaysShowHeader === true;
 }
 
 // Literal class maps — Tailwind's scanner needs the full class strings, which a
