@@ -3,6 +3,7 @@
 import { Check } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useRef } from 'react';
+import { UnifiedSkeleton } from '../loading';
 import { Badge, Input } from '../ui';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
@@ -74,25 +75,27 @@ interface PushButtonSelectorProps {
   footer?: React.ReactNode;
 }
 
-// Skeleton component matching external pattern from announcement-form.tsx
+// Composed from the app-wide UnifiedSkeleton system (components/loading) —
+// the same base every other loading surface uses (bg-ods-skeleton pulse,
+// prefers-reduced-motion support, role="status" a11y). Each skeleton row
+// mirrors a LOADED option row exactly (bg-ods-bg card, p-4, icon + two
+// 20px-tall text lines + selection box) so the list never jumps on load.
 function PushButtonSelectorSkeleton({ count = 3, hasTitle }: { count?: number; hasTitle?: boolean }) {
   return (
-    <div className="space-y-3">
-      {hasTitle && <div className="h-5 w-20 animate-pulse rounded bg-ods-skeleton" />}
+    <div className="space-y-3" role="status" aria-label="Loading options">
+      {hasTitle && <UnifiedSkeleton className="h-5 w-20" aria-label="Loading title" />}
       <div className="space-y-3">
         {Array.from({ length: count }, (_, i) => (
-          <div key={i} className="animate-pulse rounded-lg border border-ods-border bg-ods-skeleton p-4">
-            {/* Geometry MUST match a loaded option row (p-4 + two 20px text
-                lines) — a shorter skeleton makes the whole list jump on load. */}
-            <div className="flex items-center justify-between">
+          <div key={i} className="rounded-lg border border-ods-border bg-ods-bg p-4">
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded bg-ods-skeleton" />
+                <UnifiedSkeleton className="h-8 w-8" aria-label="Loading icon" />
                 <div>
-                  <div className="mb-2 h-4 w-24 rounded bg-ods-skeleton" />
-                  <div className="h-4 w-36 rounded bg-ods-skeleton" />
+                  <UnifiedSkeleton variant="text" className="mb-2 h-4 w-24" aria-label="Loading name" />
+                  <UnifiedSkeleton variant="text" className="h-4 w-36" aria-label="Loading description" />
                 </div>
               </div>
-              <div className="h-6 w-6 rounded border-2 border-ods-border bg-ods-skeleton" />
+              <UnifiedSkeleton className="h-6 w-6" aria-label="Loading selection state" />
             </div>
           </div>
         ))}
