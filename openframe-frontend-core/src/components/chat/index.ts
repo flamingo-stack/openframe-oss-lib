@@ -10,7 +10,6 @@ export * from './ai-assistant-info';
 export * from './context-compaction-display';
 export * from './expand-chevron';
 export * from './thinking-display';
-export * from './guide-display';
 export * from './ask-display';
 export * from './error-message-display';
 export * from './chat-container';

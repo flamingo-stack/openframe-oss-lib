@@ -63,9 +63,7 @@ export interface ChunkData {
   /** Batch-approval rows. Coerced by `normalizeToolCalls` in the NATS decoder
    *  — the wire shape is per-backend, so entries stay opaque here. */
   toolCalls?: unknown[];
-  /** On GUIDE chunks: a Product Guide frame the agent re-streamed verbatim from
-   *  the hub, instead of the answer text `text` carries. Decoded by
-   *  `decodeNatsChunk` through the shared leading-frame table. */
+  /** Opaque per-chunk payload some backends attach beside `text`. */
   payload?: Record<string, unknown>;
   modelName?: string;
   providerName?: string;
