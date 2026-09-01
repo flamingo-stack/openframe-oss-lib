@@ -59,8 +59,8 @@ public class SsoTenantRegistrationService {
     }
 
     private void preProcessRegistration(SsoTenantRegistrationInitRequest request) {
+        // No email yet — the SSO identity provides it at the callback.
         TenantRegistrationRequest preReq = TenantRegistrationRequest.builder()
-                .email(request.getEmail())
                 .tenantDomain(request.getTenantDomain())
                 .build();
         registrationProcessor.preProcessTenantRegistration(preReq);
@@ -72,7 +72,6 @@ public class SsoTenantRegistrationService {
                                                          long issuedAt) {
         return new SsoTenantRegCookiePayload(
                 state,
-                request.getEmail(),
                 request.getTenantName(),
                 request.getTenantDomain(),
                 provider,

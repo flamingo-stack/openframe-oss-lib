@@ -19,7 +19,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
-import static org.springframework.util.StringUtils.hasText;
 
 
 @Component
@@ -48,8 +47,6 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
         SsoTenantRegCookiePayload payload = ssoCookieCodec.decodeTenant(cookie.getValue())
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
-        requireEmailMatchesForm(payload.email(), email);
-
         String[] names = resolveNames(request, authentication, user);
         String givenName = names[0];
         String familyName = names[1];
@@ -73,23 +70,6 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
         var tenant = registrationService.registerTenant(reg);
 
         clearFlowCookieAndRedirect(response, cookie, tenant.getId(), payload.redirectTo(), payload.authMobile());
-    }
-
-    /**
-     * The tenant is created with the email the identity provider asserts, but every pre-flight
-     * check (disposable-domain, access code, attribution) ran against the email typed into the
-     * sign-up form — so a different SSO account must not slip through. Missing form email means a
-     * cookie minted before this field existed; the flow cookie lives 10 minutes, so just let it pass.
-     */
-    private void requireEmailMatchesForm(String formEmail, String ssoEmail) {
-        if (!hasText(formEmail)) {
-            return;
-        }
-        if (!formEmail.trim().equalsIgnoreCase(ssoEmail)) {
-            throw new IllegalStateException(
-                    "This account's email (" + ssoEmail + ") doesn't match the email you entered ("
-                            + formEmail.trim() + "). Please sign up with the account that matches the form email.");
-        }
     }
 
 }
