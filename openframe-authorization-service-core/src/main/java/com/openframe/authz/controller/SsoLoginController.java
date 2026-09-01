@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -77,6 +79,30 @@ public class SsoLoginController {
                     "Sign-in failed. Please try again.");
         }
     }
+
+    /**
+     * What the signup-continue page renders: the identity the provider asserted, read from the
+     * authenticated SAS session. 401-style errors surface as the standard error redirect would be
+     * wrong for an XHR, so this endpoint answers JSON — an expired session is a 409 with a message
+     * the page shows before sending the user back to login.
+     */
+    @GetMapping(path = "/login/sso/pending")
+    public PendingSsoIdentity pendingSsoIdentity(Authentication authentication, HttpServletRequest httpRequest) {
+        try {
+            OidcUser user = requireSessionOidcUser(authentication);
+            SsoLoginCookiePayload payload = requireLoginFlowCookie(httpRequest);
+            String[] names = OidcUserUtils.resolveNames(user);
+            return new PendingSsoIdentity(
+                    OidcUserUtils.resolveEmail(user),
+                    names[0],
+                    names[1],
+                    payload.provider());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
+    }
+
+    public record PendingSsoIdentity(String email, String firstName, String lastName, String provider) {}
 
     /**
      * Finishes registration for an SSO identity that had no account at login time. Identity (email,
