@@ -54,18 +54,6 @@ export interface ThinkingDeltaEvent extends ChatStreamEventBase {
   text: string;
 }
 
-/** Guide-body delta (NATS `GUIDE` chunk) — the assistant's how-to /
- *  documentation answer, rendered as a titled "OpenFrame Guide" card rather
- *  than bare prose. Same APPEND-ONLY contract as `text-delta` /
- *  `thinking-delta`: each event carries the next verbatim slice and consumers
- *  coalesce into the trailing `guide` segment. NATS-only today — the SSE
- *  frame grammar has no guide frame — but it lives in the shared union
- *  because the reducer is transport-agnostic. */
-export interface GuideDeltaEvent extends ChatStreamEventBase {
-  type: 'guide-delta';
-  text: string;
-}
-
 /** Clarification card (NATS `ASK` chunk) — the assistant asking which reading
  *  of an ambiguous question to answer. NOT a delta: the chunk carries the
  *  finished card, so consumers push it whole instead of coalescing. `text` is
@@ -134,35 +122,6 @@ export interface ApprovalRequestEvent extends ChatStreamEventBase {
   fields?: ApprovalRequestField[];
   toolCalls?: ApprovalToolCall[];
   status?: 'pending';
-  /** Set when the card came from a Product Guide frame — see {@link GuideOrigin}. */
-  origin?: GuideOrigin;
-}
-
-/**
- * Marks an event whose payload is a Product Guide frame, whatever transport
- * carried it. It exists because ONE stream can now mix both worlds: the agent
- * re-streams the hub's frames into a NATS dialog, so a card typed the hub's way
- * (`approvalType` = the tool name, resolved through the hub's confirm route)
- * travels beside cards typed the agent's way (`approvalType` = an approval TIER
- * routed to human escalation).
- *
- * Consumers read it to keep the guide half behaving exactly as it does in the
- * hub's own chat — NOT to give it special treatment. Without it the NATS kernel
- * would have to guess from `approvalType`, and every tool the hub adds would
- * silently fall into the escalation path.
- */
-export type GuideOrigin = 'guide';
-
-/** The only value of {@link GuideOrigin}. Lives beside the type, and beside the
- *  predicate below, because both decoders and every consumer that branches on
- *  provenance must compare against the same token — a bare `'guide'` literal
- *  typo silently disables the branch instead of failing to compile. */
-export const GUIDE_ORIGIN: GuideOrigin = 'guide';
-
-/** True for anything stamped as coming from the Product Guide — a stream event
- *  or the `data` of a segment built from one. */
-export function isGuideOrigin(source: { origin?: GuideOrigin | string } | null | undefined): boolean {
-  return source?.origin === GUIDE_ORIGIN;
 }
 
 /** An approval request was resolved (SSE `decision_resolved` frame /
@@ -178,8 +137,6 @@ export interface ApprovalResolvedEvent extends ChatStreamEventBase {
   receiptText?: string;
   result?: DecisionResolvedFrame['result'];
   willAutoContinue?: boolean;
-  /** Set when the resolution came from a Product Guide frame — see {@link GuideOrigin}. */
-  origin?: GuideOrigin;
 }
 
 /** The client is offered a handoff of this ticket to a human technician
@@ -281,13 +238,6 @@ export interface ChatMetadataEvent extends ChatStreamEventBase {
     routedModel?: string;
     routedThinkingBudget: number | null;
   };
-  /**
-   * Set when the metadata came from a Product Guide frame — see
-   * {@link GuideOrigin}. Such an event carries ONLY `conversationId`: it exists
-   * to record the hub's conversation id (every confirm-tool call must quote it
-   * back), NOT to describe the dialog's model, which stays the agent's.
-   */
-  origin?: GuideOrigin;
 }
 
 /** SSE usage frames — raw wire keys (snake_case) preserved. */
@@ -402,7 +352,6 @@ export type ChatStreamEvent =
   | TurnEndEvent
   | TextDeltaEvent
   | ThinkingDeltaEvent
-  | GuideDeltaEvent
   | AskEvent
   | StatusEvent
   | ToolExecutionEvent

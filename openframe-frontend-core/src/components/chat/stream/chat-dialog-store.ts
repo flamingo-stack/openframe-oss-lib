@@ -207,7 +207,7 @@ const EMPTY_STATE: ChatReducerState = Object.freeze({
   dialogTokenUsage: null,
   liveModel: null,
   approvalStatuses: Object.freeze({}) as ChatReducerState['approvalStatuses'],
-}) as ChatReducerState;
+});
 
 /** Shared frozen empty list for a key with no send in flight. */
 const EMPTY_PENDING_ECHOES: readonly PendingEcho[] = Object.freeze([]);

@@ -11,7 +11,7 @@
  *     (`title` / `url` / `targetPlatform` / `sourceRepo`). `resolveSourceRowCTA`
  *     then routes that `externalUrl` through the host's `composeContentUrl`
  *     seam and the card is clickable.
- *   - **Mingo / NATS transport** (`messageData: [{ type: 'GUIDE' | 'TEXT', text }]`)
+ *   - **Mingo / NATS transport** (`messageData: [{ type: 'TEXT', text }]`)
  *     — the body carries bare `[card://type:id]` markers and NOTHING else.
  *     `chat-message-enhanced.tsx` synthesizes a minimal `{ type, id, title: id,
  *     url: null }` ref so fetch-mode cards can still self-fetch their row, but
