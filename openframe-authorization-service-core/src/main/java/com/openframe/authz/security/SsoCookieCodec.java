@@ -60,6 +60,18 @@ public class SsoCookieCodec {
         return decode(token, SsoLoginCookiePayload.class);
     }
 
+    /**
+     * The OAuth state of ANY flow cookie, without knowing which flow wrote it — every payload
+     * shares the {@link SsoCookiePayload} shape, and Jackson ignores the flow-specific fields.
+     * Signature and expiry are enforced exactly as in the typed decodes.
+     */
+    public Optional<String> decodeState(String token) {
+        return decode(token, FlowStatePayload.class).map(FlowStatePayload::s);
+    }
+
+    private record FlowStatePayload(String s, long exp) implements SsoCookiePayload {
+    }
+
     public <T extends SsoCookiePayload> Optional<T> decode(String token, Class<T> type) {
         try {
             if (token == null) {
