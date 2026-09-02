@@ -9,6 +9,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import org.springframework.stereotype.Component;
 
@@ -31,6 +32,7 @@ public class ScriptScheduleMapper {
                 .scriptIds(input.getScriptIds())
                 .scriptCustomParams(toCustomParams(input.getScriptCustomParams()))
                 .trigger(defaultTrigger(input.getTrigger()))
+                .timeReference(defaultTimeReference(input.getTimeReference()))
                 .offlineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()))
                 .reconnectWindowSeconds(input.getReconnectWindowSeconds())
                 .startAt(input.getStartAt())
@@ -45,6 +47,7 @@ public class ScriptScheduleMapper {
         existing.setScriptIds(input.getScriptIds());
         existing.setScriptCustomParams(toCustomParams(input.getScriptCustomParams()));
         existing.setTrigger(defaultTrigger(input.getTrigger()));
+        existing.setTimeReference(defaultTimeReference(input.getTimeReference()));
         existing.setOfflineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()));
         existing.setReconnectWindowSeconds(input.getReconnectWindowSeconds());
         existing.setSelectionMode(defaultSelectionMode(input.getSelectionMode()));
@@ -54,6 +57,10 @@ public class ScriptScheduleMapper {
 
     private static ScheduleScriptTrigger defaultTrigger(ScheduleScriptTrigger trigger) {
         return trigger != null ? trigger : ScheduleScriptTrigger.DATE_TIME;
+    }
+
+    private static ScheduleTimeReference defaultTimeReference(ScheduleTimeReference timeReference) {
+        return timeReference != null ? timeReference : ScheduleTimeReference.SERVER;
     }
 
     private static ScheduleOfflineBehavior defaultOfflineBehavior(ScheduleOfflineBehavior behavior) {
@@ -75,6 +82,7 @@ public class ScriptScheduleMapper {
                 .selectionMode(defaultSelectionMode(entity.getSelectionMode()))
                 .deviceCriteria(entity.getDeviceCriteria())
                 .trigger(defaultTrigger(entity.getTrigger()))
+                .timeReference(defaultTimeReference(entity.getTimeReference()))
                 .offlineBehavior(defaultOfflineBehavior(entity.getOfflineBehavior()))
                 .reconnectWindowSeconds(entity.getReconnectWindowSeconds())
                 .startAt(entity.getStartAt())
