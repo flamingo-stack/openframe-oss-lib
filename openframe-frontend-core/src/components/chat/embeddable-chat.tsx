@@ -1844,29 +1844,41 @@ function EmbeddableChatInner({
     return out;
   }, [commandsById, enabledSet]);
 
-  // Find sources for the last assistant message; split into cited / uncited.
-  const lastAssistantMsg = [...rawMessages].reverse().find(m => m.role === 'assistant');
-  const lastSources = useMemo(() => {
-    if (chatLoading) return undefined;
-    const sources = lastAssistantMsg?.sources;
-    if (!sources || sources.length === 0) return undefined;
-    const content =
-      lastAssistantMsg.content ||
-      (lastAssistantMsg.segments ?? [])
-        .filter(segment => segment.type === 'text')
-        .map(segment => segment.text)
-        .join('\n');
-    const citationOrder = [...content.matchAll(/\[(\d+)\]/g)].map(m => parseInt(m[1], 10));
-    const seenOrder = new Map<number, number>();
-    citationOrder.forEach(idx => {
-      if (!seenOrder.has(idx)) seenOrder.set(idx, seenOrder.size);
-    });
-    const cited = sources
-      .filter(s => seenOrder.has(s.index))
-      .sort((a, b) => (seenOrder.get(a.index) ?? 0) - (seenOrder.get(b.index) ?? 0));
-    const uncited = sources.filter(s => !seenOrder.has(s.index));
-    return { cited, uncited };
-  }, [lastAssistantMsg, chatLoading]);
+  const renderSourcesAfterMessage = useCallback(
+    (message: Message, index: number) => {
+      if (message.role !== 'assistant' || !message.sources?.length) return null;
+      if (chatLoading && index === messages.length - 1) return null;
+      const content =
+        typeof message.content === 'string'
+          ? message.content
+          : message.content
+              .filter(segment => segment.type === 'text')
+              .map(segment => segment.text)
+              .join('\n');
+      const citationOrder = [...content.matchAll(/\[(\d+)\]/g)].map(m => parseInt(m[1], 10));
+      const seenOrder = new Map<number, number>();
+      citationOrder.forEach(idx => {
+        if (!seenOrder.has(idx)) seenOrder.set(idx, seenOrder.size);
+      });
+      const cited = message.sources
+        .filter(s => seenOrder.has(s.index))
+        .sort((a, b) => (seenOrder.get(a.index) ?? 0) - (seenOrder.get(b.index) ?? 0));
+      const uncited = message.sources.filter(s => !seenOrder.has(s.index));
+      return (
+        <div className="flex-shrink-0 pb-2">
+          <SourceChips
+            cited={cited}
+            uncited={uncited}
+            baseRoute={resolvedBaseRoute}
+            chipBasePlatform={chipBasePlatform}
+            onClose={handleNavigationClose}
+            onDiscuss={discussRef}
+          />
+        </div>
+      );
+    },
+    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, handleNavigationClose, discussRef],
+  );
 
   // Host node for in-panel Radix portals (see the body wrapper below).
   const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
@@ -2410,6 +2422,7 @@ function EmbeddableChatInner({
                                   resolveContextIcon={resolveContextIcon}
                                   renderContextItem={renderContextItem}
                                   renderMention={renderMention}
+                                  renderAfterMessage={renderSourcesAfterMessage}
                                   // Gated on `chatLoading` for the same reason the composer
                                   // is: no second send while a turn is in flight. Passive
                                   // demo hosts (previewMode) stay read-only.
@@ -2447,20 +2460,6 @@ function EmbeddableChatInner({
                                   onLoadMore={loadMoreMessages}
                                 />
                               )}
-                              {lastSources &&
-                                (lastSources.cited.length > 0 || lastSources.uncited.length > 0) &&
-                                !chatLoading && (
-                                  <div className="flex-shrink-0 pb-2">
-                                    <SourceChips
-                                      cited={lastSources.cited}
-                                      uncited={lastSources.uncited}
-                                      baseRoute={resolvedBaseRoute}
-                                      chipBasePlatform={chipBasePlatform}
-                                      onClose={handleNavigationClose}
-                                      onDiscuss={discussRef}
-                                    />
-                                  </div>
-                                )}
                             </div>
                           ) : activeMode === 'mingo' ? (
                             /* Figma node 7532:222444 — default (Mingo-mode) empty state:

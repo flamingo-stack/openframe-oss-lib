@@ -24,10 +24,12 @@ import type { SlashCommandActionId, SlashCommandSummaryAction, SlashCommandSumma
 // canonical declaration.
 export type { SlashCommandActionId, SlashCommandSummaryAction, SlashCommandSummary };
 
+const COMMANDS_MAX_RESULTS = 10;
+
 /**
- * Fetch slash-command suggestions for the CURRENT deployment platform,
- * matching id-prefix `prefix`. The chat source is server-resolved — the
- * client sends NO `source` param on the URL.
+ * Fetch the full slash-command registry for the CURRENT deployment platform,
+ * then match id-prefix `prefix` locally. The chat source is server-resolved —
+ * the client sends NO `source` param on the URL.
  *
  * `commandsUrl` is required — supplied by `useChatRuntime().endpoints.commandsUrl`
  * at the call site. NO default value.
@@ -56,13 +58,15 @@ export async function fetchSlashCommands(
 ): Promise<SlashCommandSummary[]> {
   try {
     const url = new URL(commandsUrl, window.location.origin);
-    if (prefix) url.searchParams.set('q', prefix);
     // `headers: {}` opts out of the default `Content-Type: application/json`
     // — this is a bare GET with no body, so no content-type is needed.
     const res = await embedAuthedFetch(url.toString(), { signal, headers: {} });
     if (!res.ok) return [];
     const data = (await res.json()) as { commands?: SlashCommandSummary[] };
-    return data.commands ?? [];
+    const commands = data.commands ?? [];
+    const normalizedPrefix = prefix.trim().toLowerCase();
+    if (!normalizedPrefix) return commands;
+    return commands.filter(({ id }) => id.startsWith(normalizedPrefix)).slice(0, COMMANDS_MAX_RESULTS);
   } catch (err) {
     // Cancellation (unmount / dep change) MUST propagate so react-query treats
     // it as cancelled, not as a successful empty result. Every OTHER failure

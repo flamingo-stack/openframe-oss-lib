@@ -306,6 +306,8 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  ChatMessageEnhanced; the host sends the received label as the user's next
    *  message. Omit to render ask cards read-only. */
   onAskSelect?: (label: string) => void;
+  /** Renders content owned by one message directly after that message. */
+  renderAfterMessage?: (message: Message, index: number) => ReactNode;
 }
 
 export interface ChatMessageListRef {

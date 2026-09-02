@@ -115,6 +115,45 @@ afterAll(() => {
 });
 
 describe('EmbeddableChat source strip', () => {
+  it('keeps sources attached to their assistant turn after later messages', () => {
+    renderChat([
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: 'Use the first guide [1].',
+        sources: [
+          {
+            index: 1,
+            name: 'First turn source',
+            path: 'docs/first',
+            documentType: 'docs',
+          },
+        ],
+      },
+      {
+        id: 'assistant-2',
+        role: 'assistant',
+        content: 'Use the second guide [1].',
+        sources: [
+          {
+            index: 1,
+            name: 'Second turn source',
+            path: 'docs/second',
+            documentType: 'docs',
+          },
+        ],
+      },
+      {
+        id: 'assistant-3',
+        role: 'assistant',
+        content: 'Here is a plain follow-up answer.',
+      },
+    ]);
+
+    expect(screen.getByText('[1] First turn source')).toBeInTheDocument();
+    expect(screen.getByText('[1] Second turn source')).toBeInTheDocument();
+  });
+
   it('renders live SOURCES metadata in citation order with uncited overflow', () => {
     const reducer = createChatStreamReducer({ transport: 'nats' });
     for (const chunk of [
