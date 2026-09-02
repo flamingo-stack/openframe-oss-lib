@@ -1,0 +1,88 @@
+extend type Query {
+    """
+    Search packages in a public package-manager repository (Homebrew, Chocolatey, winget).
+    Homebrew and winget results are ranked by match quality with popularity/canonical-id
+    tiebreaks; Chocolatey results come in the repository's own download-count order.
+    """
+    searchPackages(input: PackageSearchInput!): PackageSearchResult!
+    """
+    Package details by identifier, including available versions (newest first).
+    Errors with NOT_FOUND when the id is unknown to the package manager.
+    """
+    packageDetails(packageManager: PackageManagerType!, packageId: ID!, packageType: BrewPackageType): PackageDetails!
+}
+
+enum PackageManagerType {
+    BREW
+    CHOCO
+    WINGET
+}
+
+"BREW only — the same name can exist as both a formula and a cask; other managers ignore it."
+enum BrewPackageType {
+    FORMULA
+    CASK
+}
+
+input PackageSearchInput {
+    packageManager: PackageManagerType!
+    "At least 2 characters after trimming."
+    query: String!
+    "Defaults to 25; values above 39 are clamped, not rejected (Chocolatey's server page cap of 40 minus the row used to compute hasMore)."
+    limit: Int
+    offset: Int
+}
+
+type PackageSearchResult {
+    items: [PackageSearchItem!]!
+    "Null when the source cannot report a total without an extra request (Chocolatey)."
+    total: Int
+    "Exact for every source — drive pagination off this field, not off total."
+    hasMore: Boolean!
+}
+
+type PackageSearchItem {
+    "Identifier to pass to packageDetails: brew name/token, Chocolatey package id, winget PackageIdentifier."
+    id: ID!
+    name: String!
+    description: String
+    "Latest available version."
+    version: String
+    "WINGET only in search results."
+    publisher: String
+    homepage: String
+    "CHOCO only in search results; winget provides it in packageDetails."
+    iconUrl: String
+    "Ready-to-run install command, e.g. `brew install --cask slack`."
+    installCommand: String!
+    "BREW only — pass it back to packageDetails to open exactly this package, not its twin of the other type."
+    packageType: BrewPackageType
+    "Install/download count where the source publishes one: brew 30-day installs, Chocolatey total downloads."
+    popularity: Int
+    packageManager: PackageManagerType!
+}
+
+type PackageDetails {
+    id: ID!
+    packageManager: PackageManagerType!
+    name: String!
+    description: String
+    publisher: String
+    homepage: String
+    iconUrl: String
+    license: String
+    installCommand: String!
+    packageType: BrewPackageType
+    "BREW and CHOCO only."
+    popularity: Int
+    tags: [String!]!
+    "Available versions, newest first. Homebrew publishes only the current one; Chocolatey returns the newest 40."
+    versions: [PackageVersion!]!
+}
+
+type PackageVersion {
+    version: String!
+    "Chocolatey only — the other sources do not publish release dates."
+    releasedAt: Instant
+    prerelease: Boolean
+}

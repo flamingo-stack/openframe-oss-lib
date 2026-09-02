@@ -73,6 +73,7 @@
         <module>openframe-gateway-service-core</module>
         <module>openframe-test-service-core</module>
         <module>openframe-fe-feature-flags</module>
+        <module>openframe-package-search</module>
     </modules>
 
     <dependencies>
