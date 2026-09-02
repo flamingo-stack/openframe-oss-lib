@@ -20,5 +20,6 @@ public class ToolConnection {
     private String metadata;
     private String connectedAt;
     private String lastSyncAt;
+    private String vulnerabilitiesUpdatedAt;
     private String disconnectedAt;
 }
