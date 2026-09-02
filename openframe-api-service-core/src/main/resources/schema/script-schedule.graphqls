@@ -278,7 +278,7 @@ input UpdateScriptScheduleInput {
     offlineBehavior: ScheduleOfflineBehavior
     "Max seconds to wait for an offline device to reconnect. Set only when offlineBehavior is RETRY_ON_RECONNECT; null/ignored for SKIP."
     reconnectWindowSeconds: Long
-    "How this schedule targets devices — SPECIFIC (an explicit machine set) or CRITERIA (a live rule). Null defaults to SPECIFIC, matching legacy documents. DEVICE_LOCAL schedules must stay SPECIFIC. Flipping between modes leaves the join rows/rule untouched; whichever mode is active is what the resolver reads."
+    "How this schedule targets devices — SPECIFIC (an explicit machine set) or CRITERIA (a live rule). Null defaults to SPECIFIC, matching legacy documents. Flipping between modes leaves the join rows/rule untouched; whichever mode is active is what the resolver reads."
     selectionMode: ScheduleDeviceSelectionMode
     "The scheduled run time. For SERVER: an absolute UTC instant. For DEVICE_LOCAL: the picked Date + Time with NO zone offset applied, re-based per device. Required when trigger is DATE_TIME; must be null for DEVICE_ONLINE. Changing it reschedules the run. Must fall on a 30-minute boundary."
     startAt: Instant

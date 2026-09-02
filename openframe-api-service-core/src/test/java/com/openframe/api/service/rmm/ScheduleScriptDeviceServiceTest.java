@@ -60,7 +60,8 @@ class ScheduleScriptDeviceServiceTest {
         targetResolver = mock(ScheduleDeviceTargetResolver.class);
         TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
         dispatchRepository = mock(DeviceOnlineDispatchRepository.class);
-        service = new ScheduleScriptDeviceService(assignedRepository, scheduleRepository, machineRepository, targetResolver, tenantIdProvider, dispatchRepository);
+        service = new ScheduleScriptDeviceService(assignedRepository, scheduleRepository, machineRepository,
+                targetResolver, tenantIdProvider, dispatchRepository);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // By default every requested machineId resolves to an in-tenant device (osType "windows");
         // platform/existence tests override this stub with their own machines.
