@@ -41,6 +41,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -145,9 +146,11 @@ class TicketStatusServiceTest {
         @Test
         void create_byNonAdmin_isRejectedBeforeAnyLookup() {
             assertThatThrownBy(() -> service.create(principal(ActorType.AGENT), create("Nope", "#ff0000")))
-                    .isInstanceOf(IllegalStateException.class);
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("ADMIN");
 
             verify(statusRepository, never()).save(any());
+            verifyNoInteractions(statusRepository, ticketRepository);
         }
     }
 
@@ -209,6 +212,15 @@ class TicketStatusServiceTest {
 
             assertThatThrownBy(() -> service.update(admin, update("st-hold", "Resolved", null)))
                     .isInstanceOf(DuplicateTicketStatusNameException.class);
+        }
+
+        @Test
+        void update_byNonAdmin_isRejectedBeforeAnyLookup() {
+            assertThatThrownBy(() -> service.update(principal(ActorType.AGENT), update("st-hold", "Paused", null)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("ADMIN");
+
+            verifyNoInteractions(statusRepository, ticketRepository);
         }
 
         @Test
@@ -284,6 +296,15 @@ class TicketStatusServiceTest {
         }
 
         @Test
+        void delete_byNonAdmin_isRejectedBeforeAnyLookup() {
+            assertThatThrownBy(() -> service.delete(principal(ActorType.AGENT), delete("st-hold", null)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("ADMIN");
+
+            verifyNoInteractions(statusRepository, ticketRepository);
+        }
+
+        @Test
         void delete_ofASystemStatus_isRejected() {
             when(statusRepository.findById("st-resolved")).thenReturn(Optional.of(resolved));
 
@@ -345,6 +366,130 @@ class TicketStatusServiceTest {
                     .isLessThan(onHold.getPosition());
         }
 
+        /** A custom column sits after the anchor, so the moving status lands in that gap — not next to Resolved. */
+        @Test
+        void reorder_afterAnAnchorFollowedByAnotherCustom_landsBetweenThem() {
+            TicketStatusDefinition waiting = status("st-wait", CUSTOM, "Waiting",
+                    LexoRank.parse(onHold.getPosition()).genNext());
+            TicketStatusDefinition moving = status("st-move", CUSTOM, "Moving", MIDDLE.genPrev());
+            when(statusRepository.findById("st-move")).thenReturn(Optional.of(moving));
+            when(statusRepository.findById("st-hold")).thenReturn(Optional.of(onHold));
+            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM))
+                    .thenReturn(List.of(onHold, waiting, moving));
+            when(statusRepository.save(moving)).thenReturn(moving);
+
+            TicketStatusDefinition reordered = service.reorder(admin, reorder("st-move", "st-hold", null));
+
+            assertThat(reordered.getPosition())
+                    .isGreaterThan(onHold.getPosition())
+                    .isLessThan(waiting.getPosition());
+            verify(statusRepository, never()).findByKind(RESOLVED);
+        }
+
+        /** A custom column sits before the anchor, so the moving status lands in that gap — not next to Tech Required. */
+        @Test
+        void reorder_beforeAnAnchorPrecededByAnotherCustom_landsBetweenThem() {
+            TicketStatusDefinition early = status("st-early", CUSTOM, "Early",
+                    LexoRank.parse(onHold.getPosition()).genPrev());
+            TicketStatusDefinition moving = status("st-move", CUSTOM, "Moving", MIDDLE.genNext().genNext().genNext());
+            when(statusRepository.findById("st-move")).thenReturn(Optional.of(moving));
+            when(statusRepository.findById("st-hold")).thenReturn(Optional.of(onHold));
+            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM))
+                    .thenReturn(List.of(early, onHold, moving));
+            when(statusRepository.save(moving)).thenReturn(moving);
+
+            TicketStatusDefinition reordered = service.reorder(admin, reorder("st-move", null, "st-hold"));
+
+            assertThat(reordered.getPosition())
+                    .isGreaterThan(early.getPosition())
+                    .isLessThan(onHold.getPosition());
+            verify(statusRepository, never()).findByKind(TECH_REQUIRED);
+        }
+
+        /**
+         * The scan looks strictly to the left of the anchor: a custom column sitting after it must
+         * not be mistaken for the left neighbour.
+         */
+        @Test
+        void reorder_beforeAnAnchor_ignoresCustomColumnsThatFollowIt() {
+            LexoRank holdRank = LexoRank.parse(onHold.getPosition());
+            TicketStatusDefinition early = status("st-early", CUSTOM, "Early", holdRank.genPrev());
+            TicketStatusDefinition later = status("st-later", CUSTOM, "Later", holdRank.genNext());
+            TicketStatusDefinition moving = status("st-move", CUSTOM, "Moving", holdRank.genNext().genNext());
+            when(statusRepository.findById("st-move")).thenReturn(Optional.of(moving));
+            when(statusRepository.findById("st-hold")).thenReturn(Optional.of(onHold));
+            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM))
+                    .thenReturn(List.of(early, onHold, later, moving));
+            when(statusRepository.save(moving)).thenReturn(moving);
+
+            TicketStatusDefinition reordered = service.reorder(admin, reorder("st-move", null, "st-hold"));
+
+            assertThat(reordered.getPosition())
+                    .isGreaterThan(early.getPosition())
+                    .isLessThan(onHold.getPosition());
+        }
+
+        /** The moving status is skipped when scanning for neighbours — otherwise it anchors against itself. */
+        @Test
+        void reorder_afterAnAnchor_ignoresTheMovingStatusWhenScanning() {
+            TicketStatusDefinition moving = status("st-move", CUSTOM, "Moving",
+                    LexoRank.parse(onHold.getPosition()).genNext());
+            when(statusRepository.findById("st-move")).thenReturn(Optional.of(moving));
+            when(statusRepository.findById("st-hold")).thenReturn(Optional.of(onHold));
+            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM)).thenReturn(List.of(onHold, moving));
+            when(statusRepository.findByKind(RESOLVED)).thenReturn(Optional.of(resolved));
+            when(statusRepository.save(moving)).thenReturn(moving);
+
+            TicketStatusDefinition reordered = service.reorder(admin, reorder("st-move", "st-hold", null));
+
+            assertThat(reordered.getPosition())
+                    .isGreaterThan(onHold.getPosition())
+                    .isLessThan(resolved.getPosition());
+        }
+
+        /**
+         * The moving status is the only custom column left of the anchor. Skipping it leaves no
+         * neighbour at all, so the gap is measured against Tech Required — not against itself.
+         */
+        @Test
+        void reorder_beforeAnAnchor_whenOnlyTheMovingStatusPrecedesIt_fallsBackToTechRequired() {
+            LexoRank holdRank = LexoRank.parse(onHold.getPosition());
+            TicketStatusDefinition moving = status("st-move", CUSTOM, "Moving", holdRank.genPrev());
+            when(statusRepository.findById("st-move")).thenReturn(Optional.of(moving));
+            when(statusRepository.findById("st-hold")).thenReturn(Optional.of(onHold));
+            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM)).thenReturn(List.of(moving, onHold));
+            when(statusRepository.findByKind(TECH_REQUIRED)).thenReturn(Optional.of(techRequired));
+            when(statusRepository.save(moving)).thenReturn(moving);
+
+            TicketStatusDefinition reordered = service.reorder(admin, reorder("st-move", null, "st-hold"));
+
+            verify(statusRepository).findByKind(TECH_REQUIRED);
+            assertThat(reordered.getPosition())
+                    .isGreaterThan(techRequired.getPosition())
+                    .isLessThan(onHold.getPosition());
+        }
+
+        /** With several columns to the left, the gap is measured against the nearest one, not the first. */
+        @Test
+        void reorder_beforeAnAnchor_picksTheNearestOfSeveralLeftNeighbours() {
+            LexoRank holdRank = LexoRank.parse(onHold.getPosition());
+            TicketStatusDefinition first = status("st-first", CUSTOM, "First", holdRank.genPrev().genPrev());
+            TicketStatusDefinition nearest = status("st-near", CUSTOM, "Nearest", holdRank.genPrev());
+            TicketStatusDefinition moving = status("st-move", CUSTOM, "Moving", holdRank.genNext());
+            when(statusRepository.findById("st-move")).thenReturn(Optional.of(moving));
+            when(statusRepository.findById("st-hold")).thenReturn(Optional.of(onHold));
+            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM))
+                    .thenReturn(List.of(first, nearest, onHold, moving));
+            when(statusRepository.save(moving)).thenReturn(moving);
+
+            TicketStatusDefinition reordered = service.reorder(admin, reorder("st-move", null, "st-hold"));
+
+            assertThat(reordered.getPosition())
+                    .isGreaterThan(nearest.getPosition())
+                    .isLessThan(onHold.getPosition());
+            verify(statusRepository, never()).findByKind(TECH_REQUIRED);
+        }
+
         @Test
         void reorder_withoutAnyNeighbour_isRejected() {
             TicketStatusDefinition moving = status("st-move", CUSTOM, "Moving", MIDDLE.genPrev());
@@ -377,6 +522,15 @@ class TicketStatusServiceTest {
                     .isInstanceOf(InvalidTicketStatusReorderException.class);
 
             verify(statusRepository, never()).save(any());
+        }
+
+        @Test
+        void reorder_byNonAdmin_isRejectedBeforeAnyLookup() {
+            assertThatThrownBy(() -> service.reorder(principal(ActorType.AGENT), reorder("st-move", "st-hold", null)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("ADMIN");
+
+            verifyNoInteractions(statusRepository, ticketRepository);
         }
 
         @Test
