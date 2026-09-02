@@ -387,6 +387,7 @@ impl Client {
             config_service.clone(),
             tool_run_manager.clone(),
             deactivation_service.clone(),
+            http_client.clone(),
         );
 
         // Initialize tool connection service
