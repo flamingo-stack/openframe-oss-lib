@@ -57,8 +57,7 @@ describe('renderChatInlineEntityCard video refs', () => {
   });
 
   it('keeps a direct-video URL direct when its query mentions a YouTube URL', () => {
-    const directUrl =
-      'https://cdn.example.test/product-overview.mp4?source=youtube.com/watch?v=MdFJNoJeqZQ';
+    const directUrl = 'https://cdn.example.test/product-overview.mp4?source=youtube.com/watch?v=MdFJNoJeqZQ';
     const ref: ChatRef = {
       type: 'video',
       id: 'mp4-direct',
