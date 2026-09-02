@@ -309,17 +309,12 @@ public class ScheduleScriptService {
                                        Instant startAt, Long repeatSeconds) {
         if (trigger == ScheduleScriptTrigger.DEVICE_ONLINE) {
             if (startAt != null || repeatSeconds != null) {
-                throw new BadRequestException(
-                        "A DEVICE_ONLINE schedule is event-triggered and must not set startAt or repeat");
+                throw new BadRequestException("A DEVICE_ONLINE schedule is event-triggered and must not set startAt or repeat");
             }
             return;
         }
-        // DATE_TIME: startAt is mandatory — the runner has nothing to fire without it. It is an
-        // absolute instant for SERVER time and the wall-clock to re-base per device for DEVICE_LOCAL;
-        // either way it must land on the 30-minute grid.
         if (startAt == null) {
-            throw new BadRequestException(
-                    "A scheduled (DATE_TIME) schedule requires a run date and time (startAt)");
+            throw new BadRequestException("A scheduled (DATE_TIME) schedule requires a run date and time (startAt)");
         }
         validateGrid(startAt, repeatSeconds);
         if (timeReference == ScheduleTimeReference.DEVICE_LOCAL && repeatSeconds != null) {

@@ -24,6 +24,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -60,13 +61,10 @@ class ScheduleScriptDeviceServiceTest {
         targetResolver = mock(ScheduleDeviceTargetResolver.class);
         TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
         dispatchRepository = mock(DeviceOnlineDispatchRepository.class);
-        service = new ScheduleScriptDeviceService(assignedRepository, scheduleRepository, machineRepository,
-                targetResolver, tenantIdProvider, dispatchRepository);
+        service = new ScheduleScriptDeviceService(assignedRepository, scheduleRepository, machineRepository, targetResolver, tenantIdProvider, dispatchRepository);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        // By default every requested machineId resolves to an in-tenant device (osType "windows");
-        // platform/existence tests override this stub with their own machines.
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenAnswer(inv -> {
-            java.util.Collection<String> ids = inv.getArgument(1);
+            Collection<String> ids = inv.getArgument(1);
             return ids.stream().map(id -> machine(id, id, WINDOWS)).toList();
         });
     }
@@ -99,8 +97,7 @@ class ScheduleScriptDeviceServiceTest {
         ArgumentCaptor<List<DeviceFirstOnlineDispatch>> captor = ArgumentCaptor.forClass(List.class);
         verify(dispatchRepository).saveAll(captor.capture());
         List<DeviceFirstOnlineDispatch> rows = captor.getValue();
-        assertThat(rows).extracting(DeviceFirstOnlineDispatch::getMachineId)
-                .containsExactlyInAnyOrder("m-1", "m-2");
+        assertThat(rows).extracting(DeviceFirstOnlineDispatch::getMachineId).containsExactlyInAnyOrder("m-1", "m-2");
         assertThat(rows).allSatisfy(r -> {
             assertThat(r.getScheduleId()).isEqualTo(SCHEDULE_ID);
             assertThat(r.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);

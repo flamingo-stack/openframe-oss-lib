@@ -70,8 +70,8 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
-            // server -> agent: "report your timezone" requests for DEVICE_LOCAL schedules.
-            // Re-sent every 30-minute sweep per pending device, so cap age to keep the stream small.
+            // server -> agent: "report your timezone" requests for DEVICE_LOCAL schedules
+            // Re-sent every 30-minute sweep per pending device, so cap age to keep the stream small
             StreamConfiguration.builder()
                     .name("MACHINE_TIMEZONE_REQUEST")
                     .subjects(List.of("machine.*.timezone.request"))
@@ -79,7 +79,7 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .retentionPolicy(RetentionPolicy.Limits)
                     .maxAge(Duration.ofHours(1))
                     .build(),
-            // agent -> server: reported IANA timezone (reply to the request above).
+            // agent -> server: reported IANA timezone (reply to the request above)
             StreamConfiguration.builder()
                     .name("MACHINE_TIMEZONE")
                     .subjects(List.of("machine.*.timezone"))

@@ -40,7 +40,6 @@ class DeviceLocalScheduleServiceTest {
 
     private static final String TENANT = "tenant-1";
     private static final String SCHEDULE_ID = "sched-local-1";
-    // Wall-clock the user picked: 09:00, encoded as a UTC instant (offset deliberately not applied).
     private static final Instant LOCAL_RUN_AT = Instant.parse("2026-09-15T09:00:00Z");
 
     @Mock private ScriptScheduleRepository scheduleRepository;
@@ -80,7 +79,6 @@ class DeviceLocalScheduleServiceTest {
     @Test
     @DisplayName("online device whose stored-zone local time has not arrived: re-requested, not fired")
     void onlineNotYet_requestedNotFired() {
-        // New York is UTC-4 in September → local 09:00 == 13:00Z; 06:30Z is well before.
         Instant now = Instant.parse("2026-09-15T06:30:00Z");
         stubSchedule(List.of("m-ny"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))

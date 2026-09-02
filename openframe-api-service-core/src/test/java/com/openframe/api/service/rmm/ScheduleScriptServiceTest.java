@@ -770,7 +770,7 @@ class ScheduleScriptServiceTest {
         assertThat(result.getStartAt()).isEqualTo(Instant.parse("2026-09-15T09:00:00Z"));
         ArgumentCaptor<ScheduleScript> saved = ArgumentCaptor.forClass(ScheduleScript.class);
         verify(scheduleRepository).save(saved.capture());
-        assertThat(saved.getValue().getNextRunAt()).isNull();   // per-device path never uses nextRunAt
+        assertThat(saved.getValue().getNextRunAt()).isNull();
     }
 
     @Test

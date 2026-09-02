@@ -94,7 +94,6 @@ public class DeviceLocalScheduleService {
                 .findByTenantIdAndMachineIdIn(schedule.getTenantId(), new HashSet<>(pending)).stream()
                 .collect(Collectors.toMap(Machine::getMachineId, Function.identity(), (a, b) -> a));
 
-        // The naive wall-clock the user picked, read back with the UTC offset the API encoded it with.
         LocalDateTime wallClock = LocalDateTime.ofInstant(wallClockInstant, ZoneOffset.UTC);
 
         for (String machineId : pending) {
@@ -113,13 +112,11 @@ public class DeviceLocalScheduleService {
     private void evaluateOnline(ScheduleScript schedule, Machine machine, LocalDateTime wallClock, Instant now) {
         String machineId = machine.getMachineId();
 
-        // Refresh the device's timezone for this and future sweeps; the reply lands asynchronously.
         timezoneRequestPublisher.request(machineId, schedule.getId());
 
         String zoneId = machine.getTimezone();
         if (isBlank(zoneId)) {
-            log.info("DEVICE_LOCAL scheduleId={} machineId={} has no known timezone yet — requested, deferring",
-                    schedule.getId(), machineId);
+            log.info("DEVICE_LOCAL scheduleId={} machineId={} has no known timezone yet — requested, deferring", schedule.getId(), machineId);
             return;
         }
 
@@ -127,14 +124,13 @@ public class DeviceLocalScheduleService {
         try {
             zone = ZoneId.of(zoneId);
         } catch (DateTimeException e) {
-            log.warn("DEVICE_LOCAL scheduleId={} machineId={} has invalid stored timezone '{}' — skipping",
-                    schedule.getId(), machineId, zoneId);
+            log.warn("DEVICE_LOCAL scheduleId={} machineId={} has invalid stored timezone '{}' — skipping", schedule.getId(), machineId, zoneId);
             return;
         }
 
         Instant fireAt = wallClock.atZone(zone).toInstant();
         if (now.isBefore(fireAt)) {
-            return; // the device's local run time has not arrived yet
+            return;
         }
         if (now.isAfter(fireAt.plusSeconds(catchupSeconds))) {
             markTerminal(schedule, machineId, now, ScheduleDeviceLocalTimeDispatchStatus.MISSED);
@@ -143,7 +139,6 @@ public class DeviceLocalScheduleService {
             return;
         }
 
-        // Claim the fire before dispatching so a concurrent replica cannot run it twice.
         if (!markTerminal(schedule, machineId, now, ScheduleDeviceLocalTimeDispatchStatus.FIRED)) {
             return;
         }
