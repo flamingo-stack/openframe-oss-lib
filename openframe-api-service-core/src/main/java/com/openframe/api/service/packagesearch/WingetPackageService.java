@@ -70,8 +70,7 @@ public class WingetPackageService implements PackageManagerClient {
 
     @Override
     public PackageDetails findPackage(String packageId, BrewPackageType packageType) {
-        String managerName = PackageManagerType.WINGET.name();
-        List<PackageCatalogEntry> found = packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(managerName, packageId);
+        List<PackageCatalogEntry> found = packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.WINGET, packageId);
         if (found.isEmpty()) {
             throw new PackageNotFoundException(packageId);
         }
@@ -81,8 +80,7 @@ public class WingetPackageService implements PackageManagerClient {
     }
 
     private List<Scored> scoreCandidates(String query) {
-        String managerName = PackageManagerType.WINGET.name();
-        List<PackageCatalogEntry> candidates = packageCatalogRepository.findByManagerAndSearchBlobContaining(managerName, query);
+        List<PackageCatalogEntry> candidates = packageCatalogRepository.findByManagerAndSearchBlobContaining(PackageManagerType.WINGET, query);
         return candidates.stream()
                 .map(entry -> scoreEntry(query, entry))
                 .filter(Scored::isMatch)

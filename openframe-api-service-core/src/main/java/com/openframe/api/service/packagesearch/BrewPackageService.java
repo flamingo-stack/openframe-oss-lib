@@ -47,7 +47,6 @@ public class BrewPackageService implements PackageManagerClient {
     @Override
     public PackageDetails findPackage(String packageId, BrewPackageType packageType) {
         PackageCatalogEntry entry = findEntry(packageId, packageType);
-        BrewPackageType entryType = typeOf(entry);
         String installCommand = installCommand(entry);
         List<PackageVersion> versions = versionsOf(entry);
         return PackageDetails.builder()
@@ -58,7 +57,7 @@ public class BrewPackageService implements PackageManagerClient {
                 .homepage(entry.getHomepage())
                 .license(entry.getLicense())
                 .installCommand(installCommand)
-                .packageType(entryType)
+                .packageType(entry.getBrewType())
                 .popularity(entry.getPopularity())
                 .tags(List.of())
                 .versions(versions)
@@ -66,8 +65,7 @@ public class BrewPackageService implements PackageManagerClient {
     }
 
     private List<Scored> scoreCandidates(String query) {
-        String managerName = PackageManagerType.BREW.name();
-        List<PackageCatalogEntry> candidates = packageCatalogRepository.findByManagerAndSearchBlobContaining(managerName, query);
+        List<PackageCatalogEntry> candidates = packageCatalogRepository.findByManagerAndSearchBlobContaining(PackageManagerType.BREW, query);
         return candidates.stream()
                 .map(entry -> scoreEntry(query, entry))
                 .filter(Scored::isMatch)
@@ -97,7 +95,6 @@ public class BrewPackageService implements PackageManagerClient {
 
     private PackageSearchItem toItem(Scored scored) {
         PackageCatalogEntry entry = scored.getEntry();
-        BrewPackageType entryType = typeOf(entry);
         String installCommand = installCommand(entry);
         return PackageSearchItem.builder()
                 .id(entry.getPackageId())
@@ -106,18 +103,17 @@ public class BrewPackageService implements PackageManagerClient {
                 .version(entry.getVersion())
                 .homepage(entry.getHomepage())
                 .installCommand(installCommand)
-                .packageType(entryType)
+                .packageType(entry.getBrewType())
                 .popularity(entry.getPopularity())
                 .packageManager(PackageManagerType.BREW)
                 .build();
     }
 
     private PackageCatalogEntry findEntry(String packageId, BrewPackageType packageType) {
-        String managerName = PackageManagerType.BREW.name();
-        List<PackageCatalogEntry> found = packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(managerName, packageId);
+        List<PackageCatalogEntry> found = packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.BREW, packageId);
         for (BrewPackageType candidateType : lookupOrder(packageType)) {
             for (PackageCatalogEntry entry : found) {
-                if (candidateType.name().equals(entry.getBrewType())) {
+                if (candidateType == entry.getBrewType()) {
                     return entry;
                 }
             }
@@ -141,13 +137,9 @@ public class BrewPackageService implements PackageManagerClient {
         return List.of(current);
     }
 
-    private static BrewPackageType typeOf(PackageCatalogEntry entry) {
-        return BrewPackageType.valueOf(entry.getBrewType());
-    }
-
     private static String installCommand(PackageCatalogEntry entry) {
         String id = entry.getPackageId();
-        return typeOf(entry) == BrewPackageType.CASK ? "brew install --cask " + id : "brew install " + id;
+        return entry.getBrewType() == BrewPackageType.CASK ? "brew install --cask " + id : "brew install " + id;
     }
 
     @Getter

@@ -34,7 +34,7 @@ class BrewPackageServiceTest {
         PackageCatalogEntry slack = caskEntry("slack", "Slack", 7594);
         PackageCatalogEntry slackCli = caskEntry("slack-cli", "Slack CLI", 791);
         PackageCatalogEntry slackBeta = caskEntry("slack@beta", "Slack", 23);
-        when(packageCatalogRepository.findByManagerAndSearchBlobContaining("BREW", "slack")).thenReturn(List.of(slackCli, slackBeta, slack));
+        when(packageCatalogRepository.findByManagerAndSearchBlobContaining(PackageManagerType.BREW, "slack")).thenReturn(List.of(slackCli, slackBeta, slack));
 
         PackageSearchResult result = service.search("slack", 3, 0);
 
@@ -47,7 +47,7 @@ class BrewPackageServiceTest {
     @Test
     void findPackagePrefersFormulaWhenTypeAbsent() {
         PackageCatalogEntry formula = formulaEntry("wireshark", "wireshark", 100);
-        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase("BREW", "wireshark"))
+        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.BREW, "wireshark"))
                 .thenReturn(List.of(formula));
 
         PackageDetails details = service.findPackage("wireshark", null);
@@ -60,7 +60,7 @@ class BrewPackageServiceTest {
     void findPackageHonorsRequestedCaskType() {
         PackageCatalogEntry cask = caskEntry("slack", "Slack", 7594);
         PackageCatalogEntry formulaTwin = formulaEntry("slack", "slack", 1);
-        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase("BREW", "slack"))
+        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.BREW, "slack"))
                 .thenReturn(List.of(formulaTwin, cask));
 
         PackageDetails details = service.findPackage("slack", BrewPackageType.CASK);
@@ -71,7 +71,7 @@ class BrewPackageServiceTest {
 
     @Test
     void findPackageThrowsWhenUnknown() {
-        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase("BREW", "nope")).thenReturn(List.of());
+        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.BREW, "nope")).thenReturn(List.of());
 
         assertThrows(PackageNotFoundException.class, () -> service.findPackage("nope", null));
     }
@@ -80,7 +80,7 @@ class BrewPackageServiceTest {
     void paginationReportsHasMore() {
         PackageCatalogEntry slack = caskEntry("slack", "Slack", 7594);
         PackageCatalogEntry slackCli = caskEntry("slack-cli", "Slack CLI", 791);
-        when(packageCatalogRepository.findByManagerAndSearchBlobContaining("BREW", "slack")).thenReturn(List.of(slack, slackCli));
+        when(packageCatalogRepository.findByManagerAndSearchBlobContaining(PackageManagerType.BREW, "slack")).thenReturn(List.of(slack, slackCli));
 
         PackageSearchResult firstPage = service.search("slack", 1, 0);
 
@@ -89,17 +89,17 @@ class BrewPackageServiceTest {
     }
 
     private static PackageCatalogEntry caskEntry(String id, String name, int popularity) {
-        return entry(id, name, "CASK", popularity);
+        return entry(id, name, BrewPackageType.CASK, popularity);
     }
 
     private static PackageCatalogEntry formulaEntry(String id, String name, int popularity) {
-        return entry(id, name, "FORMULA", popularity);
+        return entry(id, name, BrewPackageType.FORMULA, popularity);
     }
 
-    private static PackageCatalogEntry entry(String id, String name, String brewType, int popularity) {
+    private static PackageCatalogEntry entry(String id, String name, BrewPackageType brewType, int popularity) {
         return PackageCatalogEntry.builder()
                 .id("BREW:" + brewType + ":" + id)
-                .manager("BREW")
+                .manager(PackageManagerType.BREW)
                 .packageId(id)
                 .name(name)
                 .brewType(brewType)

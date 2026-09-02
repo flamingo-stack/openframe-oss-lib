@@ -85,14 +85,14 @@ public class BrewCatalogFetcher {
         Integer popularity = installs.get(name);
         String blob = SearchBlob.of(name, name, formula.getDesc(), aliases);
         return PackageCatalogEntry.builder()
-                .manager(PackageManagerType.BREW.name())
+                .manager(PackageManagerType.BREW)
                 .packageId(name)
                 .name(name)
                 .description(formula.getDesc())
                 .homepage(formula.getHomepage())
                 .version(stableVersion)
                 .license(formula.getLicense())
-                .brewType(BrewPackageType.FORMULA.name())
+                .brewType(BrewPackageType.FORMULA)
                 .popularity(popularity)
                 .aliases(aliases)
                 .searchBlob(blob)
@@ -107,13 +107,13 @@ public class BrewCatalogFetcher {
         Integer popularity = installs.get(token);
         String blob = SearchBlob.of(token, displayName, cask.getDesc(), aliases);
         return PackageCatalogEntry.builder()
-                .manager(PackageManagerType.BREW.name())
+                .manager(PackageManagerType.BREW)
                 .packageId(token)
                 .name(displayName)
                 .description(cask.getDesc())
                 .homepage(cask.getHomepage())
                 .version(cask.getVersion())
-                .brewType(BrewPackageType.CASK.name())
+                .brewType(BrewPackageType.CASK)
                 .popularity(popularity)
                 .aliases(aliases)
                 .searchBlob(blob)

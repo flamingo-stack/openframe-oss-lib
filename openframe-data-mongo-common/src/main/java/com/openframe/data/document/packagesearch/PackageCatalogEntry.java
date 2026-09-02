@@ -23,7 +23,7 @@ public class PackageCatalogEntry {
 
     @Id
     private String id;
-    private String manager;
+    private PackageManagerType manager;
     private String packageId;
     private String name;
     private String description;
@@ -31,7 +31,7 @@ public class PackageCatalogEntry {
     private String version;
     private String license;
     private String publisher;
-    private String brewType;
+    private BrewPackageType brewType;
     private String hashPrefix;
     private Integer popularity;
     private List<String> aliases;

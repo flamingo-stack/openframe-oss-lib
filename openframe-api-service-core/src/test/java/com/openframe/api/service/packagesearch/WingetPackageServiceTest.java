@@ -31,7 +31,7 @@ class WingetPackageServiceTest {
     void canonicalPackageOutranksLocaleForksOnSharedMoniker() {
         PackageCatalogEntry canonical = entry("Mozilla.Firefox", "Mozilla Firefox (en-US)");
         PackageCatalogEntry localeFork = entry("Mozilla.Firefox.ach", "Mozilla Firefox (ach)");
-        when(packageCatalogRepository.findByManagerAndSearchBlobContaining("WINGET", "firefox")).thenReturn(List.of(localeFork, canonical));
+        when(packageCatalogRepository.findByManagerAndSearchBlobContaining(PackageManagerType.WINGET, "firefox")).thenReturn(List.of(localeFork, canonical));
 
         PackageSearchResult result = service.search("firefox", 2, 0);
 
@@ -40,7 +40,7 @@ class WingetPackageServiceTest {
 
     @Test
     void findPackageThrowsWhenUnknown() {
-        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase("WINGET", "No.Such")).thenReturn(List.of());
+        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.WINGET, "No.Such")).thenReturn(List.of());
 
         assertThrows(PackageNotFoundException.class, () -> service.findPackage("No.Such", null));
     }
@@ -48,7 +48,7 @@ class WingetPackageServiceTest {
     private static PackageCatalogEntry entry(String id, String name) {
         return PackageCatalogEntry.builder()
                 .id("WINGET:" + id.toLowerCase())
-                .manager("WINGET")
+                .manager(PackageManagerType.WINGET)
                 .packageId(id)
                 .name(name)
                 .version("154.0.1")

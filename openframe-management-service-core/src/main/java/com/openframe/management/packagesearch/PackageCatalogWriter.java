@@ -1,5 +1,6 @@
 package com.openframe.management.packagesearch;
 
+import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
@@ -42,7 +43,7 @@ public class PackageCatalogWriter {
     // the composite key format is owned here, by the only place that writes it
     private static String entryIdOf(PackageCatalogEntry entry) {
         String lowerId = entry.getPackageId().toLowerCase(Locale.ROOT);
-        String brewType = entry.getBrewType();
+        BrewPackageType brewType = entry.getBrewType();
         return brewType == null
                 ? entry.getManager() + ":" + lowerId
                 : entry.getManager() + ":" + brewType + ":" + lowerId;
@@ -51,7 +52,6 @@ public class PackageCatalogWriter {
     // upsert everything with a fresh timestamp, then prune what no snapshot contains anymore —
     // the collection is never empty mid-sync
     public void replaceManagerEntries(PackageManagerType manager, List<PackageCatalogEntry> entries) {
-        String managerName = manager.name();
         Instant syncStart = Instant.now();
         BulkOperations bulk = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, PackageCatalogEntry.class);
         for (PackageCatalogEntry entry : entries) {
@@ -63,7 +63,7 @@ public class PackageCatalogWriter {
         bulk.execute();
 
         Instant pruneBefore = syncStart.minus(PRUNE_GRACE);
-        Query stale = new Query(Criteria.where("manager").is(managerName).and("updatedAt").lt(pruneBefore));
+        Query stale = new Query(Criteria.where("manager").is(manager).and("updatedAt").lt(pruneBefore));
         long pruned = mongoTemplate.remove(stale, PackageCatalogEntry.class).getDeletedCount();
         log.info("Synced {} catalog: {} entries upserted, {} stale pruned", manager, entries.size(), pruned);
     }
