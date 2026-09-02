@@ -9,15 +9,14 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 import com.openframe.authz.util.AppleUserParam;
 import com.openframe.authz.util.OidcUserUtils;
+import com.openframe.authz.web.Redirects;
 
 import java.util.Optional;
 
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 import static com.openframe.authz.web.AuthStateUtils.clearCookie;
 import static com.openframe.authz.web.Redirects.foundAtRoot;
-import static java.net.URLEncoder.encode;
 import static org.springframework.util.StringUtils.hasText;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Locale.ROOT;
 
 public interface SsoFlowHandler {
@@ -94,14 +93,6 @@ public interface SsoFlowHandler {
                                             String redirectTo,
                                             boolean authMobile) {
         clearCookie(response, flowCookie.getName());
-        String path = "/oauth/continue?tenantId=" +
-                encode(tenantId, UTF_8);
-        if (hasText(redirectTo)) {
-            path += "&redirectTo=" + encode(redirectTo, UTF_8);
-        }
-        if (authMobile) {
-            path += "&authMobile=true";
-        }
-        foundAtRoot(response, path);
+        foundAtRoot(response, Redirects.oauthContinuePath(tenantId, redirectTo, authMobile));
     }
 }

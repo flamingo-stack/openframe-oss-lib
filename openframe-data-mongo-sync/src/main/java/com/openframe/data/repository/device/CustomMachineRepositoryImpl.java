@@ -15,7 +15,9 @@ import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -33,6 +35,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String ID_FIELD = "_id";
     private static final String OS_TYPE_FIELD = "osType";
     private static final String MACHINE_ID_FIELD = "machineId";
+    private static final String LAST_SEEN_FIELD = "lastSeen";
     private static final String STATUS_FIELD = "status";
     private static final String TYPE_FIELD = "type";
     private static final String ORGANIZATION_ID_FIELD = "organizationId";
@@ -363,6 +366,12 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             query.addCriteria(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
         }
         return query;
+    }
+
+    @Override
+    public void updateLastSeen(String machineId, Instant lastSeen) {
+        Query query = new Query(Criteria.where(MACHINE_ID_FIELD).is(machineId));
+        mongoTemplate.updateFirst(query, new Update().set(LAST_SEEN_FIELD, lastSeen), Machine.class);
     }
 
     @Override
