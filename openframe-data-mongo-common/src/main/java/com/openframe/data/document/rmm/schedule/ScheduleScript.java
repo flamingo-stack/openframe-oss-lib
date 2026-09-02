@@ -18,11 +18,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * Script schedule — a named task that runs a set of existing {@link Script}s
- * (ad-hoc or, eventually, on a recurring schedule) against assigned machines.
-
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -68,8 +63,6 @@ public class ScheduleScript implements TenantScoped {
     private Long reconnectWindowSeconds;
 
     private Instant startAt;
-
-    private Instant localRunAt;
 
     private Long repeat;
 
