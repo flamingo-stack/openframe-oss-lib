@@ -52,21 +52,31 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
   const hasUnread = unreadCount > 0;
 
   const className = cn(
-    'relative flex w-full items-center justify-start',
+    // `isolate` scopes the hover layer's negative z-index to this row, so it
+    // paints over the row's own background and under its content instead of
+    // sliding behind the sidebar.
+    'relative isolate flex w-full items-center justify-start',
     'h-14 p-[var(--spacing-system-m)]',
-    // 150ms, not 300: the outgoing and incoming entries cross-fade, so for the
-    // whole duration TWO rows read as half-active. At 300ms that window is long
-    // enough to look like a flicker rather than a transition.
-    'transition-colors duration-150',
-    '[&_svg]:transition-colors [&_svg]:duration-150',
+    // The hover/pending wash is its own LAYER, and that separation is the whole
+    // point. Hover and active both want the row's background-color, so a
+    // `transition-colors` that smooths hover necessarily smooths the accent too
+    // — and it runs on the OUTGOING row as well as the incoming one. Measured on
+    // a real navigation: for 150ms two rows carried the accent background AND
+    // the accent bar, mid-fade, with nothing to say which one was the page you
+    // were actually on. Shortening it (300ms -> 150ms) only shortened the lie.
+    //
+    // Split apart, each gets the timing its meaning calls for: the wash fades,
+    // because it is decoration reacting to a cursor; the accent switches in a
+    // single frame, because it is a statement of fact — exactly one row is the
+    // current page, at every instant, including the instant the route commits.
+    "after:pointer-events-none after:absolute after:inset-0 after:-z-10 after:bg-ods-bg-hover after:opacity-0 after:transition-opacity after:duration-150 after:content-['']",
     "before:absolute before:bottom-0 before:left-0 before:top-0 before:w-1 before:content-['']",
-    'before:transition-colors before:duration-150',
     // Pending borrows the HOVER weight and nothing else — no accent bar, no
     // accent text, no `aria-current`. It says "this row is working", not "this
     // is where you are", and it reads as the row staying pressed under the
     // cursor, which is exactly what happened.
-    !isActive && !disabled && 'text-ods-text-primary hover:bg-ods-bg-hover [&_svg]:fill-ods-text-secondary',
-    !isActive && !disabled && isPending && 'bg-ods-bg-hover',
+    !isActive && !disabled && 'text-ods-text-primary hover:after:opacity-100 [&_svg]:fill-ods-text-secondary',
+    !isActive && !disabled && isPending && 'after:opacity-100',
     !isActive && disabled && 'text-ods-text-secondary [&_svg]:fill-ods-text-secondary',
     isActive &&
       !disabled && [
