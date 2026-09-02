@@ -4,19 +4,13 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import java.util.List;
-
-import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_INVITE;
-import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_LOGIN;
-import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_REG;
+import static com.openframe.authz.security.SsoRegistrationConstants.SSO_FLOW_COOKIES;
 
 public final class AuthStateUtils {
     private AuthStateUtils() {
     }
 
     public static final String JSESSIONID = "JSESSIONID";
-
-    private static final List<String> SSO_FLOW_COOKIES = List.of(COOKIE_SSO_REG, COOKIE_SSO_INVITE, COOKIE_SSO_LOGIN);
 
     /**
      * Drops any SSO flow cookie other than the one about to be issued. Without this an abandoned flow
