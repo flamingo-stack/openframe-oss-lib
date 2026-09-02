@@ -59,17 +59,18 @@ public class DeviceLocalScheduleService {
         }
 
         log.debug("Evaluating {} device-local schedule(s)", schedules.size());
-        for (ScheduleScript schedule : schedules) {
-            try {
-                evaluate(schedule, now);
-            } catch (Exception e) {
-                log.error("Device-local schedule evaluation failed scheduleId={} tenantId={}",
-                        schedule.getId(), schedule.getTenantId(), e);
-            }
-        }
+        schedules.forEach(schedule -> evaluate(schedule, now));
     }
 
     private void evaluate(ScheduleScript schedule, Instant now) {
+        try {
+            evaluateSchedule(schedule, now);
+        } catch (Exception e) {
+            log.error("Device-local schedule evaluation failed scheduleId={} tenantId={}", schedule.getId(), schedule.getTenantId(), e);
+        }
+    }
+
+    private void evaluateSchedule(ScheduleScript schedule, Instant now) {
         Instant wallClockInstant = schedule.getStartAt();
         if (wallClockInstant == null) {
             log.warn("DEVICE_LOCAL schedule scheduleId={} has no startAt (wall-clock) — skipping", schedule.getId());

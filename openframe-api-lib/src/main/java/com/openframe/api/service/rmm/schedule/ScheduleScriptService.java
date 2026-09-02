@@ -40,13 +40,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * Application-level operations on RMM script schedules. Mirrors
- * {@link ScriptService}: tenant scope is resolved internally via
- * {@link TenantIdProvider}, name uniqueness is enforced per tenant, and
- * {@link ScriptStatus#DELETED} is treated as "doesn't exist" for
- * {@link #get(String)} / {@link #update(UpdateScriptScheduleInput)} (soft-delete).
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -193,12 +186,6 @@ public class ScheduleScriptService {
                 .build();
     }
 
-    /**
-     * Full replacement of an existing schedule (PUT semantics).
-     *
-     * @throws NotFoundException if it does not exist or has been soft-deleted.
-     * @throws ConflictException if the supplied name collides with another schedule.
-     */
     public ScriptScheduleResponse update(UpdateScriptScheduleInput input) {
         String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();
@@ -220,25 +207,34 @@ public class ScheduleScriptService {
 
         Instant priorStartAt = existing.getStartAt();
         scheduleMapper.updateEntity(existing, input);
-        if (trigger == ScheduleScriptTrigger.DATE_TIME && timeReference == ScheduleTimeReference.DEVICE_LOCAL) {
-            existing.setNextRunAt(null);   // per-device path never uses the nextRunAt grid
-            if (!Objects.equals(priorStartAt, existing.getStartAt())) {
-                long cleared = deviceLocalDispatchRepository.deleteByScheduleId(id);
-                if (cleared > 0) {
-                    log.info("Cleared {} device-local fire record(s) after startAt change scheduleId={} tenantId={}",
-                            cleared, id, tenantId);
-                }
-            }
-        } else if (trigger == ScheduleScriptTrigger.DATE_TIME) {
-            if (!Objects.equals(priorStartAt, existing.getStartAt())) {
-                existing.setNextRunAt(existing.getStartAt());
-            }
-        } else {
-            existing.setNextRunAt(null);   // event-driven: never on the timer grid
-        }
+        rescheduleAfterUpdate(existing, trigger, timeReference, priorStartAt, tenantId);
+
         ScheduleScript saved = scheduleRepository.save(existing);
         log.info("Updated script schedule id={} tenantId={}", saved.getId(), tenantId);
         return scheduleMapper.toResponse(saved);
+    }
+
+    private void rescheduleAfterUpdate(ScheduleScript schedule, ScheduleScriptTrigger trigger, ScheduleTimeReference timeReference, Instant priorStartAt, String tenantId) {
+        boolean startAtChanged = !Objects.equals(priorStartAt, schedule.getStartAt());
+
+        if (trigger == ScheduleScriptTrigger.DATE_TIME && timeReference == ScheduleTimeReference.SERVER) {
+            if (startAtChanged) {
+                schedule.setNextRunAt(schedule.getStartAt());
+            }
+            return;
+        }
+
+        schedule.setNextRunAt(null);
+        if (trigger == ScheduleScriptTrigger.DATE_TIME && timeReference == ScheduleTimeReference.DEVICE_LOCAL && startAtChanged) {
+            clearDeviceLocalFires(schedule.getId(), tenantId);
+        }
+    }
+
+    private void clearDeviceLocalFires(String scheduleId, String tenantId) {
+        long cleared = deviceLocalDispatchRepository.deleteByScheduleId(scheduleId);
+        if (cleared > 0) {
+            log.info("Cleared {} device-local fire record(s) after startAt change scheduleId={} tenantId={}", cleared, scheduleId, tenantId);
+        }
     }
 
     /**
