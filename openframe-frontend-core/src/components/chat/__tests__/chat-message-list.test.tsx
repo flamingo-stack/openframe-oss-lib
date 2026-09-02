@@ -174,7 +174,7 @@ describe('ChatMessageList message footers', () => {
 
     const sourceFooter = screen.getByText('Windows installation guide');
     expect(sourceFooter).toBeInTheDocument();
-    expect(sourceFooter.previousElementSibling).toHaveTextContent('body of a1');
+    expect(screen.getByText('body of a1')).toAppearBefore(sourceFooter);
   });
 
   it('renders separate source names when citation indices restart on each turn', () => {
@@ -211,8 +211,8 @@ describe('ChatMessageList message footers', () => {
 
     const firstSourceFooter = screen.getByText('First turn source');
     const secondSourceFooter = screen.getByText('Second turn source');
-    expect(firstSourceFooter.previousElementSibling).toHaveTextContent('body of a1');
-    expect(secondSourceFooter.previousElementSibling).toHaveTextContent('body of a2');
+    expect(screen.getByText('body of a1')).toAppearBefore(firstSourceFooter);
+    expect(screen.getByText('body of a2')).toAppearBefore(secondSourceFooter);
   });
 });
 
