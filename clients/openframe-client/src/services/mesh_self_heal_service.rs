@@ -70,6 +70,7 @@ impl MeshSelfHealService {
         agent_config: AgentConfigurationService,
         tool_run_manager: ToolRunManager,
         deactivation: Arc<DeactivationService>,
+        http: reqwest::Client,
     ) -> Self {
         Self {
             directory_manager,
@@ -80,10 +81,7 @@ impl MeshSelfHealService {
             agent_config,
             tool_run_manager,
             deactivation,
-            http: reqwest::Client::builder()
-                .timeout(HTTP_TIMEOUT)
-                .build()
-                .expect("failed to build mesh self-heal HTTP client"),
+            http,
         }
     }
 
@@ -295,6 +293,7 @@ impl MeshSelfHealService {
         let resp = self
             .http
             .get(&url)
+            .timeout(HTTP_TIMEOUT)
             .header("Authorization", format!("Bearer {token}"))
             .send()
             .await?;
