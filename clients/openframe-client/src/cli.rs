@@ -151,7 +151,7 @@ pub fn run() -> Result<()> {
 
             if report.has_failures() {
                 println!(
-                    "\n{} check(s) failed. The parameters were not saved — fix the issues above and run 'openframe auth' again.",
+                    "\n{} check(s) failed. Nothing was saved — fix the issues above and run 'openframe auth' again.",
                     report.failure_count()
                 );
                 process::exit(1);
