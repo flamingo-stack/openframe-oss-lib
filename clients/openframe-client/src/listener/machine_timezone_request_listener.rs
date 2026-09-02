@@ -40,7 +40,7 @@ impl MachineTimezoneRequestListener {
                 info!("Starting machine timezone request listener...");
                 match listener.listen().await {
                     Ok(_) => {
-                        warn!("Machine timezone request listener exited normally (unexpected)");
+                        warn!("Machine timezone request subscription closed");
                     }
                     Err(e) => {
                         error!("Machine timezone request listener error: {:#}", e);
@@ -48,7 +48,7 @@ impl MachineTimezoneRequestListener {
                 }
 
                 info!(
-                    "Reconnecting machine timezone request listener in {} seconds...",
+                    "Resubscribing to machine timezone requests in {} seconds...",
                     RECONNECTION_DELAY_MS / 1000
                 );
                 tokio::time::sleep(Duration::from_millis(RECONNECTION_DELAY_MS)).await;
