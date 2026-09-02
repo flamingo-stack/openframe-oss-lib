@@ -679,9 +679,6 @@ impl Client {
         self.hostname_report_publisher.publish().await;
 
         self.machine_timezone_request_listener.start().await?;
-
-        // One-shot timezone report so an OS timezone change, or a request missed while the
-        // client was offline, resyncs at startup without a durable consumer.
         self.machine_timezone_request_listener.report_once().await;
 
         //Start tool installation message listener in background
