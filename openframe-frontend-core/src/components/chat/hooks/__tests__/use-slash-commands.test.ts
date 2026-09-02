@@ -51,9 +51,10 @@ describe('fetchSlashCommands', () => {
   it('caps non-empty prefix matches at ten commands', async () => {
     embedAuthedFetchMock.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        commands: Array.from({ length: 12 }, (_, index) => command(`webinar-${index}`)),
-      }),
+      json: () =>
+        Promise.resolve({
+          commands: Array.from({ length: 12 }, (_, index) => command(`webinar-${index}`)),
+        }),
     });
 
     const commands = await fetchSlashCommands('webinar', undefined, commandsUrl);
