@@ -357,10 +357,16 @@ describe('EmbeddableChat source strip', () => {
 
     renderChat(reducer.state.messages);
 
-    fireEvent.click(screen.getByText('[1] Case Studies (3 records)'));
+    const groupedSource = screen.getByText('[1] Case Studies (3 records)');
+    fireEvent.mouseEnter(groupedSource);
+    fireEvent.click(groupedSource);
 
     expect(screen.getByText('Northstar MSP')).toBeInTheDocument();
     expect(screen.getByText('Blue Harbor IT')).toBeInTheDocument();
     expect(screen.getByText('Summit Technology')).toBeInTheDocument();
+
+    fireEvent.click(groupedSource);
+
+    expect(screen.queryByText('Northstar MSP')).not.toBeInTheDocument();
   });
 });

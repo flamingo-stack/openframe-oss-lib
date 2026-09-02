@@ -106,6 +106,7 @@ export function HoverDropdown({
 }: HoverDropdownProps) {
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const clickPinnedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -156,18 +157,22 @@ export function HoverDropdown({
   }, []);
 
   const hide = useCallback(() => {
+    if (clickPinnedRef.current) return;
     timeoutRef.current = setTimeout(() => setOpen(false), hideDelay);
   }, [hideDelay]);
 
   // Click handler — touch / mobile (no hover) + desktop users who
-  // expect clicking a chip to open a menu. Toggles the dropdown state
-  // so a second click closes it. `stopPropagation` prevents the click
+  // expect clicking a chip to open a menu. The first desktop click can arrive
+  // after mouse-enter already opened the panel; pin it open instead of blindly
+  // toggling it closed. A second click closes it. `stopPropagation` prevents the click
   // from bubbling to ancestor handlers (the chip's parent message
   // bubble shouldn't react to chip clicks).
   const toggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     clearTimeout(timeoutRef.current);
-    setOpen(prev => !prev);
+    const pinned = !clickPinnedRef.current;
+    clickPinnedRef.current = pinned;
+    setOpen(pinned);
   }, []);
 
   // Every hook is above this line: an `items` list that goes from empty to
