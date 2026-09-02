@@ -15,8 +15,14 @@ import java.util.Optional;
 
 /**
  * Custom resolver that adjusts the outgoing authorization request: injects our pre-generated state
- * from the signed flow cookie (signup/invite flows), and adds any provider-required extra
- * parameters, e.g. Apple's {@code response_mode=form_post}.
+ * from the signed flow cookie (signup, invite and email-less login flows), and adds any
+ * provider-required extra parameters, e.g. Apple's {@code response_mode=form_post}.
+ * <p>
+ * The state injection is what lets {@code SsoFlowSuccessHandler} dispatch the callback to the
+ * right flow handler: each flow's cookie carries the state it generated, and the provider must
+ * echo that exact value. Flow cookies are decoded payload-agnostically via
+ * {@code SsoCookieCodec#decodeState}, so a new flow only needs its cookie name added to
+ * {@code SsoRegistrationConstants#SSO_FLOW_COOKIES}.
  */
 @Slf4j
 public class SsoAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
@@ -71,15 +77,14 @@ public class SsoAuthorizationRequestResolver implements OAuth2AuthorizationReque
         Cookie[] cookies = request.getCookies();
         if (cookies == null) return Optional.empty();
         for (Cookie c : cookies) {
-            String name = c.getName();
+            if (!SsoRegistrationConstants.SSO_FLOW_COOKIES.contains(c.getName())) {
+                continue;
+            }
             String token = c.getValue();
             if (token == null || token.isBlank()) continue;
-            if (SsoRegistrationConstants.COOKIE_SSO_REG.equals(name)) {
-                var payload = ssoCookieCodec.decodeTenant(token);
-                if (payload.isPresent()) return Optional.ofNullable(payload.get().s());
-            } else if (SsoRegistrationConstants.COOKIE_SSO_INVITE.equals(name)) {
-                var payload = ssoCookieCodec.decodeInvite(token);
-                if (payload.isPresent()) return Optional.ofNullable(payload.get().s());
+            Optional<String> state = ssoCookieCodec.decodeState(token);
+            if (state.isPresent()) {
+                return state;
             }
         }
         return Optional.empty();
