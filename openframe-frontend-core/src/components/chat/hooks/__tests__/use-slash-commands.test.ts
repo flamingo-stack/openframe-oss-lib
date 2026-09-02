@@ -27,7 +27,7 @@ describe('fetchSlashCommands', () => {
   it('fetches the full registry and filters normalized prefixes locally', async () => {
     embedAuthedFetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ commands: [command('roadmap'), command('webinars')] }),
+      json: () => Promise.resolve({ commands: [command('roadmap'), command('webinars')] }),
     });
 
     const commands = await fetchSlashCommands(' W ', undefined, commandsUrl);
@@ -42,7 +42,7 @@ describe('fetchSlashCommands', () => {
     const registry = [command('roadmap'), command('webinars')];
     embedAuthedFetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ commands: registry }),
+      json: () => Promise.resolve({ commands: registry }),
     });
 
     await expect(fetchSlashCommands('', undefined, commandsUrl)).resolves.toEqual(registry);
@@ -51,7 +51,7 @@ describe('fetchSlashCommands', () => {
   it('caps non-empty prefix matches at ten commands', async () => {
     embedAuthedFetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({
+      json: () => Promise.resolve({
         commands: Array.from({ length: 12 }, (_, index) => command(`webinar-${index}`)),
       }),
     });
