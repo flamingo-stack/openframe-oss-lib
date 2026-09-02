@@ -188,6 +188,9 @@ describe('makeComposeContentUrl (unified single-object seam)', () => {
     expect(c({ type: 'product_release', identifier: 'v2', externalUrl: `${HUB}/releases/v2` })).toEqual({
       href: '/custom/v2',
       targetPlatform: 'openframe',
+      // Only this branch is flagged — fetch-mode cards rank it above the
+      // fetched row's own url (`pickFetchedCardHref`).
+      hostOverride: true,
     });
   });
 

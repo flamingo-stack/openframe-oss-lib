@@ -1,6 +1,7 @@
 package com.openframe.authz.security;
 
 import com.openframe.authz.security.flow.SsoFlowHandler;
+import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
 import com.openframe.authz.web.AuthErrorResponder;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +28,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
 
     private final List<SsoFlowHandler> flowHandlers;
     private final AuthErrorResponder authErrorResponder;
+    private final AppleWebTokenCapture appleWebTokenCapture;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -43,6 +45,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
         if (handler == null) {
             if (flowHandlers.stream().noneMatch(h -> h.isActivated(request))) {
                 super.onAuthenticationSuccess(request, response, authentication);
+                appleWebTokenCapture.captureIfApple(request, authentication);
                 return;
             }
             // A flow cookie is present but none owns this state: a stale cookie from an abandoned flow,
@@ -55,6 +58,10 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
 
         try {
             handler.handle(request, response, authentication);
+            // After the handler: flows that create the user have created it by now, so the
+            // capture's lookup by the authenticated email finds the owner. The response is
+            // already committed (redirect) — the capture only writes to the database.
+            appleWebTokenCapture.captureIfApple(request, authentication);
         } catch (Exception e) {
             authErrorResponder.send(response, request, "sso-flow-finalize", e,
                     "Registration failed. Please try again.");
