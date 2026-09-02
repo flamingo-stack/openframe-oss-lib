@@ -15,8 +15,13 @@ import java.util.Optional;
 
 /**
  * Custom resolver that adjusts the outgoing authorization request: injects our pre-generated state
- * from the signed flow cookie (signup/invite flows), and adds any provider-required extra
- * parameters, e.g. Apple's {@code response_mode=form_post}.
+ * from the signed flow cookie (signup, invite and email-less login flows), and adds any
+ * provider-required extra parameters, e.g. Apple's {@code response_mode=form_post}.
+ * <p>
+ * The state injection is what lets {@code SsoFlowSuccessHandler} dispatch the callback to the
+ * right flow handler: each flow's cookie carries the state it generated, the provider must echo
+ * that exact value, and a flow cookie whose state the provider never saw dead-ends in the
+ * state-mismatch guard ("SSO session expired") — so every new flow cookie MUST get a branch here.
  */
 @Slf4j
 public class SsoAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
@@ -79,6 +84,9 @@ public class SsoAuthorizationRequestResolver implements OAuth2AuthorizationReque
                 if (payload.isPresent()) return Optional.ofNullable(payload.get().s());
             } else if (SsoRegistrationConstants.COOKIE_SSO_INVITE.equals(name)) {
                 var payload = ssoCookieCodec.decodeInvite(token);
+                if (payload.isPresent()) return Optional.ofNullable(payload.get().s());
+            } else if (SsoRegistrationConstants.COOKIE_SSO_LOGIN.equals(name)) {
+                var payload = ssoCookieCodec.decodeLogin(token);
                 if (payload.isPresent()) return Optional.ofNullable(payload.get().s());
             }
         }
