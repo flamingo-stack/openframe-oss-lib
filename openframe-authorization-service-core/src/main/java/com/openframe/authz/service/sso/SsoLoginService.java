@@ -25,6 +25,14 @@ public class SsoLoginService {
 
     private final SsoProviderValidator ssoProviderValidator;
     private final SsoCookieCodec ssoCookieCodec;
+    private final com.openframe.authz.service.user.UserService userService;
+
+    /** The owner just created by registration — resolved for binding the signup ticket. */
+    public String ownerUserId(String email, String tenantId) {
+        return userService.findActiveByEmailAndTenant(email.toLowerCase(java.util.Locale.ROOT), tenantId)
+                .map(u -> u.getId())
+                .orElseThrow(() -> new IllegalStateException("Registration did not produce an active user."));
+    }
 
     public SsoAuthorizeData startLogin(SsoLoginInitRequest request) {
         String provider = ssoProviderValidator.normalizeProvider(request.getProvider());
