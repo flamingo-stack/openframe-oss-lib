@@ -808,13 +808,14 @@ function SourceChips({
   const [expanded, setExpanded] = useState(false);
 
   if (cited.length === 0) {
-    const fallback = uncited.slice(0, FALLBACK_TOP_RETRIEVED);
-    if (fallback.length === 0) return null;
+    const visible = expanded ? uncited : uncited.slice(0, FALLBACK_TOP_RETRIEVED);
+    const hiddenCount = Math.max(0, uncited.length - FALLBACK_TOP_RETRIEVED);
+    if (visible.length === 0) return null;
     return (
       <div className="mt-2 flex flex-col gap-1.5 border-t border-ods-border pt-2">
         <span className="uppercase text-ods-text-muted text-h6">Top retrieved sources</span>
-        <div className="flex flex-wrap gap-1.5">
-          {fallback.map(src => (
+        <div className={`flex flex-wrap gap-1.5 ${expanded ? 'max-h-[200px] overflow-y-auto overscroll-contain' : ''}`}>
+          {visible.map(src => (
             <SourceChip
               key={src.index}
               src={src}
@@ -824,6 +825,16 @@ function SourceChips({
               onDiscuss={onDiscuss}
             />
           ))}
+          {hiddenCount > 0 && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="inline-flex cursor-pointer items-center gap-1 rounded border border-ods-accent bg-ods-card px-2 py-0.5 text-ods-accent transition-colors text-h6 hover:bg-ods-accent/10"
+              aria-expanded={expanded}
+              aria-label={expanded ? 'Show fewer sources' : `Show ${hiddenCount} additional retrieved sources`}
+            >
+              {expanded ? 'Show less' : `+${hiddenCount} more retrieved ${hiddenCount === 1 ? 'source' : 'sources'}`}
+            </button>
+          )}
         </div>
       </div>
     );

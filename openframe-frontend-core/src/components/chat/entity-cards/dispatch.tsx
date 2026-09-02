@@ -1261,6 +1261,10 @@ interface ChatCardRegistryEntry {
    *  point — a host that re-homes a type must be able to say so even when
    *  the row already carries the content host's own url. */
   noComposedHref?: boolean;
+  /** Render a document card from same-turn SOURCES metadata when its optional
+   *  hydration endpoint has no row. Only doc refs opt in: their source record
+   *  already carries the complete title/path/navigation fallback. */
+  renderFromSourceMetadata?: boolean;
 }
 
 /**
@@ -1283,6 +1287,7 @@ function refHydratedEntry(
   docType: string,
   label: string,
   renderRef: (displayRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode,
+  renderFromSourceMetadata = false,
 ): ChatCardRegistryEntry {
   return {
     label,
@@ -1292,6 +1297,19 @@ function refHydratedEntry(
     fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
     skeleton: () => <MingoInfoCardSkeleton />,
     render: (item, chatRef, opts) => renderRef(fetchedItemDisplayRef(item, chatRef), opts),
+    renderFromSourceMetadata,
+  };
+}
+
+function sourceMetadataCardItem(chatRef: ChatRef): ChatCardItem {
+  return {
+    type: chatRef.type,
+    id: chatRef.id,
+    title: chatRef.title,
+    url: chatRef.url,
+    targetPlatform: chatRef.targetPlatform,
+    sourceRepo: chatRef.sourceRepo,
+    metadata: chatRef.metadata,
   };
 }
 
@@ -1487,12 +1505,18 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   hubspot_ticket_self: refHydratedEntry('hubspot_ticket_self', 'HubSpot ticket (self)', (displayRef, opts) => (
     <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
   )),
-  data_room_doc: refHydratedEntry('data_room_doc', 'Data-room doc', (displayRef, opts) => (
-    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
-  )),
-  markdown: refHydratedEntry('markdown', 'Doc page (markdown)', (displayRef, opts) => (
-    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
-  )),
+  data_room_doc: refHydratedEntry(
+    'data_room_doc',
+    'Data-room doc',
+    (displayRef, opts) => <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />,
+    true,
+  ),
+  markdown: refHydratedEntry(
+    'markdown',
+    'Doc page (markdown)',
+    (displayRef, opts) => <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />,
+    true,
+  ),
   // Body-synthesized video ids (`shortVideoId` content hashes / YouTube
   // ids) have no backing table row to fetch — ref-only by nature.
   video: {
@@ -1935,6 +1959,13 @@ export function ChatCardLoader({
   }
   if (isLoading) return <>{fetchEntry.skeleton?.() ?? null}</>;
   if (!item) {
+    const hasSourceMetadata =
+      fetchEntry.renderFromSourceMetadata &&
+      finalChatRef.title !== finalChatRef.id &&
+      typeof finalChatRef.metadata?.path === 'string';
+    if (hasSourceMetadata) {
+      return finish(fetchEntry.render(sourceMetadataCardItem(finalChatRef), finalChatRef, renderOpts));
+    }
     // FAIL LOUD (explicit product decision 2026-08-13): a card that
     // cannot hydrate renders a VISIBLE error card — silent removal made
     // broken answers look fine. Three distinguishable states:

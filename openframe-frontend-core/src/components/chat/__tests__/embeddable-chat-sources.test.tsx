@@ -168,4 +168,138 @@ describe('EmbeddableChat source strip', () => {
       'https://stream.mux.com/product-overview.m3u8',
     );
   });
+
+  it('keeps every uncited source accessible behind the top-three fallback', () => {
+    const reducer = createChatStreamReducer({ transport: 'nats' });
+    for (const chunk of [
+      { type: 'MESSAGE_START', streamSeq: 1 },
+      {
+        type: 'SOURCES',
+        payload: {
+          sources: Array.from({ length: 5 }, (_, index) => ({
+            index: index + 1,
+            name: `Source ${index + 1}`,
+            path: `source-${index + 1}`,
+            documentType: 'docs',
+          })),
+        },
+        streamSeq: 2,
+      },
+      { type: 'TEXT', text: 'Here are the relevant materials.', streamSeq: 3 },
+      { type: 'MESSAGE_END', streamSeq: 4 },
+    ]) {
+      const event = decodeNatsChunk(chunk);
+      if (event) reducer.apply(event);
+    }
+
+    renderChat(reducer.state.messages);
+
+    expect(screen.getByText('[1] Source 1')).toBeInTheDocument();
+    expect(screen.getByText('[3] Source 3')).toBeInTheDocument();
+    expect(screen.queryByText('[4] Source 4')).not.toBeInTheDocument();
+
+    const expander = screen.getByRole('button', { name: 'Show 2 additional retrieved sources' });
+    fireEvent.click(expander);
+
+    expect(screen.getByText('[4] Source 4')).toBeInTheDocument();
+    expect(screen.getByText('[5] Source 5')).toBeInTheDocument();
+  });
+
+  it('renders a markdown card from matching source metadata when hydration is unavailable', () => {
+    const reducer = createChatStreamReducer({ transport: 'nats' });
+    for (const chunk of [
+      { type: 'MESSAGE_START', streamSeq: 1 },
+      {
+        type: 'SOURCES',
+        payload: {
+          sources: [
+            {
+              index: 1,
+              id: 'install-agent',
+              name: 'Install the OpenFrame agent on Windows',
+              path: 'getting-started/install-agent.md',
+              documentType: 'markdown',
+              sourceRepo: 'openframe-docs',
+            },
+          ],
+          cards: [
+            {
+              ref: '[card://markdown:install-agent]',
+              entityType: 'markdown',
+              entityId: 'install-agent',
+            },
+          ],
+        },
+        streamSeq: 2,
+      },
+      {
+        type: 'TEXT',
+        text: 'Follow [card://markdown:install-agent].',
+        streamSeq: 3,
+      },
+      { type: 'MESSAGE_END', streamSeq: 4 },
+    ]) {
+      const event = decodeNatsChunk(chunk);
+      if (event) reducer.apply(event);
+    }
+
+    renderChat(reducer.state.messages);
+
+    expect(screen.getByText('Install the OpenFrame agent on Windows')).toBeInTheDocument();
+    expect(screen.queryByText('FAILED')).not.toBeInTheDocument();
+  });
+
+  it('opens every item carried by a grouped source', () => {
+    const reducer = createChatStreamReducer({ transport: 'nats' });
+    for (const chunk of [
+      { type: 'MESSAGE_START', streamSeq: 1 },
+      {
+        type: 'SOURCES',
+        payload: {
+          sources: [
+            {
+              index: 1,
+              name: 'Case Studies (3 records)',
+              path: 'case-studies',
+              documentType: 'case-study',
+              items: [
+                {
+                  id: 'case-study-1',
+                  name: 'Northstar MSP',
+                  path: 'case-studies/northstar',
+                  documentType: 'case-study',
+                },
+                {
+                  id: 'case-study-2',
+                  name: 'Blue Harbor IT',
+                  path: 'case-studies/blue-harbor',
+                  documentType: 'case-study',
+                },
+                {
+                  id: 'case-study-3',
+                  name: 'Summit Technology',
+                  path: 'case-studies/summit',
+                  documentType: 'case-study',
+                },
+              ],
+            },
+          ],
+        },
+        streamSeq: 2,
+      },
+      { type: 'TEXT', text: 'Here are three customer stories [1].', streamSeq: 3 },
+      { type: 'MESSAGE_END', streamSeq: 4 },
+    ]) {
+      const event = decodeNatsChunk(chunk);
+      if (event) reducer.apply(event);
+    }
+
+    renderChat(reducer.state.messages);
+
+    fireEvent.click(screen.getByText('[1] Case Studies (3 records)'));
+
+    expect(screen.getByText('Northstar MSP')).toBeInTheDocument();
+    expect(screen.getByText('Blue Harbor IT')).toBeInTheDocument();
+    expect(screen.getByText('Summit Technology')).toBeInTheDocument();
+  });
 });

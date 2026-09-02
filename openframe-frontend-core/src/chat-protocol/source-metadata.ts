@@ -157,7 +157,7 @@ function normalizeVideos(value: unknown): ChatRef[] {
   });
 }
 
-function normalizeCards(value: unknown): ChatRef[] {
+function normalizeCards(value: unknown, sources: ChatSource[]): ChatRef[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap(candidate => {
     if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return [];
@@ -167,7 +167,18 @@ function normalizeCards(value: unknown): ChatRef[] {
     const type = requiredString(card.entityType);
     const id = requiredString(card.entityId);
     if (!type || !id || type !== match[1] || id !== match[2]) return [];
-    return [{ type, id, title: id, url: null }];
+    const source = sources.find(item => item.id === id && item.documentType === type);
+    return [
+      {
+        type,
+        id,
+        title: source?.name ?? id,
+        url: source?.externalUrl ?? null,
+        ...(source?.sourceRepo ? { sourceRepo: source.sourceRepo } : {}),
+        ...(source?.targetPlatform !== undefined ? { targetPlatform: source.targetPlatform } : {}),
+        ...(source?.path ? { metadata: { path: source.path } } : {}),
+      },
+    ];
   });
 }
 
@@ -175,7 +186,7 @@ export function sourceMetadataEvent(payload: unknown): SourcesEvent | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
   const metadata = payload as Record<string, unknown>;
   const sources = normalizeSources(metadata.sources);
-  const refs = [...normalizeVideos(metadata.videos), ...normalizeCards(metadata.cards)];
+  const refs = [...normalizeVideos(metadata.videos), ...normalizeCards(metadata.cards, sources)];
   const refsByIdentity = new Map<string, ChatRef>();
   refs.forEach(ref => {
     const identity = `${ref.type}:${ref.id}`;
