@@ -47,7 +47,7 @@ class BrewPackageServiceTest {
     @Test
     void findPackagePrefersFormulaWhenTypeAbsent() {
         PackageCatalogEntry formula = formulaEntry("wireshark", "wireshark", 100);
-        when(packageCatalogRepository.findByIdIn(List.of("BREW:FORMULA:wireshark", "BREW:CASK:wireshark")))
+        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase("BREW", "wireshark"))
                 .thenReturn(List.of(formula));
 
         PackageDetails details = service.findPackage("wireshark", null);
@@ -59,7 +59,9 @@ class BrewPackageServiceTest {
     @Test
     void findPackageHonorsRequestedCaskType() {
         PackageCatalogEntry cask = caskEntry("slack", "Slack", 7594);
-        when(packageCatalogRepository.findByIdIn(List.of("BREW:CASK:slack"))).thenReturn(List.of(cask));
+        PackageCatalogEntry formulaTwin = formulaEntry("slack", "slack", 1);
+        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase("BREW", "slack"))
+                .thenReturn(List.of(formulaTwin, cask));
 
         PackageDetails details = service.findPackage("slack", BrewPackageType.CASK);
 
@@ -69,7 +71,7 @@ class BrewPackageServiceTest {
 
     @Test
     void findPackageThrowsWhenUnknown() {
-        when(packageCatalogRepository.findByIdIn(List.of("BREW:FORMULA:nope", "BREW:CASK:nope"))).thenReturn(List.of());
+        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase("BREW", "nope")).thenReturn(List.of());
 
         assertThrows(PackageNotFoundException.class, () -> service.findPackage("nope", null));
     }

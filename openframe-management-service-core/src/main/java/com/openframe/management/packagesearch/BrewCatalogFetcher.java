@@ -84,9 +84,7 @@ public class BrewCatalogFetcher {
         List<String> aliases = concat(formula.getAliases(), formula.getOldnames());
         Integer popularity = installs.get(name);
         String blob = SearchBlob.of(name, name, formula.getDesc(), aliases);
-        String entryId = PackageCatalogEntry.entryId(PackageManagerType.BREW, BrewPackageType.FORMULA, name);
         return PackageCatalogEntry.builder()
-                .id(entryId)
                 .manager(PackageManagerType.BREW.name())
                 .packageId(name)
                 .name(name)
@@ -108,9 +106,7 @@ public class BrewCatalogFetcher {
         List<String> aliases = concat(cask.getOldTokens(), null);
         Integer popularity = installs.get(token);
         String blob = SearchBlob.of(token, displayName, cask.getDesc(), aliases);
-        String entryId = PackageCatalogEntry.entryId(PackageManagerType.BREW, BrewPackageType.CASK, token);
         return PackageCatalogEntry.builder()
-                .id(entryId)
                 .manager(PackageManagerType.BREW.name())
                 .packageId(token)
                 .name(displayName)

@@ -14,14 +14,9 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.toMap;
 
 @Service
 @RequiredArgsConstructor
@@ -118,28 +113,23 @@ public class BrewPackageService implements PackageManagerClient {
     }
 
     private PackageCatalogEntry findEntry(String packageId, BrewPackageType packageType) {
-        List<String> orderedIds = lookupIdsFor(packageId, packageType);
-        List<PackageCatalogEntry> found = packageCatalogRepository.findByIdIn(orderedIds);
-        Map<String, PackageCatalogEntry> byId = found.stream()
-                .collect(toMap(PackageCatalogEntry::getId, identity()));
-        for (String entryId : orderedIds) {
-            PackageCatalogEntry entry = byId.get(entryId);
-            if (entry != null) {
-                return entry;
+        String managerName = PackageManagerType.BREW.name();
+        List<PackageCatalogEntry> found = packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(managerName, packageId);
+        for (BrewPackageType candidateType : lookupOrder(packageType)) {
+            for (PackageCatalogEntry entry : found) {
+                if (candidateType.name().equals(entry.getBrewType())) {
+                    return entry;
+                }
             }
         }
         throw new PackageNotFoundException(packageId);
     }
 
-    private static List<String> lookupIdsFor(String packageId, BrewPackageType packageType) {
-        List<String> ids = new ArrayList<>();
-        if (packageType != BrewPackageType.CASK) {
-            ids.add(PackageCatalogEntry.entryId(PackageManagerType.BREW, BrewPackageType.FORMULA, packageId));
+    private static List<BrewPackageType> lookupOrder(BrewPackageType requested) {
+        if (requested != null) {
+            return List.of(requested);
         }
-        if (packageType != BrewPackageType.FORMULA) {
-            ids.add(PackageCatalogEntry.entryId(PackageManagerType.BREW, BrewPackageType.CASK, packageId));
-        }
-        return ids;
+        return List.of(BrewPackageType.FORMULA, BrewPackageType.CASK);
     }
 
     private static List<PackageVersion> versionsOf(PackageCatalogEntry entry) {

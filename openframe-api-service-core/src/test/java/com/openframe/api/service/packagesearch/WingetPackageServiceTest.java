@@ -40,7 +40,7 @@ class WingetPackageServiceTest {
 
     @Test
     void findPackageThrowsWhenUnknown() {
-        when(packageCatalogRepository.findByIdIn(List.of("WINGET:no.such"))).thenReturn(List.of());
+        when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase("WINGET", "No.Such")).thenReturn(List.of());
 
         assertThrows(PackageNotFoundException.class, () -> service.findPackage("No.Such", null));
     }

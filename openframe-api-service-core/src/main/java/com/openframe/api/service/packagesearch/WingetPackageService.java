@@ -70,8 +70,8 @@ public class WingetPackageService implements PackageManagerClient {
 
     @Override
     public PackageDetails findPackage(String packageId, BrewPackageType packageType) {
-        String entryId = PackageCatalogEntry.entryId(PackageManagerType.WINGET, null, packageId);
-        List<PackageCatalogEntry> found = packageCatalogRepository.findByIdIn(List.of(entryId));
+        String managerName = PackageManagerType.WINGET.name();
+        List<PackageCatalogEntry> found = packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(managerName, packageId);
         if (found.isEmpty()) {
             throw new PackageNotFoundException(packageId);
         }

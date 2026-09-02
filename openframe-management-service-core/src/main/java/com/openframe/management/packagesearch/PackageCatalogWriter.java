@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.List;
 
 @Slf4j
@@ -38,6 +39,15 @@ public class PackageCatalogWriter {
     // entries no sync has touched for hours can never race a concurrent writer
     private static final Duration PRUNE_GRACE = Duration.ofHours(6);
 
+    // the composite key format is owned here, by the only place that writes it
+    private static String entryIdOf(PackageCatalogEntry entry) {
+        String lowerId = entry.getPackageId().toLowerCase(Locale.ROOT);
+        String brewType = entry.getBrewType();
+        return brewType == null
+                ? entry.getManager() + ":" + lowerId
+                : entry.getManager() + ":" + brewType + ":" + lowerId;
+    }
+
     // upsert everything with a fresh timestamp, then prune what no snapshot contains anymore —
     // the collection is never empty mid-sync
     public void replaceManagerEntries(PackageManagerType manager, List<PackageCatalogEntry> entries) {
@@ -45,6 +55,7 @@ public class PackageCatalogWriter {
         Instant syncStart = Instant.now();
         BulkOperations bulk = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, PackageCatalogEntry.class);
         for (PackageCatalogEntry entry : entries) {
+            entry.setId(entryIdOf(entry));
             entry.setUpdatedAt(syncStart);
             Query byId = new Query(Criteria.where("_id").is(entry.getId()));
             bulk.replaceOne(byId, entry, FindAndReplaceOptions.options().upsert());

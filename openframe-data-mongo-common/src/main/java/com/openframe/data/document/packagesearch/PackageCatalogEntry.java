@@ -10,7 +10,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 
 // public package-manager catalog stored once in the shared database; written by the management
 // services' sync jobs, read by the api services; not TenantScoped on purpose
@@ -39,11 +38,4 @@ public class PackageCatalogEntry {
     private String searchBlob;
     private Instant updatedAt;
 
-    public static String entryId(PackageManagerType manager, BrewPackageType brewType, String packageId) {
-        String lowerId = packageId.toLowerCase(Locale.ROOT);
-        String managerName = manager.name();
-        return brewType == null
-                ? managerName + ":" + lowerId
-                : managerName + ":" + brewType.name() + ":" + lowerId;
-    }
 }
