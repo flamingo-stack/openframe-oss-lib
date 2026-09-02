@@ -29,10 +29,16 @@ const HEALTHY_MARKER: &str = "Received CoreOk from server";
 const POLL_INTERVAL: Duration = Duration::from_secs(30);
 /// How long an unresolved failure (no healthy connect logged since) may stand before we act.
 const STUCK_DURATION: Duration = Duration::from_secs(10 * 60);
-/// A healthy agent logs roughly hourly, so this much total silence means it is wedged or dead.
+/// A live agent logs routine chatter far more often than hourly, so this much total silence means it is wedged or dead.
 const SILENCE_DURATION: Duration = Duration::from_secs(90 * 60);
-/// Minimum wait between heal attempts (restart, no-op, or failure), so a server-side outage can't spin.
+/// The agent reconnects hourly on token expiry and logs a healthy marker each time, but missing a single beat is normal and self-recovers (measured fleet-wide: median gap 55m, with a large cluster of healthy machines at ~110m), so allow two before assuming it holds no session.
+const DISCONNECTED_DURATION: Duration = Duration::from_secs(3 * 60 * 60);
+/// Base wait between heal attempts (restart, no-op, or failure), doubled per consecutive failed heal, so a server-side outage can't spin.
 const ACTION_COOLDOWN: Duration = Duration::from_secs(60 * 60);
+/// Cap on the exponential cooldown backoff, so heals that never restore health settle to a slow retry instead of hammering hourly forever.
+const MAX_COOLDOWN_BACKOFF_SHIFT: u32 = 3;
+/// After this many heals without a healthy marker, stop healing on the marker's absence alone: either the agent needs a reinstall or the marker itself has changed, and a rename must not turn into a fleet-wide restart loop.
+const MAX_DISCONNECT_HEALS: u32 = 5;
 /// Timeout for the /generate-msh fetch so an unresponsive server can't block the heal loop.
 const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
 /// How far back to look for markers when seeding health state at startup.
@@ -126,6 +132,11 @@ impl MeshSelfHealService {
         };
         let mut last_action: Option<Instant> = None;
         let mut last_activity = seed_last_activity(&log_path).await;
+        // The tail says whether the last marker was healthy, not when — so claim no positive proof yet and let the grace window below run before acting on it.
+        let mut last_healthy: Option<Instant> = None;
+        let mut watching_since = Instant::now();
+        let mut failed_heals: u32 = 0;
+        let mut was_suspended = false;
 
         loop {
             let sleep_started = Instant::now();
@@ -133,13 +144,25 @@ impl MeshSelfHealService {
 
             // Tenant gone: agent is stopped and /generate-msh returns 410 — don't hammer it.
             if self.deactivation.is_suspended() {
+                was_suspended = true;
                 continue;
+            }
+
+            // Reactivation: every timer aged through the suspension, so restart them rather than heal an agent that is only now coming back.
+            if std::mem::take(&mut was_suspended) {
+                stuck_since = None;
+                last_activity = Instant::now();
+                last_healthy = None;
+                watching_since = Instant::now();
             }
 
             // The sleep alone overran by far ⇒ the host was suspended (Instant counts suspend on Windows) — discard timers measured across it.
             if sleep_started.elapsed() > POLL_INTERVAL * 5 {
                 stuck_since = None;
                 last_activity = Instant::now();
+                // Suspend time counts toward the disconnect window too, so restart its grace period rather than blaming the agent for the nap.
+                last_healthy = None;
+                watching_since = Instant::now();
             }
 
             match read_new_lines(&log_path, &mut offset).await {
@@ -152,6 +175,8 @@ impl MeshSelfHealService {
                             stuck_since = None;
                             last_action = None;
                             last_marker_healthy = true;
+                            last_healthy = Some(Instant::now());
+                            failed_heals = 0;
                         } else if line.contains(FAILURE_MARKER) {
                             stuck_since.get_or_insert_with(Instant::now);
                             last_marker_healthy = false;
@@ -167,17 +192,21 @@ impl MeshSelfHealService {
             if self.tool_run_manager.is_updating(MESH_TOOL_ID).await {
                 stuck_since = None;
                 last_activity = Instant::now();
+                last_healthy = None;
+                watching_since = Instant::now();
                 continue;
             }
 
             if let Some(t) = last_action {
-                if t.elapsed() < ACTION_COOLDOWN {
+                if t.elapsed() < cooldown_for(failed_heals) {
                     continue;
                 }
             }
 
             let stuck = stuck_since.is_some_and(|t| t.elapsed() >= STUCK_DURATION);
             let silent = last_activity.elapsed() >= SILENCE_DURATION;
+            let disconnected = failed_heals < MAX_DISCONNECT_HEALS
+                && is_disconnected(last_healthy.map(|t| t.elapsed()), watching_since.elapsed());
             let msh_missing_serverid = self.current_msh_missing_serverid().await;
 
             let reason = if msh_missing_serverid {
@@ -192,6 +221,14 @@ impl MeshSelfHealService {
                     "silent for {}s (last_marker_healthy={last_marker_healthy})",
                     last_activity.elapsed().as_secs()
                 ))
+            } else if disconnected {
+                Some(format!(
+                    "log is active but no healthy marker for {}s — agent holds no server session",
+                    last_healthy
+                        .map(|t| t.elapsed())
+                        .unwrap_or_else(|| watching_since.elapsed())
+                        .as_secs()
+                ))
             } else {
                 None
             };
@@ -202,6 +239,16 @@ impl MeshSelfHealService {
                 self.heal(&reason).await;
                 stuck_since = None;
                 last_activity = Instant::now();
+                // Deliberately not resetting last_healthy: the restart has to earn its success by producing a healthy marker, or the next pass escalates.
+                failed_heals = failed_heals.saturating_add(1);
+                if failed_heals == MAX_DISCONNECT_HEALS {
+                    error!("mesh self-heal: {failed_heals} heals have not restored a server session — no longer healing on a missing healthy marker alone; the agent likely needs a reinstall");
+                } else if failed_heals > 1 {
+                    warn!(
+                        "mesh self-heal: {failed_heals} consecutive heals have not restored a server session — backing off to {}s",
+                        cooldown_for(failed_heals).as_secs()
+                    );
+                }
             }
         }
     }
@@ -387,6 +434,17 @@ fn parse_msh_field(msh: &str, key: &str) -> Option<String> {
                 .map(|v| v.trim().to_string())
         })
         .filter(|v| !v.is_empty())
+}
+
+/// Positive-health check: healthy means a recent healthy marker, not merely the absence of a failing one, so an agent whose log stays busy without ever connecting is still caught.
+/// Before the first marker is ever seen, the watcher's own uptime supplies the grace window, so a fresh start can't fire immediately.
+fn is_disconnected(since_last_healthy: Option<Duration>, watched_for: Duration) -> bool {
+    since_last_healthy.unwrap_or(watched_for) >= DISCONNECTED_DURATION
+}
+
+/// Exponential backoff on heals that keep failing to restore a session, capped so the retry stays regular instead of drifting to never.
+fn cooldown_for(failed_heals: u32) -> Duration {
+    ACTION_COOLDOWN * 2u32.pow(failed_heals.min(MAX_COOLDOWN_BACKOFF_SHIFT))
 }
 
 /// Seed the silence timer from the log's mtime so an already-silent agent isn't granted a fresh window on client restart; a recent boot (Instant underflow) falls back to now.
