@@ -30,6 +30,7 @@
  */
 
 import React, { type ReactNode } from 'react';
+import { isSourceMetadataCardRef } from '../../../chat-protocol/source-metadata';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
@@ -1961,7 +1962,7 @@ export function ChatCardLoader({
   if (!item) {
     const hasSourceMetadata =
       fetchEntry.renderFromSourceMetadata &&
-      finalChatRef.title !== finalChatRef.id &&
+      isSourceMetadataCardRef(chatRef) &&
       typeof finalChatRef.metadata?.path === 'string';
     if (hasSourceMetadata) {
       return finish(fetchEntry.render(sourceMetadataCardItem(finalChatRef), finalChatRef, renderOpts));

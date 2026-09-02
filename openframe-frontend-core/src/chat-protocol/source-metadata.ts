@@ -3,6 +3,11 @@ import type { ChatSource } from '../components/chat/types/message.types';
 import type { SourcesEvent } from './events';
 
 const CARD_REFERENCE = /^\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)\]$/;
+const sourceMetadataCardRefs = new WeakSet<ChatRef>();
+
+export function isSourceMetadataCardRef(ref: ChatRef): boolean {
+  return sourceMetadataCardRefs.has(ref);
+}
 
 function requiredString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -168,17 +173,17 @@ function normalizeCards(value: unknown, sources: ChatSource[]): ChatRef[] {
     const id = requiredString(card.entityId);
     if (!type || !id || type !== match[1] || id !== match[2]) return [];
     const source = sources.find(item => item.id === id && item.documentType === type);
-    return [
-      {
-        type,
-        id,
-        title: source?.name ?? id,
-        url: source?.externalUrl ?? null,
-        ...(source?.sourceRepo ? { sourceRepo: source.sourceRepo } : {}),
-        ...(source?.targetPlatform !== undefined ? { targetPlatform: source.targetPlatform } : {}),
-        ...(source?.path ? { metadata: { path: source.path } } : {}),
-      },
-    ];
+    const ref: ChatRef = {
+      type,
+      id,
+      title: source?.name ?? id,
+      url: source?.externalUrl ?? null,
+      ...(source?.sourceRepo ? { sourceRepo: source.sourceRepo } : {}),
+      ...(source?.targetPlatform !== undefined ? { targetPlatform: source.targetPlatform } : {}),
+      ...(source?.path ? { metadata: { path: source.path } } : {}),
+    };
+    if (source) sourceMetadataCardRefs.add(ref);
+    return [ref];
   });
 }
 
