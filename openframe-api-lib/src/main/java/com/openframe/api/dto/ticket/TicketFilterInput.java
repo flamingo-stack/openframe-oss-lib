@@ -1,6 +1,5 @@
 package com.openframe.api.dto.ticket;
 
-import com.openframe.data.document.ticket.TicketStatus;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,9 +13,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TicketFilterInput {
-    @Size(max = 5)
-    private List<TicketStatus> statuses;
-    /** Filter by custom status ids. */
+    /** Filter by lifecycle status ids. */
     @Size(max = 50)
     private List<String> statusIds;
     @Size(max = 50)
