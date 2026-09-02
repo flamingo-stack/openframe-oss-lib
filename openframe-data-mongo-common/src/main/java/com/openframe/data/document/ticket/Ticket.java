@@ -29,7 +29,9 @@ import java.time.Instant;
         // TODO(lifecycle-rollout): drop legacy status_order index after `status` field removal
         @CompoundIndex(name = "status_order", def = "{'status': 1, 'order': 1}"),
         @CompoundIndex(name = "status_kind", def = "{'statusKind': 1}"),
-        @CompoundIndex(name = "status_id_order", def = "{'statusId': 1, 'order': 1}")
+        @CompoundIndex(name = "status_id_order", def = "{'statusId': 1, 'order': 1}"),
+        // Board activity filter: per-column staleness scan. Never edit a live index def in place.
+        @CompoundIndex(name = "tenant_status_activity", def = "{'tenantId': 1, 'statusId': 1, 'lastActivityAt': 1}")
 })
 public class Ticket implements TenantScoped {
     @Id
@@ -62,10 +64,28 @@ public class Ticket implements TenantScoped {
     @LastModifiedDate
     private Instant updatedAt;
     private Instant resolvedAt;
+    /**
+     * Most recent chat action by any actor (end user, AI agent, technician) plus status moves.
+     * The canonical staleness input, and deliberately separate from {@code updatedAt}: that field
+     * means "the ticket record changed" and clients read it as the status move, so activity is
+     * always stamped with a targeted update rather than a full save.
+     * Null on tickets predating the field — read it as {@code createdAt}.
+     */
+    private Instant lastActivityAt;
+    /**
+     * Set when our side (AI or technician) sends a message, cleared when the client answers.
+     * Non-null means the ticket is waiting on the client, so quiet does not read as stalled.
+     */
+    private Instant awaitingClientSince;
     private TicketResolver resolvedBy;
     private String resolvedById;
     private String resolvedByName;
     private Integer reopenCount;
+    /** Activity falls back to creation time for tickets that predate activity tracking. */
+    public Instant effectiveLastActivityAt() {
+        return lastActivityAt != null ? lastActivityAt : createdAt;
+    }
+
     public boolean isAiDisabled() {
         return statusKind != null && statusKind != TicketStatusKind.AI_ASSISTANCE;
     }

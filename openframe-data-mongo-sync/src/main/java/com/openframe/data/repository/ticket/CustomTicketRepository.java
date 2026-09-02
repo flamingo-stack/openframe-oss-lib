@@ -6,6 +6,7 @@ import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import org.springframework.data.mongodb.core.query.Query;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,6 +42,12 @@ public interface CustomTicketRepository {
     int reassignTicketsToStatus(Query query, String toStatusId, TicketStatusKind toKind);
 
     void updateTitle(String ticketId, String title);
+
+    /** Targeted stamp of the ticket's last activity — deliberately does not touch {@code updatedAt}. */
+    void updateLastActivityAt(String ticketId, Instant lastActivityAt);
+
+    /** Stamps activity and sets (or, with a null {@code awaitingSince}, clears) the client wait. */
+    void updateActivityAndAwaiting(String ticketId, Instant lastActivityAt, Instant awaitingSince);
 
     boolean isSortableField(String field);
 

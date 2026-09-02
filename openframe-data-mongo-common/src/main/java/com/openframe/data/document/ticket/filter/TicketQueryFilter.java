@@ -36,4 +36,6 @@ public class TicketQueryFilter {
     private List<TicketCreationSource> creationSources;
     private Instant createdAtFrom;
     private Instant createdAtTo;
+    /** Board activity filter, already resolved to cutoff instants. Null or empty does not filter. */
+    private TicketActivityCriteria activity;
 }

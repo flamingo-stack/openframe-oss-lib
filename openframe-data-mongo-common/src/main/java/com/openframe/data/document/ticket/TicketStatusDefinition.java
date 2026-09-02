@@ -28,6 +28,11 @@ public class TicketStatusDefinition implements TenantScoped {
     private String name;
     private String color;
     private String position;
+    /**
+     * Minutes without activity after which a ticket in this status counts as stale. Null falls back
+     * to the deployment-wide default, so a tenant only stores a value where it differs.
+     */
+    private Integer staleAfterMinutes;
     @CreatedDate
     private Instant createdAt;
     @LastModifiedDate
