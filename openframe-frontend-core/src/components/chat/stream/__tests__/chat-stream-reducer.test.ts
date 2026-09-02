@@ -1289,3 +1289,59 @@ describe('createChatStreamReducer — ask cards', () => {
     expect(last.segments?.map(s => s.type)).toEqual(['ask', 'ask']);
   });
 });
+
+describe('createChatStreamReducer — Mingo source metadata', () => {
+  const sources = [
+    {
+      index: 1,
+      name: 'Enroll devices',
+      path: 'docs/enroll.md',
+      documentType: 'markdown',
+    },
+  ];
+
+  it('attaches metadata received before text to the same assistant turn', () => {
+    const reducer = createChatStreamReducer({ transport: 'nats' });
+    const refs = [
+      {
+        type: 'video',
+        id: 'mux-9b6586b494',
+        title: 'Community demo',
+        url: 'https://stream.mux.com/playback-id.m3u8',
+        metadata: { videoUrl: 'https://stream.mux.com/playback-id.m3u8' },
+      },
+    ];
+
+    reducer.apply({ type: 'turn-start', seq: 1 });
+    reducer.apply({ type: 'sources', sources, refs, seq: 2 });
+    reducer.apply({ type: 'text-delta', text: 'Follow the guide [1].', seq: 3 });
+
+    expect(reducer.state.messages).toHaveLength(1);
+    expect(reducer.state.messages[0]).toMatchObject({ sources, refs });
+  });
+
+  it('deduplicates cumulative metadata and does not leak it into the next turn', () => {
+    const reducer = createChatStreamReducer({ transport: 'nats' });
+
+    reducer.apply({ type: 'turn-start', seq: 1 });
+    reducer.apply({ type: 'sources', sources, seq: 2 });
+    reducer.apply({
+      type: 'sources',
+      sources: [
+        { ...sources[0], name: 'Duplicate' },
+        { index: 2, name: 'Install agent', path: 'docs/install.md', documentType: 'markdown' },
+      ],
+      seq: 3,
+    });
+    reducer.apply({ type: 'text-delta', text: 'First answer [1] [2].', seq: 4 });
+    reducer.apply({ type: 'turn-end', seq: 5 });
+    reducer.apply({ type: 'turn-start', seq: 6 });
+    reducer.apply({ type: 'text-delta', text: 'Second answer.', seq: 7 });
+
+    expect(reducer.state.messages[0].sources).toEqual([
+      sources[0],
+      { index: 2, name: 'Install agent', path: 'docs/install.md', documentType: 'markdown' },
+    ]);
+    expect(reducer.state.messages[1].sources).toBeUndefined();
+  });
+});

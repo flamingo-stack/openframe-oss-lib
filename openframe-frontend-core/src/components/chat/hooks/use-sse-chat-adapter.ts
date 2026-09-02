@@ -63,7 +63,7 @@ import type { ChatDialogStore } from '../stream/chat-dialog-store';
 import type { ChatStreamReducerOptions } from '../stream/chat-stream-reducer';
 import { useChatStreamReducer } from '../stream/use-chat-stream-reducer';
 import type { DialogItem } from '../types/component.types';
-import type { Message, MessageSegment } from '../types/message.types';
+import type { ChatSource, Message, MessageSegment } from '../types/message.types';
 import type {
   UnifiedChatState,
   UnifiedChatMessage,
@@ -81,6 +81,7 @@ import { useSlashCommandRegistry, type SlashCommandSummary } from './use-slash-c
 // Canonical home of the per-turn meta row moved to the stream module in
 // Phase 3; re-exported here to keep the legacy import path stable.
 export type { ChatTurnMeta } from '../stream/chat-stream-reducer';
+export type { ChatSource } from '../types/message.types';
 
 // ─── Stable no-op references for the Guide-mode dialog-management stubs ──
 // Plain module-scope constants so the adapter's return identity stays
@@ -127,34 +128,6 @@ const noopBumpMetaTick = (): void => {};
 /** Source identifier — opaque string ID (registry lookup happens in the
  *  hub-side platform-utils, not in lib). */
 export type DocSource = string;
-
-export interface ChatSource {
-  index: number;
-  name: string;
-  path: string;
-  documentType: string;
-  externalUrl?: string;
-  /** Platform that owns the destination at `externalUrl`. */
-  targetPlatform?: string | null;
-  /** Primary-key value for single-row chips. */
-  id?: string;
-  /** Per-row items for grouped chips. */
-  items?: Array<{
-    id: string;
-    documentType: string;
-    name: string;
-    externalUrl?: string;
-    targetPlatform?: string | null;
-    /** In-app doc-tree path for markdown / data-room-doc rows so the
-     *  grouped chip's anchor can trigger an in-page doc-tree swap via
-     *  `handleChatNavClick` (parity with single-row chips + cards). */
-    path?: string | null;
-  }>;
-  /** RagTableConfig.id for this source. */
-  sourceRepo?: string;
-  /** Optional display label override returned by the chat API. */
-  label?: string;
-}
 
 export interface DocChatMessage {
   id: string;

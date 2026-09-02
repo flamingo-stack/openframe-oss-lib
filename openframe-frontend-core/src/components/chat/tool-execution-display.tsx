@@ -54,6 +54,9 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
 
     const hasResult = isExecuted && typeof message.result === 'string' && message.result.length > 0;
     const hasBody = argEntries.length > 0 || hasResult || isExecuting;
+    const isConciseRemoteRead =
+      !message.integratedToolType && !!message.toolTitle?.trim() && argEntries.length === 0 && !hasResult;
+    const isStaticRow = isClientView || isConciseRemoteRead;
 
     const renderStatusIcon = () => {
       if (isExecuting) return <DotsLoaderIcon size={16} className="text-ods-text-secondary" />;
@@ -82,7 +85,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
           {previewText}
         </div>
         <div className="flex h-5 w-5 shrink-0 items-center justify-center">{renderStatusIcon()}</div>
-        {!isClientView && (
+        {!isStaticRow && (
           <div className="flex h-5 w-5 shrink-0 items-center justify-center">
             <ExpandChevron expanded={expanded} />
           </div>
@@ -101,7 +104,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
         )}
         {...props}
       >
-        {isClientView ? (
+        {isStaticRow ? (
           // Client (Fae end-user): static, non-expandable row — no chevron, no
           // body. Just the explanation + status; command/args/result are hidden.
           <div className="flex w-full items-start gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] text-left">

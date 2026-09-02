@@ -60,6 +60,7 @@ import {
   type ParticipantEvent,
   type UsageEvent,
 } from '../../../chat-protocol/events';
+import type { ChatRef } from '../chat-ref.types';
 import type {
   ApprovalBatchSegment,
   ApprovalRequestSegment,
@@ -70,6 +71,7 @@ import type {
   ToolExecutionSegment,
   ExecutingToolState,
 } from '../types';
+import type { ChatSource } from '../types/message.types';
 import type { PendingApproval } from '../types/processing.types';
 import type {
   DialogTokenUsage,
@@ -78,6 +80,7 @@ import type {
   UnifiedUsageBreakdown,
 } from '../types/unified-chat-state.types';
 import { approvalDisplaysInline } from '../utils/approval-display';
+import { mergeChatRefs, mergeChatSources } from '../utils/chat-source-metadata';
 import {
   type MessageSegmentAccumulator,
   createMessageSegmentAccumulator,
@@ -676,6 +679,9 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   let sendCount = 0;
   let sseCurrentText = '';
 
+  let pendingSources: ChatSource[] | undefined;
+  let pendingRefs: ChatRef[] | undefined;
+
   // ── Snapshot cache ─────────────────────────────────────────────────────
   let stateCache: ChatReducerState | null = null;
   function invalidate(): void {
@@ -771,6 +777,18 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       return;
     }
     setMessagesInternal(stampTrailingAssistantSeq(updateTrailingAssistant(messages, segments), seq));
+  }
+
+  function attachPendingSourceMetadata(): void {
+    if (!pendingSources && !pendingRefs) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant') return;
+    const next = {
+      ...last,
+      ...(pendingSources ? { sources: pendingSources } : {}),
+      ...(pendingRefs ? { refs: pendingRefs } : {}),
+    };
+    setMessagesInternal([...messages.slice(0, -1), next]);
   }
 
   function applyStreamStartToState(): void {
@@ -966,6 +984,8 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
 
     switch (event.type) {
       case 'turn-start': {
+        pendingSources = undefined;
+        pendingRefs = undefined;
         isInStream = true;
         hasEverStreamed = true;
         turnStartedAt = Date.now();
@@ -981,6 +1001,15 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         emit('onStreamEnd');
         setPhaseInternal('idle');
         accumulator.resetSegments();
+        pendingSources = undefined;
+        pendingRefs = undefined;
+        break;
+      }
+
+      case 'sources': {
+        pendingSources = mergeChatSources(pendingSources, event.sources);
+        if (event.refs) pendingRefs = mergeChatRefs(pendingRefs, event.refs);
+        attachPendingSourceMetadata();
         break;
       }
 
@@ -1017,10 +1046,12 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         if (isInStream || !hasEverStreamed) {
           emitSegments(segments);
           applySegmentsToState(segments, withSeqMeta(undefined));
+          attachPendingSourceMetadata();
         } else {
           const delta: MessageSegment[] = [{ type: kind, text: event.text }];
           emitSegments(delta, { append: true });
           applySegmentsToState(delta, withSeqMeta({ append: true }));
+          attachPendingSourceMetadata();
         }
         break;
       }

@@ -1005,6 +1005,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                       renderContextItem={renderContextItem}
                       renderMention={renderMention}
                       renderEntityCard={renderEntityCard}
+                      refs={message.refs}
                       onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}
                       NavLinkAnchor={NavLinkAnchor}
                     />

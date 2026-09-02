@@ -20,6 +20,7 @@ import { MESSAGE_TYPE } from '../components/chat/types/message.types';
 import type { AskOptionData } from '../components/chat/types/message.types';
 import { ESCALATION_STATE, escalationResolvedStatus } from './events';
 import type { ApprovalToolCall, ChatStreamEvent } from './events';
+import { sourceMetadataEvent } from './source-metadata';
 
 /** Minimal structural view of a NATS chunk (see `ChunkData` in
  *  `src/components/chat/types/network.types.ts`). */
@@ -124,6 +125,12 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         return { type: 'thinking-delta', text: data.text, ...seq };
       }
       return null;
+
+    case MESSAGE_TYPE.GUIDE:
+    case MESSAGE_TYPE.SOURCES: {
+      const event = sourceMetadataEvent(data.payload);
+      return event ? { ...event, ...seq } : null;
+    }
 
     // An ask card is only an ask card with something to pick: a question and at
     // least one option. Anything less is dropped rather than rendered as an

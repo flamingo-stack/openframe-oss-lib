@@ -391,3 +391,60 @@ describe('processHistoricalMessages — ASK rows', () => {
     expect(processHistoricalMessages(dialog).messages).toEqual([]);
   });
 });
+
+describe('processHistoricalMessages — Mingo source metadata', () => {
+  it.each(['GUIDE', 'SOURCES'] as const)('restores %s metadata on the same assistant turn', type => {
+    const dialog: HistoricalMessage[] = [
+      {
+        id: 'a1',
+        chatType: 'ADMIN_AI_CHAT',
+        createdAt: '2026-07-19T09:00:05Z',
+        owner: { type: 'ASSISTANT' },
+        messageData: [
+          {
+            type,
+            payload: {
+              sources: [
+                {
+                  index: 1,
+                  name: 'Install agent',
+                  path: 'docs/install.md',
+                  documentType: 'markdown',
+                },
+              ],
+              videos: [
+                {
+                  ref: '[card://video:mux-9b6586b494]',
+                  title: 'Community demo',
+                  url: 'https://stream.mux.com/playback-id.m3u8',
+                  metadata: { videoUrl: 'https://stream.mux.com/playback-id.m3u8' },
+                },
+              ],
+            },
+          },
+          { type: 'TEXT', text: 'Install the agent [1]. [card://video:mux-9b6586b494]' },
+        ],
+      },
+    ];
+
+    expect(processHistoricalMessages(dialog).messages[0]).toMatchObject({
+      role: 'assistant',
+      sources: [
+        {
+          index: 1,
+          name: 'Install agent',
+          path: 'docs/install.md',
+          documentType: 'markdown',
+        },
+      ],
+      refs: [
+        {
+          type: 'video',
+          id: 'mux-9b6586b494',
+          metadata: { videoUrl: 'https://stream.mux.com/playback-id.m3u8' },
+        },
+      ],
+      content: [{ type: 'text', text: 'Install the agent [1]. [card://video:mux-9b6586b494]' }],
+    });
+  });
+});

@@ -1579,6 +1579,10 @@ function EmbeddableChatInner({
         // explicitly — see `Message.hidden` and `chat-message-list`'s skip.
         ...(m.hidden ? { hidden: true } : {}),
         ...(m.scrollAnchor ? { scrollAnchor: m.scrollAnchor } : {}),
+        // Preserve same-turn rich metadata. Source chips and entity-card
+        // renderers consume it after this raw-to-Message projection.
+        ...(m.sources && m.sources.length > 0 ? { sources: m.sources } : {}),
+        ...(m.refs && m.refs.length > 0 ? { refs: m.refs } : {}),
         // Forward attached context items so the user bubble renders its chips.
         ...(m.contextItems && m.contextItems.length > 0 ? { contextItems: m.contextItems } : {}),
       };
@@ -1835,7 +1839,12 @@ function EmbeddableChatInner({
     if (chatLoading) return undefined;
     const sources = lastAssistantMsg?.sources;
     if (!sources || sources.length === 0) return undefined;
-    const content = lastAssistantMsg?.content || '';
+    const content =
+      lastAssistantMsg.content ||
+      (lastAssistantMsg.segments ?? [])
+        .filter(segment => segment.type === 'text')
+        .map(segment => segment.text)
+        .join('\n');
     const citationOrder = [...content.matchAll(/\[(\d+)\]/g)].map(m => parseInt(m[1], 10));
     const seenOrder = new Map<number, number>();
     citationOrder.forEach(idx => {

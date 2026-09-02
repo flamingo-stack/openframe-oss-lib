@@ -61,6 +61,7 @@ import type {
   MessageSegment,
   NatsMessageType,
   ChatApprovalStatus,
+  ChatSource,
 } from '../types';
 import type { DialogItem } from '../types/component.types';
 import type {
@@ -352,6 +353,8 @@ export function mapProcessedToUnified(
     role: 'user' | 'assistant' | 'error';
     content: string | MessageSegment[];
     name?: string;
+    sources?: ChatSource[];
+    refs?: ChatRef[];
   }>,
 ): UnifiedChatMessage[] {
   const out: UnifiedChatMessage[] = [];
@@ -363,12 +366,16 @@ export function mapProcessedToUnified(
         role: m.role,
         content: '',
         segments: m.content,
+        ...(m.sources ? { sources: m.sources } : {}),
+        ...(m.refs ? { refs: m.refs } : {}),
       });
     } else {
       out.push({
         id: m.id,
         role: m.role,
         content: m.content,
+        ...(m.sources ? { sources: m.sources } : {}),
+        ...(m.refs ? { refs: m.refs } : {}),
       });
     }
   }

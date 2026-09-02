@@ -103,6 +103,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       renderContextItem,
       renderMention,
       renderEntityCard,
+      refs,
       onAskSelect,
       NavLinkAnchor,
       ...props
@@ -126,6 +127,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // null, the override falls back to the bare cardId. Never renders the
     // literal `[card://...]` URL.
     const hasMarkerSupport = !!renderEntityCard;
+
+    const refsByKey = useMemo(
+      () => new Map((refs ?? []).map(reference => [`${reference.type}:${reference.id}`, reference])),
+      [refs],
+    );
 
     const segments = useMemo(() => normalizeContent(content), [content]);
 
@@ -180,7 +186,14 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // (and its open menu) survives across chunks. Invalidated per key when the
     // render fn identity changes.
     const renderedCardNodeCache = useRef(
-      new Map<string, { render: ((ref: ChatRef) => React.ReactNode) | undefined; node: React.ReactNode }>(),
+      new Map<
+        string,
+        {
+          render: ((ref: ChatRef) => React.ReactNode) | undefined;
+          reference: ChatRef;
+          node: React.ReactNode;
+        }
+      >(),
     );
 
     /**
@@ -242,10 +255,17 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           // menu / re-fetching) on every stream chunk. Also dedups the same
           // key emitted twice within one message.
           let entry = cache.get(key);
-          if (!entry || entry.render !== render) {
-            // The marker is the ONLY data on the wire: cards hydrate by id
-            // from the host's per-object APIs, so a minimal {type, id}
-            // descriptor is all the renderer needs to mount the loader.
+          const enrichedRef = refsByKey.get(key);
+          const refForRender: ChatRef = enrichedRef ?? {
+            type: cardType,
+            id: cardId,
+            title: cardId,
+            url: null,
+          };
+          if (!entry || entry.render !== render || entry.reference !== refForRender) {
+            // Prefer same-turn SOURCES metadata when available. Otherwise
+            // cards hydrate by id from the host's per-object APIs, so a
+            // minimal {type, id} descriptor still mounts the loader.
             // For types with nothing to fetch the host's render() returns
             // null and we fall through to the bare-cardId fallback in the
             // `<a card://…>` override below.
@@ -257,13 +277,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             // the id rather than `undefined`) and `url` to null (matches
             // the no-link semantics fetch-mode cards rely on — they
             // resolve their own URL after fetch).
-            const refForRender: ChatRef = {
-              type: cardType,
-              id: cardId,
-              title: cardId,
-              url: null,
-            };
-            entry = { render, node: render(refForRender) };
+            entry = { render, reference: refForRender, node: render(refForRender) };
             cache.set(key, entry);
           }
           const rendered = entry.node;
@@ -326,7 +340,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         }
       });
       return { inlineByKey, partsBySegment, usedKeys };
-    }, [hasMarkerSupport, renderEntityCard, segments]);
+    }, [hasMarkerSupport, refsByKey, renderEntityCard, segments]);
 
     // Drop cached nodes for markers no longer present so the cache can't grow
     // unbounded as a long message's markers change. Deliberately an EFFECT,
@@ -716,6 +730,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // equality holds across streaming chunks.
     prevProps.renderMention === nextProps.renderMention &&
     prevProps.renderEntityCard === nextProps.renderEntityCard &&
+    prevProps.refs === nextProps.refs &&
     // Same stability contract as the renderers above: hosts pass a `useCallback`
     // (EmbeddableChat passes its memoized `handleSend`), so this holds across
     // streaming chunks instead of re-rendering every ask card per chunk.
