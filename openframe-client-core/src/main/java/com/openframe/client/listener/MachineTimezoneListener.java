@@ -61,12 +61,11 @@ public class MachineTimezoneListener extends AbstractJetStreamPushListener {
 
     @Override
     protected void handleMessage(Message message) {
-        String messagePayload = new String(message.getData(), StandardCharsets.UTF_8);
+        String payload = new String(message.getData(), StandardCharsets.UTF_8);
         String subject = message.getSubject();
-
         try {
             String machineId = machineIdExtractor.extract(subject);
-            MachineTimezoneMessage timezoneMessage = objectMapper.readValue(messagePayload, MachineTimezoneMessage.class);
+            MachineTimezoneMessage timezoneMessage = objectMapper.readValue(payload, MachineTimezoneMessage.class);
 
             String timezone = timezoneMessage.getTimezone();
             if (isBlank(timezone)) {
@@ -81,7 +80,8 @@ public class MachineTimezoneListener extends AbstractJetStreamPushListener {
             message.ack();
             log.debug("Timezone update processed successfully and acked");
         } catch (Exception e) {
-            log.error("Unexpected error processing timezone update: {}", messagePayload, e);
+            log.error("Unexpected error processing timezone update: {}", payload, e);
+            // Leave unacked so JetStream redelivers.
         }
     }
 }
