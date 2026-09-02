@@ -6,6 +6,12 @@ on:
       node_matrix:
         description: "Node packages matrix"
         value: ${{ jobs.collect.outputs.node_matrix }}
+      images_matrix:
+        description: "Maven modules matrix"
+        value: ${{ jobs.collect.outputs.images_matrix }}
+      skip:
+        description: "Comma-separated module paths, skip list for the root scan"
+        value: ${{ jobs.collect.outputs.skip }}
       changes:
         description: "JSON object mapping each component key to true/false"
         value: ${{ jobs.collect.outputs.changes }}
@@ -16,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       node_matrix: ${{ steps.define.outputs.node_matrix }}
+      images_matrix: ${{ steps.define.outputs.images_matrix }}
+      skip: ${{ steps.define.outputs.skip }}
       changes: ${{ steps.changes.outputs.changes }}
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +39,11 @@ jobs:
                 "path": "openframe-frontend-core"
               }
             ]')
+
+          modules=$(grep -o '<module>[^<]*</module>' pom.xml | sed 's/<[^>]*>//g')
+          images_matrix=$(printf '%s\n' "$modules" | jq -R '{ name: gsub("/"; "-"), path: . }' | jq -sc .)
+          skip=$(printf '%s\n' "$modules" | paste -sd, -)
+          module_filters=$(printf '%s\n' "$modules" | jq -R '{ key: gsub("/"; "-"), value: ["pom.xml", (. + "/**")] }' | jq -sc 'from_entries')
 
           filters=$(jq -nc '{
               "java": [
@@ -79,14 +92,18 @@ jobs:
                 ".github/steps/rust-setup/**"
               ]
             }')
+          filters=$(jq -nc --argjson base "$filters" --argjson modules "$module_filters" '$base + $modules')
 
           keys=$(jq -nc --argjson f "$filters" '$f | keys')
 
           [ "$(jq 'length' <<< "$node_matrix")" -gt 0 ] || { echo "node_matrix is empty" >&2; exit 1; }
+          [ "$(jq 'length' <<< "$images_matrix")" -gt 0 ] || { echo "images_matrix is empty" >&2; exit 1; }
           [ "$(jq 'length' <<< "$keys")" -gt 0 ] || { echo "no change filters" >&2; exit 1; }
 
           {
             echo "node_matrix=$node_matrix"
+            echo "images_matrix=$images_matrix"
+            echo "skip=$skip"
             echo "filters=$filters"
             echo "keys=$keys"
           } >> "$GITHUB_OUTPUT"
