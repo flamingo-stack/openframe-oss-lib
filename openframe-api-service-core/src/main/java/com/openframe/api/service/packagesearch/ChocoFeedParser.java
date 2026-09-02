@@ -1,8 +1,6 @@
 package com.openframe.api.service.packagesearch;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
+import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -18,32 +16,13 @@ import java.util.stream.IntStream;
 
 // the Chocolatey community feed is Atom-XML-only (406 on JSON); the package id lives in atom:title,
 // NOT in the OData properties
-final class ChocoFeedParser {
+@Component
+class ChocoFeedParser {
 
     private static final String ATOM_NS = "http://www.w3.org/2005/Atom";
     private static final String DATA_NS = "http://schemas.microsoft.com/ado/2007/08/dataservices";
 
-    @Getter
-    @Builder
-    @AllArgsConstructor
-    static final class ChocoEntry {
-        private final String id;
-        private final String title;
-        private final String summary;
-        private final String description;
-        private final String version;
-        private final Integer downloadCount;
-        private final String iconUrl;
-        private final String projectUrl;
-        private final String tags;
-        private final Instant published;
-        private final Boolean prerelease;
-    }
-
-    private ChocoFeedParser() {
-    }
-
-    static List<ChocoEntry> parse(String xml) {
+    List<ChocoEntry> parse(String xml) {
         Document document = parseDocument(xml);
         NodeList entryNodes = document.getElementsByTagNameNS(ATOM_NS, "entry");
         int entryCount = entryNodes.getLength();

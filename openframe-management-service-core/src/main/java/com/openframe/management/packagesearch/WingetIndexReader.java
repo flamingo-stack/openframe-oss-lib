@@ -1,7 +1,6 @@
 package com.openframe.management.packagesearch;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.IOException;
@@ -20,25 +19,12 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-final class WingetIndexReader {
+@Component
+class WingetIndexReader {
 
     private static final String INDEX_ENTRY_NAME = "Public/index.db";
 
-    @Getter
-    @AllArgsConstructor
-    static final class WingetEntry {
-        private final String id;
-        private final String name;
-        private final String moniker;
-        private final String latestVersion;
-        // first 8 hex chars of the package hash, lower-cased — a CDN path segment that 404s on upper-case
-        private final String hashPrefix;
-    }
-
-    private WingetIndexReader() {
-    }
-
-    static List<WingetEntry> read(byte[] msixBytes) {
+    List<WingetEntry> read(byte[] msixBytes) {
         Path tempMsix;
         Path tempDb;
         try {

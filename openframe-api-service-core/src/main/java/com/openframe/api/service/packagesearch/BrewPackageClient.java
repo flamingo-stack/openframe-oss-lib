@@ -20,7 +20,7 @@ import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
-public class BrewPackageService implements PackageManagerClient {
+public class BrewPackageClient implements PackageManagerClient {
 
 
     private final PackageCatalogRepository packageCatalogRepository;

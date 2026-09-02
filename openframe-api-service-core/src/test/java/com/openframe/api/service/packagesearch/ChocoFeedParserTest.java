@@ -1,6 +1,5 @@
 package com.openframe.api.service.packagesearch;
 
-import com.openframe.api.service.packagesearch.ChocoFeedParser.ChocoEntry;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -50,7 +49,7 @@ class ChocoFeedParserTest {
 
     @Test
     void parsesEntries() {
-        List<ChocoEntry> entries = ChocoFeedParser.parse(FEED);
+        List<ChocoEntry> entries = new ChocoFeedParser().parse(FEED);
 
         assertEquals(2, entries.size());
         ChocoEntry firefox = entries.getFirst();
@@ -67,7 +66,7 @@ class ChocoFeedParserTest {
 
     @Test
     void missingAndNullPropertiesBecomeNull() {
-        ChocoEntry bare = ChocoFeedParser.parse(FEED).get(1);
+        ChocoEntry bare = new ChocoFeedParser().parse(FEED).get(1);
 
         assertEquals("bare", bare.getId());
         assertNull(bare.getTitle());
@@ -86,7 +85,7 @@ class ChocoFeedParserTest {
                 """;
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> ChocoFeedParser.parse(malicious));
+                () -> new ChocoFeedParser().parse(malicious));
         assertTrue(error.getMessage().contains("Chocolatey"));
     }
 }

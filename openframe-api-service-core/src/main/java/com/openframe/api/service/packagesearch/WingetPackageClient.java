@@ -29,7 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 
 @Service
-public class WingetPackageService implements PackageManagerClient {
+public class WingetPackageClient implements PackageManagerClient {
 
     private static final String UNAVAILABLE_MESSAGE =
             "The winget catalog is temporarily unavailable. Please try again later.";
@@ -39,7 +39,7 @@ public class WingetPackageService implements PackageManagerClient {
     private final RestClient restClient;
     private final Cache<String, PackageDetails> detailsCache;
 
-    public WingetPackageService(PackageCatalogRepository packageCatalogRepository, PackageSearchProperties properties) {
+    public WingetPackageClient(PackageCatalogRepository packageCatalogRepository, PackageSearchProperties properties) {
         PackageSearchProperties.Winget winget = properties.getWinget();
         this.packageCatalogRepository = packageCatalogRepository;
         this.restClient = PackageSearchRestClientFactory.create(winget.getBaseUrl(), winget.getTimeout());

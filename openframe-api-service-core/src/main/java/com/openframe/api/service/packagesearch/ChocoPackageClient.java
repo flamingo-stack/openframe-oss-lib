@@ -12,7 +12,6 @@ import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.dto.packagesearch.PackageVersion;
 import com.openframe.api.exception.PackageNotFoundException;
 import com.openframe.api.exception.PackageSourceUnavailableException;
-import com.openframe.api.service.packagesearch.ChocoFeedParser.ChocoEntry;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -24,10 +23,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
 
-// responses are cached for the community CDN's own freshness window, so repeated queries never
-// leave the pod twice
 @Service
-public class ChocoPackageService implements PackageManagerClient {
+public class ChocoPackageClient implements PackageManagerClient {
 
     private static final String UNAVAILABLE_MESSAGE =
             "The Chocolatey repository is temporarily unavailable. Please try again later.";
@@ -39,16 +36,13 @@ public class ChocoPackageService implements PackageManagerClient {
     private static final int CACHE_MAX_SIZE = 2000;
 
     private final RestClient restClient;
-    private final Cache<String, PackageSearchResult> searchCache;
+    private final ChocoFeedParser chocoFeedParser;
     private final Cache<String, PackageDetails> detailsCache;
 
-    public ChocoPackageService(PackageSearchProperties packageSearchProperties) {
+    public ChocoPackageClient(PackageSearchProperties packageSearchProperties, ChocoFeedParser chocoFeedParser) {
         PackageSearchProperties.Choco choco = packageSearchProperties.getChoco();
         this.restClient = PackageSearchRestClientFactory.create(choco.getBaseUrl(), choco.getTimeout());
-        this.searchCache = Caffeine.newBuilder()
-                .expireAfterWrite(choco.getCacheTtl())
-                .maximumSize(CACHE_MAX_SIZE)
-                .build();
+        this.chocoFeedParser = chocoFeedParser;
         this.detailsCache = Caffeine.newBuilder()
                 .expireAfterWrite(choco.getCacheTtl())
                 .maximumSize(CACHE_MAX_SIZE)
@@ -63,8 +57,7 @@ public class ChocoPackageService implements PackageManagerClient {
     @Override
     public PackageSearchResult search(String query, int limit, int offset) {
         String trimmedQuery = query.trim();
-        String cacheKey = trimmedQuery.toLowerCase(Locale.ROOT) + '|' + limit + '|' + offset;
-        return searchCache.get(cacheKey, key -> requestSearchPage(trimmedQuery, limit, offset));
+        return requestSearchPage(trimmedQuery, limit, offset);
     }
 
     @Override
@@ -196,7 +189,7 @@ public class ChocoPackageService implements PackageManagerClient {
             throw new PackageSourceUnavailableException(UNAVAILABLE_MESSAGE);
         }
         try {
-            return ChocoFeedParser.parse(xml);
+            return chocoFeedParser.parse(xml);
         } catch (IllegalStateException e) {
             throw new PackageSourceUnavailableException(UNAVAILABLE_MESSAGE, e);
         }

@@ -1,6 +1,6 @@
 package com.openframe.api.service.packagesearch;
 
-import com.openframe.api.service.packagesearch.WingetPackageService.VersionData;
+import com.openframe.api.service.packagesearch.WingetPackageClient.VersionData;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -22,7 +22,7 @@ class WingetVersionDataTest {
                   rP: manifests/m/Mozilla/Firefox/154.0/7bee
                 """;
 
-        List<VersionData> versions = WingetPackageService.parseVersionData(yaml);
+        List<VersionData> versions = WingetPackageClient.parseVersionData(yaml);
 
         assertEquals(2, versions.size());
         assertEquals("154.0.1", versions.getFirst().getVersion());
@@ -41,14 +41,14 @@ class WingetVersionDataTest {
                   rP: manifests/s/Some/Pkg/4.280/aaaa
                 """;
 
-        List<VersionData> versions = WingetPackageService.parseVersionData(yaml);
+        List<VersionData> versions = WingetPackageClient.parseVersionData(yaml);
 
         assertEquals("4.280", versions.getFirst().getVersion());
     }
 
     @Test
     void ignoresEntriesWithoutManifestPath() {
-        List<VersionData> versions = WingetPackageService.parseVersionData("sV: 1.0\nvD:\n- v: 1.0.0\n");
+        List<VersionData> versions = WingetPackageClient.parseVersionData("sV: 1.0\nvD:\n- v: 1.0.0\n");
 
         assertEquals(0, versions.size());
     }

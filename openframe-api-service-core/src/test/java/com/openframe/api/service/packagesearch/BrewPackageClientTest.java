@@ -18,15 +18,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class BrewPackageServiceTest {
+class BrewPackageClientTest {
 
     private PackageCatalogRepository packageCatalogRepository;
-    private BrewPackageService service;
+    private BrewPackageClient client;
 
     @BeforeEach
     void setUp() {
         packageCatalogRepository = mock(PackageCatalogRepository.class);
-        service = new BrewPackageService(packageCatalogRepository);
+        client = new BrewPackageClient(packageCatalogRepository);
     }
 
     @Test
@@ -36,7 +36,7 @@ class BrewPackageServiceTest {
         PackageCatalogEntry slackBeta = caskEntry("slack@beta", "Slack", 23);
         when(packageCatalogRepository.findByManagerAndSearchBlobContaining(PackageManagerType.BREW, "slack")).thenReturn(List.of(slackCli, slackBeta, slack));
 
-        PackageSearchResult result = service.search("slack", 3, 0);
+        PackageSearchResult result = client.search("slack", 3, 0);
 
         // slack@beta outranks slack-cli: its display name "Slack" is an exact name match
         List<String> ids = result.getItems().stream().map(item -> item.getId()).toList();
@@ -50,7 +50,7 @@ class BrewPackageServiceTest {
         when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.BREW, "wireshark"))
                 .thenReturn(List.of(formula));
 
-        PackageDetails details = service.findPackage("wireshark", null);
+        PackageDetails details = client.findPackage("wireshark", null);
 
         assertEquals(BrewPackageType.FORMULA, details.getPackageType());
         assertEquals("brew install wireshark", details.getInstallCommand());
@@ -63,7 +63,7 @@ class BrewPackageServiceTest {
         when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.BREW, "slack"))
                 .thenReturn(List.of(formulaTwin, cask));
 
-        PackageDetails details = service.findPackage("slack", BrewPackageType.CASK);
+        PackageDetails details = client.findPackage("slack", BrewPackageType.CASK);
 
         assertEquals(BrewPackageType.CASK, details.getPackageType());
         assertEquals("brew install --cask slack", details.getInstallCommand());
@@ -73,7 +73,7 @@ class BrewPackageServiceTest {
     void findPackageThrowsWhenUnknown() {
         when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.BREW, "nope")).thenReturn(List.of());
 
-        assertThrows(PackageNotFoundException.class, () -> service.findPackage("nope", null));
+        assertThrows(PackageNotFoundException.class, () -> client.findPackage("nope", null));
     }
 
     @Test
@@ -82,7 +82,7 @@ class BrewPackageServiceTest {
         PackageCatalogEntry slackCli = caskEntry("slack-cli", "Slack CLI", 791);
         when(packageCatalogRepository.findByManagerAndSearchBlobContaining(PackageManagerType.BREW, "slack")).thenReturn(List.of(slack, slackCli));
 
-        PackageSearchResult firstPage = service.search("slack", 1, 0);
+        PackageSearchResult firstPage = client.search("slack", 1, 0);
 
         assertEquals(1, firstPage.getItems().size());
         assertTrue(firstPage.isHasMore());

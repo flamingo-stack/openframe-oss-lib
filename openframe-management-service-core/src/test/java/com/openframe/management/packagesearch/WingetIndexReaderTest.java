@@ -1,6 +1,5 @@
 package com.openframe.management.packagesearch;
 
-import com.openframe.management.packagesearch.WingetIndexReader.WingetEntry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -43,7 +42,7 @@ class WingetIndexReaderTest {
             }
         }
 
-        List<WingetEntry> entries = WingetIndexReader.read(msix("Public/index.db", Files.readAllBytes(db)));
+        List<WingetEntry> entries = new WingetIndexReader().read(msix("Public/index.db", Files.readAllBytes(db)));
 
         assertEquals(1, entries.size());
         WingetEntry entry = entries.getFirst();
@@ -58,7 +57,7 @@ class WingetIndexReaderTest {
     void failsWhenIndexEntryMissing() throws Exception {
         byte[] zipWithoutIndex = msix("AppxManifest.xml", "<x/>".getBytes(StandardCharsets.UTF_8));
 
-        assertThrows(UncheckedIOException.class, () -> WingetIndexReader.read(zipWithoutIndex));
+        assertThrows(UncheckedIOException.class, () -> new WingetIndexReader().read(zipWithoutIndex));
     }
 
     private static byte[] msix(String entryName, byte[] content) throws IOException {

@@ -4,13 +4,9 @@ import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.core.rest.PackageSearchRestClientFactory;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -192,40 +188,5 @@ public class BrewCatalogFetcher {
             result.addAll(second);
         }
         return List.copyOf(result);
-    }
-
-    @Data
-    @NoArgsConstructor
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class BrewFormulaJson {
-        private String name;
-        private String desc;
-        private String homepage;
-        private String license;
-        private List<String> aliases;
-        private List<String> oldnames;
-        private Versions versions;
-        private Boolean disabled;
-
-        @Data
-        @NoArgsConstructor
-        @JsonIgnoreProperties(ignoreUnknown = true)
-        static class Versions {
-            private String stable;
-        }
-    }
-
-    @Data
-    @NoArgsConstructor
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class BrewCaskJson {
-        private String token;
-        private List<String> name;
-        private String desc;
-        private String homepage;
-        private String version;
-        @JsonProperty("old_tokens")
-        private List<String> oldTokens;
-        private Boolean disabled;
     }
 }

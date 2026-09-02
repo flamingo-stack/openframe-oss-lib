@@ -16,15 +16,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class WingetPackageServiceTest {
+class WingetPackageClientTest {
 
     private PackageCatalogRepository packageCatalogRepository;
-    private WingetPackageService service;
+    private WingetPackageClient client;
 
     @BeforeEach
     void setUp() {
         packageCatalogRepository = mock(PackageCatalogRepository.class);
-        service = new WingetPackageService(packageCatalogRepository, new PackageSearchProperties());
+        client = new WingetPackageClient(packageCatalogRepository, new PackageSearchProperties());
     }
 
     @Test
@@ -33,7 +33,7 @@ class WingetPackageServiceTest {
         PackageCatalogEntry localeFork = entry("Mozilla.Firefox.ach", "Mozilla Firefox (ach)");
         when(packageCatalogRepository.findByManagerAndSearchBlobContaining(PackageManagerType.WINGET, "firefox")).thenReturn(List.of(localeFork, canonical));
 
-        PackageSearchResult result = service.search("firefox", 2, 0);
+        PackageSearchResult result = client.search("firefox", 2, 0);
 
         assertEquals("Mozilla.Firefox", result.getItems().getFirst().getId());
     }
@@ -42,7 +42,7 @@ class WingetPackageServiceTest {
     void findPackageThrowsWhenUnknown() {
         when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.WINGET, "No.Such")).thenReturn(List.of());
 
-        assertThrows(PackageNotFoundException.class, () -> service.findPackage("No.Such", null));
+        assertThrows(PackageNotFoundException.class, () -> client.findPackage("No.Such", null));
     }
 
     private static PackageCatalogEntry entry(String id, String name) {

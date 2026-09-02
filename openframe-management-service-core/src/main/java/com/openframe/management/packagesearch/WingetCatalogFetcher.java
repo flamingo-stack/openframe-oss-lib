@@ -3,7 +3,6 @@ package com.openframe.management.packagesearch;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.core.rest.PackageSearchRestClientFactory;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
-import com.openframe.management.packagesearch.WingetIndexReader.WingetEntry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -18,10 +17,12 @@ public class WingetCatalogFetcher {
     private static final String INDEX_PATH = "/cache/source2.msix";
 
     private final RestClient restClient;
+    private final WingetIndexReader wingetIndexReader;
 
-    public WingetCatalogFetcher(PackageCatalogSyncProperties properties) {
+    public WingetCatalogFetcher(PackageCatalogSyncProperties properties, WingetIndexReader wingetIndexReader) {
         PackageCatalogSyncProperties.Winget winget = properties.getWinget();
         this.restClient = PackageSearchRestClientFactory.create(winget.getBaseUrl(), winget.getTimeout());
+        this.wingetIndexReader = wingetIndexReader;
     }
 
     public List<PackageCatalogEntry> fetchAll() {
@@ -29,7 +30,7 @@ public class WingetCatalogFetcher {
         if (msix == null) {
             throw new IllegalStateException("empty winget index response");
         }
-        List<WingetEntry> indexEntries = WingetIndexReader.read(msix);
+        List<WingetEntry> indexEntries = wingetIndexReader.read(msix);
         List<PackageCatalogEntry> entries = new ArrayList<>();
         for (WingetEntry indexEntry : indexEntries) {
             if (shouldSkip(indexEntry)) {
