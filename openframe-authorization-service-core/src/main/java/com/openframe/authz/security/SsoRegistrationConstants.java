@@ -1,5 +1,7 @@
 package com.openframe.authz.security;
 
+import java.util.List;
+
 public final class SsoRegistrationConstants {
     private SsoRegistrationConstants() {
     }
@@ -14,8 +16,8 @@ public final class SsoRegistrationConstants {
      * injected dead-ends its callbacks in the state-mismatch guard). A new flow cookie only
      * needs to be added here.
      */
-    public static final java.util.List<String> SSO_FLOW_COOKIES =
-            java.util.List.of(COOKIE_SSO_REG, COOKIE_SSO_INVITE, COOKIE_SSO_LOGIN);
+    public static final List<String> SSO_FLOW_COOKIES =
+            List.of(COOKIE_SSO_REG, COOKIE_SSO_INVITE, COOKIE_SSO_LOGIN);
 
     public static final String ONBOARDING_TENANT_ID = "sso-onboarding";
 
