@@ -44,12 +44,20 @@ public class SsoCookieCodec {
         return encode(payload);
     }
 
+    public String encodeLogin(SsoLoginCookiePayload payload) {
+        return encode(payload);
+    }
+
     public Optional<SsoTenantRegCookiePayload> decodeTenant(String token) {
         return decode(token, SsoTenantRegCookiePayload.class);
     }
 
     public Optional<SsoInviteCookiePayload> decodeInvite(String token) {
         return decode(token, SsoInviteCookiePayload.class);
+    }
+
+    public Optional<SsoLoginCookiePayload> decodeLogin(String token) {
+        return decode(token, SsoLoginCookiePayload.class);
     }
 
     public <T extends SsoCookiePayload> Optional<T> decode(String token, Class<T> type) {

@@ -6,6 +6,7 @@ import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import com.openframe.security.jwt.JwtService;
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
 import com.openframe.security.oauth.dto.TokenResponse;
+import com.openframe.security.oauth.exception.AppleNativeRegistrationRequiredException;
 import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
 import com.openframe.security.oauth.headers.ForwardedHeadersContributor;
 import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
@@ -209,6 +210,79 @@ public class OAuthBffService {
      * code to the auth server's token endpoint under the apple-native grant, authenticated with
      * this gateway's client credentials. Tokens come back exactly like any other grant.
      */
+    /**
+     * Resolves the tenant for a native Apple identity via the authorization server's tenantless
+     * discovery endpoint (the token is fully verified there — signature, audience, nonce). 404
+     * means the identity has no account and the app should branch into registration.
+     */
+    public Mono<String> appleNativeDiscoverTenant(String identityToken, String nonce, ServerHttpRequest request) {
+        java.util.Map<String, String> body = nonce != null && !nonce.isBlank()
+                ? java.util.Map.of("identityToken", identityToken, "nonce", nonce)
+                : java.util.Map.of("identityToken", identityToken);
+        return webClientBuilder.build()
+                .post()
+                .uri(authServerUrl + "/oauth/apple/native/discover")
+                .headers(h -> headersContributor.contribute(h, request))
+                .bodyValue(body)
+                .retrieve()
+                .onStatus(st -> st.value() == 404, resp -> Mono.error(new AppleNativeRegistrationRequiredException()))
+                .onStatus(st -> st.is4xxClientError() || st.is5xxServerError(), resp ->
+                        resp.bodyToMono(String.class).defaultIfEmpty("")
+                                .flatMap(b -> {
+                                    log.warn("Apple native tenant discovery rejected ({}): {}", resp.statusCode(), b);
+                                    return Mono.error(new IllegalStateException("Apple sign-in failed. Please try again."));
+                                }))
+                .bodyToMono(AppleNativeDiscoverResponse.class)
+                .map(AppleNativeDiscoverResponse::tenantId);
+    }
+
+    public record AppleNativeDiscoverResponse(String tenantId) {}
+
+    /**
+     * Creates the tenant for a verified Apple identity (no account yet). The authorization code
+     * is NOT spent here — the caller runs the regular exchange against the returned tenant right
+     * after, which redeems it. 4xx bodies (domain taken, account exists) surface as
+     * IllegalArgumentException so the app sees the actual reason.
+     */
+    public Mono<String> appleNativeRegisterTenant(String identityToken, String nonce,
+                                                  String tenantName, String tenantDomain,
+                                                  String firstName, String lastName,
+                                                  ServerHttpRequest request) {
+        java.util.Map<String, String> body = new java.util.HashMap<>();
+        body.put("identityToken", identityToken);
+        if (hasText(nonce)) body.put("nonce", nonce);
+        body.put("tenantName", tenantName);
+        body.put("tenantDomain", tenantDomain);
+        if (hasText(firstName)) body.put("firstName", firstName);
+        if (hasText(lastName)) body.put("lastName", lastName);
+        return webClientBuilder.build()
+                .post()
+                .uri(authServerUrl + "/oauth/apple/native/register")
+                .headers(h -> headersContributor.contribute(h, request))
+                .bodyValue(body)
+                .retrieve()
+                .onStatus(org.springframework.http.HttpStatusCode::is4xxClientError, resp ->
+                        resp.bodyToMono(String.class).defaultIfEmpty("Registration failed. Please try again.")
+                                .flatMap(b -> {
+                                    log.warn("Apple native registration rejected ({}): {}", resp.statusCode(), b);
+                                    return Mono.error(new IllegalArgumentException(extractErrorMessage(b)));
+                                }))
+                .bodyToMono(AppleNativeDiscoverResponse.class)
+                .map(AppleNativeDiscoverResponse::tenantId);
+    }
+
+    private static String extractErrorMessage(String body) {
+        try {
+            var node = ERROR_BODY_MAPPER.readTree(body);
+            for (String field : new String[]{"message", "error", "detail"}) {
+                if (node.hasNonNull(field)) return node.get(field).asText();
+            }
+        } catch (Exception ignored) {
+        }
+        return "Registration failed. Please try again.";
+    }
+
+
     public Mono<TokenResponse> appleNativeExchange(String tenantId,
                                                    String identityToken,
                                                    String authorizationCode,

@@ -9,14 +9,14 @@ import com.openframe.data.document.auth.AuthInvitation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import static com.openframe.authz.security.SsoRegistrationConstants.FLOW_COOKIE_TTL_SECONDS;
+import static com.openframe.authz.security.SsoRegistrationConstants.providerAuthorizationPath;
 import static java.time.Instant.now;
 import static java.util.UUID.randomUUID;
 
 @Service
 @RequiredArgsConstructor
 public class SsoInvitationService {
-
-    private static final int COOKIE_TTL_SECONDS = 600;
 
     private final InvitationValidator invitationValidator;
     private final SsoProviderValidator ssoProviderValidator;
@@ -38,11 +38,11 @@ public class SsoInvitationService {
                 request.getRedirectTo(),
                 request.isAuthMobile(),
                 now,
-                now + COOKIE_TTL_SECONDS
+                now + FLOW_COOKIE_TTL_SECONDS
         );
         String token = ssoCookieCodec.encodeInvite(payload);
-        String redirectPath = "/oauth2/authorization/" + provider + "?tenant=" + inv.getTenantId();
-        return new SsoAuthorizeData(token, COOKIE_TTL_SECONDS, provider, state, redirectPath);
+        String redirectPath = providerAuthorizationPath(provider, inv.getTenantId());
+        return new SsoAuthorizeData(token, FLOW_COOKIE_TTL_SECONDS, provider, state, redirectPath);
     }
 }
 
