@@ -9,6 +9,9 @@ import com.openframe.authz.keys.TenantKeyService;
 import com.openframe.authz.security.ProviderAwareAuthenticationEntryPoint;
 import com.openframe.authz.security.grant.AppleNativeGrantAuthenticationConverter;
 import com.openframe.authz.security.grant.AppleNativeGrantAuthenticationProvider;
+import com.openframe.authz.security.grant.SignupTicketGrantAuthenticationConverter;
+import com.openframe.authz.security.grant.SignupTicketGrantAuthenticationProvider;
+import com.openframe.authz.service.sso.SignupTicketService;
 import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.sso.apple.AppleAuthorizationCodeClient;
 import com.openframe.authz.service.sso.apple.AppleTokenService;
@@ -77,6 +80,7 @@ public class AuthorizationServerConfig {
             AppleNativeTokenVerifier appleNativeTokenVerifier,
             AppleAuthorizationCodeClient appleAuthorizationCodeClient,
             AppleTokenService appleTokenService,
+            SignupTicketService signupTicketService,
             SsoOidcUserService ssoOidcUserService,
             UserService userService,
             OAuth2AuthorizationService authorizationService,
@@ -89,6 +93,8 @@ public class AuthorizationServerConfig {
         var appleNativeGrantAuthenticationProvider = new AppleNativeGrantAuthenticationProvider(
                 appleNativeTokenVerifier, appleAuthorizationCodeClient, appleTokenService,
                 ssoOidcUserService, userService, authorizationService, tokenGenerator);
+        var signupTicketGrantAuthenticationProvider = new SignupTicketGrantAuthenticationProvider(
+                signupTicketService, userService, authorizationService, tokenGenerator);
 
         var as = new OAuth2AuthorizationServerConfigurer();
         AuthorizationServerSettings settings = AuthorizationServerSettings
@@ -104,7 +110,9 @@ public class AuthorizationServerConfig {
             // persistence and refresh reuse the standard machinery.
             config.tokenEndpoint(token -> token
                     .accessTokenRequestConverter(new AppleNativeGrantAuthenticationConverter())
-                    .authenticationProvider(appleNativeGrantAuthenticationProvider));
+                    .authenticationProvider(appleNativeGrantAuthenticationProvider)
+                    .accessTokenRequestConverter(new SignupTicketGrantAuthenticationConverter())
+                    .authenticationProvider(signupTicketGrantAuthenticationProvider));
         });
         var endpoints = as.getEndpointsMatcher();
 
