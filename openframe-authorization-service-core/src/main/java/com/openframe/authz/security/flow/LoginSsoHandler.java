@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.util.Optional;
 
 import static com.openframe.authz.web.Redirects.foundAtRoot;
+import static java.net.URLEncoder.encode;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.springframework.util.StringUtils.hasText;
 
 /**
@@ -173,6 +175,6 @@ public class LoginSsoHandler implements SsoFlowHandler {
     }
 
     private static String urlEncode(String value) {
-        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
+        return encode(value, UTF_8);
     }
 }

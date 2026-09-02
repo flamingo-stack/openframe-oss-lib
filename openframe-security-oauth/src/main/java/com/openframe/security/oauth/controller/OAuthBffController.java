@@ -6,6 +6,7 @@ import com.openframe.security.oauth.exception.AppleNativeRegistrationRequiredExc
 import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
 import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
+import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,7 +36,7 @@ public class OAuthBffController {
     private final OAuthBffService oauthBffService;
     private final OAuthDevTicketStore devTicketStore;
     private final CookieService cookieService;
-    private final com.openframe.security.oauth.service.redirect.RedirectTargetResolver redirectTargetResolver;
+    private final RedirectTargetResolver redirectTargetResolver;
 
     @Value("${openframe.gateway.oauth.state-cookie-ttl-seconds:180}")
     private int stateCookieTtlSeconds;
@@ -137,6 +138,13 @@ public class OAuthBffController {
                 });
     }
 
+
+    /** Widens a typed response for endpoints whose success and error bodies differ in shape. */
+    @SuppressWarnings("unchecked")
+    private static ResponseEntity<Object> asObjectResponse(ResponseEntity<?> response) {
+        return (ResponseEntity<Object>) response;
+    }
+
     private ResponseEntity<Void> unauthorized() {
         return ResponseEntity.status(401).build();
     }
@@ -180,7 +188,7 @@ public class OAuthBffController {
                 .flatMap(tid -> oauthBffService.appleNativeExchange(
                                 tid, body.identityToken(), body.authorizationCode(),
                                 body.nonce(), body.firstName(), body.lastName(), request)
-                        .map(tokens -> (ResponseEntity<Object>) (ResponseEntity<?>) buildNoContentWithCookies(tokens, true)))
+                        .map(tokens -> asObjectResponse(buildNoContentWithCookies(tokens, true))))
                 .onErrorResume(AppleNativeRegistrationRequiredException.class, e ->
                         Mono.just(ResponseEntity.status(409).body(Map.of("error", "registration_required"))))
                 .onErrorResume(e -> {
@@ -213,7 +221,7 @@ public class OAuthBffController {
                 .flatMap(tenantId -> oauthBffService.appleNativeExchange(
                                 tenantId, body.identityToken(), body.authorizationCode(),
                                 body.nonce(), body.firstName(), body.lastName(), request)
-                        .map(tokens -> (ResponseEntity<Object>) (ResponseEntity<?>) buildNoContentWithCookies(tokens, true)))
+                        .map(tokens -> asObjectResponse(buildNoContentWithCookies(tokens, true))))
                 .onErrorResume(IllegalArgumentException.class, e ->
                         Mono.just(ResponseEntity.badRequest().body(Map.of("error", e.getMessage()))))
                 .onErrorResume(e -> {
@@ -270,9 +278,9 @@ public class OAuthBffController {
         return oauthBffService.completeSignupTicket(
                         body.ticket(), body.tenantName(), body.tenantDomain(), body.attribution(), request)
                 .flatMap(tokens -> devTicketStore.createTicket(tokens)
-                        .map(devTicket -> (ResponseEntity<Object>) (ResponseEntity<?>) ResponseEntity.ok(Map.of("devTicket", devTicket))))
+                        .map(devTicket -> asObjectResponse(ResponseEntity.ok(Map.of("devTicket", devTicket)))))
                 .onErrorResume(IllegalArgumentException.class, e ->
-                        Mono.just(ResponseEntity.badRequest().body((Object) Map.of("error", e.getMessage()))))
+                        Mono.just(asObjectResponse(ResponseEntity.badRequest().body(Map.of("error", e.getMessage())))))
                 .onErrorResume(e -> {
                     log.warn("Mobile signup completion failed: {}", e.getMessage());
                     return Mono.just(ResponseEntity.status(401).<Object>build());

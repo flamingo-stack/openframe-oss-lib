@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Component
@@ -51,7 +52,7 @@ public class IdpConfigurationScheduler {
                 // Existing deployments predate the apple-native grant — upsert it, or the token
                 // endpoint rejects the exchange with unauthorized_client.
                 MongoRegisteredClient client = existing.get();
-                java.util.Set<String> grants = new java.util.HashSet<>(
+                Set<String> grants = new HashSet<>(
                         client.getGrantTypes() != null ? client.getGrantTypes() : Set.of());
                 if (grants.addAll(Set.of(APPLE_NATIVE_GRANT, SIGNUP_TICKET_GRANT))) {
                     client.setGrantTypes(grants);

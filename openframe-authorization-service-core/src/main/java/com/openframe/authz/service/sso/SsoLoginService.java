@@ -3,6 +3,7 @@ package com.openframe.authz.service.sso;
 import com.openframe.authz.dto.SsoLoginInitRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
+import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.service.validation.SsoProviderValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import static com.openframe.authz.security.SsoRegistrationConstants.FLOW_COOKIE_
 import static com.openframe.authz.security.SsoRegistrationConstants.providerAuthorizationPath;
 import static com.openframe.authz.security.SsoRegistrationConstants.ONBOARDING_TENANT_ID;
 import static java.time.Instant.now;
+import static java.util.Locale.ROOT;
 import static java.util.UUID.randomUUID;
 
 /**
@@ -25,11 +27,11 @@ public class SsoLoginService {
 
     private final SsoProviderValidator ssoProviderValidator;
     private final SsoCookieCodec ssoCookieCodec;
-    private final com.openframe.authz.service.user.UserService userService;
+    private final UserService userService;
 
     /** The owner just created by registration — resolved for binding the signup ticket. */
     public String ownerUserId(String email, String tenantId) {
-        return userService.findActiveByEmailAndTenant(email.toLowerCase(java.util.Locale.ROOT), tenantId)
+        return userService.findActiveByEmailAndTenant(email.toLowerCase(ROOT), tenantId)
                 .map(u -> u.getId())
                 .orElseThrow(() -> new IllegalStateException("Registration did not produce an active user."));
     }

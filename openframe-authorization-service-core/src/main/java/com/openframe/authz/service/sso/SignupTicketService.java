@@ -2,6 +2,7 @@ package com.openframe.authz.service.sso;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SignupTicketService {
 
     private static final Duration TTL = Duration.ofMinutes(10);
@@ -29,14 +31,6 @@ public class SignupTicketService {
     private final RedisTemplate<String, String> redisTemplate;
     private final OpenframeRedisKeyBuilder keyBuilder;
     private final ObjectMapper objectMapper;
-
-    public SignupTicketService(RedisTemplate<String, String> redisTemplate,
-                               OpenframeRedisKeyBuilder keyBuilder,
-                               ObjectMapper objectMapper) {
-        this.redisTemplate = redisTemplate;
-        this.keyBuilder = keyBuilder;
-        this.objectMapper = objectMapper;
-    }
 
     public record SignupTicketPayload(String email,
                                       String firstName,
