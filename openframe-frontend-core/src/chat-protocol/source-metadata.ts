@@ -3,10 +3,10 @@ import type { ChatSource } from '../components/chat/types/message.types';
 import type { SourcesEvent } from './events';
 
 const CARD_REFERENCE = /^\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)\]$/;
-const SOURCE_METADATA_CARD_REF = Symbol.for('openframe.sourceMetadataCardRef');
+const SOURCE_METADATA_MATCHED = 'sourceMetadataMatched';
 
 export function isSourceMetadataCardRef(ref: ChatRef): boolean {
-  return Reflect.get(ref, SOURCE_METADATA_CARD_REF) === true;
+  return ref.metadata?.[SOURCE_METADATA_MATCHED] === true;
 }
 
 function requiredString(value: unknown): string | null {
@@ -180,9 +180,8 @@ function normalizeCards(value: unknown, sources: ChatSource[]): ChatRef[] {
       url: source?.externalUrl ?? null,
       ...(source?.sourceRepo ? { sourceRepo: source.sourceRepo } : {}),
       ...(source?.targetPlatform !== undefined ? { targetPlatform: source.targetPlatform } : {}),
-      ...(source?.path ? { metadata: { path: source.path } } : {}),
+      ...(source?.path ? { metadata: { path: source.path, [SOURCE_METADATA_MATCHED]: true } } : {}),
     };
-    if (source) Object.defineProperty(ref, SOURCE_METADATA_CARD_REF, { value: true });
     return [ref];
   });
 }
