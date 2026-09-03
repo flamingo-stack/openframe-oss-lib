@@ -59,7 +59,7 @@ class PackageInstallServiceTest {
         when(packageSearchService.findPackage(PackageManagerType.BREW, "slack", BrewPackageType.CASK))
                 .thenReturn(details);
         PackageScript script = new PackageScript("script-code", ScriptShell.BASH, PrivilegeLevel.USER);
-        when(scriptBuilder.installScript(details, null)).thenReturn(script);
+        when(scriptBuilder.buildInstallScript(details, null)).thenReturn(script);
         DispatchResponse dispatched = DispatchResponse.builder().executionId("exec-1").build();
         when(commandDispatchService.batchRunCommand(any(), anyString())).thenReturn(dispatched);
 
@@ -108,7 +108,7 @@ class PackageInstallServiceTest {
         PackageDetails details = details(PackageManagerType.CHOCO, "7zip");
         when(packageSearchService.findPackage(PackageManagerType.CHOCO, "7zip", null)).thenReturn(details);
         PackageScript script = new PackageScript("uninstall-code", ScriptShell.POWERSHELL, PrivilegeLevel.ADMIN);
-        when(scriptBuilder.uninstallScript(details)).thenReturn(script);
+        when(scriptBuilder.buildUninstallScript(details)).thenReturn(script);
         DispatchResponse dispatched = DispatchResponse.builder().executionId("exec-2").build();
         when(commandDispatchService.batchRunCommand(any(), anyString())).thenReturn(dispatched);
 

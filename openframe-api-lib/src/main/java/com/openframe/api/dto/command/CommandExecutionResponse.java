@@ -8,11 +8,7 @@ import lombok.Data;
 
 import java.time.Instant;
 
-/**
- * Read-side projection of a {@code CommandExecution} row — one machine's slice
- * of a batch dispatch, as sent to the GraphQL layer. Command counterpart of
- * {@code ScriptExecutionResponse}.
- */
+// one machine's slice of a batch dispatch — command counterpart of ScriptExecutionResponse
 @Data
 @Builder
 public class CommandExecutionResponse {

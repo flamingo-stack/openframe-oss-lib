@@ -25,12 +25,14 @@ public class PackageInstallDataFetcher {
 
     @DgsMutation
     public DispatchResponse installPackage(@InputArgument @Valid InstallPackageInput input) {
-        return packageInstallService.install(input, getCurrentUserId());
+        String initiatedBy = getCurrentUserId();
+        return packageInstallService.install(input, initiatedBy);
     }
 
     @DgsMutation
     public DispatchResponse uninstallPackage(@InputArgument @Valid UninstallPackageInput input) {
-        return packageInstallService.uninstall(input, getCurrentUserId());
+        String initiatedBy = getCurrentUserId();
+        return packageInstallService.uninstall(input, initiatedBy);
     }
 
     private String getCurrentUserId() {

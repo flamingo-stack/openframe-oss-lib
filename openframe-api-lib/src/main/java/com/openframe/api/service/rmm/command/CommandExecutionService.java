@@ -68,11 +68,7 @@ public class CommandExecutionService {
                 .toList();
     }
 
-    /**
-     * All per-machine rows of one batch dispatch as read-side projections — backs
-     * the {@code commandExecutions} GraphQL query the dashboard polls for status
-     * and execution logs. Tenant-scoped; an unknown executionId yields an empty list.
-     */
+    // backs the commandExecutions GraphQL poll; an unknown executionId yields an empty list
     public List<CommandExecutionResponse> getExecutionResults(String executionId) {
         String tenantId = tenantIdProvider.getTenantId();
         List<CommandExecution> rows = commandExecutionRepository.findByTenantIdAndExecutionId(tenantId, executionId);

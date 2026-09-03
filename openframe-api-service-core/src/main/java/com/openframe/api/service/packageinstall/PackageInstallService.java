@@ -10,8 +10,11 @@ import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.packagesearch.PackageSearchService;
 import com.openframe.api.service.rmm.command.CommandDispatchService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,12 +22,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Installs / uninstalls software on a managed machine through its OS package
- * manager. The package is resolved in the manager's catalog first, so the
- * dispatched script is built only from catalog data — never from the raw
- * client input.
- */
+// the dispatched script is built only from catalog data — raw client input must never reach the shell
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -44,52 +42,74 @@ public class PackageInstallService {
     private final CommandDispatchService commandDispatchService;
 
     public DispatchResponse install(InstallPackageInput input, String initiatedBy) {
-        requireVersionSupport(input.getPackageManager(), input.getVersion());
-        requireOsMatch(input.getMachineId(), input.getPackageManager());
-        PackageDetails details = packageSearchService.findPackage(
-                input.getPackageManager(), input.getPackageId(), input.getPackageType());
-        PackageScript script = packageInstallScriptBuilder.installScript(details, input.getVersion());
-        DispatchResponse response = dispatch(input.getMachineId(), script, initiatedBy);
+        PackageManagerType packageManager = input.getPackageManager();
+        String machineId = input.getMachineId();
+        String version = input.getVersion();
+        requireVersionSupport(packageManager, version);
+        requireOsMatch(machineId, packageManager);
+
+        String packageId = input.getPackageId();
+        BrewPackageType packageType = input.getPackageType();
+        PackageDetails details = resolvePackage(packageManager, packageId, packageType);
+        PackageScript script = packageInstallScriptBuilder.buildInstallScript(details, version);
+        DispatchResponse response = dispatch(machineId, script, initiatedBy);
+
         log.info("Dispatched package install: manager={} packageId={} version={} machineId={} executionId={}",
-                input.getPackageManager(), details.getId(), input.getVersion(), input.getMachineId(),
-                response.getExecutionId());
+                packageManager, details.getId(), version, machineId, response.getExecutionId());
         return response;
     }
 
     public DispatchResponse uninstall(UninstallPackageInput input, String initiatedBy) {
-        requireOsMatch(input.getMachineId(), input.getPackageManager());
-        PackageDetails details = packageSearchService.findPackage(
-                input.getPackageManager(), input.getPackageId(), input.getPackageType());
-        PackageScript script = packageInstallScriptBuilder.uninstallScript(details);
-        DispatchResponse response = dispatch(input.getMachineId(), script, initiatedBy);
+        PackageManagerType packageManager = input.getPackageManager();
+        String machineId = input.getMachineId();
+        requireOsMatch(machineId, packageManager);
+
+        String packageId = input.getPackageId();
+        BrewPackageType packageType = input.getPackageType();
+        PackageDetails details = resolvePackage(packageManager, packageId, packageType);
+        PackageScript script = packageInstallScriptBuilder.buildUninstallScript(details);
+        DispatchResponse response = dispatch(machineId, script, initiatedBy);
+
         log.info("Dispatched package uninstall: manager={} packageId={} machineId={} executionId={}",
-                input.getPackageManager(), details.getId(), input.getMachineId(), response.getExecutionId());
+                packageManager, details.getId(), machineId, response.getExecutionId());
         return response;
     }
 
     private static void requireVersionSupport(PackageManagerType packageManager, String version) {
-        if (version != null && packageManager == PackageManagerType.BREW) {
+        if (isVersionPinnedForBrew(packageManager, version)) {
             throw new IllegalArgumentException(
                     "Homebrew always installs the latest version — version pinning is not supported for BREW");
         }
+    }
+
+    private static boolean isVersionPinnedForBrew(PackageManagerType packageManager, String version) {
+        return version != null && packageManager == PackageManagerType.BREW;
     }
 
     private void requireOsMatch(String machineId, PackageManagerType packageManager) {
         Machine machine = deviceService.findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
         OsType required = MANAGER_OS.get(packageManager);
-        if (machine.getOsType() != required) {
+        OsType actual = machine.getOsType();
+        if (actual != required) {
             throw new IllegalArgumentException(packageManager + " packages require a " + required
-                    + " machine, but " + machineId + " is " + machine.getOsType());
+                    + " machine, but " + machineId + " is " + actual);
         }
     }
 
+    private PackageDetails resolvePackage(PackageManagerType packageManager, String packageId, BrewPackageType packageType) {
+        return packageSearchService.findPackage(packageManager, packageId, packageType);
+    }
+
     private DispatchResponse dispatch(String machineId, PackageScript script, String initiatedBy) {
+        String code = script.getCode();
+        ScriptShell shell = script.getShell();
+        PrivilegeLevel privilegeLevel = script.getPrivilegeLevel();
         BatchRunCommandInput command = new BatchRunCommandInput();
         command.setMachineIds(List.of(machineId));
-        command.setCommand(script.code());
-        command.setShell(script.shell());
-        command.setPrivilegeLevel(script.privilegeLevel());
+        command.setCommand(code);
+        command.setShell(shell);
+        command.setPrivilegeLevel(privilegeLevel);
         command.setTimeoutSeconds(TIMEOUT_SECONDS);
         return commandDispatchService.batchRunCommand(command, initiatedBy);
     }

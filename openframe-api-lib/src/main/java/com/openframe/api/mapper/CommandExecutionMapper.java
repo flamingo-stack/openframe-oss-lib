@@ -4,10 +4,6 @@ import com.openframe.api.dto.command.CommandExecutionResponse;
 import com.openframe.data.document.rmm.command.CommandExecution;
 import org.springframework.stereotype.Component;
 
-/**
- * Pure entity → DTO mapping for {@link CommandExecution}. Mirrors
- * {@link ScriptExecutionMapper}.
- */
 @Component
 public class CommandExecutionMapper {
 

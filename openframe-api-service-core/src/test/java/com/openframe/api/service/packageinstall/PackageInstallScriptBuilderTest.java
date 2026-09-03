@@ -17,77 +17,77 @@ class PackageInstallScriptBuilderTest {
 
     @Test
     void brewCaskInstallRunsAsConsoleUserWithHomebrewOnPath() {
-        PackageScript script = builder.installScript(details(PackageManagerType.BREW, "slack", BrewPackageType.CASK), null);
+        PackageScript script = builder.buildInstallScript(details(PackageManagerType.BREW, "slack", BrewPackageType.CASK), null);
 
-        assertEquals(ScriptShell.BASH, script.shell());
-        assertEquals(PrivilegeLevel.USER, script.privilegeLevel());
-        assertTrue(script.code().contains("export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\""));
-        assertTrue(script.code().contains("brew install --cask 'slack'"));
+        assertEquals(ScriptShell.BASH, script.getShell());
+        assertEquals(PrivilegeLevel.USER, script.getPrivilegeLevel());
+        assertTrue(script.getCode().contains("export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\""));
+        assertTrue(script.getCode().contains("brew install --cask 'slack'"));
     }
 
     @Test
     void brewFormulaInstallHasNoCaskFlag() {
-        PackageScript script = builder.installScript(details(PackageManagerType.BREW, "wireshark", BrewPackageType.FORMULA), null);
+        PackageScript script = builder.buildInstallScript(details(PackageManagerType.BREW, "wireshark", BrewPackageType.FORMULA), null);
 
-        assertTrue(script.code().contains("brew install 'wireshark'"));
-        assertFalse(script.code().contains("--cask"));
+        assertTrue(script.getCode().contains("brew install 'wireshark'"));
+        assertFalse(script.getCode().contains("--cask"));
     }
 
     @Test
     void brewUninstallKeepsCaskFlag() {
-        PackageScript script = builder.uninstallScript(details(PackageManagerType.BREW, "slack", BrewPackageType.CASK));
+        PackageScript script = builder.buildUninstallScript(details(PackageManagerType.BREW, "slack", BrewPackageType.CASK));
 
-        assertTrue(script.code().contains("brew uninstall --cask 'slack'"));
-        assertEquals(PrivilegeLevel.USER, script.privilegeLevel());
+        assertTrue(script.getCode().contains("brew uninstall --cask 'slack'"));
+        assertEquals(PrivilegeLevel.USER, script.getPrivilegeLevel());
     }
 
     @Test
     void chocoInstallIsNonInteractiveAdminAndForwardsExitCode() {
-        PackageScript script = builder.installScript(details(PackageManagerType.CHOCO, "7zip", null), null);
+        PackageScript script = builder.buildInstallScript(details(PackageManagerType.CHOCO, "7zip", null), null);
 
-        assertEquals(ScriptShell.POWERSHELL, script.shell());
-        assertEquals(PrivilegeLevel.ADMIN, script.privilegeLevel());
-        assertTrue(script.code().contains("choco install '7zip' -y --no-progress"));
-        assertTrue(script.code().endsWith("exit $LASTEXITCODE"));
+        assertEquals(ScriptShell.POWERSHELL, script.getShell());
+        assertEquals(PrivilegeLevel.ADMIN, script.getPrivilegeLevel());
+        assertTrue(script.getCode().contains("choco install '7zip' -y --no-progress"));
+        assertTrue(script.getCode().endsWith("exit $LASTEXITCODE"));
     }
 
     @Test
     void chocoInstallPinsRequestedVersion() {
-        PackageScript script = builder.installScript(details(PackageManagerType.CHOCO, "7zip", null), "22.1.0");
+        PackageScript script = builder.buildInstallScript(details(PackageManagerType.CHOCO, "7zip", null), "22.1.0");
 
-        assertTrue(script.code().contains("choco install '7zip' --version '22.1.0' -y --no-progress"));
+        assertTrue(script.getCode().contains("choco install '7zip' --version '22.1.0' -y --no-progress"));
     }
 
     @Test
     void chocoUninstallIsNonInteractive() {
-        PackageScript script = builder.uninstallScript(details(PackageManagerType.CHOCO, "7zip", null));
+        PackageScript script = builder.buildUninstallScript(details(PackageManagerType.CHOCO, "7zip", null));
 
-        assertTrue(script.code().contains("choco uninstall '7zip' -y"));
+        assertTrue(script.getCode().contains("choco uninstall '7zip' -y"));
     }
 
     @Test
     void wingetInstallIsSilentConsoleUserAndAcceptsAgreements() {
-        PackageScript script = builder.installScript(details(PackageManagerType.WINGET, "Mozilla.Firefox", null), null);
+        PackageScript script = builder.buildInstallScript(details(PackageManagerType.WINGET, "Mozilla.Firefox", null), null);
 
-        assertEquals(ScriptShell.POWERSHELL, script.shell());
-        assertEquals(PrivilegeLevel.USER, script.privilegeLevel());
-        assertTrue(script.code().contains(
+        assertEquals(ScriptShell.POWERSHELL, script.getShell());
+        assertEquals(PrivilegeLevel.USER, script.getPrivilegeLevel());
+        assertTrue(script.getCode().contains(
                 "winget install -e --id 'Mozilla.Firefox' --silent --accept-package-agreements --accept-source-agreements"));
-        assertTrue(script.code().endsWith("exit $LASTEXITCODE"));
+        assertTrue(script.getCode().endsWith("exit $LASTEXITCODE"));
     }
 
     @Test
     void wingetInstallPinsRequestedVersion() {
-        PackageScript script = builder.installScript(details(PackageManagerType.WINGET, "Mozilla.Firefox", null), "155.0");
+        PackageScript script = builder.buildInstallScript(details(PackageManagerType.WINGET, "Mozilla.Firefox", null), "155.0");
 
-        assertTrue(script.code().contains("winget install -e --id 'Mozilla.Firefox' --version '155.0' --silent"));
+        assertTrue(script.getCode().contains("winget install -e --id 'Mozilla.Firefox' --version '155.0' --silent"));
     }
 
     @Test
     void wingetUninstallIsSilent() {
-        PackageScript script = builder.uninstallScript(details(PackageManagerType.WINGET, "Mozilla.Firefox", null));
+        PackageScript script = builder.buildUninstallScript(details(PackageManagerType.WINGET, "Mozilla.Firefox", null));
 
-        assertTrue(script.code().contains("winget uninstall -e --id 'Mozilla.Firefox' --silent"));
+        assertTrue(script.getCode().contains("winget uninstall -e --id 'Mozilla.Firefox' --silent --accept-source-agreements"));
     }
 
     private static PackageDetails details(PackageManagerType manager, String id, BrewPackageType packageType) {

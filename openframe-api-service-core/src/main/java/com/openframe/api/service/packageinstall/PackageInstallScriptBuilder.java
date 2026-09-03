@@ -14,23 +14,23 @@ public class PackageInstallScriptBuilder {
     // powershell -File exits 0 unless the script forwards the tool's exit code
     private static final String POWERSHELL_EXIT = "exit $LASTEXITCODE";
 
-    public PackageScript installScript(PackageDetails details, String version) {
+    public PackageScript buildInstallScript(PackageDetails details, String version) {
         return switch (details.getPackageManager()) {
             case BREW -> brewScript("install", details);
-            case CHOCO -> chocoScript(chocoInstallCommand(details, version));
-            case WINGET -> wingetScript(wingetInstallCommand(details, version));
+            case CHOCO -> chocoInstall(details, version);
+            case WINGET -> wingetInstall(details, version);
         };
     }
 
-    public PackageScript uninstallScript(PackageDetails details) {
+    public PackageScript buildUninstallScript(PackageDetails details) {
         return switch (details.getPackageManager()) {
             case BREW -> brewScript("uninstall", details);
-            case CHOCO -> chocoScript("choco uninstall '" + details.getId() + "' -y");
-            case WINGET -> wingetScript("winget uninstall -e --id '" + details.getId() + "' --silent");
+            case CHOCO -> chocoUninstall(details);
+            case WINGET -> wingetUninstall(details);
         };
     }
 
-    // brew refuses to run under root, so it executes as the console user
+    // brew refuses to run under root, so both actions execute as the console user
     private static PackageScript brewScript(String action, PackageDetails details) {
         String caskFlag = details.getPackageType() == BrewPackageType.CASK ? " --cask" : "";
         String code = BREW_PATH_EXPORT + "\n"
@@ -38,25 +38,35 @@ public class PackageInstallScriptBuilder {
         return new PackageScript(code, ScriptShell.BASH, PrivilegeLevel.USER);
     }
 
-    private static String chocoInstallCommand(PackageDetails details, String version) {
-        String versionFlag = version == null ? "" : " --version '" + version + "'";
-        return "choco install '" + details.getId() + "'" + versionFlag + " -y --no-progress";
+    private static PackageScript chocoInstall(PackageDetails details, String version) {
+        String command = "choco install '" + details.getId() + "'" + versionFlag(version) + " -y --no-progress";
+        return powershellScript(command, PrivilegeLevel.ADMIN);
     }
 
-    private static PackageScript chocoScript(String command) {
-        String code = command + "\n" + POWERSHELL_EXIT;
-        return new PackageScript(code, ScriptShell.POWERSHELL, PrivilegeLevel.ADMIN);
+    private static PackageScript chocoUninstall(PackageDetails details) {
+        String command = "choco uninstall '" + details.getId() + "' -y";
+        return powershellScript(command, PrivilegeLevel.ADMIN);
     }
 
-    private static String wingetInstallCommand(PackageDetails details, String version) {
-        String versionFlag = version == null ? "" : " --version '" + version + "'";
-        return "winget install -e --id '" + details.getId() + "'" + versionFlag
+    // winget is unavailable to the SYSTEM account, so both actions execute as the console user
+    private static PackageScript wingetInstall(PackageDetails details, String version) {
+        String command = "winget install -e --id '" + details.getId() + "'" + versionFlag(version)
                 + " --silent --accept-package-agreements --accept-source-agreements";
+        return powershellScript(command, PrivilegeLevel.USER);
     }
 
-    // winget is not available to the SYSTEM account, so it executes as the console user
-    private static PackageScript wingetScript(String command) {
+    // the source-agreement prompt can appear on any winget run, not only installs
+    private static PackageScript wingetUninstall(PackageDetails details) {
+        String command = "winget uninstall -e --id '" + details.getId() + "' --silent --accept-source-agreements";
+        return powershellScript(command, PrivilegeLevel.USER);
+    }
+
+    private static String versionFlag(String version) {
+        return version == null ? "" : " --version '" + version + "'";
+    }
+
+    private static PackageScript powershellScript(String command, PrivilegeLevel privilegeLevel) {
         String code = command + "\n" + POWERSHELL_EXIT;
-        return new PackageScript(code, ScriptShell.POWERSHELL, PrivilegeLevel.USER);
+        return new PackageScript(code, ScriptShell.POWERSHELL, privilegeLevel);
     }
 }
