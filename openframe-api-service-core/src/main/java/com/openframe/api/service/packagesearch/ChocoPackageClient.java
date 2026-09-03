@@ -79,8 +79,6 @@ public class ChocoPackageClient implements PackageManagerClient {
                 .body(String.class));
         List<ChocoEntry> entries = parseFeed(xml);
         boolean hasMore = entries.size() > limit;
-        // cut the page BEFORE ranking: re-ordering across the cut would swap content rows with
-        // the hasMore probe row, which is the first row of the next page — a duplicate
         List<ChocoEntry> page = entries.stream().limit(limit).toList();
         List<PackageSearchItem> items = rankAndMap(query, page);
         return PackageSearchResult.builder()
@@ -90,8 +88,6 @@ public class ChocoPackageClient implements PackageManagerClient {
                 .build();
     }
 
-    // the server picks the page contents by its text relevance; the order inside the delivered
-    // page is ours — match tier first, downloads within a tier, same semantics as brew/winget
     private List<PackageSearchItem> rankAndMap(String query, List<ChocoEntry> page) {
         String matcherQuery = query.toLowerCase(Locale.ROOT);
         return page.stream()
