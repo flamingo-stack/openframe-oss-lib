@@ -70,8 +70,10 @@ class WebSocketServiceSecurityDecoratorTest {
         RequestJwtClaimsReader jwtReader = mock(RequestJwtClaimsReader.class);
         GatewayTrafficMetrics metrics = mock(GatewayTrafficMetrics.class);
 
+        // Command filtering off: these cases cover the logging tap, not the allowlist.
         WebSocketServiceSecurityDecorator decorator =
-                new WebSocketServiceSecurityDecorator(defaultService, jwtReader, metrics, props);
+                new WebSocketServiceSecurityDecorator(defaultService, jwtReader, metrics, props,
+                        new MeshControlCommandProperties(), new com.fasterxml.jackson.databind.ObjectMapper());
 
         ServerWebExchange exchange = exchangeWithPath(requestPath);
         when(jwtReader.getSubject(exchange)).thenReturn(Optional.of("agent_x"));

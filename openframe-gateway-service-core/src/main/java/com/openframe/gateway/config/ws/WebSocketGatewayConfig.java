@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import com.openframe.gateway.tenant.NamespaceRewriteGatewayFilter;
 import lombok.RequiredArgsConstructor;
@@ -76,9 +77,15 @@ public class WebSocketGatewayConfig {
             RequestJwtClaimsReader requestJwtClaimsReader,
             WebSocketService defaultWebSocketService,
             GatewayTrafficMetrics gatewayTrafficMetrics,
-            WebSocketLoggingProperties webSocketLoggingProperties
+            WebSocketLoggingProperties webSocketLoggingProperties,
+            MeshControlCommandProperties meshControlCommandProperties,
+            ObjectMapper objectMapper
     ) {
-        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtClaimsReader, gatewayTrafficMetrics, webSocketLoggingProperties);
+        log.info("MeshCentral control command allowlist: enabled={} enforce={} actions={}",
+                meshControlCommandProperties.isEnabled(), meshControlCommandProperties.isEnforce(),
+                meshControlCommandProperties.getAllowedActions());
+        return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtClaimsReader,
+                gatewayTrafficMetrics, webSocketLoggingProperties, meshControlCommandProperties, objectMapper);
     }
 
 
