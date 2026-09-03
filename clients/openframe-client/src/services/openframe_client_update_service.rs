@@ -245,25 +245,23 @@ impl OpenFrameClientUpdateService {
         update_state.set_phase(UpdatePhase::Extracting);
         self.update_state_service.save(update_state).await?;
 
-        // 4. Save binary to a temp archive for the updater
-        // Note: The updater expects a ZIP, so we create one with the binary
+        // 4. Stage the extracted binary for the updater script
         update_state.set_phase(UpdatePhase::PreparingUpdater);
         self.update_state_service.save(update_state).await?;
 
-        let archive_path = match self
-            .create_temp_archive(&binary_bytes, &download_config.target_file_name)
+        let staged_path = match self
+            .stage_binary(&binary_bytes, &download_config.target_file_name)
             .await
         {
             Ok(path) => path,
             Err(e) => {
-                error!("Failed to create archive: {:#}", e);
-                // Clear update state - archive creation failed
+                error!("Failed to stage binary: {:#}", e);
                 self.update_state_service.clear().await?;
-                return Err(e.context("Failed to create temporary archive"));
+                return Err(e.context("Failed to stage update binary"));
             }
         };
 
-        info!("Temporary archive created: {}", archive_path.display());
+        info!("Update binary staged: {}", staged_path.display());
 
         // 5. Launch update process (platform-specific)
         update_state.set_phase(UpdatePhase::UpdaterLaunched);
@@ -273,7 +271,7 @@ impl OpenFrameClientUpdateService {
             std::env::current_exe().context("Failed to get current executable path")?;
 
         let params = UpdaterParams {
-            binary_path: archive_path.clone(),
+            binary_path: staged_path.clone(),
             target_exe: current_exe,
             service_name: FULL_SERVICE_NAME.to_string(),
             update_state_path: self.update_state_service.get_state_file_path(),
@@ -291,8 +289,11 @@ impl OpenFrameClientUpdateService {
 
         if self.tool_run_manager.any_tool_op_in_progress().await {
             warn!("Tool operation started during client download, deferring client update (will redeliver)");
-            if let Err(cleanup_err) = std::fs::remove_file(&archive_path) {
-                warn!("Failed to remove archive after deferring: {}", cleanup_err);
+            if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
+                warn!(
+                    "Failed to remove staged binary after deferring: {}",
+                    cleanup_err
+                );
             }
             self.update_state_service.clear().await?;
             return Err(anyhow!(
@@ -302,13 +303,12 @@ impl OpenFrameClientUpdateService {
 
         let launch_result = updater_launcher::launch_updater(params).await;
 
-        // If launch failed, cleanup archive and state
+        // If launch failed, cleanup staged binary and state
         if let Err(e) = launch_result {
             error!("Failed to launch updater: {:#}", e);
-            // Cleanup archive
-            if let Err(cleanup_err) = std::fs::remove_file(&archive_path) {
+            if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
                 warn!(
-                    "Failed to remove archive after launch failure: {}",
+                    "Failed to remove staged binary after launch failure: {}",
                     cleanup_err
                 );
             }
@@ -324,46 +324,28 @@ impl OpenFrameClientUpdateService {
         Ok(())
     }
 
-    /// Creates a temporary ZIP archive containing the binary for the updater script
-    #[cfg(windows)]
-    async fn create_temp_archive(&self, binary_bytes: &[u8], binary_name: &str) -> Result<PathBuf> {
-        use std::io::Write;
-        use zip::write::{FileOptions, ZipWriter};
-
-        let temp_dir = std::env::temp_dir();
-        let archive_path = temp_dir.join(format!("openframe-update-{}.zip", Uuid::new_v4()));
-
-        let file =
-            std::fs::File::create(&archive_path).context("Failed to create temporary ZIP file")?;
-
-        let mut zip = ZipWriter::new(file);
-        let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-
-        zip.start_file(binary_name, options)
-            .context("Failed to start file in ZIP")?;
-
-        zip.write_all(binary_bytes)
-            .context("Failed to write binary to ZIP")?;
-
-        zip.finish().context("Failed to finalize ZIP archive")?;
-
-        Ok(archive_path)
-    }
-
-    /// On Unix, we can directly write the binary (no ZIP needed)
-    #[cfg(unix)]
-    async fn create_temp_archive(&self, binary_bytes: &[u8], binary_name: &str) -> Result<PathBuf> {
+    /// Writes the extracted binary to a temp file (tmp + fsync + rename) for the updater script
+    async fn stage_binary(&self, binary_bytes: &[u8], binary_name: &str) -> Result<PathBuf> {
         let temp_dir = std::env::temp_dir();
         let binary_path = temp_dir.join(format!(
             "openframe-update-{}-{}",
             Uuid::new_v4(),
             binary_name
         ));
-
-        tokio::fs::write(&binary_path, binary_bytes)
+        let tmp_path = binary_path.with_extension("tmp");
+        let mut file = tokio::fs::File::create(&tmp_path)
             .await
-            .context("Failed to write binary file")?;
-
+            .context("Failed to create staged binary file")?;
+        tokio::io::AsyncWriteExt::write_all(&mut file, binary_bytes)
+            .await
+            .context("Failed to write staged binary")?;
+        file.sync_all()
+            .await
+            .context("Failed to flush staged binary")?;
+        drop(file);
+        tokio::fs::rename(&tmp_path, &binary_path)
+            .await
+            .context("Failed to finalize staged binary")?;
         Ok(binary_path)
     }
 

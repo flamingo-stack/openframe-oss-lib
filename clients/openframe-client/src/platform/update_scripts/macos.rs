@@ -147,12 +147,15 @@ fail_rollback() {
                 set_update_phase "rolled_back"
                 log "Rollback complete, service restarted"
             else
+                set_update_phase "failed"
                 log "Service did not come up after rollback"
             fi
         else
+            set_update_phase "failed"
             log "Failed to load service after rollback"
         fi
     else
+        set_update_phase "failed"
         log "All restore attempts failed"
         launchctl load "$PLIST_PATH" 2>/dev/null
     fi
@@ -170,6 +173,7 @@ fail_preswap() {
         exit 1
     fi
 
+    set_update_phase "failed"
     if ! service_loaded; then
         launchctl load "$PLIST_PATH" 2>/dev/null && log "Service restarted with the untouched binary"
     fi

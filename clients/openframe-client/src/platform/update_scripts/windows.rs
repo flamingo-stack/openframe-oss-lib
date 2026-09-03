@@ -1,8 +1,9 @@
-//! Windows PowerShell update script for self-update functionality
+//! Windows PowerShell self-update script: the Rust side extracts the binary, the script only stops, swaps, starts and verifies.
 
 pub const UPDATE_SCRIPT_WINDOWS: &str = r#"
+# Requires Windows PowerShell 3.0+ (ConvertFrom-Json, Get-Content -Raw); never use 5.0-only cmdlets such as New-Guid or Expand-Archive.
 param(
-    [string]$ArchivePath,
+    [string]$NewExePath,
     [string]$ServiceName,
     [string]$TargetExe,
     [string]$UpdateStatePath,
@@ -21,15 +22,20 @@ if ($TranscriptPath) {
 }
 
 $PrevPath = "$TargetExe.prev"
-$TempExtract = $null
 $SwapReached = $false
 
 function Set-UpdatePhase {
-    param([string]$Phase)
+    param([string]$Phase, [string]$Reason)
     if ($UpdateStatePath -and (Test-Path $UpdateStatePath)) {
         try {
             $stateContent = Get-Content -Path $UpdateStatePath -Raw | ConvertFrom-Json
             $stateContent.phase = $Phase
+            if ($Reason) {
+                # ASCII only: Set-Content writes the ANSI code page, which the Rust reader rejects as invalid UTF-8
+                $safeReason = ($Reason -replace '[^\x20-\x7E]', '?')
+                if ($safeReason.Length -gt 1000) { $safeReason = $safeReason.Substring(0, 1000) }
+                $stateContent | Add-Member -NotePropertyName last_error -NotePropertyValue "PowerShell $($PSVersionTable.PSVersion): $safeReason" -Force
+            }
             $stateTmp = "$UpdateStatePath.tmp"
             $stateContent | ConvertTo-Json -Depth 10 | Set-Content -Path $stateTmp -Force
             Move-Item -Path $stateTmp -Destination $UpdateStatePath -Force
@@ -38,6 +44,12 @@ function Set-UpdatePhase {
         catch {
             Write-Output "Failed to stamp update phase '$Phase': $_"
         }
+    }
+}
+
+function Remove-NewExe {
+    if ($NewExePath -and (Test-Path $NewExePath)) {
+        Remove-Item -Path $NewExePath -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -65,7 +77,7 @@ function Test-AgentUninstalled {
 }
 
 try {
-    Write-Output "Updater starting: target version '$TargetVersion', target exe '$TargetExe'"
+    Write-Output "Updater starting: target version '$TargetVersion', target exe '$TargetExe', PowerShell $($PSVersionTable.PSVersion)"
 
     if ($RollbackOnly) {
         $SwapReached = $true
@@ -73,16 +85,16 @@ try {
     }
 
     # Validate inputs
-    if (-not (Test-Path $ArchivePath)) {
-        throw "Archive file not found: $ArchivePath"
+    if (-not (Test-Path $NewExePath)) {
+        throw "New executable not found: $NewExePath"
     }
     if (-not (Test-Path $TargetExe)) {
         throw "Target executable not found: $TargetExe"
     }
 
-    $archiveSize = (Get-Item $ArchivePath).Length
-    if ($archiveSize -lt 100KB) {
-        throw "Archive too small ($archiveSize bytes), likely corrupted"
+    $newExeSize = (Get-Item $NewExePath).Length
+    if ($newExeSize -lt 100KB) {
+        throw "New executable too small ($newExeSize bytes), likely corrupted"
     }
 
     # Stop the service
@@ -109,26 +121,11 @@ try {
 
     Start-Sleep -Seconds 2
 
-    # Extract archive
-    $TempExtract = Join-Path $env:TEMP "openframe-update-$(New-Guid)"
-    Expand-Archive -Path $ArchivePath -DestinationPath $TempExtract -Force -ErrorAction Stop
-
-    # Find new executable
-    $NewExe = Get-ChildItem -Path $TempExtract -Filter "*.exe" -Recurse | Select-Object -First 1
-
-    if (-not $NewExe) {
-        throw "No executable found in archive"
-    }
-
-    if ($NewExe.Length -lt 100KB) {
-        throw "Extracted executable too small, likely corrupted"
-    }
-
     # Replace binary
     Move-Item -Path $TargetExe -Destination $PrevPath -Force -ErrorAction Stop
     $SwapReached = $true
 
-    Copy-Item -Path $NewExe.FullName -Destination $TargetExe -Force -ErrorAction Stop
+    Copy-Item -Path $NewExePath -Destination $TargetExe -Force -ErrorAction Stop
 
     if ($BootMarkerPath -and (Test-Path $BootMarkerPath)) {
         Remove-Item -Path $BootMarkerPath -Force -ErrorAction Stop
@@ -178,23 +175,17 @@ try {
 
     Set-UpdatePhase -Phase "verifying"
 
-    # Cleanup
-    Remove-Item -Path $ArchivePath -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path $TempExtract -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-NewExe
 
     exit 0
 }
 catch {
-    Write-Output "Updater failed: $_"
+    $failure = "$_"
+    Write-Output "Updater failed: $failure"
 
     if (Test-AgentUninstalled) {
         Write-Output "Update state file is gone (agent uninstalled mid-update) - standing down without touching the service"
-        if ($TempExtract -and (Test-Path $TempExtract)) {
-            Remove-Item -Path $TempExtract -Recurse -Force -ErrorAction SilentlyContinue
-        }
-        if ($ArchivePath -and (Test-Path $ArchivePath)) {
-            Remove-Item -Path $ArchivePath -Force -ErrorAction SilentlyContinue
-        }
+        Remove-NewExe
         exit 1
     }
 
@@ -242,6 +233,7 @@ catch {
         }
         catch {
             Write-Output "Rollback failed: $_"
+            Set-UpdatePhase -Phase "failed" -Reason "$failure; rollback failed: $_"
             try {
                 if ((Get-Service -Name $ServiceName -ErrorAction Stop).Status -ne 'Running') {
                     Start-Service -Name $ServiceName -ErrorAction Stop
@@ -255,6 +247,7 @@ catch {
     }
     else {
         Write-Output "Failure happened before the binary swap, no rollback needed"
+        Set-UpdatePhase -Phase "failed" -Reason $failure
         try {
             $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
             if ($service -and $service.Status -ne 'Running') {
@@ -267,13 +260,7 @@ catch {
         }
     }
 
-    # Cleanup temp files even on failure
-    if ($TempExtract -and (Test-Path $TempExtract)) {
-        Remove-Item -Path $TempExtract -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    if ($ArchivePath -and (Test-Path $ArchivePath)) {
-        Remove-Item -Path $ArchivePath -Force -ErrorAction SilentlyContinue
-    }
+    Remove-NewExe
 
     exit 1
 }

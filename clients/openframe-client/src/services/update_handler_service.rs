@@ -140,6 +140,17 @@ impl UpdateHandlerService {
                 );
                 Ok(())
             }
+            UpdatePhase::Failed => {
+                warn!(
+                    "Updater script reported failure for {} (running {}): {}",
+                    update_state.target_version,
+                    running_version,
+                    update_state.last_error.as_deref().unwrap_or(
+                        "no reason recorded, see the updater transcript in the logs directory"
+                    )
+                );
+                self.handle_failure(update_state).await
+            }
             _ => self.handle_failure(update_state).await,
         }
     }

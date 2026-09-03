@@ -10,6 +10,29 @@ fn windows_update_script_is_ascii() {
     );
 }
 
+// Server 2012 / 2012 R2 ship PowerShell 3.0 / 4.0; a 5.0-only cmdlet fails there before the swap.
+#[cfg(target_os = "windows")]
+#[test]
+fn windows_update_script_stays_powershell3_compatible() {
+    let script = super::windows::UPDATE_SCRIPT_WINDOWS;
+    for cmdlet in ["New-Guid", "Expand-Archive", "Compress-Archive"] {
+        assert!(
+            !script.contains(cmdlet),
+            "UPDATE_SCRIPT_WINDOWS must not use the PowerShell 5.0-only cmdlet {cmdlet}"
+        );
+    }
+    assert!(script.contains("# Requires Windows PowerShell 3.0+"));
+    assert!(script.contains("[string]$NewExePath,"));
+    assert!(script.contains("Set-UpdatePhase -Phase \"failed\" -Reason"));
+    assert!(script.contains("-NotePropertyName last_error"));
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn macos_update_script_stamps_failed_phase() {
+    assert!(super::macos::UPDATE_SCRIPT_MACOS.contains("set_update_phase \"failed\""));
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn macos_update_script_is_ascii() {
