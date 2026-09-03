@@ -387,6 +387,7 @@ impl Client {
             config_service.clone(),
             tool_run_manager.clone(),
             deactivation_service.clone(),
+            http_client.clone(),
         );
 
         // Initialize tool connection service
@@ -655,6 +656,8 @@ impl Client {
 
         // Connect to NATS
         self.nats_connection_manager.connect().await?;
+
+        self.nats_connection_manager.start_connection_watchdog();
 
         // Handle any pending update from previous run (after NATS is connected)
         if let Err(e) = self.update_handler_service.handle_pending_update().await {

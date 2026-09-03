@@ -69,14 +69,20 @@ impl OpenFrameClientUpdateListener {
     async fn listen(&self) -> Result<()> {
         info!("Run OpenFrame client update message listener");
         let machine_id = self.config_service.get_machine_id()?;
-        let reprovisioning = Arc::new(AtomicBool::new(false));
-
         loop {
+            let reprovisioning = Arc::new(AtomicBool::new(false));
+            let mut client_rx = self.nats_connection_manager.on_client_replaced();
             let client = self.nats_connection_manager.get_client().await?;
             let mut reconnect_rx = self.nats_connection_manager.subscribe_reconnect();
             let js = jetstream::new((*client).clone());
 
-            let consumer = self.create_consumer(&js, &machine_id).await;
+            let consumer = tokio::select! {
+                consumer = self.create_consumer(&js, &machine_id) => consumer,
+                _ = client_rx.changed() => {
+                    info!("NATS client replaced, rebinding OpenFrame client update consumer");
+                    continue;
+                }
+            };
 
             info!("Start listening for OpenFrame client update messages");
             let mut messages = consumer.messages().await?;
@@ -100,6 +106,10 @@ impl OpenFrameClientUpdateListener {
                             }
                         }
                     }
+                    _ = client_rx.changed() => {
+                        info!("NATS client replaced, rebinding OpenFrame client update consumer");
+                        break;
+                    }
                     _ = reconnect_rx.recv() => {
                         info!("NATS reconnected, re-provisioning OpenFrame client update consumer");
                         if !reprovisioning.swap(true, Ordering::SeqCst) {
@@ -107,8 +117,12 @@ impl OpenFrameClientUpdateListener {
                             let js = js.clone();
                             let machine_id = machine_id.clone();
                             let reprovisioning = reprovisioning.clone();
+                            let mut client_rx = client_rx.clone();
                             tokio::spawn(async move {
-                                listener.create_consumer(&js, &machine_id).await;
+                                tokio::select! {
+                                    _ = listener.create_consumer(&js, &machine_id) => {}
+                                    _ = client_rx.changed() => {}
+                                }
                                 reprovisioning.store(false, Ordering::SeqCst);
                             });
                         }
