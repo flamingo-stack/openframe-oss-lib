@@ -30,7 +30,6 @@ public class ChocoPackageClient implements PackageManagerClient {
             "The Chocolatey repository is temporarily unavailable. Please try again later.";
     private static final String FILTER_LATEST_VERSION = "IsLatestVersion";
     private static final String EMPTY_TARGET_FRAMEWORK = "''";
-    private static final String ORDER_BY_DOWNLOADS = "DownloadCount desc";
     private static final String ORDER_BY_PUBLISHED = "Published desc";
     private static final int SEARCH_ITEM_DESCRIPTION_LIMIT = 300;
     private static final int CACHE_MAX_SIZE = 2000;
@@ -94,7 +93,6 @@ public class ChocoPackageClient implements PackageManagerClient {
                 .queryParam("searchTerm", quotedQuery)
                 .queryParam("targetFramework", EMPTY_TARGET_FRAMEWORK)
                 .queryParam("includePrerelease", "false")
-                .queryParam("$orderby", ORDER_BY_DOWNLOADS)
                 .queryParam("$top", top)
                 .queryParam("$skip", skip)
                 .build();
