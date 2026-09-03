@@ -47,6 +47,11 @@ impl<M> Clone for ExecutionListener<M> {
     }
 }
 
+enum ListenExit {
+    ClientReplaced,
+    StreamEnded,
+}
+
 impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
     pub fn new(
         nats_connection_manager: NatsConnectionManager,
@@ -73,9 +78,13 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
             loop {
                 info!(kind = M::KIND, "Starting execution listener...");
                 match listener.listen().await {
-                    Ok(_) => warn!(
+                    Ok(ListenExit::ClientReplaced) => info!(
                         kind = M::KIND,
-                        "Execution listener exited normally (unexpected)"
+                        "NATS client replaced, resubscribing execution listener"
+                    ),
+                    Ok(ListenExit::StreamEnded) => warn!(
+                        kind = M::KIND,
+                        "Execution listener stream ended (unexpected)"
                     ),
                     Err(e) => error!(kind = M::KIND, "Execution listener error: {:#}", e),
                 }
@@ -90,7 +99,8 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
         Ok(handle)
     }
 
-    async fn listen(&self) -> Result<()> {
+    async fn listen(&self) -> Result<ListenExit> {
+        let mut client_rx = self.nats_connection_manager.on_client_replaced();
         let client = self.nats_connection_manager.get_client().await?;
         let machine_id = self.config_service.get_machine_id()?;
 
@@ -105,7 +115,7 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
         let queued = subscriber.inspect(|_| info!(kind = M::KIND, "Execution message received"));
 
         let listener = self.clone();
-        run_unbounded(queued, move |message| {
+        let run = run_unbounded(queued, move |message| {
             let listener = listener.clone();
             let machine_id = machine_id.clone();
             async move {
@@ -116,10 +126,14 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
                     );
                 }
             }
-        })
-        .await;
+        });
 
-        Ok(())
+        let exit = tokio::select! {
+            _ = run => ListenExit::StreamEnded,
+            _ = client_rx.changed() => ListenExit::ClientReplaced,
+        };
+
+        Ok(exit)
     }
 
     async fn handle_message(&self, message: Message, machine_id: &str) -> Result<()> {

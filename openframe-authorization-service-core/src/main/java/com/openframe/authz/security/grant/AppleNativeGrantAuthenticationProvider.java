@@ -3,6 +3,7 @@ package com.openframe.authz.security.grant;
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.sso.apple.AppleAuthorizationCodeClient;
+import com.openframe.authz.service.sso.apple.AppleTokenService;
 import com.openframe.authz.service.sso.apple.AppleNativeTokenVerifier;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
@@ -50,6 +51,7 @@ public class AppleNativeGrantAuthenticationProvider implements AuthenticationPro
 
     private final AppleNativeTokenVerifier tokenVerifier;
     private final AppleAuthorizationCodeClient codeClient;
+    private final AppleTokenService appleTokenService;
     private final SsoOidcUserService ssoOidcUserService;
     private final UserService userService;
     private final OAuth2AuthorizationService authorizationService;
@@ -57,12 +59,14 @@ public class AppleNativeGrantAuthenticationProvider implements AuthenticationPro
 
     public AppleNativeGrantAuthenticationProvider(AppleNativeTokenVerifier tokenVerifier,
                                                   AppleAuthorizationCodeClient codeClient,
+                                                  AppleTokenService appleTokenService,
                                                   SsoOidcUserService ssoOidcUserService,
                                                   UserService userService,
                                                   OAuth2AuthorizationService authorizationService,
                                                   OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) {
         this.tokenVerifier = tokenVerifier;
         this.codeClient = codeClient;
+        this.appleTokenService = appleTokenService;
         this.ssoOidcUserService = ssoOidcUserService;
         this.userService = userService;
         this.authorizationService = authorizationService;
@@ -87,7 +91,7 @@ public class AppleNativeGrantAuthenticationProvider implements AuthenticationPro
 
         Jwt identityToken = tokenVerifier.verify(request.getIdentityToken(), request.getNonce());
         String bundleId = identityToken.getAudience().get(0);
-        codeClient.redeemAndVerify(bundleId, request.getAuthorizationCode(), identityToken.getSubject(), tenantId);
+        String appleRefreshToken = codeClient.redeemAndVerify(bundleId, request.getAuthorizationCode(), identityToken.getSubject(), tenantId);
 
         String email = identityToken.getClaimAsString("email");
         if (email == null || email.isBlank()) {
@@ -98,6 +102,8 @@ public class AppleNativeGrantAuthenticationProvider implements AuthenticationPro
                 .resolveOrProvision(tenantId, APPLE, email, request.getFirstName(), request.getLastName())
                 .orElseThrow(() -> error(OAuth2ErrorCodes.INVALID_GRANT,
                         "No user for this Apple account in the tenant, and auto-provisioning is not enabled."));
+
+        appleTokenService.store(tenantId, user.getId(), bundleId, appleRefreshToken);
 
         if (OidcUserUtils.emailVerifiedClaimAllows(identityToken.getClaims())) {
             userService.markEmailVerified(user.getId());

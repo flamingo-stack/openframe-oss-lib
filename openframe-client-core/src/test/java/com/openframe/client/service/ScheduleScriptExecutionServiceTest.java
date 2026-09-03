@@ -1,5 +1,6 @@
 package com.openframe.client.service;
 
+import com.openframe.client.service.rmm.DeviceLocalScheduleService;
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.client.service.rmm.ScheduleScriptExecutionService;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
@@ -38,12 +39,13 @@ class ScheduleScriptExecutionServiceTest {
 
     @Mock private ScriptScheduleRepository scheduleRepository;
     @Mock private ScheduleFireDispatcher fireDispatcher;
+    @Mock private DeviceLocalScheduleService deviceLocalScheduleService;
 
     private ScheduleScriptExecutionService service;
 
     @BeforeEach
     void setUp() {
-        service = new ScheduleScriptExecutionService(scheduleRepository, fireDispatcher);
+        service = new ScheduleScriptExecutionService(scheduleRepository, fireDispatcher, deviceLocalScheduleService);
     }
 
     @Test
@@ -56,6 +58,7 @@ class ScheduleScriptExecutionServiceTest {
 
         verifyNoInteractions(fireDispatcher);
         verify(scheduleRepository, never()).save(any());
+        verify(deviceLocalScheduleService).runDueDeviceLocalSchedules(any());
     }
 
     @Test

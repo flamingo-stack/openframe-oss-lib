@@ -10,6 +10,8 @@ export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
   invalid?: boolean;
   /** Label text displayed above the textarea */
   label?: string;
+  /** Label scale forwarded to FieldWrapper ('large' = text-h4 for designs with body-scale field titles) */
+  labelVariant?: 'default' | 'large';
   /** Error message displayed below the textarea */
   error?: string;
   /** Element rendered at the right edge of the field (e.g. send icon). */
@@ -41,6 +43,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       className,
       invalid = false,
       label,
+      labelVariant,
       error,
       endIcon,
       endIconAsButton = false,
@@ -66,7 +69,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     // border/bg/hover all live on the textarea itself.
     if (!hasAdornment) {
       return (
-        <FieldWrapper label={label} error={error}>
+        <FieldWrapper label={label} labelVariant={labelVariant} error={error}>
           <textarea
             className={cn(
               'flex min-h-[96px] w-full rounded-[6px] border p-3',
@@ -214,7 +217,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     );
 
     return (
-      <FieldWrapper label={label} error={error}>
+      <FieldWrapper label={label} labelVariant={labelVariant} error={error}>
         {content}
       </FieldWrapper>
     );
