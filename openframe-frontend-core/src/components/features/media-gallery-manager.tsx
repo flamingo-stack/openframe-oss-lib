@@ -4,9 +4,10 @@ import { Upload, Image as ImageIcon, Video as VideoIcon, Trash2, Loader2, GripVe
 import type React from 'react';
 import { useState, useRef, useCallback } from 'react';
 import Image from '../../embed-shims/next-image';
+import { isVideoMedia } from '../../utils/media-type';
 import { Button, Card } from '../ui';
-import { Video } from './video';
 
+import { Video } from './video';
 export interface MediaItem {
   id?: string | number; // Optional for new items
   media_type: 'image' | 'video' | 'screenshot' | 'demo';
@@ -157,7 +158,7 @@ export function MediaGalleryManager({
 
           {/* Media Content */}
           <div className="relative aspect-video overflow-hidden rounded-lg bg-ods-bg">
-            {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
+            {isVideoMedia(mediaItem) || mediaItem.media_type === 'demo' ? (
               // <Video> SSOT (MuxPlayer) — plays Mux HLS + MP4 alike;
               // fit="cover" crops to the aspect-video cell.
               <Video kind="file" url={mediaItem.media_url} fit="cover" className="h-full w-full" />
@@ -175,7 +176,7 @@ export function MediaGalleryManager({
           {/* Media Info */}
           <div className="p-3">
             <div className="mb-1 flex items-center gap-2">
-              {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
+              {isVideoMedia(mediaItem) || mediaItem.media_type === 'demo' ? (
                 <VideoIcon className="h-4 w-4 text-ods-text-secondary" />
               ) : (
                 <ImageIcon className="h-4 w-4 text-ods-text-secondary" />

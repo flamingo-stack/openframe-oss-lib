@@ -1,8 +1,8 @@
 // Vendor media utilities for UI kit
 // Real implementation copied from main project
 
+import { isImageMedia, isVideoMedia } from './media-type';
 import { fixSupabaseStorageUrl } from './url-fix';
-
 export interface VendorMedia {
   media_type: 'logo' | 'image' | 'video';
   media_url: string;
@@ -44,7 +44,7 @@ export function getVendorLogo(vendor: VendorWithMedia): string | null {
  * Get the main image URL from vendor_media array
  */
 export function getVendorImage(vendor: VendorWithMedia): string | null {
-  const imageMedia = vendor.vendor_media?.find(m => m.media_type === 'image');
+  const imageMedia = vendor.vendor_media?.find(m => isImageMedia(m));
   return imageMedia?.media_url ? fixSupabaseStorageUrl(imageMedia.media_url) : null;
 }
 
@@ -52,7 +52,7 @@ export function getVendorImage(vendor: VendorWithMedia): string | null {
  * Get the video URL from vendor_media array
  */
 export function getVendorVideo(vendor: VendorWithMedia): string | null {
-  const videoMedia = vendor.vendor_media?.find(m => m.media_type === 'video');
+  const videoMedia = vendor.vendor_media?.find(m => isVideoMedia(m));
   return videoMedia?.media_url ? fixSupabaseStorageUrl(videoMedia.media_url) : null;
 }
 
@@ -75,8 +75,8 @@ export function getVendorMediaGrouped(vendor: VendorWithMedia): {
 
   return {
     logos: media.filter(m => m.media_type === 'logo').map(m => fixSupabaseStorageUrl(m.media_url)),
-    images: media.filter(m => m.media_type === 'image').map(m => fixSupabaseStorageUrl(m.media_url)),
-    videos: media.filter(m => m.media_type === 'video').map(m => fixSupabaseStorageUrl(m.media_url)),
+    images: media.filter(m => isImageMedia(m)).map(m => fixSupabaseStorageUrl(m.media_url)),
+    videos: media.filter(m => isVideoMedia(m)).map(m => fixSupabaseStorageUrl(m.media_url)),
   };
 }
 
@@ -115,8 +115,8 @@ export function getVendorMediaCount(vendor: VendorWithMedia): {
   const media = vendor.vendor_media || [];
 
   const logos = media.filter(m => m.media_type === 'logo').length;
-  const images = media.filter(m => m.media_type === 'image').length;
-  const videos = media.filter(m => m.media_type === 'video').length;
+  const images = media.filter(m => isImageMedia(m)).length;
+  const videos = media.filter(m => isVideoMedia(m)).length;
 
   return {
     logos,
