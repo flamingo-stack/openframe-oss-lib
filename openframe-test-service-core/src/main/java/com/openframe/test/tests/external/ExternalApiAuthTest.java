@@ -26,10 +26,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Security permits it and {@code ApiKeyAuthenticationFilter} is the sole authority. It had no test
  * coverage before this suite.
  */
-@Tag("saas")
 @Tag("external-api")
 @EnabledIf(ExternalApiBaseTest.EXTERNAL_API_KEY_CONDITION)
-@DisplayName("External API - Authentication")
+@DisplayName("ExtApi: External API - Authentication")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Slf4j
 public class ExternalApiAuthTest extends ExternalApiBaseTest {
@@ -48,7 +47,7 @@ public class ExternalApiAuthTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(1)
     @Test
-    @DisplayName("Valid API key is accepted")
+    @DisplayName("ExtApi: Valid API key is accepted")
     public void testValidKeyIsAccepted() {
         Response response = given(getExternalApiSpec()).get(PROBE_ENDPOINT);
         assertThat(response.getStatusCode())
@@ -60,7 +59,7 @@ public class ExternalApiAuthTest extends ExternalApiBaseTest {
     @Tag("injection")
     @Order(2)
     @Test
-    @DisplayName("Request without an API key is rejected")
+    @DisplayName("ExtApi: Request without an API key is rejected")
     public void testMissingKeyIsRejected() {
         ExternalErrorResponse error = given(getExternalApiSpecNoKey())
                 .get(PROBE_ENDPOINT)
@@ -76,7 +75,7 @@ public class ExternalApiAuthTest extends ExternalApiBaseTest {
     @Tag("injection")
     @Order(3)
     @Test
-    @DisplayName("Malformed API key is rejected")
+    @DisplayName("ExtApi: Malformed API key is rejected")
     public void testMalformedKeyIsRejected() {
         ExternalErrorResponse error = attemptWithKey("not-a-key", 401);
         assertThat(error.getCode()).as("Error code for a malformed key").isEqualTo(UNAUTHORIZED);
@@ -86,7 +85,7 @@ public class ExternalApiAuthTest extends ExternalApiBaseTest {
     @Tag("injection")
     @Order(4)
     @Test
-    @DisplayName("Well-formed but unknown API key is rejected")
+    @DisplayName("ExtApi: Well-formed but unknown API key is rejected")
     public void testUnknownKeyIsRejected() {
         // Correct ak_/sk_ shape and length, so this gets past format validation and is rejected on lookup
         // rather than on parsing — a different branch of the filter from the malformed case above.
@@ -99,7 +98,7 @@ public class ExternalApiAuthTest extends ExternalApiBaseTest {
     @Tag("injection")
     @Order(5)
     @Test
-    @DisplayName("Empty API key header is rejected")
+    @DisplayName("ExtApi: Empty API key header is rejected")
     public void testEmptyKeyIsRejected() {
         ExternalErrorResponse error = attemptWithKey("", 401);
         assertThat(error.getCode()).as("Error code for an empty key").isEqualTo(UNAUTHORIZED);
@@ -109,7 +108,7 @@ public class ExternalApiAuthTest extends ExternalApiBaseTest {
     @Tag("safety")
     @Order(6)
     @Test
-    @DisplayName("Spoofed X-User-Id header does not bypass the gateway")
+    @DisplayName("ExtApi: Spoofed X-User-Id header does not bypass the gateway")
     public void testSpoofedUserIdHeaderIsIgnored() {
         // The gateway derives X-User-Id from the validated key and overwrites whatever the caller sent.
         // A client-supplied value must never be trusted; if this ever starts returning 200 for a request
@@ -128,7 +127,7 @@ public class ExternalApiAuthTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(7)
     @Test
-    @DisplayName("Rate limit headers are present and consistent")
+    @DisplayName("ExtApi: Rate limit headers are present and consistent")
     public void testRateLimitHeadersArePresent() {
         Response response = given(getExternalApiSpec()).get(PROBE_ENDPOINT);
         assertThat(response.getStatusCode()).as("Probe request should succeed").isEqualTo(200);

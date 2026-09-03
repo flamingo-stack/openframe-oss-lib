@@ -28,10 +28,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * the original value, and the status case is <b>excluded from the default run</b> — see
  * {@link #testUpdateDeviceStatus()}.
  */
-@Tag("saas")
 @Tag("external-api")
 @EnabledIf(ExternalApiBaseTest.EXTERNAL_API_KEY_CONDITION)
-@DisplayName("External API - Devices")
+@DisplayName("ExtApi: External API - Devices")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Slf4j
 public class ExternalDevicesTest extends ExternalApiBaseTest {
@@ -43,7 +42,7 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
     @Tag("device")
     @Order(1)
     @Test
-    @DisplayName("List devices")
+    @DisplayName("ExtApi: List devices")
     public void testListDevices() {
         DevicesResponse response = ExternalDeviceApi.listDevices(Map.of("limit", 10));
 
@@ -63,7 +62,7 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
     @Tag("device")
     @Order(2)
     @Test
-    @DisplayName("List devices with tags included")
+    @DisplayName("ExtApi: List devices with tags included")
     public void testListDevicesWithTags() {
         List<DeviceResponse> devices = ExternalDeviceApi
                 .listDevices(Map.of("limit", 5, "includeTags", true)).getDevices();
@@ -79,7 +78,7 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
     @Tag("device")
     @Order(3)
     @Test
-    @DisplayName("Get device filter options")
+    @DisplayName("ExtApi: Get device filter options")
     public void testGetDeviceFilters() {
         DeviceFilterResponse filters = ExternalDeviceApi.getFilters();
 
@@ -99,7 +98,7 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
     @Tag("device")
     @Order(4)
     @Test
-    @DisplayName("Get device by machine ID")
+    @DisplayName("ExtApi: Get device by machine ID")
     public void testGetDeviceByMachineId() {
         DeviceResponse listed = firstDevice();
         DeviceResponse fetched = ExternalDeviceApi.getDevice(listed.getMachineId());
@@ -130,7 +129,7 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
     @Tag("device")
     @Order(5)
     @Test
-    @DisplayName("Get device returns 404 for an unknown machine ID")
+    @DisplayName("ExtApi: Get device returns 404 for an unknown machine ID")
     public void testGetUnknownDevice() {
         ExternalErrorResponse error = ExternalDeviceApi.attemptGetDevice(UNKNOWN_MACHINE_ID, 404);
         assertThat(error.getCode()).as("Unknown device should report an error code").isNotNull();
@@ -141,7 +140,7 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
     @Tag("device")
     @Order(6)
     @Test
-    @DisplayName("Filter devices by an advertised status")
+    @DisplayName("ExtApi: Filter devices by an advertised status")
     public void testFilterDevicesByStatus() {
         DeviceFilterResponse filters = ExternalDeviceApi.getFilters();
         if (filters.getStatuses() == null || filters.getStatuses().isEmpty()) {
@@ -163,7 +162,7 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
     @Tag("device")
     @Order(7)
     @Test
-    @DisplayName("Update and restore device nickname")
+    @DisplayName("ExtApi: Update and restore device nickname")
     public void testUpdateDeviceNickname() {
         DeviceResponse device = firstDevice();
         String machineId = device.getMachineId();
@@ -197,7 +196,7 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
     @Tag("device")
     @Order(8)
     @Test
-    @DisplayName("Update device status (destructive; opt-in)")
+    @DisplayName("ExtApi: Update device status (destructive; opt-in)")
     public void testUpdateDeviceStatus() {
         List<DeviceResponse> archived = ExternalDeviceApi
                 .listDevices(Map.of("statuses", "ARCHIVED", "limit", 1)).getDevices();

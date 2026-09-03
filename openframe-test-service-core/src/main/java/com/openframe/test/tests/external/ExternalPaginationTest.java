@@ -33,10 +33,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * of 20, plus an opaque cursor — so the boundary cases belong in one place. Each is checked against
  * every collection because they are four independent controllers, not one shared implementation.
  */
-@Tag("saas")
 @Tag("external-api")
 @EnabledIf(ExternalApiBaseTest.EXTERNAL_API_KEY_CONDITION)
-@DisplayName("External API - Pagination")
+@DisplayName("ExtApi: External API - Pagination")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Slf4j
 public class ExternalPaginationTest extends ExternalApiBaseTest {
@@ -55,7 +54,7 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(1)
     @Test
-    @DisplayName("limit below the minimum is rejected")
+    @DisplayName("ExtApi: limit below the minimum is rejected")
     public void testLimitBelowMinimumIsRejected() {
         PAGINATED.forEach((name, call) -> {
             Response response = call.apply(Map.of("limit", 0));
@@ -69,7 +68,7 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(2)
     @Test
-    @DisplayName("limit above the maximum is rejected")
+    @DisplayName("ExtApi: limit above the maximum is rejected")
     public void testLimitAboveMaximumIsRejected() {
         PAGINATED.forEach((name, call) -> {
             Response response = call.apply(Map.of("limit", MAX_LIMIT + 1));
@@ -84,7 +83,7 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(3)
     @Test
-    @DisplayName("limit at the boundaries is accepted")
+    @DisplayName("ExtApi: limit at the boundaries is accepted")
     public void testLimitBoundariesAreAccepted() {
         PAGINATED.forEach((name, call) -> {
             assertThat(call.apply(Map.of("limit", 1)).getStatusCode())
@@ -100,7 +99,7 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(4)
     @Test
-    @DisplayName("Page size is honoured")
+    @DisplayName("ExtApi: Page size is honoured")
     public void testPageSizeIsHonoured() {
         CustomersResponse page = ExternalCustomerApi.listCustomers(Map.of("limit", 1));
 
@@ -113,7 +112,7 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(5)
     @Test
-    @DisplayName("Cursor advances to a disjoint page")
+    @DisplayName("ExtApi: Cursor advances to a disjoint page")
     public void testCursorAdvancesToNextPage() {
         CustomersResponse first = ExternalCustomerApi.listCustomers(Map.of("limit", 1));
         PageInfo pageInfo = first.getPageInfo();
@@ -141,7 +140,7 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(6)
     @Test
-    @DisplayName("Malformed cursor is rejected")
+    @DisplayName("ExtApi: Malformed cursor is rejected")
     public void testMalformedCursorIsRejected() {
         Response response = ExternalCustomerApi
                 .listCustomersRaw(Map.of("limit", 2, "cursor", "not-a-valid-cursor"));
@@ -159,7 +158,7 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(7)
     @Test
-    @DisplayName("Cursor pointing past the end returns an empty page")
+    @DisplayName("ExtApi: Cursor pointing past the end returns an empty page")
     public void testCursorPastEndReturnsEmptyPage() {
         // A well-formed cursor (base64 of an id) that no row can follow. Unlike the malformed case
         // above, this one behaves correctly: an empty page that reports a previous page.

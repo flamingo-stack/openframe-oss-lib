@@ -196,11 +196,14 @@
           Same mechanics as ai-test below: these tests live in src/main/java, so surefire is pointed at
           the main output dir and restricted to the tests/external package.
 
-          Requires TEST_EXTERNAL_API_KEY in addition to the usual suite env; without it every case in
-          the package reports as skipped rather than failing.
+          Needs no credential of its own: the suite mints an API key over POST /api/api-keys as the
+          admin user in the usual suite env, and deletes it again when the run ends. Set
+          TEST_EXTERNAL_API_KEY only to pin a specific pre-existing key; one supplied that way is used
+          as-is and never deleted. With no admin credentials at all every case reports as skipped rather
+          than failing.
 
-          Note the suite is paced against the gateway's per-key rate limit (5 req/min on the QA key), so
-          a full run is dominated by that wait, not by the API. See RateLimitRetryFilter.
+          Note the suite paces itself to whatever per-minute rate limit the gateway advertises for the key,
+          so a full run can be dominated by that wait rather than by the API. See RateLimitRetryFilter.
 
           Usage:
             mvn test -Pexternal-api-test                                   # whole suite

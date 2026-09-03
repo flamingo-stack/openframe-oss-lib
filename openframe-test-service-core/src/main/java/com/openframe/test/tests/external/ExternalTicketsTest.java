@@ -39,10 +39,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>There is no delete on this API. {@link #cleanup()} transitions what it created into the archived
  * status instead — the strongest cleanup available.
  */
-@Tag("saas")
 @Tag("external-api")
 @EnabledIf(ExternalApiBaseTest.EXTERNAL_API_KEY_CONDITION)
-@DisplayName("External API - Tickets")
+@DisplayName("ExtApi: External API - Tickets")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Slf4j
 public class ExternalTicketsTest extends ExternalApiBaseTest {
@@ -76,7 +75,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("create")
     @Order(1)
     @Test
-    @DisplayName("Create ticket")
+    @DisplayName("ExtApi: Create ticket")
     public void testCreateTicket() {
         CreateTicketRequest request = ExternalTicketGenerator.createTicketRequest();
         created = ExternalTicketApi.createTicket(request);
@@ -96,7 +95,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(2)
     @Test
-    @DisplayName("Get ticket by ID")
+    @DisplayName("ExtApi: Get ticket by ID")
     public void testGetTicket() {
         TicketResponse fetched = ExternalTicketApi.getTicket(created.getId());
 
@@ -112,7 +111,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(3)
     @Test
-    @DisplayName("Created ticket appears in the list")
+    @DisplayName("ExtApi: Created ticket appears in the list")
     public void testCreatedTicketIsListed() {
         TicketsResponse response = ExternalTicketApi
                 .listTickets(Map.of("search", created.getTitle(), "limit", 20));
@@ -126,7 +125,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("update")
     @Order(4)
     @Test
-    @DisplayName("Update ticket")
+    @DisplayName("ExtApi: Update ticket")
     public void testUpdateTicket() {
         UpdateTicketRequest request = ExternalTicketGenerator.updateTicketRequest();
         TicketResponse updated = ExternalTicketApi.updateTicket(created.getId(), request);
@@ -147,7 +146,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(5)
     @Test
-    @DisplayName("Get ticket statuses")
+    @DisplayName("ExtApi: Get ticket statuses")
     public void testGetStatuses() {
         List<TicketStatusResponse> statuses = ExternalTicketApi.getStatuses();
 
@@ -165,7 +164,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(6)
     @Test
-    @DisplayName("Get ticket tags")
+    @DisplayName("ExtApi: Get ticket tags")
     public void testGetTags() {
         List<TicketTagResponse> tags = ExternalTicketApi.getTags();
 
@@ -180,7 +179,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(7)
     @Test
-    @DisplayName("Get ticket filter options")
+    @DisplayName("ExtApi: Get ticket filter options")
     public void testGetFilters() {
         TicketFiltersResponse filters = ExternalTicketApi.getFilters();
 
@@ -195,7 +194,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(8)
     @Test
-    @DisplayName("Get ticket statistics")
+    @DisplayName("ExtApi: Get ticket statistics")
     public void testGetStatistics() {
         TicketStatisticsResponse statistics = ExternalTicketApi.getStatistics();
 
@@ -222,7 +221,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("update")
     @Order(9)
     @Test
-    @DisplayName("Add and remove a tag")
+    @DisplayName("ExtApi: Add and remove a tag")
     public void testAddAndRemoveTag() {
         List<TicketTagResponse> tags = ExternalTicketApi.getTags();
         if (tags.isEmpty()) {
@@ -246,7 +245,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("update")
     @Order(10)
     @Test
-    @DisplayName("Assign and unassign a ticket")
+    @DisplayName("ExtApi: Assign and unassign a ticket")
     public void testAssignAndUnassign() {
         List<TicketFilterOptionResponse> assignees = ExternalTicketApi.getFilters().getAssigneeIds();
         if (assignees == null || assignees.isEmpty()) {
@@ -268,7 +267,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("create")
     @Order(11)
     @Test
-    @DisplayName("Add an internal note")
+    @DisplayName("ExtApi: Add an internal note")
     public void testAddNote() {
         String content = noteContent();
         note = ExternalTicketApi.addNote(created.getId(), content);
@@ -287,7 +286,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("update")
     @Order(12)
     @Test
-    @DisplayName("Update a note")
+    @DisplayName("ExtApi: Update a note")
     public void testUpdateNote() {
         String content = noteContent();
         TicketNoteResponse updated = ExternalTicketApi.updateNote(created.getId(), note.getId(), content);
@@ -300,7 +299,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(13)
     @Test
-    @DisplayName("Note is visible on the ticket")
+    @DisplayName("ExtApi: Note is visible on the ticket")
     public void testNoteIsOnTicket() {
         assertThat(ExternalTicketApi.getTicket(created.getId()).getNotes())
                 .as("The added note should appear on the ticket")
@@ -311,7 +310,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("delete")
     @Order(14)
     @Test
-    @DisplayName("Delete a note")
+    @DisplayName("ExtApi: Delete a note")
     public void testDeleteNote() {
         ExternalTicketApi.deleteNote(created.getId(), note.getId());
 
@@ -326,7 +325,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("update")
     @Order(15)
     @Test
-    @DisplayName("Transition ticket to another status")
+    @DisplayName("ExtApi: Transition ticket to another status")
     public void testTransitionTicket() {
         TicketResponse current = ExternalTicketApi.getTicket(created.getId());
         List<TicketStatusResponse> available = current.getAvailableTransitions();
@@ -353,7 +352,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("update")
     @Order(16)
     @Test
-    @DisplayName("Unlink device and customer")
+    @DisplayName("ExtApi: Unlink device and customer")
     public void testUnlinkDeviceAndCustomer() {
         TicketResponse withoutDevice = ExternalTicketApi.unlinkDevice(created.getId());
         assertThat(withoutDevice.getDeviceId()).as("Device should be unlinked from the ticket").isNull();
@@ -371,7 +370,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(17)
     @Test
-    @DisplayName("Get ticket returns 404 for an unknown ID")
+    @DisplayName("ExtApi: Get ticket returns 404 for an unknown ID")
     public void testGetUnknownTicket() {
         ExternalErrorResponse error = ExternalTicketApi.attemptGetTicket(UNKNOWN_ID, 404);
         assertThat(error.getCode()).as("Unknown ticket should report an error code").isNotNull();
@@ -381,7 +380,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("create")
     @Order(18)
     @Test
-    @DisplayName("Create ticket rejects a missing title")
+    @DisplayName("ExtApi: Create ticket rejects a missing title")
     public void testCreateTicketRequiresTitle() {
         CreateTicketRequest request = ExternalTicketGenerator.createTicketRequest();
         request.setTitle(null);
@@ -394,7 +393,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
     @Tag("create")
     @Order(19)
     @Test
-    @DisplayName("Create ticket rejects an over-long title")
+    @DisplayName("ExtApi: Create ticket rejects an over-long title")
     public void testCreateTicketRejectsOverlongTitle() {
         CreateTicketRequest request = ExternalTicketGenerator.createTicketRequest();
         request.setTitle(ExternalTicketGenerator.overlongTitle());

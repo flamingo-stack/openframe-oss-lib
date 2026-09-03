@@ -19,10 +19,9 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** {@code /api/v1/tools} — the integrated-tool registry. Read-only and unpaginated. */
-@Tag("saas")
 @Tag("external-api")
 @EnabledIf(ExternalApiBaseTest.EXTERNAL_API_KEY_CONDITION)
-@DisplayName("External API - Tools")
+@DisplayName("ExtApi: External API - Tools")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Slf4j
 public class ExternalToolsTest extends ExternalApiBaseTest {
@@ -31,7 +30,7 @@ public class ExternalToolsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(1)
     @Test
-    @DisplayName("List integrated tools")
+    @DisplayName("ExtApi: List integrated tools")
     public void testListTools() {
         ToolsResponse response = ExternalToolApi.listTools();
 
@@ -47,7 +46,7 @@ public class ExternalToolsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(2)
     @Test
-    @DisplayName("Get tool filter options")
+    @DisplayName("ExtApi: Get tool filter options")
     public void testGetToolFilters() {
         ToolFilterResponse filters = ExternalToolApi.getFilters();
 
@@ -64,7 +63,7 @@ public class ExternalToolsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(3)
     @Test
-    @DisplayName("Filter tools by enabled flag")
+    @DisplayName("ExtApi: Filter tools by enabled flag")
     public void testFilterToolsByEnabled() {
         List<ToolResponse> enabled = ExternalToolApi.listTools(Map.of("enabled", true)).getTools();
 
@@ -77,7 +76,7 @@ public class ExternalToolsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(4)
     @Test
-    @DisplayName("Filter tools by a value taken from the filter options")
+    @DisplayName("ExtApi: Filter tools by a value taken from the filter options")
     public void testFilterToolsByAdvertisedCategory() {
         ToolFilterResponse filters = ExternalToolApi.getFilters();
         List<String> categories = filters.getCategories();

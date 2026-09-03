@@ -27,10 +27,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Backed by Pinot rather than Mongo, so these are the only External API reads that can legitimately
  * return {@code 503 PINOT_QUERY_ERROR}. Cases tolerate an empty tenant but not a malformed response.
  */
-@Tag("saas")
 @Tag("external-api")
 @EnabledIf(ExternalApiBaseTest.EXTERNAL_API_KEY_CONDITION)
-@DisplayName("External API - Logs")
+@DisplayName("ExtApi: External API - Logs")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Slf4j
 public class ExternalLogsTest extends ExternalApiBaseTest {
@@ -39,7 +38,7 @@ public class ExternalLogsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(1)
     @Test
-    @DisplayName("List logs")
+    @DisplayName("ExtApi: List logs")
     public void testListLogs() {
         LogsResponse response = ExternalLogApi.listLogs(Map.of("limit", 10));
 
@@ -59,7 +58,7 @@ public class ExternalLogsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(2)
     @Test
-    @DisplayName("Get log filter options")
+    @DisplayName("ExtApi: Get log filter options")
     public void testGetLogFilters() {
         LogFilterResponse filters = ExternalLogApi.getFilters();
 
@@ -79,7 +78,7 @@ public class ExternalLogsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(3)
     @Test
-    @DisplayName("Filter logs by an advertised severity")
+    @DisplayName("ExtApi: Filter logs by an advertised severity")
     public void testFilterLogsBySeverity() {
         List<String> severities = ExternalLogApi.getFilters().getSeverities();
         if (severities == null || severities.isEmpty()) {
@@ -100,7 +99,7 @@ public class ExternalLogsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(4)
     @Test
-    @DisplayName("Get log details for a listed log")
+    @DisplayName("ExtApi: Get log details for a listed log")
     public void testGetLogDetails() {
         List<LogResponse> logs = ExternalLogApi.listLogs(Map.of("limit", 1)).getLogs();
         if (logs.isEmpty()) {
@@ -129,7 +128,7 @@ public class ExternalLogsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(5)
     @Test
-    @DisplayName("Log details rejects a request missing a required parameter")
+    @DisplayName("ExtApi: Log details rejects a request missing a required parameter")
     public void testGetLogDetailsRequiresAllParams() {
         List<LogResponse> logs = ExternalLogApi.listLogs(Map.of("limit", 1)).getLogs();
         if (logs.isEmpty()) {
@@ -152,7 +151,7 @@ public class ExternalLogsTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(6)
     @Test
-    @DisplayName("Log details returns 404 for an unknown event")
+    @DisplayName("ExtApi: Log details returns 404 for an unknown event")
     public void testGetLogDetailsUnknownEvent() {
         List<LogResponse> logs = ExternalLogApi.listLogs(Map.of("limit", 1)).getLogs();
         if (logs.isEmpty()) {

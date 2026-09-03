@@ -37,10 +37,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * suite never touches a record it did not make. {@link #cleanup()} archives anything left over if a
  * case fails partway.
  */
-@Tag("saas")
 @Tag("external-api")
 @EnabledIf(ExternalApiBaseTest.EXTERNAL_API_KEY_CONDITION)
-@DisplayName("External API - Customers")
+@DisplayName("ExtApi: External API - Customers")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Slf4j
 public class ExternalCustomersTest extends ExternalApiBaseTest {
@@ -80,7 +79,7 @@ public class ExternalCustomersTest extends ExternalApiBaseTest {
     @Tag("create")
     @Order(1)
     @Test
-    @DisplayName("Create customer")
+    @DisplayName("ExtApi: Create customer")
     public void testCreateCustomer() {
         CreateCustomerRequest request = ExternalCustomerGenerator.createCustomerRequest(true);
         created = trackCustomer(ExternalCustomerApi.createCustomer(request));
@@ -105,7 +104,7 @@ public class ExternalCustomersTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(2)
     @Test
-    @DisplayName("Get customer by ID")
+    @DisplayName("ExtApi: Get customer by ID")
     public void testGetCustomerById() {
         CustomerResponse fetched = ExternalCustomerApi.getCustomer(fixture().getId());
 
@@ -122,7 +121,7 @@ public class ExternalCustomersTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(3)
     @Test
-    @DisplayName("Created customer appears in the list")
+    @DisplayName("ExtApi: Created customer appears in the list")
     public void testCreatedCustomerIsListed() {
         CustomersResponse response = ExternalCustomerApi
                 .listCustomers(Map.of("search", fixture().getName(), "limit", 20));
@@ -137,7 +136,7 @@ public class ExternalCustomersTest extends ExternalApiBaseTest {
     @Tag("update")
     @Order(4)
     @Test
-    @DisplayName("Update customer")
+    @DisplayName("ExtApi: Update customer")
     public void testUpdateCustomer() {
         UpdateCustomerRequest request = ExternalCustomerGenerator.updateCustomerRequest(false);
         CustomerResponse updated = ExternalCustomerApi.updateCustomer(fixture().getId(), request);
@@ -156,7 +155,7 @@ public class ExternalCustomersTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(5)
     @Test
-    @DisplayName("Customer with no devices can be archived")
+    @DisplayName("ExtApi: Customer with no devices can be archived")
     public void testCanArchive() {
         // Nothing has ever been installed for this customer, so the answer must be yes. This is the
         // precondition the archive case below depends on.
@@ -169,7 +168,7 @@ public class ExternalCustomersTest extends ExternalApiBaseTest {
     @Tag("archive")
     @Order(6)
     @Test
-    @DisplayName("Archive customer")
+    @DisplayName("ExtApi: Archive customer")
     public void testArchiveCustomer() {
         ExternalCustomerApi.updateStatus(fixture().getId(), STATUS_ARCHIVED);
 
@@ -181,7 +180,7 @@ public class ExternalCustomersTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(7)
     @Test
-    @DisplayName("Archived customer is excluded from the active list")
+    @DisplayName("ExtApi: Archived customer is excluded from the active list")
     public void testArchivedCustomerIsNotActive() {
         CustomersResponse active = ExternalCustomerApi
                 .listCustomers(Map.of("status", STATUS_ACTIVE, "search", fixture().getName(), "limit", 20));
@@ -195,7 +194,7 @@ public class ExternalCustomersTest extends ExternalApiBaseTest {
     @Tag("update")
     @Order(8)
     @Test
-    @DisplayName("Archiving is reversible")
+    @DisplayName("ExtApi: Archiving is reversible")
     public void testUnarchiveCustomer() {
         // Worth asserting explicitly: archive being reversible is what makes it a safe cleanup action
         // for this suite, and what distinguishes it from the device status endpoint.
@@ -209,7 +208,7 @@ public class ExternalCustomersTest extends ExternalApiBaseTest {
     @Tag("read")
     @Order(9)
     @Test
-    @DisplayName("Get customer returns 404 for an unknown ID")
+    @DisplayName("ExtApi: Get customer returns 404 for an unknown ID")
     public void testGetUnknownCustomer() {
         ExternalErrorResponse error = ExternalCustomerApi.attemptGetCustomer(UNKNOWN_ID, 404);
         assertThat(error.getCode()).as("Unknown customer should report an error code").isNotNull();
@@ -219,7 +218,7 @@ public class ExternalCustomersTest extends ExternalApiBaseTest {
     @Tag("create")
     @Order(10)
     @Test
-    @DisplayName("Create customer rejects a missing name")
+    @DisplayName("ExtApi: Create customer rejects a missing name")
     public void testCreateCustomerRequiresName() {
         CreateCustomerRequest request = ExternalCustomerGenerator.createCustomerRequest(true);
         request.setName(null);
