@@ -1,3 +1,4 @@
+export * from './account-details-fields';
 export * from './auth-benefits-panel';
 export * from './auth-branding';
 export * from './auth-shell';
@@ -5,6 +6,7 @@ export * from './back-to-login-link';
 export * from './complete-account-form';
 export * from './create-organization-form';
 export * from './invite-link-invalid-modal';
+export * from './labeled-divider';
 export * from './login-form';
 export * from './openframe-sso-login-form';
 export * from './openframe-sso-signup-form';
