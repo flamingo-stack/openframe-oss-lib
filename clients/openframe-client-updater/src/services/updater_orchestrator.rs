@@ -127,6 +127,7 @@ impl UpdaterOrchestrator {
             .await
             .context("Failed to connect to NATS")?;
         info!("NATS connected");
+        nats_manager.start_connection_watchdog();
 
         // The updater only writes its own .log file; openframe-client tails it and ships
         // it to NATS (LogSourceKind::Updater), the same way it handles the MeshCentral

@@ -51,11 +51,18 @@ impl ClientUpdateListener {
         let machine_id = self.config_service.get_machine_id().await?;
 
         loop {
+            let mut client_rx = self.nats.on_client_replaced();
             let client = self.nats.get_client().await?;
             let mut reconnect_rx = self.nats.subscribe_reconnect();
             let js = jetstream::new((*client).clone());
 
-            let consumer = self.acquire_consumer(&js, &machine_id).await;
+            let consumer = tokio::select! {
+                consumer = self.acquire_consumer(&js, &machine_id) => consumer,
+                _ = client_rx.changed() => {
+                    info!("NATS client replaced, rebinding CLIENT_UPDATE consumer");
+                    continue;
+                }
+            };
 
             info!(
                 "Listening for CLIENT_UPDATE messages (machine_id={})",
@@ -82,9 +89,19 @@ impl ClientUpdateListener {
                             }
                         }
                     }
+                    _ = client_rx.changed() => {
+                        info!("NATS client replaced, rebinding CLIENT_UPDATE consumer");
+                        break;
+                    }
                     _ = reconnect_rx.recv() => {
                         info!("NATS reconnected, re-provisioning CLIENT_UPDATE consumer");
-                        self.acquire_consumer(&js, &machine_id).await;
+                        tokio::select! {
+                            _ = self.acquire_consumer(&js, &machine_id) => {}
+                            _ = client_rx.changed() => {
+                                info!("NATS client replaced, rebinding CLIENT_UPDATE consumer");
+                                break;
+                            }
+                        }
                     }
                 }
             }
