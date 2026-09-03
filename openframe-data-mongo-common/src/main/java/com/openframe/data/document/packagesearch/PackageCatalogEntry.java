@@ -24,8 +24,6 @@ public class PackageCatalogEntry {
 
     @Id
     private String id;
-    // "manager_1" is the server-generated name the pre-@Indexed releases created via ensureIndex;
-    // any other name makes index creation fail with IndexOptionsConflict on those databases
     @Indexed(name = "manager_1")
     private PackageManagerType manager;
     private String packageId;
