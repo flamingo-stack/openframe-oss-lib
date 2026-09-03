@@ -193,7 +193,7 @@ impl UpdateHandlerService {
         Ok(())
     }
 
-    async fn handle_failure(&self, state: UpdateState) -> Result<()> {
+    pub async fn handle_failure(&self, state: UpdateState) -> Result<()> {
         warn!(
             "Update to {} failed (phase: {:?}): {}",
             state.target_version,
@@ -221,7 +221,7 @@ impl UpdateHandlerService {
             .await;
         self.state_service.clear().await?;
 
-        info!("Update marked as failed, NATS will retry");
+        info!("Update marked as failed");
         Ok(())
     }
 

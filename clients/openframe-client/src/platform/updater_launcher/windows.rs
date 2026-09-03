@@ -1,18 +1,18 @@
 use anyhow::{anyhow, Context, Result};
-use std::os::windows::process::CommandExt;
-use std::process::{Command, Stdio};
-use std::time::Duration;
+use std::path::PathBuf;
+use std::process::{ExitStatus, Stdio};
+use tokio::process::{Child, Command};
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use super::UpdaterParams;
-use crate::config::update_config::{BOOT_MARKER_WAIT_SECS, UPDATER_EARLY_EXIT_WATCH_SECS};
+use super::{LaunchedUpdater, UpdaterParams};
+use crate::config::update_config::BOOT_MARKER_WAIT_SECS;
 use crate::platform::get_powershell_path;
 use crate::platform::update_scripts::UPDATE_SCRIPT_WINDOWS;
 
 /// Launch PowerShell updater script on Windows with the already-extracted binary
 /// Uses CREATE_NO_WINDOW flag to run detached from console
-pub async fn launch_updater(params: UpdaterParams) -> Result<()> {
+pub async fn launch_updater(params: UpdaterParams) -> Result<LaunchedUpdater> {
     info!("Launching Windows PowerShell updater");
 
     // Save PowerShell script to temp file
@@ -69,30 +69,38 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<()> {
     if params.rollback_only {
         command.arg("-RollbackOnly");
     }
-    let mut child = command
+    let child = command
         .spawn()
         .context("Failed to spawn PowerShell updater")?;
 
-    info!("PowerShell updater launched (PID: {})", child.id());
+    info!(
+        "PowerShell updater launched (PID: {})",
+        child.id().unwrap_or_default()
+    );
 
-    // Log-only: the script's first real action stops this service, so an exit this early is a failure.
-    tokio::spawn(async move {
-        let deadline =
-            tokio::time::Instant::now() + Duration::from_secs(UPDATER_EARLY_EXIT_WATCH_SECS);
-        while tokio::time::Instant::now() < deadline {
-            if let Ok(Some(status)) = child.try_wait() {
-                let data = std::fs::read(&output_path).unwrap_or_default();
-                let tail = String::from_utf8_lossy(&data[data.len().saturating_sub(2048)..]);
-                warn!(
-                    "PowerShell updater exited with {} before stopping the service; output: {}",
-                    status,
-                    tail.trim()
-                );
-                return;
-            }
-            tokio::time::sleep(Duration::from_millis(500)).await;
+    // No deadline: a cold PowerShell start can take longer than any fixed watch window.
+    let exit_watch = tokio::spawn(watch_exit(child, output_path));
+
+    Ok(LaunchedUpdater {
+        exit_watch: Some(exit_watch),
+    })
+}
+
+/// Resolves only if the updater exits while this process is still alive, i.e. before it stopped the service.
+async fn watch_exit(mut child: Child, output_path: PathBuf) -> Option<ExitStatus> {
+    let status = match child.wait().await {
+        Ok(status) => status,
+        Err(e) => {
+            warn!("Lost track of the PowerShell updater process: {:#}", e);
+            return None;
         }
-    });
-
-    Ok(())
+    };
+    let data = tokio::fs::read(&output_path).await.unwrap_or_default();
+    let tail = String::from_utf8_lossy(&data[data.len().saturating_sub(2048)..]);
+    warn!(
+        "PowerShell updater exited with {} while this process is still alive; output: {}",
+        status,
+        tail.trim()
+    );
+    Some(status)
 }

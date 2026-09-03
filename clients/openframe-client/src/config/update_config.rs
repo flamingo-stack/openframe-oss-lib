@@ -34,9 +34,6 @@ pub const NATS_PAYLOAD_HEADROOM_BYTES: usize = 64 * 1024;
 // Last-known-good update ratchet
 /// How long the updater waits for the new binary's boot marker.
 pub const BOOT_MARKER_WAIT_SECS: u64 = 90;
-// Updater exits inside this window (before stopping the service) count as launch failures.
-#[cfg(windows)]
-pub const UPDATER_EARLY_EXIT_WATCH_SECS: u64 = 5;
 /// Unverified boots tolerated before an update is treated as failed.
 pub const CRASH_LOOP_MAX_BOOT_ATTEMPTS: u32 = 3;
 /// Refuse update messages below the LKG anchor (flip to force a downgrade).
