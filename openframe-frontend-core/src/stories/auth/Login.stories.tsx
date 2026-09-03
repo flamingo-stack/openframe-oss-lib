@@ -48,8 +48,7 @@ function LoginPage(initial: Partial<LoginFormProps>) {
           email={email}
           onEmailChange={setEmail}
           submitDisabled={!isValid}
-          onSubmit={() => {}}
-          onForgotPassword={() => {}}
+          onSubmitClick={() => {}}
         />
       ) : (
         <div className="flex min-h-[240px] items-center justify-center rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xl)] text-ods-text-secondary text-h4">
@@ -70,9 +69,20 @@ export const Filled: Story = {
   render: () => <LoginPage email="roman@mail.com" />,
 };
 
-const SSO_PROVIDERS: AuthSsoProvider[] = ['openframe', 'google', 'microsoft', 'apple'];
+/** The generic providers, which need nothing typed and render above the email field. */
+const SSO_PROVIDERS: AuthSsoProvider[] = ['google', 'microsoft', 'apple'];
 
-/** SSO configured: email filled, submit replaced by provider buttons. */
+/** Providers above the email field, before anything is typed. */
 export const SSO: Story = {
-  render: () => <LoginPage email="roman@mail.com" ssoProviders={SSO_PROVIDERS} />,
+  render: () => <LoginPage ssoProviders={SSO_PROVIDERS} />,
+};
+
+/** Discovery resolved a tenant that has its own SSO: its options appear under the email. */
+export const CustomSso: Story = {
+  render: () => <LoginPage email="roman@mail.com" ssoProviders={SSO_PROVIDERS} customSsoProviders={['openframe']} />,
+};
+
+/** Discovery resolved a tenant with none configured — the empty array is the answer, not silence. */
+export const NoCustomSso: Story = {
+  render: () => <LoginPage email="roman@mail.com" ssoProviders={SSO_PROVIDERS} customSsoProviders={[]} />,
 };

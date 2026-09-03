@@ -285,11 +285,18 @@ public class MingoDeviceTest extends MingoBaseTest {
         String name = "E2E-" + runId + "-run";
 
         // Seed a script (setup) whose body writes the token to a known path on the box.
+        //
+        // ADMIN rather than USER: a USER-privilege execution is dispatched as run_as_user, which the agent
+        // refuses with "run_as_user requested but no active interactive session" unless somebody is logged
+        // into the box — so as USER this case failed on the target having no console/RDP session rather
+        // than on anything Mingo did. Nothing here is about the run-as-user path (the case is that Mingo
+        // can run a *saved* script), so it should not depend on that session existing. PrivilegeLevel is
+        // {USER, ADMIN}; there is no SYSTEM level to ask for.
         Script script = ScriptApi.createScript(CreateScriptInput.builder()
                 .name(name)
                 .description("e2e run target")
                 .shell("POWERSHELL")
-                .privilegeLevel("USER")
+                .privilegeLevel("ADMIN")
                 .scriptBody("Set-Content -LiteralPath '" + path + "' -Value '" + token + "' -NoNewline -Encoding utf8")
                 .supportedPlatforms(List.of("WINDOWS"))
                 .defaultTimeoutSeconds(90)

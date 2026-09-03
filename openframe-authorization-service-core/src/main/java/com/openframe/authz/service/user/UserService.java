@@ -31,6 +31,10 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserEmailVerifiedProcessor userEmailVerifiedProcessor;
 
+    public Optional<AuthUser> findById(String userId) {
+        return userRepository.findById(userId);
+    }
+
     public Optional<AuthUser> findActiveByEmail(String email) {
         return userRepository.findByEmailAndStatus(email, ACTIVE);
     }
