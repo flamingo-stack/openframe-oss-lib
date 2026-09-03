@@ -219,11 +219,8 @@ public class TicketService {
      * dialog status sync; on lifecycle-on tenants only an AI_ASSISTANCE ticket may transition (an
      * already-TECH_REQUIRED one is a no-op).
      *
-     * <p>Re-ranked to the top of the column on transition, same as a freshly created escalation
-     * ticket ({@code computeTopOrder} below) — {@code transition()} only moves statusId/statusKind
-     * and never touches order, so without this a reused ticket (the common case: a dialog almost
-     * always already has one) kept its position from whenever it was originally created, making
-     * "just escalated" tickets sort oldest-first among themselves on the board.
+     * <p>The escalated ticket lands at the top of its new column; that re-ranking belongs to
+     * the transition itself, so this no longer does it here.
      */
     @Transactional
     public Optional<Ticket> moveExistingTicketToTechRequired(AuthPrincipal principal, Ticket ticket, String reason) {
@@ -234,10 +231,8 @@ public class TicketService {
         if (currentKind != TicketStatusKind.AI_ASSISTANCE) {
             return Optional.empty();
         }
-        Ticket transitioned = ticketLifecycleService.transitionToKind(
-                principal, ticket.getId(), TicketStatusKind.TECH_REQUIRED, reason);
-        transitioned.setOrder(computeTopOrder(transitioned));
-        return Optional.of(ticketRepository.save(transitioned));
+        return Optional.of(ticketLifecycleService.transitionToKind(
+                principal, ticket.getId(), TicketStatusKind.TECH_REQUIRED, reason));
     }
 
     @Transactional
