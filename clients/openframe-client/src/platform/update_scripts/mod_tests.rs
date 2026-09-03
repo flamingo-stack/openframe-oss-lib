@@ -15,9 +15,15 @@ fn windows_update_script_is_ascii() {
 #[test]
 fn windows_update_script_stays_powershell3_compatible() {
     let script = super::windows::UPDATE_SCRIPT_WINDOWS;
+    // The header comment names the banned cmdlets, so only executable lines are checked.
+    let code: Vec<&str> = script
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .collect();
+    let code = code.join("\n");
     for cmdlet in ["New-Guid", "Expand-Archive", "Compress-Archive"] {
         assert!(
-            !script.contains(cmdlet),
+            !code.contains(cmdlet),
             "UPDATE_SCRIPT_WINDOWS must not use the PowerShell 5.0-only cmdlet {cmdlet}"
         );
     }
