@@ -16,6 +16,7 @@ import com.openframe.notification.spec.NotificationSeed;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
 import com.openframe.notification.spec.NotificationTypeSpec;
+import com.openframe.notification.spec.UpdatableNotificationSpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,8 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -39,10 +42,12 @@ class NotificationEmitterTest {
     private static final AttrKey TICKET_ID = AttrKey.of("ticketId");
     private static final AttrKey ASSIGNEE = AttrKey.of("assigneeUserId");
 
-    private enum TestType implements NotificationType { TEST_TYPE, UNREGISTERED }
+    private enum TestType implements NotificationType { TEST_TYPE, UNREGISTERED, UPDATABLE_TYPE }
 
-    private record TestSeed(String ticketId, String assigneeUserId) implements NotificationSeed {
-        @Override public NotificationType type() { return TestType.TEST_TYPE; }
+    private record TestSeed(String ticketId, String assigneeUserId, NotificationType type) implements NotificationSeed {
+        TestSeed(String ticketId, String assigneeUserId) {
+            this(ticketId, assigneeUserId, TestType.TEST_TYPE);
+        }
     }
 
     private record UnregisteredSeed() implements NotificationSeed {
@@ -57,12 +62,14 @@ class NotificationEmitterTest {
     private NotificationBroadcaster broadcaster;
     private NotificationEmitter emitter;
     private TestSpec spec;
+    private UpdatableTestSpec updatableSpec;
 
     @BeforeEach
     void setUp() {
         broadcaster = mock(NotificationBroadcaster.class);
         spec = new TestSpec();
-        NotificationTypeRegistry registry = new NotificationTypeRegistry(provider(spec));
+        updatableSpec = new UpdatableTestSpec();
+        NotificationTypeRegistry registry = new NotificationTypeRegistry(provider(spec, updatableSpec));
         emitter = new NotificationEmitter(registry, broadcaster);
     }
 
@@ -71,7 +78,7 @@ class NotificationEmitterTest {
     void happy_path_builds_the_full_command() {
         NotificationRequest request = NotificationRequest.of(new TestSeed("t-1", "u-9"));
 
-        emitter.notify(request, "corr-1");
+        emitter.notify(request);
 
         ArgumentCaptor<NotificationCommand> command = ArgumentCaptor.forClass(NotificationCommand.class);
         verify(broadcaster).broadcast(command.capture());
@@ -85,7 +92,6 @@ class NotificationEmitterTest {
         assertThat(sent.getDescription()).isEqualTo("Assigned to u-9");
         assertThat(sent.getSeverity()).isEqualTo(NotificationSeverity.INFO);
         assertThat(sent.getAudience()).isSameAs(spec.audience);
-        assertThat(sent.getCorrelationId()).isEqualTo("corr-1");
         assertThat(sent.getContext().getType()).isEqualTo("TEST_TYPE");
         assertThat(sent.getApplePushCategory()).isEqualTo("TEST_CATEGORY");
     }
@@ -99,6 +105,39 @@ class NotificationEmitterTest {
         assertThatCode(() -> emitter.notify(unregistered)).doesNotThrowAnyException();
         assertThatCode(() -> emitter.notify(wrongSeedClass)).doesNotThrowAnyException();
         verify(broadcaster, never()).broadcast(any());
+    }
+
+    @Test
+    @DisplayName("update() looks the stored card up by the attribute its spec declares and hands over the recomposed command")
+    void update_delegates_with_the_declared_source_attribute() {
+        when(broadcaster.update(any(), anyString(), anyString())).thenReturn(Optional.of("notif-1"));
+        NotificationRequest request = NotificationRequest.of(new TestSeed("t-1", "u-9", TestType.UPDATABLE_TYPE));
+
+        Optional<String> updatedId = emitter.update(request);
+
+        assertThat(updatedId).contains("notif-1");
+        ArgumentCaptor<NotificationCommand> command = ArgumentCaptor.forClass(NotificationCommand.class);
+        verify(broadcaster).update(command.capture(), eq("ticketId"), eq("t-1"));
+        assertThat(command.getValue().getAttributes()).containsEntry("assigneeUserId", "u-9");
+    }
+
+    @Test
+    @DisplayName("update() on a type whose spec never opted into being updatable is swallowed — a wiring bug must not reach the business flow")
+    void update_of_a_non_updatable_type_is_swallowed() {
+        NotificationRequest request = NotificationRequest.of(new TestSeed("t-1", "u-9"));
+
+        assertThat(emitter.update(request)).isEmpty();
+        verify(broadcaster, never()).update(any(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("A spec declaring a source attribute its attrs() never emits is a producer bug — swallowed, and nothing is looked up")
+    void update_with_a_declared_but_unemitted_attribute_is_swallowed() {
+        updatableSpec.sourceIdAttr = AttrKey.of("missingKey");
+        NotificationRequest request = NotificationRequest.of(new TestSeed("t-1", "u-9", TestType.UPDATABLE_TYPE));
+
+        assertThat(emitter.update(request)).isEmpty();
+        verify(broadcaster, never()).update(any(), anyString(), anyString());
     }
 
     @SuppressWarnings("unchecked")
@@ -143,5 +182,13 @@ class NotificationEmitterTest {
         @Override public NotificationContext buildLegacyContext(TestSeed seed) {
             return GenericContext.builder().type(getType().name()).payload("{}").build();
         }
+    }
+
+    private static class UpdatableTestSpec extends TestSpec implements UpdatableNotificationSpec<TestSeed> {
+
+        AttrKey sourceIdAttr = TICKET_ID;
+
+        @Override public NotificationType getType() { return TestType.UPDATABLE_TYPE; }
+        @Override public AttrKey sourceIdAttr() { return sourceIdAttr; }
     }
 }
