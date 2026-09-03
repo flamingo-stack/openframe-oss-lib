@@ -13,6 +13,10 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "openframe.package-search.sync")
 public class PackageCatalogSyncProperties {
 
+    private Duration initialDelay = Duration.ofSeconds(10);
+    private Duration brewInterval = Duration.ofMinutes(15);
+    private Duration wingetInterval = Duration.ofMinutes(30);
+
     private Brew brew = new Brew();
     private Winget winget = new Winget();
 
