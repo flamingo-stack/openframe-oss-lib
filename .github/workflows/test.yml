@@ -116,7 +116,7 @@ jobs:
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm install
+        run: npm ci
 
       # Config smoke first: it is ~1s and a broken eslint config makes every
       # lint result below meaningless rather than failing honestly.
@@ -181,7 +181,7 @@ jobs:
   # narrowed to a diff — and on this runner it takes longer than every other
   # step in `test-node` put together. Run sequentially it made a PR's checks
   # ~16 min; run in parallel the two jobs overlap and the wall clock is roughly
-  # this job alone. The price is a second `npm install`: about a minute of
+  # this job alone. The price is a second `npm ci`: about a minute of
   # machine time, none of it wall time.
   #
   # Keep it a REQUIRED check (it is in `all-checks` below). It sat misconfigured
@@ -218,7 +218,7 @@ jobs:
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm install
+        run: npm ci
 
       - name: Lint (import cycles)
         if: steps.should_run.outputs.run == 'true'
