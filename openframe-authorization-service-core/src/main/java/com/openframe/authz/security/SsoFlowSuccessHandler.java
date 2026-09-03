@@ -30,6 +30,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
     private final List<SsoFlowHandler> flowHandlers;
     private final AuthErrorResponder authErrorResponder;
     private final AppleWebTokenCapture appleWebTokenCapture;
+    private final MicrosoftLoginEmailGate microsoftLoginEmailGate;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -45,6 +46,13 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
 
         if (handler == null) {
             if (flowHandlers.stream().noneMatch(h -> h.isActivated(request))) {
+                try {
+                    microsoftLoginEmailGate.require(authentication);
+                } catch (IllegalStateException e) {
+                    authErrorResponder.send(response, request, "sso-login-unverified-email", e,
+                            "SSO login failed. Please try again.");
+                    return;
+                }
                 super.onAuthenticationSuccess(request, response, authentication);
                 appleWebTokenCapture.captureIfApple(request, authentication);
                 return;
