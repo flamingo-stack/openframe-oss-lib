@@ -15,7 +15,6 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.List;
@@ -35,11 +34,6 @@ public class PackageCatalogWriter {
         mongoTemplate.indexOps(PackageCatalogEntry.class).ensureIndex(byManager);
     }
 
-    // the collection lives in the SHARED database and every tenant's management syncs it; the prune
-    // grace absorbs overlapping syncs stamping older timestamps over each other — deleting only
-    // entries no sync has touched for hours can never race a concurrent writer
-    private static final Duration PRUNE_GRACE = Duration.ofHours(6);
-
     // the composite key format is owned here, by the only place that writes it
     private static String entryIdOf(PackageCatalogEntry entry) {
         String lowerId = entry.getPackageId().toLowerCase(Locale.ROOT);
@@ -49,8 +43,9 @@ public class PackageCatalogWriter {
                 : entry.getManager() + ":" + brewType + ":" + lowerId;
     }
 
-    // upsert everything with a fresh timestamp, then prune what no snapshot contains anymore —
-    // the collection is never empty mid-sync
+    // upsert everything with a fresh timestamp, then prune what this snapshot no longer contains —
+    // the collection is never empty mid-sync; the scheduler's environment-wide ShedLock guarantees
+    // a single writer, so everything stamped before this sync is exactly the departed entries
     public void replaceManagerEntries(PackageManagerType manager, List<PackageCatalogEntry> entries) {
         Instant syncStart = Instant.now();
         BulkOperations bulk = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, PackageCatalogEntry.class);
@@ -62,8 +57,7 @@ public class PackageCatalogWriter {
         }
         bulk.execute();
 
-        Instant pruneBefore = syncStart.minus(PRUNE_GRACE);
-        Query stale = new Query(Criteria.where("manager").is(manager).and("updatedAt").lt(pruneBefore));
+        Query stale = new Query(Criteria.where("manager").is(manager).and("updatedAt").lt(syncStart));
         long pruned = mongoTemplate.remove(stale, PackageCatalogEntry.class).getDeletedCount();
         log.info("Synced {} catalog: {} entries upserted, {} stale pruned", manager, entries.size(), pruned);
     }
