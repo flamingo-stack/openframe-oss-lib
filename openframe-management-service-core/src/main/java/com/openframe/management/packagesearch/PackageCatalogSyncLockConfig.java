@@ -12,12 +12,10 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 
 @Configuration
 @ConditionalOnProperty(name = "openframe.package-search.sync.enabled", havingValue = "true")
-class PackageCatalogSyncLockConfig {
+public class PackageCatalogSyncLockConfig {
 
-    // the catalog is one shared copy per environment, so this lock must span tenants —
-    // deliberately NOT the tenant-scoped key ShedLockConfig builds for @SchedulerLock jobs
     @Bean
-    LockingTaskExecutor packageCatalogSyncLockExecutor(
+    public LockingTaskExecutor packageCatalogSyncLockExecutor(
             RedisConnectionFactory connectionFactory,
             OpenframeRedisKeyBuilder keyBuilder,
             @Value("${openframe.shedlock.environment:default}") String environment) {

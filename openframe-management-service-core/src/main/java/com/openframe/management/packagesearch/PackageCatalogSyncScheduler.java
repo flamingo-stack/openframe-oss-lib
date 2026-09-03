@@ -20,8 +20,9 @@ import java.util.List;
 @ConditionalOnProperty(name = "openframe.package-search.sync.enabled", havingValue = "true")
 public class PackageCatalogSyncScheduler {
 
-    // holding the lock for (almost) the whole interval is what turns "every tenant's cron"
-    // into one sync per environment: later firers find it held and skip the cycle
+    // the lock is held for interval-minus-margin even after the sync finishes, so every other
+    // tenant firing within the interval skips its cycle; the margin guarantees the lock is
+    // released before the next cycle is due, otherwise phase drift between pods would skip cycles
     private static final Duration LOCK_MARGIN = Duration.ofMinutes(1);
 
     private final BrewCatalogFetcher brewCatalogFetcher;
@@ -30,15 +31,15 @@ public class PackageCatalogSyncScheduler {
     private final PackageCatalogSyncProperties syncProperties;
     private final LockingTaskExecutor packageCatalogSyncLockExecutor;
 
-    @Scheduled(initialDelayString = "${openframe.package-search.sync.initial-delay:10000}",
-            fixedDelayString = "${openframe.package-search.sync.brew-interval:900000}")
+    @Scheduled(initialDelayString = "#{@packageCatalogSyncProperties.initialDelay.toMillis()}",
+            fixedDelayString = "#{@packageCatalogSyncProperties.brewInterval.toMillis()}")
     public void syncBrewCatalog() {
         Duration interval = syncProperties.getBrewInterval();
         runLocked("package-catalog-brew-sync", interval, this::runBrewSync);
     }
 
-    @Scheduled(initialDelayString = "${openframe.package-search.sync.initial-delay:10000}",
-            fixedDelayString = "${openframe.package-search.sync.winget-interval:1800000}")
+    @Scheduled(initialDelayString = "#{@packageCatalogSyncProperties.initialDelay.toMillis()}",
+            fixedDelayString = "#{@packageCatalogSyncProperties.wingetInterval.toMillis()}")
     public void syncWingetCatalog() {
         Duration interval = syncProperties.getWingetInterval();
         runLocked("package-catalog-winget-sync", interval, this::runWingetSync);

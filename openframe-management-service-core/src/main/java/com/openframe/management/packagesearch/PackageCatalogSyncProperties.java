@@ -13,10 +13,9 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "openframe.package-search.sync")
 public class PackageCatalogSyncProperties {
 
-    // must stay in step with the @Scheduled placeholders in PackageCatalogSyncScheduler —
-    // the same values also size the cross-tenant sync lock
-    private Duration brewInterval = Duration.ofMillis(900000);
-    private Duration wingetInterval = Duration.ofMillis(1800000);
+    private Duration initialDelay = Duration.ofSeconds(10);
+    private Duration brewInterval = Duration.ofMinutes(15);
+    private Duration wingetInterval = Duration.ofMinutes(30);
 
     private Brew brew = new Brew();
     private Winget winget = new Winget();
