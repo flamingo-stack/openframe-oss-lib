@@ -40,8 +40,6 @@ import static org.springframework.util.StringUtils.hasText;
 @RequiredArgsConstructor
 public class LoginSsoHandler implements SsoFlowHandler {
 
-    private static final String MICROSOFT = "microsoft";
-
     private final SsoCookieCodec ssoCookieCodec;
     private final SignupTicketService signupTicketService;
     private final UserService userService;
@@ -108,23 +106,13 @@ public class LoginSsoHandler implements SsoFlowHandler {
      * (an optional claim that must be enabled on the generic app registration).
      */
     private void requireEmailTrustedForRouting(String provider, OidcUser user) {
-        boolean trusted;
-        if (MICROSOFT.equals(provider)) {
-            trusted = truthy(user.getClaims().get("xms_edov"))
-                    || Boolean.TRUE.equals(user.getClaims().get("email_verified"));
-        } else {
-            trusted = OidcUserUtils.emailVerifiedClaimAllows(user);
-        }
-        if (!trusted) {
+        if (!OidcUserUtils.emailTrustedForRouting(provider, user.getClaims())) {
             log.warn("event=sso-login-unverified-email provider={} sub={}", provider, user.getSubject());
             throw new IllegalStateException(
                     "This account's email is not verified by the provider. Enter your email on the login page instead.");
         }
     }
 
-    private static boolean truthy(Object claim) {
-        return Boolean.TRUE.equals(claim) || "true".equalsIgnoreCase(OidcUserUtils.stringClaim(claim));
-    }
 
     /**
      * A tenant with its own enabled provider app has pinned sign-in to it (their conditional
