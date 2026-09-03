@@ -37,6 +37,8 @@ class OAuthBffControllerRefreshTest {
     private OAuthDevTicketStore devTicketStore;
     @Mock
     private CookieService cookieService;
+    @Mock
+    private com.openframe.security.oauth.service.redirect.RedirectTargetResolver redirectTargetResolver;
 
     private OAuthBffController controller;
 
@@ -44,7 +46,7 @@ class OAuthBffControllerRefreshTest {
 
     @BeforeEach
     void setUp() {
-        controller = new OAuthBffController(oauthBffService, devTicketStore, cookieService);
+        controller = new OAuthBffController(oauthBffService, devTicketStore, cookieService, redirectTargetResolver);
         ReflectionTestUtils.setField(controller, "devTicketEnabled", false);
         ReflectionTestUtils.setField(controller, "mobileAuthEnabled", false);
     }

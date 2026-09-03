@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import static com.openframe.authz.security.SsoRegistrationConstants.FLOW_COOKIE_TTL_SECONDS;
+import static com.openframe.authz.security.SsoRegistrationConstants.providerAuthorizationPath;
 import static com.openframe.authz.security.SsoRegistrationConstants.ONBOARDING_TENANT_ID;
 import static java.time.Instant.now;
 import static java.util.UUID.randomUUID;
@@ -20,8 +22,6 @@ import static java.util.UUID.randomUUID;
 @Service
 @RequiredArgsConstructor
 public class SsoTenantRegistrationService {
-
-    private static final int COOKIE_TTL_SECONDS = 600;
 
     /** A normal attribution is well under 1KB; the whole signed cookie must stay under the ~4KB browser cap */
     private static final int MAX_ATTRIBUTION_LENGTH = 2048;
@@ -45,7 +45,7 @@ public class SsoTenantRegistrationService {
         String jwtCookieValue = ssoCookieCodec.encodeTenant(payload);
 
         String redirectPath = buildRedirectPath(provider);
-        return new SsoAuthorizeData(jwtCookieValue, COOKIE_TTL_SECONDS, provider, state, redirectPath);
+        return new SsoAuthorizeData(jwtCookieValue, FLOW_COOKIE_TTL_SECONDS, provider, state, redirectPath);
     }
 
     private String normalizeAndEnsureOnboarding(SsoTenantRegistrationInitRequest request) {
@@ -61,7 +61,6 @@ public class SsoTenantRegistrationService {
     private void preProcessRegistration(SsoTenantRegistrationInitRequest request) {
         TenantRegistrationRequest preReq = TenantRegistrationRequest.builder()
                 .email(request.getEmail())
-                .accessCode(request.getAccessCode())
                 .tenantDomain(request.getTenantDomain())
                 .build();
         registrationProcessor.preProcessTenantRegistration(preReq);
@@ -79,10 +78,9 @@ public class SsoTenantRegistrationService {
                 provider,
                 request.getRedirectTo(),
                 request.isAuthMobile(),
-                request.getAccessCode(),
                 boundedAttribution(request.getAttribution()),
                 issuedAt,
-                issuedAt + COOKIE_TTL_SECONDS
+                issuedAt + FLOW_COOKIE_TTL_SECONDS
         );
     }
 
@@ -95,7 +93,7 @@ public class SsoTenantRegistrationService {
     }
 
     private String buildRedirectPath(String provider) {
-        return "/oauth2/authorization/" + provider + "?tenant=" + ONBOARDING_TENANT_ID;
+        return providerAuthorizationPath(provider, ONBOARDING_TENANT_ID);
     }
 
 }

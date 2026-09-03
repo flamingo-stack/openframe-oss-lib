@@ -379,6 +379,7 @@ impl Client {
             config_service.clone(),
             tool_run_manager.clone(),
             deactivation_service.clone(),
+            http_client.clone(),
         );
 
         // Initialize tool connection service
@@ -608,6 +609,8 @@ impl Client {
 
         // Connect to NATS
         self.nats_connection_manager.connect().await?;
+
+        self.nats_connection_manager.start_connection_watchdog();
 
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();

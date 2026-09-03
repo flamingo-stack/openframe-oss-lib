@@ -2,6 +2,7 @@ package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
@@ -35,4 +36,6 @@ public interface ScriptScheduleRepository
     List<ScheduleScript> findByStatusAndNextRunAtLessThanEqual(ScriptStatus status, Instant cutoff);
 
     List<ScheduleScript> findByTenantIdAndTriggerAndStatus(String tenantId, ScheduleScriptTrigger trigger, ScriptStatus status);
+
+    List<ScheduleScript> findByStatusAndTriggerAndTimeReference(ScriptStatus status, ScheduleScriptTrigger trigger, ScheduleTimeReference timeReference);
 }
