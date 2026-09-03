@@ -130,6 +130,17 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ matrix.path }}/package.json
 
+      # Works around an Arborist bug in the npm version `actions/setup-node`'s
+      # Node 22 image currently bundles: resolving this project's tree with no
+      # lockfile to pin it (see the comment on Install Dependencies below)
+      # intermittently throws "Cannot read properties of null (reading
+      # 'edgesOut')" — reproduced on unrelated PRs the same day, not
+      # reproducible locally on npm 11.9.0. Pin removed once the bundled npm
+      # on that image picks up the fix upstream.
+      - name: Upgrade npm (workaround for a bundled-npm Arborist bug)
+        if: steps.should_run.outputs.run == 'true'
+        run: npm install -g npm@11.9.0
+
       # `install`, not `ci`: `npm ci` requires a committed lockfile and this
       # repo has none. The consequence is that CI resolves dependencies afresh
       # and can test a different tree than a developer has — worth fixing, but
@@ -235,6 +246,11 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: ${{ matrix.path }}/package.json
+
+      # See the identical step in test-node above for why this is here.
+      - name: Upgrade npm (workaround for a bundled-npm Arborist bug)
+        if: steps.should_run.outputs.run == 'true'
+        run: npm install -g npm@11.9.0
 
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'

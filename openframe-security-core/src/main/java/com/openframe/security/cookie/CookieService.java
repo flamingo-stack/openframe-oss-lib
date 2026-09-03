@@ -73,12 +73,19 @@ public class CookieService {
         // Also clear potential SSO invitation cookie used during invitation acceptance
         ResponseCookie clearedSsoInvite = createClearedCookie("of_sso_invite", "/");
         ResponseCookie clearedSsoInviteHostOnly = createClearedCookieHostOnly("of_sso_invite", "/");
+        // And the email-less login flow cookie: left behind by an abandoned or failed attempt, it
+        // would otherwise inject its stale state into this fresh tenant-scoped login and let the
+        // wrong flow handler claim the callback.
+        ResponseCookie clearedSsoLogin = createClearedCookie("of_sso_login", "/");
+        ResponseCookie clearedSsoLoginHostOnly = createClearedCookieHostOnly("of_sso_login", "/");
         headers.add(SET_COOKIE, clearedAuthSession.toString());
         headers.add(SET_COOKIE, clearedAuthSessionHostOnly.toString());
         headers.add(SET_COOKIE, clearedSsoRegistration.toString());
         headers.add(SET_COOKIE, clearedSsoRegistrationHostOnly.toString());
         headers.add(SET_COOKIE, clearedSsoInvite.toString());
         headers.add(SET_COOKIE, clearedSsoInviteHostOnly.toString());
+        headers.add(SET_COOKIE, clearedSsoLogin.toString());
+        headers.add(SET_COOKIE, clearedSsoLoginHostOnly.toString());
     }
 
     /**
