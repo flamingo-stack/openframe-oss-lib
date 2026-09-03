@@ -3,6 +3,7 @@ package com.openframe.authz.security;
 import com.openframe.authz.security.flow.SsoFlowHandler;
 import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
 import com.openframe.authz.web.AuthErrorResponder;
+import com.openframe.authz.web.AuthStateUtils;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -49,7 +50,9 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
                 return;
             }
             // A flow cookie is present but none owns this state: a stale cookie from an abandoned flow,
-            // an expired or tampered payload, or a replayed callback.
+            // an expired or tampered payload, or a replayed callback. Drop the leftovers so they
+            // cannot also steal the next attempt.
+            AuthStateUtils.clearSsoFlowCookies(response);
             authErrorResponder.send(response, request, "sso-flow-state-mismatch",
                     new IllegalStateException("SSO session expired. Please try again."),
                     "SSO session expired. Please try again.");
@@ -63,6 +66,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
             // already committed (redirect) — the capture only writes to the database.
             appleWebTokenCapture.captureIfApple(request, authentication);
         } catch (Exception e) {
+            AuthStateUtils.clearSsoFlowCookies(response);
             authErrorResponder.send(response, request, "sso-flow-finalize", e,
                     "Registration failed. Please try again.");
         }
