@@ -33,11 +33,13 @@ import { decideNewTab as libDecideNewTab } from './decide-new-tab';
 /** An ABSOLUTE `http(s)` URL on the current page's origin. Relative hrefs return
  *  false (in embed mode they're hub-relative, not in-app), as do cross-origin
  *  and non-http URLs. SSR-safe: no `window` → false. */
-function isSameOriginAbsoluteHref(href: string): boolean {
+export function isSameOriginAbsoluteHref(href: string): boolean {
   if (typeof window === 'undefined') return false;
   if (!/^https?:\/\//i.test(href)) return false;
   try {
-    return new URL(href).origin === window.location.origin;
+    // Origin off `location.href`, not `location.origin`: jsdom leaves the latter
+    // undefined, which reads as "every URL is foreign" under test.
+    return new URL(href).origin === new URL(window.location.href).origin;
   } catch {
     return false;
   }

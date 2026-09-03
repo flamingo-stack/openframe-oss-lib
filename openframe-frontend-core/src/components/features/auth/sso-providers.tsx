@@ -12,7 +12,7 @@ export type AuthSsoProvider = 'openframe' | 'google' | 'microsoft' | 'apple';
 
 export const PROVIDER_META: Record<AuthSsoProvider, { name: string; Icon: ComponentType<{ className?: string }> }> = {
   openframe: {
-    name: 'OpenFrame SSO',
+    name: 'OpenFrame',
     Icon: ({ className }) => (
       <OpenFrameLogo
         className={className}
@@ -29,7 +29,7 @@ export const PROVIDER_META: Record<AuthSsoProvider, { name: string; Icon: Compon
 export interface SsoProviderButtonsProps {
   providers: AuthSsoProvider[];
   onSsoClick?: (provider: AuthSsoProvider) => void;
-  /** Verb prefix for provider buttons, e.g. "Continue with". Ignored for "openframe". */
+  /** Verb prefix for provider buttons, e.g. "Continue with". */
   actionLabel?: string;
   disabled?: boolean;
   /**
@@ -65,7 +65,7 @@ export function SsoProviderButtons({
             leftIcon={<Icon className="h-5 w-5" />}
             onClick={() => onSsoClick?.(provider)}
           >
-            {provider === 'openframe' ? meta.name : `${actionLabel} ${meta.name}`}
+            {`${actionLabel} ${meta.name}`}
           </Button>
         );
       })}

@@ -2,15 +2,9 @@
  * Leading-frame → `ChatStreamEvent` table — the ONE mapping both transports read.
  *
  * The SSE decoder (`./decode.ts`) reaches it while walking the hub's byte
- * framing. The NATS decoder (`./nats-decoder.ts`) reaches it for `GUIDE` chunks
- * carrying a `payload`: the saas-ai-agent re-streams the Product Guide's hub
- * frames VERBATIM into the Mingo chunk stream (`GuideStreamingService`), so the
- * bytes a guide answer is made of are the same frames on both transports — only
- * the envelope differs. Decoding them twice would drift the moment the hub adds
- * a frame kind, which is why this table lives outside either decoder.
- *
- * The NATS side does NOT take every event this table can produce; see
- * `guideFrameEvent` in `./nats-decoder.ts` for which ones cross over and why.
+ * framing. It lives outside that decoder so a second transport can reuse the
+ * table rather than re-implement it and drift the moment the hub adds a frame
+ * kind.
  *
  * Server-safe: no React, no browser APIs.
  */

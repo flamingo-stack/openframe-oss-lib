@@ -7,6 +7,7 @@ import React, { useCallback } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { Chevron02RightIcon, Ellipsis01Icon } from '../icons-v2-generated';
+import { ActionsMenuHeaderContext } from './actions-menu-header-context';
 import { Button } from './button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './dropdown-menu';
 import { useReportOverlayOpen } from './overlay-open-registry';
@@ -64,6 +65,14 @@ export interface ActionsMenuProps {
   groups: ActionsMenuGroup[];
   className?: string;
   onItemClick?: (item: ActionsMenuItem) => void;
+  /**
+   * Optional node rendered as the menu's first row, above every group — e.g.
+   * the mobile "…" menu surfaces the page's view-mode `TabSelector` here (the
+   * tickets design). Separated from the rows below by the same border the rows
+   * use; interaction stays the node's own — clicking it does not close the
+   * menu by itself.
+   */
+  header?: React.ReactNode;
 }
 
 interface MenuItemProps {
@@ -297,11 +306,19 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 
 const GroupSeparator: React.FC = () => <div className="h-[3px] w-full bg-ods-bg-surface" />;
 
-export const ActionsMenu: React.FC<ActionsMenuProps> = ({ groups, className = '', onItemClick }) => {
+export const ActionsMenu: React.FC<ActionsMenuProps> = ({ groups, className = '', onItemClick, header }) => {
   return (
     <div
       className={`relative max-h-[var(--radix-popper-available-height)] min-w-[256px] overflow-y-auto rounded-md border border-ods-border bg-ods-bg shadow-lg ${className}`}
     >
+      {header && (
+        // The context strips the frame off controls that carry one (the view
+        // TabSelector): inside the menu, the row border and the menu's own
+        // rounding ARE the frame — see `actions-menu-header-context.ts`.
+        <ActionsMenuHeaderContext.Provider value={true}>
+          <div className="border-b border-ods-border">{header}</div>
+        </ActionsMenuHeaderContext.Provider>
+      )}
       {groups.map((group, groupIndex) => {
         const groupKey = group.id || group.items.map(i => i.id).join('|');
         return (
@@ -340,6 +357,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
   groups,
   onItemClick,
   className,
+  header,
   trigger,
   customTrigger,
   triggerAriaLabel = 'More actions',
@@ -432,7 +450,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
         onCloseAutoFocus={onCloseAutoFocus}
         className={cn('overflow-visible border-0 bg-transparent p-0 shadow-none', contentClassName)}
       >
-        <ActionsMenu groups={groups} onItemClick={handleItemClick} className={className} />
+        <ActionsMenu groups={groups} onItemClick={handleItemClick} className={className} header={header} />
       </DropdownMenuContent>
     </DropdownMenu>
   );

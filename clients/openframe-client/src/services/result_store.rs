@@ -23,6 +23,7 @@ const ERROR_NOT_STARTED: &str = "not executed: agent restarted earlier in batch"
 const ERROR_INTERRUPTED: &str = "interrupted by agent restart; outcome unknown";
 
 pub trait ResultPublisher: Send + Sync {
+    fn publish_raw(&self, subject: &str, bytes: &[u8]) -> impl Future<Output = Result<()>> + Send;
     fn publish_acked(&self, subject: &str, bytes: &[u8])
         -> impl Future<Output = Result<()>> + Send;
     fn max_payload(&self) -> impl Future<Output = Option<usize>> + Send;

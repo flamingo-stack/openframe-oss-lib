@@ -98,9 +98,9 @@ import type { UnifiedChatState } from './types/unified-chat-state.types';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
+import { executeNavigation } from './utils/execute-navigation';
 import { resolveIcon } from './utils/icon-library';
 import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props';
-import { handleChatNavClick } from './utils/nav-click-handler';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
 import { getSourceIconName } from './utils/source-icons';
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta';
@@ -732,7 +732,14 @@ function SourceChip({
   const buildClickHandler =
     (href: string, path: string | null | undefined, targetPlatform: string | null, isNewTab: boolean) =>
     (e: React.MouseEvent<HTMLAnchorElement>) => {
-      const handled = handleChatNavClick(e, runtime, { href, path, targetPlatform }, router.push);
+      const handled = executeNavigation({
+        event: e,
+        runtime,
+        href,
+        path,
+        targetPlatform,
+        fallbackNavigate: router.push,
+      });
       if (handled && !isNewTab && onClose) onClose();
     };
 

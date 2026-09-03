@@ -33,7 +33,7 @@ import {
 } from '../../../chat-protocol/events';
 // One normalizer for ask rows, shared with the live decoder — history and the
 // stream must agree on which options are usable.
-import { guideFrameEvent, normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
+import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
 import { applyApprovalStatusToSegment } from '../stream/message-mutations';
 import {
   MESSAGE_TYPE,
@@ -47,7 +47,7 @@ import {
   type MessageData,
   type MessageOwner,
 } from '../types';
-import { approvalDisplaysInline, guideApprovalOrigin } from './approval-display';
+import { approvalDisplaysInline } from './approval-display';
 import { type MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator';
 import { getCommandText } from './tool-call-helpers';
 
@@ -120,22 +120,6 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
         return { type: 'thinking-delta', text: data.text };
       }
       return null;
-
-    // Two persisted shapes, mirroring the live `GUIDE` chunk: the answer body
-    // (`text`) and a Product Guide frame the agent re-streamed (`payload`,
-    // persisted so a card survives a reload). Decoded through the SAME
-    // `guideFrameEvent` the live path uses — a second mapping here would let
-    // history and realtime disagree about the same bytes.
-    case MESSAGE_TYPE.GUIDE: {
-      if ('text' in data && data.text) {
-        return { type: 'guide-delta', text: data.text };
-      }
-      const payload = 'payload' in data ? data.payload : undefined;
-      if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-        return guideFrameEvent(payload);
-      }
-      return null;
-    }
 
     // Same completeness gate as the live decoder (`decodeNatsChunk`): a
     // persisted row without a question or without options is not a card the
@@ -397,10 +381,6 @@ function applyHistoryEvent(
       accumulator.appendThinking(event.text);
       break;
 
-    case 'guide-delta':
-      accumulator.appendGuide(event.text);
-      break;
-
     // Mirror of the live path: the intro sentence replays as answer text in
     // front of the card, so a reloaded thread reads exactly like the stream did.
     case 'ask':
@@ -417,23 +397,13 @@ function applyHistoryEvent(
       const toolCalls = event.toolCalls;
       const isBatch = !!toolCalls && toolCalls.length > 0;
       // Same rule the live kernels use — a card must not change where it
-      // renders (or which backend its buttons hit) just because the page was
-      // reloaded and it came back through history instead of the stream.
-      const guideOrigin = guideApprovalOrigin(event);
-
-      if (approvalDisplaysInline(event, approvalType, displayApprovalTypes)) {
+      // renders just because the page was reloaded and it came back through
+      // history instead of the stream.
+      if (approvalDisplaysInline(approvalType, displayApprovalTypes)) {
         if (isBatch) {
           const status = (approvalStatuses[event.requestId] as ChatApprovalStatus) || 'pending';
           if (batchApprovalsEnabled) {
-            accumulator.addApprovalBatch(
-              event.requestId,
-              approvalType,
-              toolCalls,
-              status,
-              undefined,
-              undefined,
-              guideOrigin,
-            );
+            accumulator.addApprovalBatch(event.requestId, approvalType, toolCalls, status, undefined, undefined);
           } else {
             // Flag OFF — unfold batch into N legacy approval cards (same id).
             for (const call of toolCalls) {
@@ -445,7 +415,6 @@ function applyHistoryEvent(
                 approvalType,
                 status,
                 undefined,
-                guideOrigin,
               );
             }
           }
@@ -459,12 +428,7 @@ function applyHistoryEvent(
           // and honor `approvalStatuses`.
           const resolvedStatus = approvalStatuses[event.requestId] as ChatApprovalStatus | undefined;
           const isResolved = resolvedStatus === 'approved' || resolvedStatus === 'rejected';
-          // A guide card is added inline even while pending. The tracked path
-          // below ends in `flushPendingApprovals`, whose segments the consumer
-          // lifts into a sticky footer — that is the treatment for the
-          // consumer's OWN approvals, and it is not how the hub's chat renders
-          // a proposal (nor where its preamble expects it).
-          if (guideOrigin || isResolved) {
+          if (isResolved) {
             accumulator.addApprovalRequest(
               event.requestId,
               event.command || '',
@@ -472,7 +436,6 @@ function applyHistoryEvent(
               approvalType,
               resolvedStatus ?? 'pending',
               event.fields,
-              guideOrigin,
             );
           } else {
             accumulator.trackApprovalRequest(event.requestId, {

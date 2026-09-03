@@ -14,6 +14,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useDragAndDropEnabled } from '../../../hooks/ui/use-drag-and-drop-enabled';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { autoScrollAncestors, autoScrollBothWays } from '../../../utils/auto-scroll-ancestors';
 import { type DragSlots, measureSlots, resolveSlot, shiftFor } from './slot-geometry';
@@ -30,8 +31,15 @@ const EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 interface SortableListContextValue {
   /** Distinguishes this list's drags from any other list's on the page. */
   dragType: string;
+  /** The consumer's `disabled` prop: everything off, move buttons included. */
   disabled: boolean;
-  /** Reorders the list. Used by the drop AND by a handle's arrow keys. */
+  /**
+   * The input-type gate (`useDragAndDropEnabled`): `false` on touch/narrow
+   * viewports, where no drag is registered and rows render explicit
+   * `SortableMoveButtons` instead of a handle.
+   */
+  dragAndDropEnabled: boolean;
+  /** Reorders the list. Used by the drop, a handle's arrow keys AND the move buttons. */
   reorder: (from: number, to: number) => void;
   /** Every registered item, in DOM order. */
   readItems: () => HTMLElement[];
@@ -82,6 +90,9 @@ export interface SortableListProps {
  */
 export function SortableList({ onReorder, getItemLabel, disabled = false, className, children }: SortableListProps) {
   const listRef = useRef<HTMLDivElement>(null);
+  // False on touch/narrow viewports: no drag is initialized anywhere in the
+  // list, and rows fall back to explicit move buttons.
+  const dragAndDropEnabled = useDragAndDropEnabled();
   // Stable across renders and never rendered, so there is no hydration to
   // mismatch — unlike keying a drag on a random per-item id.
   const dragType = useId();
@@ -126,7 +137,7 @@ export function SortableList({ onReorder, getItemLabel, disabled = false, classN
 
   useEffect(() => {
     const list = listRef.current;
-    if (!list) return undefined;
+    if (!list || disabled || !dragAndDropEnabled) return undefined;
 
     /** Alive for one drag; this effect body is its whole scope. */
     let drag: (DragSlots & { items: HTMLElement[]; to: number; startY: number }) | null = null;
@@ -218,7 +229,7 @@ export function SortableList({ onReorder, getItemLabel, disabled = false, classN
         },
       }),
     );
-  }, [dragType, readItems, reorder]);
+  }, [dragType, disabled, dragAndDropEnabled, readItems, reorder]);
 
   // Runs after the commit that carries BOTH the reorder and the tick above, so
   // the DOM is already in its final order — which is why `onReorder` never has
@@ -267,8 +278,8 @@ export function SortableList({ onReorder, getItemLabel, disabled = false, classN
   );
 
   const context = useMemo<SortableListContextValue>(
-    () => ({ dragType, disabled, reorder, readItems }),
-    [dragType, disabled, reorder, readItems],
+    () => ({ dragType, disabled, dragAndDropEnabled, reorder, readItems }),
+    [dragType, disabled, dragAndDropEnabled, reorder, readItems],
   );
 
   return (
