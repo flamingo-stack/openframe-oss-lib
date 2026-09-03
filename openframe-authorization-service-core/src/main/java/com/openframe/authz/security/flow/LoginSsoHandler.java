@@ -108,8 +108,11 @@ public class LoginSsoHandler implements SsoFlowHandler {
     private void requireEmailTrustedForRouting(String provider, OidcUser user) {
         if (!OidcUserUtils.emailTrustedForRouting(provider, user.getClaims())) {
             log.warn("event=sso-login-unverified-email provider={} sub={}", provider, user.getSubject());
+            // No "use the login page" hint here: that path runs through the same generic app and
+            // fails the same check — the hint is only honest in the forbidden-provider case, where
+            // the tenant's own app actually works.
             throw new IllegalStateException(
-                    "This account's email is not verified by the provider. Enter your email on the login page instead.");
+                    "This account's email is not verified by the provider. Please contact your administrator.");
         }
     }
 
