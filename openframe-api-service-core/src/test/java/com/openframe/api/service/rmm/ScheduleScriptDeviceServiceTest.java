@@ -3,6 +3,7 @@ package com.openframe.api.service.rmm;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
@@ -178,10 +179,15 @@ class ScheduleScriptDeviceServiceTest {
     }
 
     private static Machine machine(String machineId, String hostname, OsType osType) {
+        return machine(machineId, hostname, osType, null);
+    }
+
+    private static Machine machine(String machineId, String hostname, OsType osType, DeviceStatus status) {
         Machine m = new Machine();
         m.setMachineId(machineId);
         m.setHostname(hostname);
         m.setOsType(osType);
+        m.setStatus(status);
         return m;
     }
 
@@ -418,6 +424,76 @@ class ScheduleScriptDeviceServiceTest {
                 .hasMessageContaining("m-ghost");
         verify(assignedRepository, never()).saveAll(any());
         verify(assignedRepository, never()).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("setDevices: a machine in PENDING_DELETION is rejected — schedule assignment would leak into UI counts but never fire")
+    void setDevices_pendingDeletionMachine_rejected() {
+        scheduleExists(ScriptStatus.ACTIVE);
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(
+                        machine("m-live", "live-box", WINDOWS),
+                        machine("m-decom", "decom-box", WINDOWS, DeviceStatus.PENDING_DELETION)));
+
+        assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-live", "m-decom"), "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("pending deletion")
+                .hasMessageContaining("decom-box");   // uses hostname when set
+        verify(assignedRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("addDevices: a machine already DELETED is rejected — same guard as PENDING_DELETION")
+    void addDevices_deletedMachine_rejected() {
+        scheduleExists(ScriptStatus.ACTIVE);
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-gone", null, WINDOWS, DeviceStatus.DELETED)));
+
+        assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-gone"), "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("pending deletion or deleted")
+                .hasMessageContaining("m-gone");   // falls back to machineId when hostname null
+        verify(assignedRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("getMachineIdsByScheduleIds: drops assigned machines that are now PENDING_DELETION / DELETED from the SPECIFIC list")
+    void getMachineIdsByScheduleIds_dropsInactive() {
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(ScheduleScript.builder()
+                        .id(SCHEDULE_ID).tenantId(TENANT_ID)
+                        .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).build()));
+        when(assignedRepository.findByTenantIdAndScriptScheduleIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(pair("m-live"), pair("m-decom")));
+        // m-decom is PENDING_DELETION → dropped; m-live stays; m-gone (assigned but Machine row gone) also dropped
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(
+                        machine("m-live", "live-box", WINDOWS),
+                        machine("m-decom", "decom-box", WINDOWS, DeviceStatus.PENDING_DELETION)));
+
+        Map<String, List<String>> ids = service.getMachineIdsByScheduleIds(List.of(SCHEDULE_ID));
+
+        assertThat(ids.get(SCHEDULE_ID)).containsExactly("m-live");
+    }
+
+    @Test
+    @DisplayName("getMachineCountsByScheduleIds: count agrees with the id list — inactive assigned rows do not inflate the total")
+    void getMachineCountsByScheduleIds_dropsInactive() {
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(ScheduleScript.builder()
+                        .id(SCHEDULE_ID).tenantId(TENANT_ID)
+                        .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).build()));
+        when(assignedRepository.findByTenantIdAndScriptScheduleIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(pair("m-live-1"), pair("m-live-2"), pair("m-decom")));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(
+                        machine("m-live-1", "live-1", WINDOWS),
+                        machine("m-live-2", "live-2", WINDOWS),
+                        machine("m-decom", "decom", WINDOWS, DeviceStatus.PENDING_DELETION)));
+
+        Map<String, Integer> counts = service.getMachineCountsByScheduleIds(List.of(SCHEDULE_ID));
+
+        assertThat(counts).containsEntry(SCHEDULE_ID, 2);   // NOT 3 — inactive dropped
     }
 
     @Test

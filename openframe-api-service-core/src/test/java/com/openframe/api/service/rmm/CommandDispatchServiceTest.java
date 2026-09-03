@@ -8,6 +8,8 @@ import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.command.CommandDispatchService;
 import com.openframe.api.service.rmm.command.CommandExecutionService;
+import com.openframe.core.exception.BadRequestException;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptShell;
@@ -75,6 +77,18 @@ class CommandDispatchServiceTest {
 
         assertThatThrownBy(() -> commandDispatchService.runCommand(input))
                 .isInstanceOf(DeviceNotFoundException.class);
+
+        verifyNoInteractions(commandNatsPublisher);
+    }
+
+    @Test
+    @DisplayName("runCommand: a machine in PENDING_DELETION is rejected (BadRequestException) — no publish")
+    void runCommand_rejectsPendingDeletionMachine() {
+        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machineWithStatus(DeviceStatus.PENDING_DELETION)));
+
+        assertThatThrownBy(() -> commandDispatchService.runCommand(input))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("pending deletion");
 
         verifyNoInteractions(commandNatsPublisher);
     }
@@ -265,5 +279,26 @@ class CommandDispatchServiceTest {
 
         verifyNoInteractions(commandExecutionService);
         verifyNoInteractions(commandNatsPublisher);
+    }
+
+    @Test
+    @DisplayName("batchRunCommand: any PENDING_DELETION target rejects the whole batch — no half-dispatch")
+    void batchRunCommand_rejectsBatchWithPendingDeletionMachine() {
+        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
+        when(deviceService.findByMachineId("machine-decom")).thenReturn(Optional.of(machineWithStatus(DeviceStatus.PENDING_DELETION)));
+
+        assertThatThrownBy(() ->
+                commandDispatchService.batchRunCommand(batchInput(List.of("machine-1", "machine-decom")), INITIATED_BY))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("pending deletion");
+
+        verifyNoInteractions(commandExecutionService);
+        verifyNoInteractions(commandNatsPublisher);
+    }
+
+    private static Machine machineWithStatus(DeviceStatus status) {
+        Machine m = new Machine();
+        m.setStatus(status);
+        return m;
     }
 }

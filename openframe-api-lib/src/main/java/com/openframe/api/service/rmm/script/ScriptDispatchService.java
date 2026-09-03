@@ -11,6 +11,8 @@ import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -68,8 +70,7 @@ public class ScriptDispatchService {
 
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
-        deviceService.findByMachineId(input.getMachineId())
-                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + input.getMachineId()));
+        verifyMachine(input.getMachineId());
 
         // Tenant-scoped lookup; throws if the script is missing or soft-deleted.
         ScriptResponse script = scriptService.get(input.getScriptId());
@@ -274,8 +275,16 @@ public class ScriptDispatchService {
     }
 
     private void verifyMachines(List<String> machineIds) {
-        machineIds.forEach(machineId -> deviceService.findByMachineId(machineId)
-                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId)));
+        machineIds.forEach(this::verifyMachine);
+    }
+
+    private void verifyMachine(String machineId) {
+        Machine machine = deviceService.findByMachineId(machineId)
+                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
+        if (DeviceStatus.INACTIVE_TARGETS.contains(machine.getStatus())) {
+            throw new BadRequestException(
+                    "Machine is pending deletion or deleted: " + machineId);
+        }
     }
 
     private static Integer effectiveTimeout(Integer override, Integer scriptDefault) {
