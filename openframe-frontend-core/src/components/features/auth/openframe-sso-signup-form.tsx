@@ -5,7 +5,7 @@ import { useDeferredError } from '../../../hooks/ui/use-deferred-error';
 import { cn } from '../../../utils/cn';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
-import { PasswordInput } from '../../ui/password-input';
+import { AccountDetailsFields } from './account-details-fields';
 
 export interface OpenFrameSsoSignUpFormProps {
   /** Controlled field values */
@@ -75,10 +75,6 @@ export function OpenFrameSsoSignUpForm({
 
   // Validation messages are deferred while the user is typing (shown on blur or after a pause).
   const emailErr = useDeferredError(errors?.email, email);
-  const firstNameErr = useDeferredError(errors?.firstName, firstName);
-  const lastNameErr = useDeferredError(errors?.lastName, lastName);
-  const passwordErr = useDeferredError(errors?.password, password);
-  const confirmErr = useDeferredError(errors?.confirmPassword, confirmPassword);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldsDisabled && !submitDisabled) {
@@ -111,45 +107,17 @@ export function OpenFrameSsoSignUpForm({
         onKeyDown={handleKeyDown}
       />
 
-      {/* Name + password fields — single column on every breakpoint */}
-      <Input
-        label="First Name"
-        placeholder="Enter First Name"
-        value={firstName}
-        error={firstNameErr.error}
+      <AccountDetailsFields
+        firstName={firstName}
+        lastName={lastName}
+        password={password}
+        confirmPassword={confirmPassword}
+        onFirstNameChange={onFirstNameChange}
+        onLastNameChange={onLastNameChange}
+        onPasswordChange={onPasswordChange}
+        onConfirmPasswordChange={onConfirmPasswordChange}
+        errors={errors}
         disabled={fieldsDisabled}
-        onBlur={firstNameErr.onBlur}
-        onChange={event => onFirstNameChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      <Input
-        label="Last Name"
-        placeholder="Enter Last Name"
-        value={lastName}
-        error={lastNameErr.error}
-        disabled={fieldsDisabled}
-        onBlur={lastNameErr.onBlur}
-        onChange={event => onLastNameChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      <PasswordInput
-        label="Password"
-        placeholder="Enter Password"
-        value={password}
-        error={passwordErr.error}
-        disabled={fieldsDisabled}
-        onBlur={passwordErr.onBlur}
-        onChange={event => onPasswordChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      <PasswordInput
-        label="Confirm Password"
-        placeholder="Confirm Password"
-        value={confirmPassword}
-        error={confirmErr.error}
-        disabled={fieldsDisabled}
-        onBlur={confirmErr.onBlur}
-        onChange={event => onConfirmPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
 
