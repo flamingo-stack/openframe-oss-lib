@@ -12,7 +12,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -55,27 +54,23 @@ class CustomMachineRepositoryImplTest {
     }
 
     @Test
-    @DisplayName("buildDeviceQuery: no filter → default guard status $nin {DELETED, PENDING_DELETION} — every caller inherits this without opting in")
-    void defaultGuardExcludesInactive() {
+    @DisplayName("buildDeviceQuery: no filter → default guard status $ne DELETED — every caller inherits this without opting in")
+    void defaultGuardExcludesDeleted() {
         Document q = repo.buildDeviceQuery(null, null).getQueryObject();
 
         Document status = statusClause(q);
         assertThat(status).isNotNull();
-        assertThat(status).containsKey("$nin");
-        Collection<?> nin = (Collection<?>) status.get("$nin");
-        assertThat(nin).containsExactlyInAnyOrder(DeviceStatus.DELETED, DeviceStatus.PENDING_DELETION);
+        assertThat(status.get("$ne")).isEqualTo(DeviceStatus.DELETED);
     }
 
     @Test
-    @DisplayName("buildDeviceQuery: empty filter (no fields set) still gets the default guard covering both terminal statuses")
+    @DisplayName("buildDeviceQuery: empty filter (no fields set) still gets the default guard")
     void emptyFilterStillGetsGuard() {
         Document q = repo.buildDeviceQuery(new MachineQueryFilter(), null).getQueryObject();
 
         Document status = statusClause(q);
         assertThat(status).isNotNull();
-        assertThat(status).containsKey("$nin");
-        Collection<?> nin = (Collection<?>) status.get("$nin");
-        assertThat(nin).containsExactlyInAnyOrder(DeviceStatus.DELETED, DeviceStatus.PENDING_DELETION);
+        assertThat(status.get("$ne")).isEqualTo(DeviceStatus.DELETED);
     }
 
     @Test

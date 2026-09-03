@@ -345,13 +345,13 @@ public class ScheduleScriptDeviceService {
                     "Unknown or inaccessible device(s) for this tenant: " + unknown);
         }
 
-        List<String> inactive = machines.stream()
-                .filter(m -> DeviceStatus.INACTIVE_TARGETS.contains(m.getStatus()))
+        List<String> nonDispatchable = machines.stream()
+                .filter(m -> !DeviceStatus.DISPATCH_ELIGIBLE.contains(m.getStatus()))
                 .map(m -> m.getHostname() != null ? m.getHostname() : m.getMachineId())
                 .toList();
-        if (!inactive.isEmpty()) {
+        if (!nonDispatchable.isEmpty()) {
             throw new BadRequestException(
-                    "Device(s) are pending deletion or deleted and cannot be assigned: " + inactive);
+                    "Device(s) are not in a dispatchable state (must be ONLINE or OFFLINE): " + nonDispatchable);
         }
 
         if (schedulePlatforms == null || schedulePlatforms.isEmpty()) {
@@ -388,7 +388,7 @@ public class ScheduleScriptDeviceService {
             return Set.of();
         }
         return machineRepository.findByTenantIdAndMachineIdIn(tenantId, ids).stream()
-                .filter(m -> !DeviceStatus.INACTIVE_TARGETS.contains(m.getStatus()))
+                .filter(m -> DeviceStatus.DISPATCH_ELIGIBLE.contains(m.getStatus()))
                 .map(Machine::getMachineId)
                 .collect(java.util.stream.Collectors.toSet());
     }

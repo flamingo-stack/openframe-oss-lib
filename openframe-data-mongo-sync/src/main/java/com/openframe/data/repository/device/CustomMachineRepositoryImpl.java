@@ -317,7 +317,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                 && filter.getStatuses() != null && !filter.getStatuses().isEmpty();
         boolean callerHidesStatuses = filter != null && filter.getExcludeStatuses() != null && !filter.getExcludeStatuses().isEmpty();
         if (!callerConstrainsStatus && !callerHidesStatuses) {
-            criteriaList.add(Criteria.where("status").nin(DeviceStatus.INACTIVE_TARGETS));
+            criteriaList.add(Criteria.where("status").ne(DeviceStatus.DELETED));
         }
         if (callerHidesStatuses) {
             criteriaList.add(Criteria.where("status").nin(filter.getExcludeStatuses()));

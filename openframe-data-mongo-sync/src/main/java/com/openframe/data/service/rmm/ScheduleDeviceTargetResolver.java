@@ -54,15 +54,15 @@ public class ScheduleDeviceTargetResolver {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        return dropInactive(schedule.getTenantId(), assignedIds);
+        return keepDispatchable(schedule.getTenantId(), assignedIds);
     }
 
-    private List<String> dropInactive(String tenantId, List<String> machineIds) {
+    private List<String> keepDispatchable(String tenantId, List<String> machineIds) {
         if (machineIds.isEmpty()) {
             return machineIds;
         }
         Set<String> valid = machineRepository.findByTenantIdAndMachineIdIn(tenantId, machineIds).stream()
-                .filter(m -> !DeviceStatus.INACTIVE_TARGETS.contains(m.getStatus()))
+                .filter(m -> DeviceStatus.DISPATCH_ELIGIBLE.contains(m.getStatus()))
                 .map(Machine::getMachineId)
                 .collect(Collectors.toSet());
         return machineIds.stream().filter(valid::contains).toList();

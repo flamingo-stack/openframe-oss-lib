@@ -179,7 +179,7 @@ class ScheduleScriptDeviceServiceTest {
     }
 
     private static Machine machine(String machineId, String hostname, OsType osType) {
-        return machine(machineId, hostname, osType, null);
+        return machine(machineId, hostname, osType, DeviceStatus.ONLINE);
     }
 
     private static Machine machine(String machineId, String hostname, OsType osType, DeviceStatus status) {
@@ -437,7 +437,7 @@ class ScheduleScriptDeviceServiceTest {
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-live", "m-decom"), "user-1"))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("pending deletion")
+                .hasMessageContaining("dispatchable state")
                 .hasMessageContaining("decom-box");   // uses hostname when set
         verify(assignedRepository, never()).saveAll(any());
     }
@@ -451,7 +451,7 @@ class ScheduleScriptDeviceServiceTest {
 
         assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-gone"), "user-1"))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("pending deletion or deleted")
+                .hasMessageContaining("dispatchable state")
                 .hasMessageContaining("m-gone");   // falls back to machineId when hostname null
         verify(assignedRepository, never()).saveAll(any());
     }

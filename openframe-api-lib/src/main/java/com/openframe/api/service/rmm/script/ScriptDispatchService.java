@@ -281,9 +281,9 @@ public class ScriptDispatchService {
     private void verifyMachine(String machineId) {
         Machine machine = deviceService.findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
-        if (DeviceStatus.INACTIVE_TARGETS.contains(machine.getStatus())) {
+        if (!DeviceStatus.DISPATCH_ELIGIBLE.contains(machine.getStatus())) {
             throw new BadRequestException(
-                    "Machine is pending deletion or deleted: " + machineId);
+                    "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + machineId);
         }
     }
 
