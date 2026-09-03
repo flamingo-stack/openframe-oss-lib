@@ -24,6 +24,16 @@ public final class AuthStateUtils {
         }
     }
 
+    /**
+     * Drops every SSO flow cookie. Used on flow failure: a cookie that outlives its failed flow
+     * keeps injecting its state into subsequent logins and steals their callbacks.
+     */
+    public static void clearSsoFlowCookies(HttpServletResponse response) {
+        for (String name : SSO_FLOW_COOKIES) {
+            clearCookie(response, name);
+        }
+    }
+
     public static void clearAuthState(HttpServletRequest request, HttpServletResponse response) {
         var existing = request.getSession(false);
         if (existing != null) {
