@@ -62,6 +62,11 @@ export interface CreateOrganizationFormProps {
   termsUrl?: string;
   privacyPolicyUrl?: string;
   submitLabel?: string;
+  /**
+   * Extra fields, rendered after the account block and before the terms — the same slot
+   * CompleteAccountForm offers, for inputs a deployment adds conditionally (a dev-only PR number).
+   */
+  children?: ReactNode;
   /** Renders a back action beside the submit when supplied (e.g. to return to an earlier step). */
   onBack?: () => void;
   backLabel?: string;
@@ -133,6 +138,7 @@ export function CreateOrganizationForm({
   termsUrl = '#',
   privacyPolicyUrl = '#',
   submitLabel = 'Continue',
+  children,
   onBack,
   backLabel = 'Back',
   submitDisabled = false,
@@ -241,6 +247,8 @@ export function CreateOrganizationForm({
           onKeyDown={handleKeyDown}
         />
       )}
+
+      {children}
 
       {/* Terms & Privacy — deliberately NOT `truncateLabel`. That prop suits a
           one-line value; this label is a sentence carrying the Terms and Privacy
