@@ -34,6 +34,7 @@ import MuxPlayer from '@mux/mux-player-react';
 import type React from 'react';
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useAuthedAssetSrc } from '../../hooks/use-authed-asset-src';
+import { useNearViewport } from '../../hooks/use-near-viewport';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 import { Button } from '../ui/button';
 import { useIosNativeVideoFullscreen } from './use-ios-native-video-fullscreen';
@@ -397,6 +398,14 @@ interface VideoCommonProps {
   /** Accessible label (used as YT facade title; ignored for file branch). */
   title?: string;
   /**
+   * Mount the player only once its box comes near the viewport (shared
+   * fire-once IntersectionObserver, `NEAR_VIEWPORT_ROOT_MARGIN` lookahead).
+   * Until then the box shows the poster (or nothing) — the caller's container
+   * still owns the size, so nothing shifts when the player mounts. For grids
+   * of players: a library of 20 clips costs 20 posters, not 20 players.
+   */
+  lazy?: boolean;
+  /**
    * YouTube-only: hide YT player chrome (controls, info, fullscreen, related
    * videos, keyboard shortcuts). Used for marketing/landing-page embeds that
    * want a minimal look. No-op for file (MP4/HLS) branches.
@@ -552,11 +561,30 @@ export type VideoProps = VideoFileProps | VideoYouTubeProps | VideoAutoProps;
 // =============================================================================
 
 export function Video(props: VideoProps): React.ReactElement | null {
+  // Hooks run unconditionally; the gate only applies when `lazy` is set.
+  const { ref: nearRef, isNear } = useNearViewport<HTMLDivElement>();
   const url = props.url;
   if (!url) return null;
 
   const effectiveKind = resolveKind(props, url);
   const layout = props.layout ?? 'native';
+
+  if (props.lazy && !isNear) {
+    // Same box, poster only: the observer target IS the reserved space.
+    return wrapWithLayout(
+      <div
+        ref={nearRef}
+        className={props.className}
+        style={
+          props.poster
+            ? { backgroundImage: `url(${props.poster})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+            : undefined
+        }
+        aria-hidden="true"
+      />,
+      layout,
+    );
+  }
 
   const inner =
     effectiveKind === 'youtube' ? (

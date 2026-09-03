@@ -26,6 +26,7 @@ import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
 import { formatDurationCompact, formatTimeWithTimezone, formatDurationFromRange } from '../../../utils/format';
+import { isImageMedia } from '../../../utils/media-type';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -51,7 +52,6 @@ import {
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
-
 type CardSize = 'default' | 'sm' | 'portrait';
 
 /**
@@ -273,7 +273,7 @@ export function ProgramCard<T extends BaseProgramItem>({
     aspect: size === 'sm' ? 'square' : 'wide',
   });
   const coverImage = item.cover_url;
-  const images = media.filter(m => m.media_type === 'image');
+  const images = media.filter(m => isImageMedia(m));
   const hosts = getHosts(item.hosts);
   const accentColor = 'var(--color-accent-primary)';
   // `status` / `duration_seconds` / `location_name` / `start_at` … live on the
