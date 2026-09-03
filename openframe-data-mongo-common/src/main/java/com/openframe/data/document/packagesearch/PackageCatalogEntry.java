@@ -24,7 +24,7 @@ public class PackageCatalogEntry {
 
     @Id
     private String id;
-    @Indexed
+    @Indexed(name = "manager_1")
     private PackageManagerType manager;
     private String packageId;
     private String name;
