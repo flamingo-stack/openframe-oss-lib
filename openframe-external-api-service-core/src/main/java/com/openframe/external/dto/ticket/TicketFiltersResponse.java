@@ -15,7 +15,7 @@ import java.util.List;
 @Schema(description = "Available ticket filter options")
 public class TicketFiltersResponse {
 
-    @Schema(description = "Statuses (values are status ids on lifecycle tenants, legacy status names otherwise)")
+    @Schema(description = "Statuses (values are status ids)")
     private List<TicketFilterOptionResponse> statuses;
 
     @Schema(description = "Customers (values are customer ids)")
