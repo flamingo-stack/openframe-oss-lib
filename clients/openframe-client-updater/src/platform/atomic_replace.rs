@@ -33,13 +33,9 @@ pub fn replace(target: &Path, new_binary: &Path, backup_path: &Path) -> Result<(
     Ok(())
 }
 
+/// Moves `backup` over `target` in one rename — the target is never absent.
 pub fn restore(backup: &Path, target: &Path) -> Result<()> {
-    if target.exists() {
-        std::fs::remove_file(target)
-            .with_context(|| format!("Failed to remove failed binary at {}", target.display()))?;
-    }
-
-    std::fs::rename(backup, target).with_context(|| {
+    rename_with_retry(backup, target).with_context(|| {
         format!(
             "Failed to restore {} to {}",
             backup.display(),
@@ -53,26 +49,22 @@ pub fn restore(backup: &Path, target: &Path) -> Result<()> {
 
 /// Restores `source` to `target` by copy, leaving `source` in place.
 /// Used for the last-known-good reserve, which must survive the rollback.
+/// The copy lands in a synced temp sibling first, so a partial copy can never
+/// replace the target.
 pub fn restore_copy(source: &Path, target: &Path) -> Result<()> {
-    if target.exists() {
-        std::fs::remove_file(target)
-            .with_context(|| format!("Failed to remove failed binary at {}", target.display()))?;
-    }
+    let bytes =
+        std::fs::read(source).with_context(|| format!("Failed to read {}", source.display()))?;
+    let temp_path = write_temp(&bytes, target)?;
 
-    std::fs::copy(source, target).with_context(|| {
-        format!(
-            "Failed to copy {} to {}",
-            source.display(),
-            target.display()
-        )
-    })?;
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o755);
-        std::fs::set_permissions(target, perms)
-            .with_context(|| format!("Failed to set permissions on {}", target.display()))?;
+    if let Err(e) = rename_with_retry(&temp_path, target) {
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(e).with_context(|| {
+            format!(
+                "Failed to restore {} to {}",
+                source.display(),
+                target.display()
+            )
+        });
     }
 
     info!("Restored reserve copy to: {}", target.display());

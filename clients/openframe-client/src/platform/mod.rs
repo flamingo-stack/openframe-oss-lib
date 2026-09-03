@@ -9,6 +9,7 @@ pub mod installation_detector;
 pub mod machine_info_persistence;
 pub mod permissions;
 pub mod system_service;
+pub mod tool_ops_marker;
 pub mod tool_updater;
 pub mod uninstall;
 pub mod user_session;
@@ -39,6 +40,7 @@ pub use installation_detector::detect_actual_installation;
 pub use permissions::{Capability, PermissionError, PermissionUtils, Permissions};
 #[cfg(target_os = "windows")]
 pub use powershell::get_powershell_path;
+pub use tool_ops_marker::write_in_flight_tool_ops;
 pub(crate) use tool_updater::clear_aside_binary;
 pub use tool_updater::{
     create_migrator, create_updater, needs_migration, run_migration, run_update, ToolUpdater,

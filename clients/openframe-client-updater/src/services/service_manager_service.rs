@@ -1,8 +1,10 @@
 use anyhow::{anyhow, Context, Result};
 use std::path::PathBuf;
-use tracing::info;
+use tracing::{info, warn};
 
-use crate::config::updater_config::SERVICE_STOP_TIMEOUT_SECS;
+use crate::config::updater_config::{
+    SERVICE_STATE_QUERY_ATTEMPTS, SERVICE_STATE_QUERY_RETRY_DELAY_SECS, SERVICE_STOP_TIMEOUT_SECS,
+};
 
 /// Stops and starts `com.openframe.client` using native OS APIs.
 /// No PowerShell, no subprocesses on Windows.
@@ -49,6 +51,30 @@ impl ServiceManagerService {
         tokio::task::spawn_blocking(move || Self::is_running(service_name))
             .await
             .context("Service status task failed to join")?
+    }
+
+    /// Service state with transient query failures retried; `None` means the
+    /// state could not be determined (SCM/launchctl kept failing) — callers
+    /// must not treat that as "stopped".
+    pub async fn query_running(service_name: &'static str) -> Option<bool> {
+        for attempt in 1..=SERVICE_STATE_QUERY_ATTEMPTS {
+            match Self::is_running_async(service_name).await {
+                Ok(running) => return Some(running),
+                Err(e) => {
+                    warn!(
+                        "Service state query {}/{} for {} failed: {:#}",
+                        attempt, SERVICE_STATE_QUERY_ATTEMPTS, service_name, e
+                    );
+                    if attempt < SERVICE_STATE_QUERY_ATTEMPTS {
+                        tokio::time::sleep(std::time::Duration::from_secs(
+                            SERVICE_STATE_QUERY_RETRY_DELAY_SECS,
+                        ))
+                        .await;
+                    }
+                }
+            }
+        }
+        None
     }
 
     /// Returns the standard install path for the openframe-client binary.

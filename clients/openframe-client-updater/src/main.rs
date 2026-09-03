@@ -1,8 +1,10 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use openframe_updater::config::updater_config::UPDATER_VERSION;
 use openframe_updater::platform::directories::DirectoryManager;
 use openframe_updater::platform::permissions::PermissionUtils;
 use openframe_updater::service::UpdaterService;
+use openframe_updater::utils::rotating_log_file::RotatingLogFile;
 use std::path::PathBuf;
 use std::process;
 use tokio::runtime::Runtime;
@@ -30,7 +32,7 @@ fn ensure_admin_privileges() {
 }
 
 #[derive(Parser)]
-#[command(author, version, about = "OpenFrame Client Updater Service")]
+#[command(author, version = UPDATER_VERSION, about = "OpenFrame Client Updater Service")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -61,7 +63,7 @@ fn log_file_path(dir_manager: &DirectoryManager) -> PathBuf {
 
 /// Initialises tracing with two layers:
 ///   - stdout  (compact, for service manager capture)
-///   - file    (non-blocking, same path openframe-client will tail)
+///   - file    (non-blocking, rotating, same path openframe-client will tail)
 ///
 /// Returns the `WorkerGuard` — drop it only when the process exits.
 fn init_logging(dir_manager: &DirectoryManager) -> WorkerGuard {
@@ -74,14 +76,10 @@ fn init_logging(dir_manager: &DirectoryManager) -> WorkerGuard {
         }
     }
 
-    let file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to open log file {}: {}", log_path.display(), e);
-            process::exit(1);
-        });
+    let file = RotatingLogFile::open(log_path.clone()).unwrap_or_else(|e| {
+        eprintln!("Failed to open log file {}: {}", log_path.display(), e);
+        process::exit(1);
+    });
 
     let (file_writer, guard) = tracing_appender::non_blocking::NonBlockingBuilder::default()
         .lossy(false)
@@ -126,10 +124,7 @@ fn main() -> Result<()> {
     // and closes the file writer thread.
     let _log_guard = init_logging(&dir_manager);
 
-    info!(
-        "OpenFrame Client Updater v{}",
-        openframe_updater::config::updater_config::UPDATER_VERSION
-    );
+    info!("OpenFrame Client Updater v{}", UPDATER_VERSION);
     info!("Log file: {}", log_file_path(&dir_manager).display());
 
     let cli = Cli::parse();

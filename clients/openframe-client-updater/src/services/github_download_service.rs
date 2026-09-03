@@ -2,11 +2,11 @@ use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use reqwest::Client;
 use std::io::Cursor;
-use tokio::time::Duration;
+use tokio::time::{Duration, Instant};
 use tracing::{info, warn};
 
 use crate::config::updater_config::{
-    DOWNLOAD_TIMEOUT_SECS, MAX_DOWNLOAD_RETRIES, MIN_BINARY_SIZE_BYTES,
+    DOWNLOAD_TIMEOUT_SECS, DOWNLOAD_TOTAL_BUDGET_SECS, MAX_DOWNLOAD_RETRIES, MIN_BINARY_SIZE_BYTES,
 };
 use crate::models::DownloadConfiguration;
 
@@ -40,17 +40,29 @@ impl GithubDownloadService {
             ));
         }
 
-        let binary_bytes = if config.file_name.ends_with(".zip") {
-            info!("Extracting from ZIP: target={}", config.target_file_name);
-            self.extract_from_zip(archive_bytes, &config.target_file_name)
-                .context("Failed to extract from ZIP archive")?
-        } else if config.file_name.ends_with(".tar.gz") || config.file_name.ends_with(".tgz") {
-            info!("Extracting from tar.gz: target={}", config.target_file_name);
-            self.extract_from_tar_gz(archive_bytes, &config.target_file_name)
-                .context("Failed to extract from tar.gz archive")?
-        } else {
+        let is_zip = config.file_name.ends_with(".zip");
+        let is_tar_gz = config.file_name.ends_with(".tar.gz") || config.file_name.ends_with(".tgz");
+        if !is_zip && !is_tar_gz {
             return Err(anyhow!("Unsupported archive format: {}", config.file_name));
-        };
+        }
+
+        let service = self.clone();
+        let target_file_name = config.target_file_name.clone();
+        let binary_bytes = tokio::task::spawn_blocking(move || {
+            if is_zip {
+                info!("Extracting from ZIP: target={}", target_file_name);
+                service
+                    .extract_from_zip(archive_bytes, &target_file_name)
+                    .context("Failed to extract from ZIP archive")
+            } else {
+                info!("Extracting from tar.gz: target={}", target_file_name);
+                service
+                    .extract_from_tar_gz(archive_bytes, &target_file_name)
+                    .context("Failed to extract from tar.gz archive")
+            }
+        })
+        .await
+        .context("Archive extraction task failed to join")??;
 
         if binary_bytes.len() < MIN_BINARY_SIZE_BYTES as usize {
             return Err(anyhow!(
@@ -83,19 +95,31 @@ impl GithubDownloadService {
 
     async fn download_with_retry(&self, url: &str) -> Result<Bytes> {
         let mut last_error = None;
+        let deadline = Instant::now() + Duration::from_secs(DOWNLOAD_TOTAL_BUDGET_SECS);
+        let attempt_timeout = |deadline: Instant| {
+            deadline
+                .saturating_duration_since(Instant::now())
+                .min(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
+        };
 
         for attempt in 1..=MAX_DOWNLOAD_RETRIES {
+            let timeout = attempt_timeout(deadline);
+            if timeout.is_zero() {
+                warn!(
+                    "Download budget of {}s exhausted before attempt {}",
+                    DOWNLOAD_TOTAL_BUDGET_SECS, attempt
+                );
+                break;
+            }
             info!(
-                "Download attempt {}/{}: {}",
-                attempt, MAX_DOWNLOAD_RETRIES, url
+                "Download attempt {}/{} ({}s budget left): {}",
+                attempt,
+                MAX_DOWNLOAD_RETRIES,
+                timeout.as_secs(),
+                url
             );
 
-            match tokio::time::timeout(
-                Duration::from_secs(DOWNLOAD_TIMEOUT_SECS),
-                self.download(url),
-            )
-            .await
-            {
+            match tokio::time::timeout(timeout, self.download(url)).await {
                 Ok(Ok(bytes)) => {
                     info!("Download succeeded on attempt {}", attempt);
                     return Ok(bytes);
@@ -107,7 +131,7 @@ impl GithubDownloadService {
                         info!("CDN URL: {}", cdn_url);
 
                         match tokio::time::timeout(
-                            Duration::from_secs(DOWNLOAD_TIMEOUT_SECS),
+                            attempt_timeout(deadline),
                             self.download(&cdn_url),
                         )
                         .await
@@ -131,23 +155,31 @@ impl GithubDownloadService {
                     last_error = Some(e);
                 }
                 Err(_) => {
-                    warn!(
-                        "Attempt {} timed out after {}s",
-                        attempt, DOWNLOAD_TIMEOUT_SECS
-                    );
-                    last_error = Some(anyhow!("Timeout after {}s", DOWNLOAD_TIMEOUT_SECS));
+                    warn!("Attempt {} timed out after {}s", attempt, timeout.as_secs());
+                    last_error = Some(anyhow!("Timeout after {}s", timeout.as_secs()));
                 }
             }
 
             if attempt < MAX_DOWNLOAD_RETRIES {
-                let delay = attempt * 2;
-                info!("Retrying in {}s", delay);
-                tokio::time::sleep(Duration::from_secs(delay as u64)).await;
+                let delay = Duration::from_secs((attempt * 2) as u64);
+                if Instant::now() + delay >= deadline {
+                    warn!(
+                        "Download budget of {}s exhausted after attempt {}",
+                        DOWNLOAD_TOTAL_BUDGET_SECS, attempt
+                    );
+                    break;
+                }
+                info!("Retrying in {}s", delay.as_secs());
+                tokio::time::sleep(delay).await;
             }
         }
 
-        Err(last_error
-            .unwrap_or_else(|| anyhow!("Download failed after {} attempts", MAX_DOWNLOAD_RETRIES)))
+        Err(last_error.unwrap_or_else(|| {
+            anyhow!(
+                "Download failed within the {}s budget",
+                DOWNLOAD_TOTAL_BUDGET_SECS
+            )
+        }))
     }
 
     async fn download(&self, url: &str) -> Result<Bytes> {

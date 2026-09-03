@@ -14,10 +14,11 @@ use crate::platform::{atomic_replace, DirectoryManager};
 use crate::services::last_known_good_service::LastKnownGoodService;
 use crate::services::token_provider::TokenProvider;
 use crate::services::{
-    AgentConfigurationService, ClientUpdateService, GithubDownloadService,
+    AgentConfigurationService, ClientToolOpProbe, ClientUpdateService, GithubDownloadService,
     InitialConfigurationService, LocalTlsConfigProvider, NatsConnectionManager,
     NatsMessagePublisher, ServiceManagerService, UpdateProgressPublisher, UpdaterStateService,
 };
+use crate::utils::blocking::run_blocking;
 
 /// Outcome of crash recovery — recovery itself is purely local; the report is
 /// published once NATS is up.
@@ -166,6 +167,7 @@ impl UpdaterOrchestrator {
             state_service,
             progress_publisher,
             lkg_service,
+            ClientToolOpProbe::new(&self.dir_manager),
         );
 
         let listener =
@@ -230,13 +232,9 @@ impl UpdaterOrchestrator {
             }
 
             UpdaterPhase::StoppingService | UpdaterPhase::ReplacingBinary => {
-                let report = self.restore_and_start(
-                    &state.backup_path,
-                    &target,
-                    version,
-                    lkg_service,
-                    false,
-                );
+                let report = self
+                    .restore_and_start(&state.backup_path, &target, version, lkg_service, false)
+                    .await;
                 state_service.clear()?;
                 Some(report)
             }
@@ -245,16 +243,18 @@ impl UpdaterOrchestrator {
             // phases the marker is the source of truth: only a marker carrying
             // the target version proves the new binary booted. The marker alone
             // proves a *past* boot though — promotion additionally requires the
-            // service to be running now (started here if needed).
+            // service to be running now (started here if needed). A state query
+            // that keeps failing is "unknown", never grounds for a rollback.
             UpdaterPhase::StartingService
             | UpdaterPhase::VerifyingBoot
             | UpdaterPhase::Observing => {
-                if !matches!(
-                    ServiceManagerService::is_running(CLIENT_SERVICE_FULL_NAME),
-                    Ok(true)
-                ) {
-                    info!("Crash recovery: service not running — attempting start");
-                    if let Err(e) = ServiceManagerService::start(CLIENT_SERVICE_FULL_NAME) {
+                if ServiceManagerService::query_running(CLIENT_SERVICE_FULL_NAME).await
+                    != Some(true)
+                {
+                    info!("Crash recovery: service not confirmed running — attempting start");
+                    if let Err(e) =
+                        ServiceManagerService::start_async(CLIENT_SERVICE_FULL_NAME).await
+                    {
                         warn!("Crash recovery: start failed: {:#}", e);
                     }
                     tokio::time::sleep(Duration::from_secs(SERVICE_START_VERIFY_WAIT_SECS)).await;
@@ -277,14 +277,18 @@ impl UpdaterOrchestrator {
                     }
                 }
 
-                let running = matches!(
-                    ServiceManagerService::is_running(CLIENT_SERVICE_FULL_NAME),
-                    Ok(true)
-                );
+                let running = ServiceManagerService::query_running(CLIENT_SERVICE_FULL_NAME).await;
+                if running.is_none() {
+                    warn!("Crash recovery: service state unknown after retries — trusting the boot marker");
+                }
 
-                let report = if verified && running {
+                let report = if verified && running != Some(false) {
                     info!("Crash recovery: boot marker matches target and service is running — marking success");
-                    if let Err(e) = lkg_service.promote(version) {
+                    let promoted = {
+                        let (lkg, version) = (lkg_service.clone(), version.clone());
+                        run_blocking(move || lkg.promote(&version)).await
+                    };
+                    if let Err(e) = promoted {
                         warn!(
                             "Crash recovery: failed to raise last-known-good anchor to {}: {:#}",
                             version, e
@@ -295,10 +299,11 @@ impl UpdaterOrchestrator {
                     }
                 } else {
                     warn!(
-                        "Crash recovery: not healthy (marker verified: {}, running: {}) — rolling back",
+                        "Crash recovery: not healthy (marker verified: {}, running: {:?}) — rolling back",
                         verified, running
                     );
                     self.restore_and_start(&state.backup_path, &target, version, lkg_service, true)
+                        .await
                 };
                 state_service.clear()?;
                 Some(report)
@@ -317,7 +322,7 @@ impl UpdaterOrchestrator {
         Ok(report)
     }
 
-    fn restore_and_start(
+    async fn restore_and_start(
         &self,
         backup_path: &Option<String>,
         target: &Path,
@@ -359,7 +364,7 @@ impl UpdaterOrchestrator {
         if candidates.is_empty() {
             if target.exists() {
                 info!("Crash recovery: client binary intact — ensuring service is running");
-                if let Err(e) = ServiceManagerService::start(CLIENT_SERVICE_FULL_NAME) {
+                if let Err(e) = ServiceManagerService::start_async(CLIENT_SERVICE_FULL_NAME).await {
                     error!("Crash recovery: failed to start service: {}", e);
                 }
                 return RecoveryReport::Failure {
@@ -379,11 +384,16 @@ impl UpdaterOrchestrator {
 
         let mut restored = false;
         for (source, is_reserve) in &candidates {
-            let result = if *is_reserve {
-                atomic_replace::restore_copy(source, target)
-            } else {
-                atomic_replace::restore(source, target)
-            };
+            let (source_owned, target_owned, is_reserve) =
+                (source.clone(), target.to_path_buf(), *is_reserve);
+            let result = run_blocking(move || {
+                if is_reserve {
+                    atomic_replace::restore_copy(&source_owned, &target_owned)
+                } else {
+                    atomic_replace::restore(&source_owned, &target_owned)
+                }
+            })
+            .await;
             match result {
                 Ok(()) => {
                     info!(
@@ -410,7 +420,7 @@ impl UpdaterOrchestrator {
             };
         }
 
-        if let Err(e) = ServiceManagerService::start(CLIENT_SERVICE_FULL_NAME) {
+        if let Err(e) = ServiceManagerService::start_async(CLIENT_SERVICE_FULL_NAME).await {
             error!("Crash recovery: failed to start restored service: {}", e);
         }
         RecoveryReport::Failure {

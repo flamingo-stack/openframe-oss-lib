@@ -2,9 +2,8 @@ use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::models::tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
 use crate::models::{Installation, InstalledAsset, ToolRecordState};
 use crate::platform::{
-    binary_writer, clear_aside_binary, detect_actual_installation, in_flight_client_update_phase,
-    needs_migration, run_migration, run_update, DirectoryManager, ToolUpdaterDeps,
-    UPDATER_TOOL_AGENT_ID,
+    binary_writer, clear_aside_binary, detect_actual_installation, needs_migration, run_migration,
+    run_update, DirectoryManager, ToolUpdaterDeps,
 };
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::tool_run_manager::ToolRunManager;
@@ -13,7 +12,7 @@ use crate::services::InstalledAgentMessagePublisher;
 use crate::services::InstalledToolsService;
 use crate::services::ToolCommandParamsResolver;
 use crate::services::ToolKillService;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use tracing::{error, info, warn};
 
 #[derive(Clone)]
@@ -69,12 +68,6 @@ impl ToolAgentUpdateService {
             "Processing tool agent update for tool: {} to version: {}",
             tool_agent_id, new_version
         );
-
-        if tool_agent_id == UPDATER_TOOL_AGENT_ID {
-            if let Some(phase) = in_flight_client_update_phase() {
-                bail!("client update in flight (updater phase: {phase}) — deferring updater self-update to redelivery");
-            }
-        }
 
         // Check if tool is installed
         let mut installed_tool = match self

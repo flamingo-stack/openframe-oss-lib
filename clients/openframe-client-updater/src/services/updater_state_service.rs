@@ -48,14 +48,22 @@ impl UpdaterStateService {
             serde_json::to_string_pretty(state).context("Failed to serialize updater state")?;
 
         let temp_path = self.state_file_path.with_extension("json.tmp");
-        fs::write(&temp_path, json)
-            .with_context(|| format!("Failed to write {}", temp_path.display()))?;
+        {
+            use std::io::Write;
+            let mut file = fs::File::create(&temp_path)
+                .with_context(|| format!("Failed to create {}", temp_path.display()))?;
+            file.write_all(json.as_bytes())
+                .with_context(|| format!("Failed to write {}", temp_path.display()))?;
+            file.sync_all()
+                .with_context(|| format!("Failed to sync {}", temp_path.display()))?;
+        }
         fs::rename(&temp_path, &self.state_file_path).with_context(|| {
             format!(
                 "Failed to move state file into place: {}",
                 self.state_file_path.display()
             )
         })?;
+        self.sync_parent_dir()?;
 
         info!(phase = %state.phase, version = %state.target_version, "Saved updater state");
         Ok(())
@@ -65,8 +73,24 @@ impl UpdaterStateService {
         if self.state_file_path.exists() {
             fs::remove_file(&self.state_file_path)
                 .with_context(|| format!("Failed to remove {}", self.state_file_path.display()))?;
+            self.sync_parent_dir()?;
             info!("Cleared updater state file");
         }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    fn sync_parent_dir(&self) -> Result<()> {
+        if let Some(parent) = self.state_file_path.parent() {
+            fs::File::open(parent)
+                .and_then(|dir| dir.sync_all())
+                .with_context(|| format!("Failed to sync directory {}", parent.display()))?;
+        }
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    fn sync_parent_dir(&self) -> Result<()> {
         Ok(())
     }
 

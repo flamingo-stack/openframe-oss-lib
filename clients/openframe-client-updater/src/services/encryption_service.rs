@@ -1,5 +1,5 @@
 use aes_gcm::{
-    aead::{generic_array::GenericArray, rand_core::RngCore, Aead, KeyInit, OsRng},
+    aead::{generic_array::GenericArray, Aead, KeyInit},
     Aes256Gcm,
 };
 use anyhow::Result;
@@ -22,7 +22,10 @@ impl EncryptionService {
         Self
     }
 
+    #[cfg(test)]
     pub fn encrypt(&self, data: &str) -> Result<String> {
+        use aes_gcm::aead::{rand_core::RngCore, OsRng};
+
         let key = Aes256Gcm::new_from_slice(Self::KEY.as_bytes())
             .map_err(|e| anyhow::anyhow!("Failed to create encryption key: {}", e))?;
 

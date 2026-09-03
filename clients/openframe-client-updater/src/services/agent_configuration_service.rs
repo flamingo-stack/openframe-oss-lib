@@ -1,19 +1,14 @@
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 use crate::models::AgentConfiguration;
 use crate::platform::DirectoryManager;
 
 // Credentials read from agent_config.json (owned by the main client, never written here).
-// Tokens are in-memory only — avoids racing the main client on the shared file.
 #[derive(Clone)]
 pub struct AgentConfigurationService {
     config_file_path: PathBuf,
-    access_token: Arc<RwLock<String>>,
-    refresh_token: Arc<RwLock<String>>,
 }
 
 impl AgentConfigurationService {
@@ -24,11 +19,7 @@ impl AgentConfigurationService {
             .ensure_directories()
             .with_context(|| "Failed to ensure secured directory exists")?;
 
-        Ok(Self {
-            config_file_path,
-            access_token: Arc::new(RwLock::new(String::new())),
-            refresh_token: Arc::new(RwLock::new(String::new())),
-        })
+        Ok(Self { config_file_path })
     }
 
     pub async fn get_machine_id(&self) -> Result<String> {
@@ -38,20 +29,6 @@ impl AgentConfigurationService {
     pub async fn get_client_credentials(&self) -> Result<(String, String)> {
         let cfg = self.read_config()?;
         Ok((cfg.client_id, cfg.client_secret))
-    }
-
-    pub async fn get_access_token(&self) -> Result<String> {
-        Ok(self.access_token.read().await.clone())
-    }
-
-    pub async fn get_refresh_token(&self) -> Result<String> {
-        Ok(self.refresh_token.read().await.clone())
-    }
-
-    pub async fn update_tokens(&self, access_token: String, refresh_token: String) -> Result<()> {
-        *self.access_token.write().await = access_token;
-        *self.refresh_token.write().await = refresh_token;
-        Ok(())
     }
 
     fn read_config(&self) -> Result<AgentConfiguration> {

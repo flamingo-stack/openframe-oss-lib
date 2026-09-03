@@ -1,4 +1,5 @@
 pub mod agent_configuration_service;
+pub mod client_tool_op_probe;
 pub mod client_update_service;
 pub mod encryption_service;
 pub mod github_download_service;
@@ -14,6 +15,7 @@ pub mod updater_orchestrator;
 pub mod updater_state_service;
 
 pub use agent_configuration_service::AgentConfigurationService;
+pub use client_tool_op_probe::ClientToolOpProbe;
 pub use client_update_service::ClientUpdateService;
 pub use encryption_service::EncryptionService;
 pub use github_download_service::GithubDownloadService;

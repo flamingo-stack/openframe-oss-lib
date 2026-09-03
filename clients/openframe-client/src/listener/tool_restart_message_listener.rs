@@ -5,7 +5,6 @@ use crate::config::update_config::{
 };
 use crate::listener::client_update_gate::park_or_dispatch;
 use crate::models::ToolRestartMessage;
-use crate::platform::{in_flight_client_update_phase, UPDATER_TOOL_AGENT_ID};
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::tool_restart_service::RestartOutcome;
 use crate::services::tool_restart_service::ToolRestartService;
@@ -152,13 +151,6 @@ impl ToolRestartMessageListener {
     }
 
     async fn dispatch(&self, message: Message, tool_agent_id: String) {
-        if tool_agent_id == UPDATER_TOOL_AGENT_ID {
-            if let Some(phase) = in_flight_client_update_phase() {
-                info!("Client update in flight (updater phase: {phase}), deferring updater restart for redelivery");
-                return;
-            }
-        }
-
         let ack_message = match self
             .tool_restart_service
             .restart_guarded(&tool_agent_id)

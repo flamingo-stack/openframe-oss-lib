@@ -1,5 +1,5 @@
 use crate::models::installed_tool::{Installation, InstalledTool, ToolRecordState};
-use crate::platform::system_service;
+use crate::platform::{system_service, write_in_flight_tool_ops};
 use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
 use crate::services::tool_kill_service::ToolKillService;
@@ -410,6 +410,7 @@ impl ToolRunManager {
         params_processor: ToolCommandParamsResolver,
         tool_kill_service: ToolKillService,
     ) -> Self {
+        write_in_flight_tool_ops(params_processor.directory_manager.secured_dir(), &[]);
         Self {
             installed_tools_service,
             params_processor,
@@ -493,6 +494,16 @@ impl ToolRunManager {
             "Tool {} marked as updating (in-flight ops: {})",
             tool_id, *count
         );
+        self.publish_in_flight_tool_ops(&map);
+    }
+
+    fn publish_in_flight_tool_ops(&self, map: &HashMap<String, usize>) {
+        let mut tool_ids: Vec<String> = map.keys().cloned().collect();
+        tool_ids.sort();
+        write_in_flight_tool_ops(
+            self.params_processor.directory_manager.secured_dir(),
+            &tool_ids,
+        );
     }
 
     pub async fn clear_updating(&self, tool_id: &str) {
@@ -509,6 +520,7 @@ impl ToolRunManager {
                 );
             }
         }
+        self.publish_in_flight_tool_ops(&map);
     }
 
     pub async fn is_updating(&self, tool_id: &str) -> bool {

@@ -112,31 +112,6 @@ fn set_service_status(status_handle: &ServiceStatusHandle, state: ServiceState) 
 pub struct UpdaterService;
 
 impl UpdaterService {
-    pub fn is_installed() -> bool {
-        #[cfg(target_os = "windows")]
-        {
-            std::process::Command::new("sc")
-                .args(["query", FULL_SERVICE_NAME])
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false)
-        }
-
-        #[cfg(target_os = "macos")]
-        {
-            PathBuf::from(format!(
-                "/Library/LaunchDaemons/{}.plist",
-                FULL_SERVICE_NAME
-            ))
-            .exists()
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            PathBuf::from(format!("/etc/systemd/system/{}.service", FULL_SERVICE_NAME)).exists()
-        }
-    }
-
     /// Install the updater as an OS service.
     /// Requires agent_config.json to already exist (populated by main client install).
     pub async fn install() -> Result<()> {
