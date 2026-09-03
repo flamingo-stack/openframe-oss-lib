@@ -1,7 +1,6 @@
 package com.openframe.api.dto.notification;
 
 import com.openframe.data.document.notification.NotificationCategory;
-import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationSeverity;
 import lombok.Builder;
 
@@ -10,6 +9,6 @@ import java.util.Map;
 
 @Builder
 public record NotificationView(String id, NotificationSeverity severity, String title, String description,
-                               Instant createdAt, NotificationCategory category, NotificationContext context,
+                               Instant createdAt, NotificationCategory category,
                                String type, Map<String, String> attributes,
                                boolean read)     {}
