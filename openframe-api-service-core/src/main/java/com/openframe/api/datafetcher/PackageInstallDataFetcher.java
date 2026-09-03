@@ -13,9 +13,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.validation.annotation.Validated;
 
+// @Validated activates the @Valid input constraints — without it every @Pattern/@NotBlank here is dead
 @DgsComponent
 @RequiredArgsConstructor
+@Validated
 public class PackageInstallDataFetcher {
 
     private final PackageInstallService packageInstallService;
