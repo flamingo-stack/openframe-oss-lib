@@ -20,9 +20,6 @@ import java.util.List;
 @ConditionalOnProperty(name = "openframe.package-search.sync.enabled", havingValue = "true")
 public class PackageCatalogSyncScheduler {
 
-    // the lock is held for interval-minus-margin even after the sync finishes, so every other
-    // tenant firing within the interval skips its cycle; the margin guarantees the lock is
-    // released before the next cycle is due, otherwise phase drift between pods would skip cycles
     private static final Duration LOCK_MARGIN = Duration.ofMinutes(1);
 
     private final BrewCatalogFetcher brewCatalogFetcher;
