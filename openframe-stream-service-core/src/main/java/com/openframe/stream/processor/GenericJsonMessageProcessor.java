@@ -26,8 +26,9 @@ public class GenericJsonMessageProcessor {
     private final Map<EventHandlerType, Map<Destination, MessageHandler>> handlers;
     private final Map<DataEnrichmentServiceType, DataEnrichmentService> dataEnrichmentServices;
     private final Map<MessageType, KafkaMessageDeserializer> deserializers;
+    private final List<ProcessedMessageObserver> observers;
 
-    public GenericJsonMessageProcessor(List<MessageHandler> handlers, List<DataEnrichmentService> dataEnrichmentServices, List<KafkaMessageDeserializer> deserializers) {
+    public GenericJsonMessageProcessor(List<MessageHandler> handlers, List<DataEnrichmentService> dataEnrichmentServices, List<KafkaMessageDeserializer> deserializers, List<ProcessedMessageObserver> observers) {
         this.handlers = handlers.stream()
                 .collect(Collectors.groupingBy(
                         MessageHandler::getType,
@@ -40,6 +41,7 @@ public class GenericJsonMessageProcessor {
                 .collect(Collectors.toMap(DataEnrichmentService::getType, Function.identity()));
         this.deserializers = deserializers.stream()
                 .collect(Collectors.toMap(KafkaMessageDeserializer::getType, Function.identity()));
+        this.observers = observers;
     }
 
     public void process(CommonDebeziumMessage message, MessageType type) {
@@ -63,6 +65,22 @@ public class GenericJsonMessageProcessor {
             }
             handler.handle(deserializedKafkaMessage, enrichedData);
         });
+        notifyObservers(type, deserializedKafkaMessage, enrichedData);
+    }
+
+    // An observer only reads the event, so its failure must not fail the batch: the destinations above
+    // have already been written and a redelivery would write them twice.
+    private void notifyObservers(MessageType type, DeserializedDebeziumMessage message, IntegratedToolEnrichedData enrichedData) {
+        observers.forEach(observer -> notifyObserver(observer, type, message, enrichedData));
+    }
+
+    private void notifyObserver(ProcessedMessageObserver observer, MessageType type,
+                                DeserializedDebeziumMessage message, IntegratedToolEnrichedData enrichedData) {
+        try {
+            observer.onProcessed(type, message, enrichedData);
+        } catch (Exception e) {
+            log.error("Observer {} failed on {}", observer.getClass().getSimpleName(), type, e);
+        }
     }
 
     private DeserializedDebeziumMessage deserialize(CommonDebeziumMessage message, MessageType type) {
