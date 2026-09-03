@@ -1,0 +1,37 @@
+package com.openframe.api.datafetcher;
+
+import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsMutation;
+import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dto.packageinstall.InstallPackageInput;
+import com.openframe.api.dto.packageinstall.UninstallPackageInput;
+import com.openframe.api.dto.rmm.DispatchResponse;
+import com.openframe.api.service.packageinstall.PackageInstallService;
+import com.openframe.security.authentication.AuthPrincipal;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+@DgsComponent
+@RequiredArgsConstructor
+public class PackageInstallDataFetcher {
+
+    private final PackageInstallService packageInstallService;
+
+    @DgsMutation
+    public DispatchResponse installPackage(@InputArgument @Valid InstallPackageInput input) {
+        return packageInstallService.install(input, getCurrentUserId());
+    }
+
+    @DgsMutation
+    public DispatchResponse uninstallPackage(@InputArgument @Valid UninstallPackageInput input) {
+        return packageInstallService.uninstall(input, getCurrentUserId());
+    }
+
+    private String getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
+    }
+}

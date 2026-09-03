@@ -1,0 +1,29 @@
+# Software install / uninstall on a managed machine through its OS package
+# manager (brew / choco / winget).
+#
+# The server resolves the package in the manager's catalog and builds the
+# script itself — clients never send a command string. Dispatch rides the RMM
+# batch-command engine, so the returned executionId is polled for status and
+# execution logs via commandExecutions(executionId).
+
+extend type Mutation {
+    installPackage(input: InstallPackageInput!): DispatchResponse!
+    uninstallPackage(input: UninstallPackageInput!): DispatchResponse!
+}
+
+input InstallPackageInput {
+    machineId: String!
+    packageManager: PackageManagerType!
+    packageId: ID!
+    "Disambiguates Homebrew ids that exist as both formula and cask."
+    packageType: BrewPackageType
+    "Exact version to install — CHOCO / WINGET only, Homebrew always installs the latest."
+    version: String
+}
+
+input UninstallPackageInput {
+    machineId: String!
+    packageManager: PackageManagerType!
+    packageId: ID!
+    packageType: BrewPackageType
+}
