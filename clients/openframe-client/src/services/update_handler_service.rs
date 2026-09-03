@@ -140,17 +140,6 @@ impl UpdateHandlerService {
                 );
                 Ok(())
             }
-            UpdatePhase::Failed => {
-                warn!(
-                    "Updater script reported failure for {} (running {}): {}",
-                    update_state.target_version,
-                    running_version,
-                    update_state.last_error.as_deref().unwrap_or(
-                        "no reason recorded, see the updater transcript in the logs directory"
-                    )
-                );
-                self.handle_failure(update_state).await
-            }
             _ => self.handle_failure(update_state).await,
         }
     }
@@ -205,9 +194,14 @@ impl UpdateHandlerService {
     }
 
     async fn handle_failure(&self, state: UpdateState) -> Result<()> {
-        info!(
-            "Update to {} failed (phase: {:?}; binary restore is owned by the updater script)",
-            state.target_version, state.phase
+        warn!(
+            "Update to {} failed (phase: {:?}): {}",
+            state.target_version,
+            state.phase,
+            state
+                .last_error
+                .as_deref()
+                .unwrap_or("no reason recorded, see the updater transcript in the logs directory")
         );
 
         if let Err(e) = self

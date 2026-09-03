@@ -137,6 +137,8 @@ fail_rollback() {
     done
 
     if [ $RESTORED -eq 1 ]; then
+        # Stamped before the load so the restored client's first boot already sees the final phase
+        set_update_phase "rolled_back"
         if launchctl load "$PLIST_PATH" 2>/dev/null; then
             RB_ELAPSED=0
             while ! service_loaded && [ $RB_ELAPSED -lt 30 ]; do
@@ -144,7 +146,6 @@ fail_rollback() {
                 RB_ELAPSED=$((RB_ELAPSED + 1))
             done
             if service_loaded; then
-                set_update_phase "rolled_back"
                 log "Rollback complete, service restarted"
             else
                 set_update_phase "failed"

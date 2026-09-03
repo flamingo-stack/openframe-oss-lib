@@ -218,6 +218,8 @@ catch {
                 throw "All restore attempts failed"
             }
 
+            # Stamped before the start so the restored client's first boot already sees the final phase
+            Set-UpdatePhase -Phase "rolled_back" -Reason $failure
             Start-Service -Name $ServiceName -ErrorAction Stop
             $rbElapsed = 0
             while ((Get-Service -Name $ServiceName).Status -ne 'Running' -and $rbElapsed -lt 30) {
@@ -228,7 +230,6 @@ catch {
                 throw "Service did not reach Running state after rollback"
             }
 
-            Set-UpdatePhase -Phase "rolled_back"
             Write-Output "Rollback complete, service restarted"
         }
         catch {

@@ -30,13 +30,30 @@ fn windows_update_script_stays_powershell3_compatible() {
     assert!(script.contains("# Requires Windows PowerShell 3.0+"));
     assert!(script.contains("[string]$NewExePath,"));
     assert!(script.contains("Set-UpdatePhase -Phase \"failed\" -Reason"));
+    let rollback = &script[script.find("All restore attempts failed").unwrap()
+        ..script.find("Rollback complete").unwrap()];
+    assert!(
+        rollback
+            .find("Set-UpdatePhase -Phase \"rolled_back\"")
+            .unwrap()
+            < rollback.find("Start-Service").unwrap(),
+        "rolled_back must be stamped before the service is started"
+    );
     assert!(script.contains("-NotePropertyName last_error"));
 }
 
 #[cfg(target_os = "macos")]
 #[test]
 fn macos_update_script_stamps_failed_phase() {
-    assert!(super::macos::UPDATE_SCRIPT_MACOS.contains("set_update_phase \"failed\""));
+    let script = super::macos::UPDATE_SCRIPT_MACOS;
+    assert!(script.contains("set_update_phase \"failed\""));
+    let rollback =
+        &script[script.find("fail_rollback()").unwrap()..script.find("Rollback complete").unwrap()];
+    assert!(
+        rollback.find("set_update_phase \"rolled_back\"").unwrap()
+            < rollback.find("launchctl load").unwrap(),
+        "rolled_back must be stamped before the service is loaded"
+    );
 }
 
 #[cfg(target_os = "macos")]
