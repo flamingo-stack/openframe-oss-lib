@@ -4,9 +4,10 @@ import { Trash2, Plus, Image as ImageIcon, Video as VideoIcon, Upload, Loader2, 
 import { useState, useRef } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 import Image from '../../embed-shims/next-image';
+import { isVideoMedia } from '../../utils/media-type';
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
-import { Video } from './video';
 
+import { Video } from './video';
 export interface ReleaseMediaItem {
   media_type: 'image' | 'video' | 'screenshot' | 'demo';
   media_url: string;
@@ -199,7 +200,7 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
                 {/* Media Preview */}
                 {item.media_url && (
                   <div className="relative aspect-video bg-ods-bg">
-                    {item.media_type === 'video' || item.media_type === 'demo' ? (
+                    {isVideoMedia(item) || item.media_type === 'demo' ? (
                       // <Video> SSOT (MuxPlayer) — plays Mux HLS + MP4 alike;
                       // fit="cover" crops to the aspect-video cell.
                       <Video kind="file" url={item.media_url} fit="cover" className="h-full w-full" />

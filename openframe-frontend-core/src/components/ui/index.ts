@@ -218,3 +218,6 @@ export * from './ticket-notes-section';
 export * from './marquee-wall';
 export * from './markdown';
 export * from './filter-pill-row';
+
+// Viewport-gated mounting for heavy previews (players, large images)
+export { LazyMount, type LazyMountProps } from './lazy-mount';
