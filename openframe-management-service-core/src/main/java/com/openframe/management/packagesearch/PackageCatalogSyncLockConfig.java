@@ -19,7 +19,7 @@ public class PackageCatalogSyncLockConfig {
             RedisConnectionFactory connectionFactory,
             OpenframeRedisKeyBuilder keyBuilder,
             @Value("${openframe.shedlock.environment:default}") String environment) {
-        String keyPrefix = keyBuilder.tenantKey("job-lock", "global");
+        String keyPrefix = keyBuilder.globalKey("job-lock");
         RedisLockProvider lockProvider = new RedisLockProvider(connectionFactory, environment, keyPrefix);
         return new DefaultLockingTaskExecutor(lockProvider);
     }
