@@ -365,3 +365,6 @@ export * from './embed-url-converters';
 export * from './hubspot-meetings-convention';
 export * from './page-header-constants';
 export * from './first-touch-attribution';
+
+// Media type SSOT — `media_type` discriminator predicates (leaf, zero imports)
+export * from './media-type';
