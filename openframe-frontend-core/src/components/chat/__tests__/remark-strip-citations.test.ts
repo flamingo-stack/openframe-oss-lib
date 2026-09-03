@@ -32,7 +32,9 @@ describe('remarkStripCitations', () => {
       children: [
         {
           type: 'paragraph',
-          children: [{ type: 'text', value: 'Install on Windows [1], verify the service [2], and confirm Devices [3].' }],
+          children: [
+            { type: 'text', value: 'Install on Windows [1], verify the service [2], and confirm Devices [3].' },
+          ],
         },
       ],
     };
