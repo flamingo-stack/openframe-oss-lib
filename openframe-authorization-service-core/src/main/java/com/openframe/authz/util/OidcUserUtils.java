@@ -28,6 +28,24 @@ public final class OidcUserUtils {
      * Missing claim counts as verified — Microsoft often omits it for org accounts; an explicit
      * {@code false} (boolean or string) never does.
      */
+    /**
+     * Whether the provider-asserted email is trustworthy enough to ROUTE INTO AN EXISTING
+     * ACCOUNT. Google and Apple verify mailbox/domain ownership before an email appears in a
+     * token. A generic multi-tenant Microsoft app does not — the email attribute is free text set
+     * by the issuing directory's admin, and anyone can create a directory (the nOAuth
+     * account-takeover class) — so Microsoft additionally requires the positive domain-ownership
+     * signal {@code xms_edov} (or an explicit {@code email_verified: true}).
+     */
+    public static boolean emailTrustedForRouting(String provider, java.util.Map<String, Object> claims) {
+        if ("microsoft".equals(provider)) {
+            Object edov = claims.get("xms_edov");
+            return Boolean.TRUE.equals(edov)
+                    || "true".equalsIgnoreCase(stringClaim(edov))
+                    || Boolean.TRUE.equals(claims.get("email_verified"));
+        }
+        return emailVerifiedClaimAllows(claims);
+    }
+
     public static boolean emailVerifiedClaimAllows(OidcUser user) {
         return emailVerifiedClaimAllows(user.getClaims());
     }

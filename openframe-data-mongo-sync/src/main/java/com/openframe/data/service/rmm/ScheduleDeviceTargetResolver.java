@@ -1,5 +1,6 @@
 package com.openframe.data.service.rmm;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
@@ -47,12 +48,24 @@ public class ScheduleDeviceTargetResolver {
         if (schedule.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA) {
             return resolveCriteriaMachineIds(schedule);
         }
-        return assignedRepository
+        List<String> assignedIds = assignedRepository
                 .findByTenantIdAndScriptScheduleId(schedule.getTenantId(), schedule.getId()).stream()
                 .map(ScheduleScriptMachineAssigned::getMachineId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+        return keepDispatchable(schedule.getTenantId(), assignedIds);
+    }
+
+    private List<String> keepDispatchable(String tenantId, List<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return machineIds;
+        }
+        Set<String> valid = machineRepository.findByTenantIdAndMachineIdIn(tenantId, machineIds).stream()
+                .filter(m -> DeviceStatus.DISPATCH_ELIGIBLE.contains(m.getStatus()))
+                .map(Machine::getMachineId)
+                .collect(Collectors.toSet());
+        return machineIds.stream().filter(valid::contains).toList();
     }
 
     /**
