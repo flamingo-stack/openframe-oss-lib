@@ -789,7 +789,7 @@ describe('useApiParams', () => {
       expect(tags).toEqual(['new1', 'new2']);
     });
 
-    it('should handle invalid number strings', () => {
+    it('falls back to the DECLARED default for an unparseable number', () => {
       const params = new URLSearchParams();
       params.set('page', 'not-a-number');
       setMockSearchParams(params);
@@ -800,8 +800,26 @@ describe('useApiParams', () => {
 
       const { result } = renderHook(() => useApiParams(schema));
 
-      // Invalid number should coerce to null
-      expect(result.current.params.page).toBeNull();
+      // `params` and `pendingParams` now share ONE parser. This used to read
+      // `null` here (the schema's own default ignored) and `1` there, which is
+      // enough to desynchronize any adapter that compares the two.
+      expect(result.current.params.page).toBe(1);
+      expect(result.current.pendingParams.page).toBe(result.current.params.page);
+    });
+
+    it('applies the schema min/max to the COMMITTED params too', () => {
+      const params = new URLSearchParams();
+      params.set('pageSize', '9999');
+      setMockSearchParams(params);
+
+      const schema = {
+        pageSize: { type: 'int' as const, default: 15, min: 1, max: 100 },
+      };
+
+      const { result } = renderHook(() => useApiParams(schema));
+
+      expect(result.current.params.pageSize).toBe(100);
+      expect(result.current.pendingParams.pageSize).toBe(100);
     });
 
     it('should handle zero as valid number', () => {

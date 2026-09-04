@@ -24,7 +24,6 @@ import { useRouter, useSearchParams } from '../../embed-shims/next-navigation';
 import { parseSchemaParams, type ParamSchema } from '../../utils/search-params';
 import { type FlattenedParam, shouldIncludeInUrl } from './flatten-schema';
 import type { JSType } from './graphql-parser';
-import { coerceValue } from './url-converter';
 
 /**
  * Returns the previous reference if the JSON-serialized content of `value`
@@ -249,8 +248,6 @@ export function useApiParams<TSchema extends ParamSchema>(
     setPendingTail(pendingRef.current[pendingRef.current.length - 1]);
   }, []);
 
-  const absentValue = options.absent === 'null' ? null : undefined;
-
   // 2. Schema reference stabilized by content. Consumers commonly pass an
   //    object literal each render, which would otherwise invalidate every memo.
   const schemaKey = useMemo(() => JSON.stringify(schema), [schema]);
@@ -276,36 +273,26 @@ export function useApiParams<TSchema extends ParamSchema>(
     return flattened;
   }, [stableSchema]);
 
-  // Parse URL parameters with type coercion. PURE — it reads nothing but its
-  // own dependencies, so a render attempt React discards leaves no trace.
+  // Parse URL parameters. PURE — it reads nothing but its own dependencies, so
+  // a render attempt React discards leaves no trace.
+  //
+  // THE reader, and the SAME one `pendingParams` uses. This used to walk the
+  // schema itself through `coerceValue`, which knows only a param's TYPE — so
+  // `min`/`max`/`default` were applied to the pending params and not to the
+  // committed ones. `?pageSize=9999` then read as 9999 here and 100 there, and
+  // `?page=abc` as `null` here and `1` there, which is enough to desynchronize
+  // any adapter that compares the two.
   const rawParams = useMemo((): Record<string, unknown> => {
-    const sp = new URLSearchParams(searchString);
-    const result: Record<string, unknown> = {};
-
-    for (const [key, config] of Object.entries(stableSchema)) {
-      // Read from URL
-      const rawValue = config.type === 'array' ? sp.getAll(key) : sp.get(key);
-
-      // Use value from URL, else the declared default, else the caller's
-      // ABSENT value (arrays never take `absent`: an unset array is `[]`).
-      let value: unknown;
-      if (rawValue && (Array.isArray(rawValue) ? rawValue.length > 0 : true)) {
-        value = coerceValue(rawValue, config.type);
-      } else if (config.default !== undefined) {
-        value = config.default;
-      } else {
-        value = config.type === 'array' ? [] : absentValue;
-      }
-
-      result[key] = value;
-    }
+    const result = parseSchemaParams(stableSchema, new URLSearchParams(searchString), {
+      absent: options.absent === 'null' ? 'null' : 'undefined',
+    }) as Record<string, unknown>;
 
     if (debug) {
       console.log('[useApiParams] Parsed params:', result);
     }
 
     return result;
-  }, [searchString, debug, stableSchema, absentValue]);
+  }, [searchString, debug, stableSchema, options.absent]);
 
   // Carry the previously COMMITTED array instances forward when their content
   // is unchanged, so `params.<arrayField>` stays reference-stable across a URL
