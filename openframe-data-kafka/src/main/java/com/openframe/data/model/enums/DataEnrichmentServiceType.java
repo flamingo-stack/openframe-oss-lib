@@ -3,6 +3,7 @@ package com.openframe.data.model.enums;
 public enum DataEnrichmentServiceType {
 
     INTEGRATED_TOOLS_EVENTS,
-    RMM_RESULTS
+    RMM_RESULTS,
+    PRE_ENRICHED
 
 }
