@@ -1,6 +1,5 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.document.rmm.script.ScriptStatus;
@@ -23,7 +22,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -184,14 +182,6 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
     @Override
     public String getDefaultSortField() {
         return FIELD_ID;
-    }
-
-    @Override
-    public Optional<Script> findSystemScript(SystemScriptCode code, String tenantId) {
-        Query query = new Query(Criteria.where(FIELD_TENANT_ID).is(tenantId)
-                .and(FIELD_SYSTEM).is(true)
-                .and(FIELD_NAME).is(code.canonicalName()));
-        return Optional.ofNullable(mongoTemplate.findOne(query, Script.class));
     }
 
     private static void applySystemShield(Criteria criteria) {

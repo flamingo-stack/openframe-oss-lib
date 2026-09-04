@@ -1,4 +1,6 @@
-package com.openframe.management.systemscript;
+package com.openframe.management.migration;
+
+import com.openframe.management.systemscript.SystemScriptDefinition;
 
 import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -25,19 +27,20 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class SystemScriptInitializerTest {
+class SeedSystemScriptsChangeUnitTest {
 
     private static final String TENANT_ID = "tenant-1";
 
+    private final SeedSystemScriptsChangeUnit changeUnit = new SeedSystemScriptsChangeUnit();
+
     private ScriptRepository scriptRepository;
-    private SystemScriptInitializer initializer;
+    private TenantIdProvider tenantIdProvider;
 
     @BeforeEach
     void setUp() {
         scriptRepository = mock(ScriptRepository.class);
-        TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
+        tenantIdProvider = mock(TenantIdProvider.class);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        initializer = new SystemScriptInitializer(scriptRepository, tenantIdProvider);
     }
 
     @Test
@@ -45,7 +48,7 @@ class SystemScriptInitializerTest {
         when(scriptRepository.findSystemScript(any(), any())).thenReturn(Optional.empty());
         when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        initializer.run(null);
+        changeUnit.execution(scriptRepository, tenantIdProvider);
 
         ArgumentCaptor<Script> saved = ArgumentCaptor.forClass(Script.class);
         verify(scriptRepository, times(3)).save(saved.capture());
@@ -81,7 +84,7 @@ class SystemScriptInitializerTest {
                 inv.getArgument(0) == SystemScriptCode.INSTALL_BREW ? Optional.of(stale) : Optional.empty());
         when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        initializer.run(null);
+        changeUnit.execution(scriptRepository, tenantIdProvider);
 
         assertTrue(stale.getScriptBody().contains("tar xz --strip-components 1"));
         assertNotNull(stale.getContentHash());
@@ -92,19 +95,17 @@ class SystemScriptInitializerTest {
     void leavesUpToDateScriptsUntouched() {
         when(scriptRepository.findSystemScript(any(), any())).thenReturn(Optional.empty());
         when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        initializer.run(null);
+        changeUnit.execution(scriptRepository, tenantIdProvider);
         ArgumentCaptor<Script> seeded = ArgumentCaptor.forClass(Script.class);
         verify(scriptRepository, times(3)).save(seeded.capture());
 
         ScriptRepository secondRepo = mock(ScriptRepository.class);
-        TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         for (Script script : seeded.getAllValues()) {
             SystemScriptCode code = codeByName(script.getName());
             when(secondRepo.findSystemScript(code, TENANT_ID)).thenReturn(Optional.of(script));
         }
 
-        new SystemScriptInitializer(secondRepo, tenantIdProvider).run(null);
+        changeUnit.execution(secondRepo, tenantIdProvider);
 
         verify(secondRepo, never()).save(any());
     }

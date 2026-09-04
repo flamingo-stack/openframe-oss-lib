@@ -1,5 +1,6 @@
 package com.openframe.data.document.rmm.filter;
 
+import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -36,4 +37,11 @@ public class ScriptExecutionQueryFilter {
 
     /** Inclusive upper bound on {@code dispatchedAt}. {@code null} = no upper bound. Mirrors the Logs {@code timestampTo} pattern. */
     private Instant dispatchedAtTo;
+
+    /**
+     * Hide executions whose {@code source} is ANY of these. {@code null}/empty = no
+     * exclusion. Set by the service layer — which sources a view hides is a business
+     * rule, not a repository default.
+     */
+    private List<ExecutionSource> excludedSources;
 }

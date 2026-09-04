@@ -1,6 +1,5 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
@@ -184,10 +183,14 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static Criteria baseCriteria(String tenantId, ExecutionOwnerScope owner,
                                          ScriptExecutionQueryFilter filter, String excludedField) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId)
-                .and(OWNER_FIELDS.get(owner.type())).is(owner.id())
-                .and(FIELD_SOURCE).ne(ExecutionSource.SYSTEM_BOOTSTRAP);
+                .and(OWNER_FIELDS.get(owner.type())).is(owner.id());
         if (filter == null) {
             return criteria;
+        }
+        // never dropped by facets: source is not a facet field, and the service-level
+        // exclusion must hold in every counted bucket
+        if (filter.getExcludedSources() != null && !filter.getExcludedSources().isEmpty()) {
+            criteria.and(FIELD_SOURCE).nin(filter.getExcludedSources());
         }
         if (!FIELD_STATUS.equals(excludedField)
                 && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {

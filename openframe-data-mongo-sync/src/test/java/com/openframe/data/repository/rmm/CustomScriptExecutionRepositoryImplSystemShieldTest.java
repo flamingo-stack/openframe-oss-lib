@@ -1,6 +1,7 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
+import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import org.bson.Document;
@@ -28,36 +29,51 @@ class CustomScriptExecutionRepositoryImplSystemShieldTest {
     private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
     private final CustomScriptExecutionRepositoryImpl repo = new CustomScriptExecutionRepositoryImpl(mongoTemplate);
 
+    private static ScriptExecutionQueryFilter serviceFilter() {
+        return ScriptExecutionQueryFilter.builder()
+                .excludedSources(List.of(ExecutionSource.SYSTEM_BOOTSTRAP))
+                .build();
+    }
+
     private static Document sourceClause(Document queryObject) {
         Object node = queryObject.get("source");
         return node instanceof Document doc ? doc : null;
     }
 
     @Test
-    @DisplayName("findPage: default query carries the source-shield ($ne SYSTEM_BOOTSTRAP) — bootstrap executions are hidden from user History")
-    void findPage_shieldsBootstrapExecutions() {
+    @DisplayName("findPage: the service-supplied exclusion lands as $nin — bootstrap executions are hidden from user History")
+    void findPage_appliesServiceSuppliedSourceExclusion() {
+        when(mongoTemplate.find(any(Query.class), eq(ScriptExecution.class))).thenReturn(List.of());
+
+        repo.findPage(TENANT_ID, ExecutionOwnerScope.forScript(SCRIPT_ID), serviceFilter(),
+                "_id", Sort.Direction.DESC, null, false, 10, null);
+
+        Document sourceClause = sourceClause(captureFind().getQueryObject());
+        assertThat(sourceClause).isNotNull();
+        assertThat(sourceClause.get("$nin")).isEqualTo(List.of(ExecutionSource.SYSTEM_BOOTSTRAP));
+    }
+
+    @Test
+    @DisplayName("count: the count query gets the same exclusion — count agrees with the list")
+    void count_appliesServiceSuppliedSourceExclusion() {
+        when(mongoTemplate.count(any(Query.class), eq(ScriptExecution.class))).thenReturn(0L);
+
+        repo.count(TENANT_ID, ExecutionOwnerScope.forScript(SCRIPT_ID), serviceFilter(), null);
+
+        Document sourceClause = sourceClause(captureCount().getQueryObject());
+        assertThat(sourceClause).isNotNull();
+        assertThat(sourceClause.get("$nin")).isEqualTo(List.of(ExecutionSource.SYSTEM_BOOTSTRAP));
+    }
+
+    @Test
+    @DisplayName("the repository stays neutral: no filter — no source clause; which sources to hide is the service's call")
+    void noFilter_noSourceClause() {
         when(mongoTemplate.find(any(Query.class), eq(ScriptExecution.class))).thenReturn(List.of());
 
         repo.findPage(TENANT_ID, ExecutionOwnerScope.forScript(SCRIPT_ID), null,
                 "_id", Sort.Direction.DESC, null, false, 10, null);
 
-        Query captured = captureFind();
-        Document sourceClause = sourceClause(captured.getQueryObject());
-        assertThat(sourceClause).isNotNull();
-        assertThat(sourceClause.get("$ne")).isEqualTo(ExecutionSource.SYSTEM_BOOTSTRAP);
-    }
-
-    @Test
-    @DisplayName("count: the count query gets the same shield — count agrees with the list, bootstrap rows never inflate the total")
-    void count_shieldsBootstrapExecutions() {
-        when(mongoTemplate.count(any(Query.class), eq(ScriptExecution.class))).thenReturn(0L);
-
-        repo.count(TENANT_ID, ExecutionOwnerScope.forScript(SCRIPT_ID), null, null);
-
-        Query captured = captureCount();
-        Document sourceClause = sourceClause(captured.getQueryObject());
-        assertThat(sourceClause).isNotNull();
-        assertThat(sourceClause.get("$ne")).isEqualTo(ExecutionSource.SYSTEM_BOOTSTRAP);
+        assertThat(sourceClause(captureFind().getQueryObject())).isNull();
     }
 
     private Query captureFind() {
