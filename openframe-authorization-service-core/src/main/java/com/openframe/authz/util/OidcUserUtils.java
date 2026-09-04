@@ -2,6 +2,8 @@ package com.openframe.authz.util;
 
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
+import java.util.Map;
+
 public final class OidcUserUtils {
 
     private OidcUserUtils() {
@@ -32,7 +34,7 @@ public final class OidcUserUtils {
      * One-line description of the trust-relevant Microsoft claims, for gate rejection logs:
      * which signals were present and what they said — never the email itself.
      */
-    public static String describeEmailTrustSignals(java.util.Map<String, Object> claims) {
+    public static String describeEmailTrustSignals(Map<String, Object> claims) {
         Object edov = claims.get("xms_edov");
         Object verified = claims.get("email_verified");
         return "tid=" + claims.get("tid")
@@ -45,7 +47,7 @@ public final class OidcUserUtils {
     }
 
     /** Claims-map variant for callers outside the OIDC-login flow (e.g. the native Apple exchange). */
-    public static boolean emailVerifiedClaimAllows(java.util.Map<String, Object> claims) {
+    public static boolean emailVerifiedClaimAllows(Map<String, Object> claims) {
         Object claim = claims.get("email_verified");
         if (claim instanceof Boolean b) {
             return b;

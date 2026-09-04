@@ -33,8 +33,6 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 import java.security.Principal;
 import java.util.Map;
 
-import static com.openframe.data.document.user.UserStatus.ACTIVE;
-
 /**
  * Session-less mint for the mobile SSO signup: the BFF redeems a signup ticket that the
  * completion step bound to a freshly registered user. Trust comes from three things — the ticket
@@ -86,8 +84,7 @@ public class SignupTicketGrantAuthenticationProvider implements AuthenticationPr
             throw error(OAuth2ErrorCodes.INVALID_GRANT, "Signup ticket does not belong to this tenant.");
         }
 
-        AuthUser user = userService.findById(ticket.userId())
-                .filter(u -> u.getStatus() == ACTIVE)
+        AuthUser user = userService.findActiveById(ticket.userId())
                 .orElseThrow(() -> error(OAuth2ErrorCodes.INVALID_GRANT, "User is not active."));
 
         userService.touchLastLogin(user.getEmail(), tenantId);

@@ -1,6 +1,7 @@
 package com.openframe.authz.controller;
 
 import com.openframe.authz.dto.TenantRegistrationRequest;
+import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.sso.apple.AppleNativeTokenVerifier;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import com.openframe.authz.service.tenant.TenantService;
@@ -17,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.UUID;
 
 import static java.util.Locale.ROOT;
 import static org.springframework.http.HttpStatus.*;
@@ -42,7 +45,7 @@ public class AppleNativeDiscoveryController {
     private final UserService userService;
     private final TenantService tenantService;
     private final TenantRegistrationService registrationService;
-    private final com.openframe.authz.service.sso.SsoIdentityService ssoIdentityService;
+    private final SsoIdentityService ssoIdentityService;
 
     public record AppleNativeDiscoverRequest(String identityToken, String nonce) {}
 
@@ -67,8 +70,7 @@ public class AppleNativeDiscoveryController {
 
         // Link-first: the Apple sub survives email changes and Hide My Email relay churn.
         AuthUser user = ssoIdentityService.findLink("apple", token.getClaims())
-                .flatMap(link -> userService.findById(link.getUserId()))
-                .filter(u -> u.getStatus() == com.openframe.data.document.user.UserStatus.ACTIVE)
+                .flatMap(link -> userService.findActiveById(link.getUserId()))
                 .or(() -> userService.findActiveByEmail(email.toLowerCase(ROOT)))
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "registration_required"));
 
@@ -118,7 +120,7 @@ public class AppleNativeDiscoveryController {
                 .email(email.toLowerCase(ROOT))
                 .firstName(hasText(body.firstName()) ? body.firstName() : "")
                 .lastName(hasText(body.lastName()) ? body.lastName() : "")
-                .password(java.util.UUID.randomUUID().toString())
+                .password(UUID.randomUUID().toString())
                 .tenantName(body.tenantName())
                 .tenantDomain(body.tenantDomain().toLowerCase(ROOT))
                 .emailPreVerified(OidcUserUtils.emailVerifiedClaimAllows(token.getClaims()))

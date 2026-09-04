@@ -16,6 +16,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
+import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenDecoderFactory;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -27,7 +28,6 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
 import org.springframework.security.oauth2.jwt.JwtValidators;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -122,27 +122,23 @@ public class SecurityConfig {
      */
     @Bean
     public JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory(SsoProviderRegistry ssoProviderRegistry) {
-        return clientRegistration -> {
+        // Spring's own factory handles the decoder plumbing (JWKS resolution, per-registration
+        // caching); we only define the validator stack. EVERY provider gets the full OIDC set —
+        // the old hand-rolled factory's no-custom-validator branch (Google) skipped the
+        // OidcIdTokenValidator, so an ID token minted for ANY other application passed (no
+        // audience check). Registrations that pin an issuer (Google, Apple) get it enforced;
+        // Microsoft's varies per directory and is validated by its registry pattern instead.
+        OidcIdTokenDecoderFactory factory = new OidcIdTokenDecoderFactory();
+        factory.setJwtValidatorFactory(clientRegistration -> {
             String issuer = clientRegistration.getProviderDetails().getIssuerUri();
-            String jwkSetUri = clientRegistration.getProviderDetails().getJwkSetUri();
-
-            log.debug("Building JWT decoder for provider='{}', configuredIssuer='{}', jwkSetUri='{}'",
-                    clientRegistration.getRegistrationId(), issuer, jwkSetUri);
-
-            // EVERY provider gets the full OIDC validator set. The old no-custom-validator branch
-            // (Google) used fromIssuerLocation, whose defaults check timestamp + issuer only — an
-            // ID token minted for ANY other application passed (no audience check). The
-            // OidcIdTokenValidator enforces aud/azp for all providers uniformly.
             List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
             validators.add(issuer != null && !issuer.isBlank()
                     ? JwtValidators.createDefaultWithIssuer(issuer)
                     : JwtValidators.createDefault());
             validators.add(new OidcIdTokenValidator(clientRegistration));
             ssoProviderRegistry.idTokenValidator(clientRegistration).ifPresent(validators::add);
-
-            NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
-            return decoder;
-        };
+            return new DelegatingOAuth2TokenValidator<>(validators);
+        });
+        return factory;
     }
 }

@@ -82,8 +82,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
         // forged by a hostile directory and needs no verified-email signal. Email-based routing
         // (gated) is the first-association bootstrap only.
         AuthUser authUser = ssoIdentityService.findLink(provider, user.getClaims())
-                .flatMap(link -> userService.findById(link.getUserId()))
-                .filter(u -> u.getStatus() == com.openframe.data.document.user.UserStatus.ACTIVE)
+                .flatMap(link -> userService.findActiveById(link.getUserId()))
                 .orElse(null);
 
         if (authUser == null) {

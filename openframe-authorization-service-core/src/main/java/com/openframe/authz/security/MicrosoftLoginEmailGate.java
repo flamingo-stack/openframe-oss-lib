@@ -2,6 +2,8 @@ package com.openframe.authz.security;
 
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.sso.SSOConfigService;
+import com.openframe.authz.service.sso.SsoIdentityService;
+import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,19 +33,19 @@ public class MicrosoftLoginEmailGate {
 
     private final SSOConfigService ssoConfigService;
     private final EmailTrustPolicy emailTrustPolicy;
-    private final com.openframe.authz.service.sso.SsoIdentityService ssoIdentityService;
-    private final com.openframe.authz.service.user.UserService userService;
+    private final SsoIdentityService ssoIdentityService;
+    private final UserService userService;
 
     @Value("${openframe.sso.microsoft.require-verified-email:false}")
     private boolean requireVerifiedEmail;
 
     private boolean isLinkedToClaimedEmail(String tenantId, OidcUser user) {
-        String email = com.openframe.authz.util.OidcUserUtils.resolveEmail(user);
+        String email = OidcUserUtils.resolveEmail(user);
         if (email == null || tenantId == null) {
             return false;
         }
         return ssoIdentityService.findLink(MICROSOFT, user.getClaims())
-                .flatMap(link -> userService.findById(link.getUserId()))
+                .flatMap(link -> userService.findActiveById(link.getUserId()))
                 .filter(u -> tenantId.equals(u.getTenantId()))
                 .filter(u -> email.equalsIgnoreCase(u.getEmail()))
                 .isPresent();
