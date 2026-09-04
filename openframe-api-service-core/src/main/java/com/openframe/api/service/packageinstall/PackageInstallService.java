@@ -20,7 +20,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 
 // the dispatched script is built only from catalog data — raw client input must never reach the shell
 @Slf4j
@@ -30,11 +29,6 @@ public class PackageInstallService {
 
     // ceiling of the command pipeline (input cap + watchdog stuck-threshold)
     private static final int TIMEOUT_SECONDS = 600;
-
-    private static final Map<PackageManagerType, OsType> MANAGER_OS = Map.of(
-            PackageManagerType.BREW, OsType.MAC_OS,
-            PackageManagerType.CHOCO, OsType.WINDOWS,
-            PackageManagerType.WINGET, OsType.WINDOWS);
 
     private final DeviceService deviceService;
     private final PackageSearchService packageSearchService;
@@ -89,7 +83,7 @@ public class PackageInstallService {
     private void requireOsMatch(String machineId, PackageManagerType packageManager) {
         Machine machine = deviceService.findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
-        OsType required = MANAGER_OS.get(packageManager);
+        OsType required = packageManager.getOsType();
         OsType actual = machine.getOsType();
         if (actual != required) {
             throw new IllegalArgumentException(packageManager + " packages require a " + required
