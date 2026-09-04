@@ -19,6 +19,12 @@ import java.time.Instant;
  * nOAuth takeover class). The first association still requires a trusted event (verified-email
  * match, invitation, or an authenticated session); after that the link is authoritative.
  * <p>
+ * <b>Invariant (product decision): one SSO account belongs to exactly ONE user, platform-wide.</b>
+ * The {@code (provider, subject)} unique index is global on purpose — an email may exist in
+ * several tenants, a provider subject may not. Registration paths enforce this up front
+ * (an already-linked subject cannot create another account); the conflict guard in
+ * {@code SsoIdentityService.link} is the last-resort backstop, not the enforcement point.
+ * <p>
  * Subject normalization: Microsoft uses {@code tid:oid} (the pairwise {@code sub} changes when
  * the app registration is rotated); Google and Apple use {@code sub} as issued.
  */

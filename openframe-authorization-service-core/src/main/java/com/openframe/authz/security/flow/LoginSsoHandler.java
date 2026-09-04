@@ -167,7 +167,8 @@ public class LoginSsoHandler implements SsoFlowHandler {
             // existing allow-list — this handler makes no redirect-policy decision.
             String[] names = resolveNames(request, authentication, user);
             String ticket = signupTicketService.create(email, names[0], names[1], provider,
-                    OidcUserUtils.emailVerifiedClaimAllows(user));
+                    OidcUserUtils.emailVerifiedClaimAllows(user),
+                    ssoIdentityService.subjectOf(provider, user.getClaims()).orElse(null));
             log.info("event=sso-login-continue-registration-mobile provider={}", provider);
             foundAtRoot(response, "/oauth/signup-continue?signupTicket=" + urlEncode(ticket)
                     + "&redirectTo=" + urlEncode(payload.redirectTo()));

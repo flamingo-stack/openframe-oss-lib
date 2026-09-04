@@ -112,6 +112,11 @@ public class AppleNativeDiscoveryController {
         if (!hasText(email)) {
             throw new ResponseStatusException(UNAUTHORIZED, "Apple identity token carries no email");
         }
+        if (ssoIdentityService.findLink("apple", token.getClaims()).isPresent()) {
+            // Invariant: one SSO account — one user. A linked subject signs in; it does not
+            // create a second account it could never reach through this provider again.
+            throw new ResponseStatusException(CONFLICT, "already_linked");
+        }
         if (userService.findActiveByEmail(email.toLowerCase(ROOT)).isPresent()) {
             throw new ResponseStatusException(CONFLICT, "account_exists");
         }

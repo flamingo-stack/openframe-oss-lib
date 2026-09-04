@@ -48,7 +48,11 @@ public class SsoIdentityService {
 
     public Optional<SsoIdentity> findLink(String provider, Map<String, Object> claims) {
         return subjectOf(provider, claims)
-                .flatMap(subject -> ssoIdentityRepository.findByProviderAndSubject(provider, subject));
+                .flatMap(subject -> findBySubject(provider, subject));
+    }
+
+    public Optional<SsoIdentity> findBySubject(String provider, String subject) {
+        return ssoIdentityRepository.findByProviderAndSubject(provider, subject);
     }
 
     /**

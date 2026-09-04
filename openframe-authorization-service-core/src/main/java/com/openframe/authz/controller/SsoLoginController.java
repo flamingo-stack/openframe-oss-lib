@@ -8,6 +8,7 @@ import com.openframe.authz.security.SsoFlowCookies;
 import com.openframe.authz.security.SsoLoginCookiePayload;
 import com.openframe.authz.service.sso.SsoAuthorizeData;
 import com.openframe.authz.service.sso.SignupTicketService;
+import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.sso.SsoLoginService;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import com.openframe.authz.util.OidcUserUtils;
@@ -61,6 +62,7 @@ public class SsoLoginController {
 
     private final SsoLoginService ssoLoginService;
     private final SignupTicketService signupTicketService;
+    private final SsoIdentityService ssoIdentityService;
     private final SsoFlowCookies ssoFlowCookies;
     private final SsoCookieCodec ssoCookieCodec;
     private final TenantRegistrationService registrationService;
@@ -138,6 +140,11 @@ public class SsoLoginController {
             if (payload.bound()) {
                 return new SignupTicketCompleteResponse(payload.tenantId());
             }
+            if (payload.subject() != null
+                    && ssoIdentityService.findBySubject(payload.provider(), payload.subject()).isPresent()) {
+                // Invariant: one SSO account — one user, platform-wide.
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "already_linked");
+            }
 
             TenantRegistrationRequest reg = TenantRegistrationRequest.builder()
                     .email(payload.email().toLowerCase(Locale.ROOT))
@@ -187,6 +194,13 @@ public class SsoLoginController {
         try {
             OidcUser user = requireSessionOidcUser(authentication);
             SsoLoginCookiePayload payload = requireLoginFlowCookie(httpRequest);
+
+            if (ssoIdentityService.findLink(payload.provider(), user.getClaims()).isPresent()) {
+                // Invariant: one SSO account — one user, platform-wide. Enforced here at
+                // registration rather than discovered later as a runtime link conflict.
+                throw new IllegalStateException(
+                        "This account is already connected to an organization. Please sign in instead.");
+            }
 
             String email = OidcUserUtils.resolveEmail(user);
             if (!hasText(email)) {
