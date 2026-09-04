@@ -29,9 +29,16 @@ export interface DataTableSkeletonProps {
   rows?: number;
   className?: string;
   rowClassName?: string;
+  /**
+   * REPLACES the design row height, for a table whose rows are not that tall.
+   * Appending a height through `rowClassName` cannot do this: tailwind-merge
+   * drops the plain `h-[66px]` but keeps `md:h-[78px]`, so the override held
+   * on a phone and lost on a desktop. See `DataTableBodyProps.rowHeightClassName`.
+   */
+  rowHeightClassName?: string;
 }
 
-export function DataTableSkeleton({ rows = 10, className, rowClassName }: DataTableSkeletonProps) {
+export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeightClassName }: DataTableSkeletonProps) {
   const table = useDataTableContext();
   const columns = table.getVisibleFlatColumns();
   const firstColumnId = columns[0]?.id;
@@ -46,7 +53,14 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName }: DataTa
             className,
           )}
         >
-          <div className={cn('hidden py-0 md:flex', ROW_SHELL_CLASSES, ROW_HEIGHT_DESKTOP, rowClassName)}>
+          <div
+            className={cn(
+              'hidden py-0 md:flex',
+              ROW_SHELL_CLASSES,
+              rowHeightClassName ?? ROW_HEIGHT_DESKTOP,
+              rowClassName,
+            )}
+          >
             {columns.map(column => {
               const meta = column.columnDef.meta;
               return (
@@ -71,7 +85,14 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName }: DataTa
               );
             })}
           </div>
-          <div className={cn('flex justify-start py-0 md:hidden', ROW_SHELL_CLASSES, ROW_HEIGHT_MOBILE, rowClassName)}>
+          <div
+            className={cn(
+              'flex justify-start py-0 md:hidden',
+              ROW_SHELL_CLASSES,
+              rowHeightClassName ?? ROW_HEIGHT_MOBILE,
+              rowClassName,
+            )}
+          >
             <div className="flex min-w-0 flex-1 flex-col justify-center py-[var(--spacing-system-sf)]">
               <div className="mb-[var(--spacing-system-xsf)] h-4 w-3/4 rounded-sm bg-ods-bg-surface" />
               <div className="h-3 w-1/2 rounded-sm bg-ods-bg-surface opacity-60" />

@@ -20,6 +20,13 @@ export interface DataTableRowProps<T> {
    * clipped. Default keeps the fixed height.
    */
   autoHeight?: boolean;
+  /**
+   * REPLACES the height this row would otherwise take (`compact`, `autoHeight`
+   * or the design default). The one place a table states how tall a row is, so
+   * the pad rows and the skeleton can reserve the SAME number — see
+   * `DataTableBodyProps.rowHeightClassName`.
+   */
+  rowHeightClassName?: string;
   className?: string;
   /** Expandable content rendered below the cells, inside the same card. */
   subRow?: ReactNode;
@@ -62,7 +69,16 @@ export interface DataTableRowProps<T> {
  * for `onClick` and `className` (if function) via `useCallback` / `useMemo` in
  * the consumer. `href` and string `className` are compared by value.
  */
-function DataTableRowImpl<T>({ row, onClick, href, compact, autoHeight, className, subRow }: DataTableRowProps<T>) {
+function DataTableRowImpl<T>({
+  row,
+  onClick,
+  href,
+  compact,
+  autoHeight,
+  rowHeightClassName,
+  className,
+  subRow,
+}: DataTableRowProps<T>) {
   const hasSubRow = subRow != null && subRow !== false;
   // A sub-row carries its own interactive controls, so it must not live inside the
   // row-level <Link>; when present, the link wraps only the cells.
@@ -101,11 +117,13 @@ function DataTableRowImpl<T>({ row, onClick, href, compact, autoHeight, classNam
       className={cn(
         'flex',
         ROW_SHELL_CLASSES,
-        compact
-          ? 'py-[var(--spacing-system-xsf)]'
-          : autoHeight
-            ? 'min-h-[66px] py-[var(--spacing-system-sf)] md:min-h-[78px]'
-            : `py-0 ${ROW_HEIGHT_DESKTOP}`,
+        rowHeightClassName
+          ? `py-0 ${rowHeightClassName}`
+          : compact
+            ? 'py-[var(--spacing-system-xsf)]'
+            : autoHeight
+              ? 'min-h-[66px] py-[var(--spacing-system-sf)] md:min-h-[78px]'
+              : `py-0 ${ROW_HEIGHT_DESKTOP}`,
         hasSubRow && 'border-b border-ods-border',
       )}
     >
