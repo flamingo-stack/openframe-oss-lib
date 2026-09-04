@@ -92,9 +92,6 @@ public class LoginSsoHandler implements SsoFlowHandler {
                 continueIntoRegistration(request, response, authentication, payload, provider, user, email);
                 return;
             }
-            ssoIdentityService.link(provider, user.getClaims(), authUser);
-        } else {
-            ssoIdentityService.link(provider, user.getClaims(), authUser);
         }
 
         String tenantId = authUser.getTenantId();
@@ -103,6 +100,11 @@ public class LoginSsoHandler implements SsoFlowHandler {
         tenantService.findById(tenantId)
                 .filter(Tenant::isActive)
                 .orElseThrow(() -> new IllegalStateException("Your account is not active. Please contact your administrator."));
+
+        // Only now — the login is fully allowed (trusted routing, provider permitted, tenant
+        // active). A link written before these checks would outlive a REJECTED login and later
+        // count as proof of trust.
+        ssoIdentityService.link(provider, user.getClaims(), authUser);
 
         clearFlowCookieAndRedirect(response, cookie, tenantId, payload.redirectTo(), payload.authMobile());
     }
