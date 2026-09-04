@@ -21,10 +21,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from '../../embed-shims/next-navigation';
+import { parseSchemaParams, type ParamSchema } from '../../utils/search-params';
 import { type FlattenedParam, shouldIncludeInUrl } from './flatten-schema';
 import type { JSType } from './graphql-parser';
 import { coerceValue } from './url-converter';
-import { parseSchemaParams, type ParamSchema } from '../../utils/search-params';
 
 /**
  * Returns the previous reference if the JSON-serialized content of `value`
@@ -118,15 +118,6 @@ type OutputTypeForJSType<T extends JSType> = OutputTypeMap[T];
  * Get the TypeScript type for INPUT (setting params)
  */
 type InputTypeForJSType<T extends JSType> = InputTypeMap[T];
-
-/**
- * Get the default value type for a given JSType
- */
-type DefaultValueForType<T extends JSType> = T extends 'array'
-  ? string[]
-  : T extends 'object'
-    ? Record<string, unknown>
-    : OutputTypeMap[T];
 
 // Schema types + the schema helper live in the search-params leaf, so the hook's
 // `params` ARE the same parsed contract a server route produces for that URL.
@@ -249,9 +240,14 @@ export function useApiParams<TSchema extends ParamSchema>(
 
   // Serialized query strings this hook has written and not yet seen committed.
   const pendingRef = useRef<string[]>([]);
-  // Bumped on every queued write so `pendingParams` recomputes before the
-  // router commits (the ref alone would not re-render).
-  const [pendingVersion, setPendingVersion] = useState(0);
+  // The queue's TAIL, mirrored into state: `pendingParams` is render output, and
+  // reading a ref during render is both a lint error and a correctness hazard
+  // (the value would not re-render the consumer). The ref stays the mutable
+  // queue the commit effect drains; this is the one part render may see.
+  const [pendingTail, setPendingTail] = useState<string | undefined>(undefined);
+  const syncPendingTail = useCallback(() => {
+    setPendingTail(pendingRef.current[pendingRef.current.length - 1]);
+  }, []);
 
   const absentValue = options.absent === 'null' ? null : undefined;
 
@@ -309,7 +305,7 @@ export function useApiParams<TSchema extends ParamSchema>(
     }
 
     return result;
-  }, [searchString, debug, stableSchema]);
+  }, [searchString, debug, stableSchema, absentValue]);
 
   // Carry the previously COMMITTED array instances forward when their content
   // is unchanged, so `params.<arrayField>` stays reference-stable across a URL
@@ -422,7 +418,7 @@ export function useApiParams<TSchema extends ParamSchema>(
       if (merged === base) return;
 
       pendingRef.current = [...pendingRef.current, merged];
-      setPendingVersion(v => v + 1);
+      syncPendingTail();
 
       const url = merged ? `?${merged}` : window.location.pathname;
 
@@ -433,7 +429,7 @@ export function useApiParams<TSchema extends ParamSchema>(
       // Use replace for shallow routing (no page reload, no history spam)
       router.replace(url, { scroll: false });
     },
-    [router, debug, searchString, stableSchema],
+    [router, debug, searchString, stableSchema, syncPendingTail],
   );
 
   // Drain the queue as commits arrive. A commit EQUAL to a queued write drops
@@ -445,8 +441,8 @@ export function useApiParams<TSchema extends ParamSchema>(
     if (queue.length === 0) return;
     const hit = queue.indexOf(searchString);
     pendingRef.current = hit === -1 ? [] : queue.slice(hit + 1);
-    setPendingVersion(v => v + 1);
-  }, [searchString]);
+    syncPendingTail();
+  }, [searchString, syncPendingTail]);
 
   // Helper to check if value is empty
   const isEmptyValue = (value: unknown): boolean => {
@@ -496,16 +492,20 @@ export function useApiParams<TSchema extends ParamSchema>(
           continue;
         }
 
-        if (isEmptyValue(value)) {
-          keysToRemove.push(key);
-        } else {
+        // The SAME omission rule the reader uses (`urlSearchParams`): empty
+        // values AND values equal to the schema default drop out. Writing a
+        // default back into the URL left `?page=1&pageSize=15` on a pristine
+        // board and made the canonical URL un-shareable.
+        if (shouldIncludeInUrl(value, flattenedSchema[key])) {
           addParamToSearchParams(newParams, key, value);
+        } else {
+          keysToRemove.push(key);
         }
       }
 
       updateUrl(newParams, keysToRemove);
     },
-    [updateUrl, addParamToSearchParams, stableSchema],
+    [updateUrl, addParamToSearchParams, stableSchema, flattenedSchema],
   );
 
   // Clear specific parameters
@@ -531,13 +531,11 @@ export function useApiParams<TSchema extends ParamSchema>(
   // while a `router.replace` is uncommitted compares against the click, not the
   // stale URL.
   const pendingParams = useMemo((): InferParamsFromSchema<TSchema> => {
-    void pendingVersion;
-    const last = pendingRef.current[pendingRef.current.length - 1];
-    if (last === undefined || last === searchString) return params;
-    return parseSchemaParams(stableSchema, new URLSearchParams(last), {
+    if (pendingTail === undefined || pendingTail === searchString) return params;
+    return parseSchemaParams(stableSchema, new URLSearchParams(pendingTail), {
       absent: options.absent === 'null' ? 'null' : 'undefined',
     }) as InferParamsFromSchema<TSchema>;
-  }, [pendingVersion, searchString, params, stableSchema, options.absent]);
+  }, [pendingTail, searchString, params, stableSchema, options.absent]);
 
   return {
     params,
