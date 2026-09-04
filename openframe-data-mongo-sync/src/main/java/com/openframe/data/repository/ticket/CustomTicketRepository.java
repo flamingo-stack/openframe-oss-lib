@@ -43,9 +43,15 @@ public interface CustomTicketRepository {
 
     void updateTitle(String ticketId, String title);
 
-    void updateLastActivityAt(String ticketId, Instant lastActivityAt);
+    /**
+     * Stamps the ticket's last activity and returns the stamped document, so a caller that has to
+     * broadcast the change gets {@code statusId} and {@code awaitingClientSince} from the same round
+     * trip. Deliberately does not touch {@code updatedAt}.
+     */
+    Optional<Ticket> updateLastActivityAt(String ticketId, Instant lastActivityAt);
 
-    void updateActivityAndAwaiting(String ticketId, Instant lastActivityAt, Instant awaitingSince);
+    /** Stamps activity and sets (or, with a null {@code awaitingSince}, clears) the client wait. */
+    Optional<Ticket> updateActivityAndAwaiting(String ticketId, Instant lastActivityAt, Instant awaitingSince);
 
     boolean isSortableField(String field);
 

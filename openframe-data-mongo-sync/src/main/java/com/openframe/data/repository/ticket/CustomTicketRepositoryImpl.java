@@ -13,6 +13,7 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.BasicQuery;
@@ -457,10 +458,10 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
      * whole ticket on every message would silently redefine that field.
      */
     @Override
-    public void updateLastActivityAt(String ticketId, Instant lastActivityAt) {
+    public Optional<Ticket> updateLastActivityAt(String ticketId, Instant lastActivityAt) {
         Query query = new Query(Criteria.where(ID_FIELD).is(ticketId));
         Update update = new Update().set(FIELD_LAST_ACTIVITY_AT, lastActivityAt);
-        mongoTemplate.updateFirst(query, update, Ticket.class);
+        return stamp(query, update);
     }
 
     /**
@@ -468,7 +469,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
      * {@code awaitingSince} of null clears the wait — the client has answered.
      */
     @Override
-    public void updateActivityAndAwaiting(String ticketId, Instant lastActivityAt, Instant awaitingSince) {
+    public Optional<Ticket> updateActivityAndAwaiting(String ticketId, Instant lastActivityAt, Instant awaitingSince) {
         Query query = new Query(Criteria.where(ID_FIELD).is(ticketId));
         Update update = new Update().set(FIELD_LAST_ACTIVITY_AT, lastActivityAt);
         if (awaitingSince == null) {
@@ -476,7 +477,12 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         } else {
             update.set(FIELD_AWAITING_CLIENT_SINCE, awaitingSince);
         }
-        mongoTemplate.updateFirst(query, update, Ticket.class);
+        return stamp(query, update);
+    }
+
+    private Optional<Ticket> stamp(Query query, Update update) {
+        FindAndModifyOptions options = FindAndModifyOptions.options().returnNew(true);
+        return Optional.ofNullable(mongoTemplate.findAndModify(query, update, options, Ticket.class));
     }
 
     @Override
