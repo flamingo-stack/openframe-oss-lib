@@ -212,8 +212,17 @@ export function parseSchemaParams<TSchema extends ParamSchema, Opts extends Pars
 
 // ── Writing ─────────────────────────────────────────────────────────────────
 
-/** A schema entry OR a legacy flattened param (which spells its default `defaultValue`). */
-type OmissionConfig = { default?: unknown; defaultValue?: unknown };
+/**
+ * A schema entry OR a legacy flattened param (which spells its default
+ * `defaultValue`).
+ *
+ * A UNION, not a bag of two optional fields: with only `default?` and
+ * `defaultValue?` this is a WEAK TYPE, and TypeScript rejects any argument
+ * sharing neither — including `{ type: 'string' }`, the single most common
+ * schema entry there is. Naming the real config shapes fixes that without an
+ * index signature, which `FlattenedParam` (an interface) could never satisfy.
+ */
+type OmissionConfig = ParamConfig | { default?: unknown; defaultValue?: unknown };
 
 /**
  * THE omission rule: `null`, `undefined`, `''`, `[]`, and a value equal to the
@@ -223,7 +232,12 @@ export function shouldIncludeInUrl(value: unknown, config: OmissionConfig | unde
   if (value === null || value === undefined) return false;
   if (Array.isArray(value) && value.length === 0) return false;
   if (value === '') return false;
-  const declared = config?.default !== undefined ? config.default : config?.defaultValue;
+  // `in` narrowing rather than a cast: the union's members genuinely differ —
+  // a schema entry spells its default `default`, a flattened param spells it
+  // `defaultValue`, and neither is obliged to carry the other's field.
+  const fromDefault = config && 'default' in config ? config.default : undefined;
+  const fromLegacy = config && 'defaultValue' in config ? config.defaultValue : undefined;
+  const declared = fromDefault !== undefined ? fromDefault : fromLegacy;
   if (declared !== undefined && value === declared) return false;
   return true;
 }
