@@ -4,15 +4,15 @@
  * Provides runtime utilities for working with ODS color tokens
  */
 
+import type { PlatformName } from '../types/platform';
 import { pickReadableTextColor } from './color-analysis';
-import { colorTokens as odsTokens } from './ods-color-tokens-stub';
 import { clamp } from './common';
+import { colorTokens as odsTokens } from './ods-color-tokens-stub';
 import {
   PLATFORM_THEME,
   getPlatformAccentColor as identityAccentColor,
   getPlatformDisplayName,
 } from './platform-identity';
-import type { PlatformName } from '../types/platform';
 
 /** The token map, viewed as a flat key→value lookup. Nested groups (`text`)
  *  are not addressable by a flat key, so `lookupToken` returns only string
@@ -347,4 +347,3 @@ export function hslToRgb(h: number, s: number, l: number): { r: number; g: numbe
     b: Math.round(hue2rgb(hk - 1 / 3) * 255),
   };
 }
-

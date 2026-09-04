@@ -1,10 +1,9 @@
 'use client';
 
-import { Trash2, User, Globe, Youtube, Instagram, Facebook, MessageCircle, Send, Music, Mail } from 'lucide-react';
-import { LinkedInIcon, GitHubIcon, XLogo, RedditIcon, SlackIcon, WhatsAppIcon } from '../icons';
-import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
-import { SOCIAL_ICON_COMPONENTS } from '../social-icon-row';
+import { Trash2, User } from 'lucide-react';
 import { normalizeSocialPlatform } from '../../utils/social-platforms';
+import { SOCIAL_ICON_COMPONENTS } from '../social-icon-row';
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
 
 export interface SocialLink {
   platform: string;

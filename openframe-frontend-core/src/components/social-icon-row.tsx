@@ -1,6 +1,7 @@
 'use client';
 
 import { Mail, Music } from 'lucide-react';
+import { normalizeSocialPlatform, type SocialIconLink, type SocialIconPlatform } from '../utils/social-platforms';
 import {
   GitHubIcon,
   RedditIcon,
@@ -18,16 +19,9 @@ import {
   CopyIcon,
 } from './icons';
 import { Button } from './ui/button';
-import {
-  SOCIAL_ICON_PLATFORMS,
-  normalizeSocialPlatform,
-  type SocialIconLink,
-  type SocialIconPlatform,
-} from '../utils/social-platforms';
 
 /** Re-exported for call sites that already import the link type from this module. */
 export type { SocialIconLink };
-
 
 interface SocialIconRowProps {
   className?: string;

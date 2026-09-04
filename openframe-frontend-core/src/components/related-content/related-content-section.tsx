@@ -60,6 +60,7 @@ import {
 } from '../../utils/content-ref-groups';
 import { extractItems, extractItemId } from '../../utils/extract-items';
 import { buildListUrl as libBuildListUrl, canonicalContentRefType } from '../../utils/list-url';
+import { pageCount } from '../../utils/search-params';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
 // Type-only — erased at build, no runtime dependency on the dispatch module.
 import type { ChatCardDispatchExtras } from '../chat/entity-cards/dispatch';
@@ -78,7 +79,6 @@ import {
   type CardSize,
   type RelatedCardRegistryEntry,
 } from './card-registry';
-import { pageCount } from '../../utils/search-params';
 
 export type { CardLinkAnchorProps };
 

@@ -28,10 +28,10 @@ import type { SchedulingLink, SchedulingLinksPayload } from '../../schemas/meeti
 import { cn } from '../../utils/cn';
 import { contentFetch } from '../../utils/embed-content-fetch';
 import { formatDurationCompact } from '../../utils/format';
+import { pageCount } from '../../utils/search-params';
 import { EmptyState } from '../empty-state';
 import { PersistentPaginationWrapper } from '../persistent-pagination';
 import { AvatarStack, StatusBadge, Skeleton } from '../ui';
-import { pageCount } from '../../utils/search-params';
 
 export interface MeetingSchedulerDirectoryProps {
   /** Endpoints prefix, default '' (same-origin `/api/meetings`). */

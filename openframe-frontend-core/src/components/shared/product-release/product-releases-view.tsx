@@ -27,6 +27,7 @@ import type { ProductRelease, ProductReleaseListResponse } from '../../../types/
 import { cn } from '../../../utils/cn';
 import { resolveContentHref } from '../../../utils/content-href';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
+import { pageCount, positiveInt } from '../../../utils/search-params';
 import { buildProductReleaseCardProps } from '../../chat/entity-cards/product-release-card-defaults';
 import { useEntityCardLink } from '../../chat/entity-cards/use-entity-card-link';
 import { isModifierClick } from '../../chat/utils/chat-nav-resolution';
@@ -36,7 +37,6 @@ import { PersistentPaginationWrapper } from '../../persistent-pagination';
 import { LoadError } from '../../ui/error-state';
 import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
 import { ProductReleaseCardSkeleton } from './product-release-card-skeleton';
-import { pageCount, positiveInt } from '../../../utils/search-params';
 
 const DEFAULT_ENDPOINT = '/api/releases';
 // Param keys sourced from the shared registry (see RoadmapView) — single source for the

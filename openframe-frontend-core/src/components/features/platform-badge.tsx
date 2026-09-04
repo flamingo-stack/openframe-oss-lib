@@ -2,11 +2,11 @@
 
 import { Globe } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { getPlatformBrandClasses } from '../../utils/platform-identity';
 import { FlamingoLogo } from '../flamingo-logo';
 import { MiamiCyberGangLogoFaceOnly } from '../icons/miami-cyber-gang-logo-face-only';
 import { OpenFrameLogo } from '../icons/openframe-logo';
 import { OpenmspLogo } from '../openmsp-logo';
-import { getPlatformBrandClasses } from '../../utils/platform-identity';
 
 interface PlatformBadgeProps {
   platform?: {
@@ -36,7 +36,6 @@ const sizeClasses = {
     text: 'text-h6',
   },
 };
-
 
 const PlatformIcon = ({ platform, className }: { platform: string; className: string }) => {
   // Extract size from className (h-4 w-4 -> 16, h-5 w-5 -> 20, etc.)

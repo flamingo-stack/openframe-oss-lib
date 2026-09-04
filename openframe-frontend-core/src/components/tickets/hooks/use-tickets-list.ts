@@ -22,8 +22,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
-import type { TicketData } from '../types';
 import { PAGE_PARAM_LIMITS, pageCount, positiveInt } from '../../../utils/search-params';
+import type { TicketData } from '../types';
 
 const FIND_TICKET_ENDPOINT = '/api/chat/agent/find-ticket';
 const DEFAULT_PAGE_SIZE = 20;

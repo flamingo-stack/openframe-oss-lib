@@ -33,6 +33,7 @@ import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
 import { toast as defaultToast } from '../../hooks/use-toast';
 import { DEV_SECTION_PARAM_KEYS, devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
+import { positiveInt } from '../../utils/search-params';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
 import { DevSectionPage } from '../shared/dev-section';
@@ -45,7 +46,6 @@ import { useTicketActions } from './hooks/use-ticket-actions';
 import { useTicketsList } from './hooks/use-tickets-list';
 import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types';
 import { isOptimistic, TICKET_OPEN_PARAM } from './types';
-import { positiveInt } from '../../utils/search-params';
 
 export interface HelpCenterListProps {
   /** Toast override (test-friendly). Defaults to the lib's shared

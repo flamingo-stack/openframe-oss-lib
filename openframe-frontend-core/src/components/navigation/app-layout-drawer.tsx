@@ -18,6 +18,7 @@ import {
 } from 'react';
 
 import { cn } from '../../utils/cn';
+import { clamp } from '../../utils/common';
 import {
   DrawerBody,
   DrawerDescription,
@@ -32,7 +33,6 @@ import {
   useAppLayoutDrawerContainer,
   useAppLayoutDrawerCoordination,
 } from './app-layout-context';
-import { clamp } from '../../utils/common';
 
 /**
  * AppLayoutDrawer is a Drawer variant that renders **inside** AppLayout's main
