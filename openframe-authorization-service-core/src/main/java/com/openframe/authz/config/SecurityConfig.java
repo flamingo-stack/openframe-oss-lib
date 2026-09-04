@@ -37,7 +37,6 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Security configuration for all non-Authorization-Server requests: the login page, form login,

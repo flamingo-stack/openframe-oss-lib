@@ -26,11 +26,6 @@ public final class OidcUserUtils {
     }
 
     /**
-     * Whether the provider's {@code email_verified} claim permits treating the email as verified.
-     * Missing claim counts as verified — Microsoft often omits it for org accounts; an explicit
-     * {@code false} (boolean or string) never does.
-     */
-    /**
      * One-line description of the trust-relevant Microsoft claims, for gate rejection logs:
      * which signals were present and what they said — never the email itself.
      */

@@ -108,7 +108,7 @@ public class AppleNativeGrantAuthenticationProvider implements AuthenticationPro
                         "No user for this Apple account in the tenant, and auto-provisioning is not enabled."));
 
         appleTokenService.store(tenantId, user.getId(), bundleId, appleRefreshToken);
-        ssoIdentityService.link("apple", identityToken.getClaims(), user);
+        ssoIdentityService.link(APPLE, identityToken.getClaims(), user);
 
         if (OidcUserUtils.emailVerifiedClaimAllows(identityToken.getClaims())) {
             userService.markEmailVerified(user.getId());

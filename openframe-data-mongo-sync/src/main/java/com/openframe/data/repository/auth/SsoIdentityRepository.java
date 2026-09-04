@@ -12,6 +12,4 @@ public interface SsoIdentityRepository extends MongoRepository<SsoIdentity, Stri
     Optional<SsoIdentity> findByProviderAndSubject(String provider, String subject);
 
     void deleteByUserId(String userId);
-
-    void deleteByTenantId(String tenantId);
 }

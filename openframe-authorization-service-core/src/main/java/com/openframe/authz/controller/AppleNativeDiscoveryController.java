@@ -21,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
+import static com.openframe.authz.config.oidc.AppleSSOProperties.APPLE;
 import static java.util.Locale.ROOT;
 import static org.springframework.http.HttpStatus.*;
 import static org.springframework.util.StringUtils.hasText;
@@ -69,7 +70,7 @@ public class AppleNativeDiscoveryController {
         }
 
         // Link-first: the Apple sub survives email changes and Hide My Email relay churn.
-        AuthUser user = ssoIdentityService.findLink("apple", token.getClaims())
+        AuthUser user = ssoIdentityService.findLink(APPLE, token.getClaims())
                 .flatMap(link -> userService.findActiveById(link.getUserId()))
                 .or(() -> userService.findActiveByEmail(email.toLowerCase(ROOT)))
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "registration_required"));
@@ -112,7 +113,7 @@ public class AppleNativeDiscoveryController {
         if (!hasText(email)) {
             throw new ResponseStatusException(UNAUTHORIZED, "Apple identity token carries no email");
         }
-        if (ssoIdentityService.findLink("apple", token.getClaims()).isPresent()) {
+        if (ssoIdentityService.findLink(APPLE, token.getClaims()).isPresent()) {
             // Invariant: one SSO account — one user. A linked subject signs in; it does not
             // create a second account it could never reach through this provider again.
             throw new ResponseStatusException(CONFLICT, "already_linked");
