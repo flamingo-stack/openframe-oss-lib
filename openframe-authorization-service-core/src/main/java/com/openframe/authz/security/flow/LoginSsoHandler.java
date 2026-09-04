@@ -1,9 +1,10 @@
 package com.openframe.authz.security.flow;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import com.openframe.authz.security.EmailTrustPolicy;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
-import com.openframe.authz.security.SsoRegistrationConstants;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.sso.SignupTicketService;
 import com.openframe.authz.service.sso.SsoIdentityService;
@@ -59,7 +60,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
 
     @Override
     public String cookieName() {
-        return SsoRegistrationConstants.COOKIE_SSO_LOGIN;
+        return SsoFlowCookieNames.OF_SSO_LOGIN;
     }
 
     @Override
@@ -92,9 +93,6 @@ public class LoginSsoHandler implements SsoFlowHandler {
                 continueIntoRegistration(request, response, authentication, payload, provider, user, email);
                 return;
             }
-            ssoIdentityService.link(provider, user.getClaims(), authUser);
-        } else {
-            ssoIdentityService.link(provider, user.getClaims(), authUser);
         }
 
         String tenantId = authUser.getTenantId();
@@ -103,6 +101,11 @@ public class LoginSsoHandler implements SsoFlowHandler {
         tenantService.findById(tenantId)
                 .filter(Tenant::isActive)
                 .orElseThrow(() -> new IllegalStateException("Your account is not active. Please contact your administrator."));
+
+        // Only now — the login is fully allowed (trusted routing, provider permitted, tenant
+        // active). A link written before these checks would outlive a REJECTED login and later
+        // count as proof of trust.
+        ssoIdentityService.link(provider, user.getClaims(), authUser);
 
         clearFlowCookieAndRedirect(response, cookie, tenantId, payload.redirectTo(), payload.authMobile());
     }
@@ -165,7 +168,8 @@ public class LoginSsoHandler implements SsoFlowHandler {
             // existing allow-list — this handler makes no redirect-policy decision.
             String[] names = resolveNames(request, authentication, user);
             String ticket = signupTicketService.create(email, names[0], names[1], provider,
-                    OidcUserUtils.emailVerifiedClaimAllows(user));
+                    OidcUserUtils.emailVerifiedClaimAllows(user),
+                    ssoIdentityService.subjectOf(provider, user.getClaims()).orElse(null));
             log.info("event=sso-login-continue-registration-mobile provider={}", provider);
             foundAtRoot(response, "/oauth/signup-continue?signupTicket=" + urlEncode(ticket)
                     + "&redirectTo=" + urlEncode(payload.redirectTo()));

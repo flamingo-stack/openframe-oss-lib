@@ -29,7 +29,8 @@ import static com.openframe.authz.service.auth.strategy.AppleClientSecretFactory
  * <p>
  * The identity token alone is a bearer credential (replayable within its lifetime); callers must
  * pair verification with the single-use authorization-code exchange — see
- * {@link AppleAuthorizationCodeClient} — and, when the app supplies one, the nonce check here.
+ * {@link AppleAuthorizationCodeClient} — and with the mandatory nonce check here, which binds the
+ * token to the app session that requested it.
  */
 @Slf4j
 @Component
@@ -44,8 +45,8 @@ public class AppleNativeTokenVerifier {
 
     /**
      * @param identityToken the JWT from {@code ASAuthorizationAppleIDCredential.identityToken}
-     * @param rawNonce      the un-hashed nonce the app generated for this authorization, or null;
-     *                      when present, the token's {@code nonce} claim must equal its SHA-256 hex
+     * @param rawNonce the raw nonce the app generated; REQUIRED — a blank nonce is rejected, an
+     *                 optional nonce would let a caller opt out of replay binding by omitting a field
      * @return the verified token
      * @throws OAuth2AuthenticationException with {@code invalid_grant} on any verification failure
      */

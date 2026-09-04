@@ -16,7 +16,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
-import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenDecoderFactory;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -26,8 +25,10 @@ import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
 import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -37,7 +38,8 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Security configuration for all non-Authorization-Server requests: the login page, form login,
@@ -115,30 +117,47 @@ public class SecurityConfig {
                         "SSO login failed. Please try again.");
     }
 
+    /** One entry per distinct SSO config (its cache key), NOT per login — bounded by active configs. */
+    private final Map<String, JwtDecoder> ssoDecoderCache = new ConcurrentHashMap<>();
+
     /**
-     * Builds the ID-token decoder for whichever provider the registration belongs to. Providers that
-     * need validation beyond the OIDC defaults supply it from their own strategy — see
-     * {@link com.openframe.authz.service.auth.strategy.ClientRegistrationStrategy#idTokenValidator}.
+     * Builds the ID-token decoder for whichever provider the registration belongs to, supplying the
+     * full OIDC validator set (providers needing more add it from their own strategy — see
+     * {@link com.openframe.authz.service.auth.strategy.ClientRegistrationStrategy#idTokenValidator}).
+     * <p>
+     * Decoders are cached on a key capturing everything that distinguishes two registrations —
+     * {@code clientId} (the {@code aud} check), {@code jwkSetUri} and {@code issuerUri}. Spring's own
+     * {@code OidcIdTokenDecoderFactory} keys only on {@code registrationId}, a per-provider constant
+     * here (registrations are built per TENANT under "google"/"microsoft"/"apple"), so it would pin
+     * the first tenant's client onto the pod for everyone. This key reuses a decoder — keeping the
+     * JWKS keys cached process-wide — while rebuilding whenever a tenant's clientId, JWKS URI or
+     * issuer differs or is rotated; a rotated config's stale entry is harmless and rare.
      */
     @Bean
     public JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory(SsoProviderRegistry ssoProviderRegistry) {
-        // Spring's own factory handles the decoder plumbing (JWKS resolution, per-registration
-        // caching); we only define the validator stack. EVERY provider gets the full OIDC set —
-        // the old hand-rolled factory's no-custom-validator branch (Google) skipped the
-        // OidcIdTokenValidator, so an ID token minted for ANY other application passed (no
-        // audience check). Registrations that pin an issuer (Google, Apple) get it enforced;
-        // Microsoft's varies per directory and is validated by its registry pattern instead.
-        OidcIdTokenDecoderFactory factory = new OidcIdTokenDecoderFactory();
-        factory.setJwtValidatorFactory(clientRegistration -> {
+        return clientRegistration -> {
+            String jwkSetUri = clientRegistration.getProviderDetails().getJwkSetUri();
             String issuer = clientRegistration.getProviderDetails().getIssuerUri();
-            List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
-            validators.add(issuer != null && !issuer.isBlank()
-                    ? JwtValidators.createDefaultWithIssuer(issuer)
-                    : JwtValidators.createDefault());
-            validators.add(new OidcIdTokenValidator(clientRegistration));
-            ssoProviderRegistry.idTokenValidator(clientRegistration).ifPresent(validators::add);
-            return new DelegatingOAuth2TokenValidator<>(validators);
-        });
-        return factory;
+            String cacheKey = clientRegistration.getRegistrationId()
+                    + "|" + clientRegistration.getClientId()
+                    + "|" + jwkSetUri
+                    + "|" + issuer;
+            return ssoDecoderCache.computeIfAbsent(cacheKey, k -> {
+                // EVERY provider gets the full OIDC validator set — the audience check is what
+                // stops an ID token minted for any other application. Registrations that pin an
+                // issuer (Google, Apple) get it enforced; Microsoft's varies per directory and is
+                // validated by its registry pattern instead.
+                List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+                validators.add(issuer != null && !issuer.isBlank()
+                        ? JwtValidators.createDefaultWithIssuer(issuer)
+                        : JwtValidators.createDefault());
+                validators.add(new OidcIdTokenValidator(clientRegistration));
+                ssoProviderRegistry.idTokenValidator(clientRegistration).ifPresent(validators::add);
+
+                NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+                decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
+                return decoder;
+            });
+        };
     }
 }

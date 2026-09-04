@@ -1,16 +1,19 @@
 package com.openframe.authz.security.flow;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.util.OidcUserUtils;
-import com.openframe.authz.security.SsoRegistrationConstants;
 import com.openframe.authz.security.SsoTenantRegCookiePayload;
+import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
@@ -28,10 +31,11 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
 
     private final SsoCookieCodec ssoCookieCodec;
     private final TenantRegistrationService registrationService;
+    private final SsoIdentityService ssoIdentityService;
 
     @Override
     public String cookieName() {
-        return SsoRegistrationConstants.COOKIE_SSO_REG;
+        return SsoFlowCookieNames.OF_SSO_REG;
     }
 
     @Override
@@ -49,6 +53,12 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
         requireEmailMatchesForm(payload.email(), email);
+        // Provider from the authenticated token, falling back to the flow cookie — never null, so
+        // the invariant guard fails CLOSED rather than passing a null provider that matches nothing.
+        String provider = authentication instanceof OAuth2AuthenticationToken token
+                ? token.getAuthorizedClientRegistrationId()
+                : payload.provider();
+        ssoIdentityService.ensureNotAlreadyLinked(provider, user.getClaims());
 
         String[] names = resolveNames(request, authentication, user);
         String givenName = names[0];

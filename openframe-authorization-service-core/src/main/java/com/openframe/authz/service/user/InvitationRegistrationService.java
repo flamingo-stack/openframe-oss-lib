@@ -6,6 +6,7 @@ import com.openframe.authz.exception.UserActiveInAnotherTenantException;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.processor.UserDeactivationProcessor;
+import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.validation.InvitationValidator;
 import com.openframe.data.document.auth.AuthInvitation;
 import com.openframe.data.document.auth.AuthUser;
@@ -27,6 +28,7 @@ public class InvitationRegistrationService {
     private final RegistrationProcessor registrationProcessor;
     private final UserDeactivationProcessor userDeactivationProcessor;
     private final InvitationValidator invitationValidator;
+    private final SsoIdentityService ssoIdentityService;
 
     public AuthUser registerByInvitation(InvitationRegistrationRequest request) {
         AuthInvitation invitation = invitationValidator.loadAndEnsureAcceptable(request.getInvitationId());
@@ -65,6 +67,13 @@ public class InvitationRegistrationService {
                 throw new OwnerCannotSwitchTenantException(invitation.getEmail());
             }
             userService.deactivateUser(user);
+            // Tenant switch is an explicit lifecycle action — the one context where touching links
+            // is allowed. Drop the departing (now-deactivated) user's links so the identity binds
+            // cleanly to the new tenant's account on first login instead of dead-ending on a
+            // deactivated user and logging a conflict every time. Intentionally NOT best-effort
+            // (unlike account-deletion's link cleanup): a failure here must abort the switch rather
+            // than leave a stale link that would silently route the invitee back to the old tenant.
+            ssoIdentityService.removeUserLinks(user.getId());
             userDeactivationProcessor.postProcessDeactivation(user);
             return null;
         }
