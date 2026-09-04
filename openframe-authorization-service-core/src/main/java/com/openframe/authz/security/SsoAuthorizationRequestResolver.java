@@ -1,5 +1,7 @@
 package com.openframe.authz.security;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,7 +24,7 @@ import java.util.Optional;
  * right flow handler: each flow's cookie carries the state it generated, and the provider must
  * echo that exact value. Flow cookies are decoded payload-agnostically via
  * {@code SsoCookieCodec#decodeState}, so a new flow only needs its cookie name added to
- * {@code SsoRegistrationConstants#SSO_FLOW_COOKIES}.
+ * {@code SsoRegistrationConstants#SsoFlowCookieNames.ALL}.
  */
 @Slf4j
 public class SsoAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
@@ -77,7 +79,7 @@ public class SsoAuthorizationRequestResolver implements OAuth2AuthorizationReque
         Cookie[] cookies = request.getCookies();
         if (cookies == null) return Optional.empty();
         for (Cookie c : cookies) {
-            if (!SsoRegistrationConstants.SSO_FLOW_COOKIES.contains(c.getName())) {
+            if (!SsoFlowCookieNames.ALL.contains(c.getName())) {
                 continue;
             }
             String token = c.getValue();

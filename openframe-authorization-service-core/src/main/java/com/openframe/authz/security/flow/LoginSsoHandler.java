@@ -1,9 +1,10 @@
 package com.openframe.authz.security.flow;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import com.openframe.authz.security.EmailTrustPolicy;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
-import com.openframe.authz.security.SsoRegistrationConstants;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.sso.SignupTicketService;
 import com.openframe.authz.service.sso.SsoIdentityService;
@@ -59,7 +60,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
 
     @Override
     public String cookieName() {
-        return SsoRegistrationConstants.COOKIE_SSO_LOGIN;
+        return SsoFlowCookieNames.OF_SSO_LOGIN;
     }
 
     @Override
