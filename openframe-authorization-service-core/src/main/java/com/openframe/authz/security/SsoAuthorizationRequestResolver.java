@@ -24,7 +24,7 @@ import java.util.Optional;
  * right flow handler: each flow's cookie carries the state it generated, and the provider must
  * echo that exact value. Flow cookies are decoded payload-agnostically via
  * {@code SsoCookieCodec#decodeState}, so a new flow only needs its cookie name added to
- * {@code SsoRegistrationConstants#SsoFlowCookieNames.ALL}.
+ * {@link com.openframe.core.constants.SsoFlowCookieNames#ALL}.
  */
 @Slf4j
 public class SsoAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {

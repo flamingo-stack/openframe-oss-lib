@@ -197,12 +197,7 @@ public class SsoLoginController {
             OidcUser user = requireSessionOidcUser(authentication);
             SsoLoginCookiePayload payload = requireLoginFlowCookie(httpRequest);
 
-            if (ssoIdentityService.findLink(payload.provider(), user.getClaims()).isPresent()) {
-                // Invariant: one SSO account — one user, platform-wide. Enforced here at
-                // registration rather than discovered later as a runtime link conflict.
-                throw new IllegalStateException(
-                        "This account is already connected to an organization. Please sign in instead.");
-            }
+            ssoIdentityService.ensureNotAlreadyLinked(payload.provider(), user.getClaims());
 
             String email = OidcUserUtils.resolveEmail(user);
             if (!hasText(email)) {

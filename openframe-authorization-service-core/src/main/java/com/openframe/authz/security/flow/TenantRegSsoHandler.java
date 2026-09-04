@@ -29,6 +29,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
 
     private final SsoCookieCodec ssoCookieCodec;
     private final TenantRegistrationService registrationService;
+    private final com.openframe.authz.service.sso.SsoIdentityService ssoIdentityService;
 
     @Override
     public String cookieName() {
@@ -38,6 +39,11 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
     @Override
     public Optional<String> expectedState(Cookie cookie) {
         return ssoCookieCodec.decodeTenant(cookie.getValue()).map(SsoTenantRegCookiePayload::s);
+    }
+
+    private String provider(Authentication authentication) {
+        return authentication instanceof org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken t
+                ? t.getAuthorizedClientRegistrationId() : null;
     }
 
     @Override
@@ -50,6 +56,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
         requireEmailMatchesForm(payload.email(), email);
+        ssoIdentityService.ensureNotAlreadyLinked(provider(authentication), user.getClaims());
 
         String[] names = resolveNames(request, authentication, user);
         String givenName = names[0];

@@ -32,6 +32,17 @@ public class MongoIndexConfig {
 
     @PostConstruct
     public void initIndexes() {
+        // Load-bearing: the (provider, subject) unique index IS the enforcement of the
+        // one-SSO-account-one-user invariant (registration guards rely on it, and
+        // findByProviderAndSubject assumes at most one match). Created explicitly here rather than
+        // trusting auto-index-creation, so a single missing config in a new environment cannot
+        // silently drop the invariant and turn resolution into IncorrectResultSizeDataAccessException.
+        mongoTemplate.indexOps("sso_identities")
+            .ensureIndex(new Index().on("provider", Sort.Direction.ASC)
+                                    .on("subject", Sort.Direction.ASC)
+                                    .unique()
+                                    .named("sso_identities_provider_subject_unique"));
+
         mongoTemplate.indexOps("application_events")
             .ensureIndex(new Index().on("userId", Sort.Direction.ASC)
                                   .on("timestamp", Sort.Direction.DESC));

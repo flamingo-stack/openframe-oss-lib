@@ -3,12 +3,11 @@ package com.openframe.authz.security;
 import com.openframe.authz.config.oidc.MicrosoftSSOProperties;
 import com.openframe.authz.util.OidcUserUtils;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
-
 import java.util.Map;
+
+import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
 
 /**
  * Whether a provider-asserted email is trustworthy enough to ROUTE INTO AN EXISTING ACCOUNT.
@@ -20,7 +19,6 @@ import java.util.Map;
  * their emails are Microsoft-verified sign-in aliases with no directory admin who could forge
  * them, so they are trusted without {@code xms_edov} (which is never issued on MSA tokens).
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class EmailTrustPolicy {

@@ -56,8 +56,24 @@ public class SsoIdentityService {
                 .flatMap(subject -> findBySubject(provider, subject));
     }
 
+    /** Explicit lifecycle removal (cross-tenant switch, admin unlink). Not a login side effect. */
+    public void removeUserLinks(String userId) {
+        ssoIdentityRepository.deleteByUserId(userId);
+    }
+
     public Optional<SsoIdentity> findBySubject(String provider, String subject) {
         return ssoIdentityRepository.findByProviderAndSubject(provider, subject);
+    }
+
+    /**
+     * Registration guard for the one-SSO-account-one-user invariant: throws when this identity is
+     * already linked, so a bound subject signs in rather than spawning a second account it could
+     * never reach through this provider again. Every registration entry must call this.
+     */
+    public void ensureNotAlreadyLinked(String provider, Map<String, Object> claims) {
+        if (findLink(provider, claims).isPresent()) {
+            throw new SsoAlreadyLinkedException();
+        }
     }
 
     /**
@@ -78,11 +94,10 @@ public class SsoIdentityService {
             Query query = new Query(Criteria.where("provider").is(provider)
                     .and("subject").is(subject.get())
                     .and("userId").is(user.getId()));
+            // provider/subject/userId come from the query's equality criteria — Mongo copies them
+            // into the inserted document automatically; only the non-query fields need setOnInsert.
             Update update = new Update()
                     .setOnInsert("tenantId", user.getTenantId())
-                    .setOnInsert("userId", user.getId())
-                    .setOnInsert("provider", provider)
-                    .setOnInsert("subject", subject.get())
                     .setOnInsert("createdAt", Instant.now())
                     .set("lastSeenAt", Instant.now());
             var result = mongoTemplate.upsert(query, update, SsoIdentity.class);
@@ -90,7 +105,7 @@ public class SsoIdentityService {
                 log.info("event=sso-identity-linked provider={} user={}", provider, user.getId());
             }
         } catch (DuplicateKeyException e) {
-            log.warn("event=sso-identity-conflict provider={} subject={} loginUser={} — subject already bound to another user",
+            log.warn("event=sso-identity-link-duplicate provider={} subject={} user={} — link already present (concurrent first login, or subject bound to another user)",
                     provider, subject.get(), user.getId());
         } catch (Exception e) {
             log.warn("Failed to write sso identity link for user {}: {}", user.getId(), e.getMessage());

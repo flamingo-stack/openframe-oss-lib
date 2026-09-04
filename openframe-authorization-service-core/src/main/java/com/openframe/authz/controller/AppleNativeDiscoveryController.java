@@ -113,9 +113,9 @@ public class AppleNativeDiscoveryController {
         if (!hasText(email)) {
             throw new ResponseStatusException(UNAUTHORIZED, "Apple identity token carries no email");
         }
-        if (ssoIdentityService.findLink(APPLE, token.getClaims()).isPresent()) {
-            // Invariant: one SSO account — one user. A linked subject signs in; it does not
-            // create a second account it could never reach through this provider again.
+        try {
+            ssoIdentityService.ensureNotAlreadyLinked(APPLE, token.getClaims());
+        } catch (com.openframe.authz.service.sso.SsoAlreadyLinkedException e) {
             throw new ResponseStatusException(CONFLICT, "already_linked");
         }
         if (userService.findActiveByEmail(email.toLowerCase(ROOT)).isPresent()) {

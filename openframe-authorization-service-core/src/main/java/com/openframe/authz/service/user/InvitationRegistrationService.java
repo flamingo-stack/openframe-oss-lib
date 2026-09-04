@@ -27,6 +27,7 @@ public class InvitationRegistrationService {
     private final RegistrationProcessor registrationProcessor;
     private final UserDeactivationProcessor userDeactivationProcessor;
     private final InvitationValidator invitationValidator;
+    private final com.openframe.authz.service.sso.SsoIdentityService ssoIdentityService;
 
     public AuthUser registerByInvitation(InvitationRegistrationRequest request) {
         AuthInvitation invitation = invitationValidator.loadAndEnsureAcceptable(request.getInvitationId());
@@ -65,6 +66,11 @@ public class InvitationRegistrationService {
                 throw new OwnerCannotSwitchTenantException(invitation.getEmail());
             }
             userService.deactivateUser(user);
+            // Tenant switch is an explicit lifecycle action — the one context where touching links
+            // is allowed. Drop the departing (now-deactivated) user's links so the identity binds
+            // cleanly to the new tenant's account on first login instead of dead-ending on a
+            // deactivated user and logging a conflict every time.
+            ssoIdentityService.removeUserLinks(user.getId());
             userDeactivationProcessor.postProcessDeactivation(user);
             return null;
         }

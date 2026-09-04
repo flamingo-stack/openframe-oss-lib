@@ -47,7 +47,6 @@ public class AppleNativeTokenVerifier {
      * @param identityToken the JWT from {@code ASAuthorizationAppleIDCredential.identityToken}
      * @param rawNonce the raw nonce the app generated; REQUIRED — a blank nonce is rejected, an
      *                 optional nonce would let a caller opt out of replay binding by omitting a field
-     *                      when present, the token's {@code nonce} claim must equal its SHA-256 hex
      * @return the verified token
      * @throws OAuth2AuthenticationException with {@code invalid_grant} on any verification failure
      */

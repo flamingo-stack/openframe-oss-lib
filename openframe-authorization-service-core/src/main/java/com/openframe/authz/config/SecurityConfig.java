@@ -25,6 +25,7 @@ import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -37,6 +38,8 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 /**
  * Security configuration for all non-Authorization-Server requests: the login page, form login,
@@ -119,32 +122,42 @@ public class SecurityConfig {
      * need validation beyond the OIDC defaults supply it from their own strategy — see
      * {@link com.openframe.authz.service.auth.strategy.ClientRegistrationStrategy#idTokenValidator}.
      */
+    /**
+     * Decoders are cached on a key that captures everything distinguishing two registrations —
+     * {@code clientId} (the {@code aud} check), {@code jwkSetUri} and {@code issuerUri}. Spring's
+     * own {@code OidcIdTokenDecoderFactory} keys only on {@code registrationId}, which is a
+     * per-provider constant here (registrations are built per TENANT under "google"/"microsoft"/
+     * "apple"), so it would pin the first tenant's client onto the pod for everyone. This key
+     * reuses a decoder — so the JWKS keys stay cached process-wide — while still building a fresh
+     * one whenever a tenant's clientId, JWKS URI or issuer differs or is rotated.
+     */
+    private final Map<String, JwtDecoder> ssoDecoderCache = new ConcurrentHashMap<>();
+
     @Bean
     public JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory(SsoProviderRegistry ssoProviderRegistry) {
-        // Built PER CALL on purpose — do NOT use Spring's OidcIdTokenDecoderFactory here: it
-        // caches decoders by registrationId, and our registrations are built per TENANT under one
-        // constant id per provider ("google"/"microsoft"/"apple"). The cache would pin the first
-        // tenant's clientId (aud check), jwkSetUri and secret onto the pod for every later tenant
-        // and ignore SSO config rotation until restart. NimbusJwtDecoder caches the JWKS keys
-        // internally, so the per-call decoder costs no extra key fetches for the same URI.
-        // EVERY provider gets the full OIDC validator set — the audience check is what stops an
-        // ID token minted for any other application. Registrations that pin an issuer (Google,
-        // Apple) get it enforced; Microsoft's varies per directory and is validated by its
-        // registry pattern instead.
         return clientRegistration -> {
+            String jwkSetUri = clientRegistration.getProviderDetails().getJwkSetUri();
             String issuer = clientRegistration.getProviderDetails().getIssuerUri();
-            List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
-            validators.add(issuer != null && !issuer.isBlank()
-                    ? JwtValidators.createDefaultWithIssuer(issuer)
-                    : JwtValidators.createDefault());
-            validators.add(new OidcIdTokenValidator(clientRegistration));
-            ssoProviderRegistry.idTokenValidator(clientRegistration).ifPresent(validators::add);
+            String cacheKey = clientRegistration.getRegistrationId()
+                    + "|" + clientRegistration.getClientId()
+                    + "|" + jwkSetUri
+                    + "|" + issuer;
+            return ssoDecoderCache.computeIfAbsent(cacheKey, k -> {
+                // EVERY provider gets the full OIDC validator set — the audience check is what
+                // stops an ID token minted for any other application. Registrations that pin an
+                // issuer (Google, Apple) get it enforced; Microsoft's varies per directory and is
+                // validated by its registry pattern instead.
+                List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+                validators.add(issuer != null && !issuer.isBlank()
+                        ? JwtValidators.createDefaultWithIssuer(issuer)
+                        : JwtValidators.createDefault());
+                validators.add(new OidcIdTokenValidator(clientRegistration));
+                ssoProviderRegistry.idTokenValidator(clientRegistration).ifPresent(validators::add);
 
-            NimbusJwtDecoder decoder = NimbusJwtDecoder
-                    .withJwkSetUri(clientRegistration.getProviderDetails().getJwkSetUri())
-                    .build();
-            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
-            return decoder;
+                NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+                decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
+                return decoder;
+            });
         };
     }
 }
