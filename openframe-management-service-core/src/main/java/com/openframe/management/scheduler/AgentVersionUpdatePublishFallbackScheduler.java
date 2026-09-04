@@ -61,9 +61,13 @@ public class AgentVersionUpdatePublishFallbackScheduler {
     private void processToolAgents() {
         List<IntegratedToolAgent> enabled = integratedToolAgentService.getAllEnabled();
         for (IntegratedToolAgent agent : enabled) {
-            PublishState publishState = agent.getPublishState();
-            if (shouldRetryPublish(publishState)) {
-                toolAgentUpdateUpdatePublisher.publish(agent);
+            try {
+                PublishState publishState = agent.getPublishState();
+                if (shouldRetryPublish(publishState)) {
+                    toolAgentUpdateUpdatePublisher.publish(agent);
+                }
+            } catch (Exception e) {
+                log.error("Failed to publish tool agent update: agentId={}", agent.getId(), e);
             }
         }
     }
