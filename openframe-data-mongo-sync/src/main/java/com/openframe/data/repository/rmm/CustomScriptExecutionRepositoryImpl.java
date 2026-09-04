@@ -1,5 +1,6 @@
 package com.openframe.data.repository.rmm;
 
+import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
@@ -59,6 +60,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_STATUS = "status";
+    private static final String FIELD_SOURCE = "source";
     private static final String FIELD_INITIATED_BY = "initiatedBy";
     private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_EXECUTION_ID = "executionId";
@@ -182,7 +184,8 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static Criteria baseCriteria(String tenantId, ExecutionOwnerScope owner,
                                          ScriptExecutionQueryFilter filter, String excludedField) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId)
-                .and(OWNER_FIELDS.get(owner.type())).is(owner.id());
+                .and(OWNER_FIELDS.get(owner.type())).is(owner.id())
+                .and(FIELD_SOURCE).ne(ExecutionSource.SYSTEM_BOOTSTRAP);
         if (filter == null) {
             return criteria;
         }
