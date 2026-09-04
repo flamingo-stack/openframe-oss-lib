@@ -33,7 +33,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "sso_identities")
-@CompoundIndex(def = "{'provider': 1, 'subject': 1}", unique = true)
+@CompoundIndex(name = "sso_identities_provider_subject_unique", def = "{'provider': 1, 'subject': 1}", unique = true)
 public class SsoIdentity implements TenantScoped {
 
     @Id
