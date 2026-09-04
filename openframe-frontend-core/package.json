@@ -381,6 +381,7 @@
     "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "^3.0.1",
     "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.1.0",
     "@eslint/js": "^9.39.0",
+    "@flamingo-stack/openframe-frontend-core": "file:.yalc/@flamingo-stack/openframe-frontend-core",
     "@floating-ui/react": "^0.27.15",
     "@headlessui/react": "^2.2.9",
     "@mux/mux-player-react": "^3.13.0",

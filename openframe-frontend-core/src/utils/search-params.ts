@@ -29,15 +29,22 @@ export interface PositiveIntOptions {
  * produced `NaN` for `'abc'`. A value below `min` falls back. The RESULT (parsed
  * value or fallback alike) is clamped to `max`, so "never exceeds max" has one owner.
  */
-export function positiveInt(
+export function positiveInt<TFallback = number>(
   raw: string | number | null | undefined,
-  fallback: number,
-  { min = 1, max }: PositiveIntOptions = {}
-): number {
+  fallback: TFallback,
+  { min = 1, max }: PositiveIntOptions = {},
+): number | TFallback {
+  // The fallback is returned AS GIVEN — capping only ever applies to a value
+  // parsed out of the input, so a caller with no default (`null`) gets its
+  // sentinel back untouched instead of `Math.min(null, max)`.
   const capped = (v: number) => (max == null ? v : Math.min(v, max));
-  if (raw === null || raw === undefined || raw === '') return capped(fallback);
+  if (raw === null || raw === undefined || raw === '') {
+    return typeof fallback === 'number' ? (capped(fallback) as number | TFallback) : fallback;
+  }
   const n = Math.trunc(Number(raw));
-  if (!Number.isFinite(n) || n < min) return capped(fallback);
+  if (!Number.isFinite(n) || n < min) {
+    return typeof fallback === 'number' ? (capped(fallback) as number | TFallback) : fallback;
+  }
   return capped(n);
 }
 
@@ -186,10 +193,10 @@ function coerceScalar(raw: string | undefined, config: ParamConfig): unknown {
  * PRECEDENCE: an absent or empty SCALAR takes the declared `default` when there
  * is one, else the `absent` value. ARRAY keys never take `absent`: they are `[]`.
  */
-export function parseSchemaParams<TSchema extends ParamSchema, Opts extends ParseSchemaOptions = {}>(
+export function parseSchemaParams<TSchema extends ParamSchema, Opts extends ParseSchemaOptions = Record<string, never>>(
   schema: TSchema,
   input: ParamInput,
-  options?: Opts
+  options?: Opts,
 ): InferParsedParams<TSchema, AbsentValue<Opts>> {
   const absent = options?.absent === 'null' ? null : undefined;
   const out: Record<string, unknown> = {};
@@ -231,7 +238,7 @@ export interface CreateSearchParamsOptions {
 /** Build `URLSearchParams` from a value record (arrays repeat the key by default). */
 export function createSearchParams(
   params: Record<string, unknown>,
-  { arrayJoin }: CreateSearchParamsOptions = {}
+  { arrayJoin }: CreateSearchParamsOptions = {},
 ): URLSearchParams {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -258,7 +265,7 @@ export function createSearchParams(
 export function serializeSchemaParams<TSchema extends ParamSchema>(
   schema: TSchema,
   params: Record<string, unknown>,
-  options?: CreateSearchParamsOptions
+  options?: CreateSearchParamsOptions,
 ): string {
   const kept: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(params)) {

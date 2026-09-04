@@ -39,24 +39,32 @@ export type OdsSpacingToken = (typeof ODS_SPACING_TOKENS)[number];
 export const ODS_SPACING_TOKEN_PATTERN = /--spacing-system-([a-z]+)/g;
 
 /** Spacing properties the conversion covers (gap + every padding/margin edge). */
-export type OdsSpacingProp =
-  | 'gap'
-  | 'p'
-  | 'px'
-  | 'py'
-  | 'pt'
-  | 'pb'
-  | 'pl'
-  | 'pr'
-  | 'm'
-  | 'mx'
-  | 'my'
-  | 'mt'
-  | 'mb'
-  | 'ml'
-  | 'mr'
-  | 'space-x'
-  | 'space-y';
+/**
+ * Every spacing property ODS tokenizes. A runtime TUPLE, not just a union, so
+ * a consumer that has to scan source for untokenized spacing reads the list
+ * from here instead of re-spelling it.
+ */
+export const ODS_SPACING_PROPS = [
+  'gap',
+  'p',
+  'px',
+  'py',
+  'pt',
+  'pb',
+  'pl',
+  'pr',
+  'm',
+  'mx',
+  'my',
+  'mt',
+  'mb',
+  'ml',
+  'mr',
+  'space-x',
+  'space-y',
+] as const;
+
+export type OdsSpacingProp = (typeof ODS_SPACING_PROPS)[number];
 
 /**
  * THE conversion table: a Tailwind step whose pixel value has an EXACT ODS token.
