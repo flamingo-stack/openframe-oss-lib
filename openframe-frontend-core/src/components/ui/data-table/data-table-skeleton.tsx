@@ -31,6 +31,7 @@ export interface DataTableSkeletonProps {
   rowClassName?: string;
   /**
    * REPLACES the design row height, for a table whose rows are not that tall.
+   * Sizes the CARD, as a real row does.
    * Appending a height through `rowClassName` cannot do this: tailwind-merge
    * drops the plain `h-[66px]` but keeps `md:h-[78px]`, so the override held
    * on a phone and lost on a desktop. See `DataTableBodyProps.rowHeightClassName`.
@@ -50,6 +51,8 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
           key={index}
           className={cn(
             'relative animate-pulse overflow-hidden rounded-md border border-ods-border bg-ods-card',
+            // The slot height sits on the card, matching a real row.
+            rowHeightClassName,
             className,
           )}
         >
@@ -57,7 +60,7 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
             className={cn(
               'hidden py-0 md:flex',
               ROW_SHELL_CLASSES,
-              rowHeightClassName ?? ROW_HEIGHT_DESKTOP,
+              rowHeightClassName ? 'h-full' : ROW_HEIGHT_DESKTOP,
               rowClassName,
             )}
           >
@@ -89,7 +92,7 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
             className={cn(
               'flex justify-start py-0 md:hidden',
               ROW_SHELL_CLASSES,
-              rowHeightClassName ?? ROW_HEIGHT_MOBILE,
+              rowHeightClassName ? 'h-full' : ROW_HEIGHT_MOBILE,
               rowClassName,
             )}
           >
