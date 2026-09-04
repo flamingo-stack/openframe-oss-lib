@@ -131,7 +131,7 @@ describe('common leaf', () => {
     expect(clamp(5, 1, 3)).toBe(3);
     expect(clamp(-5, 1, 3)).toBe(1);
     expect(pick({ a: 1, b: 2, c: 3 }, ['a', 'c'])).toEqual({ a: 1, c: 3 });
-    expect(pick({ a: undefined } as { a: number | undefined }, ['a'])).toEqual({ a: undefined });
+    expect(pick({ a: undefined }, ['a'])).toEqual({ a: undefined });
   });
   it('states the no-client-cache rule once', () => {
     expect(NO_CLIENT_CACHE).toEqual({ staleTime: 0 });
