@@ -42,6 +42,7 @@ public class AppleNativeDiscoveryController {
     private final UserService userService;
     private final TenantService tenantService;
     private final TenantRegistrationService registrationService;
+    private final com.openframe.authz.service.sso.SsoIdentityService ssoIdentityService;
 
     public record AppleNativeDiscoverRequest(String identityToken, String nonce) {}
 
@@ -64,7 +65,11 @@ public class AppleNativeDiscoveryController {
             throw new ResponseStatusException(UNAUTHORIZED, "Apple identity token carries no verified email");
         }
 
-        AuthUser user = userService.findActiveByEmail(email.toLowerCase(ROOT))
+        // Link-first: the Apple sub survives email changes and Hide My Email relay churn.
+        AuthUser user = ssoIdentityService.findLink("apple", token.getClaims())
+                .flatMap(link -> userService.findById(link.getUserId()))
+                .filter(u -> u.getStatus() == com.openframe.data.document.user.UserStatus.ACTIVE)
+                .or(() -> userService.findActiveByEmail(email.toLowerCase(ROOT)))
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "registration_required"));
 
         tenantService.findById(user.getTenantId())

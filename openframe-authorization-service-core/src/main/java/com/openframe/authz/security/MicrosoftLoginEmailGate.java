@@ -30,9 +30,23 @@ public class MicrosoftLoginEmailGate {
     private static final String MICROSOFT = "microsoft";
 
     private final SSOConfigService ssoConfigService;
+    private final com.openframe.authz.service.sso.SsoIdentityService ssoIdentityService;
+    private final com.openframe.authz.service.user.UserService userService;
 
     @Value("${openframe.sso.microsoft.require-verified-email:false}")
     private boolean requireVerifiedEmail;
+
+    private boolean isLinkedToClaimedEmail(String tenantId, OidcUser user) {
+        String email = com.openframe.authz.util.OidcUserUtils.resolveEmail(user);
+        if (email == null || tenantId == null) {
+            return false;
+        }
+        return ssoIdentityService.findLink(MICROSOFT, user.getClaims())
+                .flatMap(link -> userService.findById(link.getUserId()))
+                .filter(u -> tenantId.equals(u.getTenantId()))
+                .filter(u -> email.equalsIgnoreCase(u.getEmail()))
+                .isPresent();
+    }
 
     /** @throws IllegalStateException when the login must not proceed */
     public void require(Authentication authentication) {
@@ -45,6 +59,11 @@ public class MicrosoftLoginEmailGate {
         String tenantId = TenantContext.getTenantId();
         // A per-tenant custom app means a tenant-scoped issuer — its admin is authoritative.
         if (tenantId != null && ssoConfigService.getSSOConfig(tenantId, MICROSOFT).isPresent()) {
+            return;
+        }
+        // A previously bound identity link is proof enough: the subject cannot be forged, and it
+        // must point at the user this login's email resolves to in this tenant.
+        if (isLinkedToClaimedEmail(tenantId, user)) {
             return;
         }
         if (!OidcUserUtils.emailTrustedForRouting(MICROSOFT, user.getClaims())) {
