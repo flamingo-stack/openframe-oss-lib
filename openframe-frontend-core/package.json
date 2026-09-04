@@ -253,6 +253,12 @@
       "require": "./dist/utils/csv.cjs",
       "default": "./dist/utils/csv.js"
     },
+    "./utils/common": {
+      "types": "./dist/utils/common.d.ts",
+      "import": "./dist/utils/common.js",
+      "require": "./dist/utils/common.cjs",
+      "default": "./dist/utils/common.js"
+    },
     "./utils/social-platforms": {
       "types": "./dist/utils/social-platforms.d.ts",
       "import": "./dist/utils/social-platforms.js",
