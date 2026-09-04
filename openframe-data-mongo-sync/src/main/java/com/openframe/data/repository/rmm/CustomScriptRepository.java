@@ -1,11 +1,13 @@
 package com.openframe.data.repository.rmm;
 
+import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Custom MongoTemplate-backed queries for {@link Script}.
@@ -83,4 +85,6 @@ public interface CustomScriptRepository {
 
     /** Default sort field when none is supplied. */
     String getDefaultSortField();
+
+    Optional<Script> findSystemScript(SystemScriptCode code, String tenantId);
 }
