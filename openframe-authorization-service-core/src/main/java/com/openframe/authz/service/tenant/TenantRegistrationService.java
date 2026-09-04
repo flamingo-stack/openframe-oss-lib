@@ -1,7 +1,6 @@
 package com.openframe.authz.service.tenant;
 
 import com.openframe.authz.dto.TenantRegistrationRequest;
-import com.openframe.authz.event.TenantRegisteredEvent;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.core.email.EmailDomainPolicy;
@@ -9,7 +8,6 @@ import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,7 +24,6 @@ public class TenantRegistrationService {
     private final TenantService tenantService;
     private final RegistrationProcessor registrationProcessor;
     private final EmailDomainPolicy emailDomainPolicy;
-    private final ApplicationEventPublisher eventPublisher;
 
     public Tenant registerTenant(TenantRegistrationRequest request) {
 
@@ -62,8 +59,6 @@ public class TenantRegistrationService {
         tenant.setOwnerId(user.getId());
 
         Tenant savedTenant = tenantService.save(tenant);
-
-        eventPublisher.publishEvent(new TenantRegisteredEvent(this, savedTenant));
 
         registrationProcessor.postProcessTenantRegistration(savedTenant, user, request);
 
