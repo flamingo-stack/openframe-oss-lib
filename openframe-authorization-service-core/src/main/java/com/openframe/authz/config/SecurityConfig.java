@@ -16,6 +16,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
+import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenDecoderFactory;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -26,9 +27,7 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
-import org.springframework.security.oauth2.jwt.JwtDecoders;
 import org.springframework.security.oauth2.jwt.JwtValidators;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -36,6 +35,8 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -121,29 +122,23 @@ public class SecurityConfig {
      */
     @Bean
     public JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory(SsoProviderRegistry ssoProviderRegistry) {
-        return clientRegistration -> {
+        // Spring's own factory handles the decoder plumbing (JWKS resolution, per-registration
+        // caching); we only define the validator stack. EVERY provider gets the full OIDC set —
+        // the old hand-rolled factory's no-custom-validator branch (Google) skipped the
+        // OidcIdTokenValidator, so an ID token minted for ANY other application passed (no
+        // audience check). Registrations that pin an issuer (Google, Apple) get it enforced;
+        // Microsoft's varies per directory and is validated by its registry pattern instead.
+        OidcIdTokenDecoderFactory factory = new OidcIdTokenDecoderFactory();
+        factory.setJwtValidatorFactory(clientRegistration -> {
             String issuer = clientRegistration.getProviderDetails().getIssuerUri();
-            String jwkSetUri = clientRegistration.getProviderDetails().getJwkSetUri();
-
-            log.debug("Building JWT decoder for provider='{}', configuredIssuer='{}', jwkSetUri='{}'",
-                    clientRegistration.getRegistrationId(), issuer, jwkSetUri);
-
-            Optional<OAuth2TokenValidator<Jwt>> providerValidator =
-                    ssoProviderRegistry.idTokenValidator(clientRegistration);
-
-            if (providerValidator.isEmpty()) {
-                if (issuer != null && !issuer.isBlank()) {
-                    return JwtDecoders.fromIssuerLocation(issuer);
-                }
-                return NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-            }
-
-            NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                    JwtValidators.createDefault(),
-                    new OidcIdTokenValidator(clientRegistration),
-                    providerValidator.get()));
-            return decoder;
-        };
+            List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+            validators.add(issuer != null && !issuer.isBlank()
+                    ? JwtValidators.createDefaultWithIssuer(issuer)
+                    : JwtValidators.createDefault());
+            validators.add(new OidcIdTokenValidator(clientRegistration));
+            ssoProviderRegistry.idTokenValidator(clientRegistration).ifPresent(validators::add);
+            return new DelegatingOAuth2TokenValidator<>(validators);
+        });
+        return factory;
     }
 }

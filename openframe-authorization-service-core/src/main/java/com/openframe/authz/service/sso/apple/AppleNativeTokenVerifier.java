@@ -71,8 +71,10 @@ public class AppleNativeTokenVerifier {
 
     private void verifyNonce(Jwt jwt, String rawNonce) {
         String tokenNonce = jwt.getClaimAsString("nonce");
+        // Mandatory: an optional nonce lets the caller opt out of replay binding by omitting a
+        // field. The iOS client always generates one (raw to us, SHA-256 to Apple).
         if (rawNonce == null || rawNonce.isBlank()) {
-            return;
+            throw invalidGrant("Nonce is required.");
         }
         if (tokenNonce == null || !tokenNonce.equals(sha256Hex(rawNonce))) {
             log.warn("Apple native identity token nonce mismatch");
