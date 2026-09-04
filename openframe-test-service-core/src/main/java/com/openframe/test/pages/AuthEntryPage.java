@@ -87,11 +87,18 @@ public class AuthEntryPage {
 
     /**
      * Selects the "Login" tab and waits for the login email form at
-     * /auth/login to render. The email field and the auth-method buttons
-     * (OpenFrame SSO / Google / Microsoft) render together on this single
-     * screen – there is no separate Continue step – so we wait for both the
-     * email field and the SSO button before returning, to avoid racing input
-     * against hydration.
+     * /auth/login to render.
+     * <p>
+     * Waits for the email field only. The auth-method buttons are <em>not</em>
+     * on screen yet: the provider list renders the OpenFrame SSO option once a
+     * valid email has been entered, so waiting for it here would block on a
+     * button that only this method's caller can cause to appear. That wait
+     * belongs after the email is typed, and {@link #submitEmail(String)} does
+     * it there.
+     * <p>
+     * Racing input against hydration is handled where it actually occurs, in
+     * {@link #enterEmail(String)}, which re-fills until the input reports the
+     * value back.
      */
     public AuthEntryPage switchToLogin() {
         loginTab().click();
@@ -100,9 +107,6 @@ public class AuthEntryPage {
                 new Page.WaitForURLOptions().setTimeout(10_000)
         );
         emailInput().waitFor(new Locator.WaitForOptions()
-                .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(10_000));
-        ssoButton().waitFor(new Locator.WaitForOptions()
                 .setState(WaitForSelectorState.VISIBLE)
                 .setTimeout(10_000));
         return this;
