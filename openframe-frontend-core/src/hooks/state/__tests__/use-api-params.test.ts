@@ -914,10 +914,12 @@ describe('useApiParams', () => {
         result.current.setParam('tags', ['', null, undefined]);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
-      // All values (empty string, null, undefined) are filtered out
-      // So array ['', null, undefined] becomes [] and tags param is removed
-      expect(callArg).toBe(window.location.pathname);
+      // All values (empty string, null, undefined) are filtered out, so the
+      // array becomes [] and the `tags` param is absent — which is what the URL
+      // already said. The writer SKIPS a navigation that would not change the
+      // URL (a `router.replace` to an identical URL produces no commit, which
+      // would strand the entry in the pending-writes queue forever).
+      expect(mockReplace).not.toHaveBeenCalled();
     });
   });
 

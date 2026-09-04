@@ -78,7 +78,7 @@ export function useUnifiedFiltering(config: FilterConfig) {
     const tags = searchParams?.get('tags')?.split(',').filter(Boolean) || [];
     const filters = searchParams?.getAll('filter') || [];
     const pricing = searchParams?.get('pricing') || undefined;
-    const page = parseInt(searchParams?.get('page') || '1');
+    const page = positiveInt(searchParams?.get('page'), 1);
 
     return {
       search,
@@ -395,6 +395,7 @@ export function useUnifiedFiltering(config: FilterConfig) {
 }
 
 import { formatClassification, formatPricingModel } from '../utils/format-text-stub';
+import { positiveInt } from '../utils/search-params';
 
 // Helper functions for filter labels
 function getFilterLabel(filterKey: string): string {

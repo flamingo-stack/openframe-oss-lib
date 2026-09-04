@@ -31,6 +31,7 @@ import { formatDurationCompact } from '../../utils/format';
 import { EmptyState } from '../empty-state';
 import { PersistentPaginationWrapper } from '../persistent-pagination';
 import { AvatarStack, StatusBadge, Skeleton } from '../ui';
+import { pageCount } from '../../utils/search-params';
 
 export interface MeetingSchedulerDirectoryProps {
   /** Endpoints prefix, default '' (same-origin `/api/meetings`). */
@@ -199,7 +200,7 @@ export function MeetingSchedulerDirectory({
     return purposes.flatMap(p => p.links.map(link => ({ link, audienceLabel: p.label })));
   }, [data]);
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const totalPages = pageCount(rows.length, pageSize);
   const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
   // Reserved rows-area height: pageSize × 80px rows + (pageSize−1) × 16px gaps.

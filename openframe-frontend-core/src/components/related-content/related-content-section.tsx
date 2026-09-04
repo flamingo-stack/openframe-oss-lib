@@ -78,6 +78,7 @@ import {
   type CardSize,
   type RelatedCardRegistryEntry,
 } from './card-registry';
+import { pageCount } from '../../utils/search-params';
 
 export type { CardLinkAnchorProps };
 
@@ -344,7 +345,7 @@ function ContentGroup({
       setPage(1);
     }
   }, [refsKey]);
-  const totalGroupPages = Math.max(1, Math.ceil(refs.length / GROUP_PAGE_SIZE));
+  const totalGroupPages = pageCount(refs.length, GROUP_PAGE_SIZE);
   const safePage = Math.min(page, totalGroupPages);
   const visibleGroupRefs =
     refs.length > GROUP_PAGE_SIZE ? refs.slice((safePage - 1) * GROUP_PAGE_SIZE, safePage * GROUP_PAGE_SIZE) : refs;

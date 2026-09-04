@@ -6,6 +6,7 @@ import { FlamingoLogo } from '../flamingo-logo';
 import { MiamiCyberGangLogoFaceOnly } from '../icons/miami-cyber-gang-logo-face-only';
 import { OpenFrameLogo } from '../icons/openframe-logo';
 import { OpenmspLogo } from '../openmsp-logo';
+import { getPlatformBrandClasses } from '../../utils/platform-identity';
 
 interface PlatformBadgeProps {
   platform?: {
@@ -36,63 +37,6 @@ const sizeClasses = {
   },
 };
 
-const platformColors = {
-  openmsp: {
-    bg: 'bg-[#FFC008]/10',
-    border: 'border-[#FFC008]/30',
-    text: 'text-[#FFC008]',
-  },
-  flamingo: {
-    bg: 'bg-[#FF006E]/10',
-    border: 'border-[#FF006E]/30',
-    text: 'text-[#FF006E]',
-  },
-  'flamingo-teaser': {
-    bg: 'bg-[#FF006E]/10',
-    border: 'border-[#FF006E]/30',
-    text: 'text-[#FF006E]',
-  },
-  openframe: {
-    bg: 'bg-[#00D9D9]/10',
-    border: 'border-[#00D9D9]/30',
-    text: 'text-[#00D9D9]',
-  },
-  tmcg: {
-    bg: 'bg-[#F357BB]/10',
-    border: 'border-[#F357BB]/30',
-    text: 'text-[#F357BB]',
-  },
-  'company-hub': {
-    bg: 'bg-[#f36666]/10',
-    border: 'border-[#f36666]/30',
-    text: 'text-[#f36666]',
-  },
-  'marketing-hub': {
-    bg: 'bg-[#F357BB]/10',
-    border: 'border-[#F357BB]/30',
-    text: 'text-[#F357BB]',
-  },
-  'product-hub': {
-    bg: 'bg-[#5EA62E]/10',
-    border: 'border-[#5EA62E]/30',
-    text: 'text-[#5EA62E]',
-  },
-  'revenue-hub': {
-    bg: 'bg-[#FFC008]/10',
-    border: 'border-[#FFC008]/30',
-    text: 'text-[#FFC008]',
-  },
-  'people-hub': {
-    bg: 'bg-[#5EFAF0]/10',
-    border: 'border-[#5EFAF0]/30',
-    text: 'text-[#5EFAF0]',
-  },
-  universal: {
-    bg: 'bg-[#6B7280]/10',
-    border: 'border-[#6B7280]/30',
-    text: 'text-[#6B7280]',
-  },
-};
 
 const PlatformIcon = ({ platform, className }: { platform: string; className: string }) => {
   // Extract size from className (h-4 w-4 -> 16, h-5 w-5 -> 20, etc.)
@@ -105,7 +49,7 @@ const PlatformIcon = ({ platform, className }: { platform: string; className: st
         <OpenmspLogo
           className={className}
           frontBubbleColor="currentColor"
-          innerFrontBubbleColor="#000000"
+          innerFrontBubbleColor="var(--ods-system-greys-black)"
           backBubbleColor="currentColor"
         />
       );
@@ -133,16 +77,18 @@ export function PlatformBadge({ platform, size = 'sm', showLabel = true, classNa
   }
 
   const sizes = sizeClasses[size];
-  const colors = platformColors[platform.name as keyof typeof platformColors] || platformColors.universal;
+  // Soft-tinted chip: background + border at 10%/30% of the platform's accent,
+  // text at full strength. Derived from the brand record (was a hex map).
+  const colors = getPlatformBrandClasses(platform.name);
 
   return (
     <div
       className={cn(
         'inline-flex items-center rounded-full border',
         sizes.container,
-        colors.bg,
-        colors.border,
-        colors.text,
+        colors.accentBgSoft,
+        colors.accentBorderSoft,
+        colors.accentText,
         'font-body font-medium',
         className,
       )}

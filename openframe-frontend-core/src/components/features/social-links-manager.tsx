@@ -3,6 +3,8 @@
 import { Trash2, User, Globe, Youtube, Instagram, Facebook, MessageCircle, Send, Music, Mail } from 'lucide-react';
 import { LinkedInIcon, GitHubIcon, XLogo, RedditIcon, SlackIcon, WhatsAppIcon } from '../icons';
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
+import { SOCIAL_ICON_COMPONENTS } from '../social-icon-row';
+import { normalizeSocialPlatform } from '../../utils/social-platforms';
 
 export interface SocialLink {
   platform: string;
@@ -33,23 +35,6 @@ interface SocialLinksManagerProps {
 const defaultPlatforms: SocialPlatform[] = [];
 
 // Icon mapping - dynamically loaded based on database icon_name
-const iconMap = {
-  linkedin: LinkedInIcon,
-  github: GitHubIcon,
-  twitter: XLogo,
-  reddit: RedditIcon,
-  slack: SlackIcon,
-  whatsapp: WhatsAppIcon,
-  website: Globe,
-  youtube: Youtube,
-  instagram: Instagram,
-  facebook: Facebook,
-  discord: MessageCircle,
-  telegram: Send,
-  tiktok: Music,
-  email: Mail,
-  mail: Mail,
-};
 
 export function SocialLinksManager({
   links,
@@ -75,8 +60,10 @@ export function SocialLinksManager({
   const getIcon = (link: SocialLink, platform?: SocialPlatform) => {
     // Use database icon_name if available, fallback to platform name
     const iconKey = platform?.icon_name || link.platform;
-    const IconComponent = iconMap[iconKey as keyof typeof iconMap];
-    return IconComponent ? <IconComponent className="h-5 w-5 text-ods-text-secondary" /> : null;
+    const key = normalizeSocialPlatform(iconKey);
+    if (!key) return null;
+    const IconComponent = SOCIAL_ICON_COMPONENTS[key];
+    return <IconComponent className="h-5 w-5 text-ods-text-secondary" />;
   };
 
   return (

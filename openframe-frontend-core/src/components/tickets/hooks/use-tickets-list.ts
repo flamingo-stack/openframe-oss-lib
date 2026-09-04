@@ -23,6 +23,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import type { TicketData } from '../types';
+import { PAGE_PARAM_LIMITS, pageCount, positiveInt } from '../../../utils/search-params';
 
 const FIND_TICKET_ENDPOINT = '/api/chat/agent/find-ticket';
 const DEFAULT_PAGE_SIZE = 20;
@@ -93,8 +94,8 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
   const search = (filters.search ?? '').trim();
   const status = (filters.status ?? '').trim().toLowerCase();
   const statusFilter = status && status !== 'all' ? status : '';
-  const page = Math.max(1, Math.floor(filters.page ?? 1) || 1);
-  const pageSize = Math.max(1, Math.min(100, Math.floor(filters.pageSize ?? DEFAULT_PAGE_SIZE) || DEFAULT_PAGE_SIZE));
+  const page = positiveInt(filters.page, 1);
+  const pageSize = positiveInt(filters.pageSize, DEFAULT_PAGE_SIZE, { max: PAGE_PARAM_LIMITS.maxPageSize });
 
   // `customerEmail` is the source of truth — parent (HelpCenterList)
   // already gates on `identity.user?.email` being truthy before
@@ -145,7 +146,7 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
   const totalCount = data?.totalCount ?? data?.count ?? data?.tickets?.length ?? 0;
   const echoedPage = data?.page ?? page;
   const echoedPageSize = data?.pageSize ?? pageSize;
-  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(totalCount / echoedPageSize));
+  const totalPages = data?.totalPages ?? pageCount(totalCount, echoedPageSize);
 
   return {
     tickets: data?.tickets ?? [],

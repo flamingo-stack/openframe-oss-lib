@@ -10,7 +10,10 @@ import { type DocumentNode, type VariableDefinitionNode, type TypeNode, visit } 
 /**
  * JavaScript type that can be represented in URL parameters
  */
-export type JSType = 'string' | 'number' | 'boolean' | 'array' | 'object';
+// THE JSType lives in the search-params leaf (server + client share it); re-exported
+// here so every existing importer of `graphql-parser` keeps working.
+export type { JSType } from '../../utils/search-params';
+import type { JSType } from '../../utils/search-params';
 
 /**
  * Variable definition extracted from GraphQL query

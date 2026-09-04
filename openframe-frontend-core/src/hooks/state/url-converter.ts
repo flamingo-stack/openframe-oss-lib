@@ -156,6 +156,12 @@ function coerceScalar(value: string, type: JSType): UrlScalar {
       return isNaN(num) ? null : num;
     }
 
+    case 'int': {
+      // THE integer grammar (rejects '12abc'/'abc'; truncates '12.9'), floored at 1.
+      const n = Math.trunc(Number(value));
+      return Number.isFinite(n) && n >= 1 ? n : null;
+    }
+
     case 'boolean':
       return value === 'true' || value === '1';
 

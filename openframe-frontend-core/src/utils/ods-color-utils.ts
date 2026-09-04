@@ -6,6 +6,13 @@
 
 import { pickReadableTextColor } from './color-analysis';
 import { colorTokens as odsTokens } from './ods-color-tokens-stub';
+import { clamp } from './common';
+import {
+  PLATFORM_THEME,
+  getPlatformAccentColor as identityAccentColor,
+  getPlatformDisplayName,
+} from './platform-identity';
+import type { PlatformName } from '../types/platform';
 
 /** The token map, viewed as a flat key→value lookup. Nested groups (`text`)
  *  are not addressable by a flat key, so `lookupToken` returns only string
@@ -18,7 +25,9 @@ function lookupToken(tokenKey: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-export type Platform = 'openmsp' | 'openframe' | 'flamingo';
+// THE platform union is `PlatformName` (12 platforms). This alias is kept so
+// existing importers of `Platform` from this module keep compiling.
+export type Platform = PlatformName;
 export type ColorCategory = 'open' | 'flamingo' | 'system' | 'attention';
 export type ColorVariant = 'base' | 'hover' | 'active' | 'focus' | 'disabled';
 
@@ -34,37 +43,26 @@ export function getODSToken(
   return lookupToken(tokenKey);
 }
 
-/**
- * Gets the current platform's accent color
- */
-export function getPlatformAccentColor(platform?: Platform): string {
-  const currentPlatform = platform || getCurrentPlatform();
-
-  const platformColors = {
-    openmsp: 'var(--ods-open-yellow-base)', // CSS variable instead of hex
-    openframe: 'var(--ods-open-yellow-base)', // CSS variable instead of hex
-    flamingo: 'var(--ods-flamingo-pink-base)', // CSS variable instead of hex
-  };
-
-  return platformColors[currentPlatform];
-}
+// The accent colour is owned by the platform-identity leaf (all 12 platforms,
+// derived from the brand record); re-exported here for existing importers.
+export { getPlatformAccentColor } from './platform-identity';
 
 /**
  * Gets the current platform from environment or DOM
  */
-export function getCurrentPlatform(): Platform {
+export function getCurrentPlatform(): PlatformName {
   // Server-side: use environment variable
   if (typeof window === 'undefined') {
-    return (process.env.NEXT_PUBLIC_APP_TYPE as Platform) || 'openmsp';
+    return (process.env.NEXT_PUBLIC_APP_TYPE as PlatformName) || 'openmsp';
   }
 
   // Client-side: check DOM attribute first, fallback to environment
   const domPlatform = document.documentElement.getAttribute('data-app-type');
   if (domPlatform) {
-    return domPlatform as Platform;
+    return domPlatform as PlatformName;
   }
 
-  return (process.env.NEXT_PUBLIC_APP_TYPE as Platform) || 'openmsp';
+  return (process.env.NEXT_PUBLIC_APP_TYPE as PlatformName) || 'openmsp';
 }
 
 /**
@@ -187,42 +185,18 @@ export function isValidODSToken(tokenKey: string): boolean {
  */
 export function getPlatformConfig(platform?: Platform) {
   const currentPlatform = platform || getCurrentPlatform();
+  // STATED CHANGE: `isDarkTheme` is now `PLATFORM_THEME` (dark for every
+  // platform, which is what every `[data-app-type]` block actually inherits).
+  // It used to read `platform !== 'flamingo'`, which was stale.
+  const isDarkTheme = PLATFORM_THEME === 'dark';
 
   return {
     platform: currentPlatform,
-    accentColor: getPlatformAccentColor(currentPlatform),
-    isDarkTheme: currentPlatform !== 'flamingo',
-    isLightTheme: currentPlatform === 'flamingo',
-    brandName: {
-      openmsp: 'OpenMSP',
-      openframe: 'OpenFrame',
-      flamingo: 'Flamingo',
-    }[currentPlatform],
+    accentColor: identityAccentColor(currentPlatform),
+    isDarkTheme,
+    isLightTheme: !isDarkTheme,
+    brandName: getPlatformDisplayName(currentPlatform),
   };
-}
-
-/**
- * Generates CSS custom property declarations for a platform
- */
-export function generatePlatformCSS(platform: Platform): string {
-  const accentColor = getPlatformAccentColor(platform);
-
-  let css = `[data-app-type="${platform}"] {\n`;
-  css += `  --color-accent-primary: ${accentColor};\n`;
-
-  // Add platform-specific overrides
-  if (platform === 'flamingo') {
-    css += `  --color-bg: var(--ods-system-greys-white);\n`;
-    css += `  --color-text-primary: var(--ods-system-greys-background);\n`;
-  }
-
-  if (platform === 'openframe') {
-    css += `  --color-bg: var(--ods-system-greys-darker);\n`;
-  }
-
-  css += `}\n`;
-
-  return css;
 }
 
 /**
@@ -295,10 +269,6 @@ export function getReadableTextColor(hex: string): string {
 // Hex <-> RGB <-> HSL. Hex is #rrggbb lowercase; hexToRgb returns null on invalid.
 
 export const HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
-
-function clamp(n: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, n));
-}
 
 export function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   if (!HEX_PATTERN.test(hex)) return null;
@@ -378,25 +348,3 @@ export function hslToRgb(h: number, s: number, l: number): { r: number; g: numbe
   };
 }
 
-/**
- * Namespace object for consumers that prefer a single import over 13 named
- * ones. The named exports above stay the primary entry point — they are what
- * tree-shakes.
- */
-const odsColorUtils = {
-  getODSToken,
-  getPlatformAccentColor,
-  getCurrentPlatform,
-  switchPlatformTheme,
-  getSemanticColor,
-  tokenToTailwindClass,
-  getTokensByCategory,
-  isValidODSToken,
-  getPlatformConfig,
-  generatePlatformCSS,
-  applyColorToken,
-  interpolateColors,
-  usePlatformColors,
-};
-
-export default odsColorUtils;

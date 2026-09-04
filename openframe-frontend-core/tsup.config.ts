@@ -36,6 +36,13 @@ export default defineConfig([
       // Its own entry so the hub's server-side `verifyHuman` can import
       // `./utils/humanity-signals` without pulling the full utils barrel.
       'utils/humanity-signals': 'src/utils/humanity-signals.ts',
+      // JSX-free leaves, each with its own `exports` subpath so hub SCRIPTS and
+      // `server-only` modules import them without React or the utils barrel.
+      'utils/platform-identity': 'src/utils/platform-identity.ts',
+      'utils/search-params': 'src/utils/search-params.ts',
+      'utils/ods-spacing': 'src/utils/ods-spacing.ts',
+      'utils/csv': 'src/utils/csv.ts',
+      'utils/social-platforms': 'src/utils/social-platforms.ts',
       // Bite element identity — pure + isomorphic (no React, no browser
       // APIs beyond crypto.randomUUID). Its own entry so the hub's Mux
       // pipeline DALs import `./utils/video-bite-id` without the barrel.

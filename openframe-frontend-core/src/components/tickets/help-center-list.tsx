@@ -45,6 +45,7 @@ import { useTicketActions } from './hooks/use-ticket-actions';
 import { useTicketsList } from './hooks/use-tickets-list';
 import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types';
 import { isOptimistic, TICKET_OPEN_PARAM } from './types';
+import { positiveInt } from '../../utils/search-params';
 
 export interface HelpCenterListProps {
   /** Toast override (test-friendly). Defaults to the lib's shared
@@ -80,8 +81,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
   // 1-based page from the URL. `<UnifiedPagination>` writes `?page=N`
   // on navigation; we read it here and re-fetch on change. Invalid
   // values fall back to page 1.
-  const rawPage = Number(searchParams.get('page'));
-  const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+  const page = positiveInt(searchParams.get('page'), 1);
 
   // Identity gate FIRST — anon visitors skip every fetch + hook below.
   // `useChatIdentity` has a brief `isLoading` window on first render

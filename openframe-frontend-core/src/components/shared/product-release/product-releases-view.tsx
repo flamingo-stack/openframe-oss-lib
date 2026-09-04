@@ -36,6 +36,7 @@ import { PersistentPaginationWrapper } from '../../persistent-pagination';
 import { LoadError } from '../../ui/error-state';
 import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
 import { ProductReleaseCardSkeleton } from './product-release-card-skeleton';
+import { pageCount, positiveInt } from '../../../utils/search-params';
 
 const DEFAULT_ENDPOINT = '/api/releases';
 // Param keys sourced from the shared registry (see RoadmapView) — single source for the
@@ -149,7 +150,7 @@ export function ProductReleasesView({
   // Filter / page state from the URL (written by the section chrome above).
   const search = searchParams.get(searchParamKey) || '';
   const status = searchParams.get(statusParamKey) || 'all';
-  const currentPage = Math.max(1, parseInt(searchParams.get(pageParamKey) || '1', 10) || 1);
+  const currentPage = positiveInt(searchParams.get(pageParamKey), 1);
   const offset = (currentPage - 1) * itemsPerPage;
 
   // Fold every query param into the url so it IS the fetch key.
@@ -163,7 +164,7 @@ export function ProductReleasesView({
 
   const releases = data?.data ?? [];
   const totalCount = data?.count ?? 0;
-  const totalPages = Math.ceil(totalCount / itemsPerPage);
+  const totalPages = pageCount(totalCount, itemsPerPage);
   const hasActiveFilters = search !== '' || status !== 'all';
   const showEmpty = !isLoading && !error && releases.length === 0;
 

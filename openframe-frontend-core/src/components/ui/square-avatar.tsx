@@ -4,7 +4,7 @@ import { type HTMLAttributes, memo, forwardRef } from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
 import { cn } from '../../utils/cn';
-import { getFirstLastInitials } from '../../utils/format';
+import { personInitials } from '../../utils/format';
 
 interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
   src?: string;
@@ -81,7 +81,7 @@ const SquareAvatar = memo(
               resolvedSrc && 'hidden',
             )}
           >
-            {getFirstLastInitials(fallback || alt) || '?'}
+            {personInitials(fallback || alt) || '?'}
           </div>
           {resolvedSrc && (
             <Image

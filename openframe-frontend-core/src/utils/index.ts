@@ -14,6 +14,10 @@ export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/
 export {
   getPlatformAccentColor,
   getCurrentPlatform,
+  getPlatformConfig,
+  usePlatformColors,
+  switchPlatformTheme,
+  getSemanticColor,
   type ColorCategory,
   HEX_PATTERN,
   // Custom-color helpers so consumers (e.g. the chat client's accent theming)
@@ -125,7 +129,8 @@ export {
   formatLargeNumber,
   formatAbbreviatedNumber,
   nameInitials,
-  getFirstLastInitials,
+  personInitials,
+  singleInitial,
   formatDurationMMSS,
   formatDurationCompact,
   formatTimeWithTimezone,
@@ -368,3 +373,16 @@ export * from './first-touch-attribution';
 
 // Media type SSOT — `media_type` discriminator predicates (leaf, zero imports)
 export * from './media-type';
+
+// ── JSX-free leaves (each also has its own `exports` subpath, so hub scripts
+// and `server-only` modules can import them without pulling in React) ────────
+// Platform identity + brand SSOT (strings, stems, brand record, surface).
+export * from './platform-identity';
+// URL parameter schema engine (the int grammar, page limits, parse/serialize).
+export * from './search-params';
+// ODS spacing tokens + the Tailwind-step conversion table.
+export * from './ods-spacing';
+// CSV quoting + formula neutralization.
+export * from './csv';
+// Social platform vocabulary, host table, link type, picker.
+export * from './social-platforms';

@@ -19,11 +19,12 @@
 
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from '../../embed-shims/next-navigation';
 import { type FlattenedParam, shouldIncludeInUrl } from './flatten-schema';
 import type { JSType } from './graphql-parser';
 import { coerceValue } from './url-converter';
+import { parseSchemaParams, type ParamSchema } from '../../utils/search-params';
 
 /**
  * Returns the previous reference if the JSON-serialized content of `value`
@@ -92,6 +93,7 @@ type OutputTypeMap = {
   boolean: boolean;
   array: string[];
   object: Record<string, unknown>;
+  int: number;
 };
 
 /**
@@ -104,6 +106,7 @@ type InputTypeMap = {
   boolean: boolean | null | undefined;
   array: (string | null | undefined)[];
   object: Record<string, unknown> | null | undefined;
+  int: number | null | undefined;
 };
 
 /**
@@ -125,30 +128,10 @@ type DefaultValueForType<T extends JSType> = T extends 'array'
     ? Record<string, unknown>
     : OutputTypeMap[T];
 
-/**
- * Parameter configuration for a single parameter
- */
-export interface ParamConfig<T extends JSType = JSType> {
-  /** JavaScript type for URL parameter */
-  type: T;
-  /** Default value matching the type */
-  default?: DefaultValueForType<T>;
-  /** Whether parameter is required */
-  required?: boolean;
-}
-
-/**
- * REST API parameter schema definition
- * Maps parameter names to their configuration
- */
-export type ParamSchema = Record<string, ParamConfig>;
-
-/**
- * Helper to create a typed param schema (preserves literal types)
- */
-export function defineParamSchema<T extends ParamSchema>(schema: T): T {
-  return schema;
-}
+// Schema types + the schema helper live in the search-params leaf, so the hook's
+// `params` ARE the same parsed contract a server route produces for that URL.
+export type { ParamConfig, ParamSchema } from '../../utils/search-params';
+export { defineParamSchema } from '../../utils/search-params';
 
 /**
  * Options for useApiParams hook
@@ -156,6 +139,12 @@ export function defineParamSchema<T extends ParamSchema>(schema: T): T {
 export interface UseApiParamsOptions {
   /** Enable debug logging */
   debug?: boolean;
+  /**
+   * What an ABSENT scalar with no declared `default` reads as. Passed straight
+   * through to `parseSchemaParams`, so the hook's `params` ARE the same parsed
+   * contract the server produces for the same URL.
+   */
+  absent?: 'undefined' | 'null';
 }
 
 /**
@@ -200,6 +189,12 @@ export type ParamValue =
 export interface UseApiParamsReturn<TSchema extends ParamSchema, TParams = InferParamsFromSchema<TSchema>> {
   /** Parsed parameters object with strict typing */
   params: TParams;
+
+  /**
+   * `params` of the last write this hook issued, or `params` itself when no
+   * write is in flight. The URL is authoritative; this is the latest INTENT.
+   */
+  pendingParams: TParams;
 
   /** URLSearchParams for fetch/axios */
   urlSearchParams: URLSearchParams;
@@ -252,6 +247,14 @@ export function useApiParams<TSchema extends ParamSchema>(
   // 1. URL string is the canonical, value-stable representation of search params.
   const searchString = searchParamsLive.toString();
 
+  // Serialized query strings this hook has written and not yet seen committed.
+  const pendingRef = useRef<string[]>([]);
+  // Bumped on every queued write so `pendingParams` recomputes before the
+  // router commits (the ref alone would not re-render).
+  const [pendingVersion, setPendingVersion] = useState(0);
+
+  const absentValue = options.absent === 'null' ? null : undefined;
+
   // 2. Schema reference stabilized by content. Consumers commonly pass an
   //    object literal each render, which would otherwise invalidate every memo.
   const schemaKey = useMemo(() => JSON.stringify(schema), [schema]);
@@ -287,12 +290,15 @@ export function useApiParams<TSchema extends ParamSchema>(
       // Read from URL
       const rawValue = config.type === 'array' ? sp.getAll(key) : sp.get(key);
 
-      // Use value from URL or default
+      // Use value from URL, else the declared default, else the caller's
+      // ABSENT value (arrays never take `absent`: an unset array is `[]`).
       let value: unknown;
       if (rawValue && (Array.isArray(rawValue) ? rawValue.length > 0 : true)) {
         value = coerceValue(rawValue, config.type);
-      } else {
+      } else if (config.default !== undefined) {
         value = config.default;
+      } else {
+        value = config.type === 'array' ? [] : absentValue;
       }
 
       result[key] = value;
@@ -369,8 +375,12 @@ export function useApiParams<TSchema extends ParamSchema>(
   // `useEffect` deps.
   const updateUrl = useCallback(
     (newParams: URLSearchParams, keysToRemove: string[] = []) => {
-      // Preserve all existing params, then override with new ones
-      const finalParams = new URLSearchParams(searchString);
+      // Base the write on the LAST WRITE WE ISSUED, not on the committed URL.
+      // Next commits each `router.replace` as its own navigation, so two writes
+      // fired before the first commits would both rebase on the pre-first URL
+      // and the first one's keys would be lost.
+      const base = pendingRef.current[pendingRef.current.length - 1] ?? searchString;
+      const finalParams = new URLSearchParams(base);
 
       // Remove keys that are explicitly marked for removal
       keysToRemove.forEach(key => {
@@ -403,7 +413,18 @@ export function useApiParams<TSchema extends ParamSchema>(
         }
       });
 
-      const url = finalParams.toString() ? `?${finalParams.toString()}` : window.location.pathname;
+      const merged = finalParams.toString();
+
+      // A NO-OP write (re-selecting the current option, clearing an already
+      // empty picker) must not enter the queue: `router.replace` with an
+      // identical URL produces no commit, so the entry would never drain and
+      // every later write would rebase on a phantom.
+      if (merged === base) return;
+
+      pendingRef.current = [...pendingRef.current, merged];
+      setPendingVersion(v => v + 1);
+
+      const url = merged ? `?${merged}` : window.location.pathname;
 
       if (debug) {
         console.log('[useApiParams] Updating URL:', url);
@@ -414,6 +435,18 @@ export function useApiParams<TSchema extends ParamSchema>(
     },
     [router, debug, searchString, stableSchema],
   );
+
+  // Drain the queue as commits arrive. A commit EQUAL to a queued write drops
+  // that entry and everything before it (so `[A, B, A']` survives A's commit
+  // with `[B, A']` intact); a commit matching NOTHING is a FOREIGN navigation
+  // (Back/Forward, another hook's replace) and invalidates the whole base.
+  useEffect(() => {
+    const queue = pendingRef.current;
+    if (queue.length === 0) return;
+    const hit = queue.indexOf(searchString);
+    pendingRef.current = hit === -1 ? [] : queue.slice(hit + 1);
+    setPendingVersion(v => v + 1);
+  }, [searchString]);
 
   // Helper to check if value is empty
   const isEmptyValue = (value: unknown): boolean => {
@@ -493,8 +526,22 @@ export function useApiParams<TSchema extends ParamSchema>(
     router.replace(window.location.pathname, { scroll: false });
   }, [router, debug]);
 
+  // The params of the LAST write we issued, or `params` when nothing is in
+  // flight. Adapters read this as "the user's latest intent" so a decision made
+  // while a `router.replace` is uncommitted compares against the click, not the
+  // stale URL.
+  const pendingParams = useMemo((): InferParamsFromSchema<TSchema> => {
+    void pendingVersion;
+    const last = pendingRef.current[pendingRef.current.length - 1];
+    if (last === undefined || last === searchString) return params;
+    return parseSchemaParams(stableSchema, new URLSearchParams(last), {
+      absent: options.absent === 'null' ? 'null' : 'undefined',
+    }) as InferParamsFromSchema<TSchema>;
+  }, [pendingVersion, searchString, params, stableSchema, options.absent]);
+
   return {
     params,
+    pendingParams,
     urlSearchParams,
     setParam,
     setParams,
@@ -503,35 +550,6 @@ export function useApiParams<TSchema extends ParamSchema>(
   };
 }
 
-/**
- * Helper: Create URLSearchParams from object
- *
- * Handles arrays as repeated parameters. Filters out undefined, and empty values.
- *
- * @param params - Parameters object
- * @returns URLSearchParams
- */
-export function createSearchParams(params: Record<string, ParamValue>): URLSearchParams {
-  const searchParams = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === '' || value === null) {
-      continue;
-    }
-
-    if (Array.isArray(value)) {
-      value.forEach(v => {
-        if (v !== undefined && v !== '' && v !== null) {
-          searchParams.append(key, String(v));
-        }
-      });
-    } else if (typeof value === 'object') {
-      // For objects, convert to JSON string
-      searchParams.set(key, JSON.stringify(value));
-    } else {
-      searchParams.set(key, String(value));
-    }
-  }
-
-  return searchParams;
-}
+// THE serializer lives in the search-params leaf (one array/object/omission
+// rule for the hook and for server code); re-exported for existing importers.
+export { createSearchParams } from '../../utils/search-params';

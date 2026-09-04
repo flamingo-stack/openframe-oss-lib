@@ -229,6 +229,36 @@
       "require": "./dist/utils/humanity-signals.cjs",
       "default": "./dist/utils/humanity-signals.js"
     },
+    "./utils/platform-identity": {
+      "types": "./dist/utils/platform-identity.d.ts",
+      "import": "./dist/utils/platform-identity.js",
+      "require": "./dist/utils/platform-identity.cjs",
+      "default": "./dist/utils/platform-identity.js"
+    },
+    "./utils/search-params": {
+      "types": "./dist/utils/search-params.d.ts",
+      "import": "./dist/utils/search-params.js",
+      "require": "./dist/utils/search-params.cjs",
+      "default": "./dist/utils/search-params.js"
+    },
+    "./utils/ods-spacing": {
+      "types": "./dist/utils/ods-spacing.d.ts",
+      "import": "./dist/utils/ods-spacing.js",
+      "require": "./dist/utils/ods-spacing.cjs",
+      "default": "./dist/utils/ods-spacing.js"
+    },
+    "./utils/csv": {
+      "types": "./dist/utils/csv.d.ts",
+      "import": "./dist/utils/csv.js",
+      "require": "./dist/utils/csv.cjs",
+      "default": "./dist/utils/csv.js"
+    },
+    "./utils/social-platforms": {
+      "types": "./dist/utils/social-platforms.d.ts",
+      "import": "./dist/utils/social-platforms.js",
+      "require": "./dist/utils/social-platforms.cjs",
+      "default": "./dist/utils/social-platforms.js"
+    },
     "./utils/video-bite-id": {
       "types": "./dist/utils/video-bite-id.d.ts",
       "import": "./dist/utils/video-bite-id.js",
