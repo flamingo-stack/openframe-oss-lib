@@ -26,7 +26,6 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
-import org.springframework.security.oauth2.jwt.JwtDecoders;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -36,6 +35,8 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -128,21 +129,19 @@ public class SecurityConfig {
             log.debug("Building JWT decoder for provider='{}', configuredIssuer='{}', jwkSetUri='{}'",
                     clientRegistration.getRegistrationId(), issuer, jwkSetUri);
 
-            Optional<OAuth2TokenValidator<Jwt>> providerValidator =
-                    ssoProviderRegistry.idTokenValidator(clientRegistration);
-
-            if (providerValidator.isEmpty()) {
-                if (issuer != null && !issuer.isBlank()) {
-                    return JwtDecoders.fromIssuerLocation(issuer);
-                }
-                return NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-            }
+            // EVERY provider gets the full OIDC validator set. The old no-custom-validator branch
+            // (Google) used fromIssuerLocation, whose defaults check timestamp + issuer only — an
+            // ID token minted for ANY other application passed (no audience check). The
+            // OidcIdTokenValidator enforces aud/azp for all providers uniformly.
+            List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+            validators.add(issuer != null && !issuer.isBlank()
+                    ? JwtValidators.createDefaultWithIssuer(issuer)
+                    : JwtValidators.createDefault());
+            validators.add(new OidcIdTokenValidator(clientRegistration));
+            ssoProviderRegistry.idTokenValidator(clientRegistration).ifPresent(validators::add);
 
             NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                    JwtValidators.createDefault(),
-                    new OidcIdTokenValidator(clientRegistration),
-                    providerValidator.get()));
+            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
             return decoder;
         };
     }
