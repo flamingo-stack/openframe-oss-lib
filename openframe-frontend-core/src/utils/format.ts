@@ -161,14 +161,6 @@ export function formatAbbreviatedNumber(n: number): string {
  * return a single uppercase letter. Pure — same input always produces
  * the same output, no locale or timezone surface.
  */
-export function getFirstLastInitials(name?: string | null): string {
-  if (!name) return '';
-  const words = name.trim().split(/\s+/);
-  if (words.length === 0 || !words[0]) return '';
-  if (words.length === 1) return words[0].charAt(0).toUpperCase();
-  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
-}
-
 /**
  * Two-letter uppercase initials from the FIRST + SECOND word of a name.
  * Used as SquareAvatar / EntityImage / EntityAuthorCard fallback across
@@ -179,15 +171,45 @@ export function getFirstLastInitials(name?: string | null): string {
  * Single source of truth: every "first-letter of each word, uppercase,
  * max 2 chars" computation across hub + lib MUST come through here.
  */
-export function nameInitials(name: string | null | undefined, fallback: string = 'E'): string {
+export interface NameInitialsOptions {
+  /** How many letters to keep (default 2). */
+  maxLetters?: number;
+  /**
+   * `'all'` (default) takes the leading words; `'first-last'` takes the FIRST and
+   * LAST word, which is what a person's initials mean for a middle-name case.
+   */
+  pick?: 'all' | 'first-last';
+}
+
+export function nameInitials(
+  name: string | null | undefined,
+  fallback: string = 'E',
+  options: NameInitialsOptions = {}
+): string {
+  const { maxLetters = 2, pick: mode = 'all' } = options;
   const source = typeof name === 'string' ? name.trim() : '';
-  const words = source.length > 0 ? source.split(/\s+/) : [];
-  const letters = words
+  const words = source.length > 0 ? source.split(/\s+/).filter(Boolean) : [];
+  const chosen =
+    mode === 'first-last' && words.length > 1 ? [words[0], words[words.length - 1]] : words.slice(0, maxLetters);
+  const letters = chosen
     .map(w => w[0])
     .filter(Boolean)
-    .slice(0, 2)
+    .slice(0, maxLetters)
     .join('');
   return (letters || fallback).toUpperCase();
+}
+
+/**
+ * A PERSON's initials: first + last word, empty when there is no name.
+ * THE named policy for avatars and person cells (replaces `getFirstLastInitials`).
+ */
+export function personInitials(name?: string | null): string {
+  return nameInitials(name, '', { pick: 'first-last' });
+}
+
+/** A single leading letter, `?` when there is no name. THE named one-letter policy. */
+export function singleInitial(name?: string | null): string {
+  return nameInitials(name, '?', { maxLetters: 1 });
 }
 
 /**

@@ -13,7 +13,8 @@ import {
   type GraphQLInputType,
   isInputObjectType,
 } from 'graphql';
-import type { VariableDefinition, JSType } from './graphql-parser';
+import type { JSType } from '../../utils/search-params';
+import type { VariableDefinition } from './graphql-parser';
 
 /**
  * Schema cache structure stored in localStorage

@@ -21,7 +21,7 @@
 
 import { useState, type ReactNode } from 'react';
 import Image from '../../embed-shims/next-image';
-import { getFirstLastInitials } from '../../utils/format';
+import { personInitials } from '../../utils/format';
 import { useProxiedImageUrl } from './hooks/use-proxied-image-url';
 
 export interface ChatMessageRowProps {
@@ -72,7 +72,7 @@ export function ChatMessageRow({ displayName, avatarUrl, timeLabel, body, footer
         />
       ) : (
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg text-ods-text-primary text-h6 md:h-10 md:w-10">
-          {getFirstLastInitials(displayName) || '?'}
+          {personInitials(displayName) || '?'}
         </div>
       )}
 

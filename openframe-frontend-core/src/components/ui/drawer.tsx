@@ -20,6 +20,7 @@ import {
 
 import { useHeaderHeight } from '../../hooks/ui/use-header-height';
 import { cn } from '../../utils/cn';
+import { clamp } from '../../utils/common';
 
 /** Unified overlay backdrop — dimmed, no blur. Single source of truth for
  *  every full-screen backdrop (Drawer, AppLayoutDrawer, MobileBurgerMenu,
@@ -124,11 +125,6 @@ const drawerPanelVariants = cva(
 type DrawerSide = 'right' | 'left' | 'top' | 'bottom';
 
 const HORIZONTAL_SIDES: ReadonlySet<DrawerSide> = new Set(['left', 'right']);
-
-function clamp(value: number, min: number, max: number): number {
-  if (max < min) return min;
-  return Math.min(max, Math.max(min, value));
-}
 
 function viewportSize(isHorizontal: boolean): number {
   if (typeof window === 'undefined') return 0;

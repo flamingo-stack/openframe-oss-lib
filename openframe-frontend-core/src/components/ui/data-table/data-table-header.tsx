@@ -277,15 +277,19 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
   );
 }
 
+/**
+ * THE header label styling. Exported because a column may supply a NODE header
+ * (an icon beside the text), and without this those headers rendered unstyled
+ * beside the string ones — same row, two different type treatments.
+ */
+export const DATA_TABLE_HEADER_LABEL_CLASS =
+  'whitespace-nowrap uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary';
+
 function HeaderLabel({ header }: { header: AnyHeader }) {
   const headerDef = header.column.columnDef.header;
   if (headerDef === undefined) return null;
   if (typeof headerDef === 'string') {
-    return (
-      <span className="whitespace-nowrap uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary">
-        {headerDef}
-      </span>
-    );
+    return <span className={DATA_TABLE_HEADER_LABEL_CLASS}>{headerDef}</span>;
   }
   // Render-function or ReactNode: caller is responsible for styling.
   return <>{flexRender(headerDef, header.getContext())}</>;

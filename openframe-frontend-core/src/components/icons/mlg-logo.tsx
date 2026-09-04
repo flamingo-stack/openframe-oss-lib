@@ -1,14 +1,21 @@
 import type React from 'react';
 
 interface MlgLogoProps {
+  /** Fill for both paths. Defaults to `currentColor` so the caller's text colour drives the mark. */
   color?: string;
   size?: number;
+  className?: string;
 }
 
-/** @deprecated Use icons from icons-v2-generated instead. */
-export const MlgLogo: React.FC<MlgLogoProps> = ({ size = 240, color = 'white' }) => {
+export const MlgLogo: React.FC<MlgLogoProps> = ({ size = 240, color = 'currentColor', className }) => {
   return (
-    <svg width={size} height={size} viewBox="0 0 1080 1081.4" xmlns="http://www.w3.org/2000/svg" style={{ color }}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 1080 1081.4"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
       <g>
         <path
           d="M534.4,893.1c0,0-20.9,3.6-50.8,3.6c-75.3,0-99.1-48.1-110.5-75c-14.7-35-33.9-51.5-54.2-64.6

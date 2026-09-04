@@ -789,7 +789,24 @@ describe('useApiParams', () => {
       expect(tags).toEqual(['new1', 'new2']);
     });
 
-    it('should handle invalid number strings', () => {
+    it('setParam and setParams share ONE omission rule', () => {
+      // REGRESSION: setParams was moved onto `shouldIncludeInUrl` while
+      // setParam kept a local emptiness check that knew nothing about schema
+      // defaults, so setParam('page', 1) left `?page=1` on a URL that
+      // setParams({ page: 1 }) kept clean.
+      setMockSearchParams(new URLSearchParams('page=5'));
+      const schema = { page: { type: 'int' as const, default: 1 } };
+      const { result } = renderHook(() => useApiParams(schema));
+
+      act(() => {
+        result.current.setParam('page', 1);
+      });
+
+      const written = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+      expect(written).not.toContain('page=1');
+    });
+
+    it('falls back to the DECLARED default for an unparseable number', () => {
       const params = new URLSearchParams();
       params.set('page', 'not-a-number');
       setMockSearchParams(params);
@@ -800,8 +817,26 @@ describe('useApiParams', () => {
 
       const { result } = renderHook(() => useApiParams(schema));
 
-      // Invalid number should coerce to null
-      expect(result.current.params.page).toBeNull();
+      // `params` and `pendingParams` now share ONE parser. This used to read
+      // `null` here (the schema's own default ignored) and `1` there, which is
+      // enough to desynchronize any adapter that compares the two.
+      expect(result.current.params.page).toBe(1);
+      expect(result.current.pendingParams.page).toBe(result.current.params.page);
+    });
+
+    it('applies the schema min/max to the COMMITTED params too', () => {
+      const params = new URLSearchParams();
+      params.set('pageSize', '9999');
+      setMockSearchParams(params);
+
+      const schema = {
+        pageSize: { type: 'int' as const, default: 15, min: 1, max: 100 },
+      };
+
+      const { result } = renderHook(() => useApiParams(schema));
+
+      expect(result.current.params.pageSize).toBe(100);
+      expect(result.current.pendingParams.pageSize).toBe(100);
     });
 
     it('should handle zero as valid number', () => {
@@ -914,10 +949,12 @@ describe('useApiParams', () => {
         result.current.setParam('tags', ['', null, undefined]);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
-      // All values (empty string, null, undefined) are filtered out
-      // So array ['', null, undefined] becomes [] and tags param is removed
-      expect(callArg).toBe(window.location.pathname);
+      // All values (empty string, null, undefined) are filtered out, so the
+      // array becomes [] and the `tags` param is absent — which is what the URL
+      // already said. The writer SKIPS a navigation that would not change the
+      // URL (a `router.replace` to an identical URL produces no commit, which
+      // would strand the entry in the pending-writes queue forever).
+      expect(mockReplace).not.toHaveBeenCalled();
     });
   });
 
