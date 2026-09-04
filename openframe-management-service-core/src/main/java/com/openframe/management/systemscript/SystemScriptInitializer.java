@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -27,7 +26,6 @@ import java.util.List;
  * context.
  */
 @Component
-@Order(25)
 @RequiredArgsConstructor
 @Slf4j
 public class SystemScriptInitializer implements ApplicationRunner {
