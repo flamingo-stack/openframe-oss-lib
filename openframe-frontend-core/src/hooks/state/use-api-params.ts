@@ -21,7 +21,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from '../../embed-shims/next-navigation';
-import { parseSchemaParams, type ParamSchema } from '../../utils/search-params';
+import { createSearchParams, parseSchemaParams, type ParamSchema } from '../../utils/search-params';
 import { type FlattenedParam, shouldIncludeInUrl } from './flatten-schema';
 import type { JSType } from './graphql-parser';
 
@@ -310,24 +310,15 @@ export function useApiParams<TSchema extends ParamSchema>(
   }
   const params = stableParams as InferParamsFromSchema<TSchema>;
 
-  // Helper: Add parameter value to URLSearchParams
+  // Helper: Add parameter value to URLSearchParams.
+  //
+  // Delegates to `createSearchParams`, which owns the ENCODING rule (skip
+  // null/undefined/'', repeat the key per array element, JSON objects,
+  // `String()` scalars). The rule used to be spelled out here as well; the two
+  // sat side by side in one file, and hoisting the shared one into the leaf
+  // put them in different modules where drift is much easier.
   const addParamToSearchParams = useCallback((searchParams: URLSearchParams, key: string, value: ParamValue): void => {
-    if (value === undefined || value === '' || value === null) {
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      value.forEach(v => {
-        if (v !== undefined && v !== '' && v !== null) {
-          searchParams.append(key, String(v));
-        }
-      });
-    } else if (typeof value === 'object') {
-      // For objects, convert to JSON string
-      searchParams.set(key, JSON.stringify(value));
-    } else {
-      searchParams.set(key, String(value));
-    }
+    for (const [k, v] of createSearchParams({ [key]: value })) searchParams.append(k, v);
   }, []);
 
   // Get URLSearchParams for fetch/axios. Iterates `stableSchema` (not raw
@@ -431,18 +422,6 @@ export function useApiParams<TSchema extends ParamSchema>(
     syncPendingTail();
   }, [searchString, syncPendingTail]);
 
-  // Helper to check if value is empty
-  const isEmptyValue = (value: unknown): boolean => {
-    if (value === undefined || value === null || value === '') {
-      return true;
-    }
-    if (Array.isArray(value)) {
-      // Empty array or array with all empty/null/undefined values
-      return value.length === 0 || value.every(v => v === undefined || v === null || v === '');
-    }
-    return false;
-  };
-
   // Set a single parameter
   const setParam = useCallback(
     <K extends keyof TSchema & string>(key: K, value: InferInputParamsFromSchema<Pick<TSchema, K>>[K]) => {
@@ -455,11 +434,16 @@ export function useApiParams<TSchema extends ParamSchema>(
 
       const newParams = new URLSearchParams();
 
-      if (isEmptyValue(value)) {
-        updateUrl(newParams, [key]);
-      } else {
+      // THE omission rule, the same one `setParams` uses. This branch moved
+      // `setParams` onto `shouldIncludeInUrl` (so a value equal to its schema
+      // default is dropped) and left `setParam` on a local emptiness check
+      // that knew nothing about defaults — so `setParam('page', 1)` kept
+      // `?page=1` on a URL `setParams({ page: 1 })` left clean.
+      if (shouldIncludeInUrl(value, config)) {
         addParamToSearchParams(newParams, key, value);
         updateUrl(newParams);
+      } else {
+        updateUrl(newParams, [key]);
       }
     },
     [updateUrl, addParamToSearchParams, stableSchema],

@@ -789,6 +789,23 @@ describe('useApiParams', () => {
       expect(tags).toEqual(['new1', 'new2']);
     });
 
+    it('setParam and setParams share ONE omission rule', () => {
+      // REGRESSION: setParams was moved onto `shouldIncludeInUrl` while
+      // setParam kept a local emptiness check that knew nothing about schema
+      // defaults, so setParam('page', 1) left `?page=1` on a URL that
+      // setParams({ page: 1 }) kept clean.
+      setMockSearchParams(new URLSearchParams('page=5'));
+      const schema = { page: { type: 'int' as const, default: 1 } };
+      const { result } = renderHook(() => useApiParams(schema));
+
+      act(() => {
+        result.current.setParam('page', 1);
+      });
+
+      const written = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+      expect(written).not.toContain('page=1');
+    });
+
     it('falls back to the DECLARED default for an unparseable number', () => {
       const params = new URLSearchParams();
       params.set('page', 'not-a-number');
