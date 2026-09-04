@@ -5,7 +5,8 @@
  * Example: { filter: { severity: [...] } } → URL params: ?severity=...
  */
 
-import type { VariableDefinition, JSType } from './graphql-parser';
+import type { JSType } from '../../utils/search-params';
+import type { VariableDefinition } from './graphql-parser';
 import type { GraphQLIntrospector } from './introspection';
 
 /**

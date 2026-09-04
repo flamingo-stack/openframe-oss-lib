@@ -1,7 +1,7 @@
 'use client';
 
 import { Mail, Music } from 'lucide-react';
-import { normalizeSocialPlatform, type SocialIconLink, type SocialIconPlatform } from '../utils/social-platforms';
+import { normalizeSocialPlatform, type SocialIconLink } from '../utils/social-platforms';
 import {
   GitHubIcon,
   RedditIcon,
@@ -49,11 +49,16 @@ const defaultLinks: SocialIconLink[] = [
 type SocialIconComponent = (props: { className?: string }) => React.ReactElement;
 
 /**
- * Platform → glyph. `satisfies Record<SocialIconPlatform, …>` makes a new
- * platform in the tuple a BUILD error here until it has an icon (the old
- * `switch` silently fell through to the globe).
+ * Platform name → glyph. The ONLY thing about a social platform that lives in
+ * code, because an icon is a component and a table cannot hold one; the DB
+ * names the glyph it wants through `social_platforms.icon_name`.
+ *
+ * Deliberately an OPEN record, not `satisfies Record<SomeUnion, …>`: the set of
+ * platforms is the `social_platforms` table's to decide, and a row added there
+ * must render — with the globe, until somebody adds art for it — rather than
+ * fail to type-check against a list in this file.
  */
-export const SOCIAL_ICON_COMPONENTS = {
+export const SOCIAL_ICON_COMPONENTS: Record<string, SocialIconComponent> = {
   github: props => <GitHubIcon {...props} />,
   twitter: props => <XLogo {...props} />,
   reddit: props => <RedditIcon {...props} variant="white" />,
@@ -72,11 +77,12 @@ export const SOCIAL_ICON_COMPONENTS = {
   // CopyIcon's default fill is grey and would mismatch its row-mates — force the
   // themed foreground via the ODS token (tracks the theme).
   copy: props => <CopyIcon {...props} color="var(--color-text-primary)" />,
-} satisfies Record<SocialIconPlatform, SocialIconComponent>;
+};
 
+/** The globe stands in for any platform with no art yet — never a blank slot. */
 function renderSocialIcon(platform: string) {
   const key = normalizeSocialPlatform(platform) ?? 'website';
-  const Icon = SOCIAL_ICON_COMPONENTS[key];
+  const Icon = SOCIAL_ICON_COMPONENTS[key] ?? SOCIAL_ICON_COMPONENTS.website;
   return <Icon className="h-5 w-5" />;
 }
 

@@ -1,40 +1,51 @@
 /**
- * Social platform vocabulary + host classification — ONE table.
+ * Social platform helpers — normalization, host classification, the shared link
+ * type, and the "find the link for a platform" picker.
  *
- * Owns the platform tuple, its aliases, the hostname table, the "which platform
- * is this URL" classifier, the shared link TYPE, and the "find the link for a
- * platform" picker. `SocialIconRow` maps the tuple to icon components; every
- * other consumer (profile socials, the OG scraper, markdown shortcodes, the
- * hub's MLG export) reads from here.
+ * **This module does NOT own the list of platforms.** That list lives in the
+ * `social_platforms` table and only there: it is admin-editable, it carries
+ * `display_name`, `icon_name`, `base_url`, `url_pattern`, `category` and
+ * `sort_order`, and the hub already reads it everywhere
+ * (`lib/data/social-platforms-utils.ts`, `useSocialPlatforms`). A hardcoded
+ * tuple here would be a second vocabulary that drifts the first time somebody
+ * adds a row — and, being a compile-time union, would reject that row outright.
+ *
+ * So a platform is a `string` at every boundary. What code owns is the two
+ * things a table cannot hold:
+ *
+ *   - the ICON COMPONENTS (`SOCIAL_ICON_COMPONENTS` in `social-icon-row`),
+ *     which the DB names through `icon_name`;
+ *   - the incoming SPELLINGS below, which are not platforms but ways external
+ *     data refers to them (`x` for twitter, `fb` for facebook).
  *
  * JSX-free leaf with its own `exports` subpath, so `server-only` DALs and hub
  * scripts can import the type and the classifier without pulling in React.
  */
 
-/** Every platform `SocialIconRow` can render a dedicated glyph for. */
-export const SOCIAL_ICON_PLATFORMS = [
-  'github',
-  'twitter',
-  'reddit',
-  'linkedin',
-  'luma',
-  'whatsapp',
-  'email',
-  'website',
-  'slack',
-  'discord',
-  'telegram',
-  'youtube',
-  'instagram',
-  'facebook',
-  'tiktok',
-  'copy',
-] as const;
+/**
+ * One row of `social_platforms`, in the shape callers pass around.
+ *
+ * Deliberately a narrow READ view: the columns that decide presentation and
+ * URL-building, not the OAuth or media-config columns, which have their own
+ * consumers and no business here.
+ */
+export interface SocialPlatformDefinition {
+  /** `social_platforms.name` — the canonical key, lowercase. */
+  name: string;
+  /** `social_platforms.base_url`, e.g. `https://twitter.com/`. */
+  baseUrl?: string | null;
+  /** `social_platforms.url_pattern`, e.g. `https://twitter.com/{username}`. */
+  urlPattern?: string | null;
+}
 
-export type SocialIconPlatform = (typeof SOCIAL_ICON_PLATFORMS)[number];
-
-/** Accepted spellings that normalize onto a canonical platform. */
-export const SOCIAL_PLATFORM_ALIASES: Record<string, SocialIconPlatform> = {
+/**
+ * Accepted SPELLINGS that resolve onto a platform name.
+ *
+ * Not a vocabulary — every value here must be a `social_platforms.name`. These
+ * exist because external data says `x`, `fb` or `generic` where the table says
+ * `twitter`, `facebook` and `website`.
+ */
+export const SOCIAL_PLATFORM_ALIASES: Record<string, string> = {
   x: 'twitter',
   mail: 'email',
   web: 'website',
@@ -45,16 +56,16 @@ export const SOCIAL_PLATFORM_ALIASES: Record<string, SocialIconPlatform> = {
   generic: 'website',
 };
 
-/** Lower-case, trim, and resolve aliases. Returns `null` for anything unknown. */
-export function normalizeSocialPlatform(platform: string | null | undefined): SocialIconPlatform | null {
+/**
+ * Lower-case, trim, and resolve a known alias. Returns `null` only for a blank
+ * input — an unrecognised name is passed THROUGH, because this module is not
+ * the authority on which platforms exist.
+ */
+export function normalizeSocialPlatform(platform: string | null | undefined): string | null {
   if (!platform) return null;
   const key = platform.toLowerCase().trim();
-  if ((SOCIAL_ICON_PLATFORMS as readonly string[]).includes(key)) return key as SocialIconPlatform;
-  return SOCIAL_PLATFORM_ALIASES[key] ?? null;
-}
-
-export function isSocialIconPlatform(platform: string | null | undefined): platform is SocialIconPlatform {
-  return normalizeSocialPlatform(platform) !== null;
+  if (!key) return null;
+  return SOCIAL_PLATFORM_ALIASES[key] ?? key;
 }
 
 /**
@@ -68,37 +79,57 @@ export function hostMatches(hostname: string | null | undefined, domain: string)
   return host === bare || host.endsWith(`.${bare}`);
 }
 
-/** THE host table: platform → the domains that identify it. */
-export const SOCIAL_PLATFORM_HOSTS: Partial<Record<SocialIconPlatform, readonly string[]>> = {
-  github: ['github.com'],
-  twitter: ['twitter.com', 'x.com'],
-  reddit: ['reddit.com'],
-  linkedin: ['linkedin.com'],
-  luma: ['lu.ma'],
-  whatsapp: ['whatsapp.com', 'wa.me'],
-  slack: ['slack.com'],
-  discord: ['discord.com', 'discord.gg'],
-  telegram: ['telegram.org', 't.me'],
-  youtube: ['youtube.com', 'youtu.be'],
-  instagram: ['instagram.com'],
-  facebook: ['facebook.com', 'fb.com'],
-  tiktok: ['tiktok.com'],
+/**
+ * Alternate domains a platform's own `url_pattern` cannot express — a rename
+ * (`x.com`), a share domain (`youtu.be`), an invite domain (`discord.gg`).
+ *
+ * The ONLY hardcoded host knowledge left, and it is additive: every primary
+ * host is derived from the row. Keyed by `social_platforms.name`, so a row that
+ * does not exist contributes nothing. If this grows, the answer is an
+ * `alt_hosts` column on the table, not a longer map here.
+ */
+export const SOCIAL_PLATFORM_ALT_HOSTS: Record<string, readonly string[]> = {
+  twitter: ['x.com'],
+  youtube: ['youtu.be'],
+  discord: ['discord.gg'],
+  telegram: ['telegram.org'],
+  facebook: ['fb.com'],
 };
 
-/**
- * Classify a URL by its host. Returns `'website'` for a URL that parses but
- * matches no known platform, and `null` for something that is not a URL.
- */
-export function classifySocialHost(url: string | null | undefined): SocialIconPlatform | null {
-  if (!url) return null;
-  let hostname: string;
+/** The host a `base_url`/`url_pattern` points at, or null when it names none. */
+function hostOf(value: string | null | undefined): string | null {
+  if (!value) return null;
   try {
-    hostname = new URL(url.includes('://') ? url : `https://${url}`).hostname;
+    return new URL(value.includes('://') ? value : `https://${value}`).hostname;
   } catch {
     return null;
   }
-  for (const [platform, domains] of Object.entries(SOCIAL_PLATFORM_HOSTS)) {
-    if (domains?.some(d => hostMatches(hostname, d))) return platform as SocialIconPlatform;
+}
+
+/** Every domain that identifies a platform: its row's host plus any alternates. */
+export function socialPlatformHosts(platform: SocialPlatformDefinition): string[] {
+  const primary = hostOf(platform.urlPattern) ?? hostOf(platform.baseUrl);
+  return [...(primary ? [primary] : []), ...(SOCIAL_PLATFORM_ALT_HOSTS[platform.name] ?? [])];
+}
+
+/**
+ * Classify a URL by its host against the platforms the DATABASE defines.
+ *
+ * `platforms` is the caller's loaded `social_platforms` rows — passing them in
+ * is what keeps this function pure and this module free of a platform list.
+ * Returns `'website'` for a URL that parses but matches no row (the table's own
+ * catch-all row), and `null` for something that is not a URL at all.
+ */
+export function classifySocialHost(
+  url: string | null | undefined,
+  platforms: readonly SocialPlatformDefinition[],
+): string | null {
+  const hostname = hostOf(url);
+  if (!hostname) return null;
+  for (const platform of platforms) {
+    if (socialPlatformHosts(platform).some(domain => hostMatches(hostname, domain))) {
+      return platform.name;
+    }
   }
   return 'website';
 }
@@ -123,7 +154,7 @@ export type SocialIconLink = {
  */
 export function pickSocialLink<T extends { platform: string }>(
   links: readonly T[] | null | undefined,
-  platform: string
+  platform: string,
 ): T | undefined {
   const target = normalizeSocialPlatform(platform);
   if (!target || !links) return undefined;

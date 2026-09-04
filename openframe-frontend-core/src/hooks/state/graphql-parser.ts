@@ -7,12 +7,9 @@
 
 import { type DocumentNode, type VariableDefinitionNode, type TypeNode, visit } from 'graphql';
 
-/**
- * JavaScript type that can be represented in URL parameters
- */
-// THE JSType lives in the search-params leaf (server + client share it); re-exported
-// here so every existing importer of `graphql-parser` keeps working.
-export type { JSType } from '../../utils/search-params';
+// `JSType` is OWNED by the search-params leaf (server and client share it).
+// Imported, not re-exported: a second export site is a second place to look
+// when you want to know where the type lives.
 import type { JSType } from '../../utils/search-params';
 
 /**

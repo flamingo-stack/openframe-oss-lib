@@ -36,10 +36,10 @@ import {
   withQuery,
 } from '../utils/search-params';
 import {
-  SOCIAL_ICON_PLATFORMS,
+  SOCIAL_PLATFORM_ALT_HOSTS,
   classifySocialHost,
   hostMatches,
-  isSocialIconPlatform,
+  socialPlatformHosts,
   normalizeSocialPlatform,
   pickSocialLink,
 } from '../utils/social-platforms';
@@ -166,22 +166,53 @@ describe('csv leaf', () => {
 });
 
 describe('social platforms leaf', () => {
-  it('normalizes aliases', () => {
+  // Rows as `social_platforms` actually holds them — the table is the
+  // vocabulary, so every test here feeds it in rather than trusting a list
+  // compiled into the module.
+  const SOCIAL_ROWS = [
+    { name: 'website', baseUrl: '', urlPattern: '' },
+    { name: 'linkedin', baseUrl: 'https://linkedin.com/in/', urlPattern: 'https://linkedin.com/in/{username}' },
+    { name: 'twitter', baseUrl: 'https://twitter.com/', urlPattern: 'https://twitter.com/{username}' },
+    { name: 'github', baseUrl: 'https://github.com/', urlPattern: 'https://github.com/{username}' },
+    { name: 'youtube', baseUrl: 'https://youtube.com/@', urlPattern: 'https://youtube.com/@{username}' },
+  ];
+
+  it('resolves a known spelling and PASSES THROUGH an unknown name', () => {
     expect(normalizeSocialPlatform('X')).toBe('twitter');
     expect(normalizeSocialPlatform('GENERIC')).toBe('website');
-    expect(normalizeSocialPlatform('nope')).toBeNull();
-    expect(isSocialIconPlatform('fb')).toBe(true);
+    // Not a gate: this module is not the authority on which platforms exist,
+    // so a name it has never heard of survives for the DB to judge.
+    expect(normalizeSocialPlatform('mastodon')).toBe('mastodon');
+    expect(normalizeSocialPlatform('  ')).toBeNull();
+    expect(normalizeSocialPlatform(null)).toBeNull();
   });
   it('matches hosts and subdomains only', () => {
     expect(hostMatches('www.github.com', 'github.com')).toBe(true);
     expect(hostMatches('gist.github.com', 'github.com')).toBe(true);
     expect(hostMatches('notgithub.com', 'github.com')).toBe(false);
   });
-  it('classifies urls, defaulting to website', () => {
-    expect(classifySocialHost('https://x.com/someone')).toBe('twitter');
-    expect(classifySocialHost('https://youtu.be/abc')).toBe('youtube');
-    expect(classifySocialHost('https://example.com')).toBe('website');
-    expect(classifySocialHost('not a url')).toBeNull();
+  it('derives a platform host from its row, not from a table in this file', () => {
+    expect(socialPlatformHosts({ name: 'github', urlPattern: 'https://github.com/{username}' })).toEqual([
+      'github.com',
+    ]);
+    // A row nobody has hardcoded still classifies, purely from its pattern.
+    expect(socialPlatformHosts({ name: 'mastodon', urlPattern: 'https://mastodon.social/@{username}' })).toEqual([
+      'mastodon.social',
+    ]);
+  });
+  it('adds only the alternates a url_pattern cannot express', () => {
+    expect(socialPlatformHosts(SOCIAL_ROWS[2])).toEqual(['twitter.com', 'x.com']);
+    expect(Object.keys(SOCIAL_PLATFORM_ALT_HOSTS)).not.toContain('github');
+  });
+  it('classifies urls against the DB rows, defaulting to website', () => {
+    expect(classifySocialHost('https://x.com/someone', SOCIAL_ROWS)).toBe('twitter');
+    expect(classifySocialHost('https://youtu.be/abc', SOCIAL_ROWS)).toBe('youtube');
+    expect(classifySocialHost('https://example.com', SOCIAL_ROWS)).toBe('website');
+    expect(classifySocialHost('not a url', SOCIAL_ROWS)).toBeNull();
+  });
+  it('classifies a platform added to the table with no code change', () => {
+    const withMastodon = [...SOCIAL_ROWS, { name: 'mastodon', urlPattern: 'https://mastodon.social/@{u}' }];
+    expect(classifySocialHost('https://mastodon.social/@ada', withMastodon)).toBe('mastodon');
   });
   it('picks a link case-insensitively over any link shape', () => {
     const links = [
@@ -191,9 +222,6 @@ describe('social platforms leaf', () => {
     expect(pickSocialLink(links, 'linkedin')?.href).toBe('l');
     expect(pickSocialLink(links, 'twitter')?.href).toBe('t');
     expect(pickSocialLink(links, 'github')).toBeUndefined();
-  });
-  it('keeps the platform tuple non-empty', () => {
-    expect(SOCIAL_ICON_PLATFORMS.length).toBeGreaterThan(10);
   });
 });
 

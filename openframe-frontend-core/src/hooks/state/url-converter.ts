@@ -6,8 +6,8 @@
  */
 
 import { positiveInt } from '../../utils/search-params';
+import type { JSType } from '../../utils/search-params';
 import { type FlattenedParam, shouldIncludeInUrl } from './flatten-schema';
-import type { JSType } from './graphql-parser';
 
 /** A single URL-decodable value. */
 export type UrlScalar = string | number | boolean | null;

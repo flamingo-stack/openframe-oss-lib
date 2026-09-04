@@ -21,9 +21,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from '../../embed-shims/next-navigation';
-import { createSearchParams, parseSchemaParams, type ParamSchema } from '../../utils/search-params';
+import { createSearchParams, parseSchemaParams, type ParamSchema, type JSType } from '../../utils/search-params';
 import { type FlattenedParam, shouldIncludeInUrl } from './flatten-schema';
-import type { JSType } from './graphql-parser';
 
 /**
  * Returns the previous reference if the JSON-serialized content of `value`

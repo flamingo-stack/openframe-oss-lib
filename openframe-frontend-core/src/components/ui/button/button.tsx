@@ -322,18 +322,22 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
       </>
     );
 
-    // A download is a resource fetch, not a route change — plain anchor, no
-    // prefetch, no router. Checked BEFORE the linkProps/href resolution.
+    // A download is a resource fetch, not a route change: same `Link` as every
+    // other anchor branch (so a host that registered `next/link` keeps ONE
+    // anchor implementation), with prefetch off — there is no route to warm,
+    // and prefetching would fetch the file itself. Checked BEFORE the
+    // linkProps/href resolution.
     if (download && href) {
       return (
-        <a
+        <Link
           href={href}
           download={download}
+          prefetch={false}
           className={cn(shellClasses, isDisabled && 'pointer-events-none')}
           aria-label={props['aria-label']}
         >
           {splitContent}
-        </a>
+        </Link>
       );
     }
 
@@ -409,14 +413,15 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
   // Same download short-circuit as the splitIcon branch.
   if (download && href) {
     return (
-      <a
+      <Link
         href={href}
         download={download}
+        prefetch={false}
         className={cn(classes, isDisabled && 'pointer-events-none')}
         aria-label={props['aria-label']}
       >
         {content}
-      </a>
+      </Link>
     );
   }
 
