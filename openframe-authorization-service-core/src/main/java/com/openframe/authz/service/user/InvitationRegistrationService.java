@@ -6,6 +6,7 @@ import com.openframe.authz.exception.UserActiveInAnotherTenantException;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.processor.UserDeactivationProcessor;
+import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.validation.InvitationValidator;
 import com.openframe.data.document.auth.AuthInvitation;
 import com.openframe.data.document.auth.AuthUser;
@@ -27,7 +28,7 @@ public class InvitationRegistrationService {
     private final RegistrationProcessor registrationProcessor;
     private final UserDeactivationProcessor userDeactivationProcessor;
     private final InvitationValidator invitationValidator;
-    private final com.openframe.authz.service.sso.SsoIdentityService ssoIdentityService;
+    private final SsoIdentityService ssoIdentityService;
 
     public AuthUser registerByInvitation(InvitationRegistrationRequest request) {
         AuthInvitation invitation = invitationValidator.loadAndEnsureAcceptable(request.getInvitationId());

@@ -1,6 +1,7 @@
 package com.openframe.authz.controller;
 
 import com.openframe.authz.dto.TenantRegistrationRequest;
+import com.openframe.authz.service.sso.SsoAlreadyLinkedException;
 import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.sso.apple.AppleNativeTokenVerifier;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
@@ -115,7 +116,7 @@ public class AppleNativeDiscoveryController {
         }
         try {
             ssoIdentityService.ensureNotAlreadyLinked(APPLE, token.getClaims());
-        } catch (com.openframe.authz.service.sso.SsoAlreadyLinkedException e) {
+        } catch (SsoAlreadyLinkedException e) {
             throw new ResponseStatusException(CONFLICT, "already_linked");
         }
         if (userService.findActiveByEmail(email.toLowerCase(ROOT)).isPresent()) {

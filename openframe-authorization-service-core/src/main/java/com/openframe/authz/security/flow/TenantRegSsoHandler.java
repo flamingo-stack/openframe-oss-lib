@@ -6,6 +6,7 @@ import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.security.SsoTenantRegCookiePayload;
+import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,7 +30,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
 
     private final SsoCookieCodec ssoCookieCodec;
     private final TenantRegistrationService registrationService;
-    private final com.openframe.authz.service.sso.SsoIdentityService ssoIdentityService;
+    private final SsoIdentityService ssoIdentityService;
 
     @Override
     public String cookieName() {
