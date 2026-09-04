@@ -13,7 +13,7 @@
  * the icon components, or the utils barrel into their graph.
  *
  * TWO accepted by-construction copies of the colour decision remain, both LOCKED
- * by the hub's `platform-brand-parity` jest test:
+ * by `src/__tests__/mlg-platform-leaves.test.ts` in this package:
  *   1. `platformHexColors` below (hand-typed hex mirror of each accent token).
  *   2. The `[data-app-type='…']` blocks in `src/styles/ods-colors.css`.
  */
@@ -111,13 +111,7 @@ export function getDefaultIconForPlatform(platformName: string): string {
  * by STEM rather than by token so the token spelling has exactly one home below.
  */
 export type OdsColorStem =
-  | 'flamingo-pink'
-  | 'flamingo-cyan'
-  | 'open-yellow'
-  | 'success'
-  | 'warning'
-  | 'error'
-  | 'text-secondary';
+  'flamingo-pink' | 'flamingo-cyan' | 'open-yellow' | 'success' | 'warning' | 'error' | 'text-secondary';
 
 /** Stem → ODS token name (without the `--ods-` prefix). THE token spelling. */
 export const ODS_STEM_TOKENS: Record<OdsColorStem, string> = {
@@ -281,7 +275,7 @@ export function getPlatformBrandClasses(platformName: string): {
 
 /** Platform background classes, DERIVED (was a hand-typed hex map). */
 export const platformColors: Record<PlatformName, string> = Object.fromEntries(
-  (Object.keys(PLATFORM_BRAND) as PlatformName[]).map(p => [p, getPlatformBrandClasses(p).accentBg])
+  (Object.keys(PLATFORM_BRAND) as PlatformName[]).map(p => [p, getPlatformBrandClasses(p).accentBg]),
 ) as Record<PlatformName, string>;
 
 export function getPlatformColor(platformName: string) {
@@ -290,8 +284,11 @@ export function getPlatformColor(platformName: string) {
 
 /**
  * Hand-typed hex mirror of each platform's accent token (the DB `default_color`
- * and other JS-value consumers). Accepted copy #1 — the hub's parity test asserts
- * every row equals `resolveOdsColor(platformAccentVarName(platform))`.
+ * and other JS-value consumers). Accepted copy #1 — locked by
+ * `src/__tests__/mlg-platform-leaves.test.ts` in this package, which asserts
+ * every row against the `[data-app-type]` blocks in `ods-colors.css`.
+ * (The hub has its OWN parity test, but it holds different copies: the asset
+ * generator's map and the generated manifests.)
  */
 export const platformHexColors: Record<PlatformName, string> = {
   openmsp: '#ffc008',
