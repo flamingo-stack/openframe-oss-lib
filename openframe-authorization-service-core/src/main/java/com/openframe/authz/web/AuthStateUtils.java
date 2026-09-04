@@ -1,10 +1,12 @@
 package com.openframe.authz.web;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import static com.openframe.authz.security.SsoRegistrationConstants.SSO_FLOW_COOKIES;
+import com.openframe.core.constants.SsoFlowCookieNames;
 
 public final class AuthStateUtils {
     private AuthStateUtils() {
@@ -17,7 +19,7 @@ public final class AuthStateUtils {
      * leaves its cookie alive for the full TTL, and the callback then has two flows to choose between.
      */
     public static void clearOtherSsoFlowCookies(HttpServletResponse response, String keepCookieName) {
-        for (String name : SSO_FLOW_COOKIES) {
+        for (String name : SsoFlowCookieNames.ALL) {
             if (!name.equals(keepCookieName)) {
                 clearCookie(response, name);
             }
@@ -29,7 +31,7 @@ public final class AuthStateUtils {
      * keeps injecting its state into subsequent logins and steals their callbacks.
      */
     public static void clearSsoFlowCookies(HttpServletResponse response) {
-        for (String name : SSO_FLOW_COOKIES) {
+        for (String name : SsoFlowCookieNames.ALL) {
             clearCookie(response, name);
         }
     }

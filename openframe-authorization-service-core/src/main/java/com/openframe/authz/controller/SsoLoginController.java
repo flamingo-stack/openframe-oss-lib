@@ -1,5 +1,7 @@
 package com.openframe.authz.controller;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import com.openframe.authz.dto.RegistrationAttribution;
 import com.openframe.authz.dto.SsoLoginInitRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
@@ -38,7 +40,7 @@ import java.io.IOException;
 import java.util.Locale;
 import java.util.UUID;
 
-import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_LOGIN;
+import static com.openframe.core.constants.SsoFlowCookieNames.OF_SSO_LOGIN;
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
 import static com.openframe.authz.web.AuthStateUtils.clearCookie;
 import static com.openframe.authz.web.AuthStateUtils.clearOtherSsoFlowCookies;
@@ -73,10 +75,10 @@ public class SsoLoginController {
         try {
             // Unlike registration/invite starts, the session is NOT cleared here: an anonymous
             // visitor has none worth keeping, and the OAuth dance creates a fresh one anyway.
-            clearOtherSsoFlowCookies(httpResponse, COOKIE_SSO_LOGIN);
+            clearOtherSsoFlowCookies(httpResponse, OF_SSO_LOGIN);
 
             SsoAuthorizeData data = ssoLoginService.startLogin(request);
-            ssoFlowCookies.write(httpResponse, COOKIE_SSO_LOGIN, data.cookieValue(), data.cookieTtlSeconds());
+            ssoFlowCookies.write(httpResponse, OF_SSO_LOGIN, data.cookieValue(), data.cookieTtlSeconds());
 
             seeOther(httpResponse, data.redirectPath());
         } catch (Exception e) {
@@ -208,7 +210,7 @@ public class SsoLoginController {
 
             var tenant = registrationService.registerTenant(reg);
 
-            clearCookie(httpResponse, COOKIE_SSO_LOGIN);
+            clearCookie(httpResponse, OF_SSO_LOGIN);
             foundAtRoot(httpResponse, Redirects.oauthContinuePath(tenant.getId(), payload.redirectTo(), payload.authMobile()));
         } catch (Exception e) {
             authErrorResponder.send(httpResponse, httpRequest, "sso-login-complete", e,
@@ -225,7 +227,7 @@ public class SsoLoginController {
     }
 
     private SsoLoginCookiePayload requireLoginFlowCookie(HttpServletRequest request) {
-        Cookie cookie = WebUtils.getCookie(request, COOKIE_SSO_LOGIN);
+        Cookie cookie = WebUtils.getCookie(request, OF_SSO_LOGIN);
         if (cookie == null) {
             throw new IllegalStateException("SSO session expired. Please sign in again.");
         }

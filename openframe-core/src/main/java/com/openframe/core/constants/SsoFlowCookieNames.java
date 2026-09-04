@@ -9,9 +9,9 @@ import java.util.List;
  * class was extracted to prevent (a leftover flow cookie whose state the resolver injects into
  * the next login).
  */
-public final class SsoFlowCookies {
+public final class SsoFlowCookieNames {
 
-    private SsoFlowCookies() {
+    private SsoFlowCookieNames() {
     }
 
     public static final String OF_SSO_REG = "of_sso_reg";
