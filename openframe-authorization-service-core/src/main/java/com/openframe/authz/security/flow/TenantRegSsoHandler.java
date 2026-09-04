@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
@@ -42,11 +43,6 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
         return ssoCookieCodec.decodeTenant(cookie.getValue()).map(SsoTenantRegCookiePayload::s);
     }
 
-    private String provider(Authentication authentication) {
-        return authentication instanceof org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken t
-                ? t.getAuthorizedClientRegistrationId() : null;
-    }
-
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
         Cookie cookie = requireCookie(request);
@@ -57,7 +53,12 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
         requireEmailMatchesForm(payload.email(), email);
-        ssoIdentityService.ensureNotAlreadyLinked(provider(authentication), user.getClaims());
+        // Provider from the authenticated token, falling back to the flow cookie — never null, so
+        // the invariant guard fails CLOSED rather than passing a null provider that matches nothing.
+        String provider = authentication instanceof OAuth2AuthenticationToken token
+                ? token.getAuthorizedClientRegistrationId()
+                : payload.provider();
+        ssoIdentityService.ensureNotAlreadyLinked(provider, user.getClaims());
 
         String[] names = resolveNames(request, authentication, user);
         String givenName = names[0];

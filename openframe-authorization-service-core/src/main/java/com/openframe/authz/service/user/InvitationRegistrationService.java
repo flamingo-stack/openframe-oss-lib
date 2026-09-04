@@ -70,7 +70,9 @@ public class InvitationRegistrationService {
             // Tenant switch is an explicit lifecycle action — the one context where touching links
             // is allowed. Drop the departing (now-deactivated) user's links so the identity binds
             // cleanly to the new tenant's account on first login instead of dead-ending on a
-            // deactivated user and logging a conflict every time.
+            // deactivated user and logging a conflict every time. Intentionally NOT best-effort
+            // (unlike account-deletion's link cleanup): a failure here must abort the switch rather
+            // than leave a stale link that would silently route the invitee back to the old tenant.
             ssoIdentityService.removeUserLinks(user.getId());
             userDeactivationProcessor.postProcessDeactivation(user);
             return null;

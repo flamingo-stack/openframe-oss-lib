@@ -68,7 +68,11 @@ public class SsoIdentityService {
     /**
      * Registration guard for the one-SSO-account-one-user invariant: throws when this identity is
      * already linked, so a bound subject signs in rather than spawning a second account it could
-     * never reach through this provider again. Every registration entry must call this.
+     * never reach through this provider again. The self-service registration entries (tenant
+     * signup, email-less/native complete) call this. Invitation acceptance deliberately does NOT:
+     * a {@code switchTenant} invite first deactivates the old membership and removes its links
+     * (see {@code InvitationRegistrationService}), so the subject is already free by the time a new
+     * user is created — guarding before that would break the very tenant-switch it enables.
      */
     public void ensureNotAlreadyLinked(String provider, Map<String, Object> claims) {
         if (findLink(provider, claims).isPresent()) {
