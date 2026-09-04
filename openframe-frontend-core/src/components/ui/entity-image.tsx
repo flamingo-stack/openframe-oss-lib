@@ -4,7 +4,7 @@ import React from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
 import { cn } from '../../utils/cn';
-import { getFirstLastInitials } from '../../utils/format';
+import { personInitials } from '../../utils/format';
 
 export interface EntityImageProps {
   src?: string | null;
@@ -24,7 +24,7 @@ export function EntityImage({ src, alt, fallbackText, className }: EntityImagePr
   const imageFailed = resolvedSrc !== undefined && failedSrc === resolvedSrc;
 
   const showFallback = imageFailed || !resolvedSrc;
-  const initials = getFirstLastInitials(fallbackText ?? alt);
+  const initials = personInitials(fallbackText ?? alt);
 
   if (showFallback) {
     return (

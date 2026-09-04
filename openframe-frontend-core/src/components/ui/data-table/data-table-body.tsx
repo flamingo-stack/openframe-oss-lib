@@ -85,17 +85,28 @@ export function DataTableBody<T = unknown>({
   }
 
   if (rows.length === 0) {
-    return (
-      <div className={cn('flex w-full flex-col gap-[var(--spacing-system-xsf)]', className)}>
-        {emptyState ? (
-          <DataTableEmpty {...emptyState} />
-        ) : emptyMessage != null ? (
-          <DataTableEmpty title={emptyMessage} description={undefined} />
-        ) : (
-          <DataTableEmpty />
-        )}
-      </div>
+    const empty = emptyState ? (
+      <DataTableEmpty {...emptyState} />
+    ) : emptyMessage != null ? (
+      <DataTableEmpty title={emptyMessage} description={undefined} />
+    ) : (
+      <DataTableEmpty />
     );
+
+    // `minRows` promises a STABLE table height. An empty board is exactly when
+    // a collapsing table is most visible — the pagination and everything under
+    // it jump up the moment a filter matches nothing — so reserve the same row
+    // slots here and center the empty state over them.
+    if (minRows) {
+      return (
+        <div className={cn('relative flex w-full flex-col gap-[var(--spacing-system-xsf)]', className)}>
+          <PlaceholderRows count={minRows} />
+          <div className="absolute inset-0 flex items-center justify-center">{empty}</div>
+        </div>
+      );
+    }
+
+    return <div className={cn('flex w-full flex-col gap-[var(--spacing-system-xsf)]', className)}>{empty}</div>;
   }
 
   const padCount = minRows ? Math.max(0, minRows - rows.length) : 0;
@@ -119,17 +130,31 @@ export function DataTableBody<T = unknown>({
           />
         );
       })}
-      {padCount > 0 &&
-        Array.from({ length: padCount }).map((_, i) => (
-          <div
-            key={`placeholder-${i}`}
-            className="pointer-events-none relative overflow-hidden rounded-md"
-            aria-hidden="true"
-          >
-            <div className={cn('hidden py-0 md:flex', ROW_SHELL_CLASSES, ROW_HEIGHT_DESKTOP)} />
-            <div className={cn('flex justify-start py-0 md:hidden', ROW_SHELL_CLASSES, ROW_HEIGHT_MOBILE)} />
-          </div>
-        ))}
+      {padCount > 0 && <PlaceholderRows count={padCount} />}
     </div>
+  );
+}
+
+/**
+ * Invisible rows that occupy exactly one row slot each.
+ *
+ * THE height reservation for a table whose page is short or empty — both call
+ * sites use it, so a padded page and an empty one are the same height by
+ * construction rather than by two matching guesses.
+ */
+function PlaceholderRows({ count }: { count: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={`placeholder-${i}`}
+          className="pointer-events-none relative overflow-hidden rounded-md"
+          aria-hidden="true"
+        >
+          <div className={cn('hidden py-0 md:flex', ROW_SHELL_CLASSES, ROW_HEIGHT_DESKTOP)} />
+          <div className={cn('flex justify-start py-0 md:hidden', ROW_SHELL_CLASSES, ROW_HEIGHT_MOBILE)} />
+        </div>
+      ))}
+    </>
   );
 }
