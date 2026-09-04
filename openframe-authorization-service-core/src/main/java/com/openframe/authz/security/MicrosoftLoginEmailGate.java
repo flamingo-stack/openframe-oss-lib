@@ -30,6 +30,7 @@ public class MicrosoftLoginEmailGate {
     private static final String MICROSOFT = "microsoft";
 
     private final SSOConfigService ssoConfigService;
+    private final EmailTrustPolicy emailTrustPolicy;
     private final com.openframe.authz.service.sso.SsoIdentityService ssoIdentityService;
     private final com.openframe.authz.service.user.UserService userService;
 
@@ -66,7 +67,7 @@ public class MicrosoftLoginEmailGate {
         if (isLinkedToClaimedEmail(tenantId, user)) {
             return;
         }
-        if (!OidcUserUtils.emailTrustedForRouting(MICROSOFT, user.getClaims())) {
+        if (!emailTrustPolicy.emailTrustedForRouting(MICROSOFT, user.getClaims())) {
             log.warn("event=sso-login-unverified-email provider=microsoft tenant={} sub={} {}",
                     tenantId, user.getSubject(), OidcUserUtils.describeEmailTrustSignals(user.getClaims()));
             throw new IllegalStateException(

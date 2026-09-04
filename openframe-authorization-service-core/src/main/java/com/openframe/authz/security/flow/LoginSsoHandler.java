@@ -1,5 +1,6 @@
 package com.openframe.authz.security.flow;
 
+import com.openframe.authz.security.EmailTrustPolicy;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
 import com.openframe.authz.security.SsoRegistrationConstants;
@@ -44,6 +45,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
     private final SsoCookieCodec ssoCookieCodec;
     private final SignupTicketService signupTicketService;
     private final SsoIdentityService ssoIdentityService;
+    private final EmailTrustPolicy emailTrustPolicy;
     private final UserService userService;
     private final TenantService tenantService;
     private final SSOConfigService ssoConfigService;
@@ -121,7 +123,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
      * (an optional claim that must be enabled on the generic app registration).
      */
     private void requireEmailTrustedForRouting(String provider, OidcUser user) {
-        if (!OidcUserUtils.emailTrustedForRouting(provider, user.getClaims())) {
+        if (!emailTrustPolicy.emailTrustedForRouting(provider, user.getClaims())) {
             log.warn("event=sso-login-unverified-email provider={} sub={} {}",
                     provider, user.getSubject(), OidcUserUtils.describeEmailTrustSignals(user.getClaims()));
             throw new IllegalStateException(

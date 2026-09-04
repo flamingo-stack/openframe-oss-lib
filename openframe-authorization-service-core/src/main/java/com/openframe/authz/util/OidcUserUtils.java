@@ -29,17 +29,6 @@ public final class OidcUserUtils {
      * {@code false} (boolean or string) never does.
      */
     /**
-     * Whether the provider-asserted email is trustworthy enough to ROUTE INTO AN EXISTING
-     * ACCOUNT. Google and Apple verify mailbox/domain ownership before an email appears in a
-     * token. A generic multi-tenant Microsoft app does not — the email attribute is free text set
-     * by the issuing directory's admin, and anyone can create a directory (the nOAuth
-     * account-takeover class) — so Microsoft additionally requires the positive domain-ownership
-     * signal {@code xms_edov} (or an explicit {@code email_verified: true}).
-     */
-    /** Well-known tenant id Microsoft issues personal-account (MSA) tokens under. */
-    private static final String MSA_TENANT_ID = "9188040d-6c67-4c5b-b112-36a304b66dad";
-
-    /**
      * One-line description of the trust-relevant Microsoft claims, for gate rejection logs:
      * which signals were present and what they said — never the email itself.
      */
@@ -49,23 +38,6 @@ public final class OidcUserUtils {
         return "tid=" + claims.get("tid")
                 + " xms_edov=" + (edov == null ? "absent" : edov)
                 + " email_verified=" + (verified == null ? "absent" : verified);
-    }
-
-    public static boolean emailTrustedForRouting(String provider, java.util.Map<String, Object> claims) {
-        if ("microsoft".equals(provider)) {
-            // Personal accounts: Microsoft verifies mailbox ownership before an address becomes a
-            // sign-in alias, and there is no directory admin who could forge the claim — the
-            // nOAuth class applies to organizational tenants only. xms_edov is Entra-only and
-            // never present on MSA tokens, so without this carve-out they would be over-blocked.
-            if (MSA_TENANT_ID.equals(claims.get("tid"))) {
-                return true;
-            }
-            Object edov = claims.get("xms_edov");
-            return Boolean.TRUE.equals(edov)
-                    || "true".equalsIgnoreCase(stringClaim(edov))
-                    || Boolean.TRUE.equals(claims.get("email_verified"));
-        }
-        return emailVerifiedClaimAllows(claims);
     }
 
     public static boolean emailVerifiedClaimAllows(OidcUser user) {
