@@ -122,7 +122,8 @@ public class LoginSsoHandler implements SsoFlowHandler {
      */
     private void requireEmailTrustedForRouting(String provider, OidcUser user) {
         if (!OidcUserUtils.emailTrustedForRouting(provider, user.getClaims())) {
-            log.warn("event=sso-login-unverified-email provider={} sub={}", provider, user.getSubject());
+            log.warn("event=sso-login-unverified-email provider={} sub={} {}",
+                    provider, user.getSubject(), OidcUserUtils.describeEmailTrustSignals(user.getClaims()));
             throw new IllegalStateException(
                     "This account's email is not verified by the provider. Enter your email on the login page instead.");
         }

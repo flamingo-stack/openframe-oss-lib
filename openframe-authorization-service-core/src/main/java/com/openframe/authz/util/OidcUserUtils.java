@@ -39,6 +39,18 @@ public final class OidcUserUtils {
     /** Well-known tenant id Microsoft issues personal-account (MSA) tokens under. */
     private static final String MSA_TENANT_ID = "9188040d-6c67-4c5b-b112-36a304b66dad";
 
+    /**
+     * One-line description of the trust-relevant Microsoft claims, for gate rejection logs:
+     * which signals were present and what they said — never the email itself.
+     */
+    public static String describeEmailTrustSignals(java.util.Map<String, Object> claims) {
+        Object edov = claims.get("xms_edov");
+        Object verified = claims.get("email_verified");
+        return "tid=" + claims.get("tid")
+                + " xms_edov=" + (edov == null ? "absent" : edov)
+                + " email_verified=" + (verified == null ? "absent" : verified);
+    }
+
     public static boolean emailTrustedForRouting(String provider, java.util.Map<String, Object> claims) {
         if ("microsoft".equals(provider)) {
             // Personal accounts: Microsoft verifies mailbox ownership before an address becomes a

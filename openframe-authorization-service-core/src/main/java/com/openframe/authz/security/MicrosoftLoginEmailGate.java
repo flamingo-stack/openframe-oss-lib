@@ -67,8 +67,8 @@ public class MicrosoftLoginEmailGate {
             return;
         }
         if (!OidcUserUtils.emailTrustedForRouting(MICROSOFT, user.getClaims())) {
-            log.warn("event=sso-login-unverified-email provider=microsoft tenant={} sub={}",
-                    tenantId, user.getSubject());
+            log.warn("event=sso-login-unverified-email provider=microsoft tenant={} sub={} {}",
+                    tenantId, user.getSubject(), OidcUserUtils.describeEmailTrustSignals(user.getClaims()));
             throw new IllegalStateException(
                     "This account's email is not verified by the provider. Please contact your administrator.");
         }
