@@ -557,6 +557,7 @@ export type Database = {
           city_id: string | null;
           commits: number;
           created_at: string;
+          forks_given: number;
           forks_received: number;
           language_id: string;
           language_repos: number;
@@ -577,6 +578,7 @@ export type Database = {
           city_id?: string | null;
           commits?: number;
           created_at?: string;
+          forks_given?: number;
           forks_received?: number;
           language_id: string;
           language_repos?: number;
@@ -597,6 +599,7 @@ export type Database = {
           city_id?: string | null;
           commits?: number;
           created_at?: string;
+          forks_given?: number;
           forks_received?: number;
           language_id?: string;
           language_repos?: number;
