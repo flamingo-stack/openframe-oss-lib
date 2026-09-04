@@ -42,10 +42,14 @@ export interface AutocompleteOption<T = string> {
    */
   icon?: ReactNode;
   /**
-   * Second, quieter line under the label (a club's home city, a person's email).
-   * A string so the row can truncate it and tooltip the full value.
+   * Second, quieter line under the label — a club's home city, the states a
+   * region covers, a person's email.
+   *
+   * A plain string is truncated with a tooltip; a node is rendered as-is, so an
+   * option can carry richer detail (a row of state flags, say). The row grows
+   * to fit either.
    */
-  description?: string;
+  description?: ReactNode;
 }
 
 export type AutocompleteInputChangeReason = 'input' | 'reset' | 'clear';
@@ -671,7 +675,9 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
                       role="option"
                       aria-selected={isSelected}
                       className={cn(
-                        'group/item flex h-11 cursor-pointer items-center border-b border-ods-border px-[var(--spacing-system-mf)] transition-colors last:border-b-0 md:h-12',
+                        // `min-h` rather than a fixed height: an option may carry
+                        // a second line, and a clipped one is worse than a taller row.
+                        'group/item flex min-h-11 cursor-pointer items-center border-b border-ods-border px-[var(--spacing-system-mf)] py-[var(--spacing-system-xsf)] transition-colors last:border-b-0 md:min-h-12',
                         'text-h4',
                         isHighlighted && 'bg-ods-bg-surface',
                         isSelected ? 'text-ods-accent' : 'text-ods-text-primary',
@@ -693,10 +699,12 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
                             <div className="flex min-w-0 flex-1 flex-col">
                               {/* text-current: selection state colors the row (accent vs primary); inherit it. */}
                               <TruncateText className="text-current">{option.label}</TruncateText>
-                              {option.description && (
+                              {typeof option.description === 'string' ? (
                                 <TruncateText tone="secondary" variant="h6">
                                   {option.description}
                                 </TruncateText>
+                              ) : (
+                                option.description
                               )}
                             </div>
                           </div>
