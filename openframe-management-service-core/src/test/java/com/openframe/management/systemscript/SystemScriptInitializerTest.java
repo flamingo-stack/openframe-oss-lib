@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -106,6 +107,16 @@ class SystemScriptInitializerTest {
         new SystemScriptInitializer(secondRepo, tenantIdProvider).run(null);
 
         verify(secondRepo, never()).save(any());
+    }
+
+    @Test
+    void everySystemScriptCodeHasASeedingDefinition() {
+        for (SystemScriptCode code : SystemScriptCode.values()) {
+            long definitions = Arrays.stream(SystemScriptDefinition.values())
+                    .filter(definition -> definition.getCode() == code)
+                    .count();
+            assertEquals(1, definitions, "code without exactly one seeding definition: " + code);
+        }
     }
 
     private static Script byName(List<Script> scripts, String name) {
