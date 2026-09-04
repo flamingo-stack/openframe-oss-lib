@@ -550,6 +550,72 @@ export type Database = {
         };
         Relationships: [];
       };
+      mlg_contributors: {
+        Row: {
+          avatar_url: string | null;
+          bio: string | null;
+          city_id: string | null;
+          commits: number;
+          created_at: string;
+          forks_given: number;
+          forks_received: number;
+          language_id: string;
+          language_repos: number;
+          last_active: string | null;
+          last_synced_at: string;
+          location: string | null;
+          login: string;
+          name: string | null;
+          profile_url: string | null;
+          social_links: Json;
+          stars_given: number;
+          stars_received: number;
+          synced_config_id: string;
+        };
+        Insert: {
+          avatar_url?: string | null;
+          bio?: string | null;
+          city_id?: string | null;
+          commits?: number;
+          created_at?: string;
+          forks_given?: number;
+          forks_received?: number;
+          language_id: string;
+          language_repos?: number;
+          last_active?: string | null;
+          last_synced_at?: string;
+          location?: string | null;
+          login: string;
+          name?: string | null;
+          profile_url?: string | null;
+          social_links?: Json;
+          stars_given?: number;
+          stars_received?: number;
+          synced_config_id: string;
+        };
+        Update: {
+          avatar_url?: string | null;
+          bio?: string | null;
+          city_id?: string | null;
+          commits?: number;
+          created_at?: string;
+          forks_given?: number;
+          forks_received?: number;
+          language_id?: string;
+          language_repos?: number;
+          last_active?: string | null;
+          last_synced_at?: string;
+          location?: string | null;
+          login?: string;
+          name?: string | null;
+          profile_url?: string | null;
+          social_links?: Json;
+          stars_given?: number;
+          stars_received?: number;
+          synced_config_id?: string;
+        };
+        Relationships: [];
+      };
       vendor_github_stats: {
         Row: {
           id: string;

@@ -1,6 +1,7 @@
 'use client';
 
-import { Mail } from 'lucide-react';
+import { Mail, Music } from 'lucide-react';
+import { normalizeSocialPlatform, type SocialIconLink } from '../utils/social-platforms';
 import {
   GitHubIcon,
   RedditIcon,
@@ -19,21 +20,12 @@ import {
 } from './icons';
 import { Button } from './ui/button';
 
-/** Exactly ONE of `href` (anchor, target _blank) or `onClick` (action
- *  button — share popups via window.open inside the click gesture,
- *  copy-to-clipboard) — the discriminated union makes a dead no-action
- *  entry unrepresentable. */
-type SocialLink = {
-  platform: string;
-  label?: string;
-  /** `internal` links are only ever shown on surfaces that opt in (and must be
-   *  gated server-side); with `groupByVisibility` they render after a divider. */
-  visibility?: 'external' | 'internal';
-} & ({ href: string; onClick?: never } | { onClick: () => void; href?: never });
+/** Re-exported for call sites that already import the link type from this module. */
+export type { SocialIconLink };
 
 interface SocialIconRowProps {
   className?: string;
-  links?: SocialLink[];
+  links?: SocialIconLink[];
   variant?: 'accent' | 'outline' | 'transparent' | 'destructive' | null | undefined;
   /** Quiet metadata row for page-level identity/share slots: 32px ghost
    *  icon buttons (size="icon-sm", 16px glyphs), gap-2, w-fit container,
@@ -48,60 +40,50 @@ interface SocialIconRowProps {
   groupByVisibility?: boolean;
 }
 
-const defaultLinks: SocialLink[] = [
+const defaultLinks: SocialIconLink[] = [
   { platform: 'github', href: 'https://github.com/flamingo-stack', label: 'GitHub' },
   { platform: 'linkedin', href: 'https://linkedin.com/company/flamingo.run', label: 'LinkedIn' },
   { platform: 'facebook', href: 'https://www.facebook.com/flamingoai.msp', label: 'Facebook' },
 ];
 
-function renderSocialIcon(platform: string) {
-  const normalizedPlatform = platform.toLowerCase().trim();
+type SocialIconComponent = (props: { className?: string }) => React.ReactElement;
 
-  switch (normalizedPlatform) {
-    case 'github':
-      return <GitHubIcon className="h-5 w-5" />;
-    case 'twitter':
-    case 'x':
-      return <XLogo className="h-5 w-5" />;
-    case 'reddit':
-      return <RedditIcon className="h-5 w-5" variant="white" />;
-    case 'linkedin':
-      return <LinkedInIcon className="h-5 w-5" />;
-    case 'luma':
-      return <LumaIcon className="h-5 w-5" />;
-    case 'whatsapp':
-      return <WhatsAppIcon className="h-5 w-5" />;
-    case 'email':
-    case 'mail':
-      return <Mail className="h-5 w-5" />;
-    case 'website':
-    case 'web':
-    case 'url':
-      return <GlobeIcon className="h-5 w-5" />;
-    case 'slack':
-      return <SlackIcon className="h-5 w-5" injectedColor="white" />;
-    case 'discord':
-      return <MessageCircleIcon className="h-5 w-5" />;
-    case 'telegram':
-      return <TelegramIcon className="h-5 w-5" />;
-    case 'youtube':
-    case 'yt':
-      return <YouTubeIcon className="h-5 w-5" />;
-    case 'instagram':
-    case 'ig':
-      return <InstagramIcon className="h-5 w-5" />;
-    case 'facebook':
-    case 'fb':
-      return <FacebookIcon className="h-5 w-5" />;
-    case 'copy':
-      // CopyIcon's default fill is grey and would mismatch its row-mates —
-      // force the themed foreground via the ODS token (white on the dark
-      // theme, tracking the theme unlike the literal the reddit/slack cases
-      // still carry).
-      return <CopyIcon className="h-5 w-5" color="var(--color-text-primary)" />;
-    default:
-      return <GlobeIcon className="h-5 w-5" />;
-  }
+/**
+ * Platform name → glyph. The ONLY thing about a social platform that lives in
+ * code, because an icon is a component and a table cannot hold one; the DB
+ * names the glyph it wants through `social_platforms.icon_name`.
+ *
+ * Deliberately an OPEN record, not `satisfies Record<SomeUnion, …>`: the set of
+ * platforms is the `social_platforms` table's to decide, and a row added there
+ * must render — with the globe, until somebody adds art for it — rather than
+ * fail to type-check against a list in this file.
+ */
+export const SOCIAL_ICON_COMPONENTS: Record<string, SocialIconComponent> = {
+  github: props => <GitHubIcon {...props} />,
+  twitter: props => <XLogo {...props} />,
+  reddit: props => <RedditIcon {...props} variant="white" />,
+  linkedin: props => <LinkedInIcon {...props} />,
+  luma: props => <LumaIcon {...props} />,
+  whatsapp: props => <WhatsAppIcon {...props} />,
+  email: props => <Mail {...props} />,
+  website: props => <GlobeIcon {...props} />,
+  slack: props => <SlackIcon {...props} injectedColor="white" />,
+  discord: props => <MessageCircleIcon {...props} />,
+  telegram: props => <TelegramIcon {...props} />,
+  youtube: props => <YouTubeIcon {...props} />,
+  instagram: props => <InstagramIcon {...props} />,
+  facebook: props => <FacebookIcon {...props} />,
+  tiktok: props => <Music {...props} />,
+  // CopyIcon's default fill is grey and would mismatch its row-mates — force the
+  // themed foreground via the ODS token (tracks the theme).
+  copy: props => <CopyIcon {...props} color="var(--color-text-primary)" />,
+};
+
+/** The globe stands in for any platform with no art yet — never a blank slot. */
+function renderSocialIcon(platform: string) {
+  const key = normalizeSocialPlatform(platform) ?? 'website';
+  const Icon = SOCIAL_ICON_COMPONENTS[key] ?? SOCIAL_ICON_COMPONENTS.website;
+  return <Icon className="h-5 w-5" />;
 }
 
 export function SocialIconRow({
@@ -127,7 +109,7 @@ export function SocialIconRow({
   // stretch untouched.
   const resolvedVariant = variant !== undefined ? variant : compact ? 'transparent' : 'outline';
 
-  const renderButton = (link: SocialLink, index: number) => {
+  const renderButton = (link: SocialIconLink, index: number) => {
     const ariaLabel = link.label || link.platform;
     return link.onClick ? (
       <Button

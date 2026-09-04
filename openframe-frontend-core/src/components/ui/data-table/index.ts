@@ -54,6 +54,7 @@ export { alignJustify, getHideClasses, multiSelectFilterFn } from './utils';
 
 export type { DataTableFilterOption, TailwindBreakpoint } from './types';
 export type { DataTableProps } from './data-table';
+export { DATA_TABLE_HEADER_LABEL_CLASS } from './data-table-header';
 export type { DataTableHeaderProps, DataTableSortState } from './data-table-header';
 export type { DataTableBodyProps } from './data-table-body';
 export type { DataTableRowProps } from './data-table-row';

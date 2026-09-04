@@ -107,20 +107,4 @@ export const TMCG_ROLE_DISPLAY_NAMES: Record<string, string> = {
   [TMCG_ROLES.MENTOR]: 'Mentor',
 };
 
-/**
- * Social platform icon mapping for TMCG context
- */
-export const TMCG_SOCIAL_PLATFORMS = {
-  linkedin: 'LinkedIn',
-  twitter: 'Twitter',
-  github: 'GitHub',
-  website: 'Website',
-  youtube: 'YouTube',
-  instagram: 'Instagram',
-  facebook: 'Facebook',
-  discord: 'Discord',
-  telegram: 'Telegram',
-  slack: 'Slack',
-} as const;
 
-export type TMCGSocialPlatform = keyof typeof TMCG_SOCIAL_PLATFORMS;
