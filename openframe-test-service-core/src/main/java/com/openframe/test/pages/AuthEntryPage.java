@@ -36,9 +36,13 @@ public class AuthEntryPage {
     private static final String SIGN_UP_TAB = "button:has-text('Sign Up')";
     private static final String LOGIN_TAB = "button:has-text('Login')";
     private static final String FORGOT_PWD = "button:has-text('Forgot Password?')";
-    // First auth-method button – used as the "email accepted" signal once the
-    // method picker is revealed after Continue.
-    private static final String SSO_BTN = "button:has-text('OpenFrame SSO')";
+    // The OpenFrame provider button – used as the "email accepted" signal.
+    // It is the only provider that appears in response to the email: Google,
+    // Microsoft and Apple render upfront, before anything is typed, so waiting
+    // on one of those would pass instantly and prove nothing.
+    // Labelled "OpenFrame SSO" until 2026-09; the rename to "Continue with
+    // OpenFrame" is what broke every UI case at BaseUITest.newContext.
+    private static final String SSO_BTN = "button:has-text('Continue with OpenFrame')";
     // Login email form (shown once the Login tab is active)
     private static final String PAGE_HEADING = "h1:has-text('Login to OpenFrame')";
     private static final String EMAIL_INPUT = "input[type='email']";
