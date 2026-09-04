@@ -3,8 +3,14 @@
  *
  * The ODS preset deliberately ships NO Tailwind `spacing` scale, so `gap-lf` is
  * not a class — spacing is written in the ARBITRARY-VALUE form
- * `gap-[var(--spacing-system-lf)]`. `odsSpacingClass` is the only place that
- * form is spelled.
+ * `gap-[var(--spacing-system-lf)]`.
+ *
+ * THAT FORM MUST BE WRITTEN AS A LITERAL IN JSX. Tailwind generates CSS only
+ * for class strings its scanner can find verbatim in source, so a class NAME
+ * assembled at runtime (`` `gap-[var(--spacing-system-${token})]` ``) produces
+ * no rule at all and the spacing silently disappears — the variable resolves
+ * fine, but no declaration ever references it. This module therefore exports
+ * the token DATA (for tooling and tests) and deliberately NO class builder.
  *
  * JSX-free leaf with its own `exports` subpath so the hub's ODS allowlist script
  * (a plain node/tsx script) can import the token pattern without React.
@@ -69,18 +75,3 @@ export const TAILWIND_STEP_TO_ODS_TOKEN = {
 } as const satisfies Record<number, OdsSpacingToken>;
 
 export type TailwindSpacingStep = keyof typeof TAILWIND_STEP_TO_ODS_TOKEN;
-
-/**
- * The ODS spacing class for a prop + token, with an optional breakpoint prefix.
- * `odsSpacingClass('gap', 'lf')` → `gap-[var(--spacing-system-lf)]`
- * `odsSpacingClass('py', 'mf', 'md')` → `md:py-[var(--spacing-system-mf)]`
- */
-export function odsSpacingClass(prop: OdsSpacingProp, token: OdsSpacingToken, prefix?: string): string {
-  const base = `${prop}-[var(--spacing-system-${token})]`;
-  return prefix ? `${prefix}:${base}` : base;
-}
-
-/** The ODS class for a Tailwind step that has an exact token. */
-export function odsSpacingClassForStep(prop: OdsSpacingProp, step: TailwindSpacingStep, prefix?: string): string {
-  return odsSpacingClass(prop, TAILWIND_STEP_TO_ODS_TOKEN[step], prefix);
-}

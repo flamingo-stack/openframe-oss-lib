@@ -1,8 +1,8 @@
 'use client';
 
 import { useSearchParams, usePathname } from '../embed-shims/next-navigation';
-import { Pagination } from './pagination';
 import { withQuery } from '../utils/search-params';
+import { Pagination } from './pagination';
 
 interface UnifiedPaginationProps {
   currentPage: number;
@@ -62,7 +62,20 @@ export function UnifiedPagination({
 
   // Don't render pagination if there's only one page (optionally holding the
   // row's height so the content above it does not shift).
-  if (totalPages <= 1) return reserveSpace ? <div className={className} aria-hidden="true" /> : null;
+  //
+  // The reserved row renders the REAL control, hidden — an empty div reserves
+  // nothing, and a hardcoded spacer height silently drifts the day the control
+  // changes. `invisible` keeps the box, `aria-hidden` + `pointer-events-none`
+  // keep it out of the accessibility tree and out of the way.
+  if (totalPages <= 1) {
+    return reserveSpace ? (
+      <div className={className} aria-hidden="true">
+        <div className="pointer-events-none invisible">
+          <Pagination currentPage={1} totalPages={1} onPageChange={() => {}} />
+        </div>
+      </div>
+    ) : null;
+  }
 
   return (
     <div className={className}>

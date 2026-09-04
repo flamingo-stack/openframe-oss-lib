@@ -1,6 +1,12 @@
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it, expect } from 'vitest';
+import { PLATFORM_DOMAINS } from '../platform-domains';
+import type { PlatformName } from '../types/platform';
+import { clamp, pick, NO_CLIENT_CACHE } from '../utils/common';
+import { csvEscape, toCsv, CSV_CONTENT_TYPE } from '../utils/csv';
+import { nameInitials, personInitials, singleInitial } from '../utils/format';
+import { ODS_SPACING_TOKENS, TAILWIND_STEP_TO_ODS_TOKEN } from '../utils/ods-spacing';
 import {
   ODS_STEM_CLASSES,
   ODS_STEM_TOKENS,
@@ -16,23 +22,6 @@ import {
   platformShortNames,
   platformDisplayNames,
 } from '../utils/platform-identity';
-import { nameInitials, personInitials, singleInitial } from '../utils/format';
-import { clamp, pick, NO_CLIENT_CACHE } from '../utils/common';
-import { csvEscape, toCsv, CSV_CONTENT_TYPE } from '../utils/csv';
-import {
-  SOCIAL_ICON_PLATFORMS,
-  classifySocialHost,
-  hostMatches,
-  isSocialIconPlatform,
-  normalizeSocialPlatform,
-  pickSocialLink,
-} from '../utils/social-platforms';
-import {
-  ODS_SPACING_TOKENS,
-  TAILWIND_STEP_TO_ODS_TOKEN,
-  odsSpacingClass,
-  odsSpacingClassForStep,
-} from '../utils/ods-spacing';
 import {
   PAGE_PARAM_LIMITS,
   clampPageToTotal,
@@ -46,8 +35,14 @@ import {
   shouldIncludeInUrl,
   withQuery,
 } from '../utils/search-params';
-import { PLATFORM_DOMAINS } from '../platform-domains';
-import type { PlatformName } from '../types/platform';
+import {
+  SOCIAL_ICON_PLATFORMS,
+  classifySocialHost,
+  hostMatches,
+  isSocialIconPlatform,
+  normalizeSocialPlatform,
+  pickSocialLink,
+} from '../utils/social-platforms';
 
 const CSS = readFileSync(join(__dirname, '../styles/ods-colors.css'), 'utf8');
 const SPACING_CSS = readFileSync(join(__dirname, '../styles/ods-responsive-tokens.css'), 'utf8');
@@ -109,7 +104,7 @@ describe('platform identity', () => {
       const token = ODS_STEM_TOKENS[PLATFORM_BRAND[platform].accentStem];
       const declared = CSS.match(new RegExp(`--ods-${token}:\\s*(#[0-9a-fA-F]{6})`))?.[1];
       expect(declared, `no hex for --ods-${token}`).toBeTruthy();
-      expect(platformHexColors[platform].toLowerCase()).toBe(declared!.toLowerCase());
+      expect(platformHexColors[platform].toLowerCase()).toBe(String(declared).toLowerCase());
     }
   });
 });
@@ -158,10 +153,13 @@ describe('csv leaf', () => {
     expect(csvEscape('-not-a-number')).toBe("'-not-a-number");
   });
   it('serializes rows', () => {
-    const csv = toCsv([{ n: 'a', v: 1 }], [
-      { header: 'Name', value: r => r.n },
-      { header: 'Value', value: r => r.v },
-    ]);
+    const csv = toCsv(
+      [{ n: 'a', v: 1 }],
+      [
+        { header: 'Name', value: r => r.n },
+        { header: 'Value', value: r => r.v },
+      ],
+    );
     expect(csv).toBe('Name,Value\na,1');
     expect(CSV_CONTENT_TYPE).toContain('text/csv');
   });
@@ -186,7 +184,10 @@ describe('social platforms leaf', () => {
     expect(classifySocialHost('not a url')).toBeNull();
   });
   it('picks a link case-insensitively over any link shape', () => {
-    const links = [{ platform: 'LinkedIn', href: 'l' }, { platform: 'x', href: 't' }];
+    const links = [
+      { platform: 'LinkedIn', href: 'l' },
+      { platform: 'x', href: 't' },
+    ];
     expect(pickSocialLink(links, 'linkedin')?.href).toBe('l');
     expect(pickSocialLink(links, 'twitter')?.href).toBe('t');
     expect(pickSocialLink(links, 'github')).toBeUndefined();
@@ -205,16 +206,20 @@ describe('ods spacing leaf', () => {
   it('each mapped step is 4 x step px at EVERY breakpoint', () => {
     for (const [step, token] of Object.entries(TAILWIND_STEP_TO_ODS_TOKEN)) {
       const values = [...SPACING_CSS.matchAll(new RegExp(`--spacing-system-${token}:\\s*([0-9.]+)rem`, 'g'))].map(
-        m => parseFloat(m[1]) * 16
+        m => parseFloat(m[1]) * 16,
       );
       expect(values.length, `no declarations for ${token}`).toBeGreaterThan(0);
       for (const px of values) expect(px).toBe(Number(step) * 4);
     }
   });
-  it('emits the arbitrary-value form', () => {
-    expect(odsSpacingClass('gap', 'lf')).toBe('gap-[var(--spacing-system-lf)]');
-    expect(odsSpacingClass('py', 'mf', 'md')).toBe('md:py-[var(--spacing-system-mf)]');
-    expect(odsSpacingClassForStep('mt', 2)).toBe('mt-[var(--spacing-system-xsf)]');
+  it('exports token DATA only — no runtime class builder', async () => {
+    // A Tailwind class name assembled at runtime is invisible to the scanner
+    // and emits no CSS, so the spacing silently vanishes. The leaf must not
+    // tempt callers with a builder; spacing classes are written as literals.
+    const leaf = await import('../utils/ods-spacing');
+    expect(Object.keys(leaf)).not.toContain('odsSpacingClass');
+    expect(Object.keys(leaf)).not.toContain('odsSpacingClassForStep');
+    expect(ODS_SPACING_TOKENS).toContain('lf');
   });
 });
 
@@ -277,9 +282,7 @@ describe('search-params engine', () => {
     expect(shouldIncludeInUrl('go', schema.lang)).toBe(true);
     expect(shouldIncludeInUrl('', schema.city)).toBe(false);
     expect(serializeSchemaParams(schema, { lang: 'java', city: null, ids: [] })).toBe('');
-    expect(serializeSchemaParams(schema, { lang: 'go', city: 'austin', ids: ['a'] })).toBe(
-      'lang=go&city=austin&ids=a'
-    );
+    expect(serializeSchemaParams(schema, { lang: 'go', city: 'austin', ids: ['a'] })).toBe('lang=go&city=austin&ids=a');
   });
   it('joins arrays on request and builds query strings', () => {
     expect(createSearchParams({ t: ['a', 'b'] }, { arrayJoin: ';' }).toString()).toBe('t=a%3Bb');

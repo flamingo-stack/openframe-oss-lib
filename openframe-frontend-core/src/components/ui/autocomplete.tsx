@@ -32,6 +32,20 @@ import { TruncateText } from './truncate-text';
 export interface AutocompleteOption<T = string> {
   label: string;
   value: T;
+  /**
+   * Leading glyph for this option — a flag, a crest, a logo, an avatar.
+   *
+   * Rendered by the DEFAULT option row and, for the selected option, in the
+   * input's start adornment. Entity pickers (a state, a club, a city) read as
+   * a list of names without it, so it belongs on the shared control rather
+   * than in a `renderOption` each caller re-invents.
+   */
+  icon?: ReactNode;
+  /**
+   * Second, quieter line under the label (a club's home city, a person's email).
+   * A string so the row can truncate it and tooltip the full value.
+   */
+  description?: string;
 }
 
 export type AutocompleteInputChangeReason = 'input' | 'reset' | 'clear';
@@ -43,7 +57,13 @@ interface AutocompleteBaseProps<T = string> {
   placeholder?: string;
   /** Whether the component is disabled */
   disabled?: boolean;
-  /** Element displayed at the start of the input */
+  /**
+   * Element displayed at the start of the input.
+   *
+   * OPTIONAL for an icon-bearing option list: when omitted, the SELECTED
+   * option's own `icon` is used, so the trigger and the list agree without the
+   * caller wiring it twice. Pass this to override (a static search glyph, say).
+   */
   startAdornment?: ReactNode;
   /** Whether to show clear button */
   showClearAll?: boolean;
@@ -207,6 +227,9 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
 
   // Single mode: the currently selected option
   const selectedOption = !multiple && selectedOptions.length > 0 ? selectedOptions[0] : null;
+  // A single-select trigger shows the selection's glyph unless the caller
+  // supplied its own adornment.
+  const resolvedStartAdornment = startAdornment ?? selectedOption?.icon ?? null;
 
   // Placeholder logic
   const inputPlaceholder = multiple ? (valueArray.length === 0 ? placeholder : 'Add More...') : placeholder;
@@ -462,16 +485,20 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
             }
           }}
         >
-          {/* Start Adornment */}
-          {startAdornment && (
+          {/* Start Adornment — the caller's, else the selected option's own icon. */}
+          {resolvedStartAdornment && (
             <span
               className={cn(
-                'flex-shrink-0 pl-3 text-ods-text-secondary transition-colors duration-200 [&_svg]:size-4 md:[&_svg]:size-6',
+                // Images are sized alongside svgs: an entity adornment is
+                // usually a flag or a crest, and an unconstrained <img> lays
+                // out at 0x0 inside this flex row.
+                'flex-shrink-0 pl-3 text-ods-text-secondary transition-colors duration-200',
+                '[&_img]:size-4 [&_img]:object-contain md:[&_img]:size-6 [&_svg]:size-4 md:[&_svg]:size-6',
                 isOpen && !isInvalid && 'text-ods-accent',
                 isInvalid && 'text-ods-error',
               )}
             >
-              {startAdornment}
+              {resolvedStartAdornment}
             </span>
           )}
 
@@ -657,8 +684,22 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
                         renderOption(option, isSelected)
                       ) : (
                         <div className="flex w-full min-w-0 items-center justify-between gap-[var(--spacing-system-xsf)]">
-                          {/* text-current: selection state colors the row (accent vs primary); inherit it. */}
-                          <TruncateText className="text-current">{option.label}</TruncateText>
+                          <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)]">
+                            {option.icon && (
+                              <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden [&_img]:size-full [&_img]:object-contain [&_svg]:size-full">
+                                {option.icon}
+                              </span>
+                            )}
+                            <div className="flex min-w-0 flex-1 flex-col">
+                              {/* text-current: selection state colors the row (accent vs primary); inherit it. */}
+                              <TruncateText className="text-current">{option.label}</TruncateText>
+                              {option.description && (
+                                <TruncateText tone="secondary" variant="h6">
+                                  {option.description}
+                                </TruncateText>
+                              )}
+                            </div>
+                          </div>
                           <div className="flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
                             {isSelected && <CheckIcon className="text-ods-accent" size={20} />}
                             {onDeleteOption && !isSelected && (
