@@ -195,6 +195,8 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * back to plain text title-only.
    */
   renderEntityCard?: (reference: ChatRef) => ReactNode;
+  /** Enriched references associated with this assistant answer. */
+  refs?: ChatRef[];
   /**
    * Host-provided anchor component for markdown links. When supplied, the
    * `<a>` override in the markdown renderer delegates to this component
@@ -304,6 +306,8 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  ChatMessageEnhanced; the host sends the received label as the user's next
    *  message. Omit to render ask cards read-only. */
   onAskSelect?: (label: string) => void;
+  /** Renders content owned by one message directly after that message. */
+  renderAfterMessage?: (message: Message, index: number) => ReactNode;
 }
 
 export interface ChatMessageListRef {

@@ -329,3 +329,133 @@ describe('decodeNatsChunk — seq envelope', () => {
     }).toMatchSnapshot();
   });
 });
+
+describe('decodeNatsChunk — Mingo source metadata', () => {
+  it.each(['GUIDE', 'SOURCES'] as const)('decodes %s payloads into safe sources and playable refs', type => {
+    expect(
+      decodeNatsChunk({
+        type,
+        streamSeq: 81,
+        payload: {
+          sources: [
+            {
+              index: 1,
+              name: 'Install agent',
+              path: 'docs/install.md',
+              documentType: 'markdown',
+              externalUrl: 'https://docs.example.test/install',
+            },
+            {
+              index: 2,
+              name: 'Unsafe source',
+              path: 'docs/unsafe.md',
+              documentType: 'markdown',
+              externalUrl: 'javascript:alert(1)',
+            },
+            {
+              index: 1,
+              name: 'Duplicate',
+              path: 'docs/duplicate.md',
+              documentType: 'markdown',
+            },
+            { index: 3, name: '', path: 'docs/empty.md', documentType: 'markdown' },
+          ],
+          videos: [
+            {
+              ref: '[card://video:MdFJNoJeqZQ]',
+              title: 'Install the agent',
+              url: 'https://www.youtube.com/watch?v=MdFJNoJeqZQ',
+              sourceRepo: 'embedded-videos',
+              metadata: { youtubeUrl: 'MdFJNoJeqZQ' },
+            },
+            {
+              ref: '[card://video:mux-9b6586b494]',
+              title: 'Community demo',
+              url: 'https://stream.mux.com/playback-id.m3u8',
+              metadata: { videoUrl: 'javascript:alert(1)' },
+            },
+            {
+              ref: '[card://video:mp4-1b2047dc1b]',
+              title: 'Product overview',
+              url: 'https://cdn.example.test/product-overview.mp4',
+              metadata: { videoUrl: 'https://cdn.example.test/product-overview.mp4' },
+            },
+            {
+              ref: '[card://video:MdFJNoJeqZQ]',
+              title: 'Duplicate video',
+              url: 'https://cdn.example.test/duplicate.mp4',
+            },
+          ],
+          cards: [
+            {
+              ref: '[card://markdown:install-agent]',
+              entityType: 'markdown',
+              entityId: 'install-agent',
+            },
+          ],
+        },
+      }),
+    ).toEqual({
+      type: 'sources',
+      seq: 81,
+      sources: [
+        {
+          index: 1,
+          name: 'Install agent',
+          path: 'docs/install.md',
+          documentType: 'markdown',
+          externalUrl: 'https://docs.example.test/install',
+        },
+        {
+          index: 2,
+          name: 'Unsafe source',
+          path: 'docs/unsafe.md',
+          documentType: 'markdown',
+        },
+      ],
+      refs: [
+        {
+          type: 'video',
+          id: 'MdFJNoJeqZQ',
+          title: 'Install the agent',
+          url: 'https://www.youtube.com/watch?v=MdFJNoJeqZQ',
+          sourceRepo: 'embedded-videos',
+          metadata: { youtubeUrl: 'MdFJNoJeqZQ' },
+        },
+        {
+          type: 'video',
+          id: 'mux-9b6586b494',
+          title: 'Community demo',
+          url: 'https://stream.mux.com/playback-id.m3u8',
+          metadata: { videoUrl: 'https://stream.mux.com/playback-id.m3u8' },
+        },
+        {
+          type: 'video',
+          id: 'mp4-1b2047dc1b',
+          title: 'Product overview',
+          url: 'https://cdn.example.test/product-overview.mp4',
+          metadata: { videoUrl: 'https://cdn.example.test/product-overview.mp4' },
+        },
+        {
+          type: 'markdown',
+          id: 'install-agent',
+          title: 'install-agent',
+          url: null,
+        },
+      ],
+    });
+  });
+
+  it('drops a metadata payload with no valid sources or refs', () => {
+    expect(
+      decodeNatsChunk({
+        type: 'SOURCES',
+        payload: {
+          sources: [{ index: 0, name: 'Invalid', path: '', documentType: '' }],
+          videos: [{ ref: 'https://example.test/video' }],
+          cards: [{ ref: '[CARD://blog:wrong-case]' }],
+        },
+      }),
+    ).toBeNull();
+  });
+});

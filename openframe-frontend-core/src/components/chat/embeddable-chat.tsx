@@ -808,13 +808,14 @@ function SourceChips({
   const [expanded, setExpanded] = useState(false);
 
   if (cited.length === 0) {
-    const fallback = uncited.slice(0, FALLBACK_TOP_RETRIEVED);
-    if (fallback.length === 0) return null;
+    const visible = expanded ? uncited : uncited.slice(0, FALLBACK_TOP_RETRIEVED);
+    const hiddenCount = Math.max(0, uncited.length - FALLBACK_TOP_RETRIEVED);
+    if (visible.length === 0) return null;
     return (
       <div className="mt-2 flex flex-col gap-1.5 border-t border-ods-border pt-2">
         <span className="uppercase text-ods-text-muted text-h6">Top retrieved sources</span>
-        <div className="flex flex-wrap gap-1.5">
-          {fallback.map(src => (
+        <div className={`flex flex-wrap gap-1.5 ${expanded ? 'max-h-[200px] overflow-y-auto overscroll-contain' : ''}`}>
+          {visible.map(src => (
             <SourceChip
               key={src.index}
               src={src}
@@ -824,6 +825,16 @@ function SourceChips({
               onDiscuss={onDiscuss}
             />
           ))}
+          {hiddenCount > 0 && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="inline-flex cursor-pointer items-center gap-1 rounded border border-ods-accent bg-ods-card px-2 py-0.5 text-ods-accent transition-colors text-h6 hover:bg-ods-accent/10"
+              aria-expanded={expanded}
+              aria-label={expanded ? 'Show fewer sources' : `Show ${hiddenCount} additional retrieved sources`}
+            >
+              {expanded ? 'Show less' : `+${hiddenCount} more retrieved ${hiddenCount === 1 ? 'source' : 'sources'}`}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -1579,6 +1590,10 @@ function EmbeddableChatInner({
         // explicitly — see `Message.hidden` and `chat-message-list`'s skip.
         ...(m.hidden ? { hidden: true } : {}),
         ...(m.scrollAnchor ? { scrollAnchor: m.scrollAnchor } : {}),
+        // Preserve same-turn rich metadata. Source chips and entity-card
+        // renderers consume it after this raw-to-Message projection.
+        ...(m.sources && m.sources.length > 0 ? { sources: m.sources } : {}),
+        ...(m.refs && m.refs.length > 0 ? { refs: m.refs } : {}),
         // Forward attached context items so the user bubble renders its chips.
         ...(m.contextItems && m.contextItems.length > 0 ? { contextItems: m.contextItems } : {}),
       };
@@ -1829,24 +1844,41 @@ function EmbeddableChatInner({
     return out;
   }, [commandsById, enabledSet]);
 
-  // Find sources for the last assistant message; split into cited / uncited.
-  const lastAssistantMsg = [...rawMessages].reverse().find(m => m.role === 'assistant');
-  const lastSources = useMemo(() => {
-    if (chatLoading) return undefined;
-    const sources = lastAssistantMsg?.sources;
-    if (!sources || sources.length === 0) return undefined;
-    const content = lastAssistantMsg?.content || '';
-    const citationOrder = [...content.matchAll(/\[(\d+)\]/g)].map(m => parseInt(m[1], 10));
-    const seenOrder = new Map<number, number>();
-    citationOrder.forEach(idx => {
-      if (!seenOrder.has(idx)) seenOrder.set(idx, seenOrder.size);
-    });
-    const cited = sources
-      .filter(s => seenOrder.has(s.index))
-      .sort((a, b) => (seenOrder.get(a.index) ?? 0) - (seenOrder.get(b.index) ?? 0));
-    const uncited = sources.filter(s => !seenOrder.has(s.index));
-    return { cited, uncited };
-  }, [lastAssistantMsg, chatLoading]);
+  const renderSourcesAfterMessage = useCallback(
+    (message: Message, index: number) => {
+      if (message.role !== 'assistant' || !message.sources?.length) return null;
+      if (chatLoading && index === messages.length - 1) return null;
+      const content =
+        typeof message.content === 'string'
+          ? message.content
+          : message.content
+              .filter(segment => segment.type === 'text')
+              .map(segment => segment.text)
+              .join('\n');
+      const citationOrder = [...content.matchAll(/\[(\d+)\]/g)].map(m => parseInt(m[1], 10));
+      const seenOrder = new Map<number, number>();
+      citationOrder.forEach(idx => {
+        if (!seenOrder.has(idx)) seenOrder.set(idx, seenOrder.size);
+      });
+      const cited = message.sources
+        .filter(s => seenOrder.has(s.index))
+        .sort((a, b) => (seenOrder.get(a.index) ?? 0) - (seenOrder.get(b.index) ?? 0));
+      const uncited = message.sources.filter(s => !seenOrder.has(s.index));
+      return (
+        <div className="flex-shrink-0 pb-2">
+          <SourceChips
+            cited={cited}
+            uncited={uncited}
+            baseRoute={resolvedBaseRoute}
+            chipBasePlatform={chipBasePlatform}
+            onClose={handleNavigationClose}
+            onDiscuss={discussRef}
+          />
+        </div>
+      );
+    },
+    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, handleNavigationClose, discussRef],
+  );
 
   // Host node for in-panel Radix portals (see the body wrapper below).
   const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
@@ -2390,6 +2422,7 @@ function EmbeddableChatInner({
                                   resolveContextIcon={resolveContextIcon}
                                   renderContextItem={renderContextItem}
                                   renderMention={renderMention}
+                                  renderAfterMessage={renderSourcesAfterMessage}
                                   // Gated on `chatLoading` for the same reason the composer
                                   // is: no second send while a turn is in flight. Passive
                                   // demo hosts (previewMode) stay read-only.
@@ -2427,20 +2460,6 @@ function EmbeddableChatInner({
                                   onLoadMore={loadMoreMessages}
                                 />
                               )}
-                              {lastSources &&
-                                (lastSources.cited.length > 0 || lastSources.uncited.length > 0) &&
-                                !chatLoading && (
-                                  <div className="flex-shrink-0 pb-2">
-                                    <SourceChips
-                                      cited={lastSources.cited}
-                                      uncited={lastSources.uncited}
-                                      baseRoute={resolvedBaseRoute}
-                                      chipBasePlatform={chipBasePlatform}
-                                      onClose={handleNavigationClose}
-                                      onDiscuss={discussRef}
-                                    />
-                                  </div>
-                                )}
                             </div>
                           ) : activeMode === 'mingo' ? (
                             /* Figma node 7532:222444 — default (Mingo-mode) empty state:

@@ -30,6 +30,7 @@
  */
 
 import React, { type ReactNode } from 'react';
+import { isSourceMetadataCardRef } from '../../../chat-protocol/source-metadata';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
@@ -41,6 +42,7 @@ import {
   formatTimeWithTimezone,
   formatDurationFromRange,
 } from '../../../utils/format';
+import { extractYouTubeId } from '../../features/video';
 import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
@@ -422,6 +424,15 @@ function hubspotStatusToVariant(status: string | undefined): MingoInfoCardStatus
  * which renders the marker as plain text (same anti-hallucination
  * posture as every other card type).
  */
+function validatedHttpsUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try {
+    return new URL(value).protocol === 'https:' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function decodeVideoMarkerId(id: string): { videoUrl?: string; youtubeUrl?: string } | null {
   // Prefix checks FIRST: an id like `mux-1234567` (11 chars) would also
   // satisfy the bare-YouTube-id pattern below.
@@ -439,14 +450,37 @@ function decodeVideoMarkerId(id: string): { videoUrl?: string; youtubeUrl?: stri
       const url = atob(b64);
       // https-only — the id is model-emitted text; never let a marker
       // smuggle a non-https src into a player.
-      if (!/^https:\/\//.test(url)) return null;
-      return { videoUrl: url };
+      const safeUrl = validatedHttpsUrl(url);
+      return safeUrl ? { videoUrl: safeUrl } : null;
     } catch {
       return null;
     }
   }
   if (/^[A-Za-z0-9_-]{11}$/.test(id)) return { youtubeUrl: id };
   return null;
+}
+
+function validatedVideoMetadata(chatRef: ChatRef): Record<string, unknown> | null {
+  const input = chatRef.metadata ?? {};
+  const metadata: Record<string, unknown> = {};
+  for (const key of ['videoUrl', 'highlightVideoUrl', 'videoPoster', 'highlightVideoPoster'] as const) {
+    const url = validatedHttpsUrl(input[key]);
+    if (url) metadata[key] = url;
+  }
+  const youtubeUrl = input.youtubeUrl;
+  if (typeof youtubeUrl === 'string' && /^[A-Za-z0-9_-]{11}$/.test(youtubeUrl)) {
+    metadata.youtubeUrl = youtubeUrl;
+  }
+
+  const safeUrl = validatedHttpsUrl(chatRef.url);
+  if (safeUrl) {
+    const youtubeId = extractYouTubeId(safeUrl);
+    delete metadata.videoUrl;
+    delete metadata.youtubeUrl;
+    metadata[youtubeId ? 'youtubeUrl' : 'videoUrl'] = youtubeId ?? safeUrl;
+  }
+
+  return Object.keys(metadata).length > 0 ? metadata : null;
 }
 
 /** Read hero-video metadata off a FETCHED item — the API-driven
@@ -1228,6 +1262,10 @@ interface ChatCardRegistryEntry {
    *  point — a host that re-homes a type must be able to say so even when
    *  the row already carries the content host's own url. */
   noComposedHref?: boolean;
+  /** Render a document card from same-turn SOURCES metadata when its optional
+   *  hydration endpoint has no row. Only doc refs opt in: their source record
+   *  already carries the complete title/path/navigation fallback. */
+  renderFromSourceMetadata?: boolean;
 }
 
 /**
@@ -1250,6 +1288,7 @@ function refHydratedEntry(
   docType: string,
   label: string,
   renderRef: (displayRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode,
+  renderFromSourceMetadata = false,
 ): ChatCardRegistryEntry {
   return {
     label,
@@ -1259,6 +1298,19 @@ function refHydratedEntry(
     fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
     skeleton: () => <MingoInfoCardSkeleton />,
     render: (item, chatRef, opts) => renderRef(fetchedItemDisplayRef(item, chatRef), opts),
+    renderFromSourceMetadata,
+  };
+}
+
+function sourceMetadataCardItem(chatRef: ChatRef): ChatCardItem {
+  return {
+    type: chatRef.type,
+    id: chatRef.id,
+    title: chatRef.title,
+    url: chatRef.url,
+    targetPlatform: chatRef.targetPlatform,
+    sourceRepo: chatRef.sourceRepo,
+    metadata: chatRef.metadata,
   };
 }
 
@@ -1454,12 +1506,18 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   hubspot_ticket_self: refHydratedEntry('hubspot_ticket_self', 'HubSpot ticket (self)', (displayRef, opts) => (
     <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
   )),
-  data_room_doc: refHydratedEntry('data_room_doc', 'Data-room doc', (displayRef, opts) => (
-    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
-  )),
-  markdown: refHydratedEntry('markdown', 'Doc page (markdown)', (displayRef, opts) => (
-    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
-  )),
+  data_room_doc: refHydratedEntry(
+    'data_room_doc',
+    'Data-room doc',
+    (displayRef, opts) => <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />,
+    true,
+  ),
+  markdown: refHydratedEntry(
+    'markdown',
+    'Doc page (markdown)',
+    (displayRef, opts) => <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />,
+    true,
+  ),
   // Body-synthesized video ids (`shortVideoId` content hashes / YouTube
   // ids) have no backing table row to fetch — ref-only by nature.
   video: {
@@ -1902,6 +1960,13 @@ export function ChatCardLoader({
   }
   if (isLoading) return <>{fetchEntry.skeleton?.() ?? null}</>;
   if (!item) {
+    const hasSourceMetadata =
+      fetchEntry.renderFromSourceMetadata &&
+      isSourceMetadataCardRef(chatRef) &&
+      typeof finalChatRef.metadata?.path === 'string';
+    if (hasSourceMetadata) {
+      return finish(fetchEntry.render(sourceMetadataCardItem(finalChatRef), finalChatRef, renderOpts));
+    }
     // FAIL LOUD (explicit product decision 2026-08-13): a card that
     // cannot hydrate renders a VISIBLE error card — silent removal made
     // broken answers look fine. Three distinguishable states:
@@ -1983,24 +2048,28 @@ export function renderChatInlineEntityCard(
     />
   );
 
-  // Embedded videos are SELF-DESCRIBING: the marker id alone recovers the
-  // playable URL (`decodeVideoMarkerId`), so the player renders on ANY
-  // transport with zero refs/fetch. Undecodable ids (legacy sha1 hashes,
-  // hallucinations) fall through to the loader → plain-text degrade.
+  // SOURCES metadata may enrich an opaque video marker with its playable URL.
+  // Self-describing marker ids remain transport-independent through
+  // `decodeVideoMarkerId`; undecodable ids without matching metadata fall
+  // through to the loader and degrade to plain text.
   // Hero videos on FETCHED entity types (webinars, releases, …) are
   // handled post-fetch inside ChatCardLoader (`itemVideoMetadata`) — the
-  // marker's ref plays no part in either path.
+  // marker metadata is not required for that post-fetch path.
   if (chatRef.type === 'video') {
+    const enrichedMetadata = validatedVideoMetadata(chatRef);
     const decoded = decodeVideoMarkerId(chatRef.id);
-    if (decoded) {
+    const playableMetadata = enrichedMetadata ?? decoded;
+    if (playableMetadata) {
       const displayRef: ChatRef = {
         ...chatRef,
         title: chatRef.title && chatRef.title !== chatRef.id ? chatRef.title : 'Video',
         url:
           chatRef.url ??
-          decoded.videoUrl ??
-          (decoded.youtubeUrl ? `https://www.youtube.com/watch?v=${decoded.youtubeUrl}` : null),
-        metadata: { ...(chatRef.metadata ?? {}), ...decoded },
+          (typeof playableMetadata.videoUrl === 'string' ? playableMetadata.videoUrl : null) ??
+          (typeof playableMetadata.youtubeUrl === 'string'
+            ? `https://www.youtube.com/watch?v=${playableMetadata.youtubeUrl}`
+            : null),
+        metadata: playableMetadata,
       };
       return (
         <BlockCard inline={<ChatInlineVideoPill chatRef={displayRef} />}>

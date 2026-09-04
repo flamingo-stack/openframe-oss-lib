@@ -17,12 +17,11 @@
  */
 
 import type { ChatRef } from '../chat-ref.types';
-import type { ChatSource } from '../hooks/use-sse-chat-adapter';
 import type { ChatAttachment } from '../utils/chat-attachment-markdown';
 import type { AuthorType } from './chat.types';
 import type { DialogItem } from './component.types';
 import type { ChatContextItem } from './context-item.types';
-import type { MessageSegment, ScrollAnchor } from './message.types';
+import type { ChatSource, MessageSegment, ScrollAnchor } from './message.types';
 
 // ─── Per-dialog token usage (Mingo backend telemetry) ────────────────────────
 
@@ -169,8 +168,10 @@ export interface UnifiedChatMessage {
    */
   timestamp?: Date | string | number;
 
-  /** Guide/SSE-only: document citations. Undefined in Mingo mode. */
+  /** Document citations for a Guide answer over SSE or NATS. */
   sources?: ChatSource[];
+
+  refs?: ChatRef[];
 
   /**
    * Per-message viewport-positioning hint. Common to both modes; the

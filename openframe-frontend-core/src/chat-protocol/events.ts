@@ -12,7 +12,8 @@
 // rows straight to the accumulator, so restating them here would be two
 // declarations of one wire contract. Type-only import from a React-free
 // module; `nats-decoder.ts` already depends on the same file for MESSAGE_TYPE.
-import type { AskOptionData } from '../components/chat/types/message.types';
+import type { ChatRef } from '../components/chat/chat-ref.types';
+import type { AskOptionData, ChatSource } from '../components/chat/types/message.types';
 // The wire-frame shapes these events carry through are defined ONCE in
 // `./frames.ts` — reuse them here rather than restating their fields.
 import type { ApprovalRequestField, DecisionResolvedFrame, UsageTelemetry } from './frames';
@@ -240,6 +241,12 @@ export interface ChatMetadataEvent extends ChatStreamEventBase {
   };
 }
 
+export interface SourcesEvent extends ChatStreamEventBase {
+  type: 'sources';
+  sources: ChatSource[];
+  refs?: ChatRef[];
+}
+
 /** SSE usage frames — raw wire keys (snake_case) preserved. */
 export interface UsageEvent extends ChatStreamEventBase {
   type: 'usage';
@@ -362,6 +369,7 @@ export type ChatStreamEvent =
   | TicketEscalatedEvent
   | TicketEventEvent
   | ChatMetadataEvent
+  | SourcesEvent
   | UsageEvent
   | TokenUsageEvent
   | CompactionEvent

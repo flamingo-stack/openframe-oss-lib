@@ -33,7 +33,8 @@ import {
 } from '../../../chat-protocol/events';
 // One normalizer for ask rows, shared with the live decoder — history and the
 // stream must agree on which options are usable.
-import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
+import { decodeNatsChunk, normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
+import type { ChatRef } from '../chat-ref.types';
 import { applyApprovalStatusToSegment } from '../stream/message-mutations';
 import {
   MESSAGE_TYPE,
@@ -46,8 +47,10 @@ import {
   type MessageProcessingOptions,
   type MessageData,
   type MessageOwner,
+  type ChatSource,
 } from '../types';
 import { approvalDisplaysInline } from './approval-display';
+import { mergeChatRefs, mergeChatSources } from './chat-source-metadata';
 import { type MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator';
 import { getCommandText } from './tool-call-helpers';
 
@@ -120,6 +123,10 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
         return { type: 'thinking-delta', text: data.text };
       }
       return null;
+
+    case MESSAGE_TYPE.GUIDE:
+    case MESSAGE_TYPE.SOURCES:
+      return decodeNatsChunk({ type: data.type, payload: data.payload });
 
     // Same completeness gate as the live decoder (`decodeNatsChunk`): a
     // persisted row without a question or without options is not a card the
@@ -596,6 +603,8 @@ export function processHistoricalMessages(
   // MAX persisted seq across the rows grouped into the current assistant turn
   // — carried onto the flushed message's streamSeq for per-role merge coverage.
   let currentAssistantStreamSeq: number | undefined;
+  let currentAssistantSources: ChatSource[] | undefined;
+  let currentAssistantRefs: ChatRef[] | undefined;
 
   /**
    * Flush the current assistant message to processedMessages.
@@ -613,6 +622,8 @@ export function processHistoricalMessages(
         authorType: assistantType,
         timestamp: currentAssistantTimestamp || new Date(),
         avatar: assistantAvatar,
+        ...(currentAssistantSources ? { sources: currentAssistantSources } : {}),
+        ...(currentAssistantRefs ? { refs: currentAssistantRefs } : {}),
         ...(currentAssistantStreamSeq !== undefined ? { streamSeq: currentAssistantStreamSeq } : {}),
       });
       accumulator.resetSegments();
@@ -628,6 +639,8 @@ export function processHistoricalMessages(
     currentAssistantTimestamp = null;
     lastAssistantId = null;
     currentAssistantStreamSeq = undefined;
+    currentAssistantSources = undefined;
+    currentAssistantRefs = undefined;
   };
 
   messages.forEach((msg, index) => {
@@ -694,6 +707,11 @@ export function processHistoricalMessages(
       messageDataArray.forEach(data => {
         const event = decodeHistoricalMessageData(data);
         if (!event) return;
+        if (event.type === 'sources') {
+          currentAssistantSources = mergeChatSources(currentAssistantSources, event.sources);
+          if (event.refs) currentAssistantRefs = mergeChatRefs(currentAssistantRefs, event.refs);
+          return;
+        }
         applyHistoryEvent(
           event,
           accumulator,

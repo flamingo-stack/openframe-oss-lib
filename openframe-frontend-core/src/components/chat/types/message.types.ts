@@ -3,6 +3,7 @@
  * Contains all message structures, segments, and content types
  */
 
+import type { ChatRef } from '../chat-ref.types';
 import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from './chat.types';
 
 // ========== Message Type Definitions ==========
@@ -10,6 +11,8 @@ import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from
 export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
   THINKING: 'THINKING',
+  GUIDE: 'GUIDE',
+  SOURCES: 'SOURCES',
   ASK: 'ASK',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
@@ -45,6 +48,26 @@ export type MessageType = (typeof MESSAGE_TYPE)[keyof typeof MESSAGE_TYPE];
 export const SCROLL_ANCHOR = { TOP: 'top', BOTTOM: 'bottom' } as const;
 
 export type ScrollAnchor = (typeof SCROLL_ANCHOR)[keyof typeof SCROLL_ANCHOR];
+
+export interface ChatSource {
+  index: number;
+  name: string;
+  path: string;
+  documentType: string;
+  externalUrl?: string;
+  targetPlatform?: string | null;
+  id?: string;
+  items?: Array<{
+    id: string;
+    documentType: string;
+    name: string;
+    externalUrl?: string;
+    targetPlatform?: string | null;
+    path?: string | null;
+  }>;
+  sourceRepo?: string;
+  label?: string;
+}
 
 // ========== Tool Execution Types ==========
 
@@ -391,6 +414,16 @@ export interface ThinkingMessageData extends MessageDataBase {
   text?: string;
 }
 
+export interface GuideMessageData extends MessageDataBase {
+  type: 'GUIDE';
+  payload?: Record<string, unknown>;
+}
+
+export interface SourcesMessageData extends MessageDataBase {
+  type: 'SOURCES';
+  payload?: Record<string, unknown>;
+}
+
 /** Persisted `ASK` row (GraphQL `AskData`). `text` is the intro sentence, which
  *  history replays as a text segment ahead of the card — same split the live
  *  `ASK` chunk carries. */
@@ -532,6 +565,8 @@ export interface ContextCompactionEndMessageData extends MessageDataBase {
 export type MessageData =
   | TextMessageData
   | ThinkingMessageData
+  | GuideMessageData
+  | SourcesMessageData
   | AskMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData
@@ -576,6 +611,8 @@ export interface ProcessedMessage {
   authorType?: AuthorType;
   timestamp: Date;
   avatar?: string;
+  sources?: ChatSource[];
+  refs?: ChatRef[];
   /** Persisted last-chunk stream sequence carried through from
    *  `HistoricalMessage.lastChunkStreamSeq` (for assistant turns: the MAX
    *  across the grouped rows). Hosts stamp it onto the rendered message's
@@ -598,6 +635,8 @@ export interface Message {
   authorType?: AuthorType;
   timestamp?: Date;
   avatar?: string | null;
+  sources?: ChatSource[];
+  refs?: ChatRef[];
   /** Highest CONTENT chunk streamSeq that composed this message. Stamped on
    *  realtime synthetics so `mergeHistoryWithRealtime` can decide history
    *  coverage per-message (see `MergeableChatMessage.streamSeq`). */

@@ -20,6 +20,7 @@
 import { render } from '@testing-library/react';
 import type React from 'react';
 import { describe, it, expect, vi } from 'vitest';
+import type { ChatRef } from '../chat-ref.types';
 import type { MessageSegment } from '../types';
 
 /** Every `componentOverrides` / `additionalRemarkPlugins` identity the
@@ -128,5 +129,90 @@ describe('ChatMessageEnhanced — override identity across a streamed turn', () 
     );
     expect(seenRefs).toEqual([{ type: 'blog', id: 'abc' }]);
     expect(view.container.textContent).toContain('card:abc');
+  });
+
+  it('enriches exact video markers with YouTube, hashed Mux, and hashed MP4 metadata', () => {
+    const seenRefs: Array<{ id: string; metadata?: Record<string, unknown> }> = [];
+    const refs: ChatRef[] = [
+      {
+        type: 'video',
+        id: 'MdFJNoJeqZQ',
+        title: 'Install the agent',
+        url: 'https://www.youtube.com/watch?v=MdFJNoJeqZQ',
+        metadata: { youtubeUrl: 'MdFJNoJeqZQ' },
+      },
+      {
+        type: 'video',
+        id: 'mux-9b6586b494',
+        title: 'Community demo',
+        url: 'https://stream.mux.com/playback-id.m3u8',
+        metadata: { videoUrl: 'https://stream.mux.com/playback-id.m3u8' },
+      },
+      {
+        type: 'video',
+        id: 'mp4-1b2047dc1b',
+        title: 'Product overview',
+        url: 'https://cdn.example.test/product-overview.mp4',
+        metadata: { videoUrl: 'https://cdn.example.test/product-overview.mp4' },
+      },
+    ];
+
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        content={[
+          {
+            type: 'text',
+            text: 'Watch [card://video:MdFJNoJeqZQ] [card://video:mux-9b6586b494] [card://video:mp4-1b2047dc1b].',
+          },
+        ]}
+        refs={refs}
+        renderEntityCard={ref => {
+          seenRefs.push({ id: ref.id, metadata: ref.metadata });
+          return <div data-testid={`card-${ref.id}`}>{ref.title}</div>;
+        }}
+        NavLinkAnchor={NavLinkAnchor}
+      />,
+    );
+
+    expect(seenRefs).toEqual([
+      { id: 'MdFJNoJeqZQ', metadata: { youtubeUrl: 'MdFJNoJeqZQ' } },
+      { id: 'mux-9b6586b494', metadata: { videoUrl: 'https://stream.mux.com/playback-id.m3u8' } },
+      { id: 'mp4-1b2047dc1b', metadata: { videoUrl: 'https://cdn.example.test/product-overview.mp4' } },
+    ]);
+  });
+
+  it('rerenders a completed marker when its enriched metadata arrives later', () => {
+    const seenMetadata: Array<Record<string, unknown> | undefined> = [];
+    const content: MessageSegment[] = [{ type: 'text', text: 'Watch [card://video:mux-9b6586b494].' }];
+    const props = {
+      role: 'assistant' as const,
+      content,
+      renderEntityCard: (ref: ChatRef) => {
+        seenMetadata.push(ref.metadata);
+        return <div>video</div>;
+      },
+      NavLinkAnchor,
+    };
+    const view = render(<ChatMessageEnhanced {...props} />);
+
+    view.rerender(
+      <ChatMessageEnhanced
+        {...props}
+        refs={[
+          {
+            type: 'video',
+            id: 'mux-9b6586b494',
+            title: 'Community demo',
+            url: 'https://stream.mux.com/playback-id.m3u8',
+            metadata: { videoUrl: 'https://stream.mux.com/playback-id.m3u8' },
+          },
+        ]}
+      />,
+    );
+
+    expect(seenMetadata[seenMetadata.length - 1]).toEqual({
+      videoUrl: 'https://stream.mux.com/playback-id.m3u8',
+    });
   });
 });

@@ -127,7 +127,10 @@ jobs:
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm install
+        # npm 10.8.2 can crash in Arborist while resolving this package's
+        # optional peer graph (`edgesOut`). All runtime peers are explicit
+        # dev dependencies here, so legacy peer resolution is safe for CI.
+        run: npm install --legacy-peer-deps
 
       # Config smoke first: it is ~1s and a broken eslint config makes every
       # lint result below meaningless rather than failing honestly.
@@ -234,7 +237,7 @@ jobs:
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Lint (import cycles)
         if: steps.should_run.outputs.run == 'true'

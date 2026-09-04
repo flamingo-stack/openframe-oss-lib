@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Fragment,
   useRef,
   useState,
   useCallback,
@@ -138,6 +139,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       renderContextItem,
       renderMention,
       onAskSelect,
+      renderAfterMessage,
       NavLinkAnchor,
       ...props
     },
@@ -986,28 +988,31 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     (!Array.isArray(message.content) || message.content.every(s => s.type === 'text'));
                   if (isEmptyPendingTurn) return null;
                   return (
-                    <ChatMessageEnhanced
-                      key={message.id}
-                      ref={getRegisterMessageEl(message.id)}
-                      role={message.role}
-                      name={message.name}
-                      content={message.content}
-                      timestamp={message.timestamp}
-                      isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
-                      avatar={showAvatars ? message.avatar : null}
-                      showAvatar={showAvatars}
-                      assistantType={message.assistantType || assistantType}
-                      approvalVariant={approvalVariant}
-                      authorType={message.authorType}
-                      assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
-                      contextItems={message.contextItems}
-                      resolveContextIcon={resolveContextIcon}
-                      renderContextItem={renderContextItem}
-                      renderMention={renderMention}
-                      renderEntityCard={renderEntityCard}
-                      onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}
-                      NavLinkAnchor={NavLinkAnchor}
-                    />
+                    <Fragment key={message.id}>
+                      <ChatMessageEnhanced
+                        ref={getRegisterMessageEl(message.id)}
+                        role={message.role}
+                        name={message.name}
+                        content={message.content}
+                        timestamp={message.timestamp}
+                        isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
+                        avatar={showAvatars ? message.avatar : null}
+                        showAvatar={showAvatars}
+                        assistantType={message.assistantType || assistantType}
+                        approvalVariant={approvalVariant}
+                        authorType={message.authorType}
+                        assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
+                        contextItems={message.contextItems}
+                        resolveContextIcon={resolveContextIcon}
+                        renderContextItem={renderContextItem}
+                        renderMention={renderMention}
+                        renderEntityCard={renderEntityCard}
+                        refs={message.refs}
+                        onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}
+                        NavLinkAnchor={NavLinkAnchor}
+                      />
+                      {renderAfterMessage?.(message, index)}
+                    </Fragment>
                   );
                 })}
               </div>

@@ -146,6 +146,76 @@ describe('ChatMessageList force-scroll decisions', () => {
   });
 });
 
+describe('ChatMessageList message footers', () => {
+  const renderSourceFooter = (message: Message) =>
+    message.sources?.map(source => <span key={`${message.id}-${source.index}`}>{source.name}</span>);
+
+  it('keeps a sourced assistant footer after a later plain assistant message', () => {
+    const sourcedAssistant: Message = {
+      ...msg('a1', 'assistant'),
+      sources: [
+        {
+          index: 1,
+          name: 'Windows installation guide',
+          path: '/docs/windows',
+          documentType: 'openframe-docs',
+        },
+      ],
+    };
+    const plainAssistant = msg('a2', 'assistant');
+
+    render(
+      <ChatMessageList
+        dialogId="d1"
+        messages={[sourcedAssistant, plainAssistant]}
+        renderAfterMessage={renderSourceFooter}
+      />,
+    );
+
+    const sourceFooter = screen.getByText('Windows installation guide');
+    expect(sourceFooter).toBeInTheDocument();
+    expect(screen.getByText('body of a1')).toAppearBefore(sourceFooter);
+  });
+
+  it('renders separate source names when citation indices restart on each turn', () => {
+    const firstAssistant: Message = {
+      ...msg('a1', 'assistant'),
+      sources: [
+        {
+          index: 1,
+          name: 'First turn source',
+          path: '/docs/first',
+          documentType: 'openframe-docs',
+        },
+      ],
+    };
+    const secondAssistant: Message = {
+      ...msg('a2', 'assistant'),
+      sources: [
+        {
+          index: 1,
+          name: 'Second turn source',
+          path: '/docs/second',
+          documentType: 'openframe-docs',
+        },
+      ],
+    };
+
+    render(
+      <ChatMessageList
+        dialogId="d1"
+        messages={[firstAssistant, secondAssistant]}
+        renderAfterMessage={renderSourceFooter}
+      />,
+    );
+
+    const firstSourceFooter = screen.getByText('First turn source');
+    const secondSourceFooter = screen.getByText('Second turn source');
+    expect(screen.getByText('body of a1')).toAppearBefore(firstSourceFooter);
+    expect(screen.getByText('body of a2')).toAppearBefore(secondSourceFooter);
+  });
+});
+
 // The library's own `isAtBottom` lock is lost silently when the scroller's
 // box changes (source chips mounting below it) or when a card settling out
 // of its skeleton produces a resize-driven scroll the library reads as a
