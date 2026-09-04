@@ -117,15 +117,36 @@ function isSummaryData(value: unknown): value is TicketUnreadSummary {
   );
 }
 
-export function TicketLiveProvider({ children }: { children: React.ReactNode }) {
+export interface TicketLiveProviderProps {
+  children: React.ReactNode;
+  /**
+   * Whether ticket realtime is available to this host at all (feature flag,
+   * session, entitlement). `false` provides NO context — `useOptionalTicketLive()`
+   * reads `null`, `useTicketLive()` throws, and no identity or stream request is
+   * made: byte-for-byte what a host got by not mounting this at all.
+   *
+   * It exists so a host never has to mount this CONDITIONALLY. A host that writes
+   * `enabled ? <TicketLiveProvider>{children}</TicketLiveProvider> : <>{children}</>`
+   * changes the element TYPE at that position the moment its flag answers, and React
+   * tears down and remounts everything below. In openframe-frontend that wrapper sat
+   * around the whole `AppLayout`, so every cold load remounted the app shell and the
+   * page under it — visibly, as a chat drawer opened by a deep link replaying its
+   * open animation. Mount it always and pass the answer here instead.
+   */
+  enabled?: boolean;
+}
+
+export function TicketLiveProvider({ children, enabled = true }: TicketLiveProviderProps) {
   const runtime = useChatRuntime();
-  const identity = useChatIdentity();
+  const identity = useChatIdentity(enabled);
   const queryClient = useQueryClient();
 
   const streamUrl = runtime?.endpoints.ticketStreamUrl ?? TICKET_STREAM_ENDPOINT;
   const readUrl = runtime?.endpoints.ticketReadUrl ?? TICKET_READ_ENDPOINT;
 
-  const authed = identity.authTier !== 'anon' && !!identity.user?.email;
+  // Gates the stream below (via `streamEnabled`) as well as every surface that
+  // reads `authed` — one predicate, so a disabled provider is also a silent one.
+  const authed = enabled && identity.authTier !== 'anon' && !!identity.user?.email;
 
   const [connected, setConnected] = React.useState(false);
   // The SINGLE unread source — written ONLY from server-computed
@@ -400,5 +421,5 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
     };
   }, [summary, authed, connected, openTicketIdState, markRead, setOpenTicketId, notifyTicketCreated]);
 
-  return <TicketLiveContext.Provider value={value}>{children}</TicketLiveContext.Provider>;
+  return <TicketLiveContext.Provider value={enabled ? value : null}>{children}</TicketLiveContext.Provider>;
 }
