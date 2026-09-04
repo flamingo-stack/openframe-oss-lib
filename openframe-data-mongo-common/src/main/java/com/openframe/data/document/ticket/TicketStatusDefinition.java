@@ -28,6 +28,7 @@ public class TicketStatusDefinition implements TenantScoped {
     private String name;
     private String color;
     private String position;
+    private Integer staleAfterMinutes;
     @CreatedDate
     private Instant createdAt;
     @LastModifiedDate

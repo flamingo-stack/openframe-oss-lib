@@ -12,7 +12,16 @@ export type PlatformName =
   | 'revenue-hub'
   | 'people-hub'
   | 'openframe'
-  | 'company-hub';
+  | 'company-hub'
+  | 'mlg';
+
+/**
+ * Every platform that is a deployable app type (i.e. a `NEXT_PUBLIC_APP_TYPE` value).
+ * `universal` is a content scope, never a deployment, so it is excluded.
+ * THE owner of this alias: the hub's `AppConfig` map and the platform-access seed
+ * script both key on it, so a new platform fails their builds until it is wired.
+ */
+export type PlatformAppType = Exclude<PlatformName, 'universal'>;
 
 // Database Platform Model (from platforms table)
 export interface PlatformRecord {

@@ -485,6 +485,21 @@
   --ods-accent: var(--ods-flamingo-pink-base);
 }
 
+[data-app-type='mlg'] {
+  --color-accent-primary: var(--ods-flamingo-pink-base);
+  --color-accent-hover: var(--ods-flamingo-pink-hover);
+  --color-accent-active: var(--ods-flamingo-pink-action);
+  --color-accent-focus: var(--ods-flamingo-pink-base);
+  --color-focus-ring: var(--ods-flamingo-pink-base);
+  --color-focus-visible: var(--ods-flamingo-pink-base);
+  /* Links take the CYAN secondary (the leaderboard's team/profile links read as
+   * navigation, not as the brand's primary action). */
+  --color-link: var(--ods-flamingo-cyan-base);
+  --color-link-hover: var(--ods-flamingo-cyan-hover);
+  --ods-current: var(--ods-flamingo-pink-base);
+  --ods-accent: var(--ods-flamingo-pink-base);
+}
+
 [data-app-type='marketing-hub'] {
   --color-accent-primary: var(--ods-flamingo-pink-base);
   --color-accent-hover: var(--ods-flamingo-pink-hover);

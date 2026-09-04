@@ -5,7 +5,8 @@
  * Example: { filter: { severity: [...] } } → URL params: ?severity=...
  */
 
-import type { VariableDefinition, JSType } from './graphql-parser';
+import type { JSType } from '../../utils/search-params';
+import type { VariableDefinition } from './graphql-parser';
 import type { GraphQLIntrospector } from './introspection';
 
 /**
@@ -174,38 +175,6 @@ export function getRequiredParams(schema: Record<string, FlattenedParam>): strin
     .map(([key]) => key);
 }
 
-/**
- * Check if a parameter should be included in URL
- *
- * Excludes:
- * - null/undefined values
- * - Empty arrays
- * - Default values (to keep URLs clean)
- *
- * @param value - Parameter value
- * @param param - Parameter configuration
- * @returns Whether to include in URL
- */
-export function shouldIncludeInUrl(value: unknown, param: FlattenedParam): boolean {
-  // Null/undefined - exclude
-  if (value === null || value === undefined) {
-    return false;
-  }
-
-  // Empty arrays - exclude
-  if (Array.isArray(value) && value.length === 0) {
-    return false;
-  }
-
-  // Empty strings - exclude
-  if (value === '') {
-    return false;
-  }
-
-  // Default values - exclude to keep URL clean
-  if (param.defaultValue !== undefined && value === param.defaultValue) {
-    return false;
-  }
-
-  return true;
-}
+// THE omission rule lives in the search-params leaf (the server serializer and
+// this flattened-schema path must agree); re-exported for existing importers.
+export { shouldIncludeInUrl } from '../../utils/search-params';

@@ -3,7 +3,7 @@
 import type { MouseEvent, ReactNode } from 'react';
 import Image from '../../embed-shims/next-image';
 import { cn } from '../../utils/cn';
-import { getFirstLastInitials } from '../../utils/format';
+import { personInitials } from '../../utils/format';
 import { Ellipsis01Icon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../ui/actions-menu';
 import { tagVariants, type TagProps } from '../ui/tag';
@@ -94,7 +94,7 @@ function CardMedia({ imageSrc, imageAlt, icon }: Pick<MingoInfoCardProps, 'image
             clipping a separate absolutely-positioned child). On a 404 the
             image's `onError` hides it and the initials show through. */}
         <span className="absolute inset-0 flex items-center justify-center rounded-sm border border-ods-border bg-ods-bg text-ods-text-primary text-h6">
-          {getFirstLastInitials(imageAlt) || '?'}
+          {personInitials(imageAlt) || '?'}
         </span>
         <Image
           src={imageSrc}

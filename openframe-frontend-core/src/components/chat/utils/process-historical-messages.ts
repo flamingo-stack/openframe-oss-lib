@@ -315,6 +315,7 @@ function applyHistoryEvent(
   escalatedApprovals?: EscalatedApprovals,
   offerResolutions?: OfferResolutions,
   rowCreatedAt?: Date,
+  rowStreamSeq?: number,
 ): void {
   // batchApprovalsEnabled is owned by the consumer (oss-tenant chat client /
   // openframe-frontend tickets). Defaults to ON so consumers that haven't
@@ -342,12 +343,16 @@ function applyHistoryEvent(
       });
       break;
 
-    // Seq-less on purpose: the persisted row's sequence lives on the message
-    // (`lastChunkStreamSeq`), not in `messageData`. A live redelivery of the
-    // same event matches this segment by payload equality (see
-    // `addTicketEvent`).
+    // `rowStreamSeq` re-stamps the event's JetStream sequence (the persisted
+    // row's `lastChunkStreamSeq` - `messageData` itself does not carry it).
+    // The store's `ticket-event:<seq>` upsert key is the ONLY join between
+    // this hydrated segment and a catch-up/stale-consumer replay of the same
+    // chunk; a seq-less segment never joins, so the replayed copy rendered as
+    // a second identical card (the resolve/reopen duplication). The payload
+    // fallback in `addTicketEvent` cannot own that case: a COMPLETE hydrated
+    // tail seeds no accumulator, so the twins only ever meet in the store.
     case 'ticket-event':
-      // `rowCreatedAt` is the persisted row's own time — without it the card
+      // `rowCreatedAt` is the persisted row's own time - without it the card
       // renders the enclosing assistant bubble's timestamp, i.e. the FIRST
       // row of the turn, and every lifecycle card reads the same stale time.
       accumulator.addTicketEvent(
@@ -359,7 +364,7 @@ function applyHistoryEvent(
           reason: event.reason,
           targetStatusKind: event.targetStatusKind,
         },
-        undefined,
+        rowStreamSeq,
         rowCreatedAt,
       );
       break;
@@ -697,6 +702,13 @@ export function processHistoricalMessages(
           escalatedApprovals,
           offerResolutions,
           new Date(msg.createdAt),
+          // TICKET_EVENT chunks are standalone, one per row, so the row seq IS
+          // the event seq - but vouch for that only when the row holds exactly
+          // one entry: a bundled row's `lastChunkStreamSeq` belongs to its LAST
+          // chunk and could stamp the wrong event.
+          messageDataArray.length === 1 && typeof msg.lastChunkStreamSeq === 'number'
+            ? msg.lastChunkStreamSeq
+            : undefined,
         );
       });
 
