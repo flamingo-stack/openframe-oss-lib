@@ -161,13 +161,11 @@ function coerceScalar(raw: string | undefined, config: ParamConfig): unknown {
   switch (config.type) {
     case 'int': {
       const int = config as IntParamConfig;
-      // A declared default is the fallback; without one an unparseable value is absent.
-      if (int.default === undefined) {
-        const n = Math.trunc(Number(raw));
-        if (!Number.isFinite(n) || n < (int.min ?? 1)) return undefined;
-        return int.max == null ? n : Math.min(n, int.max);
-      }
-      return positiveInt(raw, int.default, { min: int.min, max: int.max });
+      // ONE integer grammar, default or not. Without a declared default the
+      // fallback is `undefined` (an unparseable value is absent), which
+      // `positiveInt` returns untouched — the branch used to open-code the
+      // truncation, the min floor and the max clamp a second time.
+      return positiveInt<undefined>(raw, int.default as undefined, { min: int.min, max: int.max });
     }
     case 'number': {
       const n = Number(raw);
@@ -242,7 +240,10 @@ export function createSearchParams(
 ): URLSearchParams {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value === null || value === undefined || value === '') continue;
+    // The emptiness half of the omission rule has ONE owner. (No config here:
+    // callers that must also drop schema DEFAULTS filter through
+    // `shouldIncludeInUrl` with the config first — see `serializeSchemaParams`.)
+    if (!shouldIncludeInUrl(value, undefined)) continue;
     if (Array.isArray(value)) {
       // Empty ELEMENTS are dropped, and an array that filters to nothing is
       // absent (a cleared multi-select must not leave `?tags=` behind).
