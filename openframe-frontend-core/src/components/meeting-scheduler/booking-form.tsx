@@ -4,11 +4,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode, Ref } from 'react';
 import { useForm, Controller } from 'react-hook-form';
+import type { Control, UseFormRegister } from 'react-hook-form';
 import {
+  BUILT_IN_BOOKING_FIELDS,
   makeDeferredBookingSchema,
   isSupportedFormField,
+  type BuiltInBookingField,
   type MeetingAvailability,
-  type MeetingFormField,
+  type SupportedFormFieldType,
+  type SupportedMeetingFormField,
   type BookingFormValues,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
@@ -88,6 +92,126 @@ const evenSpan = (count: number): 1 | 2 | 3 | 4 =>
  * submit; the parent calls `resetSignals()` after a SLOT_TAKEN refetch so a
  * legitimate retry isn't flagged too-fast.
  */
+
+/** What one control needs: the field, its DOM id, where it registers in the
+ *  form, and the form's own register/control. */
+interface ControlArgs {
+  field: SupportedMeetingFormField & Partial<Pick<BuiltInBookingField, 'inputType' | 'autoComplete' | 'placeholder'>>;
+  id: string;
+  /** Top-level for the built-ins (`email`), `formFields.<name>` for declared questions. */
+  registerName: string;
+  register: UseFormRegister<BookingFormValues>;
+  control: Control<BookingFormValues>;
+}
+
+// Field chrome mirrors ContactForm 1:1 (`contact/contact-form.tsx`) — the
+// booking form must be indistinguishable from every other form in the app.
+const INPUT_CLASS =
+  'bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-11 md:h-12';
+const TEXTAREA_CLASS = 'border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary';
+
+/** Placeholder derived from the field itself (the mock's "Enter Company Name",
+ *  "Enter Text (optional)"), so declared questions get one without any copy
+ *  living here; the built-ins carry their own. */
+const placeholderFor = (field: ControlArgs['field']): string | undefined =>
+  field.placeholder ??
+  (field.type === 'text'
+    ? `Enter ${field.label}`
+    : field.type === 'textarea'
+      ? `Enter text${field.required ? '' : ' (optional)'}`
+      : undefined);
+
+/**
+ * ONE control per registry type. A `Record` over `SupportedFormFieldType` on
+ * purpose: `FORM_FIELD_TYPES` (the schema module) is the single place a type is
+ * declared, and this table cannot compile without an entry for each — so the
+ * validator and the renderer can never disagree about what is supported.
+ */
+const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => ReactNode> = {
+  text: ({ field, id, registerName, register }) => (
+    <Input
+      id={id}
+      type={field.inputType ?? 'text'}
+      required={field.required}
+      autoComplete={field.autoComplete}
+      placeholder={placeholderFor(field)}
+      className={INPUT_CLASS}
+      {...register(registerName as never)}
+    />
+  ),
+  textarea: ({ field, id, registerName, register }) => (
+    <Textarea
+      id={id}
+      placeholder={placeholderFor(field)}
+      className={TEXTAREA_CLASS}
+      {...register(registerName as never)}
+    />
+  ),
+  number: ({ field, id, registerName, register }) => (
+    <Input
+      id={id}
+      type="number"
+      inputMode="numeric"
+      step="any"
+      required={field.required}
+      className={INPUT_CLASS}
+      {...register(registerName as never)}
+    />
+  ),
+  select: ({ field, id, registerName, control }) => (
+    <Controller
+      control={control}
+      name={registerName as never}
+      render={({ field: rhf }) => (
+        <Select value={rhf.value ?? ''} onValueChange={rhf.onChange}>
+          <SelectTrigger id={id}>
+            <SelectValue placeholder="Select…" />
+          </SelectTrigger>
+          <SelectContent>
+            {(field.options ?? []).map(opt => (
+              <SelectItem key={opt} value={opt}>
+                {opt}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    />
+  ),
+  radio: ({ field, id, registerName, control }) => (
+    <Controller
+      control={control}
+      name={registerName as never}
+      render={({ field: rhf }) => (
+        <RadioGroup value={rhf.value ?? ''} onValueChange={rhf.onChange}>
+          {(field.options ?? []).map(opt => (
+            <div key={opt} className="flex items-center gap-[var(--spacing-system-xs)]">
+              <RadioGroupItem id={`${id}-${opt}`} value={opt} />
+              <Label htmlFor={`${id}-${opt}`}>{opt}</Label>
+            </div>
+          ))}
+        </RadioGroup>
+      )}
+    />
+  ),
+  checkbox: ({ id, registerName, control }) => (
+    <Controller
+      control={control}
+      name={registerName as never}
+      render={({ field: rhf }) => (
+        // The question's Label above already carries the text and binds to
+        // this id — a second inline label would double the visible text AND
+        // the accessible name.
+        <div className="flex items-center gap-[var(--spacing-system-xs)]">
+          <Checkbox id={id} checked={Boolean(rhf.value)} onCheckedChange={v => rhf.onChange(v === true)} />
+        </div>
+      )}
+    />
+  ),
+};
+
+/** `firstName` → `ms-first-name`; the ids the built-ins have always had. */
+const builtInId = (name: string) => `ms-${name.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`)}`;
 
 export interface BookingFormProps {
   availability: MeetingAvailability;
@@ -239,10 +363,6 @@ export function BookingForm({
     return err?.message;
   };
 
-  // Field chrome mirrors ContactForm 1:1 (`contact/contact-form.tsx`) — the
-  // booking form must be indistinguishable from every other form in the app.
-  const inputClass =
-    'bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-11 md:h-12';
   // One step ABOVE the `spacing system/m` the design names (16/24 instead of
   // 12/16), because the field messages hang out of flow: they need ~16px on a
   // phone and ~20 on desktop of clear space under the control, and `m` leaves
@@ -251,135 +371,30 @@ export function BookingForm({
   // smallest ODS step that houses it.
   const FORM_STACK = 'flex flex-col gap-[var(--spacing-system-l)]';
 
-  // Every field as a standalone node, so the default order below and any
-  // host-supplied `fieldRows` compose the SAME controls. Extracting them is what
-  // makes an injected layout a re-arrangement rather than a fork of this form.
-  const builtInFields: Record<string, ReactNode> = {
-    email: (
-      <FieldWrapper label="Email" htmlFor="ms-email" required error={errors.email?.message}>
-        <Input
-          id="ms-email"
-          type="email"
-          required
-          autoComplete="email"
-          placeholder="jane@company.com"
-          aria-invalid={!!errors.email}
-          className={inputClass}
-          {...register('email')}
-        />
-      </FieldWrapper>
-    ),
-    firstName: (
-      <FieldWrapper label="First Name" htmlFor="ms-first-name" required error={errors.firstName?.message}>
-        <Input
-          id="ms-first-name"
-          required
-          autoComplete="given-name"
-          placeholder="Jane"
-          aria-invalid={!!errors.firstName}
-          className={inputClass}
-          {...register('firstName')}
-        />
-      </FieldWrapper>
-    ),
-    lastName: (
-      <FieldWrapper label="Last Name" htmlFor="ms-last-name" required error={errors.lastName?.message}>
-        <Input
-          id="ms-last-name"
-          required
-          autoComplete="family-name"
-          placeholder="Doe"
-          aria-invalid={!!errors.lastName}
-          className={inputClass}
-          {...register('lastName')}
-        />
-      </FieldWrapper>
-    ),
-  };
-
-  const renderDeclaredField = (field: MeetingFormField): ReactNode => (
-    <FieldWrapper
-      key={field.name}
-      label={field.label}
-      htmlFor={`ms-q-${field.name}`}
-      required={field.required}
-      error={fieldError(field.name)}
-    >
-      {field.type === 'textarea' && (
-        <Textarea
-          id={`ms-q-${field.name}`}
-          className="border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"
-          {...register(`formFields.${field.name}` as never)}
-        />
-      )}
-      {field.type === 'text' && (
-        <Input
-          id={`ms-q-${field.name}`}
-          className="h-11 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary md:h-12"
-          {...register(`formFields.${field.name}` as never)}
-        />
-      )}
-      {field.type === 'number' && (
-        <Input
-          id={`ms-q-${field.name}`}
-          type="number"
-          inputMode="numeric"
-          step="any"
-          className="h-11 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary md:h-12"
-          {...register(`formFields.${field.name}` as never)}
-        />
-      )}
-      {(field.type === 'select' || field.type === 'radio') && (
-        <Controller
-          control={control}
-          name={`formFields.${field.name}` as never}
-          render={({ field: rhf }) =>
-            field.type === 'select' ? (
-              <Select value={rhf.value ?? ''} onValueChange={rhf.onChange}>
-                <SelectTrigger id={`ms-q-${field.name}`}>
-                  <SelectValue placeholder="Select…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(field.options ?? []).map(opt => (
-                    <SelectItem key={opt} value={opt}>
-                      {opt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <RadioGroup value={rhf.value ?? ''} onValueChange={rhf.onChange}>
-                {(field.options ?? []).map(opt => (
-                  <div key={opt} className="flex items-center gap-[var(--spacing-system-xs)]">
-                    <RadioGroupItem id={`ms-q-${field.name}-${opt}`} value={opt} />
-                    <Label htmlFor={`ms-q-${field.name}-${opt}`}>{opt}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            )
-          }
-        />
-      )}
-      {field.type === 'checkbox' && (
-        <Controller
-          control={control}
-          name={`formFields.${field.name}` as never}
-          render={({ field: rhf }) => (
-            // The question's Label above already carries the text and
-            // binds to this id — a second inline label would double the
-            // visible text AND the accessible name.
-            <div className="flex items-center gap-[var(--spacing-system-xs)]">
-              <Checkbox
-                id={`ms-q-${field.name}`}
-                checked={Boolean(rhf.value)}
-                onCheckedChange={v => rhf.onChange(v === true)}
-              />
-            </div>
-          )}
-        />
-      )}
+  /** ONE render path for every field — built-in or declared — so the default
+   *  order below and any host-supplied `fieldRows` compose the same controls. */
+  const renderField = (
+    field: ControlArgs['field'],
+    where: { id: string; registerName: string; error?: string },
+  ): ReactNode => (
+    <FieldWrapper key={field.name} label={field.label} htmlFor={where.id} required={field.required} error={where.error}>
+      {FIELD_CONTROLS[field.type]({ field, id: where.id, registerName: where.registerName, register, control })}
     </FieldWrapper>
   );
+
+  const builtInFields: Record<string, ReactNode> = Object.fromEntries(
+    BUILT_IN_BOOKING_FIELDS.map(field => [
+      field.name,
+      renderField(field, { id: builtInId(field.name), registerName: field.name, error: errors[field.name]?.message }),
+    ]),
+  );
+
+  const renderDeclaredField = (field: SupportedMeetingFormField): ReactNode =>
+    renderField(field, {
+      id: `ms-q-${field.name}`,
+      registerName: `formFields.${field.name}`,
+      error: fieldError(field.name),
+    });
 
   const declaredByName = new Map(supportedFields.map(f => [f.name, f]));
 

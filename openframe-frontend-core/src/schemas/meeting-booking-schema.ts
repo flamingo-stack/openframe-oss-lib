@@ -158,26 +158,123 @@ export type MeetingBookingErrorCode = (typeof MEETING_BOOKING_ERROR_CODES)[numbe
 // ---------------------------------------------------------------------------
 
 /**
- * HubSpot custom-question types the native form supports. The widget's
- * renderer switches over THIS set and `makeBookingSchema` maps over THIS set;
- * fail-closed = a field whose `type` is not in the set (the widget then
- * renders the "Open in HubSpot" escape hatch for that link instead of a
- * half-working native form). Exact upstream type strings are pinned against
- * the rollout fixture link — extend here (renderer + validator move together).
+ * THE registry of HubSpot question types the native form supports — one entry
+ * per `fieldType`, and the ONLY place a type is declared. Everything else
+ * derives from it: `SupportedFormFieldType` is its key union,
+ * `SUPPORTED_FORM_FIELD_TYPES` its keys, `FORM_FIELD_TYPES_WITH_OPTIONS` the
+ * entries that carry `options`, and `makeBookingSchema` maps each answer
+ * through the entry's validator. The widget's control table
+ * (`booking-form.tsx`) is a `Record` over the same key union, so a type added
+ * here without a control is a COMPILE error, not a silent gap.
+ *
+ * Fail-closed: a `fieldType` with no entry makes the link "not natively
+ * bookable" and the card falls back to the HubSpot escape hatch.
+ *
+ * Every string type rides the wire as a STRING (HubSpot's book endpoint takes
+ * `{ name, value: string }`); `checkbox` is the one boolean. `number` is a
+ * Number property validated as a decimal literal — what `<input type="number">`
+ * emits and what the property stores.
  */
-// HubSpot `fieldType` values the widget can render faithfully. Anything else
-// (phonenumber, date, booleancheckbox, file, …) makes the link "not natively
-// bookable" and the card fails closed to the HubSpot escape hatch — so adding a
-// type here means adding a control in `booking-form.tsx` AND a validator below.
-// `number` is a Number property: the wire value stays a STRING like every other
-// answer (HubSpot's book endpoint takes `{ name, value: string }`), validated as
-// a decimal literal.
-export const SUPPORTED_FORM_FIELD_TYPES = ['text', 'textarea', 'select', 'radio', 'checkbox', 'number'] as const;
-export type SupportedFormFieldType = (typeof SUPPORTED_FORM_FIELD_TYPES)[number];
-
-export function isSupportedFormField(field: MeetingFormField): boolean {
-  return (SUPPORTED_FORM_FIELD_TYPES as readonly string[]).includes(field.type);
+export interface FormFieldTypeSpec {
+  /** The answer's wire shape, which also decides how required/optional wraps it. */
+  kind: 'string' | 'boolean';
+  /** Whether HubSpot publishes `options` for the type (the pickers). */
+  hasOptions: boolean;
+  /** The base validator for ONE answer, before the required/optional wrapping. */
+  validator: (field: MeetingFormField) => z.ZodTypeAny;
 }
+
+const optionValidator = (field: MeetingFormField) =>
+  z.string().refine(v => !v || (field.options ?? []).includes(v), {
+    message: `Please choose a valid option for ${field.label}`,
+  });
+
+export const FORM_FIELD_TYPES = {
+  text: {
+    kind: 'string',
+    hasOptions: false,
+    validator: field => z.string().max(1000, { message: `${field.label} is too long` }),
+  },
+  textarea: {
+    kind: 'string',
+    hasOptions: false,
+    validator: field => z.string().max(5000, { message: `${field.label} is too long` }),
+  },
+  number: {
+    kind: 'string',
+    hasOptions: false,
+    validator: field =>
+      z
+        .string()
+        .max(32, { message: `${field.label} is too long` })
+        .regex(/^-?\d+(\.\d+)?$/, { message: `${field.label} must be a number` }),
+  },
+  select: { kind: 'string', hasOptions: true, validator: optionValidator },
+  radio: { kind: 'string', hasOptions: true, validator: optionValidator },
+  checkbox: { kind: 'boolean', hasOptions: false, validator: () => z.boolean() },
+} as const satisfies Record<string, FormFieldTypeSpec>;
+
+export type SupportedFormFieldType = keyof typeof FORM_FIELD_TYPES;
+
+export const SUPPORTED_FORM_FIELD_TYPES = Object.keys(FORM_FIELD_TYPES) as readonly SupportedFormFieldType[];
+
+/** The types whose `options` the host must forward (select, radio). */
+export const FORM_FIELD_TYPES_WITH_OPTIONS: readonly SupportedFormFieldType[] = SUPPORTED_FORM_FIELD_TYPES.filter(
+  type => FORM_FIELD_TYPES[type].hasOptions,
+);
+
+export function isSupportedFormField(field: MeetingFormField): field is SupportedMeetingFormField {
+  return Object.prototype.hasOwnProperty.call(FORM_FIELD_TYPES, field.type);
+}
+
+/** A declared question whose `type` is in the registry. */
+export type SupportedMeetingFormField = MeetingFormField & { type: SupportedFormFieldType };
+
+/**
+ * The scheduler's fixed identity fields. HubSpot's book endpoint takes them
+ * TOP-LEVEL (`firstName`, `lastName`, `email`), its own booking page hardcodes
+ * them, and the link's `formFields` never lists them — so they are data HERE,
+ * rendered by the widget through the SAME control path as every declared
+ * question, rather than three hand-written blocks. `inputType`/`autoComplete`
+ * are the browser hints a text control takes; the wire and the validator do
+ * not see them.
+ */
+export interface BuiltInBookingField extends MeetingFormField {
+  name: 'firstName' | 'lastName' | 'email';
+  type: 'text';
+  required: true;
+  inputType?: 'email';
+  autoComplete: string;
+  placeholder: string;
+}
+
+export const BUILT_IN_BOOKING_FIELDS: readonly BuiltInBookingField[] = [
+  {
+    name: 'firstName',
+    label: 'First Name',
+    type: 'text',
+    required: true,
+    autoComplete: 'given-name',
+    placeholder: 'Enter First Name',
+  },
+  {
+    name: 'lastName',
+    label: 'Last Name',
+    type: 'text',
+    required: true,
+    autoComplete: 'family-name',
+    placeholder: 'Enter Last Name',
+  },
+  {
+    name: 'email',
+    label: 'Email',
+    type: 'text',
+    required: true,
+    inputType: 'email',
+    autoComplete: 'email',
+    placeholder: 'username@mail.com',
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Validators (single home — client widget and server rebuild both use these)
@@ -244,42 +341,16 @@ function buildBookingSchema<TStart extends z.ZodTypeAny, TDuration extends z.Zod
   const answers: Record<string, z.ZodTypeAny> = {};
   for (const field of formFields) {
     if (!isSupportedFormField(field)) continue; // unsupported types are fail-closed at render time
-    let validator: z.ZodTypeAny;
-    switch (field.type as SupportedFormFieldType) {
-      case 'checkbox':
-        validator = z.boolean();
-        break;
-      case 'select':
-      case 'radio':
-        validator = z.string().refine(v => !v || (field.options ?? []).includes(v), {
-          message: `Please choose a valid option for ${field.label}`,
-        });
-        break;
-      case 'textarea':
-        validator = z.string().max(5000, { message: `${field.label} is too long` });
-        break;
-      case 'number':
-        // Optional integer sign, digits, optional decimal part — what
-        // `<input type="number">` emits and what a Number property stores.
-        validator = z
-          .string()
-          .max(32, { message: `${field.label} is too long` })
-          .regex(/^-?\d+(\.\d+)?$/, { message: `${field.label} must be a number` });
-        break;
-      case 'text':
-      default:
-        validator = z.string().max(1000, { message: `${field.label} is too long` });
-        break;
-    }
-    if (field.required) {
-      validator =
-        field.type === 'checkbox'
-          ? z.literal(true, { message: `${field.label} is required` })
-          : (validator as z.ZodString).min(1, { message: `${field.label} is required` });
-    } else if (field.type !== 'checkbox') {
-      validator = (validator as z.ZodString).optional().or(z.literal(''));
+    const spec: FormFieldTypeSpec = FORM_FIELD_TYPES[field.type];
+    let validator: z.ZodTypeAny = spec.validator(field);
+    // required/optional wrapping follows the answer's wire KIND, not its type:
+    // a boolean is true-or-absent, a string is non-empty-or-empty.
+    if (spec.kind === 'boolean') {
+      validator = field.required ? z.literal(true, { message: `${field.label} is required` }) : z.boolean().optional();
     } else {
-      validator = z.boolean().optional();
+      validator = field.required
+        ? (validator as z.ZodString).min(1, { message: `${field.label} is required` })
+        : (validator as z.ZodString).optional().or(z.literal(''));
     }
     answers[field.name] = validator;
   }
