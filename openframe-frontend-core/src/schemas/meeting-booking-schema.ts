@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+/** The slot's wire validators — ONE declaration for the strict and the deferred schema. */
+const SLOT_INSTANT = z.number().int().positive();
+const TIMEZONE = z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' });
 /**
  * Meeting-booking wire contracts + validation factory.
  *
@@ -453,9 +456,9 @@ function buildBookingSchema<TStart extends z.ZodTypeAny, TDuration extends z.Zod
  */
 export function makeBookingSchema(formFields: MeetingFormField[], legalConsent: MeetingLegalConsent | null) {
   return buildBookingSchema(formFields, legalConsent, {
-    startTimeMs: z.number().int().positive(),
-    durationMs: z.number().int().positive(),
-    timezone: z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' }),
+    startTimeMs: SLOT_INSTANT,
+    durationMs: SLOT_INSTANT,
+    timezone: TIMEZONE,
   });
 }
 
@@ -478,9 +481,9 @@ export function makeDeferredBookingSchema(formFields: MeetingFormField[], legalC
   // Accepting only `undefined` would reject a field with no rendered control
   // and no FieldWrapper — the submit button silently dead, type-check clean.
   return buildBookingSchema(formFields, legalConsent, {
-    startTimeMs: z.number().int().positive().nullish(),
-    durationMs: z.number().int().positive().nullish(),
-    timezone: z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' }).nullish(),
+    startTimeMs: SLOT_INSTANT.nullish(),
+    durationMs: SLOT_INSTANT.nullish(),
+    timezone: TIMEZONE.nullish(),
   });
 }
 

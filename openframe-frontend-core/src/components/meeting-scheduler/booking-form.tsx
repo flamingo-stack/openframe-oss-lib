@@ -46,8 +46,11 @@ export interface BookingFieldSlot {
   /** Built-ins autocomplete; a HubSpot question's `name` is whatever the link declares. */
   name: BuiltInBookingFieldName | (string & NonNullable<unknown>);
   /** Columns out of four at `md` and up. Defaults to an even split of the row. */
-  span?: 1 | 2 | 3 | 4;
+  span?: BookingFieldSpan;
 }
+
+/** Columns out of four at `md` and up. */
+export type BookingFieldSpan = 1 | 2 | 3 | 4;
 
 export type BookingFieldRow = BookingFieldSlot[];
 
@@ -72,15 +75,26 @@ export interface BookingFormConsent {
 
 /** Static so Tailwind's scanner sees every class — a template built from a
  *  runtime span would compile to nothing. */
-const SPAN_CLASS: Record<1 | 2 | 3 | 4, string> = {
+/** The form's vertical rhythm — one stack for the loaded form and its skeleton. */
+const FORM_STACK = 'flex flex-col gap-[var(--spacing-system-l)]';
+
+/** The wire key of the host consent tick (stripped server-side, never sent to HubSpot). */
+const HOST_CONSENT_KEY = 'hostConsent';
+
+const SPAN_CLASS: Record<BookingFieldSpan, string> = {
   1: 'md:col-span-1',
   2: 'md:col-span-2',
   3: 'md:col-span-3',
   4: 'md:col-span-4',
 };
 
-const evenSpan = (count: number): 1 | 2 | 3 | 4 =>
-  Math.min(4, Math.max(1, Math.floor(4 / Math.max(1, count)))) as 1 | 2 | 3 | 4;
+/** The even split of four columns over `count` slots; a remainder goes to the
+ *  leading slots (three slots → 2/1/1), so a row never leaves a trailing gap. */
+const evenSpan = (count: number, index: number): BookingFieldSpan => {
+  const base = Math.floor(4 / Math.max(1, count));
+  const extra = 4 - base * count;
+  return Math.min(4, Math.max(1, index < extra ? base + 1 : base)) as BookingFieldSpan;
+};
 
 /**
  * BookingForm — attendee details + the link's declared custom questions +
@@ -110,8 +124,8 @@ interface ControlArgs {
   control: Control<BookingFormValues>;
 }
 
-// Field chrome mirrors ContactForm 1:1 (`contact/contact-form.tsx`) — the
-// booking form must be indistinguishable from every other form in the app.
+// Field chrome follows ContactForm (`contact/contact-form.tsx`), tokenised —
+// the booking form must be indistinguishable from every other form in the app.
 const INPUT_CLASS =
   'bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-[var(--spacing-system-sf)] h-11 md:h-12';
 const TEXTAREA_CLASS =
@@ -122,11 +136,11 @@ const TEXTAREA_CLASS =
 const placeholderFor = (field: ControlArgs['field']): string | undefined =>
   field.placeholder ?? fieldTypeSpec(field.type).placeholder?.(field);
 
-/** `<input type="number">` accepts `1e3`, `007`, ` 12 `; the wire wants the
+/** `<input type="number">` accepts `1e3` and ` 12 `; the wire wants the
  *  decimal literal the validator checks. A value ALREADY in that shape passes
- *  verbatim — a long integer or a tiny decimal must not be reshaped through a
- *  float — and one that cannot be brought into it is left for the validator's
- *  own message. */
+ *  verbatim (`007` included) — a long integer or a tiny decimal must not be
+ *  reshaped through a float — and one that cannot be brought into it is left
+ *  for the validator's own message. */
 const canonicalNumber = (v: unknown): string => {
   const s = String(v ?? '').trim();
   if (s === '' || DECIMAL_LITERAL_RE.test(s)) return s;
@@ -352,7 +366,7 @@ export function BookingForm({
 
   // The host consent lives OUTSIDE react-hook-form (it is not a wire field), so
   // a remount restores it from the stash the same way the fields come back.
-  const [consented, setConsented] = useState(initialValues?.hostConsent === true);
+  const [consented, setConsented] = useState(initialValues?.[HOST_CONSENT_KEY] === true);
   const [consentError, setConsentError] = useState<string | null>(null);
   const consentMissing = Boolean(consent) && !consented;
 
@@ -383,10 +397,18 @@ export function BookingForm({
       // must do so synchronously in this call — this form and its honeypot are
       // still mounted here, and `getSignals()` reads a detached ref once they
       // unmount, which would silently disable the decoy.
-      await onSubmit({ ...data, meetingId, hostConsent: consented });
+      await onSubmit({ ...data, meetingId, [HOST_CONSENT_KEY]: consented });
       return;
     }
-    await onSubmit({ ...data, meetingId, hostConsent: consented, startTimeMs, durationMs, timezone, ...getSignals() });
+    await onSubmit({
+      ...data,
+      meetingId,
+      [HOST_CONSENT_KEY]: consented,
+      startTimeMs,
+      durationMs,
+      timezone,
+      ...getSignals(),
+    });
   });
 
   // Consent is checked BEFORE the resolver runs, not inside the valid branch,
@@ -408,7 +430,6 @@ export function BookingForm({
   // 12/16 — four pixels short at both ends, so an error would print over the
   // next field's label. The design has no error state drawn; this is the
   // smallest ODS step that houses it.
-  const FORM_STACK = 'flex flex-col gap-[var(--spacing-system-l)]';
 
   /** ONE render path for every field — built-in or declared — so the default
    *  order below and any host-supplied `fieldRows` compose the same controls. */
@@ -456,17 +477,22 @@ export function BookingForm({
     return declared ? renderDeclaredField(declared) : null;
   };
 
-  /** Declared questions no row claims — appended full width, so a question added
-   *  in HubSpot can never go invisible by omission from a layout written before it. */
-  const unplacedFields = fieldRows
-    ? supportedFields.filter(f => !fieldRows.some(row => row.some(slot => slot.name === f.name)))
-    : [];
+  /** Fields no row claims — appended full width, so neither a question added in
+   *  HubSpot nor a built-in the layout forgot can go invisible: the schema still
+   *  requires the identity trio, and a required field with no control is a
+   *  submit that dies silently. */
+  const placedNames = new Set((fieldRows ?? []).flat().map(slot => slot.name));
+  const unplacedBuiltIns = fieldRows ? BUILT_IN_BOOKING_FIELDS.filter(f => !placedNames.has(f.name)) : [];
+  const unplacedFields = fieldRows ? supportedFields.filter(f => !placedNames.has(f.name)) : [];
 
   /** Rows whose every slot names a question the link has not declared are
    *  DROPPED, not rendered empty: an empty grid still eats one form gap, so a
-   *  layout written ahead of the HubSpot config would print blank bands. */
+   *  layout written ahead of the HubSpot config would print blank bands. A name
+   *  placed twice renders once (its first slot) — one registered control per
+   *  field. */
+  const seen = new Set<string>();
   const placedRows = (fieldRows ?? [])
-    .map(row => row.filter(slot => slotResolves(slot.name)))
+    .map(row => row.filter(slot => slotResolves(slot.name) && !seen.has(slot.name) && Boolean(seen.add(slot.name))))
     .filter(row => row.length > 0);
 
   const submitButton = (
@@ -511,7 +537,7 @@ export function BookingForm({
               // label at the column gap.
               className="grid grid-cols-2 gap-x-[var(--spacing-system-m)] gap-y-[var(--spacing-system-lf)] md:grid-cols-4"
             >
-              {row.map(slot => (
+              {row.map((slot, slotIndex) => (
                 <div
                   key={slot.name}
                   className={cn(
@@ -520,13 +546,16 @@ export function BookingForm({
                     // fields cost one line instead of two on the layout that can
                     // least afford them.
                     row.length === 2 ? 'col-span-1' : 'col-span-2',
-                    SPAN_CLASS[slot.span ?? evenSpan(row.length)],
+                    SPAN_CLASS[slot.span ?? evenSpan(row.length, slotIndex)],
                   )}
                 >
                   {slotNode(slot.name)}
                 </div>
               ))}
             </div>
+          ))}
+          {unplacedBuiltIns.map(field => (
+            <Fragment key={field.name}>{builtInFields[field.name]}</Fragment>
           ))}
           {unplacedFields.map(field => (
             <Fragment key={field.name}>{renderDeclaredField(field)}</Fragment>
@@ -644,7 +673,7 @@ export function BookingForm({
  */
 export function BookingFormSkeleton() {
   return (
-    <div className="flex flex-1 flex-col gap-[var(--spacing-system-l)] p-[var(--spacing-system-l)] lg:p-0">
+    <div className={cn('flex-1', FORM_STACK)}>
       <div className="grid grid-cols-1 gap-[var(--spacing-system-m)] md:grid-cols-2">
         <Skeleton className="h-[4.75rem] w-full" />
         <Skeleton className="h-[4.75rem] w-full" />

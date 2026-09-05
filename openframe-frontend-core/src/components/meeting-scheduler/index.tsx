@@ -56,18 +56,6 @@ import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { Alert, AlertDescription, Button } from '../ui';
 import { BookingForm, BookingFormSkeleton, type BookingFormProps } from './booking-form';
-
-// The override surface: a host builds its `detailsForm` by re-rendering
-// `BookingForm` with `fieldRows`, so it needs both from this entry point (the
-// package exports `./components/meeting-scheduler`, not the file beneath it).
-export {
-  BookingForm,
-  BookingFormSkeleton,
-  type BookingFormProps,
-  type BookingFieldRow,
-  type BookingFieldSlot,
-  type BookingFormConsent,
-} from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';
 import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
@@ -277,7 +265,7 @@ export type SchedulerFlow = 'slot-first' | 'details-first';
  */
 export const SCHEDULER_FLOW_PRESETS: Record<
   SchedulerFlow,
-  { initialStep: 'slot' | 'details'; height: string; submitLabel?: string; footerNote?: string }
+  { initialStep: Exclude<Step, 'confirmed'>; height: string; submitLabel?: string; footerNote?: string }
 > = {
   'slot-first': { initialStep: 'slot', height: MEETING_SCHEDULER_H },
   'details-first': {
@@ -292,7 +280,7 @@ export const SCHEDULER_FLOW_PRESETS: Record<
  * The two-panel card's box, shared verbatim by the loading skeleton and the
  * loaded card so neither can drift from the other.
  *
- * Both heights come from {@link MEETING_SCHEDULER_H}; what this adds is the
+ * The height is applied per flow (`SCHEDULER_FLOW_PRESETS[flow].height`); what this adds is the
  * flex column that makes them work. On TABLET the height is stated for the
  * same reason the desktop one is: a CEILING only pins the tall stages. The short ones — the empty
  * month ("No available times in September"), a five-week month, the cold-start
@@ -319,7 +307,7 @@ const CARD_CLASS = cn(
   'overflow-hidden rounded-md border border-ods-border bg-ods-card',
   'md:flex md:flex-col',
   // The height is NOT baked in any more: it is chosen per flow at each render
-  // site (`flowHeight`), because details-first needs a taller box and both
+  // site (`cardClass`), because details-first needs a taller box and both
   // constants are module scope.
 );
 
@@ -551,6 +539,10 @@ export function HubSpotMeetingScheduler({
     // Not while a slot's POST is in flight — the step must stay on the
     // calendar the spinner lives on until the result routes it.
     if (inFlightRef.current) return;
+    // No slot rides back to the form: in this flow the form never legitimately
+    // holds one (the slot IS the submit), and a chip the server rejected with a
+    // slot-step toast would otherwise print in the form's summary line.
+    setSelectedSlot(null);
     setStep('details');
     setBookingError(null);
   }, []);
@@ -654,17 +646,20 @@ export function HubSpotMeetingScheduler({
    * last-wins, so appending it after would make a host's own `h-*` unreachable,
    * which is the override the height-inside-CARD_CLASS arrangement allows today.
    */
-  const flowHeight = preset.height;
+  const cardClass = cn(CARD_CLASS, preset.height, formOnly && 'bg-ods-bg', className);
 
-  /** One card SHAPE for both degraded returns below. */
-  const degradedCard = (
+  /** details-first: a slot's POST is in flight. The ref covers the frame before
+   *  `isSubmitting` renders true, so every guard reads both. */
+  const postInFlight = () => detailsFirst && (isSubmitting || inFlightRef.current);
+
+  /** One card SHAPE for every degraded return below. */
+  const degraded = (message: string) => (
     <SchedulerDegradedCard flow={flow} className={className}>
-      <p className="text-ods-text-secondary text-h6">
-        We couldn&apos;t load available call times. Please try again shortly.
-      </p>
+      <p className="text-ods-text-secondary text-h6">{message}</p>
       {escapeHatch}
     </SchedulerDegradedCard>
   );
+  const degradedCard = degraded("We couldn't load available call times. Please try again shortly.");
 
   if (isLoadingAvailability && !availability) {
     // COLD start only — a month already in the query cache renders straight
@@ -672,7 +667,7 @@ export function HubSpotMeetingScheduler({
     // (`ContextPanelSkeleton` beside the real slot-area layout), so nothing
     // shifts when it swaps.
     return (
-      <div className={cn(CARD_CLASS, flowHeight, formOnly && 'bg-ods-bg', className)}>
+      <div className={cardClass}>
         <div className={CARD_INNER_CLASS}>
           {!formOnly && <ContextPanelSkeleton onBack={onBack} className={CONTEXT_PANEL_CLASS} />}
           <div className={ACTION_PANEL_CLASS}>
@@ -681,7 +676,11 @@ export function HubSpotMeetingScheduler({
                 Continue (which happens at `step === 'slot'`) would swap the
                 calendar out for a form skeleton and back. */}
             {detailsFirst && step === 'details' ? (
-              <BookingFormSkeleton />
+              // The SAME wrapper the loaded form gets, so the skeleton never
+              // states its own inset.
+              <div className={cn('flex flex-1 flex-col', PANEL_STEP_CLASS)}>
+                <BookingFormSkeleton />
+              </div>
             ) : (
               <SlotPickerSkeleton monthOffset={monthOffset} />
             )}
@@ -696,18 +695,13 @@ export function HubSpotMeetingScheduler({
   if (!isNativelyBookable(availability)) {
     // Fail closed — never render a half-working native form on a link with
     // questions or consent we can't faithfully reproduce.
-    return (
-      <SchedulerDegradedCard flow={flow} className={className}>
-        <p className="text-ods-text-secondary text-h6">This meeting type is booked directly on HubSpot.</p>
-        {escapeHatch}
-      </SchedulerDegradedCard>
-    );
+    return degraded('This meeting type is booked directly on HubSpot.');
   }
 
   // ---- the card ------------------------------------------------------------
 
   return (
-    <div className={cn(CARD_CLASS, flowHeight, formOnly && 'bg-ods-bg', className)}>
+    <div className={cardClass}>
       <div className={CARD_INNER_CLASS}>
         {!formOnly && (
           <SchedulerContextPanel
@@ -741,7 +735,8 @@ export function HubSpotMeetingScheduler({
             // In details-first the duration/zone selectors stay live while the
             // form is filled — but must freeze once a POST is in flight, or a
             // mid-flight change clears the slot under the spinner while the body
-            // already built carries the old duration.
+            // already built carries the old duration (the panel disables both
+            // the chips and the zone control on `locked`).
             locked={detailsFirst ? step === 'confirmed' || isSubmitting : step !== 'slot'}
             // The zone still governs every time on screen — including the
             // summary line on the form — so the picker stays until there is
@@ -768,7 +763,7 @@ export function HubSpotMeetingScheduler({
               : durationMs != null && selectedSlot != null && timezone) ? (
             <div className={cn('flex flex-1 flex-col gap-[var(--spacing-system-m)]', PANEL_STEP_CLASS)}>
               {/* Top-aligned, and no back edge of its own: the ONE back edge
-                  lives in the context panel at every step (see `contextBack`),
+                  lives in the context panel at every step (the `onBack` wired on `SchedulerContextPanel`),
                   which is where the design puts it and the only spot that
                   stays put while this side swaps between calendar and form.
 
@@ -830,9 +825,7 @@ export function HubSpotMeetingScheduler({
                   onMonthOffsetChange={o => {
                     // details-first: a POST is in flight from this grid; paging
                     // would clear the spinning chip and swap the key under it.
-                    // Same lock as the chip handler: the ref covers the frame
-                    // before `isSubmitting` renders true.
-                    if (detailsFirst && (isSubmitting || inFlightRef.current)) return;
+                    if (postInFlight()) return;
                     setSelectedDay(null);
                     setSelectedSlot(null);
                     setMonthOffset(o);
@@ -851,7 +844,7 @@ export function HubSpotMeetingScheduler({
                     // `isSubmitting` is the render's snapshot; a second chip
                     // clicked in the same frame sees it false. The ref is the
                     // synchronous lock, so the second click changes nothing.
-                    if (isSubmitting || inFlightRef.current || !stash) return;
+                    if (postInFlight() || !stash) return;
                     inFlightRef.current = true;
                     setSelectedSlot(ms);
                     void handleSubmit({
@@ -871,7 +864,12 @@ export function HubSpotMeetingScheduler({
                     });
                   }}
                   selectedDay={selectedDay}
-                  onSelectDay={setSelectedDay}
+                  onSelectDay={day => {
+                    // Same lock: another day would swap the times column out
+                    // from under the spinning chip.
+                    if (postInFlight()) return;
+                    setSelectedDay(day);
+                  }}
                   isLoading={isLoadingAvailability}
                   // Distinct from `isLoading`, which swaps the whole times
                   // column for a skeleton: the grid must stay up with the
@@ -899,6 +897,18 @@ export function HubSpotMeetingScheduler({
     </div>
   );
 }
+
+// The override surface: a host builds its `detailsForm` by re-rendering
+// `BookingForm` with `fieldRows`, so it needs both from this entry point (the
+// package exports `./components/meeting-scheduler`, not the file beneath it).
+export {
+  BookingForm,
+  BookingFormSkeleton,
+  type BookingFormProps,
+  type BookingFieldRow,
+  type BookingFieldSlot,
+  type BookingFormConsent,
+} from './booking-form';
 
 export {
   MeetingSchedulerDirectory,

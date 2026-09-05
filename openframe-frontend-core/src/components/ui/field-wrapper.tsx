@@ -36,8 +36,8 @@ export interface FieldWrapperProps {
    */
   labelVariant?: 'default' | 'large';
   /**
-   * Marks the label with the accent asterisk `ContactForm` draws on its
-   * required fields (`Label<span class="text-ods-accent">*</span>`), so a form
+   * Marks the label with the `RequiredMark` `ContactForm` draws on its
+   * required fields, so a form
    * mixing both never shows two conventions. Visual only — the CONTROL carries
    * `required`/`aria-required` for assistive tech; the star is `aria-hidden`.
    */

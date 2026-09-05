@@ -270,6 +270,7 @@ export function SchedulerContextPanel({
             {timezone ? (
               <Autocomplete
                 value={timezone}
+                disabled={locked}
                 onChange={tz => {
                   if (tz) onTimezoneChange?.(tz);
                 }}
