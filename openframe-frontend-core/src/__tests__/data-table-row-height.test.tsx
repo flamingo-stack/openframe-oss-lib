@@ -48,6 +48,21 @@ function Table({
   );
 }
 
+/** The same table, but every row carries a sub-row beneath its cells. */
+function TableWithSubRows({ data, rowHeightClassName }: { data: Row[]; rowHeightClassName?: string }) {
+  const table = useDataTable({ data, columns });
+  return (
+    <DataTable table={table}>
+      <DataTable.Body<Row>
+        minRows={4}
+        skeletonRows={4}
+        rowHeightClassName={rowHeightClassName}
+        renderSubRow={() => <div style={{ height: 96 }}>sub</div>}
+      />
+    </DataTable>
+  );
+}
+
 const rows = (n: number): Row[] => Array.from({ length: n }, (_, i) => ({ id: String(i), name: `Row ${i}` }));
 
 /**
@@ -106,6 +121,22 @@ describe('DataTable row height', () => {
 
     expect(slots.length).toBeGreaterThanOrEqual(4);
     expect(slots.every(cls => cls.split(/\s+/).includes('border'))).toBe(true);
+  });
+
+  it('sizes the ROW SLOT, so a sub-row does not make real rows outgrow pad rows', () => {
+    // The trap: a row with a sub-row is taller than its cells. Sizing the cells
+    // left every pad row short by exactly the sub-row — 96px each on a phone
+    // board — which is the same jump `minRows` exists to prevent, reintroduced
+    // one level down.
+    const { container } = render(<TableWithSubRows data={rows(2)} rowHeightClassName={ROW_H} />);
+    const slots = slotClasses(container);
+
+    expect(slots.length).toBeGreaterThanOrEqual(4);
+    // Every card — the two real rows and the two pad rows — carries the height.
+    expect(slots.every(cls => cls.split(/\s+/).includes(ROW_H))).toBe(true);
+    // And the cells inside a real row FILL it rather than restating it, or the
+    // card would be the cells plus the sub-row.
+    expect(container.innerHTML).toContain('flex-1');
   });
 
   it('keeps the design height when a table does not state one', () => {

@@ -172,15 +172,24 @@ function PlaceholderRows({ count, rowHeightClassName }: { count: number; rowHeig
           // A pad row without one is 2px shorter than the row it stands in for
           // — invisible per row, 54px over a 27-row remainder, which is the
           // same shift `minRows` exists to prevent.
-          className="pointer-events-none relative overflow-hidden rounded-md border border-transparent"
+          className={cn(
+            'pointer-events-none relative overflow-hidden rounded-md border border-transparent',
+            // The stated slot height belongs on the CARD, exactly as a real
+            // row carries it — a real row with a sub-row is taller than its
+            // cells, so reserving the cells' height here left every pad row
+            // short by the sub-row.
+            rowHeightClassName,
+          )}
           aria-hidden="true"
         >
-          <div className={cn('hidden py-0 md:flex', ROW_SHELL_CLASSES, rowHeightClassName ?? ROW_HEIGHT_DESKTOP)} />
+          <div
+            className={cn('hidden py-0 md:flex', ROW_SHELL_CLASSES, rowHeightClassName ? 'h-full' : ROW_HEIGHT_DESKTOP)}
+          />
           <div
             className={cn(
               'flex justify-start py-0 md:hidden',
               ROW_SHELL_CLASSES,
-              rowHeightClassName ?? ROW_HEIGHT_MOBILE,
+              rowHeightClassName ? 'h-full' : ROW_HEIGHT_MOBILE,
             )}
           />
         </div>

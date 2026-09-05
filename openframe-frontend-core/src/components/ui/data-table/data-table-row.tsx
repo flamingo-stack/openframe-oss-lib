@@ -25,6 +25,11 @@ export interface DataTableRowProps<T> {
    * or the design default). The one place a table states how tall a row is, so
    * the pad rows and the skeleton can reserve the SAME number — see
    * `DataTableBodyProps.rowHeightClassName`.
+   *
+   * It sizes the row SLOT — the whole card — not the cells inside it. A row
+   * with a `subRow` is taller than its cells, so sizing the cells would leave
+   * the pad rows (which have no sub-row) short by exactly the sub-row: on a
+   * phone board that was 96px per missing row.
    */
   rowHeightClassName?: string;
   className?: string;
@@ -106,7 +111,11 @@ function DataTableRowImpl<T>({
   );
 
   const containerClassName = cn(
-    'block overflow-hidden rounded-md border border-ods-border bg-ods-card text-inherit no-underline',
+    'overflow-hidden rounded-md border border-ods-border bg-ods-card text-inherit no-underline',
+    // A stated slot height goes HERE, on the card, with the cells flexing to
+    // fill whatever the sub-row leaves. `border-box` sizing means the number a
+    // caller writes is the number the row occupies, borders included.
+    rowHeightClassName ? `flex flex-col ${rowHeightClassName}` : 'block',
     // With a sub-row the link wraps only the cells, so keep the clickable affordance off the whole card.
     (onClick || isWholeCardLink) && 'cursor-pointer transition-colors hover:bg-ods-bg-active',
     className,
@@ -118,7 +127,7 @@ function DataTableRowImpl<T>({
         'flex',
         ROW_SHELL_CLASSES,
         rowHeightClassName
-          ? `py-0 ${rowHeightClassName}`
+          ? 'min-h-0 flex-1 py-0'
           : compact
             ? 'py-[var(--spacing-system-xsf)]'
             : autoHeight
@@ -171,7 +180,10 @@ function DataTableRowImpl<T>({
         <Link
           href={href}
           prefetch={false}
-          className="block cursor-pointer text-inherit no-underline transition-colors hover:bg-ods-bg-active"
+          className={cn(
+            'cursor-pointer text-inherit no-underline transition-colors hover:bg-ods-bg-active',
+            rowHeightClassName ? 'flex min-h-0 flex-1 flex-col' : 'block',
+          )}
           onClick={handleClick}
         >
           {cells}
