@@ -244,10 +244,16 @@ export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]';
  * stages and let the tall one push the wrapper, which is the screen-shake the
  * fixed height exists to remove.
  *
+ * ONE number from `md` up, not two: 638px, the card both mocks draw
+ * (`4904:117130` form-only, `4904:118213` three columns). The form stage has no
+ * sidebar to stack into a header strip, so nothing about it changes between
+ * tablet and desktop, and the calendar stage fits the same box at both — the
+ * times column scrolls inside it as it always has.
+ *
  * A host reserving the box for a details-first card reserves THIS, not the
  * constant above.
  */
-export const MEETING_SCHEDULER_DETAILS_FIRST_H = 'md:h-[43.75rem] lg:h-[34.375rem]';
+export const MEETING_SCHEDULER_DETAILS_FIRST_H = 'md:h-[39.875rem]';
 
 /**
  * The two-panel card's box, shared verbatim by the loading skeleton and the
@@ -372,6 +378,15 @@ export function HubSpotMeetingScheduler({
   // this file's own rule forbids writing a ref there. "Frozen" means written
   // once at Continue, not `useRef`.
   const [stash, setStash] = useState<StashedDetails | null>(null);
+
+  /**
+   * details-first step ONE is the form and nothing else — the mock
+   * (`4904:117130`) draws no context panel beside it, and paints the card on the
+   * page ground so the fields read as the raised elements. The panel (host,
+   * fixed length, timezone, and the Back edge to this form) belongs to the
+   * calendar step, exactly as slot-first has always drawn it.
+   */
+  const formOnly = detailsFirst && step === 'details';
   const [pickedDurationMs, setDurationMs] = useState<number | null>(null);
   const [pickedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
@@ -616,9 +631,9 @@ export function HubSpotMeetingScheduler({
     // (`ContextPanelSkeleton` beside the real slot-area layout), so nothing
     // shifts when it swaps.
     return (
-      <div className={cn(CARD_CLASS, flowHeight, className)}>
+      <div className={cn(CARD_CLASS, flowHeight, formOnly && 'bg-ods-bg', className)}>
         <div className={CARD_INNER_CLASS}>
-          <ContextPanelSkeleton onBack={onBack} className={CONTEXT_PANEL_CLASS} />
+          {!formOnly && <ContextPanelSkeleton onBack={onBack} className={CONTEXT_PANEL_CLASS} />}
           <div className={ACTION_PANEL_CLASS}>
             {/* Both terms matter. Without `flow` this stays a calendar where
                 the form belongs; without the step term, paging a month AFTER
@@ -651,45 +666,51 @@ export function HubSpotMeetingScheduler({
   // ---- the card ------------------------------------------------------------
 
   return (
-    <div className={cn(CARD_CLASS, flowHeight, className)}>
+    <div className={cn(CARD_CLASS, flowHeight, formOnly && 'bg-ods-bg', className)}>
       <div className={CARD_INNER_CLASS}>
-        <SchedulerContextPanel
-          hosts={shownHosts}
-          title={title}
-          description={description}
-          durationsMs={durations}
-          selectedDurationMs={durationMs}
-          onSelectDuration={ms => {
-            setDurationMs(ms);
-            setSelectedDay(null);
-            setSelectedSlot(null);
-            // slot-first only. In details-first `details` is step ONE, so this
-            // would yank a mid-typing visitor onto the calendar and unmount the
-            // form under them.
-            if (!detailsFirst && step === 'details') setStep('slot');
-          }}
-          timezone={timezone}
-          onTimezoneChange={setTimezone}
-          // ONE back edge for the whole card, in the panel that never swaps.
-          // Its destination is simply "the previous step": from the form back
-          // to the calendar, from the calendar out of the scheduler (if the
-          // host gave us an exit at all). Two Backs on screen reading the same
-          // word with different destinations was the ambiguity the details
-          // step used to carry.
-          // details-first inverts the mapping: the form is step ONE, so Back at
-          // `details` is the host's exit and Back at `slot` returns to the form.
-          onBack={detailsFirst ? (step === 'slot' ? backToDetails : onBack) : step === 'details' ? backToSlot : onBack}
-          // In details-first the duration/zone selectors stay live while the
-          // form is filled — but must freeze once a POST is in flight, or a
-          // mid-flight change clears the slot under the spinner while the body
-          // already built carries the old duration.
-          locked={detailsFirst ? step === 'confirmed' || isSubmitting : step !== 'slot'}
-          // The zone still governs every time on screen — including the
-          // summary line on the form — so the picker stays until there is
-          // nothing left to re-read in it.
-          showTimezone={step !== 'confirmed'}
-          className={CONTEXT_PANEL_CLASS}
-        />
+        {!formOnly && (
+          <SchedulerContextPanel
+            hosts={shownHosts}
+            title={title}
+            description={description}
+            durationsMs={durations}
+            selectedDurationMs={durationMs}
+            onSelectDuration={ms => {
+              setDurationMs(ms);
+              setSelectedDay(null);
+              setSelectedSlot(null);
+              // slot-first only. In details-first `details` is step ONE, so this
+              // would yank a mid-typing visitor onto the calendar and unmount the
+              // form under them.
+              if (!detailsFirst && step === 'details') setStep('slot');
+            }}
+            timezone={timezone}
+            onTimezoneChange={setTimezone}
+            // ONE back edge for the whole card, in the panel that never swaps.
+            // Its destination is simply "the previous step": from the form back
+            // to the calendar, from the calendar out of the scheduler (if the
+            // host gave us an exit at all). Two Backs on screen reading the same
+            // word with different destinations was the ambiguity the details
+            // step used to carry.
+            // details-first inverts the mapping: the form is step ONE, so Back at
+            // `details` is the host's exit and Back at `slot` returns to the form.
+            onBack={
+              detailsFirst ? (step === 'slot' ? backToDetails : onBack) : step === 'details' ? backToSlot : onBack
+            }
+            // In details-first the duration/zone selectors stay live while the
+            // form is filled — but must freeze once a POST is in flight, or a
+            // mid-flight change clears the slot under the spinner while the body
+            // already built carries the old duration.
+            locked={detailsFirst ? step === 'confirmed' || isSubmitting : step !== 'slot'}
+            // The zone still governs every time on screen — including the
+            // summary line on the form — so the picker stays until there is
+            // nothing left to re-read in it.
+            showTimezone={step !== 'confirmed'}
+            // The mock's calendar step states the length, it does not offer it.
+            fixedDuration={detailsFirst}
+            className={CONTEXT_PANEL_CLASS}
+          />
+        )}
 
         {/* Scrolls INSIDE the fixed card rather than growing it — see
             MEETING_SCHEDULER_H. `min-h-0` is what lets it: a flex item's

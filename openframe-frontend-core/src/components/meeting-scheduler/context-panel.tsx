@@ -47,6 +47,14 @@ export interface SchedulerContextPanelProps {
    *  states the length and a live selector beside a filled-in form invites a
    *  change that would throw the form away. Going Back restores them. */
   locked?: boolean;
+  /**
+   * The link's length is not the visitor's to choose here: the static duration
+   * line renders and the chips never do, at every step. `flow="details-first"`
+   * sets it — the mock draws "30 min call" beside the host on the calendar step
+   * and offers no selector — and unlike `locked` it has NO effect on the
+   * timezone picker, which on that step is the only control the visitor has.
+   */
+  fixedDuration?: boolean;
   /** Whether the timezone picker renders. Default true: the zone governs every
    *  time on screen, the form's summary line included, so it stays reachable
    *  right up to the confirmation — where there is nothing left to re-read. */
@@ -165,6 +173,7 @@ export function SchedulerContextPanel({
   onBack,
   backLabel = 'Back',
   locked = false,
+  fixedDuration = false,
   showTimezone = true,
   className,
 }: SchedulerContextPanelProps) {
@@ -223,8 +232,9 @@ export function SchedulerContextPanel({
               </div>
             )}
 
-            {locked || durationsMs.length <= 1
-              ? // Post-selection, or a link that offers one length: a static line,
+            {locked || fixedDuration || durationsMs.length <= 1
+              ? // Post-selection, a fixed-length flow, or a link that offers one
+                // length: a static line,
                 // which is what sits beside the host on the header-strip layouts.
                 selectedDurationMs != null && (
                   <p className="shrink-0 text-ods-text-secondary text-h6">
@@ -239,7 +249,7 @@ export function SchedulerContextPanel({
 
           {/* Several lengths on offer: chips, which need a full row of their
               own at every width — so they stay OUT of the identity row. */}
-          {!locked && durationsMs.length > 1 && (
+          {!locked && !fixedDuration && durationsMs.length > 1 && (
             <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
               <p className={FIELD_LABEL_CLASS}>Duration</p>
               <div className="flex flex-wrap gap-[var(--spacing-system-xs)]">

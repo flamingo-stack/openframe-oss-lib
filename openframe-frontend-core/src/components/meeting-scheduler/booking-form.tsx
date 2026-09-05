@@ -24,6 +24,7 @@ import {
   SelectContent,
   SelectItem,
   Checkbox,
+  CheckboxBlock,
   RadioGroup,
   RadioGroupItem,
   Skeleton,
@@ -423,40 +424,44 @@ export function BookingForm({
         // wrapper is `display:contents` and the panel below is the flex item,
         // exactly as it was.
         <FieldWrapper error={errors.legalConsentResponses?.message}>
-          <div className="flex flex-col gap-[var(--spacing-system-xs)] rounded-md border border-ods-border p-[var(--spacing-system-m)]">
-            {/* GDPR surface — HubSpot's consent copy rendered VERBATIM, never edited. */}
-            <p className="text-ods-text-secondary text-h6">{legalConsent.processingConsentText}</p>
-            {legalConsent.communicationConsentText && (
-              <p className="text-ods-text-secondary text-h6">{legalConsent.communicationConsentText}</p>
-            )}
+          <div className="flex flex-col gap-[var(--spacing-system-xs)]">
             <Controller
               control={control}
               name="legalConsentResponses"
               render={({ field: rhf }) => (
                 <>
-                  {legalConsent.communicationConsentCheckboxes.map(box => {
+                  {legalConsent.communicationConsentCheckboxes.map((box, index) => {
                     const responses = (rhf.value ?? []) as Array<{ communicationTypeId: string; consented: boolean }>;
                     const current = responses.find(r => r.communicationTypeId === box.communicationTypeId);
                     return (
-                      <div key={box.communicationTypeId} className="flex items-center gap-[var(--spacing-system-xs)]">
-                        <Checkbox
-                          id={`ms-consent-${box.communicationTypeId}`}
-                          checked={current?.consented ?? false}
-                          onCheckedChange={v =>
-                            rhf.onChange(
-                              responses.map(r =>
-                                r.communicationTypeId === box.communicationTypeId ? { ...r, consented: v === true } : r,
-                              ),
-                            )
-                          }
-                        />
-                        <Label htmlFor={`ms-consent-${box.communicationTypeId}`}>{box.label}</Label>
-                      </div>
+                      // The design system's consent row (`checkbox-block`, the
+                      // same block the waitlist form uses): box, label, caption
+                      // in one bordered row. GDPR surface — HubSpot's copy is
+                      // rendered VERBATIM, never edited. The processing statement
+                      // rides as the caption of the FIRST row, once: it describes
+                      // the consent as a whole, not each channel.
+                      <CheckboxBlock
+                        key={box.communicationTypeId}
+                        id={`ms-consent-${box.communicationTypeId}`}
+                        checked={current?.consented ?? false}
+                        onCheckedChange={v =>
+                          rhf.onChange(
+                            responses.map(r =>
+                              r.communicationTypeId === box.communicationTypeId ? { ...r, consented: v } : r,
+                            ),
+                          )
+                        }
+                        label={box.label}
+                        description={index === 0 ? legalConsent.processingConsentText : undefined}
+                      />
                     );
                   })}
                 </>
               )}
             />
+            {legalConsent.communicationConsentText && (
+              <p className="text-ods-text-secondary text-h6">{legalConsent.communicationConsentText}</p>
+            )}
             {legalConsent.privacyPolicyText && (
               <p className="text-ods-text-secondary text-h6">{legalConsent.privacyPolicyText}</p>
             )}
