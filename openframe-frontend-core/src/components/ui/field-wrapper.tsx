@@ -34,6 +34,13 @@ export interface FieldWrapperProps {
    * default stays the converged small scale.
    */
   labelVariant?: 'default' | 'large';
+  /**
+   * Marks the label with the accent asterisk `ContactForm` draws on its
+   * required fields (`Label<span class="text-ods-accent">*</span>`), so a form
+   * mixing both never shows two conventions. Visual only — the CONTROL carries
+   * `required`/`aria-required` for assistive tech; the star is `aria-hidden`.
+   */
+  required?: boolean;
   /** Additional className for the outer wrapper */
   className?: string;
   children: ReactNode;
@@ -47,7 +54,10 @@ const errorVariantClasses = {
 } as const;
 
 const FieldWrapper = forwardRef<HTMLDivElement, FieldWrapperProps>(
-  ({ label, htmlFor, error, errorVariant = 'error', labelVariant = 'default', className, children }, ref) => {
+  (
+    { label, htmlFor, error, errorVariant = 'error', labelVariant = 'default', required = false, className, children },
+    ref,
+  ) => {
     const hasChrome = label != null || error != null;
 
     return (
@@ -60,6 +70,11 @@ const FieldWrapper = forwardRef<HTMLDivElement, FieldWrapperProps>(
           // reporting. One label scale, owned here and in Field together.
           <Label className="mb-1" htmlFor={htmlFor} variant={labelVariant}>
             {label}
+            {required && (
+              <span aria-hidden className="text-ods-accent">
+                *
+              </span>
+            )}
           </Label>
         )}
         {children}
