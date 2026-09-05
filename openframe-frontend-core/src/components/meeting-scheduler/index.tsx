@@ -33,9 +33,14 @@
  *
  * State machine: slot → details → confirmed, with a back edge, a "book
  * another" reset, and a `submitting` lock as the double-booking guard.
+ * `flow="details-first"` (opt-in, campaign landing pages) inverts it: the
+ * form is step ONE and renders alone, the slot click submits the frozen
+ * answers, and a details error routes back to the repopulated form — see
+ * `SCHEDULER_FLOW_PRESETS` and the `detailsFirst` branches below.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { useMeetingBooking } from '../../hooks/use-meeting-booking';
@@ -50,7 +55,19 @@ import {
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { Alert, AlertDescription, Button } from '../ui';
-import { BookingForm } from './booking-form';
+import { BookingForm, BookingFormSkeleton, type BookingFormProps } from './booking-form';
+
+// The override surface: a host builds its `detailsForm` by re-rendering
+// `BookingForm` with `fieldRows`, so it needs both from this entry point (the
+// package exports `./components/meeting-scheduler`, not the file beneath it).
+export {
+  BookingForm,
+  BookingFormSkeleton,
+  type BookingFormProps,
+  type BookingFieldRow,
+  type BookingFieldSlot,
+  type BookingFormConsent,
+} from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';
 import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
@@ -101,9 +118,47 @@ export interface HubSpotMeetingSchedulerProps {
   onBack?: () => void;
   onBooked?: (b: BookingConfirmation) => void;
   className?: string;
+  /**
+   * Panel order.
+   *
+   * `'slot-first'` (default, unchanged): calendar → details → confirmed.
+   * `'details-first'`: the form comes FIRST and the slot click submits the
+   * already-validated payload. Campaign landing pages use it, where "tell us
+   * about your setup, then pick a time" is the conversion shape.
+   *
+   * This is not a cosmetic swap — see the flow-dependent branches below. It is
+   * opt-in precisely so `slot-first` stays byte-identical.
+   */
+  flow?: SchedulerFlow;
+  /**
+   * Replace the details panel — step ONE under `flow="details-first"`, step two
+   * otherwise — with a host-supplied form. It receives exactly what the built-in
+   * one does, so the injected form keeps the widget's contract: the deferred
+   * schema, the honeypot and elapsed-ms signals, the verbatim consent block, the
+   * `onSubmit` handoff and the `isSubmitting` lock.
+   *
+   * The intended shape is a THIN wrapper that re-renders `BookingForm` with
+   * `fieldRows` (a layout re-arrangement, all machinery reused), not a
+   * hand-written form. Anything reimplementing the contract loses the bot
+   * protection and the consent guarantees.
+   *
+   * A COMPONENT type, not a render callback: React then owns its identity, so
+   * it reconciles across steps and keeps its own state instead of remounting —
+   * and the honeypot `ref` rides through as a normal prop.
+   *
+   * Defaults to the built-in form, so every existing embed is untouched.
+   */
+  detailsForm?: ComponentType<BookingFormProps>;
 }
 
 type Step = 'slot' | 'details' | 'confirmed';
+
+/** Values collected at the details step, held until a slot picks the instant. */
+type StashedDetails = {
+  payload: Record<string, unknown>;
+  /** Humanity signals captured while the form (and its honeypot) was mounted. */
+  signals: Record<string, string | number>;
+};
 
 /** Context-panel geometry — ONE definition for the loaded card and the
  *  loading skeleton, which is what keeps the two footprint-identical. */
@@ -185,6 +240,49 @@ const PANEL_STEP_CLASS = 'p-[var(--spacing-system-l)] md:min-h-0 md:overflow-y-a
 export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]';
 
 /**
+ * The same box for `flow="details-first"`, where the tallest stage is the
+ * DETAILS FORM (email + first/last + the link's declared questions + the
+ * consent block + Continue) rather than the calendar.
+ *
+ * Still a fixed pair, not a floor: everything below the card derives a definite
+ * height from it, and a floor was already tried here — it pinned the short
+ * stages and let the tall one push the wrapper, which is the screen-shake the
+ * fixed height exists to remove.
+ *
+ * ONE number from `md` up, not two: 638px, the card both mocks draw
+ * (`4904:117130` form-only, `4904:118213` three columns). The form stage has no
+ * sidebar to stack into a header strip, so nothing about it changes between
+ * tablet and desktop, and the calendar stage fits the same box at both — the
+ * times column scrolls inside it as it always has.
+ *
+ * A host reserving the box for a details-first card reserves THIS, not the
+ * constant above.
+ */
+export const MEETING_SCHEDULER_DETAILS_FIRST_H = 'md:h-[39.875rem]';
+
+export type SchedulerFlow = 'slot-first' | 'details-first';
+
+/**
+ * What differs between the two flows as DATA — first step, the box a host
+ * reserves, the form's submit copy. Exported so a host that swaps the card in
+ * and out reads `SCHEDULER_FLOW_PRESETS[flow].height` instead of re-deriving
+ * the pairing. The behavioural branches (lock, back edge, error routing) stay
+ * in the component: they are logic, not configuration.
+ */
+export const SCHEDULER_FLOW_PRESETS: Record<
+  SchedulerFlow,
+  { initialStep: 'slot' | 'details'; height: string; submitLabel?: string; footerNote?: string }
+> = {
+  'slot-first': { initialStep: 'slot', height: MEETING_SCHEDULER_H },
+  'details-first': {
+    initialStep: 'details',
+    height: MEETING_SCHEDULER_DETAILS_FIRST_H,
+    submitLabel: 'Continue',
+    footerNote: 'Next step: pick a slot that works. Calendar invite lands right after.',
+  },
+};
+
+/**
  * The two-panel card's box, shared verbatim by the loading skeleton and the
  * loaded card so neither can drift from the other.
  *
@@ -214,7 +312,9 @@ export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]';
 const CARD_CLASS = cn(
   'overflow-hidden rounded-md border border-ods-border bg-ods-card',
   'md:flex md:flex-col',
-  MEETING_SCHEDULER_H,
+  // The height is NOT baked in any more: it is chosen per flow at each render
+  // site (`flowHeight`), because details-first needs a taller box and both
+  // constants are module scope.
 );
 
 /** Context strip over action panel, side by side from `lg`. `md:flex-1
@@ -231,8 +331,24 @@ const CARD_INNER_CLASS = 'flex flex-col md:min-h-0 md:flex-1 lg:h-full lg:flex-r
 const CARD_DEGRADED_CLASS = cn(
   'flex flex-col items-start gap-[var(--spacing-system-m)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)]',
   'md:justify-center md:overflow-y-auto',
-  MEETING_SCHEDULER_H,
 );
+
+/**
+ * The two-line stages of the card (load failure, "booked on HubSpot", a host's
+ * own "calendar unavailable") — ONE shape, exported so a host renders its
+ * fallback in the same box instead of re-typing the chrome.
+ */
+export function SchedulerDegradedCard({
+  heightClass,
+  className,
+  children,
+}: {
+  heightClass: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return <div className={cn(CARD_DEGRADED_CLASS, heightClass, className)}>{children}</div>;
+}
 
 /**
  * Fail-closed gate: a link whose declared questions include an unsupported
@@ -262,6 +378,8 @@ export function HubSpotMeetingScheduler({
   onBack,
   onBooked,
   className,
+  flow = 'slot-first',
+  detailsForm: DetailsForm = BookingForm,
 }: HubSpotMeetingSchedulerProps) {
   const {
     availability,
@@ -274,6 +392,8 @@ export function HubSpotMeetingScheduler({
     book,
     isSubmitting,
   } = useMeetingBooking({ meetingId, apiBaseUrl, initialAvailability });
+
+  const detailsFirst = flow === 'details-first';
 
   // Zone resolution happens POST-mount (Intl) unless the embedder pins one —
   // the initial (server) render stays deterministic; time labels appear once
@@ -297,7 +417,23 @@ export function HubSpotMeetingScheduler({
   }, [hydrated]);
   const timezone = pickedTimezone ?? displayTimezone ?? resolvedLocalTimezone;
 
-  const [step, setStep] = useState<Step>('slot');
+  const preset = SCHEDULER_FLOW_PRESETS[flow];
+  const [step, setStep] = useState<Step>(preset.initialStep);
+  // State, not a ref: the link-swap reset below writes it DURING RENDER, and
+  // this file's own rule forbids writing a ref there. "Frozen" means written
+  // once at Continue, not `useRef`.
+  const [stash, setStash] = useState<StashedDetails | null>(null);
+  /** Synchronous in-flight lock for the details-first slot click — see `onSelectSlot`. */
+  const inFlightRef = useRef(false);
+
+  /**
+   * details-first step ONE is the form and nothing else — the mock
+   * (`4904:117130`) draws no context panel beside it, and paints the card on the
+   * page ground so the fields read as the raised elements. The panel (host,
+   * fixed length, timezone, and the Back edge to this form) belongs to the
+   * calendar step, exactly as slot-first has always drawn it.
+   */
+  const formOnly = detailsFirst && step === 'details';
   const [pickedDurationMs, setDurationMs] = useState<number | null>(null);
   const [pickedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
@@ -316,12 +452,16 @@ export function HubSpotMeetingScheduler({
   const [machineFor, setMachineFor] = useState(meetingId);
   if (machineFor !== meetingId) {
     setMachineFor(meetingId);
-    setStep('slot');
+    setStep(preset.initialStep);
     setDurationMs(null);
     setSelectedDay(null);
     setSelectedSlot(null);
     setConfirmation(null);
     setBookingError(null);
+    // Clearing the stash is load-bearing: otherwise the swapped-in link would
+    // POST the PREVIOUS link's answers, against a schema the server rebuilds
+    // from the new link's metadata.
+    setStash(null);
   }
   useEffect(() => {
     autoAdvanceCount.current = 0;
@@ -396,10 +536,53 @@ export function HubSpotMeetingScheduler({
     setBookingError(null);
   }, []);
 
+  /** details-first's inverse: back from the CALENDAR to the form. The stash is
+   *  what repopulates it, so nothing is cleared here but the error. */
+  const backToDetails = useCallback(() => {
+    setStep('details');
+    setBookingError(null);
+  }, []);
+
+  /**
+   * details-first: Continue does not POST. It validates, freezes the answers
+   * and the humanity signals (captured HERE, while the form and its honeypot
+   * are still mounted — `getSignals()` reads a detached ref once they unmount),
+   * and hands over to the calendar.
+   */
+  const stashDetails = useCallback(
+    (payload: Record<string, unknown>): Promise<void> => {
+      setBookingError(null);
+      setStash({ payload, signals: getSignals() });
+      setStep('slot');
+      // The visitor has been filling a form; the month they are about to see
+      // may have moved on, and its hop budget should start fresh.
+      autoAdvanceCount.current = 0;
+      void refetchAvailability();
+      // Deliberately NOT `async`: nothing here is awaited. The refetch is
+      // fire-and-forget so the calendar paints from cache the moment the step
+      // flips, and awaiting it would hold `BookingForm`'s isSubmitting past
+      // the unmount. `onSubmit` is Promise-returning, hence the explicit
+      // resolve rather than an empty async body (which `require-await` flags).
+      return Promise.resolve();
+    },
+    [getSignals, refetchAvailability],
+  );
+
   const handleSubmit = useCallback(
     async (payload: Record<string, unknown>) => {
+      // Captured BEFORE the clear below: `book()` reports a re-entrant call as
+      // a VALIDATION code carrying the message 'Already submitting', and by
+      // then this clear has already run — so a double-click would wipe a
+      // visible SLOT_TAKEN alert on its way to being ignored.
+      const priorError = bookingError;
       setBookingError(null);
       const result = await book(payload);
+
+      // Not an error: the hook's in-flight guard. No toast, no step change.
+      if (!result.ok && result.message === 'Already submitting') {
+        setBookingError(priorError);
+        return;
+      }
       if (result.ok && result.confirmation) {
         setConfirmation(result.confirmation);
         setStep('confirmed');
@@ -413,8 +596,23 @@ export function HubSpotMeetingScheduler({
         // signal so the retry isn't flagged too-fast.
         setSelectedSlot(null);
         setStep('slot');
-        resetSignals();
+        // NOT in details-first: the retry re-POSTs the frozen stash, so
+        // `getSignals()` is never consulted again — but `resetSignals()` also
+        // re-stamps `startedAtRef`, which would make a LATER Continue (after a
+        // VALIDATION round-trip) read as too-fast against the min-fill floor.
+        if (!detailsFirst) resetSignals();
         void refetchAvailability();
+      } else if (detailsFirst && (code === 'VALIDATION' || code === 'INVALID_EMAIL')) {
+        // DETAILS errors in details-first: the form is unmounted by now, so
+        // send the visitor back to it (the stash repopulates every answer) AND
+        // say why — a silent return to an unchanged form reads as nothing
+        // having happened.
+        setStep('details');
+        toast({
+          variant: 'error',
+          title: 'Booking failed',
+          description: BOOKING_ERROR_COPY[code],
+        });
       } else {
         // The error surface is the TOAST, full stop (host-mounted Toaster —
         // every hub platform mounts it globally; embedders must too).
@@ -425,7 +623,7 @@ export function HubSpotMeetingScheduler({
         });
       }
     },
-    [book, onBooked, refetchAvailability, resetSignals, toast],
+    [book, bookingError, detailsFirst, onBooked, refetchAvailability, resetSignals, toast],
   );
 
   const escapeHatch = fallbackUrl ? (
@@ -436,78 +634,112 @@ export function HubSpotMeetingScheduler({
 
   // ---- terminal / degraded states -----------------------------------------
 
+  /**
+   * The card states ONE height and everything inside derives from it (see
+   * `MEETING_SCHEDULER_H`). details-first's tallest stage is the form, so it
+   * gets its own fixed pair rather than a floor — a floor was tried here before
+   * and let the tall stage push the wrapper.
+   *
+   * Placed BEFORE the host `className`: `cn` is tailwind-merge-backed and
+   * last-wins, so appending it after would make a host's own `h-*` unreachable,
+   * which is the override the height-inside-CARD_CLASS arrangement allows today.
+   */
+  const flowHeight = preset.height;
+
+  /** One card SHAPE for both degraded returns below. */
+  const degradedCard = (
+    <SchedulerDegradedCard heightClass={flowHeight} className={className}>
+      <p className="text-ods-text-secondary text-h6">
+        We couldn&apos;t load available call times. Please try again shortly.
+      </p>
+      {escapeHatch}
+    </SchedulerDegradedCard>
+  );
+
   if (isLoadingAvailability && !availability) {
     // COLD start only — a month already in the query cache renders straight
     // into the loaded card. Composed inside the SAME wrappers as that card
     // (`ContextPanelSkeleton` beside the real slot-area layout), so nothing
     // shifts when it swaps.
     return (
-      <div className={cn(CARD_CLASS, className)}>
+      <div className={cn(CARD_CLASS, flowHeight, formOnly && 'bg-ods-bg', className)}>
         <div className={CARD_INNER_CLASS}>
-          <ContextPanelSkeleton onBack={onBack} className={CONTEXT_PANEL_CLASS} />
+          {!formOnly && <ContextPanelSkeleton onBack={onBack} className={CONTEXT_PANEL_CLASS} />}
           <div className={ACTION_PANEL_CLASS}>
-            <SlotPickerSkeleton monthOffset={monthOffset} />
+            {/* Both terms matter. Without `flow` this stays a calendar where
+                the form belongs; without the step term, paging a month AFTER
+                Continue (which happens at `step === 'slot'`) would swap the
+                calendar out for a form skeleton and back. */}
+            {detailsFirst && step === 'details' ? (
+              <BookingFormSkeleton />
+            ) : (
+              <SlotPickerSkeleton monthOffset={monthOffset} />
+            )}
           </div>
         </div>
       </div>
     );
   }
 
-  if (availabilityError || !availability) {
-    return (
-      <div className={cn(CARD_DEGRADED_CLASS, className)}>
-        <p className="text-ods-text-secondary text-h6">
-          We couldn&apos;t load available call times. Please try again shortly.
-        </p>
-        {escapeHatch}
-      </div>
-    );
-  }
+  if (availabilityError || !availability) return degradedCard;
 
   if (!isNativelyBookable(availability)) {
     // Fail closed — never render a half-working native form on a link with
     // questions or consent we can't faithfully reproduce.
     return (
-      <div className={cn(CARD_DEGRADED_CLASS, className)}>
+      <SchedulerDegradedCard heightClass={flowHeight} className={className}>
         <p className="text-ods-text-secondary text-h6">This meeting type is booked directly on HubSpot.</p>
         {escapeHatch}
-      </div>
+      </SchedulerDegradedCard>
     );
   }
 
   // ---- the card ------------------------------------------------------------
 
   return (
-    <div className={cn(CARD_CLASS, className)}>
+    <div className={cn(CARD_CLASS, flowHeight, formOnly && 'bg-ods-bg', className)}>
       <div className={CARD_INNER_CLASS}>
-        <SchedulerContextPanel
-          hosts={shownHosts}
-          title={title}
-          description={description}
-          durationsMs={durations}
-          selectedDurationMs={durationMs}
-          onSelectDuration={ms => {
-            setDurationMs(ms);
-            setSelectedDay(null);
-            setSelectedSlot(null);
-            if (step === 'details') setStep('slot');
-          }}
-          timezone={timezone}
-          onTimezoneChange={setTimezone}
-          // ONE back edge for the whole card, in the panel that never swaps.
-          // Its destination is simply "the previous step": from the form back
-          // to the calendar, from the calendar out of the scheduler (if the
-          // host gave us an exit at all). Two Backs on screen reading the same
-          // word with different destinations was the ambiguity the details
-          // step used to carry.
-          onBack={step === 'details' ? backToSlot : onBack}
-          locked={step !== 'slot'}
-          // The zone still governs every time on screen — including the
-          // summary line on the form — so the picker stays until there is
-          // nothing left to re-read in it.
-          showTimezone={step !== 'confirmed'}
-          className={CONTEXT_PANEL_CLASS}
-        />
+        {!formOnly && (
+          <SchedulerContextPanel
+            hosts={shownHosts}
+            title={title}
+            description={description}
+            durationsMs={durations}
+            selectedDurationMs={durationMs}
+            onSelectDuration={ms => {
+              setDurationMs(ms);
+              setSelectedDay(null);
+              setSelectedSlot(null);
+              // slot-first only. In details-first `details` is step ONE, so this
+              // would yank a mid-typing visitor onto the calendar and unmount the
+              // form under them.
+              if (!detailsFirst && step === 'details') setStep('slot');
+            }}
+            timezone={timezone}
+            onTimezoneChange={setTimezone}
+            // ONE back edge for the whole card, in the panel that never swaps.
+            // Its destination is simply "the previous step": from the form back
+            // to the calendar, from the calendar out of the scheduler (if the
+            // host gave us an exit at all). Two Backs on screen reading the same
+            // word with different destinations was the ambiguity the details
+            // step used to carry.
+            // details-first inverts the mapping: the form is step ONE, so Back at
+            // `details` is the host's exit and Back at `slot` returns to the form.
+            onBack={
+              detailsFirst ? (step === 'slot' ? backToDetails : onBack) : step === 'details' ? backToSlot : onBack
+            }
+            // In details-first the duration/zone selectors stay live while the
+            // form is filled — but must freeze once a POST is in flight, or a
+            // mid-flight change clears the slot under the spinner while the body
+            // already built carries the old duration.
+            locked={detailsFirst ? step === 'confirmed' || isSubmitting : step !== 'slot'}
+            // The zone still governs every time on screen — including the
+            // summary line on the form — so the picker stays until there is
+            // nothing left to re-read in it.
+            showTimezone={step !== 'confirmed'}
+            className={CONTEXT_PANEL_CLASS}
+          />
+        )}
 
         {/* Scrolls INSIDE the fixed card rather than growing it — see
             MEETING_SCHEDULER_H. `min-h-0` is what lets it: a flex item's
@@ -517,32 +749,48 @@ export function HubSpotMeetingScheduler({
             <div className={cn('flex flex-1 flex-col', PANEL_STEP_CLASS)}>
               <Confirmation confirmation={confirmation} timezone={timezone} />
             </div>
-          ) : step === 'details' && durationMs != null && selectedSlot != null && timezone ? (
+          ) : step === 'details' &&
+            (detailsFirst
+              ? // The form is step ONE here: no slot yet, and `timezone` is null
+                // on the server render, so neither may gate the PANEL. A link
+                // publishing no durations has no form worth showing.
+                durations.length > 0
+              : durationMs != null && selectedSlot != null && timezone) ? (
             <div className={cn('flex flex-1 flex-col gap-[var(--spacing-system-m)]', PANEL_STEP_CLASS)}>
               {/* Top-aligned, and no back edge of its own: the ONE back edge
                   lives in the context panel at every step (see `contextBack`),
                   which is where the design puts it and the only spot that
-                  stays put while this side swaps between calendar and form. */}
-              <p className="text-ods-text-primary text-h4">
-                {new Intl.DateTimeFormat(undefined, {
-                  timeZone: timezone,
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  timeZoneName: 'short',
-                }).format(new Date(selectedSlot))}{' '}
-                · {formatDurationCompact(durationMs / 1000)}
-              </p>
-              <BookingForm
+                  stays put while this side swaps between calendar and form.
+
+                  The summary keeps its OWN guard — including `timezone`, which
+                  is null pre-hydration and which `Intl.DateTimeFormat` throws a
+                  RangeError on rather than ignoring. */}
+              {selectedSlot != null && durationMs != null && timezone != null && (
+                <p className="text-ods-text-primary text-h4">
+                  {new Intl.DateTimeFormat(undefined, {
+                    timeZone: timezone,
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    timeZoneName: 'short',
+                  }).format(new Date(selectedSlot))}{' '}
+                  · {formatDurationCompact(durationMs / 1000)}
+                </p>
+              )}
+              <DetailsForm
                 availability={availability}
                 meetingId={meetingId}
-                startTimeMs={selectedSlot}
-                durationMs={durationMs}
+                startTimeMs={selectedSlot ?? undefined}
+                durationMs={durationMs ?? undefined}
                 timezone={timezone}
+                deferSlot={detailsFirst}
+                submitLabel={preset.submitLabel}
+                footerNote={preset.footerNote}
+                initialValues={detailsFirst ? stash?.payload : undefined}
                 isSubmitting={isSubmitting}
-                onSubmit={handleSubmit}
+                onSubmit={detailsFirst ? stashDetails : handleSubmit}
                 honeypotInputProps={honeypotInputProps}
                 getSignals={getSignals}
               />
@@ -569,18 +817,53 @@ export function HubSpotMeetingScheduler({
                   timezone={timezone}
                   monthOffset={monthOffset}
                   onMonthOffsetChange={o => {
+                    // details-first: a POST is in flight from this grid; paging
+                    // would clear the spinning chip and swap the key under it.
+                    if (detailsFirst && isSubmitting) return;
                     setSelectedDay(null);
                     setSelectedSlot(null);
                     setMonthOffset(o);
                   }}
                   selectedSlot={selectedSlot}
                   onSelectSlot={ms => {
+                    if (!detailsFirst) {
+                      setSelectedSlot(ms);
+                      setStep('details');
+                      return;
+                    }
+                    // details-first: the slot IS the submit. The step stays
+                    // 'slot' for the whole POST — moving it here would unmount
+                    // the chip the spinner lives on and fight the SLOT_TAKEN
+                    // branch, which puts the visitor back on this calendar.
+                    // `isSubmitting` is the render's snapshot; a second chip
+                    // clicked in the same frame sees it false. The ref is the
+                    // synchronous lock, so the second click changes nothing.
+                    if (isSubmitting || inFlightRef.current || !stash) return;
+                    inFlightRef.current = true;
                     setSelectedSlot(ms);
-                    setStep('details');
+                    void handleSubmit({
+                      ...stash.payload,
+                      ...stash.signals,
+                      meetingId,
+                      // `ms`, NOT `selectedSlot` — the setState above has not
+                      // committed inside this handler, so state holds null on
+                      // the first booking and the PREVIOUS slot on a retry.
+                      startTimeMs: ms,
+                      // Live values: both stay editable after Continue, so the
+                      // copies frozen at that point can be stale.
+                      durationMs,
+                      timezone,
+                    }).finally(() => {
+                      inFlightRef.current = false;
+                    });
                   }}
                   selectedDay={selectedDay}
                   onSelectDay={setSelectedDay}
                   isLoading={isLoadingAvailability}
+                  // Distinct from `isLoading`, which swaps the whole times
+                  // column for a skeleton: the grid must stay up with the
+                  // clicked chip spinning.
+                  isSubmitting={detailsFirst ? isSubmitting : undefined}
                 />
               ) : durations.length === 0 && !isFetchingAvailability ? (
                 // The LINK publishes nothing at all — a different thing from a

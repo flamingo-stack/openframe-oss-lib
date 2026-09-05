@@ -158,18 +158,155 @@ export type MeetingBookingErrorCode = (typeof MEETING_BOOKING_ERROR_CODES)[numbe
 // ---------------------------------------------------------------------------
 
 /**
- * HubSpot custom-question types the native form supports. The widget's
- * renderer switches over THIS set and `makeBookingSchema` maps over THIS set;
- * fail-closed = a field whose `type` is not in the set (the widget then
- * renders the "Open in HubSpot" escape hatch for that link instead of a
- * half-working native form). Exact upstream type strings are pinned against
- * the rollout fixture link — extend here (renderer + validator move together).
+ * THE registry of HubSpot question types the native form supports — one entry
+ * per `fieldType`, and the ONLY place a type is declared. Everything else
+ * derives from it: `SupportedFormFieldType` is its key union,
+ * `SUPPORTED_FORM_FIELD_TYPES` its keys, `FORM_FIELD_TYPES_WITH_OPTIONS` the
+ * entries that carry `options`, and `makeBookingSchema` maps each answer
+ * through the entry's validator. The widget's control table
+ * (`booking-form.tsx`) is a `Record` over the same key union, so a type added
+ * here without a control is a COMPILE error, not a silent gap.
+ *
+ * Fail-closed: a `fieldType` with no entry makes the link "not natively
+ * bookable" and the card falls back to the HubSpot escape hatch.
+ *
+ * Every string type rides the wire as a STRING (HubSpot's book endpoint takes
+ * `{ name, value: string }`); `checkbox` is the one boolean. `number` is a
+ * Number property validated as a decimal literal — what `<input type="number">`
+ * emits and what the property stores.
  */
-export const SUPPORTED_FORM_FIELD_TYPES = ['text', 'textarea', 'select', 'radio', 'checkbox'] as const;
-export type SupportedFormFieldType = (typeof SUPPORTED_FORM_FIELD_TYPES)[number];
+export interface FormFieldTypeSpec {
+  /** The answer's wire shape, which also decides how required/optional wraps it. */
+  kind: 'string' | 'boolean';
+  /** Whether HubSpot publishes `options` for the type (the pickers). */
+  hasOptions: boolean;
+  /**
+   * The validator for ONE answer. String types EXTEND `base`, which already
+   * carries the required-ness (`min(1)` when required) — so "X is required" is
+   * the first issue reported for an empty answer, ahead of the type's own rule.
+   * Boolean types ignore it.
+   */
+  validator: (field: MeetingFormField, base: z.ZodString) => z.ZodTypeAny;
+  /** The control's placeholder, derived from the field (the mock's "Enter Company Name"). */
+  placeholder?: (field: MeetingFormField) => string;
+}
 
-export function isSupportedFormField(field: MeetingFormField): boolean {
-  return (SUPPORTED_FORM_FIELD_TYPES as readonly string[]).includes(field.type);
+const optionValidator: FormFieldTypeSpec['validator'] = (field, base) =>
+  base.refine(v => !v || (field.options ?? []).includes(v), {
+    message: `Please choose a valid option for ${field.label}`,
+  });
+
+export const FORM_FIELD_TYPES = {
+  text: {
+    kind: 'string',
+    hasOptions: false,
+    validator: (field, base) => base.max(1000, { message: `${field.label} is too long` }),
+    placeholder: field => `Enter ${field.label}`,
+  },
+  textarea: {
+    kind: 'string',
+    hasOptions: false,
+    validator: (field, base) => base.max(5000, { message: `${field.label} is too long` }),
+    placeholder: field => `Enter text${field.required ? '' : ' (optional)'}`,
+  },
+  number: {
+    kind: 'string',
+    hasOptions: false,
+    // Canonical decimal literal — the control normalises what the browser
+    // accepts (`1e3`, `007`) to this before it is validated or sent.
+    validator: (field, base) =>
+      base
+        .max(32, { message: `${field.label} is too long` })
+        .regex(/^-?\d+(\.\d+)?$/, { message: `${field.label} must be a number` }),
+  },
+  select: { kind: 'string', hasOptions: true, validator: optionValidator },
+  radio: { kind: 'string', hasOptions: true, validator: optionValidator },
+  checkbox: { kind: 'boolean', hasOptions: false, validator: () => z.boolean() },
+} as const satisfies Record<string, FormFieldTypeSpec>;
+
+export type SupportedFormFieldType = keyof typeof FORM_FIELD_TYPES;
+
+export const SUPPORTED_FORM_FIELD_TYPES = Object.keys(FORM_FIELD_TYPES) as readonly SupportedFormFieldType[];
+
+/** The types whose `options` the host must forward (select, radio). */
+export const FORM_FIELD_TYPES_WITH_OPTIONS: readonly SupportedFormFieldType[] = SUPPORTED_FORM_FIELD_TYPES.filter(
+  type => FORM_FIELD_TYPES[type].hasOptions,
+);
+
+export function isSupportedFormField(field: MeetingFormField): field is SupportedMeetingFormField {
+  return Object.prototype.hasOwnProperty.call(FORM_FIELD_TYPES, field.type);
+}
+
+/** A declared question whose `type` is in the registry. */
+export type SupportedMeetingFormField = MeetingFormField & { type: SupportedFormFieldType };
+
+/**
+ * The scheduler's fixed identity fields. HubSpot's book endpoint takes them
+ * TOP-LEVEL (`firstName`, `lastName`, `email`), its own booking page hardcodes
+ * them, and the link's `formFields` never lists them — so they are data HERE,
+ * rendered by the widget through the SAME control path as every declared
+ * question, rather than three hand-written blocks. `inputType`/`autoComplete`
+ * are the browser hints a text control takes; the wire and the validator do
+ * not see them.
+ */
+export interface BuiltInBookingField extends MeetingFormField {
+  type: 'text';
+  required: true;
+  inputType?: 'email';
+  autoComplete: string;
+  placeholder: string;
+  /** The wire's own required/format message — kept verbatim from the schema it replaced. */
+  requiredMessage: string;
+}
+
+export const BUILT_IN_BOOKING_FIELDS = [
+  {
+    name: 'firstName',
+    label: 'First Name',
+    type: 'text',
+    required: true,
+    autoComplete: 'given-name',
+    placeholder: 'Enter First Name',
+    requiredMessage: 'First name is required',
+  },
+  {
+    name: 'lastName',
+    label: 'Last Name',
+    type: 'text',
+    required: true,
+    autoComplete: 'family-name',
+    placeholder: 'Enter Last Name',
+    requiredMessage: 'Last name is required',
+  },
+  {
+    name: 'email',
+    label: 'Email',
+    type: 'text',
+    required: true,
+    inputType: 'email',
+    autoComplete: 'email',
+    placeholder: 'username@mail.com',
+    requiredMessage: 'Please enter a valid email address',
+  },
+] as const satisfies readonly BuiltInBookingField[];
+
+/** `'firstName' | 'lastName' | 'email'` — derived from the array, never restated. */
+export type BuiltInBookingFieldName = (typeof BUILT_IN_BOOKING_FIELDS)[number]['name'];
+
+/** The registry entry for a supported type, widened to the spec so optional
+ *  members (`placeholder`) are readable without narrowing on the union. */
+export function fieldTypeSpec(type: SupportedFormFieldType): FormFieldTypeSpec {
+  return FORM_FIELD_TYPES[type];
+}
+
+/** The wire validator for one identity field, from ITS declaration above. */
+function identityValidator(name: BuiltInBookingFieldName) {
+  const field: BuiltInBookingField | undefined = BUILT_IN_BOOKING_FIELDS.find(f => f.name === name);
+  if (!field) throw new Error(`Unknown built-in booking field: ${name}`);
+  const base = z.string().max(255);
+  return field.inputType === 'email'
+    ? base.email({ message: field.requiredMessage })
+    : base.min(1, { message: field.requiredMessage });
 }
 
 // ---------------------------------------------------------------------------
@@ -225,38 +362,30 @@ export function isValidBcp47Locale(locale: string): boolean {
  * in the visitor's local time) — this schema is the ONLY place a
  * client-supplied zone is accepted; the availability path is UTC-pinned.
  */
-export function makeBookingSchema(formFields: MeetingFormField[], legalConsent: MeetingLegalConsent | null) {
+function buildBookingSchema<TStart extends z.ZodTypeAny, TDuration extends z.ZodTypeAny, TZone extends z.ZodTypeAny>(
+  formFields: MeetingFormField[],
+  legalConsent: MeetingLegalConsent | null,
+  // Passed IN rather than switched on a boolean: a `deferSlot: boolean`
+  // parameter cannot be narrowed at type level, so every ternary inside would
+  // infer a union and widen `startTimeMs`/`durationMs` to `number | null |
+  // undefined` for BOTH schemas — including the server's wire type.
+  slot: { startTimeMs: TStart; durationMs: TDuration; timezone: TZone },
+) {
   const answers: Record<string, z.ZodTypeAny> = {};
   for (const field of formFields) {
     if (!isSupportedFormField(field)) continue; // unsupported types are fail-closed at render time
+    const spec: FormFieldTypeSpec = FORM_FIELD_TYPES[field.type];
+    // required/optional wrapping follows the answer's wire KIND, not its type:
+    // a boolean is true-or-absent, a string is non-empty-or-empty. For strings
+    // the required check is the FIRST rule on the chain, so an empty answer
+    // reports "is required" rather than the type's own message.
     let validator: z.ZodTypeAny;
-    switch (field.type as SupportedFormFieldType) {
-      case 'checkbox':
-        validator = z.boolean();
-        break;
-      case 'select':
-      case 'radio':
-        validator = z.string().refine(v => !v || (field.options ?? []).includes(v), {
-          message: `Please choose a valid option for ${field.label}`,
-        });
-        break;
-      case 'textarea':
-        validator = z.string().max(5000, { message: `${field.label} is too long` });
-        break;
-      case 'text':
-      default:
-        validator = z.string().max(1000, { message: `${field.label} is too long` });
-        break;
-    }
-    if (field.required) {
-      validator =
-        field.type === 'checkbox'
-          ? z.literal(true, { message: `${field.label} is required` })
-          : (validator as z.ZodString).min(1, { message: `${field.label} is required` });
-    } else if (field.type !== 'checkbox') {
-      validator = (validator as z.ZodString).optional().or(z.literal(''));
+    if (spec.kind === 'boolean') {
+      validator = field.required ? z.literal(true, { message: `${field.label} is required` }) : z.boolean().optional();
     } else {
-      validator = z.boolean().optional();
+      const base = field.required ? z.string().min(1, { message: `${field.label} is required` }) : z.string();
+      validator = spec.validator(field, base);
+      if (!field.required) validator = validator.optional().or(z.literal(''));
     }
     answers[field.name] = validator;
   }
@@ -276,12 +405,14 @@ export function makeBookingSchema(formFields: MeetingFormField[], legalConsent: 
     z
       .object({
         meetingId: z.string().min(1),
-        startTimeMs: z.number().int().positive(),
-        durationMs: z.number().int().positive(),
-        firstName: z.string().min(1, { message: 'First name is required' }).max(255),
-        lastName: z.string().min(1, { message: 'Last name is required' }).max(255),
-        email: z.string().email({ message: 'Please enter a valid email address' }).max(255),
-        timezone: z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' }),
+        startTimeMs: slot.startTimeMs,
+        durationMs: slot.durationMs,
+        // The identity trio's rules come from BUILT_IN_BOOKING_FIELDS — the
+        // keys stay literal so the payload type keeps its named properties.
+        firstName: identityValidator('firstName'),
+        lastName: identityValidator('lastName'),
+        email: identityValidator('email'),
+        timezone: slot.timezone,
         locale: z.string().refine(isValidBcp47Locale, { message: 'Invalid locale' }).optional(),
         // Plain `.optional()` (no `.default()`) so zod's input and output types
         // match — react-hook-form's zodResolver needs them identical, and the
@@ -311,4 +442,50 @@ export function makeBookingSchema(formFields: MeetingFormField[], legalConsent: 
   );
 }
 
+/**
+ * The STRICT schema — the wire contract. The server rebuilds it from the link's
+ * own fetched metadata and validates every booking against it; a slot and a
+ * duration are not optional on anything that reaches HubSpot.
+ */
+export function makeBookingSchema(formFields: MeetingFormField[], legalConsent: MeetingLegalConsent | null) {
+  return buildBookingSchema(formFields, legalConsent, {
+    startTimeMs: z.number().int().positive(),
+    durationMs: z.number().int().positive(),
+    timezone: z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' }),
+  });
+}
+
+/**
+ * The DEFERRED schema — same fields, with the slot/duration/timezone triple
+ * relaxed. `flow="details-first"` collects answers BEFORE a slot exists, so the
+ * form validates against this and the parent re-attaches the authoritative
+ * values at POST time.
+ *
+ * Two named exports over one private builder rather than an overload or an
+ * options flag: `MeetingBookingPayload` is `z.infer<ReturnType<...>>`, and
+ * either of those alternatives would widen `startTimeMs`/`durationMs` to
+ * `number | undefined` for EVERY consumer — including the server's
+ * `durationsMs.includes(data.durationMs)`.
+ */
+export function makeDeferredBookingSchema(formFields: MeetingFormField[], legalConsent: MeetingLegalConsent | null) {
+  // `.nullish()`, not `.optional()`: the widget passes these straight into
+  // `defaultValues`, and details-first has `timezone === null` on the server
+  // render and the first client render (zone resolution is post-hydration).
+  // Accepting only `undefined` would reject a field with no rendered control
+  // and no FieldWrapper — the submit button silently dead, type-check clean.
+  return buildBookingSchema(formFields, legalConsent, {
+    startTimeMs: z.number().int().positive().nullish(),
+    durationMs: z.number().int().positive().nullish(),
+    timezone: z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' }).nullish(),
+  });
+}
+
+/** The wire payload. Pinned to the STRICT builder — see above. */
 export type MeetingBookingPayload = z.infer<ReturnType<typeof makeBookingSchema>>;
+
+/**
+ * The form's value type, used as the `useForm` generic in BOTH flows: a relaxed
+ * resolver is not assignable to `Resolver<MeetingBookingPayload>`, and mixing
+ * the two survives only on TS's bivariant method-parameter check.
+ */
+export type BookingFormValues = z.infer<ReturnType<typeof makeDeferredBookingSchema>>;
