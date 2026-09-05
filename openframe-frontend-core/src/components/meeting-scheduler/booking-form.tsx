@@ -356,7 +356,15 @@ export function BookingForm({
     .filter(row => row.length > 0);
 
   const submitButton = (
-    <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>
+    <Button
+      type="submit"
+      loading={isSubmitting}
+      disabled={isSubmitting}
+      // The details-first footer draws a 240px action beside its note
+      // (`4904:117335`); the bare slot-first row keeps the button at its natural
+      // width, as it always has.
+      className={footerNote ? 'md:w-60' : undefined}
+    >
       {submitLabel ?? 'Confirm Booking'}
     </Button>
   );
