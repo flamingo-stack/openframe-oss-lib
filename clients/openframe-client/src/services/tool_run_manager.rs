@@ -30,6 +30,20 @@ use windows::{
 
 const RETRY_DELAY_SECONDS: u64 = 5;
 
+/// Under the supervision lock, so a concurrent resume either finds the loop alive or relaunches its tool.
+async fn shutdown_break(
+    shutting_down: &AtomicBool,
+    running_tools: &RwLock<HashSet<String>>,
+    tool_id: &str,
+) -> bool {
+    let mut set = running_tools.write().await;
+    if !shutting_down.load(Ordering::Acquire) {
+        return false;
+    }
+    set.remove(tool_id);
+    true
+}
+
 #[cfg(windows)]
 fn get_active_user_session() -> Option<u32> {
     unsafe {
@@ -421,6 +435,8 @@ pub struct ToolRunManager {
     updating_tools: Arc<RwLock<HashMap<String, usize>>>,
     tool_locks: Arc<RwLock<HashMap<String, Arc<Mutex<()>>>>>,
     shutting_down: Arc<AtomicBool>,
+    /// Set by a deactivation stop, which a failed self-update must not undo
+    tools_stopped: Arc<AtomicBool>,
     client_update_pending: ClientUpdatePendingFlag,
 }
 
@@ -438,6 +454,7 @@ impl ToolRunManager {
             updating_tools: Arc::new(RwLock::new(HashMap::new())),
             tool_locks: Arc::new(RwLock::new(HashMap::new())),
             shutting_down: Arc::new(AtomicBool::new(false)),
+            tools_stopped: Arc::new(AtomicBool::new(false)),
             client_update_pending: ClientUpdatePendingFlag::default(),
         }
     }
@@ -459,10 +476,14 @@ impl ToolRunManager {
     /// Reversibly stop every managed tool (kill processes / stop services) without uninstalling.
     /// Used when the tenant is gone, to stop tools hammering their now-unreachable endpoints.
     pub async fn stop_all(&self) -> Result<()> {
-        self.signal_shutdown();
-        // Clear supervision so a later restart_all()/run() can relaunch these tools (symmetry
-        // with restart_all): the shutdown-triggered loop break leaves ids in running_tools.
-        self.running_tools.write().await.clear();
+        {
+            // Under the supervision lock so a concurrent resume_after_update_failure cannot undo the stop
+            let mut set = self.running_tools.write().await;
+            self.tools_stopped.store(true, Ordering::Release);
+            self.signal_shutdown();
+            // Clear the set now so restart_all()/run() can relaunch before every loop has noticed the flag
+            set.clear();
+        }
         let tools = self
             .installed_tools_service
             .get_all()
@@ -485,8 +506,12 @@ impl ToolRunManager {
     /// Clears the one-way shutdown flag and the running set, restarts OS-service tools
     /// (which `run()` deliberately skips), then re-spawns the standard/GUI supervisors.
     pub async fn restart_all(&self) -> Result<()> {
-        self.shutting_down.store(false, Ordering::Release);
-        self.running_tools.write().await.clear();
+        {
+            let mut set = self.running_tools.write().await;
+            self.tools_stopped.store(false, Ordering::Release);
+            self.shutting_down.store(false, Ordering::Release);
+            set.clear();
+        }
 
         match self.installed_tools_service.get_all().await {
             Ok(tools) => {
@@ -505,6 +530,37 @@ impl ToolRunManager {
         }
 
         self.run().await
+    }
+
+    /// Undo [`signal_shutdown`] after the updater failed without stopping the service: live supervisors carry on, tools whose loop already exited are relaunched.
+    pub async fn resume_after_update_failure(&self) -> Result<()> {
+        {
+            let _set = self.running_tools.write().await;
+            if self.tools_stopped.load(Ordering::Acquire) {
+                info!("Tool run manager: tools are stopped by deactivation, not resuming");
+                return Ok(());
+            }
+            self.shutting_down.store(false, Ordering::Release);
+        }
+
+        let tools = self
+            .installed_tools_service
+            .get_all()
+            .await
+            .context("Failed to list installed tools for resume")?;
+        for tool in tools {
+            if tool.installation.is_service() || !self.try_mark_running(&tool.tool_agent_id).await {
+                continue;
+            }
+            let tool_id = tool.tool_agent_id.clone();
+            info!(tool_id = %tool_id, "Relaunching tool supervisor after the aborted update");
+            if let Err(e) = self.run_tool(tool, false).await {
+                warn!(tool_id = %tool_id, "Failed to relaunch tool after the aborted update: {:#}", e);
+                self.clear_running_tool(&tool_id).await;
+            }
+        }
+        info!("Tool run manager: supervision resumed after the aborted update");
+        Ok(())
     }
 
     pub async fn mark_client_update_pending(&self) {
@@ -683,7 +739,7 @@ impl ToolRunManager {
             let mut launch_backoff = FailureLogBackoff::new();
             loop {
                 // Self-update in progress — stop the loop entirely
-                if shutting_down.load(Ordering::Acquire) {
+                if shutdown_break(&shutting_down, &running_tools, &tool.tool_agent_id).await {
                     info!(tool_id = %tool.tool_agent_id, "Shutdown signalled, stopping run loop");
                     break;
                 }
@@ -752,7 +808,9 @@ impl ToolRunManager {
                     } => {
                         #[cfg(windows)]
                         {
-                            if shutting_down.load(Ordering::Acquire) {
+                            if shutdown_break(&shutting_down, &running_tools, &tool.tool_agent_id)
+                                .await
+                            {
                                 info!(tool_id = %tool.tool_agent_id, "Shutdown signalled before launch, stopping run loop");
                                 break;
                             }
@@ -905,7 +963,7 @@ impl ToolRunManager {
                     }
                 }
 
-                if shutting_down.load(Ordering::Acquire) {
+                if shutdown_break(&shutting_down, &running_tools, &tool.tool_agent_id).await {
                     info!(tool_id = %tool.tool_agent_id, "Shutdown signalled before launch, stopping run loop");
                     break;
                 }

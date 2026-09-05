@@ -2,20 +2,41 @@ use crate::config::update_config::ALLOW_DOWNGRADE;
 use crate::models::openframe_client_info::ClientUpdateStatus;
 use crate::models::openframe_client_update_message::OpenFrameClientUpdateMessage;
 use crate::models::update_state::{UpdatePhase, UpdateState};
-use crate::platform::updater_launcher::{self, UpdaterParams};
+use crate::platform::updater_launcher::{self, LaunchedUpdater, UpdaterParams};
 use crate::service::FULL_SERVICE_NAME;
 use crate::services::github_download_service::GithubDownloadService;
 use crate::services::last_known_good_service::LastKnownGoodService;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::tool_run_manager::ToolRunManager;
+use crate::services::update_handler_service::UpdateHandlerService;
 use crate::services::update_state_service::UpdateStateService;
 use anyhow::{anyhow, Context, Result};
 use semver::Version;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::ExitStatus;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::io::AsyncWriteExt;
 use tracing::{error, info, warn};
 use uuid::Uuid;
+
+/// Marks an update as in progress until dropped
+struct UpdateGuard(Arc<AtomicBool>);
+
+impl UpdateGuard {
+    fn acquire(flag: &Arc<AtomicBool>) -> Option<Self> {
+        flag.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+            .then(|| Self(flag.clone()))
+    }
+}
+
+impl Drop for UpdateGuard {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+        info!("Released update lock");
+    }
+}
 
 #[derive(Clone)]
 pub struct OpenFrameClientUpdateService {
@@ -24,8 +45,9 @@ pub struct OpenFrameClientUpdateService {
     update_state_service: UpdateStateService,
     last_known_good_service: LastKnownGoodService,
     tool_run_manager: ToolRunManager,
-    /// Mutex to prevent concurrent updates (race condition protection)
-    update_in_progress: Arc<Mutex<bool>>,
+    update_handler_service: UpdateHandlerService,
+    /// Set from the update request until the updater is done with this process
+    update_in_progress: Arc<AtomicBool>,
 }
 
 impl OpenFrameClientUpdateService {
@@ -35,6 +57,7 @@ impl OpenFrameClientUpdateService {
         update_state_service: UpdateStateService,
         last_known_good_service: LastKnownGoodService,
         tool_run_manager: ToolRunManager,
+        update_handler_service: UpdateHandlerService,
     ) -> Self {
         Self {
             client_info_service,
@@ -42,7 +65,8 @@ impl OpenFrameClientUpdateService {
             update_state_service,
             last_known_good_service,
             tool_run_manager,
-            update_in_progress: Arc::new(Mutex::new(false)),
+            update_handler_service,
+            update_in_progress: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -59,36 +83,25 @@ impl OpenFrameClientUpdateService {
             ));
         }
 
-        // 1. Check if update is already in progress (race condition protection)
-        {
-            let mut update_lock = self.update_in_progress.lock().await;
-            if *update_lock {
-                warn!(
-                    "Update already in progress, ignoring duplicate request for version: {}",
-                    requested_version
-                );
-                return Err(anyhow!("Update already in progress"));
-            }
-            // Set flag to indicate update is starting
-            *update_lock = true;
-            info!("Acquired update lock for version: {}", requested_version);
-        }
+        // 1. Held until the updater is done with this process, so a redelivery cannot overlap a live script
+        let Some(guard) = UpdateGuard::acquire(&self.update_in_progress) else {
+            warn!(
+                "Update already in progress, ignoring duplicate request for version: {}",
+                requested_version
+            );
+            return Err(anyhow!("Update already in progress"));
+        };
+        info!("Acquired update lock for version: {}", requested_version);
 
-        // Ensure lock is released on error or completion
-        let update_result = self.process_update_internal(message).await;
-
-        // Release lock
-        {
-            let mut update_lock = self.update_in_progress.lock().await;
-            *update_lock = false;
-            info!("Released update lock");
-        }
-
-        update_result
+        self.process_update_internal(message, guard).await
     }
 
     /// Internal update processing with version validation and safety checks
-    async fn process_update_internal(&self, message: OpenFrameClientUpdateMessage) -> Result<()> {
+    async fn process_update_internal(
+        &self,
+        message: OpenFrameClientUpdateMessage,
+        guard: UpdateGuard,
+    ) -> Result<()> {
         let requested_version = message.version.trim();
 
         // 2. Validate version format
@@ -178,7 +191,9 @@ impl OpenFrameClientUpdateService {
         info!("Starting update to version {}", requested_version);
 
         // Execute update with status rollback
-        let update_result = self.execute_update(&message, &mut update_state).await;
+        let update_result = self
+            .execute_update(&message, &mut update_state, guard)
+            .await;
 
         // Handle errors: set status to Failed (cleanup already done in execute_update)
         if let Err(ref e) = update_result {
@@ -204,6 +219,7 @@ impl OpenFrameClientUpdateService {
         &self,
         message: &OpenFrameClientUpdateMessage,
         update_state: &mut UpdateState,
+        guard: UpdateGuard,
     ) -> Result<()> {
         // 1. Find the appropriate download configuration for current OS
         let download_config = self
@@ -245,25 +261,23 @@ impl OpenFrameClientUpdateService {
         update_state.set_phase(UpdatePhase::Extracting);
         self.update_state_service.save(update_state).await?;
 
-        // 4. Save binary to a temp archive for the updater
-        // Note: The updater expects a ZIP, so we create one with the binary
+        // 4. Stage the extracted binary for the updater script
         update_state.set_phase(UpdatePhase::PreparingUpdater);
         self.update_state_service.save(update_state).await?;
 
-        let archive_path = match self
-            .create_temp_archive(&binary_bytes, &download_config.target_file_name)
+        let staged_path = match self
+            .stage_binary(&binary_bytes, &download_config.target_file_name)
             .await
         {
             Ok(path) => path,
             Err(e) => {
-                error!("Failed to create archive: {:#}", e);
-                // Clear update state - archive creation failed
+                error!("Failed to stage binary: {:#}", e);
                 self.update_state_service.clear().await?;
-                return Err(e.context("Failed to create temporary archive"));
+                return Err(e.context("Failed to stage update binary"));
             }
         };
 
-        info!("Temporary archive created: {}", archive_path.display());
+        info!("Update binary staged: {}", staged_path.display());
 
         // 5. Launch update process (platform-specific)
         update_state.set_phase(UpdatePhase::UpdaterLaunched);
@@ -273,7 +287,7 @@ impl OpenFrameClientUpdateService {
             std::env::current_exe().context("Failed to get current executable path")?;
 
         let params = UpdaterParams {
-            binary_path: archive_path.clone(),
+            binary_path: staged_path.clone(),
             target_exe: current_exe,
             service_name: FULL_SERVICE_NAME.to_string(),
             update_state_path: self.update_state_service.get_state_file_path(),
@@ -291,8 +305,11 @@ impl OpenFrameClientUpdateService {
 
         if self.tool_run_manager.any_tool_op_in_progress().await {
             warn!("Tool operation started during client download, deferring client update (will redeliver)");
-            if let Err(cleanup_err) = std::fs::remove_file(&archive_path) {
-                warn!("Failed to remove archive after deferring: {}", cleanup_err);
+            if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
+                warn!(
+                    "Failed to remove staged binary after deferring: {}",
+                    cleanup_err
+                );
             }
             self.update_state_service.clear().await?;
             return Err(anyhow!(
@@ -300,70 +317,150 @@ impl OpenFrameClientUpdateService {
             ));
         }
 
-        let launch_result = updater_launcher::launch_updater(params).await;
-
-        // If launch failed, cleanup archive and state
-        if let Err(e) = launch_result {
-            error!("Failed to launch updater: {:#}", e);
-            // Cleanup archive
-            if let Err(cleanup_err) = std::fs::remove_file(&archive_path) {
-                warn!(
-                    "Failed to remove archive after launch failure: {}",
-                    cleanup_err
-                );
+        // If launch failed, cleanup staged binary and state
+        let launched = match updater_launcher::launch_updater(params).await {
+            Ok(launched) => launched,
+            Err(e) => {
+                error!("Failed to launch updater: {:#}", e);
+                if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
+                    warn!(
+                        "Failed to remove staged binary after launch failure: {}",
+                        cleanup_err
+                    );
+                }
+                self.update_state_service.clear().await?;
+                return Err(e);
             }
-            // Clear update state
-            self.update_state_service.clear().await?;
-            return Err(e);
-        }
+        };
 
         // Stop all tool run loops to prevent launching processes during shutdown.
         self.tool_run_manager.signal_shutdown();
+        self.watch_updater_exit(
+            launched,
+            guard,
+            staged_path,
+            update_state.target_version.clone(),
+        );
 
         info!("Update process launched, service will be stopped by update script");
         Ok(())
     }
 
-    /// Creates a temporary ZIP archive containing the binary for the updater script
-    #[cfg(windows)]
-    async fn create_temp_archive(&self, binary_bytes: &[u8], binary_name: &str) -> Result<PathBuf> {
-        use std::io::Write;
-        use zip::write::{FileOptions, ZipWriter};
-
-        let temp_dir = std::env::temp_dir();
-        let archive_path = temp_dir.join(format!("openframe-update-{}.zip", Uuid::new_v4()));
-
-        let file =
-            std::fs::File::create(&archive_path).context("Failed to create temporary ZIP file")?;
-
-        let mut zip = ZipWriter::new(file);
-        let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-
-        zip.start_file(binary_name, options)
-            .context("Failed to start file in ZIP")?;
-
-        zip.write_all(binary_bytes)
-            .context("Failed to write binary to ZIP")?;
-
-        zip.finish().context("Failed to finalize ZIP archive")?;
-
-        Ok(archive_path)
+    /// The script's first real action stops this service, so an exit seen while we are alive means it failed before the swap.
+    fn watch_updater_exit(
+        &self,
+        launched: LaunchedUpdater,
+        guard: UpdateGuard,
+        staged_path: PathBuf,
+        target_version: String,
+    ) {
+        let Some(exit_watch) = launched.exit_watch else {
+            return;
+        };
+        let this = self.clone();
+        tokio::spawn(async move {
+            let _guard = guard;
+            if let Ok(Some(status)) = exit_watch.await {
+                this.handle_updater_early_exit(status, &staged_path, &target_version)
+                    .await;
+            }
+        });
     }
 
-    /// On Unix, we can directly write the binary (no ZIP needed)
-    #[cfg(unix)]
-    async fn create_temp_archive(&self, binary_bytes: &[u8], binary_name: &str) -> Result<PathBuf> {
+    /// Finishes the failure here instead of waiting for a boot that never comes: report it, clear the state, resume the tools.
+    async fn handle_updater_early_exit(
+        &self,
+        status: ExitStatus,
+        staged_path: &Path,
+        target_version: &str,
+    ) {
+        if status.success() {
+            warn!(
+                "Updater for {} reported success while this process is still running, leaving the update state to the next boot",
+                target_version
+            );
+            return;
+        }
+
+        if let Err(e) = tokio::fs::remove_file(staged_path).await {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                warn!(
+                    "Failed to remove staged binary {}: {}",
+                    staged_path.display(),
+                    e
+                );
+            }
+        }
+
+        let mut state = match self.update_state_service.load().await {
+            Ok(Some(state)) => state,
+            Ok(None) => {
+                warn!(
+                    "Updater for {} exited early and the update state is gone (client uninstalled?), nothing to finish",
+                    target_version
+                );
+                return;
+            }
+            Err(e) => {
+                warn!(
+                    "Updater for {} exited early and the update state is unreadable: {:#}",
+                    target_version, e
+                );
+                UpdateState::new(target_version.to_string())
+            }
+        };
+
+        // Died before stamping a phase (parse error, killed): record what the launcher saw
+        if !matches!(state.phase, UpdatePhase::Failed | UpdatePhase::RolledBack) {
+            state.set_phase(UpdatePhase::Failed);
+            state.last_error = Some(format!(
+                "updater exited with {} before stopping the service, see its output log",
+                status
+            ));
+        }
+
+        if let Err(e) = self.update_handler_service.handle_failure(state).await {
+            warn!(
+                "Failed to finish the aborted update to {}: {:#}",
+                target_version, e
+            );
+        }
+
+        self.tool_run_manager.clear_client_update_pending().await;
+        if let Err(e) = self.tool_run_manager.resume_after_update_failure().await {
+            warn!(
+                "Failed to resume tool supervision after the aborted update to {}: {:#}",
+                target_version, e
+            );
+        }
+    }
+
+    /// Writes the extracted binary to a temp file (tmp + fsync + rename) for the updater script
+    async fn stage_binary(&self, binary_bytes: &[u8], binary_name: &str) -> Result<PathBuf> {
         let temp_dir = std::env::temp_dir();
         let binary_path = temp_dir.join(format!(
             "openframe-update-{}-{}",
             Uuid::new_v4(),
             binary_name
         ));
-
-        tokio::fs::write(&binary_path, binary_bytes)
+        let tmp_path = binary_path.with_extension("tmp");
+        let mut file = tokio::fs::File::create(&tmp_path)
             .await
-            .context("Failed to write binary file")?;
-
+            .context("Failed to create staged binary file")?;
+        file.write_all(binary_bytes)
+            .await
+            .context("Failed to write staged binary")?;
+        // write_all can leave the last chunk in flight, and sync_all would swallow its error
+        file.flush()
+            .await
+            .context("Failed to complete staged binary write")?;
+        file.sync_all()
+            .await
+            .context("Failed to fsync staged binary")?;
+        drop(file);
+        tokio::fs::rename(&tmp_path, &binary_path)
+            .await
+            .context("Failed to finalize staged binary")?;
         Ok(binary_path)
     }
 

@@ -422,6 +422,16 @@ impl Client {
         let last_known_good_service = LastKnownGoodService::new(directory_manager.clone())
             .context("Failed to initialize last-known-good service")?;
 
+        // Initialize update handler service (boot-time and in-process failure handling)
+        let update_handler_service = UpdateHandlerService::new(
+            update_state_service.clone(),
+            openframe_client_info_service.clone(),
+            update_cleanup_service.clone(),
+            last_known_good_service.clone(),
+            installed_agent_message_publisher.clone(),
+            config_service.clone(),
+        );
+
         // Initialize tool installation service
         let tool_installation_service = ToolInstallationService::new(
             github_download_service.clone(),
@@ -445,6 +455,7 @@ impl Client {
             update_state_service.clone(),
             last_known_good_service.clone(),
             tool_run_manager.clone(),
+            update_handler_service.clone(),
         );
 
         // Initialize tool agent update service
@@ -562,16 +573,6 @@ impl Client {
             nats_message_publisher.clone(),
             config_service.clone(),
             device_data_fetcher.clone(),
-        );
-
-        // Initialize update handler service
-        let update_handler_service = UpdateHandlerService::new(
-            update_state_service.clone(),
-            openframe_client_info_service.clone(),
-            update_cleanup_service.clone(),
-            last_known_good_service.clone(),
-            installed_agent_message_publisher.clone(),
-            config_service.clone(),
         );
 
         Ok(Self {
