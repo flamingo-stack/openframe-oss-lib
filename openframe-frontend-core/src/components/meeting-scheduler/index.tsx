@@ -456,7 +456,7 @@ export function HubSpotMeetingScheduler({
    * and hands over to the calendar.
    */
   const stashDetails = useCallback(
-    async (payload: Record<string, unknown>) => {
+    (payload: Record<string, unknown>): Promise<void> => {
       setBookingError(null);
       setStash({ payload, signals: getSignals() });
       setStep('slot');
@@ -464,6 +464,12 @@ export function HubSpotMeetingScheduler({
       // may have moved on, and its hop budget should start fresh.
       autoAdvanceCount.current = 0;
       void refetchAvailability();
+      // Deliberately NOT `async`: nothing here is awaited. The refetch is
+      // fire-and-forget so the calendar paints from cache the moment the step
+      // flips, and awaiting it would hold `BookingForm`'s isSubmitting past
+      // the unmount. `onSubmit` is Promise-returning, hence the explicit
+      // resolve rather than an empty async body (which `require-await` flags).
+      return Promise.resolve();
     },
     [getSignals, refetchAvailability],
   );
