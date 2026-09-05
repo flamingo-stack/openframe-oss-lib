@@ -190,6 +190,7 @@ export function HelpCenterCreateForm({
         placeholder="Briefly describe what's going on"
         maxLength={SUBJECT_MAX_CHARS}
         aria-invalid={!!subjectError}
+        aria-required
         aria-describedby={subjectError ? 'help-center-subject-error' : undefined}
         disabled={supportSystemDown}
         className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"

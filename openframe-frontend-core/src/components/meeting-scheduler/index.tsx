@@ -149,6 +149,12 @@ export interface HubSpotMeetingSchedulerProps {
    * Defaults to the built-in form, so every existing embed is untouched.
    */
   detailsForm?: ComponentType<BookingFormProps>;
+  /**
+   * The DATA form of the same override: `fieldRows` and a host consent row,
+   * spread onto whichever form renders. Serialisable, so a Server Component
+   * can pass it across the RSC boundary where a component cannot.
+   */
+  detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent'>;
 }
 
 type Step = 'slot' | 'details' | 'confirmed';
@@ -336,18 +342,20 @@ const CARD_DEGRADED_CLASS = cn(
 /**
  * The two-line stages of the card (load failure, "booked on HubSpot", a host's
  * own "calendar unavailable") — ONE shape, exported so a host renders its
- * fallback in the same box instead of re-typing the chrome.
+ * fallback in the same box instead of re-typing the chrome. The box is the
+ * FLOW's: a host names the flow it would have mounted and the height follows
+ * from {@link SCHEDULER_FLOW_PRESETS}, so the pairing is never re-derived.
  */
 export function SchedulerDegradedCard({
-  heightClass,
+  flow = 'slot-first',
   className,
   children,
 }: {
-  heightClass: string;
+  flow?: SchedulerFlow;
   className?: string;
   children: ReactNode;
 }) {
-  return <div className={cn(CARD_DEGRADED_CLASS, heightClass, className)}>{children}</div>;
+  return <div className={cn(CARD_DEGRADED_CLASS, SCHEDULER_FLOW_PRESETS[flow].height, className)}>{children}</div>;
 }
 
 /**
@@ -380,6 +388,7 @@ export function HubSpotMeetingScheduler({
   className,
   flow = 'slot-first',
   detailsForm: DetailsForm = BookingForm,
+  detailsFormProps,
 }: HubSpotMeetingSchedulerProps) {
   const {
     availability,
@@ -539,6 +548,9 @@ export function HubSpotMeetingScheduler({
   /** details-first's inverse: back from the CALENDAR to the form. The stash is
    *  what repopulates it, so nothing is cleared here but the error. */
   const backToDetails = useCallback(() => {
+    // Not while a slot's POST is in flight — the step must stay on the
+    // calendar the spinner lives on until the result routes it.
+    if (inFlightRef.current) return;
     setStep('details');
     setBookingError(null);
   }, []);
@@ -602,20 +614,18 @@ export function HubSpotMeetingScheduler({
         // VALIDATION round-trip) read as too-fast against the min-fill floor.
         if (!detailsFirst) resetSignals();
         void refetchAvailability();
-      } else if (detailsFirst && (code === 'VALIDATION' || code === 'INVALID_EMAIL')) {
-        // DETAILS errors in details-first: the form is unmounted by now, so
-        // send the visitor back to it (the stash repopulates every answer) AND
-        // say why — a silent return to an unchanged form reads as nothing
-        // having happened.
-        setStep('details');
-        toast({
-          variant: 'error',
-          title: 'Booking failed',
-          description: BOOKING_ERROR_COPY[code],
-        });
       } else {
+        if (detailsFirst && (code === 'VALIDATION' || code === 'INVALID_EMAIL')) {
+          // DETAILS errors in details-first: the form is unmounted by now, so
+          // send the visitor back to it (the stash repopulates every answer).
+          // The chip that submitted is un-picked too — the form's summary
+          // must not show a slot the server never accepted.
+          setSelectedSlot(null);
+          setStep('details');
+        }
         // The error surface is the TOAST, full stop (host-mounted Toaster —
-        // every hub platform mounts it globally; embedders must too).
+        // every hub platform mounts it globally; embedders must too). A silent
+        // return to an unchanged form would read as nothing having happened.
         toast({
           variant: 'error',
           title: 'Booking failed',
@@ -648,7 +658,7 @@ export function HubSpotMeetingScheduler({
 
   /** One card SHAPE for both degraded returns below. */
   const degradedCard = (
-    <SchedulerDegradedCard heightClass={flowHeight} className={className}>
+    <SchedulerDegradedCard flow={flow} className={className}>
       <p className="text-ods-text-secondary text-h6">
         We couldn&apos;t load available call times. Please try again shortly.
       </p>
@@ -687,7 +697,7 @@ export function HubSpotMeetingScheduler({
     // Fail closed — never render a half-working native form on a link with
     // questions or consent we can't faithfully reproduce.
     return (
-      <SchedulerDegradedCard heightClass={flowHeight} className={className}>
+      <SchedulerDegradedCard flow={flow} className={className}>
         <p className="text-ods-text-secondary text-h6">This meeting type is booked directly on HubSpot.</p>
         {escapeHatch}
       </SchedulerDegradedCard>
@@ -780,6 +790,7 @@ export function HubSpotMeetingScheduler({
                 </p>
               )}
               <DetailsForm
+                {...detailsFormProps}
                 availability={availability}
                 meetingId={meetingId}
                 startTimeMs={selectedSlot ?? undefined}
@@ -819,7 +830,9 @@ export function HubSpotMeetingScheduler({
                   onMonthOffsetChange={o => {
                     // details-first: a POST is in flight from this grid; paging
                     // would clear the spinning chip and swap the key under it.
-                    if (detailsFirst && isSubmitting) return;
+                    // Same lock as the chip handler: the ref covers the frame
+                    // before `isSubmitting` renders true.
+                    if (detailsFirst && (isSubmitting || inFlightRef.current)) return;
                     setSelectedDay(null);
                     setSelectedSlot(null);
                     setMonthOffset(o);

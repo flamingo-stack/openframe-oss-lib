@@ -196,6 +196,9 @@ const optionValidator: FormFieldTypeSpec['validator'] = (field, base) =>
     message: `Please choose a valid option for ${field.label}`,
   });
 
+/** The wire shape of a number answer — what the form canonicalises TO and the validator checks. */
+export const DECIMAL_LITERAL_RE = /^-?\d+(\.\d+)?$/;
+
 export const FORM_FIELD_TYPES = {
   text: {
     kind: 'string',
@@ -217,7 +220,7 @@ export const FORM_FIELD_TYPES = {
     validator: (field, base) =>
       base
         .max(32, { message: `${field.label} is too long` })
-        .regex(/^-?\d+(\.\d+)?$/, { message: `${field.label} must be a number` }),
+        .regex(DECIMAL_LITERAL_RE, { message: `${field.label} must be a number` }),
   },
   select: { kind: 'string', hasOptions: true, validator: optionValidator },
   radio: { kind: 'string', hasOptions: true, validator: optionValidator },
@@ -254,7 +257,8 @@ export interface BuiltInBookingField extends MeetingFormField {
   required: true;
   inputType?: 'email';
   autoComplete: string;
-  placeholder: string;
+  /** Own placeholder. Omitted, the control derives one from the label (the registry's rule). */
+  placeholder?: string;
   /** The wire's own required/format message — kept verbatim from the schema it replaced. */
   requiredMessage: string;
 }
@@ -266,7 +270,6 @@ export const BUILT_IN_BOOKING_FIELDS = [
     type: 'text',
     required: true,
     autoComplete: 'given-name',
-    placeholder: 'Enter First Name',
     requiredMessage: 'First name is required',
   },
   {
@@ -275,7 +278,6 @@ export const BUILT_IN_BOOKING_FIELDS = [
     type: 'text',
     required: true,
     autoComplete: 'family-name',
-    placeholder: 'Enter Last Name',
     requiredMessage: 'Last name is required',
   },
   {
@@ -303,10 +305,12 @@ export function fieldTypeSpec(type: SupportedFormFieldType): FormFieldTypeSpec {
 function identityValidator(name: BuiltInBookingFieldName) {
   const field: BuiltInBookingField | undefined = BUILT_IN_BOOKING_FIELDS.find(f => f.name === name);
   if (!field) throw new Error(`Unknown built-in booking field: ${name}`);
-  const base = z.string().max(255);
+  // The field's own message FIRST: an empty value must fail `min`/`email` with
+  // the wire's copy, not a length cap it cannot have hit.
+  const tooLong = { message: `${field.label} is too long` };
   return field.inputType === 'email'
-    ? base.email({ message: field.requiredMessage })
-    : base.min(1, { message: field.requiredMessage });
+    ? z.string().email({ message: field.requiredMessage }).max(255, tooLong)
+    : z.string().min(1, { message: field.requiredMessage }).max(255, tooLong);
 }
 
 // ---------------------------------------------------------------------------

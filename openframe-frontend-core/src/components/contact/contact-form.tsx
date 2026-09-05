@@ -298,6 +298,7 @@ export function ContactForm({
                   {...register('name')}
                   placeholder="Jane Doe"
                   aria-invalid={!!errors.name}
+                  aria-required
                   aria-describedby="name-error"
                   className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"
                 />
@@ -320,6 +321,7 @@ export function ContactForm({
                   {...register('email')}
                   placeholder="jane@company.com"
                   aria-invalid={!!errors.email}
+                  aria-required
                   aria-describedby="email-error"
                   className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"
                 />
@@ -416,6 +418,7 @@ export function ContactForm({
                   <SelectTrigger
                     id="helpCategory"
                     aria-label="Help Category"
+                    aria-required
                     className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary"
                   >
                     <SelectValue placeholder="Choose your main interest" />
@@ -449,6 +452,7 @@ export function ContactForm({
               {...register('message')}
               placeholder="Share your current challenges or questions about open-source alternatives..."
               aria-invalid={!!errors.message}
+              aria-required
               aria-describedby="message-error"
               className="h-full flex-grow border-ods-border bg-ods-card text-ods-text-primary placeholder-ods-text-secondary"
             />

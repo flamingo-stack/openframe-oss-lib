@@ -53,3 +53,15 @@ describe('meeting booking schema — number questions', () => {
     expect(schema.safeParse({ ...noSlot, formFields: { number_of_endpoints: 'forty' } }).success).toBe(false);
   });
 });
+
+describe('meeting booking schema — identity trio messages', () => {
+  it("reports the field's own message on an empty answer, not the length cap", () => {
+    const schema = makeBookingSchema([], null);
+    const result = schema.safeParse({ ...base, firstName: '', email: 'not-an-email' });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    const byPath = Object.fromEntries(result.error.issues.map(i => [i.path.join('.'), i.message]));
+    expect(byPath.firstName).toBe('First name is required');
+    expect(byPath.email).toBe('Please enter a valid email address');
+  });
+});

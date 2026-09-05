@@ -7,6 +7,8 @@ import { useForm, Controller } from 'react-hook-form';
 import type { Control, UseFormRegister } from 'react-hook-form';
 import {
   BUILT_IN_BOOKING_FIELDS,
+  type BuiltInBookingFieldName,
+  DECIMAL_LITERAL_RE,
   fieldTypeSpec,
   makeDeferredBookingSchema,
   isSupportedFormField,
@@ -41,7 +43,8 @@ import { HoneypotField } from '../ui/honeypot-field';
  * `lastName`) or a HubSpot-declared question's `name`.
  */
 export interface BookingFieldSlot {
-  name: string;
+  /** Built-ins autocomplete; a HubSpot question's `name` is whatever the link declares. */
+  name: BuiltInBookingFieldName | (string & NonNullable<unknown>);
   /** Columns out of four at `md` and up. Defaults to an even split of the row. */
   span?: 1 | 2 | 3 | 4;
 }
@@ -120,12 +123,17 @@ const placeholderFor = (field: ControlArgs['field']): string | undefined =>
   field.placeholder ?? fieldTypeSpec(field.type).placeholder?.(field);
 
 /** `<input type="number">` accepts `1e3`, `007`, ` 12 `; the wire wants the
- *  canonical decimal literal the validator checks, so normalise on the way in. */
+ *  decimal literal the validator checks. A value ALREADY in that shape passes
+ *  verbatim — a long integer or a tiny decimal must not be reshaped through a
+ *  float — and one that cannot be brought into it is left for the validator's
+ *  own message. */
 const canonicalNumber = (v: unknown): string => {
   const s = String(v ?? '').trim();
-  if (s === '') return '';
+  if (s === '' || DECIMAL_LITERAL_RE.test(s)) return s;
   const n = Number(s);
-  return Number.isFinite(n) ? String(n) : s;
+  if (!Number.isFinite(n)) return s;
+  const canonical = String(n);
+  return DECIMAL_LITERAL_RE.test(canonical) ? canonical : s;
 };
 
 /**
@@ -501,7 +509,7 @@ export function BookingForm({
               // Row gap one step wider than the column gap: field messages hang
               // ~16px below their control and would print over the next row's
               // label at the column gap.
-              className="grid grid-cols-2 gap-x-[var(--spacing-system-m)] gap-y-[var(--spacing-system-l)] md:grid-cols-4"
+              className="grid grid-cols-2 gap-x-[var(--spacing-system-m)] gap-y-[var(--spacing-system-lf)] md:grid-cols-4"
             >
               {row.map(slot => (
                 <div

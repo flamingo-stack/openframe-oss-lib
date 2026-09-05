@@ -71,4 +71,30 @@ describe('BookingForm — a HubSpot Number question', () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ formFields: { number_of_endpoints: '150' } }));
   });
+
+  it('passes an answer already in wire shape through verbatim (no float round-trip)', async () => {
+    const onSubmit = mount();
+    type(screen.getByLabelText(/^Email/), 'a@b.co');
+    type(screen.getByLabelText(/^First Name/), 'A');
+    type(screen.getByLabelText(/^Last Name/), 'B');
+    // 20 digits: `String(Number(...))` would reshape this to `1.2345678901234568e+19`.
+    type(screen.getByLabelText(/^Number of endpoints/), '12345678901234567890');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ formFields: { number_of_endpoints: '12345678901234567890' } }),
+    );
+  });
+
+  it('leaves a value it cannot bring into wire shape to the validator', async () => {
+    const onSubmit = mount();
+    type(screen.getByLabelText(/^Email/), 'a@b.co');
+    type(screen.getByLabelText(/^First Name/), 'A');
+    type(screen.getByLabelText(/^Last Name/), 'B');
+    // `String(1e21)` is `1e+21` — not a decimal literal — so the input stays as typed and fails as a number.
+    type(screen.getByLabelText(/^Number of endpoints/), '1e21');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
+    expect(await screen.findByText('Number of endpoints must be a number')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });
