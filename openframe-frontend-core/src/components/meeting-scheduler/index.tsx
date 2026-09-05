@@ -707,8 +707,6 @@ export function HubSpotMeetingScheduler({
             // summary line on the form — so the picker stays until there is
             // nothing left to re-read in it.
             showTimezone={step !== 'confirmed'}
-            // The mock's calendar step states the length, it does not offer it.
-            fixedDuration={detailsFirst}
             className={CONTEXT_PANEL_CLASS}
           />
         )}
