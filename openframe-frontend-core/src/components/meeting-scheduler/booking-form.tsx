@@ -1,15 +1,17 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, useMemo } from 'react';
-import type { Ref } from 'react';
+import { Fragment, useEffect, useMemo } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import {
   makeDeferredBookingSchema,
   isSupportedFormField,
   type MeetingAvailability,
+  type MeetingFormField,
   type BookingFormValues,
 } from '../../schemas/meeting-booking-schema';
+import { cn } from '../../utils/cn';
 import {
   Button,
   FieldWrapper,
@@ -27,6 +29,30 @@ import {
   Skeleton,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
+
+/**
+ * One field in a host-supplied row. `name` is a built-in (`email`, `firstName`,
+ * `lastName`) or a HubSpot-declared question's `name`.
+ */
+export interface BookingFieldSlot {
+  name: string;
+  /** Columns out of four at `md` and up. Defaults to an even split of the row. */
+  span?: 1 | 2 | 3 | 4;
+}
+
+export type BookingFieldRow = BookingFieldSlot[];
+
+/** Static so Tailwind's scanner sees every class — a template built from a
+ *  runtime span would compile to nothing. */
+const SPAN_CLASS: Record<1 | 2 | 3 | 4, string> = {
+  1: 'md:col-span-1',
+  2: 'md:col-span-2',
+  3: 'md:col-span-3',
+  4: 'md:col-span-4',
+};
+
+const evenSpan = (count: number): 1 | 2 | 3 | 4 =>
+  Math.min(4, Math.max(1, Math.floor(4 / Math.max(1, count)))) as 1 | 2 | 3 | 4;
 
 /**
  * BookingForm — attendee details + the link's declared custom questions +
@@ -64,6 +90,16 @@ export interface BookingFormProps {
   submitLabel?: string;
   /** Small print beside the submit (details-first sets expectations). */
   footerNote?: string;
+  /**
+   * Re-arrange the fields into rows instead of the built-in order (email, the
+   * name pair, then each declared question full width). Reuse, not a fork: the
+   * SAME controls, validation, consent block and honeypot — only their grouping
+   * changes, so a host can match a mock without owning the machine.
+   *
+   * A slot naming nothing is skipped; a declared question no row claims is
+   * appended full width. Both are deliberate — see `slotNode`/`unplacedFields`.
+   */
+  fieldRows?: BookingFieldRow[];
   isSubmitting: boolean;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
   /** From useHumanitySignals — parent owns the instance so it can resetSignals(). */
@@ -81,6 +117,7 @@ export function BookingForm({
   initialValues,
   submitLabel,
   footerNote,
+  fieldRows,
   isSubmitting,
   onSubmit,
   honeypotInputProps,
@@ -176,6 +213,147 @@ export function BookingForm({
   // smallest ODS step that houses it.
   const FORM_STACK = 'flex flex-col gap-[var(--spacing-system-l)]';
 
+  // Every field as a standalone node, so the default order below and any
+  // host-supplied `fieldRows` compose the SAME controls. Extracting them is what
+  // makes an injected layout a re-arrangement rather than a fork of this form.
+  const builtInFields: Record<string, ReactNode> = {
+    email: (
+      <FieldWrapper label="Email" htmlFor="ms-email" error={errors.email?.message}>
+        <Input
+          id="ms-email"
+          type="email"
+          required
+          autoComplete="email"
+          placeholder="jane@company.com"
+          aria-invalid={!!errors.email}
+          className={inputClass}
+          {...register('email')}
+        />
+      </FieldWrapper>
+    ),
+    firstName: (
+      <FieldWrapper label="First Name" htmlFor="ms-first-name" error={errors.firstName?.message}>
+        <Input
+          id="ms-first-name"
+          required
+          autoComplete="given-name"
+          placeholder="Jane"
+          aria-invalid={!!errors.firstName}
+          className={inputClass}
+          {...register('firstName')}
+        />
+      </FieldWrapper>
+    ),
+    lastName: (
+      <FieldWrapper label="Last Name" htmlFor="ms-last-name" error={errors.lastName?.message}>
+        <Input
+          id="ms-last-name"
+          required
+          autoComplete="family-name"
+          placeholder="Doe"
+          aria-invalid={!!errors.lastName}
+          className={inputClass}
+          {...register('lastName')}
+        />
+      </FieldWrapper>
+    ),
+  };
+
+  const renderDeclaredField = (field: MeetingFormField): ReactNode => (
+    <FieldWrapper key={field.name} label={field.label} htmlFor={`ms-q-${field.name}`} error={fieldError(field.name)}>
+      {field.type === 'textarea' && (
+        <Textarea
+          id={`ms-q-${field.name}`}
+          className="border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"
+          {...register(`formFields.${field.name}` as never)}
+        />
+      )}
+      {field.type === 'text' && (
+        <Input
+          id={`ms-q-${field.name}`}
+          className="h-11 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary md:h-12"
+          {...register(`formFields.${field.name}` as never)}
+        />
+      )}
+      {(field.type === 'select' || field.type === 'radio') && (
+        <Controller
+          control={control}
+          name={`formFields.${field.name}` as never}
+          render={({ field: rhf }) =>
+            field.type === 'select' ? (
+              <Select value={rhf.value ?? ''} onValueChange={rhf.onChange}>
+                <SelectTrigger id={`ms-q-${field.name}`}>
+                  <SelectValue placeholder="Select…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(field.options ?? []).map(opt => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <RadioGroup value={rhf.value ?? ''} onValueChange={rhf.onChange}>
+                {(field.options ?? []).map(opt => (
+                  <div key={opt} className="flex items-center gap-[var(--spacing-system-xs)]">
+                    <RadioGroupItem id={`ms-q-${field.name}-${opt}`} value={opt} />
+                    <Label htmlFor={`ms-q-${field.name}-${opt}`}>{opt}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            )
+          }
+        />
+      )}
+      {field.type === 'checkbox' && (
+        <Controller
+          control={control}
+          name={`formFields.${field.name}` as never}
+          render={({ field: rhf }) => (
+            // The question's Label above already carries the text and
+            // binds to this id — a second inline label would double the
+            // visible text AND the accessible name.
+            <div className="flex items-center gap-[var(--spacing-system-xs)]">
+              <Checkbox
+                id={`ms-q-${field.name}`}
+                checked={Boolean(rhf.value)}
+                onCheckedChange={v => rhf.onChange(v === true)}
+              />
+            </div>
+          )}
+        />
+      )}
+    </FieldWrapper>
+  );
+
+  const declaredByName = new Map(supportedFields.map(f => [f.name, f]));
+
+  const slotResolves = (name: string): boolean => Boolean(builtInFields[name] || declaredByName.has(name));
+
+  const slotNode = (name: string): ReactNode => {
+    const builtIn = builtInFields[name];
+    if (builtIn) return builtIn;
+    const declared = declaredByName.get(name);
+    // A name matching nothing is SKIPPED, not an error: a row may reference a
+    // question the link has not declared yet (declaring it in HubSpot is what
+    // turns it on), and throwing would take the whole form down over config.
+    return declared ? renderDeclaredField(declared) : null;
+  };
+
+  /** Declared questions no row claims — appended full width, so a question added
+   *  in HubSpot can never go invisible by omission from a layout written before it. */
+  const unplacedFields = fieldRows
+    ? supportedFields.filter(f => !fieldRows.some(row => row.some(slot => slot.name === f.name)))
+    : [];
+
+  /** Rows whose every slot names a question the link has not declared are
+   *  DROPPED, not rendered empty: an empty grid still eats one form gap, so a
+   *  layout written ahead of the HubSpot config would print blank bands. */
+  const placedRows = (fieldRows ?? [])
+    .map(row => row.filter(slot => slotResolves(slot.name)))
+    .filter(row => row.length > 0);
+
   const submitButton = (
     <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>
       {submitLabel ?? 'Confirm Booking'}
@@ -198,116 +376,46 @@ export function BookingForm({
           submit button off the bottom the moment validation fails. Required-ness
           is carried by `required` on the control (read out by assistive tech),
           not by an asterisk the design does not draw. */}
-      <FieldWrapper label="Email" htmlFor="ms-email" error={errors.email?.message}>
-        <Input
-          id="ms-email"
-          type="email"
-          required
-          autoComplete="email"
-          placeholder="jane@company.com"
-          aria-invalid={!!errors.email}
-          className={inputClass}
-          {...register('email')}
-        />
-      </FieldWrapper>
-
-      <div className="grid grid-cols-2 gap-[var(--spacing-system-m)]">
-        <FieldWrapper label="First Name" htmlFor="ms-first-name" error={errors.firstName?.message}>
-          <Input
-            id="ms-first-name"
-            required
-            autoComplete="given-name"
-            placeholder="Jane"
-            aria-invalid={!!errors.firstName}
-            className={inputClass}
-            {...register('firstName')}
-          />
-        </FieldWrapper>
-        <FieldWrapper label="Last Name" htmlFor="ms-last-name" error={errors.lastName?.message}>
-          <Input
-            id="ms-last-name"
-            required
-            autoComplete="family-name"
-            placeholder="Doe"
-            aria-invalid={!!errors.lastName}
-            className={inputClass}
-            {...register('lastName')}
-          />
-        </FieldWrapper>
-      </div>
-
-      {supportedFields.map(field => (
-        <FieldWrapper
-          key={field.name}
-          label={field.label}
-          htmlFor={`ms-q-${field.name}`}
-          error={fieldError(field.name)}
-        >
-          {field.type === 'textarea' && (
-            <Textarea
-              id={`ms-q-${field.name}`}
-              className="border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"
-              {...register(`formFields.${field.name}` as never)}
-            />
-          )}
-          {field.type === 'text' && (
-            <Input
-              id={`ms-q-${field.name}`}
-              className="h-11 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary md:h-12"
-              {...register(`formFields.${field.name}` as never)}
-            />
-          )}
-          {(field.type === 'select' || field.type === 'radio') && (
-            <Controller
-              control={control}
-              name={`formFields.${field.name}` as never}
-              render={({ field: rhf }) =>
-                field.type === 'select' ? (
-                  <Select value={rhf.value ?? ''} onValueChange={rhf.onChange}>
-                    <SelectTrigger id={`ms-q-${field.name}`}>
-                      <SelectValue placeholder="Select…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(field.options ?? []).map(opt => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <RadioGroup value={rhf.value ?? ''} onValueChange={rhf.onChange}>
-                    {(field.options ?? []).map(opt => (
-                      <div key={opt} className="flex items-center gap-[var(--spacing-system-xs)]">
-                        <RadioGroupItem id={`ms-q-${field.name}-${opt}`} value={opt} />
-                        <Label htmlFor={`ms-q-${field.name}-${opt}`}>{opt}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                )
-              }
-            />
-          )}
-          {field.type === 'checkbox' && (
-            <Controller
-              control={control}
-              name={`formFields.${field.name}` as never}
-              render={({ field: rhf }) => (
-                // The question's Label above already carries the text and
-                // binds to this id — a second inline label would double the
-                // visible text AND the accessible name.
-                <div className="flex items-center gap-[var(--spacing-system-xs)]">
-                  <Checkbox
-                    id={`ms-q-${field.name}`}
-                    checked={Boolean(rhf.value)}
-                    onCheckedChange={v => rhf.onChange(v === true)}
-                  />
+      {fieldRows ? (
+        <>
+          {placedRows.map((row, rowIndex) => (
+            <div
+              key={row.map(s => s.name).join('|') || rowIndex}
+              className="grid grid-cols-2 gap-[var(--spacing-system-m)] md:grid-cols-4"
+            >
+              {row.map(slot => (
+                <div
+                  key={slot.name}
+                  className={cn(
+                    // A two-field row stays side by side on a phone — the rule
+                    // the built-in name pair has always followed: two short
+                    // fields cost one line instead of two on the layout that can
+                    // least afford them.
+                    row.length === 2 ? 'col-span-1' : 'col-span-2',
+                    SPAN_CLASS[slot.span ?? evenSpan(row.length)],
+                  )}
+                >
+                  {slotNode(slot.name)}
                 </div>
-              )}
-            />
-          )}
-        </FieldWrapper>
-      ))}
+              ))}
+            </div>
+          ))}
+          {unplacedFields.map(field => (
+            <Fragment key={field.name}>{renderDeclaredField(field)}</Fragment>
+          ))}
+        </>
+      ) : (
+        <>
+          {builtInFields.email}
+          <div className="grid grid-cols-2 gap-[var(--spacing-system-m)]">
+            {builtInFields.firstName}
+            {builtInFields.lastName}
+          </div>
+          {supportedFields.map(field => (
+            <Fragment key={field.name}>{renderDeclaredField(field)}</Fragment>
+          ))}
+        </>
+      )}
 
       {legalConsent && (
         // Same out-of-flow message as the fields above, so a missed consent

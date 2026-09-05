@@ -36,6 +36,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ComponentType } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { useMeetingBooking } from '../../hooks/use-meeting-booking';
@@ -50,7 +51,18 @@ import {
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { Alert, AlertDescription, Button } from '../ui';
-import { BookingForm, BookingFormSkeleton } from './booking-form';
+import { BookingForm, BookingFormSkeleton, type BookingFormProps } from './booking-form';
+
+// The override surface: a host builds its `detailsForm` by re-rendering
+// `BookingForm` with `fieldRows`, so it needs both from this entry point (the
+// package exports `./components/meeting-scheduler`, not the file beneath it).
+export {
+  BookingForm,
+  BookingFormSkeleton,
+  type BookingFormProps,
+  type BookingFieldRow,
+  type BookingFieldSlot,
+} from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';
 import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
@@ -113,6 +125,25 @@ export interface HubSpotMeetingSchedulerProps {
    * opt-in precisely so `slot-first` stays byte-identical.
    */
   flow?: 'slot-first' | 'details-first';
+  /**
+   * Replace the details panel — step ONE under `flow="details-first"`, step two
+   * otherwise — with a host-supplied form. It receives exactly what the built-in
+   * one does, so the injected form keeps the widget's contract: the deferred
+   * schema, the honeypot and elapsed-ms signals, the verbatim consent block, the
+   * `onSubmit` handoff and the `isSubmitting` lock.
+   *
+   * The intended shape is a THIN wrapper that re-renders `BookingForm` with
+   * `fieldRows` (a layout re-arrangement, all machinery reused), not a
+   * hand-written form. Anything reimplementing the contract loses the bot
+   * protection and the consent guarantees.
+   *
+   * A COMPONENT type, not a render callback: React then owns its identity, so
+   * it reconciles across steps and keeps its own state instead of remounting —
+   * and the honeypot `ref` rides through as a normal prop.
+   *
+   * Defaults to the built-in form, so every existing embed is untouched.
+   */
+  detailsForm?: ComponentType<BookingFormProps>;
 }
 
 type Step = 'slot' | 'details' | 'confirmed';
@@ -298,6 +329,7 @@ export function HubSpotMeetingScheduler({
   onBooked,
   className,
   flow = 'slot-first',
+  detailsForm: DetailsForm = BookingForm,
 }: HubSpotMeetingSchedulerProps) {
   const {
     availability,
@@ -697,7 +729,7 @@ export function HubSpotMeetingScheduler({
                   · {formatDurationCompact(durationMs / 1000)}
                 </p>
               )}
-              <BookingForm
+              <DetailsForm
                 availability={availability}
                 meetingId={meetingId}
                 startTimeMs={selectedSlot ?? undefined}
