@@ -115,7 +115,11 @@ public class FleetMdmCacheService {
             FleetMdmClient client = clientFor(eventTenantId);
             Host host = client != null ? client.getHostById(hostId.longValue()) : null;
             return host != null ? host.getUuid() : null;
-        } catch (IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Interrupted while fetching agent ID for host: {}", hostId, e);
+            return null;
+        } catch (IOException e) {
             log.error("Error fetching agent ID for host: {}", hostId, e);
             return null;
         }
@@ -151,7 +155,11 @@ public class FleetMdmCacheService {
                 log.warn("Fleet MDM API returned null for query_id: {} (query may have been deleted)", queryId);
             }
             return query;
-        } catch (IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Interrupted while fetching query_id: {}. Cause: {}", queryId, e.getMessage(), e);
+            return null;
+        } catch (IOException e) {
             log.error("Fleet MDM API call failed for query_id: {}. Cause: {}", queryId, e.getMessage(), e);
             return null;
         }
@@ -205,7 +213,11 @@ public class FleetMdmCacheService {
                     () -> log.warn("Fleet MDM API returned null for policy_id: {} (policy may have been deleted)", policyId)
             );
             return policy;
-        } catch (IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Interrupted while fetching policy_id: {}. Cause: {}", policyId, e.getMessage(), e);
+            return Optional.empty();
+        } catch (IOException e) {
             log.error("Fleet MDM API call failed for policy_id: {}. Cause: {}", policyId, e.getMessage(), e);
             return Optional.empty();
         }
@@ -311,3 +323,4 @@ public class FleetMdmCacheService {
         return null;
     }
 }
+
