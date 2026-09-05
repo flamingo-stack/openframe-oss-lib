@@ -62,6 +62,7 @@ export {
   type BookingFormProps,
   type BookingFieldRow,
   type BookingFieldSlot,
+  type BookingFormConsent,
 } from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';

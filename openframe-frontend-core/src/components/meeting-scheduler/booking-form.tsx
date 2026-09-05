@@ -1,8 +1,8 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Fragment, useEffect, useMemo } from 'react';
-import type { ReactNode, Ref } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import type { FormEvent, ReactNode, Ref } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import {
   makeDeferredBookingSchema,
@@ -42,6 +42,25 @@ export interface BookingFieldSlot {
 }
 
 export type BookingFieldRow = BookingFieldSlot[];
+
+/**
+ * A HOST-supplied consent row — the block the waitlist form draws for its SMS
+ * consent, here for "I agree to the Privacy Policy and to be contacted". It is
+ * the host's copy and the host's link, so it is a prop, not HubSpot metadata;
+ * HubSpot's own `legalConsent` block (verbatim, declared on the link) renders
+ * alongside when the link carries one.
+ *
+ * A client-side gate, exactly like the waitlist's: Continue is refused until it
+ * is ticked, and the tick rides in the payload as `hostConsent` — which the
+ * host's book route strips as an undeclared key. It is not a HubSpot consent
+ * record; declare `legalConsent` on the link when one is required.
+ */
+export interface BookingFormConsent {
+  label: ReactNode;
+  description?: ReactNode;
+  /** Shown under the row when Continue is pressed unticked. */
+  errorMessage?: string;
+}
 
 /** Static so Tailwind's scanner sees every class — a template built from a
  *  runtime span would compile to nothing. */
@@ -101,6 +120,8 @@ export interface BookingFormProps {
    * appended full width. Both are deliberate — see `slotNode`/`unplacedFields`.
    */
   fieldRows?: BookingFieldRow[];
+  /** Host-supplied consent row, rendered after the fields — see `BookingFormConsent`. */
+  consent?: BookingFormConsent;
   isSubmitting: boolean;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
   /** From useHumanitySignals — parent owns the instance so it can resetSignals(). */
@@ -119,6 +140,7 @@ export function BookingForm({
   submitLabel,
   footerNote,
   fieldRows,
+  consent,
   isSubmitting,
   onSubmit,
   honeypotInputProps,
@@ -170,6 +192,12 @@ export function BookingForm({
 
   const priorConsents = initialValues?.legalConsentResponses as typeof consentDefaults | undefined;
 
+  // The host consent lives OUTSIDE react-hook-form (it is not a wire field), so
+  // a remount restores it from the stash the same way the fields come back.
+  const [consented, setConsented] = useState(initialValues?.hostConsent === true);
+  const [consentError, setConsentError] = useState<string | null>(null);
+  const consentMissing = Boolean(consent) && !consented;
+
   // The seeded availability is refetched immediately on mount, so the link's
   // consent set can change WHILE this form is open. Reconcile rather than
   // remount: carry each `consented` across by id and default new ids to false.
@@ -186,16 +214,25 @@ export function BookingForm({
     );
   }, [consentDefaults, priorConsents, setValue]);
 
-  const submit = handleSubmit(async data => {
+  const submitValid = handleSubmit(async data => {
+    if (consentMissing) return; // the error is already on screen — see `submit`
     if (deferSlot) {
       // Collect-only. Signals are captured HERE, while this form and its
       // honeypot are still mounted — `getSignals()` reads a detached ref once
       // they unmount, which would silently disable the decoy.
-      await onSubmit({ ...data, meetingId });
+      await onSubmit({ ...data, meetingId, hostConsent: consented });
       return;
     }
-    await onSubmit({ ...data, meetingId, startTimeMs, durationMs, timezone, ...getSignals() });
+    await onSubmit({ ...data, meetingId, hostConsent: consented, startTimeMs, durationMs, timezone, ...getSignals() });
   });
+
+  // Consent is checked BEFORE the resolver runs, not inside the valid branch,
+  // so an unticked box and an empty field are reported together rather than
+  // one submit apart.
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    if (consentMissing) setConsentError(consent?.errorMessage ?? 'Please agree to continue.');
+    return submitValid(event);
+  };
 
   const fieldError = (name: string): string | undefined => {
     const err = (errors.formFields as Record<string, { message?: string }> | undefined)?.[name];
@@ -424,6 +461,21 @@ export function BookingForm({
             <Fragment key={field.name}>{renderDeclaredField(field)}</Fragment>
           ))}
         </>
+      )}
+
+      {consent && (
+        <CheckboxBlock
+          id="ms-host-consent"
+          checked={consented}
+          onCheckedChange={v => {
+            setConsented(v);
+            if (v) setConsentError(null);
+          }}
+          disabled={isSubmitting}
+          error={consentError ?? undefined}
+          label={consent.label}
+          description={consent.description}
+        />
       )}
 
       {legalConsent && (
