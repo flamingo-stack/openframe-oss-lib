@@ -27,7 +27,7 @@ public abstract class DebeziumMessageHandler<T, U extends DeserializedDebeziumMe
                     default -> null;
                 };
             } catch (Exception e) {
-                log.error("Failed to process tag message", e);
+                log.error("Failed to parse Debezium operation type", e);
             }
         }
         return operationType;

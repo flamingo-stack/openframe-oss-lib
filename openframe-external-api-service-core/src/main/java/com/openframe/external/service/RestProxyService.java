@@ -39,6 +39,8 @@ import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 @Slf4j
 public class RestProxyService {
 
+    private static final String MASKED_VALUE = "****";
+
     private final IntegratedToolRepository toolRepository;
     private final ProxyUrlResolver proxyUrlResolver;
     private final ToolUrlService toolUrlService;
@@ -91,7 +93,7 @@ public class RestProxyService {
 
             String method = request.getMethod();
             Map<String, String> headers = buildApiRequestHeaders(tool);
-            log.debug("Headers: {}", headers);
+            log.debug("Headers: {}", maskSensitiveHeaders(headers));
 
             return proxy(tool, targetUri, method, headers, body);
             
@@ -132,6 +134,25 @@ public class RestProxyService {
         return headers;
     }
 
+    private Map<String, String> maskSensitiveHeaders(Map<String, String> headers) {
+        Map<String, String> masked = new HashMap<>();
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+            masked.put(entry.getKey(), isSensitiveHeader(entry.getKey()) ? MASKED_VALUE : entry.getValue());
+        }
+        return masked;
+    }
+
+    private boolean isSensitiveHeader(String headerName) {
+        if (headerName == null) {
+            return false;
+        }
+        String normalized = headerName.toLowerCase();
+        return normalized.equals(AUTHORIZATION.toLowerCase())
+                || normalized.contains("api-key")
+                || normalized.contains("apikey")
+                || normalized.contains("api_key");
+    }
+
     private ResponseEntity<String> proxy(IntegratedTool tool, URI targetUri, String method, 
                                        Map<String, String> proxyHeaders, String body) {
         log.info("Starting proxy request to {} - method: {}, URI: {}", tool.getName(), method, targetUri);
@@ -142,7 +163,8 @@ public class RestProxyService {
 
             for (Map.Entry<String, String> header : proxyHeaders.entrySet()) {
                 httpRequest.setHeader(header.getKey(), header.getValue());
-                log.debug("Added header: {} = {}", header.getKey(), header.getValue());
+                log.debug("Added header: {} = {}", header.getKey(),
+                        isSensitiveHeader(header.getKey()) ? MASKED_VALUE : header.getValue());
             }
 
             if (isNotEmpty(body)) {
