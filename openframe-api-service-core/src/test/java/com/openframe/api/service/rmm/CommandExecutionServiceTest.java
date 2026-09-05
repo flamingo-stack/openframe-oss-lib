@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.mapper.CommandExecutionMapper;
 import com.openframe.api.service.rmm.command.CommandExecutionService;
 import com.openframe.data.document.rmm.command.CommandExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
@@ -39,7 +40,7 @@ class CommandExecutionServiceTest {
     @BeforeEach
     void setUp() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        service = new CommandExecutionService(commandExecutionRepository, tenantIdProvider);
+        service = new CommandExecutionService(commandExecutionRepository, new CommandExecutionMapper(), tenantIdProvider);
     }
 
     @Test

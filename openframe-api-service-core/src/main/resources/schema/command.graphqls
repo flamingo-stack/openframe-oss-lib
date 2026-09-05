@@ -1,14 +1,41 @@
 # RMM ad-hoc command dispatch.
 #
 # Distinct from scripts: a command is just a raw shell string typed in the
-# dashboard. Nothing is persisted on the backend — the mutation only forwards
-# the command to the target agent over NATS and returns an executionId for
-# the dashboard to correlate the asynchronous agent response.
+# dashboard. Single runCommand is pure transport — nothing is persisted, the
+# executionId only correlates the asynchronous agent response. batchRunCommand
+# persists one row per machine, read back via commandExecutions.
 
 extend type Mutation {
     runCommand(input: RunCommandInput!): DispatchResponse!
     batchRunCommand(input: BatchRunCommandInput!): DispatchResponse!
     cancelExecution(input: CancelExecutionInput!): DispatchResponse!
+}
+
+extend type Query {
+    """Per-machine rows of one batch dispatch (batchRunCommand / installPackage /
+    uninstallPackage) — status and, once the agent reports, the execution logs
+    (stdout / stderr). Poll until every row is terminal."""
+    commandExecutions(executionId: ID!): [CommandExecution!]!
+}
+
+type CommandExecution {
+    executionId: ID!
+    machineId: String!
+    command: String!
+    shell: ScriptShell!
+    privilegeLevel: PrivilegeLevel!
+    status: ScriptExecutionStatus!
+    dispatchedAt: Instant!
+    statusChangedAt: Instant
+    finishedAt: Instant
+    exitCode: Int
+    executionTimeMs: Float
+    timedOut: Boolean
+    stdout: String
+    stdoutTruncated: Boolean
+    stderr: String
+    stderrTruncated: Boolean
+    error: String
 }
 
 input RunCommandInput {
