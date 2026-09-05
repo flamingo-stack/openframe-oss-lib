@@ -39,6 +39,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   events: 'calendar',
   podcasts: 'headphones',
   'customer-interviews': 'users',
+  faqs: 'info',
 
   // Financials
   'investor-updates': 'mail',
@@ -112,6 +113,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   events: 'Events',
   podcasts: 'Podcasts',
   'customer-interviews': 'Customer Interviews',
+  faqs: 'FAQs',
 
   // Financials
   'investor-updates': 'Investor Updates',
@@ -199,6 +201,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   event: 'events',
   podcast: 'podcasts',
   customer_interview: 'customer-interviews',
+  faq: 'faqs',
 
   // Financials
   investor_update: 'investor-updates',
