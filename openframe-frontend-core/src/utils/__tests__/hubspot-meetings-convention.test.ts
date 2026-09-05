@@ -112,7 +112,10 @@ describe('makeBookingSchema × SUPPORTED_FORM_FIELD_TYPES', () => {
       };
       expect(isSupportedFormField(field)).toBe(true);
       const schema = makeBookingSchema([field], null);
-      const answer = type === 'checkbox' ? true : type === 'select' || type === 'radio' ? 'a' : 'hello';
+      // One well-formed answer per type: a boolean for the box, an option for the
+      // pickers, a decimal literal for a Number property, free text otherwise.
+      const answer =
+        type === 'checkbox' ? true : type === 'select' || type === 'radio' ? 'a' : type === 'number' ? '42' : 'hello';
       const ok = schema.safeParse({ ...base, formFields: { [field.name]: answer } });
       expect(ok.success).toBe(true);
       const missing = schema.safeParse({ ...base, formFields: {} });
