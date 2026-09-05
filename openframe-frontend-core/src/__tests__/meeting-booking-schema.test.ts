@@ -5,16 +5,9 @@ import {
   makeDeferredBookingSchema,
   type MeetingFormField,
 } from '../schemas/meeting-booking-schema';
+import { BOOKING_BASE } from './fixtures/meeting-booking';
 
-const base = {
-  meetingId: '1',
-  startTimeMs: 1_700_000_000_000,
-  durationMs: 1_800_000,
-  firstName: 'A',
-  lastName: 'B',
-  email: 'a@b.co',
-  timezone: 'America/New_York',
-};
+const base = BOOKING_BASE;
 
 const endpoints = (required: boolean): MeetingFormField => ({
   name: 'number_of_endpoints',

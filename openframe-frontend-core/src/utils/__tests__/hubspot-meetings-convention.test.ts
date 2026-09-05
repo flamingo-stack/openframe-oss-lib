@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-
+import { BOOKING_BASE } from '../../__tests__/fixtures/meeting-booking';
 import {
   isSupportedFormField,
   makeBookingSchema,
@@ -91,15 +91,7 @@ describe('MAX_MONTH_OFFSET', () => {
 });
 
 describe('makeBookingSchema × SUPPORTED_FORM_FIELD_TYPES', () => {
-  const base = {
-    meetingId: 'm1',
-    startTimeMs: 1_785_769_200_000,
-    durationMs: 1_800_000,
-    firstName: 'Ada',
-    lastName: 'Lovelace',
-    email: 'ada@example.com',
-    timezone: 'UTC',
-  };
+  const base = BOOKING_BASE;
 
   it('every supported type yields a working validator (renderer and factory move together)', () => {
     for (const type of SUPPORTED_FORM_FIELD_TYPES) {

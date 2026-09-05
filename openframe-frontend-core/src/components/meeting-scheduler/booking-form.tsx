@@ -7,6 +7,7 @@ import { useForm, Controller } from 'react-hook-form';
 import type { Control, UseFormRegister } from 'react-hook-form';
 import {
   BUILT_IN_BOOKING_FIELDS,
+  fieldTypeSpec,
   makeDeferredBookingSchema,
   isSupportedFormField,
   type BuiltInBookingField,
@@ -100,6 +101,8 @@ interface ControlArgs {
   id: string;
   /** Top-level for the built-ins (`email`), `formFields.<name>` for declared questions. */
   registerName: string;
+  /** The field's current validation message, so the control can say `aria-invalid`. */
+  error?: string;
   register: UseFormRegister<BookingFormValues>;
   control: Control<BookingFormValues>;
 }
@@ -107,64 +110,75 @@ interface ControlArgs {
 // Field chrome mirrors ContactForm 1:1 (`contact/contact-form.tsx`) — the
 // booking form must be indistinguishable from every other form in the app.
 const INPUT_CLASS =
-  'bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-11 md:h-12';
-const TEXTAREA_CLASS = 'border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary';
+  'bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-[var(--spacing-system-sf)] h-11 md:h-12';
+const TEXTAREA_CLASS =
+  'border-ods-border bg-ods-card px-[var(--spacing-system-sf)] text-ods-text-primary placeholder-ods-text-secondary';
 
-/** Placeholder derived from the field itself (the mock's "Enter Company Name",
- *  "Enter Text (optional)"), so declared questions get one without any copy
- *  living here; the built-ins carry their own. */
+/** A built-in carries its own placeholder; a declared question gets the one its
+ *  TYPE derives (the registry's `placeholder`), so no copy lives here. */
 const placeholderFor = (field: ControlArgs['field']): string | undefined =>
-  field.placeholder ??
-  (field.type === 'text'
-    ? `Enter ${field.label}`
-    : field.type === 'textarea'
-      ? `Enter text${field.required ? '' : ' (optional)'}`
-      : undefined);
+  field.placeholder ?? fieldTypeSpec(field.type).placeholder?.(field);
+
+/** `<input type="number">` accepts `1e3`, `007`, ` 12 `; the wire wants the
+ *  canonical decimal literal the validator checks, so normalise on the way in. */
+const canonicalNumber = (v: unknown): string => {
+  const s = String(v ?? '').trim();
+  if (s === '') return '';
+  const n = Number(s);
+  return Number.isFinite(n) ? String(n) : s;
+};
 
 /**
  * ONE control per registry type. A `Record` over `SupportedFormFieldType` on
  * purpose: `FORM_FIELD_TYPES` (the schema module) is the single place a type is
  * declared, and this table cannot compile without an entry for each — so the
  * validator and the renderer can never disagree about what is supported.
+ * Every control states `aria-invalid` from the field's message and carries
+ * `required`/`aria-required` from the field, so the accent asterisk is never
+ * the only signal.
  */
 const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => ReactNode> = {
-  text: ({ field, id, registerName, register }) => (
+  text: ({ field, id, registerName, error, register }) => (
     <Input
       id={id}
       type={field.inputType ?? 'text'}
       required={field.required}
+      aria-invalid={Boolean(error)}
       autoComplete={field.autoComplete}
       placeholder={placeholderFor(field)}
       className={INPUT_CLASS}
       {...register(registerName as never)}
     />
   ),
-  textarea: ({ field, id, registerName, register }) => (
+  textarea: ({ field, id, registerName, error, register }) => (
     <Textarea
       id={id}
+      required={field.required}
+      aria-invalid={Boolean(error)}
       placeholder={placeholderFor(field)}
       className={TEXTAREA_CLASS}
       {...register(registerName as never)}
     />
   ),
-  number: ({ field, id, registerName, register }) => (
+  number: ({ field, id, registerName, error, register }) => (
     <Input
       id={id}
       type="number"
-      inputMode="numeric"
+      inputMode="decimal"
       step="any"
       required={field.required}
+      aria-invalid={Boolean(error)}
       className={INPUT_CLASS}
-      {...register(registerName as never)}
+      {...register(registerName as never, { setValueAs: canonicalNumber })}
     />
   ),
-  select: ({ field, id, registerName, control }) => (
+  select: ({ field, id, registerName, error, control }) => (
     <Controller
       control={control}
       name={registerName as never}
       render={({ field: rhf }) => (
         <Select value={rhf.value ?? ''} onValueChange={rhf.onChange}>
-          <SelectTrigger id={id}>
+          <SelectTrigger id={id} aria-required={field.required || undefined} aria-invalid={Boolean(error)}>
             <SelectValue placeholder="Select…" />
           </SelectTrigger>
           <SelectContent>
@@ -178,12 +192,17 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       )}
     />
   ),
-  radio: ({ field, id, registerName, control }) => (
+  radio: ({ field, id, registerName, error, control }) => (
     <Controller
       control={control}
       name={registerName as never}
       render={({ field: rhf }) => (
-        <RadioGroup value={rhf.value ?? ''} onValueChange={rhf.onChange}>
+        <RadioGroup
+          value={rhf.value ?? ''}
+          onValueChange={rhf.onChange}
+          aria-required={field.required || undefined}
+          aria-invalid={Boolean(error)}
+        >
           {(field.options ?? []).map(opt => (
             <div key={opt} className="flex items-center gap-[var(--spacing-system-xs)]">
               <RadioGroupItem id={`${id}-${opt}`} value={opt} />
@@ -194,7 +213,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       )}
     />
   ),
-  checkbox: ({ id, registerName, control }) => (
+  checkbox: ({ field, id, registerName, error, control }) => (
     <Controller
       control={control}
       name={registerName as never}
@@ -203,7 +222,13 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
         // this id — a second inline label would double the visible text AND
         // the accessible name.
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
-          <Checkbox id={id} checked={Boolean(rhf.value)} onCheckedChange={v => rhf.onChange(v === true)} />
+          <Checkbox
+            id={id}
+            checked={Boolean(rhf.value)}
+            onCheckedChange={v => rhf.onChange(v === true)}
+            aria-required={field.required || undefined}
+            aria-invalid={Boolean(error)}
+          />
         </div>
       )}
     />
@@ -294,6 +319,7 @@ export function BookingForm({
     control,
     handleSubmit,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm<BookingFormValues>({
     resolver: zodResolver(schema),
@@ -328,22 +354,27 @@ export function BookingForm({
   // A wholesale reset would drop what the visitor has typed; leaving it alone
   // would make a newly-declared required consent impossible to satisfy.
   useEffect(() => {
+    // The LIVE answers first (what the visitor has ticked since mount), the
+    // stash only as the seed for a fresh remount — reading the stash alone
+    // would undo every tick made after mount when the consent set refreshes.
+    const current = (getValues('legalConsentResponses') ?? priorConsents ?? []) as typeof consentDefaults;
     setValue(
       'legalConsentResponses',
       consentDefaults.map(next => ({
         ...next,
-        consented: priorConsents?.find(r => r.communicationTypeId === next.communicationTypeId)?.consented ?? false,
+        consented: current.find(r => r.communicationTypeId === next.communicationTypeId)?.consented ?? false,
       })),
       { shouldDirty: false },
     );
-  }, [consentDefaults, priorConsents, setValue]);
+  }, [consentDefaults, priorConsents, getValues, setValue]);
 
   const submitValid = handleSubmit(async data => {
     if (consentMissing) return; // the error is already on screen — see `submit`
     if (deferSlot) {
-      // Collect-only. Signals are captured HERE, while this form and its
-      // honeypot are still mounted — `getSignals()` reads a detached ref once
-      // they unmount, which would silently disable the decoy.
+      // Collect-only. The PARENT's `onSubmit` reads the humanity signals, and
+      // must do so synchronously in this call — this form and its honeypot are
+      // still mounted here, and `getSignals()` reads a detached ref once they
+      // unmount, which would silently disable the decoy.
       await onSubmit({ ...data, meetingId, hostConsent: consented });
       return;
     }
@@ -378,7 +409,14 @@ export function BookingForm({
     where: { id: string; registerName: string; error?: string },
   ): ReactNode => (
     <FieldWrapper key={field.name} label={field.label} htmlFor={where.id} required={field.required} error={where.error}>
-      {FIELD_CONTROLS[field.type]({ field, id: where.id, registerName: where.registerName, register, control })}
+      {FIELD_CONTROLS[field.type]({
+        field,
+        id: where.id,
+        registerName: where.registerName,
+        error: where.error,
+        register,
+        control,
+      })}
     </FieldWrapper>
   );
 
@@ -460,7 +498,10 @@ export function BookingForm({
           {placedRows.map((row, rowIndex) => (
             <div
               key={row.map(s => s.name).join('|') || rowIndex}
-              className="grid grid-cols-2 gap-[var(--spacing-system-m)] md:grid-cols-4"
+              // Row gap one step wider than the column gap: field messages hang
+              // ~16px below their control and would print over the next row's
+              // label at the column gap.
+              className="grid grid-cols-2 gap-x-[var(--spacing-system-m)] gap-y-[var(--spacing-system-l)] md:grid-cols-4"
             >
               {row.map(slot => (
                 <div
@@ -505,6 +546,7 @@ export function BookingForm({
             if (v) setConsentError(null);
           }}
           disabled={isSubmitting}
+          required
           error={consentError ?? undefined}
           label={consent.label}
           description={consent.description}
@@ -518,21 +560,27 @@ export function BookingForm({
         // exactly as it was.
         <FieldWrapper error={errors.legalConsentResponses?.message}>
           <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+            {/* GDPR surface — HubSpot's copy rendered VERBATIM, never edited, in
+                HubSpot's own order: processing statement, communication intro,
+                the boxes, privacy note. The statement is a standalone line so a
+                link with consent enabled but NO communication boxes still shows
+                it. */}
+            <p className="text-ods-text-secondary text-h6">{legalConsent.processingConsentText}</p>
+            {legalConsent.communicationConsentText && (
+              <p className="text-ods-text-secondary text-h6">{legalConsent.communicationConsentText}</p>
+            )}
             <Controller
               control={control}
               name="legalConsentResponses"
               render={({ field: rhf }) => (
                 <>
-                  {legalConsent.communicationConsentCheckboxes.map((box, index) => {
+                  {legalConsent.communicationConsentCheckboxes.map(box => {
                     const responses = (rhf.value ?? []) as Array<{ communicationTypeId: string; consented: boolean }>;
                     const current = responses.find(r => r.communicationTypeId === box.communicationTypeId);
                     return (
                       // The design system's consent row (`checkbox-block`, the
-                      // same block the waitlist form uses): box, label, caption
-                      // in one bordered row. GDPR surface — HubSpot's copy is
-                      // rendered VERBATIM, never edited. The processing statement
-                      // rides as the caption of the FIRST row, once: it describes
-                      // the consent as a whole, not each channel.
+                      // same block the waitlist form uses): box + label in one
+                      // bordered row.
                       <CheckboxBlock
                         key={box.communicationTypeId}
                         id={`ms-consent-${box.communicationTypeId}`}
@@ -544,17 +592,14 @@ export function BookingForm({
                             ),
                           )
                         }
+                        required={box.required}
                         label={box.label}
-                        description={index === 0 ? legalConsent.processingConsentText : undefined}
                       />
                     );
                   })}
                 </>
               )}
             />
-            {legalConsent.communicationConsentText && (
-              <p className="text-ods-text-secondary text-h6">{legalConsent.communicationConsentText}</p>
-            )}
             {legalConsent.privacyPolicyText && (
               <p className="text-ods-text-secondary text-h6">{legalConsent.privacyPolicyText}</p>
             )}

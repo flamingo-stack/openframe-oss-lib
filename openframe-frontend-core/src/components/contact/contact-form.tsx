@@ -50,6 +50,7 @@ import {
   Label,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
+import { RequiredMark } from '../ui/required-mark';
 
 /**
  * Fields the caller can suppress. Six values — every primary form
@@ -288,7 +289,8 @@ export function ContactForm({
             {showName && (
               <div className="flex flex-col">
                 <Label htmlFor="name">
-                  Your Name<span className="text-ods-accent">*</span>
+                  Your Name
+                  <RequiredMark />
                 </Label>
                 <Input
                   id="name"
@@ -309,7 +311,8 @@ export function ContactForm({
             {showEmail && (
               <div className="flex flex-col">
                 <Label htmlFor="email">
-                  Email<span className="text-ods-accent">*</span>
+                  Email
+                  <RequiredMark />
                 </Label>
                 <Input
                   id="email"
@@ -402,7 +405,8 @@ export function ContactForm({
         {showHelpCategory && (
           <div className="flex flex-col">
             <Label htmlFor="helpCategory">
-              Choose your main interest<span className="text-ods-accent">*</span>
+              Choose your main interest
+              <RequiredMark />
             </Label>
             <Controller
               control={control}
@@ -437,7 +441,8 @@ export function ContactForm({
         {showMessage && (
           <div className="flex flex-grow flex-col">
             <Label htmlFor="message">
-              Your Message<span className="text-ods-accent">*</span>
+              Your Message
+              <RequiredMark />
             </Label>
             <Textarea
               id="message"

@@ -23,6 +23,8 @@ interface CheckboxBlockProps {
    */
   trailing?: ReactNode;
   disabled?: boolean;
+  /** Marks the box `aria-required` — a required consent is invisible to assistive tech without it. */
+  required?: boolean;
   /** Error message displayed below the block (also triggers red border) */
   error?: string;
   className?: string;
@@ -40,6 +42,7 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
       truncateLabel,
       trailing,
       disabled,
+      required,
       error,
       className,
     },
@@ -81,6 +84,8 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
           defaultChecked={defaultChecked}
           onCheckedChange={onCheckedChange}
           disabled={disabled}
+          aria-required={required || undefined}
+          aria-invalid={error ? true : undefined}
           className={cn(
             'h-4 w-4 shrink-0 md:h-6 md:w-6',
             'rounded-[6px] border-2',

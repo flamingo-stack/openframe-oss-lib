@@ -2,18 +2,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { BookingForm } from '../components/meeting-scheduler/booking-form';
-import type { MeetingAvailability } from '../schemas/meeting-booking-schema';
+import { availabilityWith } from './fixtures/meeting-booking';
 
-const availability: MeetingAvailability = {
-  meetingId: '1',
-  monthOffset: 0,
-  hasMore: false,
-  durationsMs: [1_800_000],
-  slotsByDurationMs: { '1800000': [1_700_000_000_000] },
-  formFields: [{ name: 'number_of_endpoints', label: 'Number of endpoints', type: 'number', required: true }],
-  legalConsent: null,
-  hosts: [],
-};
+const availability = availabilityWith([
+  { name: 'number_of_endpoints', label: 'Number of endpoints', type: 'number', required: true },
+]);
 
 type Submit = (payload: Record<string, unknown>) => Promise<void>;
 
@@ -41,19 +34,31 @@ describe('BookingForm — a HubSpot Number question', () => {
     mount();
     const input = screen.getByLabelText(/^Number of endpoints/);
     expect(input).toHaveAttribute('type', 'number');
-    expect(input).toHaveAttribute('inputmode', 'numeric');
+    expect(input).toHaveAttribute('inputmode', 'decimal');
   });
 
-  it('refuses a non-numeric answer and never calls onSubmit', async () => {
+  it('reports a required question left empty as required, and never calls onSubmit', async () => {
     const onSubmit = mount();
     type(screen.getByLabelText(/^Email/), 'a@b.co');
     type(screen.getByLabelText(/^First Name/), 'A');
     type(screen.getByLabelText(/^Last Name/), 'B');
-    // jsdom lets a number input hold arbitrary text; the resolver is the gate.
-    type(screen.getByLabelText(/^Number of endpoints/), 'lots');
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
-    expect(await screen.findByText('Number of endpoints must be a number')).toBeInTheDocument();
+    // The required rule is FIRST on the chain, so the message is "is required",
+    // not the type's own "must be a number".
+    expect(await screen.findByText('Number of endpoints is required')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('canonicalises what the browser accepts before it reaches the wire', async () => {
+    const onSubmit = mount();
+    type(screen.getByLabelText(/^Email/), 'a@b.co');
+    type(screen.getByLabelText(/^First Name/), 'A');
+    type(screen.getByLabelText(/^Last Name/), 'B');
+    // `1e3` is a valid number-input value; the wire wants the decimal literal.
+    type(screen.getByLabelText(/^Number of endpoints/), '1e3');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ formFields: { number_of_endpoints: '1000' } }));
   });
 
   it('submits a numeric answer as a string under the declared name', async () => {

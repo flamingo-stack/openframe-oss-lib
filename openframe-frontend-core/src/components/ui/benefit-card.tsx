@@ -25,17 +25,18 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
 
   const variantStyles = {
     default: {
-      container: 'gap-2 bg-ods-bg p-2 md:p-4',
+      container:
+        'gap-[var(--spacing-system-xsf)] bg-ods-bg p-[var(--spacing-system-xsf)] md:p-[var(--spacing-system-mf)]',
       title: 'font-body font-bold text-body-md md:text-body-lg text-ods-text-primary',
       description: 'font-body font-medium text-body-sm md:text-body-md text-ods-text-secondary',
     },
     dark: {
-      container: 'gap-2 bg-transparent p-0 shadow-[0px_48px_80px_0px_rgba(0,0,0,0.24)]',
+      container: 'gap-[var(--spacing-system-xsf)] bg-transparent p-0 shadow-[0px_48px_80px_0px_rgba(0,0,0,0.24)]',
       title: 'font-mono font-semibold text-heading-4 leading-[40px] text-ods-text-primary tracking-[-0.64px]',
       description: 'font-body font-medium text-body-lg leading-6 text-ods-text-tertiary',
     },
     'auth-figma': {
-      container: 'gap-4 bg-transparent p-6',
+      container: 'gap-[var(--spacing-system-mf)] bg-transparent p-[var(--spacing-system-lf)]',
       title: 'text-h3 text-ods-text-primary tracking-[-0.36px]',
       description: 'text-h4 text-ods-text-secondary',
     },

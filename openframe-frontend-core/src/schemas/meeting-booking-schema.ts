@@ -180,12 +180,19 @@ export interface FormFieldTypeSpec {
   kind: 'string' | 'boolean';
   /** Whether HubSpot publishes `options` for the type (the pickers). */
   hasOptions: boolean;
-  /** The base validator for ONE answer, before the required/optional wrapping. */
-  validator: (field: MeetingFormField) => z.ZodTypeAny;
+  /**
+   * The validator for ONE answer. String types EXTEND `base`, which already
+   * carries the required-ness (`min(1)` when required) — so "X is required" is
+   * the first issue reported for an empty answer, ahead of the type's own rule.
+   * Boolean types ignore it.
+   */
+  validator: (field: MeetingFormField, base: z.ZodString) => z.ZodTypeAny;
+  /** The control's placeholder, derived from the field (the mock's "Enter Company Name"). */
+  placeholder?: (field: MeetingFormField) => string;
 }
 
-const optionValidator = (field: MeetingFormField) =>
-  z.string().refine(v => !v || (field.options ?? []).includes(v), {
+const optionValidator: FormFieldTypeSpec['validator'] = (field, base) =>
+  base.refine(v => !v || (field.options ?? []).includes(v), {
     message: `Please choose a valid option for ${field.label}`,
   });
 
@@ -193,19 +200,22 @@ export const FORM_FIELD_TYPES = {
   text: {
     kind: 'string',
     hasOptions: false,
-    validator: field => z.string().max(1000, { message: `${field.label} is too long` }),
+    validator: (field, base) => base.max(1000, { message: `${field.label} is too long` }),
+    placeholder: field => `Enter ${field.label}`,
   },
   textarea: {
     kind: 'string',
     hasOptions: false,
-    validator: field => z.string().max(5000, { message: `${field.label} is too long` }),
+    validator: (field, base) => base.max(5000, { message: `${field.label} is too long` }),
+    placeholder: field => `Enter text${field.required ? '' : ' (optional)'}`,
   },
   number: {
     kind: 'string',
     hasOptions: false,
-    validator: field =>
-      z
-        .string()
+    // Canonical decimal literal — the control normalises what the browser
+    // accepts (`1e3`, `007`) to this before it is validated or sent.
+    validator: (field, base) =>
+      base
         .max(32, { message: `${field.label} is too long` })
         .regex(/^-?\d+(\.\d+)?$/, { message: `${field.label} must be a number` }),
   },
@@ -240,15 +250,16 @@ export type SupportedMeetingFormField = MeetingFormField & { type: SupportedForm
  * not see them.
  */
 export interface BuiltInBookingField extends MeetingFormField {
-  name: 'firstName' | 'lastName' | 'email';
   type: 'text';
   required: true;
   inputType?: 'email';
   autoComplete: string;
   placeholder: string;
+  /** The wire's own required/format message — kept verbatim from the schema it replaced. */
+  requiredMessage: string;
 }
 
-export const BUILT_IN_BOOKING_FIELDS: readonly BuiltInBookingField[] = [
+export const BUILT_IN_BOOKING_FIELDS = [
   {
     name: 'firstName',
     label: 'First Name',
@@ -256,6 +267,7 @@ export const BUILT_IN_BOOKING_FIELDS: readonly BuiltInBookingField[] = [
     required: true,
     autoComplete: 'given-name',
     placeholder: 'Enter First Name',
+    requiredMessage: 'First name is required',
   },
   {
     name: 'lastName',
@@ -264,6 +276,7 @@ export const BUILT_IN_BOOKING_FIELDS: readonly BuiltInBookingField[] = [
     required: true,
     autoComplete: 'family-name',
     placeholder: 'Enter Last Name',
+    requiredMessage: 'Last name is required',
   },
   {
     name: 'email',
@@ -273,8 +286,28 @@ export const BUILT_IN_BOOKING_FIELDS: readonly BuiltInBookingField[] = [
     inputType: 'email',
     autoComplete: 'email',
     placeholder: 'username@mail.com',
+    requiredMessage: 'Please enter a valid email address',
   },
-];
+] as const satisfies readonly BuiltInBookingField[];
+
+/** `'firstName' | 'lastName' | 'email'` — derived from the array, never restated. */
+export type BuiltInBookingFieldName = (typeof BUILT_IN_BOOKING_FIELDS)[number]['name'];
+
+/** The registry entry for a supported type, widened to the spec so optional
+ *  members (`placeholder`) are readable without narrowing on the union. */
+export function fieldTypeSpec(type: SupportedFormFieldType): FormFieldTypeSpec {
+  return FORM_FIELD_TYPES[type];
+}
+
+/** The wire validator for one identity field, from ITS declaration above. */
+function identityValidator(name: BuiltInBookingFieldName) {
+  const field: BuiltInBookingField | undefined = BUILT_IN_BOOKING_FIELDS.find(f => f.name === name);
+  if (!field) throw new Error(`Unknown built-in booking field: ${name}`);
+  const base = z.string().max(255);
+  return field.inputType === 'email'
+    ? base.email({ message: field.requiredMessage })
+    : base.min(1, { message: field.requiredMessage });
+}
 
 // ---------------------------------------------------------------------------
 // Validators (single home — client widget and server rebuild both use these)
@@ -342,15 +375,17 @@ function buildBookingSchema<TStart extends z.ZodTypeAny, TDuration extends z.Zod
   for (const field of formFields) {
     if (!isSupportedFormField(field)) continue; // unsupported types are fail-closed at render time
     const spec: FormFieldTypeSpec = FORM_FIELD_TYPES[field.type];
-    let validator: z.ZodTypeAny = spec.validator(field);
     // required/optional wrapping follows the answer's wire KIND, not its type:
-    // a boolean is true-or-absent, a string is non-empty-or-empty.
+    // a boolean is true-or-absent, a string is non-empty-or-empty. For strings
+    // the required check is the FIRST rule on the chain, so an empty answer
+    // reports "is required" rather than the type's own message.
+    let validator: z.ZodTypeAny;
     if (spec.kind === 'boolean') {
       validator = field.required ? z.literal(true, { message: `${field.label} is required` }) : z.boolean().optional();
     } else {
-      validator = field.required
-        ? (validator as z.ZodString).min(1, { message: `${field.label} is required` })
-        : (validator as z.ZodString).optional().or(z.literal(''));
+      const base = field.required ? z.string().min(1, { message: `${field.label} is required` }) : z.string();
+      validator = spec.validator(field, base);
+      if (!field.required) validator = validator.optional().or(z.literal(''));
     }
     answers[field.name] = validator;
   }
@@ -372,9 +407,11 @@ function buildBookingSchema<TStart extends z.ZodTypeAny, TDuration extends z.Zod
         meetingId: z.string().min(1),
         startTimeMs: slot.startTimeMs,
         durationMs: slot.durationMs,
-        firstName: z.string().min(1, { message: 'First name is required' }).max(255),
-        lastName: z.string().min(1, { message: 'Last name is required' }).max(255),
-        email: z.string().email({ message: 'Please enter a valid email address' }).max(255),
+        // The identity trio's rules come from BUILT_IN_BOOKING_FIELDS — the
+        // keys stay literal so the payload type keeps its named properties.
+        firstName: identityValidator('firstName'),
+        lastName: identityValidator('lastName'),
+        email: identityValidator('email'),
         timezone: slot.timezone,
         locale: z.string().refine(isValidBcp47Locale, { message: 'Invalid locale' }).optional(),
         // Plain `.optional()` (no `.default()`) so zod's input and output types

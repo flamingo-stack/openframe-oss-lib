@@ -3,6 +3,7 @@
 import { type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { Label } from './label';
+import { RequiredMark } from './required-mark';
 
 export interface FieldWrapperProps {
   /** Label text displayed above the field */
@@ -70,11 +71,7 @@ const FieldWrapper = forwardRef<HTMLDivElement, FieldWrapperProps>(
           // reporting. One label scale, owned here and in Field together.
           <Label className="mb-1" htmlFor={htmlFor} variant={labelVariant}>
             {label}
-            {required && (
-              <span aria-hidden className="text-ods-accent">
-                *
-              </span>
-            )}
+            {required && <RequiredMark />}
           </Label>
         )}
         {children}
