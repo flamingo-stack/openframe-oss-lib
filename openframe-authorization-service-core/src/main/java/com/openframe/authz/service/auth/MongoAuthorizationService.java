@@ -27,27 +27,8 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
     public void save(OAuth2Authorization authorization) {
         log.debug("Saving authorization: {}", authorization.getId());
 
-        // Debug logging for PKCE parameters before save
-        OAuth2AuthorizationRequest request = authorization.getAttribute(OAuth2AuthorizationRequest.class.getName());
-        if (request != null) {
-            log.debug("PKCE in request before save: {}", request.getAdditionalParameters());
-        }
-
-        OAuth2Authorization.Token<OAuth2AuthorizationCode> code = authorization.getToken(OAuth2AuthorizationCode.class);
-        if (code != null) {
-            log.debug("PKCE in code metadata before save: {}", code.getMetadata());
-        }
-
         MongoOAuth2Authorization entity = MongoAuthorizationMapper.toEntity(authorization);
         repository.save(entity);
-
-        // Verify PKCE parameters after mapping
-        if (entity.getArAdditional() != null) {
-            log.debug("PKCE in entity additional params: {}", entity.getArAdditional());
-        }
-        if (entity.getAuthorizationCodeMetadata() != null) {
-            log.debug("PKCE in entity code metadata: {}", entity.getAuthorizationCodeMetadata());
-        }
     }
 
     @Override
@@ -64,7 +45,7 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
 
     @Override
     public OAuth2Authorization findByToken(String token, OAuth2TokenType tokenType) {
-        log.debug("Finding authorization by token: {}, type: {}", token, tokenType);
+        log.debug("Finding authorization by token type: {}", tokenType);
 
         Optional<MongoOAuth2Authorization> found;
         if (tokenType == null) {
@@ -82,22 +63,8 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
             found = Optional.empty();
         }
 
-        return found.map(entity -> {
-            OAuth2Authorization auth = MongoAuthorizationMapper.toDomain(entity, registeredClientRepository);
-
-            // Debug logging for PKCE parameters
-            OAuth2AuthorizationRequest request = auth.getAttribute(OAuth2AuthorizationRequest.class.getName());
-            if (request != null) {
-                log.debug("PKCE in request: {}", request.getAdditionalParameters());
-            }
-
-            OAuth2Authorization.Token<OAuth2AuthorizationCode> code = auth.getToken(OAuth2AuthorizationCode.class);
-            if (code != null) {
-                log.debug("PKCE in code metadata: {}", code.getMetadata());
-            }
-
-            return auth;
-        }).orElse(null);
+        return found.map(entity -> MongoAuthorizationMapper.toDomain(entity, registeredClientRepository))
+                .orElse(null);
     }
 }
 
