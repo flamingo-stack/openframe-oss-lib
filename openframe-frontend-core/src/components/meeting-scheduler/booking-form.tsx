@@ -256,7 +256,7 @@ export function BookingForm({
   // makes an injected layout a re-arrangement rather than a fork of this form.
   const builtInFields: Record<string, ReactNode> = {
     email: (
-      <FieldWrapper label="Email" htmlFor="ms-email" error={errors.email?.message}>
+      <FieldWrapper label="Email" htmlFor="ms-email" required error={errors.email?.message}>
         <Input
           id="ms-email"
           type="email"
@@ -270,7 +270,7 @@ export function BookingForm({
       </FieldWrapper>
     ),
     firstName: (
-      <FieldWrapper label="First Name" htmlFor="ms-first-name" error={errors.firstName?.message}>
+      <FieldWrapper label="First Name" htmlFor="ms-first-name" required error={errors.firstName?.message}>
         <Input
           id="ms-first-name"
           required
@@ -283,7 +283,7 @@ export function BookingForm({
       </FieldWrapper>
     ),
     lastName: (
-      <FieldWrapper label="Last Name" htmlFor="ms-last-name" error={errors.lastName?.message}>
+      <FieldWrapper label="Last Name" htmlFor="ms-last-name" required error={errors.lastName?.message}>
         <Input
           id="ms-last-name"
           required
@@ -298,7 +298,13 @@ export function BookingForm({
   };
 
   const renderDeclaredField = (field: MeetingFormField): ReactNode => (
-    <FieldWrapper key={field.name} label={field.label} htmlFor={`ms-q-${field.name}`} error={fieldError(field.name)}>
+    <FieldWrapper
+      key={field.name}
+      label={field.label}
+      htmlFor={`ms-q-${field.name}`}
+      required={field.required}
+      error={fieldError(field.name)}
+    >
       {field.type === 'textarea' && (
         <Textarea
           id={`ms-q-${field.name}`}
@@ -430,8 +436,10 @@ export function BookingForm({
           message rendered in flow grows its field, which pushes everything
           under it down and — inside a card that states its height — walks the
           submit button off the bottom the moment validation fails. Required-ness
-          is carried by `required` on the control (read out by assistive tech),
-          not by an asterisk the design does not draw. */}
+          is carried by `required` on the control (read out by assistive tech)
+          AND by `FieldWrapper`'s accent asterisk — the mark HubSpot's own form
+          and `ContactForm` both draw, so a visitor sees the same convention on
+          every form in the app. */}
       {fieldRows ? (
         <>
           {placedRows.map((row, rowIndex) => (

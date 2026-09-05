@@ -39,18 +39,18 @@ const type = (el: HTMLElement, value: string) => fireEvent.input(el, { target: {
 describe('BookingForm — a HubSpot Number question', () => {
   it('renders as a numeric input under the property label', () => {
     mount();
-    const input = screen.getByLabelText('Number of endpoints');
+    const input = screen.getByLabelText(/^Number of endpoints/);
     expect(input).toHaveAttribute('type', 'number');
     expect(input).toHaveAttribute('inputmode', 'numeric');
   });
 
   it('refuses a non-numeric answer and never calls onSubmit', async () => {
     const onSubmit = mount();
-    type(screen.getByLabelText('Email'), 'a@b.co');
-    type(screen.getByLabelText('First Name'), 'A');
-    type(screen.getByLabelText('Last Name'), 'B');
+    type(screen.getByLabelText(/^Email/), 'a@b.co');
+    type(screen.getByLabelText(/^First Name/), 'A');
+    type(screen.getByLabelText(/^Last Name/), 'B');
     // jsdom lets a number input hold arbitrary text; the resolver is the gate.
-    type(screen.getByLabelText('Number of endpoints'), 'lots');
+    type(screen.getByLabelText(/^Number of endpoints/), 'lots');
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
     expect(await screen.findByText('Number of endpoints must be a number')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
@@ -58,10 +58,10 @@ describe('BookingForm — a HubSpot Number question', () => {
 
   it('submits a numeric answer as a string under the declared name', async () => {
     const onSubmit = mount();
-    type(screen.getByLabelText('Email'), 'a@b.co');
-    type(screen.getByLabelText('First Name'), 'A');
-    type(screen.getByLabelText('Last Name'), 'B');
-    type(screen.getByLabelText('Number of endpoints'), '150');
+    type(screen.getByLabelText(/^Email/), 'a@b.co');
+    type(screen.getByLabelText(/^First Name/), 'A');
+    type(screen.getByLabelText(/^Last Name/), 'B');
+    type(screen.getByLabelText(/^Number of endpoints/), '150');
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ formFields: { number_of_endpoints: '150' } }));
