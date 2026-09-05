@@ -17,7 +17,7 @@ const availability: MeetingAvailability = {
 
 type Submit = (payload: Record<string, unknown>) => Promise<void>;
 
-function mount(onSubmit = vi.fn<Submit>(async () => undefined)) {
+function mount(onSubmit = vi.fn<Submit>(() => Promise.resolve())) {
   render(
     <BookingForm
       availability={availability}
