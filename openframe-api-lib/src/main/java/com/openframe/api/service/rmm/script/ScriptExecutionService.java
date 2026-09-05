@@ -213,11 +213,16 @@ public class ScriptExecutionService {
         return Sort.Direction.DESC;
     }
 
+    // History is a user-facing view — platform bootstrap runs are never part of it
+    private static final List<ExecutionSource> HIDDEN_SOURCES = List.of(ExecutionSource.SYSTEM_BOOTSTRAP);
+
     private static ScriptExecutionQueryFilter toQueryFilter(ScriptExecutionFilterInput input) {
+        ScriptExecutionQueryFilter.ScriptExecutionQueryFilterBuilder builder =
+                ScriptExecutionQueryFilter.builder().excludedSources(HIDDEN_SOURCES);
         if (input == null) {
-            return null;
+            return builder.build();
         }
-        return ScriptExecutionQueryFilter.builder()
+        return builder
                 .statuses(input.getStatuses())
                 .initiatedByIds(input.getInitiatorIds())
                 .machineIds(input.getMachineIds())

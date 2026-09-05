@@ -223,6 +223,7 @@ public class ScriptService {
         timeoutValidator.validate(input.getDefaultTimeoutSeconds());
 
         Script existing = loadVisibleOrThrow(tenantId, id);
+        requireUserScript(existing);
 
         if (!input.getName().equals(existing.getName())
                 && scriptRepository.existsByTenantIdAndNameAndIdNotAndStatusIn(
@@ -251,6 +252,7 @@ public class ScriptService {
     public String delete(String id) {
         String tenantId = tenantIdProvider.getTenantId();
         Script existing = loadOrThrow(tenantId, id);
+        requireUserScript(existing);
 
         if (existing.getStatus() == ScriptStatus.DELETED) {
             log.debug("Script id={} tenantId={} already soft-deleted, no-op", id, tenantId);
@@ -295,6 +297,7 @@ public class ScriptService {
     private ScriptResponse transitionTo(String id, ScriptStatus target) {
         String tenantId = tenantIdProvider.getTenantId();
         Script existing = loadVisibleOrThrow(tenantId, id);
+        requireUserScript(existing);
 
         if (existing.getStatus() == target) {
             log.debug("Script id={} tenantId={} already {}, no-op", id, tenantId, target);
@@ -309,6 +312,15 @@ public class ScriptService {
     }
 
     /** Load by id regardless of status — used by {@link #delete(String)}. */
+    // system scripts back platform features (package-manager bootstrap) — letting a technician
+    // edit or delete one silently breaks the feature for the whole tenant
+    private static void requireUserScript(Script script) {
+        if (Boolean.TRUE.equals(script.getSystem())) {
+            throw new IllegalArgumentException(
+                    "System scripts are managed by OpenFrame and cannot be modified or deleted");
+        }
+    }
+
     private Script loadOrThrow(String tenantId, String id) {
         return scriptRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new NotFoundException("Script not found: " + id));
