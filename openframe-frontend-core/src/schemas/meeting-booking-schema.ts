@@ -225,7 +225,15 @@ export function isValidBcp47Locale(locale: string): boolean {
  * in the visitor's local time) — this schema is the ONLY place a
  * client-supplied zone is accepted; the availability path is UTC-pinned.
  */
-export function makeBookingSchema(formFields: MeetingFormField[], legalConsent: MeetingLegalConsent | null) {
+function buildBookingSchema<TStart extends z.ZodTypeAny, TDuration extends z.ZodTypeAny, TZone extends z.ZodTypeAny>(
+  formFields: MeetingFormField[],
+  legalConsent: MeetingLegalConsent | null,
+  // Passed IN rather than switched on a boolean: a `deferSlot: boolean`
+  // parameter cannot be narrowed at type level, so every ternary inside would
+  // infer a union and widen `startTimeMs`/`durationMs` to `number | null |
+  // undefined` for BOTH schemas — including the server's wire type.
+  slot: { startTimeMs: TStart; durationMs: TDuration; timezone: TZone },
+) {
   const answers: Record<string, z.ZodTypeAny> = {};
   for (const field of formFields) {
     if (!isSupportedFormField(field)) continue; // unsupported types are fail-closed at render time
@@ -276,12 +284,12 @@ export function makeBookingSchema(formFields: MeetingFormField[], legalConsent: 
     z
       .object({
         meetingId: z.string().min(1),
-        startTimeMs: z.number().int().positive(),
-        durationMs: z.number().int().positive(),
+        startTimeMs: slot.startTimeMs,
+        durationMs: slot.durationMs,
         firstName: z.string().min(1, { message: 'First name is required' }).max(255),
         lastName: z.string().min(1, { message: 'Last name is required' }).max(255),
         email: z.string().email({ message: 'Please enter a valid email address' }).max(255),
-        timezone: z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' }),
+        timezone: slot.timezone,
         locale: z.string().refine(isValidBcp47Locale, { message: 'Invalid locale' }).optional(),
         // Plain `.optional()` (no `.default()`) so zod's input and output types
         // match — react-hook-form's zodResolver needs them identical, and the
@@ -311,4 +319,50 @@ export function makeBookingSchema(formFields: MeetingFormField[], legalConsent: 
   );
 }
 
+/**
+ * The STRICT schema — the wire contract. The server rebuilds it from the link's
+ * own fetched metadata and validates every booking against it; a slot and a
+ * duration are not optional on anything that reaches HubSpot.
+ */
+export function makeBookingSchema(formFields: MeetingFormField[], legalConsent: MeetingLegalConsent | null) {
+  return buildBookingSchema(formFields, legalConsent, {
+    startTimeMs: z.number().int().positive(),
+    durationMs: z.number().int().positive(),
+    timezone: z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' }),
+  });
+}
+
+/**
+ * The DEFERRED schema — same fields, with the slot/duration/timezone triple
+ * relaxed. `flow="details-first"` collects answers BEFORE a slot exists, so the
+ * form validates against this and the parent re-attaches the authoritative
+ * values at POST time.
+ *
+ * Two named exports over one private builder rather than an overload or an
+ * options flag: `MeetingBookingPayload` is `z.infer<ReturnType<...>>`, and
+ * either of those alternatives would widen `startTimeMs`/`durationMs` to
+ * `number | undefined` for EVERY consumer — including the server's
+ * `durationsMs.includes(data.durationMs)`.
+ */
+export function makeDeferredBookingSchema(formFields: MeetingFormField[], legalConsent: MeetingLegalConsent | null) {
+  // `.nullish()`, not `.optional()`: the widget passes these straight into
+  // `defaultValues`, and details-first has `timezone === null` on the server
+  // render and the first client render (zone resolution is post-hydration).
+  // Accepting only `undefined` would reject a field with no rendered control
+  // and no FieldWrapper — the submit button silently dead, type-check clean.
+  return buildBookingSchema(formFields, legalConsent, {
+    startTimeMs: z.number().int().positive().nullish(),
+    durationMs: z.number().int().positive().nullish(),
+    timezone: z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' }).nullish(),
+  });
+}
+
+/** The wire payload. Pinned to the STRICT builder — see above. */
 export type MeetingBookingPayload = z.infer<ReturnType<typeof makeBookingSchema>>;
+
+/**
+ * The form's value type, used as the `useForm` generic in BOTH flows: a relaxed
+ * resolver is not assignable to `Resolver<MeetingBookingPayload>`, and mixing
+ * the two survives only on TS's bivariant method-parameter check.
+ */
+export type BookingFormValues = z.infer<ReturnType<typeof makeDeferredBookingSchema>>;

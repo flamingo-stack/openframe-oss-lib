@@ -1,14 +1,14 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { Ref } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import {
-  makeBookingSchema,
+  makeDeferredBookingSchema,
   isSupportedFormField,
   type MeetingAvailability,
-  type MeetingBookingPayload,
+  type BookingFormValues,
 } from '../../schemas/meeting-booking-schema';
 import {
   Button,
@@ -24,6 +24,7 @@ import {
   Checkbox,
   RadioGroup,
   RadioGroupItem,
+  Skeleton,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
 
@@ -45,10 +46,24 @@ import { HoneypotField } from '../ui/honeypot-field';
 export interface BookingFormProps {
   availability: MeetingAvailability;
   meetingId: string;
-  startTimeMs: number;
-  durationMs: number;
-  /** IANA zone the confirmation/invite should render in (parent-resolved). */
-  timezone: string;
+  /** Absent in `deferSlot` mode — the slot is chosen AFTER these answers. */
+  startTimeMs?: number;
+  durationMs?: number;
+  /** IANA zone the confirmation/invite should render in (parent-resolved).
+   *  Null until hydration, which is why `deferSlot` relaxes it. */
+  timezone: string | null;
+  /**
+   * Collect-only mode (`flow="details-first"`): validate against the deferred
+   * schema, and hand the values up instead of POSTing. The parent re-attaches
+   * the authoritative slot/duration/timezone when it submits.
+   */
+  deferSlot?: boolean;
+  /** Repopulates the form on a remount — the back edge, or an error return. */
+  initialValues?: Record<string, unknown>;
+  /** Defaults to "Confirm Booking"; details-first says "Continue". */
+  submitLabel?: string;
+  /** Small print beside the submit (details-first sets expectations). */
+  footerNote?: string;
   isSubmitting: boolean;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
   /** From useHumanitySignals — parent owns the instance so it can resetSignals(). */
@@ -62,6 +77,10 @@ export function BookingForm({
   startTimeMs,
   durationMs,
   timezone,
+  deferSlot = false,
+  initialValues,
+  submitLabel,
+  footerNote,
   isSubmitting,
   onSubmit,
   honeypotInputProps,
@@ -69,33 +88,74 @@ export function BookingForm({
 }: BookingFormProps) {
   const { formFields, legalConsent } = availability;
   const supportedFields = useMemo(() => formFields.filter(isSupportedFormField), [formFields]);
-  const schema = useMemo(() => makeBookingSchema(supportedFields, legalConsent), [supportedFields, legalConsent]);
+  // The DEFERRED schema in both flows: it is the wider of the two, and a strict
+  // resolver is not assignable to `Resolver<BookingFormValues>`. The strict
+  // schema is the server's contract — see `makeBookingSchema`'s docblock.
+  const schema = useMemo(
+    () => makeDeferredBookingSchema(supportedFields, legalConsent),
+    [supportedFields, legalConsent],
+  );
+
+  const consentDefaults = useMemo(
+    () =>
+      (legalConsent?.communicationConsentCheckboxes ?? []).map(c => ({
+        communicationTypeId: c.communicationTypeId,
+        consented: false,
+      })),
+    [legalConsent],
+  );
 
   const {
     register,
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
-  } = useForm<MeetingBookingPayload>({
+  } = useForm<BookingFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       meetingId,
-      startTimeMs,
-      durationMs,
+      // Genuinely OMITTED, not present-as-undefined, when the slot is deferred.
+      ...(deferSlot ? {} : { startTimeMs, durationMs }),
       timezone,
       locale: typeof navigator !== 'undefined' ? navigator.language : undefined,
       firstName: '',
       lastName: '',
       email: '',
       formFields: {},
-      legalConsentResponses: (legalConsent?.communicationConsentCheckboxes ?? []).map(c => ({
-        communicationTypeId: c.communicationTypeId,
-        consented: false,
-      })),
-    },
+      legalConsentResponses: consentDefaults,
+      // A remount (back edge, or an error return) would otherwise lose every
+      // answer — `defaultValues` is snapshotted once and never re-read.
+      ...(initialValues ?? {}),
+    } as BookingFormValues,
   });
 
+  const priorConsents = initialValues?.legalConsentResponses as typeof consentDefaults | undefined;
+
+  // The seeded availability is refetched immediately on mount, so the link's
+  // consent set can change WHILE this form is open. Reconcile rather than
+  // remount: carry each `consented` across by id and default new ids to false.
+  // A wholesale reset would drop what the visitor has typed; leaving it alone
+  // would make a newly-declared required consent impossible to satisfy.
+  useEffect(() => {
+    setValue(
+      'legalConsentResponses',
+      consentDefaults.map(next => ({
+        ...next,
+        consented: priorConsents?.find(r => r.communicationTypeId === next.communicationTypeId)?.consented ?? false,
+      })),
+      { shouldDirty: false },
+    );
+  }, [consentDefaults, priorConsents, setValue]);
+
   const submit = handleSubmit(async data => {
+    if (deferSlot) {
+      // Collect-only. Signals are captured HERE, while this form and its
+      // honeypot are still mounted — `getSignals()` reads a detached ref once
+      // they unmount, which would silently disable the decoy.
+      await onSubmit({ ...data, meetingId });
+      return;
+    }
     await onSubmit({ ...data, meetingId, startTimeMs, durationMs, timezone, ...getSignals() });
   });
 
@@ -293,11 +353,38 @@ export function BookingForm({
       {/* Step navigation back to the calendar lives in the step header (the
           app-standard BackButton, rendered by the parent) — the form ships
           only its submit. */}
-      <div className="flex">
+      <div className="flex items-center justify-between gap-[var(--spacing-system-m)]">
+        {footerNote ? <p className="text-ods-text-secondary text-h6">{footerNote}</p> : <span />}
         <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>
-          Confirm Booking
+          {submitLabel ?? 'Confirm Booking'}
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * Cold-start placeholder for `flow="details-first"`, where the FORM is the
+ * first thing in the action panel.
+ *
+ * The slot-first skeleton (`SlotPickerSkeleton`) would put a grey calendar
+ * where the form belongs — above the fold on a page whose entire content is
+ * this card. Same footprint discipline as its sibling: fixed heights, no shift
+ * when the real form swaps in.
+ */
+export function BookingFormSkeleton() {
+  return (
+    <div className="flex flex-1 flex-col gap-[var(--spacing-system-l)] p-[var(--spacing-system-l)] lg:p-0">
+      <div className="grid grid-cols-1 gap-[var(--spacing-system-m)] md:grid-cols-2">
+        <Skeleton className="h-[4.75rem] w-full" />
+        <Skeleton className="h-[4.75rem] w-full" />
+      </div>
+      <Skeleton className="h-[4.75rem] w-full" />
+      <Skeleton className="h-[7.75rem] w-full" />
+      <Skeleton className="h-[4.25rem] w-full" />
+      <div className="flex justify-end">
+        <Skeleton className="h-12 w-40" />
+      </div>
+    </div>
   );
 }
