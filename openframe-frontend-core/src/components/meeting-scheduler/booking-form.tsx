@@ -176,6 +176,12 @@ export function BookingForm({
   // smallest ODS step that houses it.
   const FORM_STACK = 'flex flex-col gap-[var(--spacing-system-l)]';
 
+  const submitButton = (
+    <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>
+      {submitLabel ?? 'Confirm Booking'}
+    </Button>
+  );
+
   return (
     <form onSubmit={submit} className={FORM_STACK} noValidate>
       <HoneypotField {...honeypotInputProps} />
@@ -353,12 +359,17 @@ export function BookingForm({
       {/* Step navigation back to the calendar lives in the step header (the
           app-standard BackButton, rendered by the parent) — the form ships
           only its submit. */}
-      <div className="flex items-center justify-between gap-[var(--spacing-system-m)]">
-        {footerNote ? <p className="text-ods-text-secondary text-h6">{footerNote}</p> : <span />}
-        <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>
-          {submitLabel ?? 'Confirm Booking'}
-        </Button>
-      </div>
+      {/* Two shapes, not one with a placeholder: without a note this must stay
+          the bare `flex` row it has always been, or the submit slides from the
+          left edge to the right on every existing slot-first booking. */}
+      {footerNote ? (
+        <div className="flex items-center justify-between gap-[var(--spacing-system-m)]">
+          <p className="text-ods-text-secondary text-h6">{footerNote}</p>
+          {submitButton}
+        </div>
+      ) : (
+        <div className="flex">{submitButton}</div>
+      )}
     </form>
   );
 }

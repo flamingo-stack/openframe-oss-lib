@@ -559,16 +559,24 @@ export function HubSpotMeetingScheduler({
   const unseededDetailsFirstFailure =
     detailsFirst && step === 'details' && !availability && !initialAvailability && !hydrated;
 
-  if (unseededDetailsFirstFailure || availabilityError || !availability) {
-    return (
-      <div className={cn(CARD_DEGRADED_CLASS, flowHeight, className)}>
-        <p className="text-ods-text-secondary text-h6">
-          We couldn&apos;t load available call times. Please try again shortly.
-        </p>
-        {escapeHatch}
-      </div>
-    );
-  }
+  /** One card SHAPE for both degraded returns below — a new return, not a new
+   *  design. */
+  const degradedCard = (
+    <div className={cn(CARD_DEGRADED_CLASS, flowHeight, className)}>
+      <p className="text-ods-text-secondary text-h6">
+        We couldn&apos;t load available call times. Please try again shortly.
+      </p>
+      {escapeHatch}
+    </div>
+  );
+
+  // NARROW, and above the cold-start branch on purpose. ORing this into the
+  // `availabilityError || !availability` return below (or hoisting that return
+  // up here) would swallow the cold start for EVERY flow: its predicate is
+  // strictly broader, so slot-first would answer an unseeded mount — and every
+  // month page, which is a fresh query key with no initialData — with "we
+  // couldn't load available call times" where it renders the skeleton today.
+  if (unseededDetailsFirstFailure) return degradedCard;
 
   if (isLoadingAvailability && !availability) {
     // COLD start only — a month already in the query cache renders straight
@@ -594,6 +602,8 @@ export function HubSpotMeetingScheduler({
       </div>
     );
   }
+
+  if (availabilityError || !availability) return degradedCard;
 
   if (!isNativelyBookable(availability)) {
     // Fail closed — never render a half-working native form on a link with
