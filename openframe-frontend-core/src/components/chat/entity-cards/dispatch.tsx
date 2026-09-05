@@ -45,6 +45,7 @@ import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
 import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon';
+import { BuildingsIcon } from '../../icons-v2-generated/buildings/buildings-icon';
 import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-ver-icon';
 import { ChartPieIcon } from '../../icons-v2-generated/charts/chart-pie-icon';
 import { PresentationBarIcon } from '../../icons-v2-generated/charts/presentation-bar-icon';
@@ -53,6 +54,7 @@ import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
 import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon';
+import { ClipboardListIcon } from '../../icons-v2-generated/documents/clipboard-list-icon';
 import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon';
 import { NewspaperIcon } from '../../icons-v2-generated/documents/newspaper-icon';
 import { BankIcon } from '../../icons-v2-generated/finance/bank-icon';
@@ -612,6 +614,35 @@ function SlackChatCard({
       anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
       menuGroups={cardMenuGroups(chatRef.url, discuss)}
       menuAriaLabel="Message actions"
+    />
+  );
+}
+
+/**
+ * Generic REF-ONLY card — for types with no `?ids=` list endpoint whose
+ * ChatRef already carries everything the card shows (title / preview /
+ * url). Same posture as `video`: nothing to fetch, so no skeleton and no
+ * `contentRefType`. The per-type glyph is the only thing that varies.
+ */
+function RefOnlyChatCard({
+  chatRef,
+  icon,
+  isNewTab,
+  discuss,
+}: {
+  chatRef: ChatRef;
+  icon: React.ReactNode;
+  isNewTab: boolean;
+  discuss?: CardDiscussAction;
+}) {
+  return (
+    <MingoInfoCard
+      title={chatRef.title}
+      description={chatRef.preview ?? undefined}
+      icon={icon}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuAriaLabel="Card actions"
     />
   );
 }
@@ -1312,6 +1343,30 @@ const GITHUB_CARD_CONFIGS: Record<string, GitHubCardConfig> = {
   github_pr_review: { label: 'GitHub review', kind: 'pr_review' },
   github_pr_review_public: { label: 'GitHub review (public)', kind: 'pr_review' },
 };
+interface RefOnlyCardConfig {
+  label: string;
+  icon: () => React.ReactNode;
+}
+/** Hub-internal row types whose mapper declares `listApi: () => null` —
+ *  design docs + the tenant roster (product-hub), the two people-hub
+ *  employee feeds. Adding one = one line here + the `source-icons.ts`
+ *  label / icon / documentType entries. */
+const REF_ONLY_CARD_CONFIGS: Record<string, RefOnlyCardConfig> = {
+  design_doc: { label: 'Design doc', icon: () => <FileContentIcon size={24} /> },
+  openframe_tenant: { label: 'OpenFrame tenant', icon: () => <BuildingsIcon size={24} /> },
+  what_i_shipped: { label: 'What I Shipped', icon: () => <Rocket02Icon size={24} /> },
+  how_i_work: { label: 'How I Work', icon: () => <ClipboardListIcon size={24} /> },
+};
+function refOnlyRegistryEntries(): Record<string, ChatCardRegistryEntry> {
+  return registryEntries(REF_ONLY_CARD_CONFIGS, cfg => ({
+    label: cfg.label,
+    bareInline: true,
+    render: (_item, chatRef, opts) => (
+      <RefOnlyChatCard chatRef={chatRef} icon={cfg.icon()} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+    ),
+  }));
+}
+
 function githubRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(GITHUB_CARD_CONFIGS, (cfg, docType) =>
     refHydratedEntry(docType, cfg.label, (displayRef, opts) => (
@@ -1423,6 +1478,8 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
       />
     ),
   },
+  // ───────── ref-only types (no list endpoint; the ChatRef IS the card) ─────────
+  ...refOnlyRegistryEntries(),
   slack_message: refHydratedEntry('slack_message', 'Slack message', (displayRef, opts) => (
     <SlackChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
   )),
