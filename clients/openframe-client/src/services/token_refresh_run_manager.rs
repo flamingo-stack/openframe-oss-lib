@@ -10,24 +10,44 @@ use crate::services::deactivation_service::DeactivationService;
 use crate::services::AgentAuthService;
 use crate::utils::jwt;
 
-/// Refresh this long before `exp` under normal TTLs.
-const REFRESH_MARGIN: Duration = Duration::from_secs(5 * 60);
-/// Lead for a short-lived token (TTL <= margin) so it doesn't refresh every loop.
-const MIN_LEAD: Duration = Duration::from_secs(15);
-/// Used when the token's lifetime can't be determined.
-const FALLBACK_INTERVAL: Duration = Duration::from_secs(30 * 60);
-/// Cap on a lifetime read from the token, so a bogus claim can't overflow the timers.
-const MAX_TTL: Duration = Duration::from_secs(24 * 3600);
-/// Floor between two refreshes whatever any clock says — the guard against a hot loop.
-const MIN_INTERVAL: Duration = Duration::from_secs(60);
-/// The wait is sliced so a resume from suspend (wall clock jumps, monotonic clock may not) is noticed within a slice.
-const WAIT_SLICE: Duration = Duration::from_secs(60);
 /// Device-vs-server clock difference worth a warning.
 const SKEW_WARN: Duration = Duration::from_secs(5 * 60);
-/// Delay between refresh attempts after a failure.
-const RETRY_INTERVAL: Duration = Duration::from_secs(60);
-/// Cap on a single `reauthenticate()` call.
-const REAUTH_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Refresh timing; production values by default, shrunk in tests to run the real loop at millisecond scale.
+#[derive(Debug, Clone, Copy)]
+struct RefreshTiming {
+    /// Refresh this long before `exp` under normal TTLs.
+    margin: Duration,
+    /// Lead for a short-lived token (TTL <= margin) so it doesn't refresh every loop.
+    min_lead: Duration,
+    /// Used when the token's lifetime can't be determined.
+    fallback_interval: Duration,
+    /// Cap on a lifetime read from the token, so a bogus claim can't overflow the timers.
+    max_ttl: Duration,
+    /// Floor between two refreshes whatever any clock says — the guard against a hot loop.
+    min_interval: Duration,
+    /// The wait is sliced so a resume from suspend (wall clock jumps, monotonic clock may not) is noticed within a slice.
+    wait_slice: Duration,
+    /// Delay between refresh attempts after a failure.
+    retry_interval: Duration,
+    /// Cap on a single `reauthenticate()` call.
+    reauth_timeout: Duration,
+}
+
+impl Default for RefreshTiming {
+    fn default() -> Self {
+        Self {
+            margin: Duration::from_secs(5 * 60),
+            min_lead: Duration::from_secs(15),
+            fallback_interval: Duration::from_secs(30 * 60),
+            max_ttl: Duration::from_secs(24 * 3600),
+            min_interval: Duration::from_secs(60),
+            wait_slice: Duration::from_secs(60),
+            retry_interval: Duration::from_secs(60),
+            reauth_timeout: Duration::from_secs(30),
+        }
+    }
+}
 
 /// Proactively refreshes the access token before `exp` so `shared_token.enc` stays valid without a NATS reconnect.
 #[derive(Clone)]
@@ -35,6 +55,7 @@ pub struct TokenRefreshRunManager {
     auth_service: AgentAuthService,
     config_service: AgentConfigurationService,
     deactivation: Arc<DeactivationService>,
+    timing: RefreshTiming,
 }
 
 impl TokenRefreshRunManager {
@@ -47,20 +68,28 @@ impl TokenRefreshRunManager {
             auth_service,
             config_service,
             deactivation,
+            timing: RefreshTiming::default(),
         }
+    }
+
+    #[cfg(test)]
+    fn with_timing(mut self, timing: RefreshTiming) -> Self {
+        self.timing = timing;
+        self
     }
 
     pub fn start(&self) {
         let auth_service = self.auth_service.clone();
         let config_service = self.config_service.clone();
         let deactivation = self.deactivation.clone();
+        let timing = self.timing;
 
         info!("Starting proactive token refresh run manager");
 
         tokio::spawn(async move {
             let mut schedule = match config_service.get_access_token().await {
                 Ok(token) if !token.is_empty() => {
-                    schedule_for_existing(&token, Utc::now().timestamp(), Instant::now())
+                    schedule_for_existing(&timing, &token, Utc::now().timestamp(), Instant::now())
                 }
                 Ok(_) => RefreshSchedule::now(),
                 Err(e) => {
@@ -70,7 +99,7 @@ impl TokenRefreshRunManager {
                     RefreshSchedule::after(
                         Instant::now(),
                         Utc::now().timestamp(),
-                        FALLBACK_INTERVAL,
+                        timing.fallback_interval,
                         Duration::ZERO,
                     )
                 }
@@ -87,9 +116,10 @@ impl TokenRefreshRunManager {
                     );
                     sleep(wait).await;
                     if let Ok(Ok(response)) =
-                        timeout(REAUTH_TIMEOUT, auth_service.reauthenticate()).await
+                        timeout(timing.reauth_timeout, auth_service.reauthenticate()).await
                     {
                         schedule = schedule_after_refresh(
+                            &timing,
                             &response,
                             Utc::now().timestamp(),
                             Instant::now(),
@@ -98,13 +128,14 @@ impl TokenRefreshRunManager {
                     continue;
                 }
 
-                schedule.wait().await;
+                schedule.wait(timing.wait_slice).await;
 
                 // Retry on the short interval until a refresh succeeds.
                 loop {
-                    match timeout(REAUTH_TIMEOUT, auth_service.reauthenticate()).await {
+                    match timeout(timing.reauth_timeout, auth_service.reauthenticate()).await {
                         Ok(Ok(response)) => {
                             schedule = schedule_after_refresh(
+                                &timing,
                                 &response,
                                 Utc::now().timestamp(),
                                 Instant::now(),
@@ -114,12 +145,12 @@ impl TokenRefreshRunManager {
                         }
                         Ok(Err(e)) => error!(
                             "Proactive token refresh failed: {e:#}; retrying in {}s",
-                            RETRY_INTERVAL.as_secs()
+                            timing.retry_interval.as_secs()
                         ),
                         Err(_) => error!(
                             "Proactive token refresh timed out after {}s; retrying in {}s",
-                            REAUTH_TIMEOUT.as_secs(),
-                            RETRY_INTERVAL.as_secs()
+                            timing.reauth_timeout.as_secs(),
+                            timing.retry_interval.as_secs()
                         ),
                     }
                     // Tenant went gone mid-retry — hand control to the backoff probe above.
@@ -127,7 +158,7 @@ impl TokenRefreshRunManager {
                         schedule = RefreshSchedule::now();
                         break;
                     }
-                    sleep(RETRY_INTERVAL).await;
+                    sleep(timing.retry_interval).await;
                 }
             }
         });
@@ -165,7 +196,7 @@ impl RefreshSchedule {
     }
 
     /// Sleep until due, in slices so a wall-clock jump past the deadline is caught within a slice.
-    async fn wait(&self) {
+    async fn wait(&self, slice: Duration) {
         let remaining = self.due_at.saturating_duration_since(Instant::now());
         if !remaining.is_zero() {
             debug!("Next proactive token refresh in {}s", remaining.as_secs());
@@ -181,26 +212,29 @@ impl RefreshSchedule {
             if remaining.is_zero() || Utc::now().timestamp() >= self.due_wall {
                 return;
             }
-            sleep(remaining.min(WAIT_SLICE)).await;
+            sleep(remaining.min(slice)).await;
         }
     }
 }
 
-/// Full margin normally; `MIN_LEAD` for a short-lived token.
-fn lead_for(ttl: Duration) -> Duration {
-    if ttl > REFRESH_MARGIN {
-        REFRESH_MARGIN
-    } else {
-        MIN_LEAD
+impl RefreshTiming {
+    /// Full margin normally; `min_lead` for a short-lived token.
+    fn lead_for(&self, ttl: Duration) -> Duration {
+        if ttl > self.margin {
+            self.margin
+        } else {
+            self.min_lead
+        }
+    }
+
+    fn ttl_from_secs(&self, secs: i64) -> Duration {
+        Duration::from_secs(secs as u64).min(self.max_ttl)
     }
 }
 
-fn ttl_from_secs(secs: i64) -> Duration {
-    Duration::from_secs(secs as u64).min(MAX_TTL)
-}
-
-/// Schedule after a successful refresh: the server-granted lifetime counted from receipt, never sooner than `MIN_INTERVAL`.
+/// Schedule after a successful refresh: the server-granted lifetime counted from receipt, never sooner than `min_interval`.
 fn schedule_after_refresh(
+    timing: &RefreshTiming,
     response: &AgentTokenResponse,
     now_wall: i64,
     now_mono: Instant,
@@ -210,12 +244,14 @@ fn schedule_after_refresh(
         .expires_in
         .filter(|secs| *secs > 0)
         .or_else(|| times.and_then(|t| t.ttl_secs()))
-        .map(ttl_from_secs);
+        .map(|secs| timing.ttl_from_secs(secs));
     let delay = match ttl {
-        Some(ttl) => ttl.saturating_sub(lead_for(ttl)).max(MIN_INTERVAL),
+        Some(ttl) => ttl
+            .saturating_sub(timing.lead_for(ttl))
+            .max(timing.min_interval),
         None => {
             warn!("Token refresh: token lifetime unknown; using fallback interval");
-            FALLBACK_INTERVAL
+            timing.fallback_interval
         }
     };
 
@@ -229,17 +265,27 @@ fn schedule_after_refresh(
         }
     }
 
-    RefreshSchedule::after(now_mono, now_wall, delay, MIN_INTERVAL)
+    RefreshSchedule::after(now_mono, now_wall, delay, timing.min_interval)
 }
 
 /// Schedule for the token found at startup: its receipt time is unknown, so the device clock estimates the
 /// remaining life, trusted only within the token's own lifetime — a skewed clock costs at most one early refresh.
-fn schedule_for_existing(token: &str, now_wall: i64, now_mono: Instant) -> RefreshSchedule {
+fn schedule_for_existing(
+    timing: &RefreshTiming,
+    token: &str,
+    now_wall: i64,
+    now_mono: Instant,
+) -> RefreshSchedule {
     let Some(times) = jwt::token_times_unix(token) else {
         warn!("Token refresh: access token has no decodable exp; using fallback interval");
-        return RefreshSchedule::after(now_mono, now_wall, FALLBACK_INTERVAL, Duration::ZERO);
+        return RefreshSchedule::after(
+            now_mono,
+            now_wall,
+            timing.fallback_interval,
+            Duration::ZERO,
+        );
     };
-    let Some(ttl) = times.ttl_secs().map(ttl_from_secs) else {
+    let Some(ttl) = times.ttl_secs().map(|secs| timing.ttl_from_secs(secs)) else {
         return RefreshSchedule::after(now_mono, now_wall, Duration::ZERO, Duration::ZERO);
     };
     let remaining = times.exp - now_wall;
@@ -247,7 +293,7 @@ fn schedule_for_existing(token: &str, now_wall: i64, now_mono: Instant) -> Refre
     let delay = if remaining > ttl.as_secs() as i64 {
         Duration::ZERO
     } else {
-        Duration::from_secs(remaining.max(0) as u64).saturating_sub(lead_for(ttl))
+        Duration::from_secs(remaining.max(0) as u64).saturating_sub(timing.lead_for(ttl))
     };
     RefreshSchedule::after(now_mono, now_wall, delay, Duration::ZERO)
 }
