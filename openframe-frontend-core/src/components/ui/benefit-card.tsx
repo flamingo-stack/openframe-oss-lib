@@ -7,7 +7,7 @@ interface BenefitCardProps {
   icon?: React.ReactNode;
   title: string;
   description: string;
-  variant?: 'default' | 'dark' | 'auth-figma' | 'icon-top';
+  variant?: 'default' | 'dark' | 'auth-figma';
   className?: string;
 }
 
@@ -21,10 +21,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
   // Direction and cross-axis alignment only — every other per-variant value
   // (including `gap`, which used to hide in a ternary here) lives in
   // `variantStyles` so one variant is one place.
-  const getBaseStyles = (cardVariant: string) =>
-    cardVariant === 'icon-top'
-      ? 'flex flex-col items-center text-center relative'
-      : 'flex items-start justify-start relative';
+  const baseStyles = 'flex items-start justify-start relative';
 
   const variantStyles = {
     default: {
@@ -42,22 +39,14 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
       title: 'text-h3 text-ods-text-primary tracking-[-0.36px]',
       description: 'text-h4 text-ods-text-secondary',
     },
-    // Icon stacked ABOVE centred copy (campaign "How it works" cards).
-    // Typography follows auth-figma, the only ODS-compliant pair here —
-    // `default`/`dark` use text-body-*/font-body, which the token rules forbid.
-    'icon-top': {
-      container: 'gap-6 bg-transparent p-6',
-      title: 'text-h3 text-ods-text-primary tracking-[-0.36px]',
-      description: 'text-h4 text-ods-text-secondary',
-    },
   };
 
   const styles = variantStyles[variant];
 
   return (
-    <div className={cn(getBaseStyles(variant), styles.container, className)}>
+    <div className={cn(baseStyles, styles.container, className)}>
       {icon && <div>{icon}</div>}
-      <div className={cn('flex min-w-0 flex-col gap-1', variant !== 'icon-top' && 'flex-1')}>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <h3 className={cn(styles.title)}>{title}</h3>
         <p className={cn(styles.description)}>{description}</p>
       </div>
