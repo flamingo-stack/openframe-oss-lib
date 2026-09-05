@@ -165,7 +165,14 @@ export type MeetingBookingErrorCode = (typeof MEETING_BOOKING_ERROR_CODES)[numbe
  * half-working native form). Exact upstream type strings are pinned against
  * the rollout fixture link — extend here (renderer + validator move together).
  */
-export const SUPPORTED_FORM_FIELD_TYPES = ['text', 'textarea', 'select', 'radio', 'checkbox'] as const;
+// HubSpot `fieldType` values the widget can render faithfully. Anything else
+// (phonenumber, date, booleancheckbox, file, …) makes the link "not natively
+// bookable" and the card fails closed to the HubSpot escape hatch — so adding a
+// type here means adding a control in `booking-form.tsx` AND a validator below.
+// `number` is a Number property: the wire value stays a STRING like every other
+// answer (HubSpot's book endpoint takes `{ name, value: string }`), validated as
+// a decimal literal.
+export const SUPPORTED_FORM_FIELD_TYPES = ['text', 'textarea', 'select', 'radio', 'checkbox', 'number'] as const;
 export type SupportedFormFieldType = (typeof SUPPORTED_FORM_FIELD_TYPES)[number];
 
 export function isSupportedFormField(field: MeetingFormField): boolean {
@@ -250,6 +257,14 @@ function buildBookingSchema<TStart extends z.ZodTypeAny, TDuration extends z.Zod
         break;
       case 'textarea':
         validator = z.string().max(5000, { message: `${field.label} is too long` });
+        break;
+      case 'number':
+        // Optional integer sign, digits, optional decimal part — what
+        // `<input type="number">` emits and what a Number property stores.
+        validator = z
+          .string()
+          .max(32, { message: `${field.label} is too long` })
+          .regex(/^-?\d+(\.\d+)?$/, { message: `${field.label} must be a number` });
         break;
       case 'text':
       default:

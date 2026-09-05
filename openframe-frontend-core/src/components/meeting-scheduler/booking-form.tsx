@@ -313,6 +313,16 @@ export function BookingForm({
           {...register(`formFields.${field.name}` as never)}
         />
       )}
+      {field.type === 'number' && (
+        <Input
+          id={`ms-q-${field.name}`}
+          type="number"
+          inputMode="numeric"
+          step="any"
+          className="h-11 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary md:h-12"
+          {...register(`formFields.${field.name}` as never)}
+        />
+      )}
       {(field.type === 'select' || field.type === 'radio') && (
         <Controller
           control={control}
