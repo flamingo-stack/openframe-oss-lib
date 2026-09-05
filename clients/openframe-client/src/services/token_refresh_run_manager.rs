@@ -16,6 +16,8 @@ const REFRESH_MARGIN: Duration = Duration::from_secs(5 * 60);
 const MIN_LEAD: Duration = Duration::from_secs(15);
 /// Used when the token's lifetime can't be determined.
 const FALLBACK_INTERVAL: Duration = Duration::from_secs(30 * 60);
+/// Cap on a lifetime read from the token, so a bogus claim can't overflow the timers.
+const MAX_TTL: Duration = Duration::from_secs(24 * 3600);
 /// Floor between two refreshes whatever any clock says — the guard against a hot loop.
 const MIN_INTERVAL: Duration = Duration::from_secs(60);
 /// The wait is sliced so a resume from suspend (wall clock jumps, monotonic clock may not) is noticed within a slice.
@@ -60,12 +62,17 @@ impl TokenRefreshRunManager {
                 Ok(token) if !token.is_empty() => {
                     schedule_for_existing(&token, Utc::now().timestamp(), Instant::now())
                 }
-                Ok(_) => RefreshSchedule::at(Instant::now()),
+                Ok(_) => RefreshSchedule::now(),
                 Err(e) => {
                     warn!(
                         "Token refresh: cannot read access token ({e:#}); using fallback interval"
                     );
-                    RefreshSchedule::at(Instant::now() + FALLBACK_INTERVAL)
+                    RefreshSchedule::after(
+                        Instant::now(),
+                        Utc::now().timestamp(),
+                        FALLBACK_INTERVAL,
+                        Duration::ZERO,
+                    )
                 }
             };
 
@@ -117,7 +124,7 @@ impl TokenRefreshRunManager {
                     }
                     // Tenant went gone mid-retry — hand control to the backoff probe above.
                     if deactivation.is_suspended() {
-                        schedule = RefreshSchedule::at(Instant::now());
+                        schedule = RefreshSchedule::now();
                         break;
                     }
                     sleep(RETRY_INTERVAL).await;
@@ -127,28 +134,34 @@ impl TokenRefreshRunManager {
     }
 }
 
-/// When the next refresh is due. `due_at` counts the token's own lifetime on the monotonic clock, so the
-/// device clock can neither pull the refresh forward nor push it past `exp`; `due_wall` (device wall-clock
-/// seconds, skew-corrected) catches a resume from suspend, where the monotonic clock may have stood still.
+/// When the next refresh is due: the same delay on both clocks. `due_at` (monotonic) can't be moved by
+/// a wall-clock jump; `due_wall` (device wall-clock seconds) catches a resume from suspend, where the
+/// monotonic clock may have stood still. `not_before` floors either trigger.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RefreshSchedule {
     not_before: Instant,
     due_at: Instant,
-    due_wall: Option<i64>,
+    due_wall: i64,
 }
 
 impl RefreshSchedule {
-    fn at(due_at: Instant) -> Self {
+    fn after(now_mono: Instant, now_wall: i64, delay: Duration, floor: Duration) -> Self {
+        // Whole seconds rounded up, so the wall deadline never precedes the monotonic one.
+        let delay_secs = delay.as_secs() + u64::from(delay.subsec_nanos() > 0);
         Self {
-            not_before: due_at,
-            due_at,
-            due_wall: None,
+            not_before: now_mono + floor,
+            due_at: now_mono + delay,
+            due_wall: now_wall.saturating_add(delay_secs as i64),
         }
     }
 
-    fn wall_due(&self) -> bool {
-        self.due_wall
-            .is_some_and(|due| Utc::now().timestamp() >= due)
+    fn now() -> Self {
+        Self::after(
+            Instant::now(),
+            Utc::now().timestamp(),
+            Duration::ZERO,
+            Duration::ZERO,
+        )
     }
 
     /// Sleep until due, in slices so a wall-clock jump past the deadline is caught within a slice.
@@ -165,7 +178,7 @@ impl RefreshSchedule {
                 continue;
             }
             let remaining = self.due_at.saturating_duration_since(now);
-            if remaining.is_zero() || self.wall_due() {
+            if remaining.is_zero() || Utc::now().timestamp() >= self.due_wall {
                 return;
             }
             sleep(remaining.min(WAIT_SLICE)).await;
@@ -182,33 +195,32 @@ fn lead_for(ttl: Duration) -> Duration {
     }
 }
 
+fn ttl_from_secs(secs: i64) -> Duration {
+    Duration::from_secs(secs as u64).min(MAX_TTL)
+}
+
 /// Schedule after a successful refresh: the server-granted lifetime counted from receipt, never sooner than `MIN_INTERVAL`.
 fn schedule_after_refresh(
     response: &AgentTokenResponse,
     now_wall: i64,
     now_mono: Instant,
 ) -> RefreshSchedule {
-    let not_before = now_mono + MIN_INTERVAL;
     let times = jwt::token_times_unix(&response.access_token);
     let ttl = response
         .expires_in
         .filter(|secs| *secs > 0)
         .or_else(|| times.and_then(|t| t.ttl_secs()))
-        .map(|secs| Duration::from_secs(secs as u64));
-    let Some(ttl) = ttl else {
-        warn!("Token refresh: token lifetime unknown; using fallback interval");
-        return RefreshSchedule {
-            not_before,
-            due_at: now_mono + FALLBACK_INTERVAL,
-            due_wall: None,
-        };
+        .map(ttl_from_secs);
+    let delay = match ttl {
+        Some(ttl) => ttl.saturating_sub(lead_for(ttl)).max(MIN_INTERVAL),
+        None => {
+            warn!("Token refresh: token lifetime unknown; using fallback interval");
+            FALLBACK_INTERVAL
+        }
     };
-    let lead = lead_for(ttl);
-    let delay = ttl.saturating_sub(lead).max(MIN_INTERVAL);
 
     // Device clock minus server clock, measured against the freshly minted `iat`.
-    let skew = times.and_then(|t| t.iat).map(|iat| now_wall - iat);
-    if let Some(skew) = skew {
+    if let Some(skew) = times.and_then(|t| t.iat).map(|iat| now_wall - iat) {
         if skew.unsigned_abs() >= SKEW_WARN.as_secs() {
             warn!(
                 skew_s = skew,
@@ -216,16 +228,8 @@ fn schedule_after_refresh(
             );
         }
     }
-    let due_wall = match (times, skew) {
-        (Some(times), Some(skew)) => Some(times.exp - lead.as_secs() as i64 + skew),
-        _ => None,
-    };
 
-    RefreshSchedule {
-        not_before,
-        due_at: now_mono + delay,
-        due_wall,
-    }
+    RefreshSchedule::after(now_mono, now_wall, delay, MIN_INTERVAL)
 }
 
 /// Schedule for the token found at startup: its receipt time is unknown, so the device clock estimates the
@@ -233,15 +237,19 @@ fn schedule_after_refresh(
 fn schedule_for_existing(token: &str, now_wall: i64, now_mono: Instant) -> RefreshSchedule {
     let Some(times) = jwt::token_times_unix(token) else {
         warn!("Token refresh: access token has no decodable exp; using fallback interval");
-        return RefreshSchedule::at(now_mono + FALLBACK_INTERVAL);
+        return RefreshSchedule::after(now_mono, now_wall, FALLBACK_INTERVAL, Duration::ZERO);
     };
-    let ttl = times
-        .ttl_secs()
-        .map(|secs| Duration::from_secs(secs as u64))
-        .unwrap_or(FALLBACK_INTERVAL);
-    let remaining = (times.exp - now_wall).clamp(0, ttl.as_secs() as i64);
-    let delay = Duration::from_secs(remaining as u64).saturating_sub(lead_for(ttl));
-    RefreshSchedule::at(now_mono + delay)
+    let Some(ttl) = times.ttl_secs().map(ttl_from_secs) else {
+        return RefreshSchedule::after(now_mono, now_wall, Duration::ZERO, Duration::ZERO);
+    };
+    let remaining = times.exp - now_wall;
+    // More life left than the token ever had: the clock is behind and the real remainder is unknowable.
+    let delay = if remaining > ttl.as_secs() as i64 {
+        Duration::ZERO
+    } else {
+        Duration::from_secs(remaining.max(0) as u64).saturating_sub(lead_for(ttl))
+    };
+    RefreshSchedule::after(now_mono, now_wall, delay, Duration::ZERO)
 }
 
 #[cfg(test)]
