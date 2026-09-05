@@ -106,5 +106,3 @@ export const TMCG_ROLE_DISPLAY_NAMES: Record<string, string> = {
   [TMCG_ROLES.SPEAKER]: 'Speaker',
   [TMCG_ROLES.MENTOR]: 'Mentor',
 };
-
-
