@@ -113,7 +113,11 @@ export interface TableProps<T = TableRowData> {
    */
   minRows?: number;
   /** Props for the empty state (`NoData`). Overrides `emptyMessage`. Same shape
-   *  as `DataTableBodyProps.emptyState`. */
+   *  as `DataTableBodyProps.emptyState`.
+   *
+   *  ONE rule, so tables do not each invent their own: pass `emptyMessage` when
+   *  a title is all you need, `emptyState` when you also want a description,
+   *  icon or action — never both. */
   emptyState?: NoDataProps;
 
   // Styling
