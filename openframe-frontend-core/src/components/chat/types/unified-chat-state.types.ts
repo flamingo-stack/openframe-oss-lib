@@ -399,17 +399,23 @@ export interface UnifiedChatState {
    *  adapter doesn't support creation, resolves to `null`. */
   startNewDialog: () => Promise<string | null>;
 
-  /** Delete a dialog from history. No-op when the adapter doesn't
-   *  expose `deleteDialog` (Guide localStorage always supports it;
-   *  Mingo gates on the host-provided callback). */
+  /** Delete a dialog from history. No-op (resolves) when the adapter doesn't
+   *  expose `deleteDialog`.
+   *
+   *  REJECTS when the backend call fails — the row is kept and the error is
+   *  re-thrown so a confirmation modal can stay open for a retry instead of
+   *  closing over a write that never landed. Callers must `await`/`.catch()`;
+   *  a bare `void state.deleteDialog(id)` produces an unhandled rejection. */
   deleteDialog: (id: string) => Promise<void>;
 
   /** Rename a dialog. Optimistically updates the title in the local list.
-   *  No-op when the adapter doesn't expose a rename callback. */
+   *  No-op (resolves) when the adapter doesn't expose a rename callback.
+   *  REJECTS on failure AFTER rolling the title back — see `deleteDialog`. */
   renameDialog: (id: string, title: string) => Promise<void>;
 
-  /** Archive a dialog (removes it from the active list). No-op when the
-   *  adapter doesn't expose an archive callback. */
+  /** Archive a dialog (removes it from the active list). No-op (resolves) when
+   *  the adapter doesn't expose an archive callback.
+   *  REJECTS on failure, keeping the row — see `deleteDialog`. */
   archiveDialog: (id: string) => Promise<void>;
 
   /** True while the dialog list is being fetched for the first time. */
