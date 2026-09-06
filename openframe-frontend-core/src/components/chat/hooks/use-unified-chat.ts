@@ -23,6 +23,7 @@ import { EMPTY_DIALOG_CAPABILITIES } from '../types/unified-chat-state.types';
 import type { ChatDialogCapabilities, UnifiedChatState } from '../types/unified-chat-state.types';
 import { useNatsChatAdapter, type UseNatsChatAdapterConfig } from './use-nats-chat-adapter';
 import { useSseChatAdapter, type UseSseChatAdapterOptions } from './use-sse-chat-adapter';
+import { useStableShallow } from './use-stable-shallow';
 
 // =============================================================================
 // Modes
@@ -139,8 +140,12 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
   // reads a single resolved `dialogCapabilities` and never re-derives it from
   // the mode.
   const activeStateIsInjected = activeState === mingoStateOverride;
+  // Latched: hosts write the companion prop inline, and a fresh object each
+  // render would invalidate the state memo below (and every memo a consumer
+  // hangs off its identity) forever.
+  const stableInjected = useStableShallow(injectedDialogCapabilities);
   const dialogCapabilities = activeStateIsInjected
-    ? (activeState.dialogCapabilities ?? injectedDialogCapabilities ?? EMPTY_DIALOG_CAPABILITIES)
+    ? (activeState.dialogCapabilities ?? stableInjected ?? EMPTY_DIALOG_CAPABILITIES)
     : activeState.dialogCapabilities;
 
   // Live ref to the active state. The injected `mingoState` (and the SSE/NATS
