@@ -22,6 +22,73 @@ describe('useManagedDialogList', () => {
     vi.restoreAllMocks();
   });
 
+  it('reports loading from the FIRST render when a load is coming', async () => {
+    let resolve: ((v: ReturnType<typeof page>) => void) | undefined;
+    const fetchDialogs = vi.fn(
+      () =>
+        new Promise<ReturnType<typeof page>>(r => {
+          resolve = r;
+        }),
+    );
+    const { result } = renderHook(() =>
+      useManagedDialogList({ autoLoad: true, pageSize: 20, logTag: '[t]', fetchDialogs }),
+    );
+    // Before the effect has even run: a consumer branching on "empty list" must
+    // not see a settled-and-empty state.
+    expect(result.current.isDialogsLoading).toBe(true);
+    expect(result.current.dialogs).toEqual([]);
+    await act(async () => {
+      resolve?.(page(['a']));
+      await Promise.resolve();
+    });
+    expect(result.current.isDialogsLoading).toBe(false);
+    expect(result.current.dialogs.map(d => d.id)).toEqual(['a']);
+  });
+
+  it('re-enters loading synchronously on a search change, including clearing it', async () => {
+    const resolvers: Array<(v: ReturnType<typeof page>) => void> = [];
+    const fetchDialogs = vi.fn(
+      () =>
+        new Promise<ReturnType<typeof page>>(r => {
+          resolvers.push(r);
+        }),
+    );
+    const { result, rerender } = renderHook(
+      ({ search }) => useManagedDialogList({ autoLoad: true, pageSize: 20, logTag: '[t]', fetchDialogs, search }),
+      { initialProps: { search: '' } },
+    );
+    await act(async () => {
+      resolvers[0](page(['a']));
+      await Promise.resolve();
+    });
+    expect(result.current.isDialogsLoading).toBe(false);
+
+    rerender({ search: 'zzz' });
+    expect(result.current.isDialogsLoading).toBe(true);
+    await act(async () => {
+      resolvers[1](page([]));
+      await Promise.resolve();
+    });
+    expect(result.current.isDialogsLoading).toBe(false);
+    expect(result.current.dialogs).toEqual([]);
+
+    // Clearing the term must ALSO read as loading again, not as "settled empty".
+    rerender({ search: '' });
+    expect(result.current.isDialogsLoading).toBe(true);
+  });
+
+  it('an archive-style consumer (autoLoad false) is settled from the start', () => {
+    const { result } = renderHook(() =>
+      useManagedDialogList({
+        autoLoad: false,
+        pageSize: 20,
+        logTag: '[t]',
+        fetchDialogs: () => Promise.resolve(page([])),
+      }),
+    );
+    expect(result.current.isDialogsLoading).toBe(false);
+  });
+
   it('is inert without fetchDialogs', () => {
     const { result } = renderHook(() => useManagedDialogList({ autoLoad: true, pageSize: 20, logTag: '[t]' }));
     expect(result.current.dialogs).toEqual([]);

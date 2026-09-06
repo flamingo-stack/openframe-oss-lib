@@ -108,6 +108,15 @@ export function useManagedDialogList({
   const [dialogs, setDialogs] = useState<DialogItem[]>([]);
   const [dialogsNextCursor, setDialogsNextCursor] = useState<string | null>(null);
   const [isDialogsLoading, setIsDialogsLoading] = useState<boolean>(false);
+  // Which `search` value's FIRST PAGE has settled (`null` = the no-search
+  // case). `undefined` = nothing has settled yet. Seeded unsettled exactly when
+  // a load is coming, so `isDialogsLoading` reads true from the FIRST render
+  // rather than only once the effect fires — a consumer that branches on "the
+  // list is empty" would otherwise see a one-frame empty list on mount, and
+  // again on every search change, before the request starts.
+  const [settledSearch, setSettledSearch] = useState<string | null | undefined>(
+    autoLoad && fetchDialogs ? undefined : null,
+  );
   const [isDialogsPending, setIsDialogsPending] = useState<boolean>(false);
   // Synchronous mirror: `loadMoreDialogs` must see a page-1 load dispatched in
   // the SAME tick, which the state value (a stale render closure) would miss.
@@ -194,6 +203,7 @@ export function useManagedDialogList({
         // Only the latest request owns the shared flags.
         if (isCurrent()) {
           pendingRef.current = false;
+          if (cursor === undefined) setSettledSearch(search ?? null);
           setIsDialogsLoading(false);
           setIsDialogsPending(false);
         }
@@ -307,12 +317,16 @@ export function useManagedDialogList({
   }, []);
 
   const hasMoreDialogs = dialogsNextCursor != null;
+  // Reported as loading until the first page for the CURRENT search settles —
+  // see `settledSearch`.
+  const awaitingFirstPage = !!fetchDialogs && settledSearch !== (search ?? null);
+  const dialogsLoading = isDialogsLoading || awaitingFirstPage;
 
   return useMemo<UseManagedDialogListResult>(
     () => ({
       dialogs,
       dialogsNextCursor,
-      isDialogsLoading,
+      isDialogsLoading: dialogsLoading,
       isDialogsPending,
       dialogsError,
       hasMoreDialogs,
@@ -329,7 +343,7 @@ export function useManagedDialogList({
     [
       dialogs,
       dialogsNextCursor,
-      isDialogsLoading,
+      dialogsLoading,
       isDialogsPending,
       dialogsError,
       hasMoreDialogs,
