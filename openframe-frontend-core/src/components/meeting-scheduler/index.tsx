@@ -251,9 +251,20 @@ export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]';
  * tablet and desktop, and the calendar stage fits the same box at both — the
  * times column scrolls inside it as it always has.
  *
+ * PHONES get a stated height too — the one place this flow departs from
+ * slot-first's "the page is the scroller". Slot-first's two stages are the
+ * same shape on a phone (calendar + a capped times list either way), so it
+ * needs none. Details-first's are not: the form stage, the calendar stage and
+ * the two-line confirmation each have their own natural height, and a paid
+ * landing page that grows and shrinks by tens of pixels on every step reads as
+ * broken. 812px is the calendar stage's natural height at 375px (header strip
+ * + six fixed weeks + the 9.75rem chip cap), so that stage fits exactly and the
+ * form stage — shorter on the shipped links — sits in it; a link declaring more
+ * questions scrolls the form inside the card, as it already does from `md`.
+ *
  * Hosts read it through `SCHEDULER_FLOW_PRESETS[flow].height`, never directly.
  */
-export const MEETING_SCHEDULER_DETAILS_FIRST_H = 'md:h-[39.875rem]';
+export const MEETING_SCHEDULER_DETAILS_FIRST_H = 'h-[50.75rem] md:h-[39.875rem]';
 
 export type SchedulerFlow = 'slot-first' | 'details-first';
 
@@ -677,7 +688,12 @@ export function HubSpotMeetingScheduler({
    * last-wins, so appending it after would make a host's own `h-*` unreachable,
    * which is the override the height-inside-CARD_CLASS arrangement allows today.
    */
-  const cardClass = cn(CARD_CLASS, preset.height, formOnly && 'bg-ods-bg', className);
+  const cardClass = cn(CARD_CLASS, preset.height, detailsFirst && 'flex flex-col', formOnly && 'bg-ods-bg', className);
+  /** details-first states a height on phones too (see MEETING_SCHEDULER_DETAILS_FIRST_H), so
+   *  the wrappers that let content shrink into a stated height run at every width here. */
+  const innerClass = cn(CARD_INNER_CLASS, detailsFirst && 'min-h-0 flex-1');
+  const actionPanelClass = cn(ACTION_PANEL_CLASS, detailsFirst && 'min-h-0 overflow-y-auto');
+  const stepPanelClass = cn(STEP_PANEL_CLASS, detailsFirst && 'min-h-0 overflow-y-auto');
 
   /** One card SHAPE for every degraded return below. */
   const degraded = (message: string) => (
@@ -692,9 +708,9 @@ export function HubSpotMeetingScheduler({
     // shifts when it swaps.
     return (
       <div className={cardClass}>
-        <div className={CARD_INNER_CLASS}>
+        <div className={innerClass}>
           {!formOnly && <ContextPanelSkeleton onBack={backEdge} className={CONTEXT_PANEL_CLASS} />}
-          <div className={ACTION_PANEL_CLASS}>
+          <div className={actionPanelClass}>
             {/* Both terms matter. Without `flow` this stays a calendar where
                 the form belongs; without the step term, paging a month AFTER
                 Continue (which happens at `step === 'slot'`) would swap the
@@ -702,7 +718,7 @@ export function HubSpotMeetingScheduler({
             {formOnly ? (
               // The SAME wrapper the loaded form gets, so the skeleton never
               // states its own inset.
-              <div className={STEP_PANEL_CLASS}>
+              <div className={stepPanelClass}>
                 <BookingFormSkeleton
                   fieldRows={detailsFormProps?.fieldRows}
                   consent={Boolean(detailsFormProps?.consent)}
@@ -730,7 +746,7 @@ export function HubSpotMeetingScheduler({
 
   return (
     <div className={cardClass}>
-      <div className={CARD_INNER_CLASS}>
+      <div className={innerClass}>
         {!formOnly && (
           <SchedulerContextPanel
             hosts={shownHosts}
@@ -777,9 +793,9 @@ export function HubSpotMeetingScheduler({
         {/* Scrolls INSIDE the fixed card rather than growing it — see
             MEETING_SCHEDULER_H. `min-h-0` is what lets it: a flex item's
             default `min-height:auto` refuses to shrink below its content. */}
-        <div className={ACTION_PANEL_CLASS}>
+        <div className={actionPanelClass}>
           {step === 'confirmed' && confirmation && timezone ? (
-            <div className={STEP_PANEL_CLASS}>
+            <div className={stepPanelClass}>
               <Confirmation confirmation={confirmation} timezone={timezone} />
             </div>
           ) : step === 'details' &&
@@ -791,7 +807,7 @@ export function HubSpotMeetingScheduler({
                 // not — never a calendar skeleton in the form-only layout.
                 durations.length > 0
               : durationMs != null && selectedSlot != null && timezone) ? (
-            <div className={cn(STEP_PANEL_CLASS, 'gap-[var(--spacing-system-m)]')}>
+            <div className={cn(stepPanelClass, 'gap-[var(--spacing-system-m)]')}>
               {/* Top-aligned, and no back edge of its own: the ONE back edge
                   lives in the context panel at every step (the `onBack` wired on `SchedulerContextPanel`),
                   which is where the design puts it and the only spot that
