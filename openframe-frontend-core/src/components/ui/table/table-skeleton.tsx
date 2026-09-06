@@ -15,44 +15,14 @@ const ROW_HEIGHT_DESKTOP = 'h-[66px] md:h-[78px]';
  * than this floor (avatar + two lines) wants a non-compact, fixed-height row.
  */
 const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]';
-const ROW_HEIGHT_MOBILE = 'h-[66px]';
-
 /**
- * Invisible rows that hold a row's exact box (outer border included, so a
- * placeholder is 68px / 80px like the row it stands in for — not 66 / 78; and
- * the compact floor for compact tables, not the fixed height). The Table pads
- * a short page with these up to `skeletonRows`, and, with
- * `keepHeightWhenEmpty`, stacks them under the empty state too — so a full
- * page, a short last page, the skeleton and "no results" are all the same
- * height and the layout never jumps between them.
+ * The same 56 as a number.
+ * @deprecated Hosts no longer reserve `rows × height` themselves — pass
+ * `minRows` to `Table` (or `DataTable.Body`) and the table holds a full page's
+ * height in every state. Kept one cycle for consumers still on the formula.
  */
-export function TablePlaceholderRows({ rows, compact }: { rows: number; compact?: boolean }) {
-  if (rows <= 0) return null;
-  return (
-    <>
-      {Array.from({ length: rows }).map((_, index) => (
-        <div
-          key={`placeholder-${index}`}
-          className="pointer-events-none relative overflow-hidden rounded-[6px] border border-transparent"
-          aria-hidden="true"
-        >
-          <div
-            className={cn(
-              'hidden items-center gap-4 px-4 md:flex',
-              compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_DESKTOP),
-            )}
-          />
-          <div
-            className={cn(
-              'flex items-center justify-start gap-3 px-3 md:hidden',
-              compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_MOBILE),
-            )}
-          />
-        </div>
-      ))}
-    </>
-  );
-}
+const COMPACT_ROW_MIN_HEIGHT_PX = 56;
+const ROW_HEIGHT_MOBILE = 'h-[66px]';
 
 /** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
 export function TableCardSkeleton({
@@ -117,7 +87,15 @@ export function TableCardSkeleton({
 
           {/* Mobile Skeleton */}
           <div
-            className={cn('flex items-center justify-start gap-3 px-3 py-0 md:hidden', ROW_HEIGHT_MOBILE, rowClassName)}
+            className={cn(
+              'flex items-center justify-start gap-3 px-3 md:hidden',
+              // Mirror the real row on mobile too: a compact row is
+              // content-sized with a floor, a normal row a fixed height.
+              // Hard-wiring ROW_HEIGHT_MOBILE made every COMPACT table jump
+              // 68px -> 58px per row when the data replaced the skeleton.
+              compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_MOBILE),
+              rowClassName,
+            )}
           >
             <div className="flex min-w-0 flex-1 flex-col justify-center py-3">
               <div className="mb-2 h-4 w-3/4 rounded bg-ods-bg-surface" />
@@ -133,4 +111,4 @@ export function TableCardSkeleton({
 }
 
 /** @deprecated */
-export { COMPACT_ROW_MIN_HEIGHT, ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE };
+export { COMPACT_ROW_MIN_HEIGHT, COMPACT_ROW_MIN_HEIGHT_PX, ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE };

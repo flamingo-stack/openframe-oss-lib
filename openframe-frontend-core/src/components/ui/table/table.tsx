@@ -6,10 +6,11 @@ import { Chevron02RightIcon } from '../../icons-v2-generated';
 import { Pagination } from '../../pagination';
 import { Button } from '../button';
 import { CursorPagination } from '../cursor-pagination';
+import { PlaceholderRows } from '../data-table/data-table-skeleton';
 import { TableEmptyState } from './table-empty-state';
 import { TableHeader } from './table-header';
 import { TableRow } from './table-row';
-import { TableCardSkeleton, TablePlaceholderRows } from './table-skeleton';
+import { COMPACT_ROW_MIN_HEIGHT, TableCardSkeleton } from './table-skeleton';
 import type { RowAction, TableColumn, TableProps, TableRowData } from './types';
 import { useTableMotion } from './use-table-motion';
 
@@ -102,8 +103,8 @@ export function Table<T = TableRowData>({
   loading = false,
   emptyMessage,
   skeletonRows = 10,
-  keepHeightWhenEmpty = false,
-  emptyDescription,
+  minRows,
+  emptyState,
   className,
   containerClassName,
   headerClassName,
@@ -271,18 +272,20 @@ export function Table<T = TableRowData>({
             hasChevron={Boolean(rowHref)}
           />
         ) : data.length === 0 ? (
-          keepHeightWhenEmpty ? (
-            /* Same box as a full page: the placeholders hold the rows' height
-               and the empty state floats over them — TOP-aligned, not centred,
-               so a 20-row reservation still shows the message above the fold. */
+          /* `minRows` promises a STABLE height, and an empty table is exactly
+             when a collapsing one is most visible — the pagination and
+             everything under it jump the moment a filter matches nothing. So
+             reserve the same slots and centre the empty state over them,
+             identically to `DataTableBody`. */
+          minRows ? (
             <div className="relative flex w-full flex-col gap-2">
-              <TablePlaceholderRows rows={skeletonRows} compact={compact} />
-              <div className="absolute inset-x-0 top-0 flex justify-center">
-                <TableEmptyState message={emptyMessage} description={emptyDescription} />
+              <PlaceholderRows count={minRows} innerHeightClassName={compact ? COMPACT_ROW_MIN_HEIGHT : undefined} />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <TableEmptyState message={emptyMessage} emptyState={emptyState} />
               </div>
             </div>
           ) : (
-            <TableEmptyState message={emptyMessage} description={emptyDescription} />
+            <TableEmptyState message={emptyMessage} emptyState={emptyState} />
           )
         ) : (
           <>
@@ -326,9 +329,14 @@ export function Table<T = TableRowData>({
             )}
             {/* Infinite scroll: sentinel element */}
             {infiniteScroll?.hasNextPage && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
-            {/* Invisible placeholder rows to maintain consistent table height (disabled for infinite scroll) */}
+            {/* Invisible placeholder rows to maintain consistent table height
+                (disabled for infinite scroll). `minRows` when the host opted
+                in, else the legacy pad-to-`skeletonRows`. */}
             {!infiniteScroll && (
-              <TablePlaceholderRows rows={Math.max(0, skeletonRows - data.length)} compact={compact} />
+              <PlaceholderRows
+                count={Math.max(0, (minRows ?? skeletonRows) - data.length)}
+                innerHeightClassName={compact ? COMPACT_ROW_MIN_HEIGHT : undefined}
+              />
             )}
           </>
         )}
