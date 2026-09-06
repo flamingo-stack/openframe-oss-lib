@@ -15,13 +15,6 @@ const ROW_HEIGHT_DESKTOP = 'h-[66px] md:h-[78px]';
  * than this floor (avatar + two lines) wants a non-compact, fixed-height row.
  */
 const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]';
-/**
- * The same 56 as a number.
- * @deprecated Hosts no longer reserve `rows × height` themselves — pass
- * `minRows` to `Table` (or `DataTable.Body`) and the table holds a full page's
- * height in every state. Kept one cycle for consumers still on the formula.
- */
-const COMPACT_ROW_MIN_HEIGHT_PX = 56;
 const ROW_HEIGHT_MOBILE = 'h-[66px]';
 
 /** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
@@ -114,4 +107,4 @@ export function TableCardSkeleton({
 }
 
 /** @deprecated */
-export { COMPACT_ROW_MIN_HEIGHT, COMPACT_ROW_MIN_HEIGHT_PX, ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE };
+export { COMPACT_ROW_MIN_HEIGHT, ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE };

@@ -304,7 +304,11 @@ export interface TableCardSkeletonProps {
 /** @deprecated Use types from `data-table` instead. */
 export interface TableEmptyStateProps {
   message?: string;
-  /** Full `NoData` props — overrides `message`. Same shape as `DataTableEmpty`. */
+  /** Second line under the title. Defaults to the generic search/filter hint
+   *  only when `message` is also absent. */
+  description?: string;
+  /** Full `NoData` props — overrides `message` AND `description`. Same shape as
+   *  `DataTableEmpty`. */
   emptyState?: NoDataProps;
   icon?: ReactNode;
   action?: {
