@@ -97,7 +97,10 @@ export function TableCardSkeleton({
               rowClassName,
             )}
           >
-            <div className="flex min-w-0 flex-1 flex-col justify-center py-3">
+            {/* The inner padding is the NON-compact row's; a compact row is
+                sized by its own `py-2` + floor, so adding `py-3` here made the
+                compact mobile skeleton 78px against a real row's 58. */}
+            <div className={cn('flex min-w-0 flex-1 flex-col justify-center', compact ? 'py-0' : 'py-3')}>
               <div className="mb-2 h-4 w-3/4 rounded bg-ods-bg-surface" />
               <div className="h-3 w-1/2 rounded bg-ods-bg-surface opacity-60" />
             </div>

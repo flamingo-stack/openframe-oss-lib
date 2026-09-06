@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { useDataTableContext } from './data-table';
 import { getHideClasses } from './utils';
@@ -115,6 +116,45 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
  * a padded page and an empty one are the same height by construction rather
  * than by matching guesses in each component.
  */
+/**
+ * The empty state, floating centred over a full page's worth of reserved row
+ * slots. Both table bodies render this — an empty table is exactly when a
+ * collapsing one is most visible (the pagination and everything under it jump
+ * the moment a filter matches nothing), and two hand-matched copies of the
+ * wrapper would drift the way the two placeholder components already had.
+ */
+export function ReservedEmptyState({
+  count,
+  gapClassName,
+  rowHeightClassName,
+  innerHeightClassName,
+  children,
+}: {
+  count: number;
+  gapClassName: string;
+  rowHeightClassName?: string;
+  innerHeightClassName?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn('relative flex w-full flex-col', gapClassName)}>
+      <PlaceholderRows
+        count={count}
+        rowHeightClassName={rowHeightClassName}
+        innerHeightClassName={innerHeightClassName}
+      />
+      {/* `sticky left-0` + `w-screen max-w-full`: hosts wrap tables in a
+          horizontal scroller with a forced min-width, and an overlay centred on
+          that CANVAS puts the message off-screen on a phone. This centres it on
+          the visible area instead, and collapses to plain centring when the
+          table is not wider than its container. */}
+      <div className="absolute inset-0 flex items-center">
+        <div className="sticky left-0 flex w-screen max-w-full justify-center">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 export function PlaceholderRows({
   count,
   rowHeightClassName,

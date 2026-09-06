@@ -6,7 +6,7 @@ import { Chevron02RightIcon } from '../../icons-v2-generated';
 import { Pagination } from '../../pagination';
 import { Button } from '../button';
 import { CursorPagination } from '../cursor-pagination';
-import { PlaceholderRows } from '../data-table/data-table-skeleton';
+import { PlaceholderRows, ReservedEmptyState } from '../data-table/data-table-skeleton';
 import { TableEmptyState } from './table-empty-state';
 import { TableHeader } from './table-header';
 import { TableRow } from './table-row';
@@ -278,12 +278,13 @@ export function Table<T = TableRowData>({
              reserve the same slots and centre the empty state over them,
              identically to `DataTableBody`. */
           minRows ? (
-            <div className="relative flex w-full flex-col gap-2">
-              <PlaceholderRows count={minRows} innerHeightClassName={compact ? COMPACT_ROW_MIN_HEIGHT : undefined} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <TableEmptyState message={emptyMessage} emptyState={emptyState} />
-              </div>
-            </div>
+            <ReservedEmptyState
+              count={minRows}
+              gapClassName="gap-2"
+              innerHeightClassName={compact ? COMPACT_ROW_MIN_HEIGHT : undefined}
+            >
+              <TableEmptyState message={emptyMessage} emptyState={emptyState} />
+            </ReservedEmptyState>
           ) : (
             <TableEmptyState message={emptyMessage} emptyState={emptyState} />
           )

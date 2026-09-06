@@ -6,7 +6,7 @@ import type { NoDataProps } from '../no-data';
 import { useDataTableContext } from './data-table';
 import { DataTableEmpty } from './data-table-empty';
 import { DataTableRow } from './data-table-row';
-import { DataTableSkeleton, PlaceholderRows } from './data-table-skeleton';
+import { DataTableSkeleton, PlaceholderRows, ReservedEmptyState } from './data-table-skeleton';
 
 export interface DataTableBodyProps<T = unknown> {
   /** Show skeleton rows while `loading` is true and data is empty. */
@@ -117,10 +117,13 @@ export function DataTableBody<T = unknown>({
     // slots here and center the empty state over them.
     if (minRows) {
       return (
-        <div className={cn('relative flex w-full flex-col gap-[var(--spacing-system-xsf)]', className)}>
-          <PlaceholderRows count={minRows} rowHeightClassName={rowHeightClassName} />
-          <div className="absolute inset-0 flex items-center justify-center">{empty}</div>
-        </div>
+        <ReservedEmptyState
+          count={minRows}
+          gapClassName={cn('gap-[var(--spacing-system-xsf)]', className)}
+          rowHeightClassName={rowHeightClassName}
+        >
+          {empty}
+        </ReservedEmptyState>
       );
     }
 
