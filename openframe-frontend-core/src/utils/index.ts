@@ -371,6 +371,7 @@ export * from './embed-url-converters';
 // HubSpot meeting-link naming convention — the executable SSOT (parser,
 // validator, label + name-split helpers, MAX_MONTH_OFFSET). Pure + server-safe.
 export * from './hubspot-meetings-convention';
+export * from './hubspot-collected-forms';
 export * from './page-header-constants';
 export * from './first-touch-attribution';
 

@@ -33,6 +33,7 @@ import {
   referralSourceOptions,
   defaultHelpCategoryOptions,
 } from '../../schemas/contact-schema';
+import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
 import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from '../chat/chat-attachment-bar';
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments';
 import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown';
@@ -50,6 +51,7 @@ import {
   Label,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
+import { RequiredMark } from '../ui/required-mark';
 
 /**
  * Fields the caller can suppress. Six values — every primary form
@@ -261,10 +263,7 @@ export function ContactForm({
           );
         })}
         className="flex flex-grow flex-col space-y-4 md:space-y-6"
-        // Opt out of HubSpot's collected-forms script: this form already
-        // reaches HubSpot server-side, and a host running the tracking tag would
-        // otherwise re-post it as a phantom "non-HubSpot form" (see BookingForm).
-        data-hs-do-not-collect="true"
+        {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}
       >
         {/* Hidden inputs for fields that are required by `ContactSchema`
             but suppressed from the visible UI via `hideFields`. Without
@@ -292,7 +291,8 @@ export function ContactForm({
             {showName && (
               <div className="flex flex-col">
                 <Label htmlFor="name">
-                  Your Name<span className="text-ods-accent">*</span>
+                  Your Name
+                  <RequiredMark />
                 </Label>
                 <Input
                   id="name"
@@ -300,6 +300,7 @@ export function ContactForm({
                   {...register('name')}
                   placeholder="Jane Doe"
                   aria-invalid={!!errors.name}
+                  aria-required
                   aria-describedby="name-error"
                   className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"
                 />
@@ -313,7 +314,8 @@ export function ContactForm({
             {showEmail && (
               <div className="flex flex-col">
                 <Label htmlFor="email">
-                  Email<span className="text-ods-accent">*</span>
+                  Email
+                  <RequiredMark />
                 </Label>
                 <Input
                   id="email"
@@ -321,6 +323,7 @@ export function ContactForm({
                   {...register('email')}
                   placeholder="jane@company.com"
                   aria-invalid={!!errors.email}
+                  aria-required
                   aria-describedby="email-error"
                   className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"
                 />
@@ -406,7 +409,8 @@ export function ContactForm({
         {showHelpCategory && (
           <div className="flex flex-col">
             <Label htmlFor="helpCategory">
-              Choose your main interest<span className="text-ods-accent">*</span>
+              Choose your main interest
+              <RequiredMark />
             </Label>
             <Controller
               control={control}
@@ -416,6 +420,7 @@ export function ContactForm({
                   <SelectTrigger
                     id="helpCategory"
                     aria-label="Help Category"
+                    aria-required
                     className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary"
                   >
                     <SelectValue placeholder="Choose your main interest" />
@@ -441,13 +446,15 @@ export function ContactForm({
         {showMessage && (
           <div className="flex flex-grow flex-col">
             <Label htmlFor="message">
-              Your Message<span className="text-ods-accent">*</span>
+              Your Message
+              <RequiredMark />
             </Label>
             <Textarea
               id="message"
               {...register('message')}
               placeholder="Share your current challenges or questions about open-source alternatives..."
               aria-invalid={!!errors.message}
+              aria-required
               aria-describedby="message-error"
               className="h-full flex-grow border-ods-border bg-ods-card text-ods-text-primary placeholder-ods-text-secondary"
             />

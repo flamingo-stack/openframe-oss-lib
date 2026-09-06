@@ -36,8 +36,8 @@ const SIZES: Record<VideoCenterBadgeSize, number> = {
   lg: 64, // hero facades
 };
 
-/** Soft legibility shadow — NOT a background (per design: bare glyphs). */
-const GLYPH_SHADOW = 'drop-shadow(0 1px 4px rgba(0,0,0,0.5))';
+/** Soft legibility shadow — NOT a background (per design: bare glyphs). ODS effects own the value. */
+const GLYPH_SHADOW = 'var(--ods-shadow-glyph)';
 
 export interface VideoPlayBadgeProps {
   size?: VideoCenterBadgeSize;

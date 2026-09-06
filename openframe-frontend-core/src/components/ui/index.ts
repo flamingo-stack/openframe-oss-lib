@@ -221,3 +221,6 @@ export * from './filter-pill-row';
 
 // Viewport-gated mounting for heavy previews (players, large images)
 export { LazyMount, type LazyMountProps } from './lazy-mount';
+export { RequiredMark } from './required-mark';
+export { IconTile } from './icon-tile';
+export { PolicyLink } from './policy-link';

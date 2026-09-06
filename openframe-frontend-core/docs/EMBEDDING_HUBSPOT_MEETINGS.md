@@ -161,6 +161,30 @@ The widget renders as ONE bordered card with a Calendly-anatomy split: a CONTEXT
 first available day → details form → confirmation). Panels stack on mobile — no extra
 layout work needed from the embedder.
 
+## Flows: slot-first and details-first
+
+`flow` (default `'slot-first'`) selects the step order. `'details-first'` renders the
+form FIRST and treats the slot click as the submit — the answers are frozen at
+Continue (humanity signals included, while the honeypot is still mounted) and
+POSTed with the picked slot. Every existing embed is unchanged by default.
+
+```tsx
+<HubSpotMeetingScheduler
+  meetingId={id}
+  flow="details-first"
+  // Optional: place the link's questions in rows (4 columns at md+) and add a
+  // host consent row — DATA, so a Server Component can pass it.
+  detailsFormProps={{ fieldRows: [[{ name: 'firstName' }, { name: 'lastName' }]], consent }}
+/>
+```
+
+What differs per flow is data — `SCHEDULER_FLOW_PRESETS[flow]` (first step, the
+card height a host reserves, the submit copy). `SchedulerDegradedCard` renders a
+host's own fallback in the same box and the same type:
+`<SchedulerDegradedCard flow="details-first" message="…" action={<Button …/>} />`.
+`detailsForm` is the component-level override for a host that must wrap
+`BookingForm` itself; prefer `detailsFormProps`.
+
 ## See also
 
 - [`EMBEDDING.md`](./EMBEDDING.md) — runtime providers and the feature catalog.
