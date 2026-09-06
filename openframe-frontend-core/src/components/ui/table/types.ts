@@ -102,6 +102,16 @@ export interface TableProps<T = TableRowData> {
 
   // Skeleton configuration
   skeletonRows?: number; // Number of skeleton rows to show when loading (default: 10)
+  /**
+   * Keep the body `skeletonRows` rows tall when there are NO rows: the empty
+   * state is centred over invisible placeholder rows instead of collapsing.
+   * With `skeletonRows` = the page size, a full page, a short last page, the
+   * skeleton and "no results" are all one height — no layout jump on a filter
+   * that empties the list. Opt-in: an unpaginated table wants to collapse.
+   */
+  keepHeightWhenEmpty?: boolean;
+  /** Second line of the empty state (e.g. "Try adjusting the search"). */
+  emptyDescription?: string;
 
   // Styling
   className?: string;
@@ -270,6 +280,9 @@ export interface TableCardSkeletonProps {
 /** @deprecated Use types from `data-table` instead. */
 export interface TableEmptyStateProps {
   message?: string;
+  /** Second line under the title. Defaults to the generic search/filter hint
+   *  only when `message` is also absent. */
+  description?: string;
   icon?: ReactNode;
   action?: {
     label: string;
