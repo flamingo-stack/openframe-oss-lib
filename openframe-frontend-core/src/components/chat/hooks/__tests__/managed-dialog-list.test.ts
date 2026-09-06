@@ -77,6 +77,43 @@ describe('useManagedDialogList', () => {
     expect(result.current.isDialogsLoading).toBe(true);
   });
 
+  it('a REJECTED first page still settles — the list must not stick on a skeleton', async () => {
+    const fetchDialogs = vi.fn(() => Promise.reject(new Error('down')));
+    const { result } = renderHook(() =>
+      useManagedDialogList({ autoLoad: true, pageSize: 20, logTag: '[t]', fetchDialogs }),
+    );
+    expect(result.current.isDialogsLoading).toBe(true);
+    await waitFor(() => expect(result.current.dialogsError).toBe(true));
+    expect(result.current.isDialogsLoading).toBe(false);
+  });
+
+  it('a superseded response never settles the NEWER search term', async () => {
+    const resolvers: Array<(v: ReturnType<typeof page>) => void> = [];
+    const fetchDialogs = vi.fn(
+      () =>
+        new Promise<ReturnType<typeof page>>(r => {
+          resolvers.push(r);
+        }),
+    );
+    const { result, rerender } = renderHook(
+      ({ search }) => useManagedDialogList({ autoLoad: true, pageSize: 20, logTag: '[t]', fetchDialogs, search }),
+      { initialProps: { search: 'a' } },
+    );
+    await waitFor(() => expect(resolvers.length).toBe(1));
+    rerender({ search: 'ab' });
+    await waitFor(() => expect(resolvers.length).toBe(2));
+    await act(async () => {
+      resolvers[0](page([]));
+      await Promise.resolve();
+    });
+    expect(result.current.isDialogsLoading).toBe(true);
+    await act(async () => {
+      resolvers[1](page([]));
+      await Promise.resolve();
+    });
+    expect(result.current.isDialogsLoading).toBe(false);
+  });
+
   it('an archive-style consumer (autoLoad false) is settled from the start', () => {
     const { result } = renderHook(() =>
       useManagedDialogList({
