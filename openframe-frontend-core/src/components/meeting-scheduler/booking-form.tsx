@@ -95,7 +95,7 @@ const SPAN_CLASS: Record<BookingFieldSpan, string> = {
 
 /** The even split of four columns over `count` slots; a remainder goes to the
  *  leading slots (three slots → 2/1/1), so a row never leaves a trailing gap. */
-const evenSpan = (count: number, index: number): BookingFieldSpan => {
+export const evenSpan = (count: number, index: number): BookingFieldSpan => {
   const base = Math.floor(4 / Math.max(1, count));
   const extra = 4 - base * count;
   return Math.min(4, Math.max(1, index < extra ? base + 1 : base)) as BookingFieldSpan;
