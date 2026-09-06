@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HubSpotMeetingScheduler } from '../components/meeting-scheduler';
 import type { MeetingAvailability } from '../schemas/meeting-booking-schema';
-import { availabilityWith } from './fixtures/meeting-booking';
+import { availabilityWith, fillIdentity } from './fixtures/meeting-booking';
 
 /** A slot two hours from now, on the hour — inside the month the calendar opens on. */
 const SLOT_MS = Math.ceil((Date.now() + 2 * 3_600_000) / 3_600_000) * 3_600_000;
@@ -30,13 +30,10 @@ vi.mock('../hooks/use-meeting-booking', () => ({
 }));
 vi.mock('../hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 
-const type = (el: HTMLElement, value: string) => fireEvent.input(el, { target: { value } });
-
 async function continueFromDetails() {
   render(<HubSpotMeetingScheduler meetingId="1" flow="details-first" initialAvailability={availability} />);
-  type(await screen.findByLabelText(/^Email/), 'a@b.co');
-  type(screen.getByLabelText(/^First Name/), 'Ada');
-  type(screen.getByLabelText(/^Last Name/), 'Lovelace');
+  await screen.findByLabelText(/^Email/);
+  fillIdentity();
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   // The calendar step: Back exists here (it never does on the form step).
   await screen.findByRole('button', { name: 'Back' });

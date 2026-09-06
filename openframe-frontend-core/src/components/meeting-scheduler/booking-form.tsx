@@ -49,8 +49,8 @@ export interface BookingFieldSlot {
   span?: BookingFieldSpan;
 }
 
-/** Columns out of four at `md` and up. */
-export type BookingFieldSpan = 1 | 2 | 3 | 4;
+/** Columns out of `GRID_COLUMNS` at `md` and up — the keys of `SPAN_CLASS`. */
+export type BookingFieldSpan = keyof typeof SPAN_CLASS;
 
 export type BookingFieldRow = BookingFieldSlot[];
 
@@ -84,22 +84,36 @@ const ROW_GRID = 'grid grid-cols-2 gap-x-[var(--spacing-system-m)] gap-y-[var(--
 /** The wire key of the host consent tick (stripped server-side, never sent to HubSpot). */
 const HOST_CONSENT_KEY = 'hostConsent';
 
+/** The row grid's column count at `md` and up. `ROW_GRID`'s `md:grid-cols-4`
+ *  and `SPAN_CLASS` are its Tailwind twins (literal so the scanner sees them). */
+const GRID_COLUMNS = 4;
+
 /** Static so Tailwind's scanner sees every class — a template built from a
  *  runtime span would compile to nothing. */
-const SPAN_CLASS: Record<BookingFieldSpan, string> = {
+const SPAN_CLASS = {
   1: 'md:col-span-1',
   2: 'md:col-span-2',
   3: 'md:col-span-3',
   4: 'md:col-span-4',
-};
+} as const;
+
+/** One field's skeleton: label + control footprint. */
+const FIELD_SKELETON_CLASS = 'h-[4.75rem] w-full';
 
 /** The even split of four columns over `count` slots; a remainder goes to the
  *  leading slots (three slots → 2/1/1), so a row never leaves a trailing gap. */
 export const evenSpan = (count: number, index: number): BookingFieldSpan => {
-  const base = Math.floor(4 / Math.max(1, count));
-  const extra = 4 - base * count;
-  return Math.min(4, Math.max(1, index < extra ? base + 1 : base)) as BookingFieldSpan;
+  const base = Math.floor(GRID_COLUMNS / Math.max(1, count));
+  const extra = GRID_COLUMNS - base * count;
+  return Math.min(GRID_COLUMNS, Math.max(1, index < extra ? base + 1 : base)) as BookingFieldSpan;
 };
+
+/** ONE column rule for a slot, read by the loaded form and its skeleton: a
+ *  two-field row stays side by side on a phone — the rule the built-in name pair
+ *  has always followed: two short fields cost one line instead of two on the
+ *  layout that can least afford them — and the span applies from `md`. */
+const slotColumnClass = (row: BookingFieldRow, slot: BookingFieldSlot, index: number): string =>
+  cn(row.length === 2 ? 'col-span-1' : 'col-span-2', SPAN_CLASS[slot.span ?? evenSpan(row.length, index)]);
 
 /** What one control needs: the field, its DOM id, where it registers in the
  *  form, and the form's own register/control. */
@@ -521,20 +535,10 @@ export function BookingForm({
           every form in the app. */}
       {fieldRows ? (
         <>
-          {placedRows.map((row, rowIndex) => (
-            <div key={row.map(s => s.name).join('|') || rowIndex} className={ROW_GRID}>
+          {placedRows.map(row => (
+            <div key={row.map(s => s.name).join('|')} className={ROW_GRID}>
               {row.map((slot, slotIndex) => (
-                <div
-                  key={slot.name}
-                  className={cn(
-                    // A two-field row stays side by side on a phone — the rule
-                    // the built-in name pair has always followed: two short
-                    // fields cost one line instead of two on the layout that can
-                    // least afford them.
-                    row.length === 2 ? 'col-span-1' : 'col-span-2',
-                    SPAN_CLASS[slot.span ?? evenSpan(row.length, slotIndex)],
-                  )}
-                >
+                <div key={slot.name} className={slotColumnClass(row, slot, slotIndex)}>
                   {slotNode(slot.name)}
                 </div>
               ))}
@@ -654,39 +658,54 @@ export function BookingForm({
  * this card. Same footprint discipline as its sibling: fixed heights, no shift
  * when the real form swaps in.
  */
-export function BookingFormSkeleton({ fieldRows }: { fieldRows?: BookingFieldRow[] }) {
+export function BookingFormSkeleton({ fieldRows, footerNote }: { fieldRows?: BookingFieldRow[]; footerNote?: string }) {
   return (
     <div className={cn('flex-1', FORM_STACK)}>
       {fieldRows ? (
-        // The host's rows, through the SAME grid + span rule as the loaded form.
-        fieldRows.map((row, rowIndex) => (
-          <div key={rowIndex} className={ROW_GRID}>
+        // The host's rows through the SAME grid + column rule as the loaded form,
+        // normalised the way the form normalises what it can know without the
+        // link: a name placed twice once, and the built-ins no row names appended.
+        // (Undeclared questions cannot be dropped here — declaring them is what
+        // the availability the skeleton stands in for will tell us.)
+        skeletonRows(fieldRows).map(row => (
+          <div key={row.map(s => s.name).join('|')} className={ROW_GRID}>
             {row.map((slot, slotIndex) => (
-              <Skeleton
-                key={slot.name}
-                className={cn(
-                  'h-[4.75rem] w-full',
-                  row.length === 2 ? 'col-span-1' : 'col-span-2',
-                  SPAN_CLASS[slot.span ?? evenSpan(row.length, slotIndex)],
-                )}
-              />
+              <Skeleton key={slot.name} className={cn(FIELD_SKELETON_CLASS, slotColumnClass(row, slot, slotIndex))} />
             ))}
           </div>
         ))
       ) : (
         <>
           <div className="grid grid-cols-1 gap-[var(--spacing-system-m)] md:grid-cols-2">
-            <Skeleton className="h-[4.75rem] w-full" />
-            <Skeleton className="h-[4.75rem] w-full" />
+            <Skeleton className={FIELD_SKELETON_CLASS} />
+            <Skeleton className={FIELD_SKELETON_CLASS} />
           </div>
-          <Skeleton className="h-[4.75rem] w-full" />
+          <Skeleton className={FIELD_SKELETON_CLASS} />
           <Skeleton className="h-[7.75rem] w-full" />
         </>
       )}
       <Skeleton className="h-[4.25rem] w-full" />
-      <div className="flex justify-end">
-        <Skeleton className="h-12 w-40" />
-      </div>
+      {footerNote ? (
+        // The details-first footer: note beside a 240px button, wrapping on a phone.
+        <div className="flex flex-wrap items-center justify-between gap-[var(--spacing-system-m)]">
+          <Skeleton className="h-5 min-w-40 flex-1" />
+          <Skeleton className="h-12 w-full md:w-60" />
+        </div>
+      ) : (
+        <div className="flex justify-end">
+          <Skeleton className="h-12 w-40" />
+        </div>
+      )}
     </div>
   );
+}
+
+/** The skeleton's half of the form's row normalisation — see `BookingFormSkeleton`. */
+function skeletonRows(fieldRows: BookingFieldRow[]): BookingFieldRow[] {
+  const seen = new Set<string>();
+  const rows = fieldRows
+    .map(row => row.filter(slot => !seen.has(slot.name) && Boolean(seen.add(slot.name))))
+    .filter(row => row.length > 0);
+  const unplacedBuiltIns = BUILT_IN_BOOKING_FIELDS.filter(f => !seen.has(f.name)).map(f => [{ name: f.name }]);
+  return [...rows, ...unplacedBuiltIns];
 }

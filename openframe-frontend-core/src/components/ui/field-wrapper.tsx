@@ -36,10 +36,10 @@ export interface FieldWrapperProps {
    */
   labelVariant?: 'default' | 'large';
   /**
-   * Marks the label with the `RequiredMark` `ContactForm` draws on its
-   * required fields, so a form
-   * mixing both never shows two conventions. Visual only — the CONTROL carries
-   * `required`/`aria-required` for assistive tech; the star is `aria-hidden`.
+   * Marks the label with the `RequiredMark` `ContactForm` draws on its required
+   * fields, so a form mixing both never shows two conventions. Visual only — the
+   * CONTROL carries `required`/`aria-required` for assistive tech; the star is
+   * `aria-hidden`.
    */
   required?: boolean;
   /** Additional className for the outer wrapper */

@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BookingForm,
@@ -7,7 +6,7 @@ import {
   type BookingFormConsent,
   evenSpan,
 } from '../components/meeting-scheduler/booking-form';
-import { availabilityWith } from './fixtures/meeting-booking';
+import { availabilityWith, bookingFormBaseProps, fillIdentity, typeInto } from './fixtures/meeting-booking';
 
 // The consent row's checkbox measures itself; jsdom has no ResizeObserver.
 class ResizeObserverStub {
@@ -26,7 +25,6 @@ const CONSENT_ERROR = 'Please agree to the Privacy Policy to continue.';
 const consent: BookingFormConsent = { label: 'I agree to the Privacy Policy', errorMessage: CONSENT_ERROR };
 
 type Submit = (payload: Record<string, unknown>) => Promise<void>;
-const type = (el: HTMLElement, value: string) => fireEvent.input(el, { target: { value } });
 
 function mount(props: {
   fieldRows?: BookingFieldRow[];
@@ -34,28 +32,9 @@ function mount(props: {
   initialValues?: Record<string, unknown>;
 }) {
   const onSubmit = vi.fn<Submit>(() => Promise.resolve());
-  render(
-    <BookingForm
-      availability={availability}
-      meetingId="1"
-      startTimeMs={1_700_000_000_000}
-      durationMs={1_800_000}
-      timezone="UTC"
-      isSubmitting={false}
-      onSubmit={onSubmit}
-      honeypotInputProps={{ ref: createRef<HTMLInputElement>(), name: 'form_extra_note' }}
-      getSignals={() => ({})}
-      {...props}
-    />,
-  );
+  render(<BookingForm {...bookingFormBaseProps()} availability={availability} onSubmit={onSubmit} {...props} />);
   return onSubmit;
 }
-
-const fillIdentity = () => {
-  type(screen.getByLabelText(/^Email/), 'a@b.co');
-  type(screen.getByLabelText(/^First Name/), 'Ada');
-  type(screen.getByLabelText(/^Last Name/), 'Lovelace');
-};
 
 describe('BookingForm — host fieldRows', () => {
   it('appends built-ins and declared questions no row names, so nothing required goes invisible', () => {
@@ -89,7 +68,7 @@ describe('BookingForm — host consent row', () => {
   it('refuses to submit unticked, names why, and carries the tick as hostConsent once ticked', async () => {
     const onSubmit = mount({ consent });
     fillIdentity();
-    type(screen.getByLabelText(/^Company Name/), 'Acme');
+    typeInto(screen.getByLabelText(/^Company Name/), 'Acme');
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
     expect(await screen.findByText(CONSENT_ERROR)).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();

@@ -186,6 +186,8 @@ const ACTION_PANEL_CLASS = 'flex-1 min-w-0 flex flex-col md:min-h-0 lg:p-[var(--
  * being cut off at the card's edge.
  */
 const PANEL_STEP_CLASS = 'p-[var(--spacing-system-l)] md:min-h-0 md:overflow-y-auto lg:p-0';
+/** A step's panel: the inset above on a column that fills the action side. */
+const STEP_PANEL_CLASS = cn('flex flex-1 flex-col', PANEL_STEP_CLASS);
 
 /**
  * The widget's height on desktop: a FIXED 380px, and the ONLY size the whole
@@ -254,6 +256,9 @@ export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]';
 export const MEETING_SCHEDULER_DETAILS_FIRST_H = 'md:h-[39.875rem]';
 
 export type SchedulerFlow = 'slot-first' | 'details-first';
+
+/** The flow every existing embed gets — the ONE spelling of the default. */
+export const DEFAULT_SCHEDULER_FLOW: SchedulerFlow = 'slot-first';
 
 /**
  * What differs between the two flows as DATA — first step, the box a host
@@ -334,7 +339,7 @@ const CARD_DEGRADED_CLASS = cn(
  * from {@link SCHEDULER_FLOW_PRESETS}, so the pairing is never re-derived.
  */
 export function SchedulerDegradedCard({
-  flow = 'slot-first',
+  flow = DEFAULT_SCHEDULER_FLOW,
   className,
   message,
   action,
@@ -385,7 +390,7 @@ export function HubSpotMeetingScheduler({
   onBack,
   onBooked,
   className,
-  flow = 'slot-first',
+  flow = DEFAULT_SCHEDULER_FLOW,
   detailsForm: DetailsForm = BookingForm,
   detailsFormProps,
 }: HubSpotMeetingSchedulerProps) {
@@ -665,6 +670,11 @@ export function HubSpotMeetingScheduler({
    * last-wins, so appending it after would make a host's own `h-*` unreachable,
    * which is the override the height-inside-CARD_CLASS arrangement allows today.
    */
+  /** The card's ONE back edge, per flow and step — the skeleton and the loaded
+   *  panel wire the same one, so a month load can never swap it for the host's
+   *  exit under a details-first visitor. */
+  const backEdge = detailsFirst ? (step === 'slot' ? backToDetails : onBack) : step === 'details' ? backToSlot : onBack;
+
   const cardClass = cn(CARD_CLASS, preset.height, formOnly && 'bg-ods-bg', className);
 
   /** One card SHAPE for every degraded return below. */
@@ -681,7 +691,7 @@ export function HubSpotMeetingScheduler({
     return (
       <div className={cardClass}>
         <div className={CARD_INNER_CLASS}>
-          {!formOnly && <ContextPanelSkeleton onBack={onBack} className={CONTEXT_PANEL_CLASS} />}
+          {!formOnly && <ContextPanelSkeleton onBack={backEdge} className={CONTEXT_PANEL_CLASS} />}
           <div className={ACTION_PANEL_CLASS}>
             {/* Both terms matter. Without `flow` this stays a calendar where
                 the form belongs; without the step term, paging a month AFTER
@@ -690,8 +700,8 @@ export function HubSpotMeetingScheduler({
             {detailsFirst && step === 'details' ? (
               // The SAME wrapper the loaded form gets, so the skeleton never
               // states its own inset.
-              <div className={cn('flex flex-1 flex-col', PANEL_STEP_CLASS)}>
-                <BookingFormSkeleton fieldRows={detailsFormProps?.fieldRows} />
+              <div className={STEP_PANEL_CLASS}>
+                <BookingFormSkeleton fieldRows={detailsFormProps?.fieldRows} footerNote={preset.footerNote} />
               </div>
             ) : (
               <SlotPickerSkeleton monthOffset={monthOffset} />
@@ -742,9 +752,7 @@ export function HubSpotMeetingScheduler({
             // details-first inverts the mapping: Back at `slot` returns to the
             // form. At `details` the form-only layout mounts no panel, so a host
             // exit is not rendered there (the page around the card is the exit).
-            onBack={
-              detailsFirst ? (step === 'slot' ? backToDetails : onBack) : step === 'details' ? backToSlot : onBack
-            }
+            onBack={backEdge}
             // `locked` HIDES the selectors (post-selection steps); `disabled`
             // keeps them mounted but inert. details-first needs the second while
             // a POST is in flight: a mid-flight change would clear the slot
@@ -765,17 +773,19 @@ export function HubSpotMeetingScheduler({
             default `min-height:auto` refuses to shrink below its content. */}
         <div className={ACTION_PANEL_CLASS}>
           {step === 'confirmed' && confirmation && timezone ? (
-            <div className={cn('flex flex-1 flex-col', PANEL_STEP_CLASS)}>
+            <div className={STEP_PANEL_CLASS}>
               <Confirmation confirmation={confirmation} timezone={timezone} />
             </div>
           ) : step === 'details' &&
             (detailsFirst
               ? // The form is step ONE here: no slot yet, and `timezone` is null
                 // on the server render, so neither may gate the PANEL. A link
-                // publishing no durations has no form worth showing.
-                durations.length > 0
+                // publishing no durations has no form worth showing — but while a
+                // refetch is in flight the form stays (a calendar skeleton is
+                // the wrong shape here).
+                durations.length > 0 || isFetchingAvailability
               : durationMs != null && selectedSlot != null && timezone) ? (
-            <div className={cn('flex flex-1 flex-col gap-[var(--spacing-system-m)]', PANEL_STEP_CLASS)}>
+            <div className={cn(STEP_PANEL_CLASS, 'gap-[var(--spacing-system-m)]')}>
               {/* Top-aligned, and no back edge of its own: the ONE back edge
                   lives in the context panel at every step (the `onBack` wired on `SchedulerContextPanel`),
                   which is where the design puts it and the only spot that

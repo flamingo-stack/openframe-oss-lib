@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 /**
  * Meeting-booking wire contracts + validation factory.
  *
