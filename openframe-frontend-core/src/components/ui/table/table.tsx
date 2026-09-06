@@ -105,6 +105,8 @@ export function Table<T = TableRowData>({
   skeletonRows = 10,
   minRows,
   emptyState,
+  keepHeightWhenEmpty,
+  emptyDescription,
   className,
   containerClassName,
   headerClassName,
@@ -137,6 +139,14 @@ export function Table<T = TableRowData>({
   // ONLY when `animateRowReorder` is set, so the default table stays motion-free.
   const tableMotion = useTableMotion(Boolean(animateRowReorder));
   const columnsWithActions = injectSyntheticColumns(columns, rowActions, renderRowActions, rowHref, actionsColumnWidth);
+
+  // ONE resolution of the two vocabularies, so the render below never asks
+  // which spelling the caller used. `minRows` is the current one; the two
+  // deprecated props shipped a release earlier and hosts pin exact versions,
+  // so they keep working rather than silently doing nothing.
+  const reservedRows = minRows ?? (keepHeightWhenEmpty ? skeletonRows : undefined);
+  const resolvedEmptyState =
+    emptyState ?? (emptyDescription ? { title: emptyMessage, description: emptyDescription } : undefined);
   const getRowHref = (item: T): string | undefined => {
     if (onRowClick || !rowHref) return undefined;
     return rowHref(item) ?? undefined;
@@ -277,16 +287,16 @@ export function Table<T = TableRowData>({
              everything under it jump the moment a filter matches nothing. So
              reserve the same slots and centre the empty state over them,
              identically to `DataTableBody`. */
-          minRows ? (
+          reservedRows ? (
             <ReservedEmptyState
-              count={minRows}
+              count={reservedRows}
               gapClassName="gap-2"
               innerHeightClassName={compact ? COMPACT_ROW_MIN_HEIGHT : undefined}
             >
-              <TableEmptyState message={emptyMessage} emptyState={emptyState} />
+              <TableEmptyState message={emptyMessage} emptyState={resolvedEmptyState} />
             </ReservedEmptyState>
           ) : (
-            <TableEmptyState message={emptyMessage} emptyState={emptyState} />
+            <TableEmptyState message={emptyMessage} emptyState={resolvedEmptyState} />
           )
         ) : (
           <>
@@ -335,7 +345,7 @@ export function Table<T = TableRowData>({
                 in, else the legacy pad-to-`skeletonRows`. */}
             {!infiniteScroll && (
               <PlaceholderRows
-                count={Math.max(0, (minRows ?? skeletonRows) - data.length)}
+                count={Math.max(0, (reservedRows ?? skeletonRows) - data.length)}
                 innerHeightClassName={compact ? COMPACT_ROW_MIN_HEIGHT : undefined}
               />
             )}

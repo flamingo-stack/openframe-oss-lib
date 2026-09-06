@@ -119,6 +119,23 @@ export interface TableProps<T = TableRowData> {
    *  a title is all you need, `emptyState` when you also want a description,
    *  icon or action — never both. */
   emptyState?: NoDataProps;
+  /**
+   * @deprecated Pass `minRows` (the page size) instead — one vocabulary with
+   * `DataTable`.
+   *
+   * Kept working, not removed: it shipped in 0.0.597 and hosts pin an exact
+   * version, so deleting it would make every consumer on that release silently
+   * lose its reserved height with nothing failing loudly. Treated as
+   * `minRows = skeletonRows`, which is what every call site meant by it.
+   */
+  keepHeightWhenEmpty?: boolean;
+  /**
+   * @deprecated Pass `emptyState={{ title, description }}` instead.
+   *
+   * Kept working for the same reason as `keepHeightWhenEmpty`. Merged UNDER an
+   * explicit `emptyState`, so a caller passing both gets the newer one.
+   */
+  emptyDescription?: string;
 
   // Styling
   className?: string;
