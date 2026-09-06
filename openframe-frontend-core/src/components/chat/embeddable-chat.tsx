@@ -1975,7 +1975,19 @@ function EmbeddableChatInner({
   // in the fill column (navigation is via re-expanding the rail), NOT the list.
   // Requires no open conversation, no archive, and not composing (the composer
   // lives on the compose view).
-  const stackedListView = isMingoMode && !hasConversation && !archiveOpen && !wideMingo && !composeOpen;
+  // …but a managed GUIDE panel with NOTHING to list skips straight to the
+  // welcome + composer: a first-time visitor to a marketing site must not have
+  // to tap through an empty "Current Chats" screen to ask a question. Only
+  // once they have history does the list become the landing view. Gated on the
+  // first page having loaded so it doesn't flash the welcome mid-load.
+  const guideListIsEmpty =
+    activeMode === 'guide' &&
+    dialogsManaged === true &&
+    dialogs.length === 0 &&
+    !dialogsInitialLoading &&
+    !mingoCaps.searchQuery;
+  const stackedListView =
+    isMingoMode && !hasConversation && !archiveOpen && !wideMingo && !composeOpen && !guideListIsEmpty;
 
   // Shared header derivations — consumed by the stacked `ChatPanelHeader`, its
   // mobile fallback, and the desktop split header's right cell, so the title /

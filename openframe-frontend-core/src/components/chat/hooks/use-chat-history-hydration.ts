@@ -94,6 +94,7 @@ export function useChatHistoryHydration({
     if (hydratedKeyRef.current === key) return () => setIsHydratingHistory(false);
     hydratedKeyRef.current = key;
     let cancelled = false;
+    let completed = false;
     const runId = ++runIdRef.current;
     const isCurrentRun = () => runIdRef.current === runId;
     setIsHydratingHistory(true);
@@ -169,12 +170,19 @@ export function useChatHistoryHydration({
         // (a transient 429/5xx must not mark it hydrated for the mount).
         if (hydratedKeyRef.current === key) hydratedKeyRef.current = null;
       } finally {
+        completed = true;
         // Only the latest run owns the flag (React no-ops updates after unmount).
         if (isCurrentRun()) setIsHydratingHistory(false);
       }
     })();
     return () => {
       cancelled = true;
+      // An INCOMPLETE run must hand the key back, or a re-run for the SAME key
+      // (a mode toggle flipping `active`, a StrictMode remount) early-returns
+      // on the guard, drops the in-flight response and never refetches — the
+      // thread would render empty for the rest of the mount while the server
+      // keeps answering from history the user cannot see.
+      if (!completed && hydratedKeyRef.current === key) hydratedKeyRef.current = null;
       // Release the skeleton unless a newer run has already claimed it (that
       // run raises the flag itself and owns clearing it).
       if (isCurrentRun()) setIsHydratingHistory(false);

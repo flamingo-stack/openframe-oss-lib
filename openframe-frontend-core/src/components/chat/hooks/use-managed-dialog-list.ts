@@ -109,6 +109,9 @@ export function useManagedDialogList({
   const [dialogsNextCursor, setDialogsNextCursor] = useState<string | null>(null);
   const [isDialogsLoading, setIsDialogsLoading] = useState<boolean>(false);
   const [isDialogsPending, setIsDialogsPending] = useState<boolean>(false);
+  // Synchronous mirror: `loadMoreDialogs` must see a page-1 load dispatched in
+  // the SAME tick, which the state value (a stale render closure) would miss.
+  const pendingRef = useRef(false);
   const [dialogsError, setDialogsError] = useState<boolean>(false);
 
   // Latest-list mirror for the optimistic mutations: the rollback title must
@@ -143,6 +146,7 @@ export function useManagedDialogList({
       if (!fetchDialogs) return;
       const requestId = ++requestIdRef.current;
       const isCurrent = () => requestIdRef.current === requestId;
+      pendingRef.current = true;
       setIsDialogsPending(true);
       let skeletonTimer: ReturnType<typeof setTimeout> | undefined;
       if (cursor === undefined && skeletonDelayMs > 0) {
@@ -189,6 +193,7 @@ export function useManagedDialogList({
         if (skeletonTimer) clearTimeout(skeletonTimer);
         // Only the latest request owns the shared flags.
         if (isCurrent()) {
+          pendingRef.current = false;
           setIsDialogsLoading(false);
           setIsDialogsPending(false);
         }
@@ -283,9 +288,9 @@ export function useManagedDialogList({
     // A page-1 reload in flight will REPLACE the list and the cursor, so an
     // append started now would land on a list that no longer exists, using a
     // stale cursor. Skip it; the reload's own result is the fresh page 1.
-    if (isDialogsPending) return;
+    if (pendingRef.current) return;
     await loadDialogsPage(dialogsNextCursor);
-  }, [dialogsNextCursor, isDialogsPending, loadDialogsPage]);
+  }, [dialogsNextCursor, loadDialogsPage]);
 
   const upsertDialogTop = useCallback((item: DialogItem) => {
     setDialogs(prev => [item, ...prev.filter(d => d.id !== item.id)]);
