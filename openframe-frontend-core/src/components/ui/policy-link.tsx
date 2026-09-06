@@ -8,7 +8,7 @@ export function PolicyLink({ href, children }: { href: string; children: ReactNo
   return (
     <a
       href={href}
-      className="text-ods-accent underline"
+      className="text-ods-accent underline underline-offset-2 hover:text-ods-accent/80"
       target="_blank"
       rel="noopener noreferrer"
       onClick={e => e.stopPropagation()}

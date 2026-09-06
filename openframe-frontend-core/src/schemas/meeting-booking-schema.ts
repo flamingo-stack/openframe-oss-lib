@@ -1,8 +1,4 @@
 import { z } from 'zod';
-
-/** The slot's wire validators — ONE declaration for the strict and the deferred schema. */
-const SLOT_INSTANT = z.number().int().positive();
-const TIMEZONE = z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' });
 /**
  * Meeting-booking wire contracts + validation factory.
  *
@@ -448,6 +444,10 @@ function buildBookingSchema<TStart extends z.ZodTypeAny, TDuration extends z.Zod
       })
   );
 }
+
+/** The slot's wire validators — ONE declaration for the strict and the deferred schema. */
+const SLOT_INSTANT = z.number().int().positive();
+const TIMEZONE = z.string().refine(isValidIanaTimezone, { message: 'Invalid timezone' });
 
 /**
  * The STRICT schema — the wire contract. The server rebuilds it from the link's

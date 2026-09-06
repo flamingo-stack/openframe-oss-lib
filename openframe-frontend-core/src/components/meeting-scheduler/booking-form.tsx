@@ -73,14 +73,19 @@ export interface BookingFormConsent {
   errorMessage?: string;
 }
 
-/** Static so Tailwind's scanner sees every class — a template built from a
- *  runtime span would compile to nothing. */
 /** The form's vertical rhythm — one stack for the loaded form and its skeleton. */
 const FORM_STACK = 'flex flex-col gap-[var(--spacing-system-l)]';
+
+/** The row grid: two columns on a phone, four from `md`. The row gap is one step
+ *  wider than the column gap because field messages hang ~16px below their
+ *  control and would print over the next row's label at the column gap. */
+const ROW_GRID = 'grid grid-cols-2 gap-x-[var(--spacing-system-m)] gap-y-[var(--spacing-system-lf)] md:grid-cols-4';
 
 /** The wire key of the host consent tick (stripped server-side, never sent to HubSpot). */
 const HOST_CONSENT_KEY = 'hostConsent';
 
+/** Static so Tailwind's scanner sees every class — a template built from a
+ *  runtime span would compile to nothing. */
 const SPAN_CLASS: Record<BookingFieldSpan, string> = {
   1: 'md:col-span-1',
   2: 'md:col-span-2',
@@ -96,21 +101,6 @@ const evenSpan = (count: number, index: number): BookingFieldSpan => {
   return Math.min(4, Math.max(1, index < extra ? base + 1 : base)) as BookingFieldSpan;
 };
 
-/**
- * BookingForm — attendee details + the link's declared custom questions +
- * verbatim legal-consent copy. ContactForm's scaffolding (react-hook-form +
- * zodResolver + lib field primitives); a sibling rather than a `<ContactForm>`
- * configuration because of the dynamic HubSpot `formFields`, the per-checkbox
- * consent model, and the first/last-name field model — none expressible via
- * `hideFields`/`extraTopField`.
- *
- * Bot protection is LOAD-BEARING: without the humanity signals in the body,
- * the host's `verifyHuman` degrades to first-party-only BotID (fails open for
- * external embedders). Honeypot + elapsed-ms are merged into the POST at
- * submit; the parent calls `resetSignals()` after a SLOT_TAKEN refetch so a
- * legitimate retry isn't flagged too-fast.
- */
-
 /** What one control needs: the field, its DOM id, where it registers in the
  *  form, and the form's own register/control. */
 interface ControlArgs {
@@ -123,13 +113,6 @@ interface ControlArgs {
   register: UseFormRegister<BookingFormValues>;
   control: Control<BookingFormValues>;
 }
-
-// Field chrome follows ContactForm (`contact/contact-form.tsx`), tokenised —
-// the booking form must be indistinguishable from every other form in the app.
-const INPUT_CLASS =
-  'bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-[var(--spacing-system-sf)] h-11 md:h-12';
-const TEXTAREA_CLASS =
-  'border-ods-border bg-ods-card px-[var(--spacing-system-sf)] text-ods-text-primary placeholder-ods-text-secondary';
 
 /** A built-in carries its own placeholder; a declared question gets the one its
  *  TYPE derives (the registry's `placeholder`), so no copy lives here. */
@@ -168,7 +151,6 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       aria-invalid={Boolean(error)}
       autoComplete={field.autoComplete}
       placeholder={placeholderFor(field)}
-      className={INPUT_CLASS}
       {...register(registerName as never)}
     />
   ),
@@ -178,7 +160,6 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       required={field.required}
       aria-invalid={Boolean(error)}
       placeholder={placeholderFor(field)}
-      className={TEXTAREA_CLASS}
       {...register(registerName as never)}
     />
   ),
@@ -190,7 +171,6 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       step="any"
       required={field.required}
       aria-invalid={Boolean(error)}
-      className={INPUT_CLASS}
       {...register(registerName as never, { setValueAs: canonicalNumber })}
     />
   ),
@@ -300,6 +280,20 @@ export interface BookingFormProps {
   getSignals: () => Record<string, string | number>;
 }
 
+/**
+ * BookingForm — attendee details + the link's declared custom questions +
+ * verbatim legal-consent copy. ContactForm's scaffolding (react-hook-form +
+ * zodResolver + lib field primitives); a sibling rather than a `<ContactForm>`
+ * configuration because of the dynamic HubSpot `formFields`, the per-checkbox
+ * consent model, and the first/last-name field model — none expressible via
+ * `hideFields`/`extraTopField`.
+ *
+ * Bot protection is LOAD-BEARING: without the humanity signals in the body,
+ * the host's `verifyHuman` degrades to first-party-only BotID (fails open for
+ * external embedders). Honeypot + elapsed-ms are merged into the POST at
+ * submit; the parent calls `resetSignals()` after a SLOT_TAKEN refetch so a
+ * legitimate retry isn't flagged too-fast.
+ */
 export function BookingForm({
   availability,
   meetingId,
@@ -424,13 +418,6 @@ export function BookingForm({
     return err?.message;
   };
 
-  // One step ABOVE the `spacing system/m` the design names (16/24 instead of
-  // 12/16), because the field messages hang out of flow: they need ~16px on a
-  // phone and ~20 on desktop of clear space under the control, and `m` leaves
-  // 12/16 — four pixels short at both ends, so an error would print over the
-  // next field's label. The design has no error state drawn; this is the
-  // smallest ODS step that houses it.
-
   /** ONE render path for every field — built-in or declared — so the default
    *  order below and any host-supplied `fieldRows` compose the same controls. */
   const renderField = (
@@ -492,7 +479,12 @@ export function BookingForm({
    *  field. */
   const seen = new Set<string>();
   const placedRows = (fieldRows ?? [])
-    .map(row => row.filter(slot => slotResolves(slot.name) && !seen.has(slot.name) && Boolean(seen.add(slot.name))))
+    .map(row => {
+      const kept = row.filter(slot => slotResolves(slot.name) && !seen.has(slot.name) && Boolean(seen.add(slot.name)));
+      // Explicit spans were written for the FULL row; once a slot drops out they
+      // would leave a trailing gap, so a shortened row falls back to the even split.
+      return kept.length === row.length ? kept : kept.map((slot): BookingFieldSlot => ({ name: slot.name }));
+    })
     .filter(row => row.length > 0);
 
   const submitButton = (
@@ -530,13 +522,7 @@ export function BookingForm({
       {fieldRows ? (
         <>
           {placedRows.map((row, rowIndex) => (
-            <div
-              key={row.map(s => s.name).join('|') || rowIndex}
-              // Row gap one step wider than the column gap: field messages hang
-              // ~16px below their control and would print over the next row's
-              // label at the column gap.
-              className="grid grid-cols-2 gap-x-[var(--spacing-system-m)] gap-y-[var(--spacing-system-lf)] md:grid-cols-4"
-            >
+            <div key={row.map(s => s.name).join('|') || rowIndex} className={ROW_GRID}>
               {row.map((slot, slotIndex) => (
                 <div
                   key={slot.name}
@@ -554,11 +540,8 @@ export function BookingForm({
               ))}
             </div>
           ))}
-          {unplacedBuiltIns.map(field => (
-            <Fragment key={field.name}>{builtInFields[field.name]}</Fragment>
-          ))}
-          {unplacedFields.map(field => (
-            <Fragment key={field.name}>{renderDeclaredField(field)}</Fragment>
+          {[...unplacedBuiltIns, ...unplacedFields].map(field => (
+            <Fragment key={field.name}>{slotNode(field.name)}</Fragment>
           ))}
         </>
       ) : (
@@ -651,7 +634,7 @@ export function BookingForm({
           the bare `flex` row it has always been, or the submit slides from the
           left edge to the right on every existing slot-first booking. */}
       {footerNote ? (
-        <div className="flex items-center justify-between gap-[var(--spacing-system-m)]">
+        <div className="flex flex-wrap items-center justify-between gap-[var(--spacing-system-m)]">
           <p className="text-ods-text-secondary text-h6">{footerNote}</p>
           {submitButton}
         </div>
@@ -671,15 +654,35 @@ export function BookingForm({
  * this card. Same footprint discipline as its sibling: fixed heights, no shift
  * when the real form swaps in.
  */
-export function BookingFormSkeleton() {
+export function BookingFormSkeleton({ fieldRows }: { fieldRows?: BookingFieldRow[] }) {
   return (
     <div className={cn('flex-1', FORM_STACK)}>
-      <div className="grid grid-cols-1 gap-[var(--spacing-system-m)] md:grid-cols-2">
-        <Skeleton className="h-[4.75rem] w-full" />
-        <Skeleton className="h-[4.75rem] w-full" />
-      </div>
-      <Skeleton className="h-[4.75rem] w-full" />
-      <Skeleton className="h-[7.75rem] w-full" />
+      {fieldRows ? (
+        // The host's rows, through the SAME grid + span rule as the loaded form.
+        fieldRows.map((row, rowIndex) => (
+          <div key={rowIndex} className={ROW_GRID}>
+            {row.map((slot, slotIndex) => (
+              <Skeleton
+                key={slot.name}
+                className={cn(
+                  'h-[4.75rem] w-full',
+                  row.length === 2 ? 'col-span-1' : 'col-span-2',
+                  SPAN_CLASS[slot.span ?? evenSpan(row.length, slotIndex)],
+                )}
+              />
+            ))}
+          </div>
+        ))
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-[var(--spacing-system-m)] md:grid-cols-2">
+            <Skeleton className="h-[4.75rem] w-full" />
+            <Skeleton className="h-[4.75rem] w-full" />
+          </div>
+          <Skeleton className="h-[4.75rem] w-full" />
+          <Skeleton className="h-[7.75rem] w-full" />
+        </>
+      )}
       <Skeleton className="h-[4.25rem] w-full" />
       <div className="flex justify-end">
         <Skeleton className="h-12 w-40" />

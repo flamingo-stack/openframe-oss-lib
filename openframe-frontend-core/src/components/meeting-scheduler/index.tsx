@@ -249,8 +249,7 @@ export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]';
  * tablet and desktop, and the calendar stage fits the same box at both — the
  * times column scrolls inside it as it always has.
  *
- * A host reserving the box for a details-first card reserves THIS, not the
- * constant above.
+ * Hosts read it through `SCHEDULER_FLOW_PRESETS[flow].height`, never directly.
  */
 export const MEETING_SCHEDULER_DETAILS_FIRST_H = 'md:h-[39.875rem]';
 
@@ -265,9 +264,9 @@ export type SchedulerFlow = 'slot-first' | 'details-first';
  */
 export const SCHEDULER_FLOW_PRESETS: Record<
   SchedulerFlow,
-  { initialStep: Exclude<Step, 'confirmed'>; height: string; submitLabel?: string; footerNote?: string }
+  { initialStep: Exclude<Step, 'confirmed'>; height: string; submitLabel: string; footerNote?: string }
 > = {
-  'slot-first': { initialStep: 'slot', height: MEETING_SCHEDULER_H },
+  'slot-first': { initialStep: 'slot', height: MEETING_SCHEDULER_H, submitLabel: 'Confirm Booking' },
   'details-first': {
     initialStep: 'details',
     height: MEETING_SCHEDULER_DETAILS_FIRST_H,
@@ -422,6 +421,12 @@ export function HubSpotMeetingScheduler({
   const [stash, setStash] = useState<StashedDetails | null>(null);
   /** Synchronous in-flight lock for the details-first slot click — see `onSelectSlot`. */
   const inFlightRef = useRef(false);
+  /** details-first: a slot's POST is in flight. The ref covers the frame before
+   *  `isSubmitting` renders true, so every guard reads both. */
+  const postInFlight = useCallback(
+    () => detailsFirst && (isSubmitting || inFlightRef.current),
+    [detailsFirst, isSubmitting],
+  );
 
   /**
    * details-first step ONE is the form and nothing else — the mock
@@ -519,12 +524,14 @@ export function HubSpotMeetingScheduler({
       durationMs != null &&
       slots.length === 0 &&
       availability.hasMore &&
-      autoAdvanceCount.current < 3
+      autoAdvanceCount.current < 3 &&
+      // Not while a chip's POST is in flight — paging would unmount it.
+      !postInFlight()
     ) {
       autoAdvanceCount.current += 1;
       setMonthOffset(monthOffset + 1);
     }
-  }, [step, availability, isFetchingAvailability, durationMs, slots, monthOffset, setMonthOffset]);
+  }, [step, availability, isFetchingAvailability, durationMs, slots, monthOffset, setMonthOffset, postInFlight]);
 
   /** The back edge's destination from the form: the calendar, with any
    *  submit error cleared so the visitor doesn't carry it back. */
@@ -648,10 +655,6 @@ export function HubSpotMeetingScheduler({
    */
   const cardClass = cn(CARD_CLASS, preset.height, formOnly && 'bg-ods-bg', className);
 
-  /** details-first: a slot's POST is in flight. The ref covers the frame before
-   *  `isSubmitting` renders true, so every guard reads both. */
-  const postInFlight = () => detailsFirst && (isSubmitting || inFlightRef.current);
-
   /** One card SHAPE for every degraded return below. */
   const degraded = (message: string) => (
     <SchedulerDegradedCard flow={flow} className={className}>
@@ -679,7 +682,7 @@ export function HubSpotMeetingScheduler({
               // The SAME wrapper the loaded form gets, so the skeleton never
               // states its own inset.
               <div className={cn('flex flex-1 flex-col', PANEL_STEP_CLASS)}>
-                <BookingFormSkeleton />
+                <BookingFormSkeleton fieldRows={detailsFormProps?.fieldRows} />
               </div>
             ) : (
               <SlotPickerSkeleton monthOffset={monthOffset} />
@@ -727,17 +730,19 @@ export function HubSpotMeetingScheduler({
             // host gave us an exit at all). Two Backs on screen reading the same
             // word with different destinations was the ambiguity the details
             // step used to carry.
-            // details-first inverts the mapping: the form is step ONE, so Back at
-            // `details` is the host's exit and Back at `slot` returns to the form.
+            // details-first inverts the mapping: Back at `slot` returns to the
+            // form. At `details` the form-only layout mounts no panel, so a host
+            // exit is not rendered there (the page around the card is the exit).
             onBack={
               detailsFirst ? (step === 'slot' ? backToDetails : onBack) : step === 'details' ? backToSlot : onBack
             }
-            // In details-first the duration/zone selectors stay live while the
-            // form is filled — but must freeze once a POST is in flight, or a
-            // mid-flight change clears the slot under the spinner while the body
-            // already built carries the old duration (the panel disables both
-            // the chips and the zone control on `locked`).
-            locked={detailsFirst ? step === 'confirmed' || isSubmitting : step !== 'slot'}
+            // `locked` HIDES the selectors (post-selection steps); `disabled`
+            // keeps them mounted but inert. details-first needs the second while
+            // a POST is in flight: a mid-flight change would clear the slot
+            // under the spinner while the body already built carries the old
+            // duration — and unmounting the row would shift the grid under it.
+            locked={detailsFirst ? step === 'confirmed' : step !== 'slot'}
+            disabled={detailsFirst && isSubmitting}
             // The zone still governs every time on screen — including the
             // summary line on the form — so the picker stays until there is
             // nothing left to re-read in it.

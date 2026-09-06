@@ -33,8 +33,13 @@ export const SCHEDULING_SLUG_SHAPE = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/;
 export const MAX_MONTH_OFFSET = 11;
 
 /** Full-slug shape validity (path-resolution safety only — never semantics). */
+/** The one spelling of slug normalisation — every map key and lookup goes through it. */
+export function normalizeSchedulingSlug(slug: string): string {
+  return slug.trim().toLowerCase();
+}
+
 export function isValidSchedulingSlug(slug: string): boolean {
-  return SCHEDULING_SLUG_SHAPE.test(slug.trim().toLowerCase());
+  return SCHEDULING_SLUG_SHAPE.test(normalizeSchedulingSlug(slug));
 }
 
 export interface ParsedSchedulingLinkName {
