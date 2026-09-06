@@ -1,12 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import {
-  BookingForm,
-  type BookingFieldRow,
-  type BookingFormConsent,
-  evenSpan,
-} from '../components/meeting-scheduler/booking-form';
-import { availabilityWith, bookingFormBaseProps, fillIdentity, typeInto } from './fixtures/meeting-booking';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { type BookingFormConsent, evenSpan } from '../components/meeting-scheduler/booking-form';
+import { availabilityWith, fillIdentity, mountBookingForm, typeInto } from './fixtures/meeting-booking';
 
 // The consent row's checkbox measures itself; jsdom has no ResizeObserver.
 class ResizeObserverStub {
@@ -24,28 +19,16 @@ const availability = availabilityWith([
 const CONSENT_ERROR = 'Please agree to the Privacy Policy to continue.';
 const consent: BookingFormConsent = { label: 'I agree to the Privacy Policy', errorMessage: CONSENT_ERROR };
 
-type Submit = (payload: Record<string, unknown>) => Promise<void>;
-
-function mount(props: {
-  fieldRows?: BookingFieldRow[];
-  consent?: BookingFormConsent;
-  initialValues?: Record<string, unknown>;
-}) {
-  const onSubmit = vi.fn<Submit>(() => Promise.resolve());
-  render(<BookingForm {...bookingFormBaseProps()} availability={availability} onSubmit={onSubmit} {...props} />);
-  return onSubmit;
-}
-
 describe('BookingForm — host fieldRows', () => {
   it('appends built-ins and declared questions no row names, so nothing required goes invisible', () => {
-    mount({ fieldRows: [[{ name: 'firstName' }], [{ name: 'company' }]] });
+    mountBookingForm(availability, { fieldRows: [[{ name: 'firstName' }], [{ name: 'company' }]] });
     expect(screen.getByLabelText(/^Last Name/)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Email/)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Job Title/)).toBeInTheDocument();
   });
 
   it('renders a name placed twice once and drops a row that resolves to nothing', () => {
-    mount({
+    mountBookingForm(availability, {
       fieldRows: [
         [{ name: 'email' }, { name: 'email' }],
         [{ name: 'not_declared_yet' }],
@@ -66,7 +49,7 @@ describe('BookingForm — host fieldRows', () => {
 
 describe('BookingForm — host consent row', () => {
   it('refuses to submit unticked, names why, and carries the tick as hostConsent once ticked', async () => {
-    const onSubmit = mount({ consent });
+    const onSubmit = mountBookingForm(availability, { consent });
     fillIdentity();
     typeInto(screen.getByLabelText(/^Company Name/), 'Acme');
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
@@ -80,7 +63,7 @@ describe('BookingForm — host consent row', () => {
   });
 
   it('restores the tick from initialValues (the details-first stash) on a remount', () => {
-    mount({ consent, initialValues: { hostConsent: true } });
+    mountBookingForm(availability, { consent, initialValues: { hostConsent: true } });
     expect(screen.getByRole('checkbox', { name: /I agree to the Privacy Policy/ })).toHaveAttribute(
       'aria-checked',
       'true',

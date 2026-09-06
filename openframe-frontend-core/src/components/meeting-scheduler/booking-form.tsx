@@ -100,6 +100,19 @@ const SPAN_CLASS = {
 /** One field's skeleton: label + control footprint. */
 const FIELD_SKELETON_CLASS = 'h-[4.75rem] w-full';
 
+/** The submit copy every standalone `BookingForm` gets; the slot-first preset reads the same constant. */
+export const DEFAULT_SUBMIT_LABEL = 'Confirm Booking';
+
+/** The footer with a note (details-first): note beside the button, wrapping on a phone. */
+const FOOTER_ROW_CLASS = 'flex flex-wrap items-center justify-between gap-[var(--spacing-system-m)]';
+/** The bare footer: the button stays LEFT, where the form's reading order ends. */
+const FOOTER_BARE_CLASS = 'flex';
+/** The submit's width when a note sits beside it. */
+const SUBMIT_WIDE_CLASS = 'md:w-60';
+
+/** The built-in layout when a host passes no rows — what the skeleton draws for it. */
+const DEFAULT_FIELD_ROWS: BookingFieldRow[] = [[{ name: 'email' }], [{ name: 'firstName' }, { name: 'lastName' }]];
+
 /** The even split of four columns over `count` slots; a remainder goes to the
  *  leading slots (three slots → 2/1/1), so a row never leaves a trailing gap. */
 export const evenSpan = (count: number, index: number): BookingFieldSpan => {
@@ -482,24 +495,8 @@ export function BookingForm({
    *  HubSpot nor a built-in the layout forgot can go invisible: the schema still
    *  requires the identity trio, and a required field with no control is a
    *  submit that dies silently. */
-  const placedNames = new Set((fieldRows ?? []).flat().map(slot => slot.name));
-  const unplacedBuiltIns = fieldRows ? BUILT_IN_BOOKING_FIELDS.filter(f => !placedNames.has(f.name)) : [];
+  const { rows: placedRows, unplacedBuiltIns, named: placedNames } = normalizeFieldRows(fieldRows ?? [], slotResolves);
   const unplacedFields = fieldRows ? supportedFields.filter(f => !placedNames.has(f.name)) : [];
-
-  /** Rows whose every slot names a question the link has not declared are
-   *  DROPPED, not rendered empty: an empty grid still eats one form gap, so a
-   *  layout written ahead of the HubSpot config would print blank bands. A name
-   *  placed twice renders once (its first slot) — one registered control per
-   *  field. */
-  const seen = new Set<string>();
-  const placedRows = (fieldRows ?? [])
-    .map(row => {
-      const kept = row.filter(slot => slotResolves(slot.name) && !seen.has(slot.name) && Boolean(seen.add(slot.name)));
-      // Explicit spans were written for the FULL row; once a slot drops out they
-      // would leave a trailing gap, so a shortened row falls back to the even split.
-      return kept.length === row.length ? kept : kept.map((slot): BookingFieldSlot => ({ name: slot.name }));
-    })
-    .filter(row => row.length > 0);
 
   const submitButton = (
     <Button
@@ -509,9 +506,9 @@ export function BookingForm({
       // The details-first footer draws a 240px action beside its note
       // (`4904:117335`); the bare slot-first row keeps the button at its natural
       // width, as it always has.
-      className={footerNote ? 'md:w-60' : undefined}
+      className={footerNote ? SUBMIT_WIDE_CLASS : undefined}
     >
-      {submitLabel ?? 'Confirm Booking'}
+      {submitLabel ?? DEFAULT_SUBMIT_LABEL}
     </Button>
   );
 
@@ -638,12 +635,12 @@ export function BookingForm({
           the bare `flex` row it has always been, or the submit slides from the
           left edge to the right on every existing slot-first booking. */}
       {footerNote ? (
-        <div className="flex flex-wrap items-center justify-between gap-[var(--spacing-system-m)]">
+        <div className={FOOTER_ROW_CLASS}>
           <p className="text-ods-text-secondary text-h6">{footerNote}</p>
           {submitButton}
         </div>
       ) : (
-        <div className="flex">{submitButton}</div>
+        <div className={FOOTER_BARE_CLASS}>{submitButton}</div>
       )}
     </form>
   );
@@ -661,38 +658,25 @@ export function BookingForm({
 export function BookingFormSkeleton({ fieldRows, footerNote }: { fieldRows?: BookingFieldRow[]; footerNote?: string }) {
   return (
     <div className={cn('flex-1', FORM_STACK)}>
-      {fieldRows ? (
-        // The host's rows through the SAME grid + column rule as the loaded form,
-        // normalised the way the form normalises what it can know without the
-        // link: a name placed twice once, and the built-ins no row names appended.
-        // (Undeclared questions cannot be dropped here — declaring them is what
-        // the availability the skeleton stands in for will tell us.)
-        skeletonRows(fieldRows).map(row => (
-          <div key={row.map(s => s.name).join('|')} className={ROW_GRID}>
-            {row.map((slot, slotIndex) => (
-              <Skeleton key={slot.name} className={cn(FIELD_SKELETON_CLASS, slotColumnClass(row, slot, slotIndex))} />
-            ))}
-          </div>
-        ))
-      ) : (
-        <>
-          <div className="grid grid-cols-1 gap-[var(--spacing-system-m)] md:grid-cols-2">
-            <Skeleton className={FIELD_SKELETON_CLASS} />
-            <Skeleton className={FIELD_SKELETON_CLASS} />
-          </div>
-          <Skeleton className={FIELD_SKELETON_CLASS} />
-          <Skeleton className="h-[7.75rem] w-full" />
-        </>
-      )}
+      {/* The host's rows (or the built-in layout) through the SAME grid, column
+          rule and normalisation as the loaded form — see `normalizeFieldRows`. */}
+      {skeletonRows(fieldRows ?? DEFAULT_FIELD_ROWS).map(row => (
+        <div key={row.map(s => s.name).join('|')} className={ROW_GRID}>
+          {row.map((slot, slotIndex) => (
+            <Skeleton key={slot.name} className={cn(FIELD_SKELETON_CLASS, slotColumnClass(row, slot, slotIndex))} />
+          ))}
+        </div>
+      ))}
+      {/* Without rows there is no telling how many questions the link declares: one long answer stands for them. */}
+      {!fieldRows && <Skeleton className="h-[7.75rem] w-full" />}
       <Skeleton className="h-[4.25rem] w-full" />
       {footerNote ? (
-        // The details-first footer: note beside a 240px button, wrapping on a phone.
-        <div className="flex flex-wrap items-center justify-between gap-[var(--spacing-system-m)]">
+        <div className={FOOTER_ROW_CLASS}>
           <Skeleton className="h-5 min-w-40 flex-1" />
-          <Skeleton className="h-12 w-full md:w-60" />
+          <Skeleton className={cn('h-12 w-full', SUBMIT_WIDE_CLASS)} />
         </div>
       ) : (
-        <div className="flex justify-end">
+        <div className={FOOTER_BARE_CLASS}>
           <Skeleton className="h-12 w-40" />
         </div>
       )}
@@ -700,12 +684,35 @@ export function BookingFormSkeleton({ fieldRows, footerNote }: { fieldRows?: Boo
   );
 }
 
-/** The skeleton's half of the form's row normalisation — see `BookingFormSkeleton`. */
-function skeletonRows(fieldRows: BookingFieldRow[]): BookingFieldRow[] {
+/**
+ * The ONE normalisation of host rows, read by the form and its skeleton.
+ *  - A slot whose name `resolves` to nothing is dropped, and a row left empty is
+ *    dropped with it: an empty grid still eats one form gap, so a layout written
+ *    ahead of the HubSpot config would print blank bands.
+ *  - A name placed twice renders once (its first slot) — one control per field.
+ *  - Explicit spans were written for the FULL row; once a slot drops out they
+ *    would leave a trailing gap, so a shortened row falls back to the even split.
+ *  - Built-ins no row names come back as `unplacedBuiltIns`: the schema still
+ *    requires the identity trio, and a required field with no control is a
+ *    submit that dies silently.
+ * The skeleton has no availability yet, so it passes no `resolves` and keeps
+ * every declared-looking name; that is the one swap it cannot rule out.
+ */
+function normalizeFieldRows(fieldRows: BookingFieldRow[], resolves: (name: string) => boolean = () => true) {
   const seen = new Set<string>();
   const rows = fieldRows
-    .map(row => row.filter(slot => !seen.has(slot.name) && Boolean(seen.add(slot.name))))
+    .map(row => {
+      const kept = row.filter(slot => resolves(slot.name) && !seen.has(slot.name) && Boolean(seen.add(slot.name)));
+      return kept.length === row.length ? kept : kept.map((slot): BookingFieldSlot => ({ name: slot.name }));
+    })
     .filter(row => row.length > 0);
-  const unplacedBuiltIns = BUILT_IN_BOOKING_FIELDS.filter(f => !seen.has(f.name)).map(f => [{ name: f.name }]);
-  return [...rows, ...unplacedBuiltIns];
+  const named = new Set(fieldRows.flat().map(slot => slot.name));
+  const unplacedBuiltIns = BUILT_IN_BOOKING_FIELDS.filter(f => !named.has(f.name));
+  return { rows, unplacedBuiltIns, named };
+}
+
+/** The skeleton's rows: the normalised host rows, then the built-ins none of them named. */
+function skeletonRows(fieldRows: BookingFieldRow[]): BookingFieldRow[] {
+  const { rows, unplacedBuiltIns } = normalizeFieldRows(fieldRows);
+  return [...rows, ...unplacedBuiltIns.map(f => [{ name: f.name }])];
 }

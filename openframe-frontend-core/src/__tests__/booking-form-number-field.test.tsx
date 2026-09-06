@@ -1,25 +1,13 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import { BookingForm } from '../components/meeting-scheduler/booking-form';
-import { availabilityWith, bookingFormBaseProps, fillIdentity, typeInto } from './fixtures/meeting-booking';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { availabilityWith, fillIdentity, mountBookingForm, typeInto } from './fixtures/meeting-booking';
 
 const availability = availabilityWith([
   { name: 'number_of_endpoints', label: 'Number of endpoints', type: 'number', required: true },
 ]);
 
-type Submit = (payload: Record<string, unknown>) => Promise<void>;
-
-function mount(onSubmit = vi.fn<Submit>(() => Promise.resolve())) {
-  render(
-    <BookingForm
-      {...bookingFormBaseProps()}
-      timezone="America/New_York"
-      availability={availability}
-      onSubmit={onSubmit}
-    />,
-  );
-  return onSubmit;
-}
+/** The form in a zone that is not UTC, so the summary line's formatting is exercised. */
+const mount = () => mountBookingForm(availability, { timezone: 'America/New_York' });
 
 describe('BookingForm — a HubSpot Number question', () => {
   it('renders as a numeric input under the property label', () => {

@@ -55,7 +55,7 @@ import {
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { Alert, AlertDescription, Button } from '../ui';
-import { BookingForm, BookingFormSkeleton, type BookingFormProps } from './booking-form';
+import { BookingForm, BookingFormSkeleton, DEFAULT_SUBMIT_LABEL, type BookingFormProps } from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';
 import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
@@ -271,7 +271,7 @@ export const SCHEDULER_FLOW_PRESETS: Record<
   SchedulerFlow,
   { initialStep: Exclude<Step, 'confirmed'>; height: string; submitLabel: string; footerNote?: string }
 > = {
-  'slot-first': { initialStep: 'slot', height: MEETING_SCHEDULER_H, submitLabel: 'Confirm Booking' },
+  'slot-first': { initialStep: 'slot', height: MEETING_SCHEDULER_H, submitLabel: DEFAULT_SUBMIT_LABEL },
   'details-first': {
     initialStep: 'details',
     height: MEETING_SCHEDULER_DETAILS_FIRST_H,

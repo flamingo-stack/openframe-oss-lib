@@ -1,5 +1,7 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { createRef } from 'react';
+import { vi } from 'vitest';
+import { BookingForm, type BookingFormProps } from '../../components/meeting-scheduler/booking-form';
 import type { MeetingAvailability, MeetingFormField } from '../../schemas/meeting-booking-schema';
 
 /** One well-formed slot-first payload minus the questions — the base every
@@ -48,3 +50,12 @@ export const fillIdentity = () => {
   typeInto(screen.getByLabelText(/^First Name/), 'Ada');
   typeInto(screen.getByLabelText(/^Last Name/), 'Lovelace');
 };
+
+export type BookingFormSubmit = (payload: Record<string, unknown>) => Promise<void>;
+
+/** Mount a `BookingForm` over `availability` with the base props; returns the submit spy. */
+export function mountBookingForm(availability: MeetingAvailability, props: Partial<BookingFormProps> = {}) {
+  const onSubmit = vi.fn<BookingFormSubmit>(() => Promise.resolve());
+  render(<BookingForm {...bookingFormBaseProps()} availability={availability} onSubmit={onSubmit} {...props} />);
+  return onSubmit;
+}
