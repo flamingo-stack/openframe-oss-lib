@@ -101,7 +101,7 @@ describe('useNatsChatAdapter — managed-dialog mode (characterization)', () => 
     expect(result.current.hasMoreDialogs).toBe(false);
   });
 
-  it('rename is optimistic and rolls back on failure', async () => {
+  it('rename is optimistic, rolls back AND surfaces the failure', async () => {
     const renameDialog = vi
       .fn<(id: string, title: string) => Promise<void>>()
       .mockResolvedValueOnce(undefined)
@@ -116,7 +116,9 @@ describe('useNatsChatAdapter — managed-dialog mode (characterization)', () => 
     expect(result.current.dialogs.find(d => d.id === 'a')?.title).toBe('Renamed');
 
     await act(async () => {
-      await result.current.renameDialog('a', 'Will fail');
+      // Re-thrown (like archive/delete) so a rename modal can stay open — a
+      // silent rollback would just look like the title flickering back.
+      await expect(result.current.renameDialog('a', 'Will fail')).rejects.toThrow('nope');
     });
     expect(result.current.dialogs.find(d => d.id === 'a')?.title).toBe('Renamed');
     expect(renameDialog).toHaveBeenCalledTimes(2);

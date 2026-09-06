@@ -2,8 +2,8 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import type { DialogItem } from '../types/component.types';
+import type { FetchDialogsParams, FetchDialogsResult } from '../types/unified-chat-state.types';
 import { useManagedDialogList } from './use-managed-dialog-list';
-import type { FetchDialogsParams, FetchDialogsResult } from './use-nats-chat-adapter';
 
 export interface UseChatDialogManagerArgs {
   /** Active (non-archived) dialogs from the unified chat state. */
@@ -49,8 +49,16 @@ export function useChatDialogManager({
   const [renameTarget, setRenameTarget] = useState<DialogItem | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<DialogItem | null>(null);
   const handleConfirmRename = useCallback(
-    (name: string) => {
-      if (renameTarget) void renameDialog(renameTarget.id, name);
+    async (name: string) => {
+      if (!renameTarget) return;
+      try {
+        await renameDialog(renameTarget.id, name);
+      } catch (err) {
+        // Keep the modal open for a retry — the same posture as archive; the
+        // optimistic title has already rolled back inside the list hook.
+        console.error('[useChatDialogManager] rename failed:', err);
+        return;
+      }
       setRenameTarget(null);
     },
     [renameTarget, renameDialog],
@@ -87,10 +95,8 @@ export function useChatDialogManager({
   // A secondary, on-demand view: opened from the header, paged on demand.
   const [archiveOpen, setArchiveOpen] = useState(false);
   // The archived list runs the SAME cursor-paged machine as the active list
-  // (`useManagedDialogList`) — one implementation of paging, request-ordering
-  // and error handling. `active: false` disables its mount-time auto-load:
-  // this list loads on OPEN (and re-validates on every re-open), which
-  // `openArchive` drives explicitly.
+  // (`useManagedDialogList`) — one implementation of paging, request-ordering,
+  // append dedupe and error handling.
   const {
     dialogs: archivedDialogs,
     dialogsNextCursor: archivedCursor,
@@ -99,7 +105,9 @@ export function useChatDialogManager({
     loadDialogsPage: loadArchivedPage,
     removeDialog: removeArchivedDialog,
   } = useManagedDialogList({
-    active: false,
+    // Loads on OPEN, not on mount — `openArchive` drives page 1 and
+    // re-validates it on every re-open (stale-while-revalidate).
+    autoLoad: false,
     fetchDialogs: fetchArchivedDialogs,
     pageSize: 20,
     // Delay the full-view skeleton so a cached/fast page-1 fetch never flashes

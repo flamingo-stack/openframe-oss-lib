@@ -260,14 +260,34 @@ describe('useSseChatAdapter — managed conversation list', () => {
     await waitFor(() => expect(result.current.isMessagesLoading).toBe(false));
   });
 
-  it('drops a stored id the server no longer recognizes (empty history)', async () => {
+  it('keeps a stored id whose thread is legitimately empty but owned', async () => {
+    window.localStorage.setItem(CONVERSATION_KEY, JSON.stringify({ conversationId: 'empty-but-mine' }));
+    const { fetchMock } = mockFetch({ list: () => listPayload([]) });
+    fetchMock.mockImplementation((url: string) => {
+      const u = String(url);
+      const json = (body: unknown) =>
+        Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) } as unknown as Response);
+      // Owned, just has no rows yet — the id must SURVIVE.
+      if (u.includes('/history')) return json({ conversationId: 'empty-but-mine', messages: [], found: true });
+      if (u.startsWith(CONVERSATIONS_URL)) return json(listPayload([]));
+      return json({ commands: [] });
+    });
+    const { result } = renderHook(() => useSseChatAdapter(), { wrapper: makeWrapper(managedRuntime) });
+    await waitFor(() => expect(result.current.dialogsManaged).toBe(true));
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(window.localStorage.getItem(CONVERSATION_KEY)).not.toBeNull();
+    expect(result.current.activeDialogId).toBe('empty-but-mine');
+  });
+
+  it('drops a stored id the server reports as not ours (found: false)', async () => {
     window.localStorage.setItem(CONVERSATION_KEY, JSON.stringify({ conversationId: 'gone' }));
     const { fetchMock } = mockFetch({ list: () => listPayload([]) });
     fetchMock.mockImplementation((url: string) => {
       const u = String(url);
       const json = (body: unknown) =>
         Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) } as unknown as Response);
-      if (u.includes('/history')) return json({ data: { messages: [] } });
+      // `found: false` = the server does not recognize this id for us.
+      if (u.includes('/history')) return json({ conversationId: 'gone', messages: [], found: false });
       if (u.startsWith(CONVERSATIONS_URL)) return json(listPayload([]));
       return json({ commands: [] });
     });

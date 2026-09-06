@@ -23,7 +23,7 @@ describe('useManagedDialogList', () => {
   });
 
   it('is inert without fetchDialogs', () => {
-    const { result } = renderHook(() => useManagedDialogList({ active: true, pageSize: 20, logTag: '[t]' }));
+    const { result } = renderHook(() => useManagedDialogList({ autoLoad: true, pageSize: 20, logTag: '[t]' }));
     expect(result.current.dialogs).toEqual([]);
     expect(result.current.hasMoreDialogs).toBe(false);
     expect(result.current.isDialogsLoading).toBe(false);
@@ -32,7 +32,7 @@ describe('useManagedDialogList', () => {
   it('upsertDialogTop prepends + dedupes; bumpDialogToTop re-heads the row', async () => {
     const fetchDialogs = vi.fn(() => Promise.resolve(page(['a', 'b'])));
     const { result } = renderHook(() =>
-      useManagedDialogList({ active: true, pageSize: 20, logTag: '[t]', fetchDialogs }),
+      useManagedDialogList({ autoLoad: true, pageSize: 20, logTag: '[t]', fetchDialogs }),
     );
     await waitFor(() => expect(result.current.dialogs.length).toBe(2));
     act(() => result.current.upsertDialogTop({ id: 'b', title: 'B again' }));
@@ -52,7 +52,7 @@ describe('useManagedDialogList', () => {
     const resolvers: Array<(v: ReturnType<typeof page>) => void> = [];
     const fetchDialogs = vi.fn(() => new Promise<ReturnType<typeof page>>(resolve => resolvers.push(resolve)));
     const { result, rerender } = renderHook(
-      ({ search }) => useManagedDialogList({ active: true, pageSize: 20, logTag: '[t]', fetchDialogs, search }),
+      ({ search }) => useManagedDialogList({ autoLoad: true, pageSize: 20, logTag: '[t]', fetchDialogs, search }),
       { initialProps: { search: 'a' } },
     );
     await waitFor(() => expect(resolvers.length).toBe(1));
@@ -83,7 +83,7 @@ describe('useManagedDialogList', () => {
   it('re-throws a failed archive/delete so a confirmation modal can stay open', async () => {
     const { result } = renderHook(() =>
       useManagedDialogList({
-        active: true,
+        autoLoad: true,
         pageSize: 20,
         logTag: '[t]',
         fetchDialogs: () => Promise.resolve(page(['a'])),
@@ -105,7 +105,7 @@ describe('useManagedDialogList', () => {
     let latest: string[] = [];
     const { result } = renderHook(() =>
       useManagedDialogList({
-        active: true,
+        autoLoad: true,
         pageSize: 20,
         logTag: '[t]',
         fetchDialogs: () => Promise.resolve(page(['a', 'b'])),
@@ -132,7 +132,7 @@ describe('useManagedDialogList', () => {
   it('mutations without their callback are no-ops', async () => {
     const { result } = renderHook(() =>
       useManagedDialogList({
-        active: true,
+        autoLoad: true,
         pageSize: 20,
         logTag: '[t]',
         fetchDialogs: () => Promise.resolve(page(['a'])),

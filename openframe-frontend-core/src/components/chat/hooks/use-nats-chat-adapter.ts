@@ -582,7 +582,7 @@ export function useNatsChatAdapter(
     deleteDialog,
     upsertDialogTop,
   } = useManagedDialogList({
-    active,
+    autoLoad: active,
     fetchDialogs,
     renameDialog: renameDialogCallback,
     archiveDialog: archiveDialogCallback,

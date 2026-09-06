@@ -28,8 +28,11 @@ import type { DialogItem } from '../types/component.types';
 import type { FetchDialogsParams, FetchDialogsResult } from '../types/unified-chat-state.types';
 
 export interface UseManagedDialogListArgs {
-  /** Mirrors the adapter's `active` gate — the initial load waits for it. */
-  active: boolean;
+  /** Gates the AUTOMATIC first-page load only (every other operation is
+   *  caller-driven). The adapters pass their own `active` gate so an idle
+   *  transport does no network; the Chat Archive passes `false` because it
+   *  loads on OPEN, which `openArchive` drives explicitly. */
+  autoLoad: boolean;
   /** Pages the active dialog list. Absent = the hook is inert. */
   fetchDialogs?: (params: FetchDialogsParams) => Promise<FetchDialogsResult>;
   /** Backend rename — absent = `renameDialog` is a no-op. */
@@ -91,7 +94,7 @@ export interface UseManagedDialogListResult {
 }
 
 export function useManagedDialogList({
-  active,
+  autoLoad,
   fetchDialogs,
   renameDialog: renameDialogCallback,
   archiveDialog: archiveDialogCallback,
@@ -206,12 +209,12 @@ export function useManagedDialogList({
   const loadedSearchRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!fetchDialogs) return;
-    if (!active) return;
+    if (!autoLoad) return;
     if (initialDialogsLoadedRef.current && loadedSearchRef.current === search) return;
     initialDialogsLoadedRef.current = true;
     loadedSearchRef.current = search;
     void loadDialogsPage();
-  }, [active, fetchDialogs, search, loadDialogsPage]);
+  }, [autoLoad, fetchDialogs, search, loadDialogsPage]);
 
   const removeLocal = useCallback((id: string) => {
     setDialogs(prev => prev.filter(d => d.id !== id));
@@ -248,6 +251,10 @@ export function useManagedDialogList({
         if (previous !== undefined) {
           setDialogs(prev => prev.map(d => (d.id === id ? { ...d, title: previous } : d)));
         }
+        // Re-thrown like archive/delete: without it the optimistic title just
+        // silently reverts a moment later and the user is never told the
+        // rename did not land.
+        throw err;
       }
     },
     [renameDialogCallback, logTag],
@@ -273,8 +280,12 @@ export function useManagedDialogList({
 
   const loadMoreDialogs = useCallback(async (): Promise<void> => {
     if (!dialogsNextCursor) return;
+    // A page-1 reload in flight will REPLACE the list and the cursor, so an
+    // append started now would land on a list that no longer exists, using a
+    // stale cursor. Skip it; the reload's own result is the fresh page 1.
+    if (isDialogsPending) return;
     await loadDialogsPage(dialogsNextCursor);
-  }, [dialogsNextCursor, loadDialogsPage]);
+  }, [dialogsNextCursor, isDialogsPending, loadDialogsPage]);
 
   const upsertDialogTop = useCallback((item: DialogItem) => {
     setDialogs(prev => [item, ...prev.filter(d => d.id !== item.id)]);

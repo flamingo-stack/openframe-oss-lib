@@ -62,7 +62,6 @@ import { createChatDialogStore } from '../stream/chat-dialog-store';
 import type { ChatDialogStore } from '../stream/chat-dialog-store';
 import type { ChatStreamReducerOptions } from '../stream/chat-stream-reducer';
 import { useChatStreamReducer } from '../stream/use-chat-stream-reducer';
-import type { DialogItem } from '../types/component.types';
 import type { Message, MessageSegment } from '../types/message.types';
 import type {
   ChatDialogCapabilities,
@@ -86,33 +85,23 @@ import { useSlashCommandRegistry, type SlashCommandSummary } from './use-slash-c
 // Phase 3; re-exported here to keep the legacy import path stable.
 export type { ChatTurnMeta } from '../stream/chat-stream-reducer';
 
-// ─── Stable no-op references for the Guide-mode dialog-management stubs ──
-// Plain module-scope constants so the adapter's return identity stays
-// stable across renders — consumers that memo on these fields don't get
-// spurious re-runs.
-const SSE_EMPTY_DIALOGS: DialogItem[] = [];
+// ─── Stable no-op references for the capabilities Guide mode never has ──
+// Plain module-scope constants so the adapter's return identity stays stable
+// across renders — consumers that memo on these fields don't get spurious
+// re-runs. The dialog LIST itself is no longer stubbed here: without a
+// conversations endpoint the shared `useManagedDialogList` is inert by
+// construction (empty list, false flags, memoized no-op mutations).
 const noopSelectDialog = (_id: string | null): void => {
-  /* Guide mode has no managed dialog list yet */
+  /* No conversations endpoint configured — nothing to select */
 };
+/** "New chat" is `clearMessages` (the server mints an id on the next send);
+ *  there is no create call to make. */
 const noopStartNewDialog = (): Promise<string | null> => Promise.resolve(null);
 const noopDeleteDialog = async (_id: string): Promise<void> => {
-  /* no-op until Guide server-side history is exposed as dialogs */
-};
-const noopRenameDialog = async (_id: string, _title: string): Promise<void> => {
-  /* no-op until Guide server-side history is exposed as dialogs */
-};
-const noopArchiveDialog = async (_id: string): Promise<void> => {
-  /* no-op until Guide server-side history is exposed as dialogs */
+  /* Deletion is not offered — archive replaces it. */
 };
 const noopAsync = async (): Promise<void> => {
-  /* no-op pagination stub */
-};
-/** `reloadDialogs` is `() => void` in the unified contract, unlike the async
- *  pagination stubs above — it is wired straight to an error-state `onRetry`,
- *  which ignores a returned promise. Keeping it sync means no caller is handed
- *  a promise it will silently drop. */
-const noopReloadDialogs = (): void => {
-  /* no-op until Guide server-side history is exposed as dialogs */
+  /* no-op pagination stub (message history, which Guide does not page) */
 };
 const noopApproveRequest = async (_id: string): Promise<void> => {
   /* Guide mode has no tool-call approval workflow */
@@ -417,6 +406,17 @@ export function useSseChatAdapter(
     },
     [mutate],
   );
+  // Live message count for the orphan guard below (a ref, so the callback's
+  // identity never changes — see the note on `onOrphanedConversation`).
+  const messagesLenRef = useRef(0);
+  messagesLenRef.current = state.messages.length;
+  const onOrphanedConversation = useCallback(
+    (id: string) => {
+      if (conversationIdRef.current === id && messagesLenRef.current === 0) commitConversationId(null);
+    },
+    [commitConversationId],
+  );
+
   const { isHydratingHistory, hydratedKeyRef } = useChatHistoryHydration({
     active,
     source,
@@ -431,12 +431,12 @@ export function useSseChatAdapter(
     // an account while this browser is signed out) — keeping it would stream
     // answers the server refuses to persist. Guarded on "no live turn yet" so
     // a just-minted id is never dropped.
-    onOrphanedConversation: useCallback(
-      (id: string) => {
-        if (conversationIdRef.current === id && state.messages.length === 0) commitConversationId(null);
-      },
-      [commitConversationId, state.messages.length],
-    ),
+    //
+    // IDENTITY-STABLE by construction: this is a dependency of the hydration
+    // effect, so a callback that changed with the message count would CANCEL
+    // an in-flight hydration the moment the user typed — silently discarding
+    // the thread they just opened. The live count is read through a ref.
+    onOrphanedConversation,
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -495,7 +495,7 @@ export function useSseChatAdapter(
     upsertDialogTop,
     bumpDialogToTop,
   } = useManagedDialogList({
-    active,
+    autoLoad: active,
     fetchDialogs: fetchActiveDialogs,
     renameDialog: conversationsApi?.renameDialog,
     archiveDialog: conversationsApi?.archiveDialog,
@@ -893,46 +893,28 @@ export function useSseChatAdapter(
     currentUsageBreakdown: latestMeta?.breakdown ?? null,
     // ─── Dialog management ───────────────────────────────────────────────
     // With `chatConversationsUrl` the server transcript store IS the dialog
-    // list (shared `useManagedDialogList`); selecting a row re-hydrates
-    // through the history route. Without it (hosts that never set the
-    // endpoint) the single-thread stubs below are returned unchanged.
-    ...(conversationsApi
-      ? {
-          dialogs,
-          activeDialogId: conversationId,
-          selectDialog,
-          // New chat = `clearMessages` (the server mints on the next send);
-          // there is no create call.
-          startNewDialog: noopStartNewDialog,
-          deleteDialog: noopDeleteDialog,
-          renameDialog,
-          archiveDialog,
-          isDialogsLoading,
-          dialogsError,
-          reloadDialogs,
-          isMessagesLoading: isHydratingHistory,
-          hasMoreDialogs,
-          loadMoreDialogs,
-          dialogsManaged: true,
-          dialogCapabilities,
-        }
-      : {
-          dialogs: SSE_EMPTY_DIALOGS,
-          activeDialogId: null,
-          selectDialog: noopSelectDialog,
-          startNewDialog: noopStartNewDialog,
-          deleteDialog: noopDeleteDialog,
-          renameDialog: noopRenameDialog,
-          archiveDialog: noopArchiveDialog,
-          isDialogsLoading: false,
-          // No server-side dialog list — never errors, nothing to retry.
-          dialogsError: false,
-          reloadDialogs: noopReloadDialogs,
-          isMessagesLoading: false,
-          hasMoreDialogs: false,
-          loadMoreDialogs: noopAsync,
-          dialogsManaged: false,
-        }),
+    // list (shared `useManagedDialogList`); selecting a row re-hydrates through
+    // the history route. WITHOUT it the same hook is inert by construction —
+    // no `fetchDialogs`, so an empty list, false flags and memoized no-op
+    // mutations — which is why only the four genuinely mode-dependent fields
+    // are branched here.
+    dialogs,
+    isDialogsLoading,
+    dialogsError,
+    reloadDialogs,
+    hasMoreDialogs,
+    loadMoreDialogs,
+    renameDialog,
+    archiveDialog,
+    // New chat = `clearMessages` (the server mints on the next send); there is
+    // no create call. Delete is not offered — archive replaces it.
+    startNewDialog: noopStartNewDialog,
+    deleteDialog: noopDeleteDialog,
+    activeDialogId: conversationsApi ? conversationId : null,
+    selectDialog: conversationsApi ? selectDialog : noopSelectDialog,
+    isMessagesLoading: conversationsApi ? isHydratingHistory : false,
+    dialogsManaged: !!conversationsApi,
+    dialogCapabilities,
     hasMoreMessages: false,
     loadMoreMessages: noopAsync,
     approveRequest: noopApproveRequest,
