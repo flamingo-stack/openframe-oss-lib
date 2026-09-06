@@ -116,9 +116,10 @@ describe('useNatsChatAdapter — managed-dialog mode (characterization)', () => 
     expect(result.current.dialogs.find(d => d.id === 'a')?.title).toBe('Renamed');
 
     await act(async () => {
-      // Re-thrown (like archive/delete) so a rename modal can stay open — a
-      // silent rollback would just look like the title flickering back.
-      await expect(result.current.renameDialog('a', 'Will fail')).rejects.toThrow('nope');
+      // SWALLOWED, unlike archive/delete: `useChatDialogManager` fires rename
+      // as `void renameDialog(...)`, so a rejection would only ever surface as
+      // an unhandled rejection. Pre-extraction NATS behaved the same way.
+      await expect(result.current.renameDialog('a', 'Will fail')).resolves.toBeUndefined();
     });
     expect(result.current.dialogs.find(d => d.id === 'a')?.title).toBe('Renamed');
     expect(renameDialog).toHaveBeenCalledTimes(2);

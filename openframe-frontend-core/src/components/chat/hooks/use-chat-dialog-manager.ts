@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { DialogItem } from '../types/component.types';
-import type { FetchDialogsParams, FetchDialogsResult } from '../types/unified-chat-state.types';
-import { useManagedDialogList } from './use-managed-dialog-list';
+import type { FetchDialogsParams, FetchDialogsResult } from './use-nats-chat-adapter';
 
 export interface UseChatDialogManagerArgs {
   /** Active (non-archived) dialogs from the unified chat state. */
@@ -49,16 +48,8 @@ export function useChatDialogManager({
   const [renameTarget, setRenameTarget] = useState<DialogItem | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<DialogItem | null>(null);
   const handleConfirmRename = useCallback(
-    async (name: string) => {
-      if (!renameTarget) return;
-      try {
-        await renameDialog(renameTarget.id, name);
-      } catch (err) {
-        // Keep the modal open for a retry — the same posture as archive; the
-        // optimistic title has already rolled back inside the list hook.
-        console.error('[useChatDialogManager] rename failed:', err);
-        return;
-      }
+    (name: string) => {
+      if (renameTarget) void renameDialog(renameTarget.id, name);
       setRenameTarget(null);
     },
     [renameTarget, renameDialog],
@@ -92,30 +83,66 @@ export function useChatDialogManager({
   }, [archiveTarget, archiveDialog, activeDialogId, clearMessages]);
 
   // ─── Chat Archive page ───
-  // A secondary, on-demand view: opened from the header, paged on demand.
+  // The archived list is paged locally (it's a secondary, on-demand view).
   const [archiveOpen, setArchiveOpen] = useState(false);
-  // The archived list runs the SAME cursor-paged machine as the active list
-  // (`useManagedDialogList`) — one implementation of paging, request-ordering,
-  // append dedupe and error handling.
-  const {
-    dialogs: archivedDialogs,
-    dialogsNextCursor: archivedCursor,
-    isDialogsLoading: archivedLoading,
-    isDialogsPending: archivedPending,
-    loadDialogsPage: loadArchivedPage,
-    removeDialog: removeArchivedDialog,
-  } = useManagedDialogList({
-    // Loads on OPEN, not on mount — `openArchive` drives page 1 and
-    // re-validates it on every re-open (stale-while-revalidate).
-    autoLoad: false,
-    fetchDialogs: fetchArchivedDialogs,
-    pageSize: 20,
-    // Delay the full-view skeleton so a cached/fast page-1 fetch never flashes
-    // it; `archivedPending` still suppresses the empty state meanwhile.
-    skeletonDelayMs: 120,
-    logTag: '[useChatDialogManager]',
-  });
-
+  const [archivedDialogs, setArchivedDialogs] = useState<DialogItem[]>([]);
+  const [archivedCursor, setArchivedCursor] = useState<string | null>(null);
+  const [archivedLoading, setArchivedLoading] = useState(false);
+  // A fetch is in flight, tracked SEPARATELY from the delayed skeleton
+  // (`archivedLoading`). Set synchronously so the empty state stays suppressed
+  // during the 120ms skeleton delay — otherwise an uncached first open flashes
+  // "No archived chats" before the skeleton/data appears.
+  const [archivedPending, setArchivedPending] = useState(false);
+  // Monotonic request id — a background page-1 refresh and a pagination fetch
+  // can overlap (the retained list stays interactive while page 1 revalidates).
+  // Only the LATEST request may mutate the list / cursor / loading flags, so a
+  // slow earlier response can't clobber newer rows, append stale ones, or clear
+  // the shared loading flag while another request is still in flight.
+  const archivedRequestIdRef = useRef(0);
+  const loadArchivedPage = useCallback(
+    async (cursor?: string): Promise<void> => {
+      if (!fetchArchivedDialogs) return;
+      const requestId = ++archivedRequestIdRef.current;
+      const isCurrent = () => archivedRequestIdRef.current === requestId;
+      // Only a first-page load drives the full-view skeleton, and only if it's
+      // actually slow: a 120ms delay means a cached/fast fetch (the host caches
+      // page 1) resolves first and never flashes a skeleton. Pagination
+      // (`cursor`) keeps the current list visible.
+      const isInitial = !cursor;
+      setArchivedPending(true);
+      let skeletonTimer: ReturnType<typeof setTimeout> | undefined;
+      if (isInitial) {
+        // Delay the full-view skeleton so a cached/fast page-1 fetch never
+        // flashes it (and skip it if a newer request already superseded us).
+        skeletonTimer = setTimeout(() => {
+          if (isCurrent()) setArchivedLoading(true);
+        }, 120);
+      } else {
+        // Pagination shows its "load more" indicator immediately (the list
+        // stays visible), so no delay here.
+        setArchivedLoading(true);
+      }
+      try {
+        const result = await fetchArchivedDialogs({ cursor, limit: 20 });
+        // A newer request superseded this one — drop the response so overlapping
+        // refresh / pagination can't append stale rows or clobber newer results.
+        if (!isCurrent()) return;
+        setArchivedCursor(result.nextCursor);
+        setArchivedDialogs(prev => (cursor ? [...prev, ...result.dialogs] : result.dialogs));
+      } catch (err) {
+        if (!isCurrent()) return;
+        console.error('[useChatDialogManager] fetchArchivedDialogs failed:', err);
+      } finally {
+        if (skeletonTimer) clearTimeout(skeletonTimer);
+        // Only the latest request owns the shared loading / pending flags.
+        if (isCurrent()) {
+          setArchivedLoading(false);
+          setArchivedPending(false);
+        }
+      }
+    },
+    [fetchArchivedDialogs],
+  );
   const openArchive = useCallback(() => {
     setArchiveOpen(true);
     // Don't clear the list — keep any already-loaded page visible and refresh
@@ -163,11 +190,11 @@ export function useChatDialogManager({
       }
       // Drop it from the locally-cached archived list and exit read-only mode
       // so the composer returns and the user can keep chatting.
-      removeArchivedDialog(restoreTarget.id);
+      setArchivedDialogs(prev => prev.filter(d => d.id !== restoreTarget.id));
       setViewingArchivedId(cur => (cur === restoreTarget.id ? null : cur));
     }
     setRestoreTarget(null);
-  }, [restoreTarget, unarchiveDialog, removeArchivedDialog]);
+  }, [restoreTarget, unarchiveDialog]);
 
   const isViewingArchived = viewingArchivedId != null && viewingArchivedId === activeDialogId;
 

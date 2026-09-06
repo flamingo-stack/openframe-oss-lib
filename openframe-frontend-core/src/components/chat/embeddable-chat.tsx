@@ -1901,9 +1901,6 @@ function EmbeddableChatInner({
       const w = entries[0]?.contentRect?.width;
       if (typeof w === 'number') setPanelWidth(w);
     });
-    // `observe` fires the callback once with the current size, so no
-    // synchronous seed is needed (and a synchronous setState here would be a
-    // cascading render).
     ro.observe(panelBoundary);
     return () => ro.disconnect();
   }, [panelBoundary]);
@@ -1911,8 +1908,16 @@ function EmbeddableChatInner({
   // ONE node for two consumers: the width measurement above and the
   // collision-boundary context. State, not a ref, so both re-run when the node
   // appears (the drawer shell mounts its body only on open).
+  //
+  // The width is ALSO seeded here, in the commit-phase ref callback: the
+  // ResizeObserver's first callback is delivered asynchronously, so seeding
+  // only there would leave a split-eligible panel painting one stacked frame at
+  // width 0 before flipping. Seeding in the effect instead is what the
+  // pre-refactor code did, but `react-hooks/set-state-in-effect` rejects it in
+  // a reactive (non-mount-only) effect.
   const setPanelNode = useCallback((node: HTMLDivElement | null) => {
     setPanelBoundary(node);
+    if (node) setPanelWidth(node.clientWidth);
   }, []);
 
   // Rail collapse toggle (Figma ⟶| control), persisted so it survives the

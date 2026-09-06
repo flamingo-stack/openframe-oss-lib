@@ -410,7 +410,12 @@ export interface UnifiedChatState {
 
   /** Rename a dialog. Optimistically updates the title in the local list.
    *  No-op (resolves) when the adapter doesn't expose a rename callback.
-   *  REJECTS on failure AFTER rolling the title back — see `deleteDialog`. */
+   *
+   *  ALWAYS RESOLVES — unlike `deleteDialog` / `archiveDialog`. A failure rolls
+   *  the optimistic title back and is logged, never re-thrown, because
+   *  `useChatDialogManager` fires rename as `void renameDialog(...)` and closes
+   *  its modal immediately; rejecting here would only produce an unhandled
+   *  rejection. The rollback is the user-visible signal. */
   renameDialog: (id: string, title: string) => Promise<void>;
 
   /** Archive a dialog (removes it from the active list). No-op (resolves) when

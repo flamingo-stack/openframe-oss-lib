@@ -1,10 +1,9 @@
 'use client';
 
 /**
- * useManagedDialogList — the ONE cursor-paged dialog-list state machine. Three
- * consumers: the NATS/Mingo adapter's managed-dialog mode, the SSE/Guide
- * adapter (when `ChatRuntime.endpoints.chatConversationsUrl` is set), and the
- * Chat Archive page inside `useChatDialogManager`.
+ * useManagedDialogList — the ONE cursor-paged dialog-list state machine. Two
+ * consumers: the NATS/Mingo adapter's managed-dialog mode and the SSE/Guide
+ * adapter (when `ChatRuntime.endpoints.chatConversationsUrl` is set).
  *
  * Owns: the loaded page of `DialogItem`s, the server cursor, first-page
  * loading/error state (with the retry re-arm), cursor pagination, an
@@ -30,8 +29,7 @@ import type { FetchDialogsParams, FetchDialogsResult } from '../types/unified-ch
 export interface UseManagedDialogListArgs {
   /** Gates the AUTOMATIC first-page load only (every other operation is
    *  caller-driven). The adapters pass their own `active` gate so an idle
-   *  transport does no network; the Chat Archive passes `false` because it
-   *  loads on OPEN, which `openArchive` drives explicitly. */
+   *  transport does no network. */
   autoLoad: boolean;
   /** Pages the active dialog list. Absent = the hook is inert. */
   fetchDialogs?: (params: FetchDialogsParams) => Promise<FetchDialogsResult>;
@@ -43,11 +41,6 @@ export interface UseManagedDialogListArgs {
   deleteDialog?: (id: string) => Promise<void>;
   /** Page size sent as `limit`. */
   pageSize: number;
-  /** Delay before a FIRST-PAGE load raises `isDialogsLoading` (the full-view
-   *  skeleton), so a cached/fast fetch never flashes one. `0` (default) raises
-   *  it immediately. Pagination always shows its indicator at once — the list
-   *  stays visible. Use `isDialogsPending` for "a fetch is in flight". */
-  skeletonDelayMs?: number;
   /** Server-side search term. `undefined` = no search support (the NATS
    *  adapter never sets it, so its wire params stay `{cursor, limit}`); any
    *  string change — including back to `''` — reloads page 1 with `search`. */
@@ -63,13 +56,8 @@ export interface UseManagedDialogListArgs {
 export interface UseManagedDialogListResult {
   dialogs: DialogItem[];
   dialogsNextCursor: string | null;
-  /** Skeleton flag — true while a page request is in flight, subject to
-   *  `skeletonDelayMs` on a first-page load. */
+  /** Skeleton flag — true while a page request is in flight. */
   isDialogsLoading: boolean;
-  /** A fetch is in flight, set SYNCHRONOUSLY and independent of
-   *  `skeletonDelayMs` — so an empty state stays suppressed during the delay
-   *  instead of flashing "no results" before the skeleton appears. */
-  isDialogsPending: boolean;
   /** True when the FIRST page failed — a pagination failure keeps the loaded rows. */
   dialogsError: boolean;
   hasMoreDialogs: boolean;
@@ -83,10 +71,6 @@ export interface UseManagedDialogListResult {
   deleteDialog: (id: string) => Promise<void>;
   /** Prepend a row (dedupes by id) — a freshly created conversation. */
   upsertDialogTop: (item: DialogItem) => void;
-  /** Drop a row locally, WITHOUT calling a backend callback — for a mutation
-   *  the caller performed itself (e.g. restoring an archived dialog removes it
-   *  from the archived list). No-op for an unknown id. */
-  removeDialog: (id: string) => void;
   /** Move an existing row to the head of the list with a fresh `timestamp` —
    *  what a new turn does server-side (`last_message_at desc`). No-op for an
    *  id the list doesn't hold. */
@@ -100,7 +84,6 @@ export function useManagedDialogList({
   archiveDialog: archiveDialogCallback,
   deleteDialog: deleteDialogCallback,
   pageSize,
-  skeletonDelayMs = 0,
   search,
   onDialogRemoved,
   logTag,
@@ -127,9 +110,9 @@ export function useManagedDialogList({
     setAutoLoadWas(autoLoad);
     if (autoLoad && fetchDialogs) setSettledSearch(undefined);
   }
-  const [isDialogsPending, setIsDialogsPending] = useState<boolean>(false);
-  // Synchronous mirror: `loadMoreDialogs` must see a page-1 load dispatched in
-  // the SAME tick, which the state value (a stale render closure) would miss.
+  // A page request is in flight. A REF, not state: its only reader is
+  // `loadMoreDialogs`, which must see a page-1 load dispatched in the SAME
+  // tick — something a render-closure state value would miss.
   const pendingRef = useRef(false);
   const [dialogsError, setDialogsError] = useState<boolean>(false);
 
@@ -166,15 +149,7 @@ export function useManagedDialogList({
       const requestId = ++requestIdRef.current;
       const isCurrent = () => requestIdRef.current === requestId;
       pendingRef.current = true;
-      setIsDialogsPending(true);
-      let skeletonTimer: ReturnType<typeof setTimeout> | undefined;
-      if (cursor === undefined && skeletonDelayMs > 0) {
-        skeletonTimer = setTimeout(() => {
-          if (isCurrent()) setIsDialogsLoading(true);
-        }, skeletonDelayMs);
-      } else {
-        setIsDialogsLoading(true);
-      }
+      setIsDialogsLoading(true);
       // Clear a prior first-page error when (re)loading the first page.
       if (cursor === undefined) setDialogsError(false);
       try {
@@ -209,17 +184,15 @@ export function useManagedDialogList({
           initialDialogsLoadedRef.current = false;
         }
       } finally {
-        if (skeletonTimer) clearTimeout(skeletonTimer);
         // Only the latest request owns the shared flags.
         if (isCurrent()) {
           pendingRef.current = false;
           if (cursor === undefined) setSettledSearch(search ?? null);
           setIsDialogsLoading(false);
-          setIsDialogsPending(false);
         }
       }
     },
-    [fetchDialogs, pageSize, skeletonDelayMs, search, logTag],
+    [fetchDialogs, pageSize, search, logTag],
   );
 
   const reloadDialogs = useCallback(() => {
@@ -272,14 +245,15 @@ export function useManagedDialogList({
       try {
         await renameDialogCallback(id, title);
       } catch (err) {
+        // SWALLOWED, unlike archive/delete. `useChatDialogManager` fires rename
+        // as `void renameDialog(...)` and closes its modal immediately, so a
+        // rejection here would surface only as an unhandled rejection. The
+        // optimistic rollback below is the user-visible signal, exactly as the
+        // pre-extraction NATS adapter behaved.
         console.error(`${logTag} renameDialog failed:`, err);
         if (previous !== undefined) {
           setDialogs(prev => prev.map(d => (d.id === id ? { ...d, title: previous } : d)));
         }
-        // Re-thrown like archive/delete: without it the optimistic title just
-        // silently reverts a moment later and the user is never told the
-        // rename did not land.
-        throw err;
       }
     },
     [renameDialogCallback, logTag],
@@ -316,8 +290,6 @@ export function useManagedDialogList({
     setDialogs(prev => [item, ...prev.filter(d => d.id !== item.id)]);
   }, []);
 
-  const removeDialog = removeLocal;
-
   const bumpDialogToTop = useCallback((id: string) => {
     setDialogs(prev => {
       const row = prev.find(d => d.id === id);
@@ -337,7 +309,6 @@ export function useManagedDialogList({
       dialogs,
       dialogsNextCursor,
       isDialogsLoading: dialogsLoading,
-      isDialogsPending,
       dialogsError,
       hasMoreDialogs,
       loadDialogsPage,
@@ -347,14 +318,12 @@ export function useManagedDialogList({
       archiveDialog,
       deleteDialog,
       upsertDialogTop,
-      removeDialog,
       bumpDialogToTop,
     }),
     [
       dialogs,
       dialogsNextCursor,
       dialogsLoading,
-      isDialogsPending,
       dialogsError,
       hasMoreDialogs,
       loadDialogsPage,
@@ -364,7 +333,6 @@ export function useManagedDialogList({
       archiveDialog,
       deleteDialog,
       upsertDialogTop,
-      removeDialog,
       bumpDialogToTop,
     ],
   );
