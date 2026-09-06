@@ -262,6 +262,10 @@ export function ContactForm({
           );
         })}
         className="flex flex-grow flex-col space-y-4 md:space-y-6"
+        // Opt out of HubSpot's collected-forms script: this form already
+        // reaches HubSpot server-side, and a host running the tracking tag would
+        // otherwise re-post it as a phantom "non-HubSpot form" (see BookingForm).
+        data-hs-do-not-collect="true"
       >
         {/* Hidden inputs for fields that are required by `ContactSchema`
             but suppressed from the visible UI via `hideFields`. Without
