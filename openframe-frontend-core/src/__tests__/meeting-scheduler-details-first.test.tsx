@@ -15,8 +15,9 @@ const book = vi.fn<(payload: Record<string, unknown>) => Promise<unknown>>();
 const refetchAvailability = vi.fn(() => Promise.resolve());
 const toast = vi.fn();
 
-vi.mock('../hooks/use-meeting-booking', () => ({
-  BOOKING_IN_FLIGHT_MESSAGE: 'Already submitting',
+vi.mock('../hooks/use-meeting-booking', async importOriginal => ({
+  // The sentinel keeps its ONE owner: only the hook itself is replaced.
+  ...((await importOriginal()) as Record<string, unknown>),
   useMeetingBooking: () => ({
     availability,
     isLoadingAvailability: false,

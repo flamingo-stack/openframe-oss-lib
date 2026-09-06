@@ -562,14 +562,14 @@ export function HubSpotMeetingScheduler({
   const backToDetails = useCallback(() => {
     // Not while a slot's POST is in flight — the step must stay on the
     // calendar the spinner lives on until the result routes it.
-    if (inFlightRef.current) return;
+    if (postInFlight()) return;
     // No slot rides back to the form: in this flow the form never legitimately
     // holds one (the slot IS the submit), and a chip the server rejected with a
     // slot-step toast would otherwise print in the form's summary line.
     setSelectedSlot(null);
     setStep('details');
     setBookingError(null);
-  }, []);
+  }, [postInFlight]);
 
   /**
    * details-first: Continue does not POST. It validates, freezes the answers
@@ -631,12 +631,14 @@ export function HubSpotMeetingScheduler({
         if (!detailsFirst) resetSignals();
         void refetchAvailability();
       } else {
+        // details-first: the chip that submitted is un-picked on EVERY failure —
+        // selection means submit in this flow, so a rejected chip must not sit
+        // in the selected variant (and the form's summary must never show a
+        // slot the server did not accept).
+        if (detailsFirst) setSelectedSlot(null);
         if (detailsFirst && (code === 'VALIDATION' || code === 'INVALID_EMAIL')) {
-          // DETAILS errors in details-first: the form is unmounted by now, so
-          // send the visitor back to it (the stash repopulates every answer).
-          // The chip that submitted is un-picked too — the form's summary
-          // must not show a slot the server never accepted.
-          setSelectedSlot(null);
+          // DETAILS errors: the form is unmounted by now, so send the visitor
+          // back to it (the stash repopulates every answer).
           setStep('details');
         }
         // The error surface is the TOAST, full stop (host-mounted Toaster —
@@ -701,7 +703,11 @@ export function HubSpotMeetingScheduler({
               // The SAME wrapper the loaded form gets, so the skeleton never
               // states its own inset.
               <div className={STEP_PANEL_CLASS}>
-                <BookingFormSkeleton fieldRows={detailsFormProps?.fieldRows} footerNote={preset.footerNote} />
+                <BookingFormSkeleton
+                  fieldRows={detailsFormProps?.fieldRows}
+                  consent={Boolean(detailsFormProps?.consent)}
+                  footerNote={preset.footerNote}
+                />
               </div>
             ) : (
               <SlotPickerSkeleton monthOffset={monthOffset} />

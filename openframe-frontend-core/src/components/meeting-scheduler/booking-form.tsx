@@ -655,11 +655,22 @@ export function BookingForm({
  * The slot-first skeleton (`SlotPickerSkeleton`) would put a grey calendar
  * where the form belongs — above the fold on a page whose entire content is
  * this card. Same footprint discipline as its sibling: fixed heights, and no
- * shift when the real form swaps in for single-line fields. A textarea row is
- * taller than its placeholder — the rows carry no type, so the skeleton cannot
- * know which slot is one.
+ * shift when the real form swaps in for single-line fields. Two footprints it
+ * cannot know: a textarea row is taller than its placeholder (the rows carry no
+ * type), and a HubSpot `legalConsent` block only exists once availability lands.
  */
-export function BookingFormSkeleton({ fieldRows, footerNote }: { fieldRows?: BookingFieldRow[]; footerNote?: string }) {
+export function BookingFormSkeleton({
+  fieldRows,
+  consent,
+  footerNote,
+}: {
+  fieldRows?: BookingFieldRow[];
+  /** Whether the host adds its consent row (drawn only then). A HubSpot
+   *  `legalConsent` block is unknown until availability lands — the one
+   *  footprint this skeleton cannot budget for. */
+  consent?: boolean;
+  footerNote?: string;
+}) {
   return (
     <div className={cn('flex-1', FORM_STACK)}>
       {/* The host's rows (or the built-in layout) through the SAME grid, column
@@ -673,7 +684,7 @@ export function BookingFormSkeleton({ fieldRows, footerNote }: { fieldRows?: Boo
       ))}
       {/* Without rows there is no telling how many questions the link declares: one long answer stands for them. */}
       {!fieldRows && <Skeleton className="h-[7.75rem] w-full" />}
-      <Skeleton className="h-[4.25rem] w-full" />
+      {consent && <Skeleton className="h-[4.25rem] w-full" />}
       {footerNote ? (
         <div className={FOOTER_ROW_CLASS}>
           <Skeleton className="h-5 min-w-40 flex-1" />

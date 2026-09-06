@@ -67,7 +67,11 @@ interface BenefitCardGridProps {
  * card's row differs per breakpoint) is what needs testing, and the grid itself
  * is a `cloneElement` over children.
  */
-export function benefitCardBorderClass(index: number, totalItems: number, columns: number): string {
+export function benefitCardBorderClass(
+  index: number,
+  totalItems: number,
+  columns: NonNullable<BenefitCardGridProps['columns']>,
+): string {
   const isLastItem = index === totalItems - 1;
   if (columns === 4) {
     // 4-column grid borders
