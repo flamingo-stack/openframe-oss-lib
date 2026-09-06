@@ -1001,18 +1001,19 @@ export function useNatsChatAdapter(
   const isLoading = streamingPhase !== 'idle';
   const hasMoreMessages = messagesNextCursor != null;
 
-  // Capabilities for `EmbeddableChat` — the presence of a host callback IS the
-  // capability (same rule the legacy per-mode derivation applied).
-  const dialogCapabilities = useMemo<ChatDialogCapabilities | undefined>(
-    () =>
-      isManagedMode
-        ? {
-            canRename: !!renameDialogCallback,
-            canArchive: !!archiveDialogCallback,
-            fetchArchivedDialogs,
-            unarchiveDialog,
-          }
-        : undefined,
+  // The conversation-list capability object — ALWAYS present: this is the
+  // Mingo transport, whose panel owns a dialog list whether or not the host
+  // wired paging (an unmanaged config just has nothing in it, and the panel
+  // renders the same empty "Current Chats" surface it always has). Each field
+  // is gated on its own callback, the rule used throughout this file: the
+  // presence of a callback IS the capability.
+  const dialogCapabilities = useMemo<ChatDialogCapabilities>(
+    () => ({
+      canRename: isManagedMode && !!renameDialogCallback,
+      canArchive: isManagedMode && !!archiveDialogCallback,
+      fetchArchivedDialogs: isManagedMode ? fetchArchivedDialogs : undefined,
+      unarchiveDialog: isManagedMode ? unarchiveDialog : undefined,
+    }),
     [isManagedMode, renameDialogCallback, archiveDialogCallback, fetchArchivedDialogs, unarchiveDialog],
   );
 
@@ -1053,7 +1054,6 @@ export function useNatsChatAdapter(
       loadMoreDialogs,
       hasMoreMessages,
       loadMoreMessages,
-      dialogsManaged: isManagedMode,
       dialogCapabilities,
       // Approval mutations
       approveRequest,
@@ -1087,7 +1087,6 @@ export function useNatsChatAdapter(
       loadMoreDialogs,
       hasMoreMessages,
       loadMoreMessages,
-      isManagedMode,
       dialogCapabilities,
       approveRequest,
       rejectRequest,

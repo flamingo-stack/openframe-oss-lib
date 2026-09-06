@@ -1212,48 +1212,31 @@ function EmbeddableChatInner({
     setDialogScope,
     hasMoreMessages,
     loadMoreMessages,
-    dialogsManaged,
     dialogCapabilities,
-  } = useUnifiedChat({ modes: effectiveModes, activeMode, mingoStateOverride: mingoState });
+  } = useUnifiedChat({
+    modes: effectiveModes,
+    activeMode,
+    mingoStateOverride: mingoState,
+    injectedDialogCapabilities: mingoDialogCapabilities,
+  });
 
-  // Transport-agnostic "this panel has a conversation list" gate. Mingo mode
-  // keeps its list UI unconditionally (bare transports and the host-injected
-  // `mingoState` drive it through the mode itself); Guide mode gains the SAME
-  // rail / stacked list / archive / rename UI only when its adapter owns a
-  // server-side list (`ChatRuntime.endpoints.chatConversationsUrl`).
-  const historyListMode = activeMode === 'mingo' || dialogsManaged === true;
+  // THE conversation-list gate. `dialogCapabilities` is present iff the ACTIVE
+  // state owns a conversation list, so the panel never asks which transport it
+  // is talking to: `useUnifiedChat` already resolved which state won, and the
+  // adapters already know whether they own a list. Absent = single-thread.
+  const historyListMode = dialogCapabilities !== undefined;
 
-  // Resolve dialog-management capabilities (rename / archive / archive-page /
-  // restore) from a single source. With injected `mingoState` they come from
-  // `mingoDialogCapabilities` (the host doesn't pass `modes.mingo`); otherwise
-  // from the callback-config shape, where the presence of a callback IS the
-  // capability. Both feed the same gating below so the JSX has one source.
-  // ONE `ChatDialogCapabilities`, from whichever source owns the list:
-  //   1. the ACTIVE ADAPTER (SSE with a conversations endpoint, or NATS
-  //      managed mode) — checked first so a Guide panel can never inherit the
-  //      Mingo config's callbacks;
-  //   2. the host-injected `mingoState`'s companion prop;
-  //   3. the legacy callback config, where a callback's PRESENCE is the
-  //      capability.
-  // `canRename`/`canArchive` default OFF everywhere: the ⋯ menu must never
-  // advertise an action nothing has wired.
-  const mingoCaps = useMemo<ChatDialogCapabilities>(() => {
-    const caps: ChatDialogCapabilities | undefined =
-      dialogCapabilities ??
-      (mingoState
-        ? mingoDialogCapabilities
-        : {
-            canRename: !!effectiveModes.mingo?.renameDialog,
-            canArchive: !!effectiveModes.mingo?.archiveDialog,
-            fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
-            unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
-          });
-    return {
-      ...caps,
-      canRename: caps?.canRename ?? false,
-      canArchive: caps?.canArchive ?? false,
-    };
-  }, [dialogCapabilities, mingoState, mingoDialogCapabilities, effectiveModes]);
+  // Non-optional view of the same object for the JSX below. `canRename` /
+  // `canArchive` default OFF: the ⋯ menu must never advertise an action
+  // nothing has wired.
+  const mingoCaps = useMemo<ChatDialogCapabilities>(
+    () => ({
+      ...dialogCapabilities,
+      canRename: dialogCapabilities?.canRename ?? false,
+      canArchive: dialogCapabilities?.canArchive ?? false,
+    }),
+    [dialogCapabilities],
+  );
 
   // ── One-shot Guide-mode launcher prompt ────────────────────────────────────
   // A host launcher (e.g. an "Ask Mingo about X" empty-state button) requests
@@ -1794,14 +1777,17 @@ function EmbeddableChatInner({
   // that wants a message-list skeleton (real header + composer, skeleton bubbles)
   // signals it via `isMessagesLoading` — treat that as an open conversation so
   // the content branch shows the skeleton instead of the new-user welcome.
-  // A managed Guide panel re-hydrating a stored/selected conversation shows the
-  // message skeleton too (instead of flashing the list) — SSE only reports
-  // `isMessagesLoading` while that fetch is in flight.
+  // …and so does a panel loading the messages of a dialog it ALREADY has
+  // selected — a restored conversation on mount, where nothing was clicked so
+  // `isOpeningDialog` is false. Keyed on the dialog id being set rather than on
+  // any transport: `isMessagesLoading` is only ever about the ACTIVE dialog.
+  const isLoadingActiveDialogMessages = activeDialogId != null && isMessagesLoading;
   const hasConversation =
     hasMessages ||
     isOpeningDialog ||
     isViewingArchived ||
-    ((previewMode || (activeMode === 'guide' && dialogsManaged === true)) && isMessagesLoading);
+    isLoadingActiveDialogMessages ||
+    (previewMode && isMessagesLoading);
   // Opening a dialog whose history hasn't arrived yet — show a message-list
   // skeleton instead of an empty thread so the open reads as "loading" rather
   // than a blank flash before the bubbles stream in.
@@ -2000,28 +1986,37 @@ function EmbeddableChatInner({
   // in the fill column (navigation is via re-expanding the rail), NOT the list.
   // Requires no open conversation, no archive, and not composing (the composer
   // lives on the compose view).
-  // …but a managed GUIDE panel with NOTHING to list skips straight to the
-  // welcome + composer: a first-time visitor to a marketing site must not have
-  // to tap through an empty "Current Chats" screen to ask a question. Only
-  // once they have history does the list become the landing view. Gated on the
-  // first page having loaded so it doesn't flash the welcome mid-load.
-  const guideListIsEmpty =
-    activeMode === 'guide' &&
-    dialogsManaged === true &&
+  // …unless the list owner asked to skip an empty one
+  // (`emptyListSkipsToCompose`), in which case a settled-empty, unsearched list
+  // lands on the composer instead of a "Current Chats" screen with nothing in
+  // it. Whether that is the right landing is the list owner's policy, not this
+  // component's guess — a public panel skips, a workspace panel keeps the list.
+  // Gated on the first page having settled so it never flashes mid-load.
+  const emptyListSkipped =
+    mingoCaps.emptyListSkipsToCompose === true &&
     dialogs.length === 0 &&
     !dialogsInitialLoading &&
     !mingoCaps.searchQuery;
   const stackedListView =
-    isMingoMode && !hasConversation && !archiveOpen && !wideMingo && !composeOpen && !guideListIsEmpty;
+    isMingoMode && !hasConversation && !archiveOpen && !wideMingo && !composeOpen && !emptyListSkipped;
 
   // Shared header derivations — consumed by the stacked `ChatPanelHeader`, its
   // mobile fallback, and the desktop split header's right cell, so the title /
   // back / ⋯ semantics can't drift between layouts.
   const headerShowBack = hasConversation || guideCanReturnToMingo;
+  /**
+   * What a conversation with nothing in it is called — ONE definition, read by
+   * the shared header derivation below, the narrow compose header and the wide
+   * split header, so a draft can't be titled three different ways.
+   *
+   * Guide's empty state IS the assistant's own welcome screen, so it wears the
+   * assistant name; anywhere else a draft is a "New Chat".
+   */
+  const freshConversationTitle = isGuideEmpty ? (headerAssistantName ?? 'Mingo Guide') : 'New Chat';
   const headerTitle = hasConversation
-    ? activeDialog?.title || 'New Chat'
+    ? activeDialog?.title || freshConversationTitle
     : isGuideEmpty
-      ? (headerAssistantName ?? 'Mingo Guide')
+      ? freshConversationTitle
       : 'Current Chats';
   const headerBackAriaLabel = hasConversation ? (isViewingArchived ? 'Back to archive' : 'Back') : 'Back to Mingo';
   const headerOnBack = hasConversation ? handleBack : () => handleActiveModeChange('mingo');
@@ -2082,19 +2077,16 @@ function EmbeddableChatInner({
   // Chats" list header (search + archive, no back) and a "New Chat" compose
   // header (back to the list); conversations + guide keep the shared header
   // derivations. Wide mode uses its own two-cell header instead.
-  // `!guideListIsEmpty` for the same reason as `stackedListView`: with nothing
-  // to list the BODY renders the Guide welcome, so a "Current Chats" header
-  // above it would be half of the empty screen the shortcut exists to remove.
-  // The else-branch header resolves to the assistant name via `isGuideEmpty`
-  // and keeps the archive entry point.
-  const narrowMingoEmpty = isMingoMode && !hasConversation && !archiveOpen && !guideListIsEmpty;
+  // `!emptyListSkipped` for the same reason as `stackedListView`: with the list
+  // skipped the BODY renders the welcome, so a "Current Chats" header above it
+  // would be half of the empty screen the skip exists to remove. The
+  // else-branch header keeps the assistant name and the archive entry point.
+  const narrowMingoEmpty = isMingoMode && !hasConversation && !archiveOpen && !emptyListSkipped;
   const narrowHeaderProps: ChatPanelHeaderProps = narrowMingoEmpty
     ? composeOpen
       ? {
           showBack: true,
-          // Guide's compose view is its own welcome (assistant name), not a
-          // Mingo "New Chat".
-          title: isGuideEmpty ? (headerAssistantName ?? 'Mingo Guide') : 'New Chat',
+          title: freshConversationTitle,
           subtitle: headerUserName,
           avatar: headerAvatar,
           backAriaLabel: 'Back to chats',
@@ -2264,7 +2256,7 @@ function EmbeddableChatInner({
                     <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
                       <div className="flex min-w-0 flex-col">
                         <p className="truncate leading-tight text-ods-text-primary text-h3">
-                          {headerShowBack || isGuideEmpty ? headerTitle : 'New Chat'}
+                          {headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
                         </p>
                         {headerPersonName && (
                           <p className="truncate leading-tight text-ods-text-secondary text-h6">{headerPersonName}</p>

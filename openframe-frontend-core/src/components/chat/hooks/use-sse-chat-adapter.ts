@@ -729,6 +729,9 @@ export function useSseChatAdapter(
     [switchConversation],
   );
 
+  // Present ONLY with a conversations endpoint — its absence is what keeps a
+  // Guide panel single-thread, and it is the single signal `EmbeddableChat`
+  // gates the whole history surface on.
   const dialogCapabilities = useMemo<ChatDialogCapabilities | undefined>(
     () =>
       conversationsApi
@@ -739,6 +742,9 @@ export function useSseChatAdapter(
             unarchiveDialog,
             searchQuery: dialogSearch,
             onSearchChange: setDialogSearch,
+            // A public panel's first-time visitor must reach the composer
+            // without tapping through an empty list.
+            emptyListSkipsToCompose: true,
           }
         : undefined,
     [conversationsApi, fetchArchivedDialogs, unarchiveDialog, dialogSearch],
@@ -913,7 +919,6 @@ export function useSseChatAdapter(
     activeDialogId: conversationsApi ? conversationId : null,
     selectDialog: conversationsApi ? selectDialog : noopSelectDialog,
     isMessagesLoading: conversationsApi ? isHydratingHistory : false,
-    dialogsManaged: !!conversationsApi,
     dialogCapabilities,
     hasMoreMessages: false,
     loadMoreMessages: noopAsync,

@@ -64,7 +64,26 @@ export interface ChatDialogCapabilities {
   onSearchChange?: (query: string) => void;
   /** "Copy chat link" — the owner of the URL shape + clipboard write. */
   onCopyLink?: (dialog: DialogItem) => void;
+  /**
+   * When the list has settled EMPTY and is unsearched, land on the composer
+   * instead of an empty "Current Chats" screen.
+   *
+   * A policy, not a transport detail: a public marketing panel must not make a
+   * first-time visitor tap through an empty list to ask a question, while a
+   * signed-in workspace panel wants the list (with its "Start New Chat"
+   * affordance) as the landing surface. Omit to keep the list.
+   */
+  emptyListSkipsToCompose?: boolean;
 }
+
+/**
+ * "This panel owns a conversation list, and no optional affordance on it."
+ *
+ * A frozen module singleton so it is referentially stable across renders —
+ * it is read inside memo dependency lists, where a fresh `{}` would
+ * invalidate them on every pass.
+ */
+export const EMPTY_DIALOG_CAPABILITIES: ChatDialogCapabilities = Object.freeze({});
 
 // ─── Per-dialog token usage (Mingo backend telemetry) ────────────────────────
 
@@ -459,22 +478,17 @@ export interface UnifiedChatState {
   loadMoreMessages: () => Promise<void>;
 
   /**
-   * True when the active adapter OWNS a server-side dialog list (NATS
-   * managed-dialog mode, or the SSE/Guide adapter with
-   * `ChatRuntime.endpoints.chatConversationsUrl` set). `EmbeddableChat` gates
-   * the history list / archive / rename affordances on this flag — transport-
-   * agnostic, so Guide mode gets the same "Current Chats" UI as Mingo mode.
-   * Undefined/false = the single-thread panel (bare transports, host-injected
-   * `mingoState`, which drives the UI through the Mingo mode check instead).
-   */
-  dialogsManaged?: boolean;
-
-  /**
-   * Dialog-management capabilities the active adapter can honour. Only
-   * meaningful when `dialogsManaged` is true; `EmbeddableChat` reads it in
-   * preference to the legacy per-mode derivations so the row ⋯ menu, the
-   * archive page and the header search never advertise an action the
-   * transport hasn't wired.
+   * THE conversation-list signal. Present iff this state owns a conversation
+   * list; absent = a single-thread panel. `EmbeddableChat` gates the whole
+   * history surface — rail, stacked list, archive page, rename/archive menus,
+   * header search — on its presence alone, so the panel never asks WHICH
+   * transport it is talking to. Each field inside it then gates one
+   * affordance, on the same rule the rest of this file uses: the presence of
+   * a callback IS the capability.
+   *
+   * Deliberately ONE field, not a `dialogsManaged` boolean beside an object:
+   * two signals derived from the same predicate can disagree, and every
+   * producer would have to remember to set both.
    */
   dialogCapabilities?: ChatDialogCapabilities;
 

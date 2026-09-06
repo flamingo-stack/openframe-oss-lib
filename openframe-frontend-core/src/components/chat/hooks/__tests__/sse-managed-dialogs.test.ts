@@ -13,7 +13,7 @@
  *   - rename / archive / restore go to the PATCH wire; archiving the open
  *     conversation drops to draft;
  *   - ZERO-REGRESSION: without the endpoint `dialogs` is `[]`,
- *     `dialogsManaged` is false and no conversations request is issued.
+ *     `dialogCapabilities` is `undefined` and no conversations request is issued.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -132,7 +132,7 @@ describe('useSseChatAdapter — managed conversation list', () => {
 
     await waitFor(() => expect(result.current.dialogs.map(d => d.id)).toEqual(['a', 'b']));
     await waitFor(() => expect(result.current.messages.length).toBe(2));
-    expect(result.current.dialogsManaged).toBe(true);
+    expect(result.current.dialogCapabilities).toBeDefined();
     expect(result.current.activeDialogId).toBe('a');
     expect(urlsOf(calls, CONVERSATIONS_URL)).toEqual([`${CONVERSATIONS_URL}?status=active&limit=20`]);
     expect(urlsOf(calls, '/api/docs/chat/history')).toEqual(['/api/docs/chat/history?conversationId=a']);
@@ -273,7 +273,7 @@ describe('useSseChatAdapter — managed conversation list', () => {
       return json({ commands: [] });
     });
     const { result } = renderHook(() => useSseChatAdapter(), { wrapper: makeWrapper(managedRuntime) });
-    await waitFor(() => expect(result.current.dialogsManaged).toBe(true));
+    await waitFor(() => expect(result.current.dialogCapabilities).toBeDefined());
     await new Promise(resolve => setTimeout(resolve, 20));
     expect(window.localStorage.getItem(CONVERSATION_KEY)).not.toBeNull();
     expect(result.current.activeDialogId).toBe('empty-but-mine');
@@ -302,7 +302,7 @@ describe('useSseChatAdapter — managed conversation list', () => {
     const { result } = renderHook(() => useSseChatAdapter(), { wrapper: makeWrapper(plainRuntime) });
     await waitFor(() => expect(result.current.messages.length).toBe(2));
     expect(result.current.dialogs).toEqual([]);
-    expect(result.current.dialogsManaged).toBe(false);
+    // The ABSENT capability object is what keeps this panel single-thread.
     expect(result.current.dialogCapabilities).toBeUndefined();
     expect(result.current.activeDialogId).toBeNull();
     expect(urlsOf(calls, CONVERSATIONS_URL)).toEqual([]);

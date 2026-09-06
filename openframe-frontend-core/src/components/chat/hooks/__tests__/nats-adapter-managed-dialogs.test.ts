@@ -170,4 +170,24 @@ describe('useNatsChatAdapter — managed-dialog mode (characterization)', () => 
     expect(result.current.dialogs).toEqual([]);
     expect(result.current.hasMoreDialogs).toBe(false);
   });
+
+  it('always reports a capability object — the Mingo panel owns a list either way', () => {
+    // `dialogCapabilities` is THE conversation-list signal `EmbeddableChat`
+    // gates on. This adapter IS the Mingo transport, so it is present even
+    // unmanaged; an unmanaged config just advertises no affordances, which is
+    // what keeps a bare host's list surface exactly as it was before the
+    // capability gate replaced the `activeMode === 'mingo'` check.
+    const unmanaged = renderHook(() => useNatsChatAdapter(makeConfig({ fetchDialogs: undefined })));
+    expect(unmanaged.result.current.dialogCapabilities).toEqual({
+      canRename: false,
+      canArchive: false,
+      fetchArchivedDialogs: undefined,
+      unarchiveDialog: undefined,
+    });
+
+    const managed = renderHook(() => useNatsChatAdapter(makeConfig()));
+    expect(managed.result.current.dialogCapabilities).toMatchObject({ canRename: true, canArchive: true });
+    // Never opts a workspace panel out of its list landing surface.
+    expect(managed.result.current.dialogCapabilities?.emptyListSkipsToCompose).toBeUndefined();
+  });
 });
