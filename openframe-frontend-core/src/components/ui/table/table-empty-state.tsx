@@ -6,7 +6,10 @@ import { NoData } from '../no-data';
 import type { TableEmptyStateProps } from './types';
 
 /** @deprecated Use `DataTableEmpty` from `data-table` instead. */
-export function TableEmptyState({ message, description, icon, action, className }: TableEmptyStateProps) {
+export function TableEmptyState({ message, description, emptyState, icon, action, className }: TableEmptyStateProps) {
+  // Two vocabularies, one component. `description` is the shipped single-line
+  // prop; `emptyState` is the full NoData bag (icon, title, description,
+  // actions) and, spread last, wins over both — exactly as in `DataTableBody`.
   return (
     <NoData
       icon={icon ?? <SearchIcon />}
@@ -15,6 +18,7 @@ export function TableEmptyState({ message, description, icon, action, className 
       buttonLabel={action?.label}
       onButtonClick={action?.onClick}
       className={cn('py-[var(--spacing-system-xxl)]', className)}
+      {...emptyState}
     />
   );
 }

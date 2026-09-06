@@ -10,49 +10,12 @@ const ROW_HEIGHT_DESKTOP = 'h-[66px] md:h-[78px]';
  * A `compact` row's floor. Compact rows are content-sized (`py-2`), but every
  * row in one table renders the same cell shapes, so pinning a minimum makes the
  * body's height a function of the ROW COUNT alone. Hosts do NOT reserve
- * `rows × 56` themselves any more: `skeletonRows` + `keepHeightWhenEmpty` hold
+ * `rows × 56` themselves any more: `skeletonRows` + `minRows` hold
  * a full page's height in every state (placeholders below), and a cell taller
  * than this floor (avatar + two lines) wants a non-compact, fixed-height row.
  */
 const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]';
 const ROW_HEIGHT_MOBILE = 'h-[66px]';
-
-/**
- * Invisible rows that hold a row's exact box (outer border included, so a
- * placeholder is 68px / 80px like the row it stands in for — not 66 / 78; and
- * the compact floor for compact tables, not the fixed height). The Table pads
- * a short page with these up to `skeletonRows`, and, with
- * `keepHeightWhenEmpty`, stacks them under the empty state too — so a full
- * page, a short last page, the skeleton and "no results" are all the same
- * height and the layout never jumps between them.
- */
-export function TablePlaceholderRows({ rows, compact }: { rows: number; compact?: boolean }) {
-  if (rows <= 0) return null;
-  return (
-    <>
-      {Array.from({ length: rows }).map((_, index) => (
-        <div
-          key={`placeholder-${index}`}
-          className="pointer-events-none relative overflow-hidden rounded-[6px] border border-transparent"
-          aria-hidden="true"
-        >
-          <div
-            className={cn(
-              'hidden items-center gap-4 px-4 md:flex',
-              compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_DESKTOP),
-            )}
-          />
-          <div
-            className={cn(
-              'flex items-center justify-start gap-3 px-3 md:hidden',
-              compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_MOBILE),
-            )}
-          />
-        </div>
-      ))}
-    </>
-  );
-}
 
 /** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
 export function TableCardSkeleton({
@@ -117,9 +80,20 @@ export function TableCardSkeleton({
 
           {/* Mobile Skeleton */}
           <div
-            className={cn('flex items-center justify-start gap-3 px-3 py-0 md:hidden', ROW_HEIGHT_MOBILE, rowClassName)}
+            className={cn(
+              'flex items-center justify-start gap-3 px-3 md:hidden',
+              // Mirror the real row on mobile too: a compact row is
+              // content-sized with a floor, a normal row a fixed height.
+              // Hard-wiring ROW_HEIGHT_MOBILE made every COMPACT table jump
+              // 68px -> 58px per row when the data replaced the skeleton.
+              compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_MOBILE),
+              rowClassName,
+            )}
           >
-            <div className="flex min-w-0 flex-1 flex-col justify-center py-3">
+            {/* The inner padding is the NON-compact row's; a compact row is
+                sized by its own `py-2` + floor, so adding `py-3` here made the
+                compact mobile skeleton 78px against a real row's 58. */}
+            <div className={cn('flex min-w-0 flex-1 flex-col justify-center', compact ? 'py-0' : 'py-3')}>
               <div className="mb-2 h-4 w-3/4 rounded bg-ods-bg-surface" />
               <div className="h-3 w-1/2 rounded bg-ods-bg-surface opacity-60" />
             </div>
