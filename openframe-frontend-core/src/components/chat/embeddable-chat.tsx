@@ -104,16 +104,41 @@ import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
 import { getSourceIconName } from './utils/source-icons';
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta';
 
+/**
+ * Split (wide) Mingo layout metrics (Figma 113:60931 / 113:63630). The
+ * "Current Chats" rail is a fixed 320px column; the chat block fills the rest
+ * with a 400px floor. Below their sum the panel is too tight for two columns,
+ * so the layout falls back to the stacked (single-column) view where the
+ * history renders inline in the Mingo empty state. Purely width-driven and
+ * self-contained — the host wires nothing.
+ */
+const HISTORY_RAIL_WIDTH = 320;
+const CHAT_BLOCK_MIN_WIDTH = 400;
+const SPLIT_MIN_WIDTH = HISTORY_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
+
 // Desktop drawer opens at this fraction of the viewport width (clamped to the
 // Drawer's own min/max). The user can still resize (persisted per DRAWER_WIDTH_KEY).
 const DRAWER_DEFAULT_WIDTH_RATIO = 0.5;
 // Bump the suffix whenever the default policy changes so previously-persisted
 // widths (e.g. the old fixed 750px / earlier 30% default) reset on next open.
-const DRAWER_WIDTH_KEY = 'mingo-chat-width-v3';
+const DRAWER_WIDTH_KEY = 'mingo-chat-width-v4';
 const DRAWER_DEFAULT_WIDTH_PX = 750; // SSR fallback before the viewport is known
-function drawerDefaultWidth(): number {
+/**
+ * A panel that owns a dialog list opens WIDE ENOUGH TO SPLIT, so the "Current
+ * Chats" rail sits beside the conversation instead of replacing it.
+ *
+ * 50% of the viewport is under `SPLIT_MIN_WIDTH` on any screen narrower than
+ * 1440, which silently downgraded every such user to the stacked single-column
+ * list — the layout meant for phones. The floor is the measured panel width the
+ * split needs plus a few px of chrome, and the Drawer still clamps it to the
+ * viewport, so a genuinely small screen keeps the stacked view.
+ */
+const SPLIT_DEFAULT_WIDTH_ALLOWANCE = 16;
+function drawerDefaultWidth(withHistoryRail: boolean): number {
   if (typeof window === 'undefined') return DRAWER_DEFAULT_WIDTH_PX;
-  return Math.round(window.innerWidth * DRAWER_DEFAULT_WIDTH_RATIO);
+  const ratioWidth = Math.round(window.innerWidth * DRAWER_DEFAULT_WIDTH_RATIO);
+  if (!withHistoryRail) return ratioWidth;
+  return Math.max(ratioWidth, SPLIT_MIN_WIDTH + SPLIT_DEFAULT_WIDTH_ALLOWANCE);
 }
 
 // =============================================================================
@@ -415,18 +440,6 @@ const mentionTokenOf = (key: string, markerByType: Map<string, string>): string 
  * retrieved sources instead of zero chips. Mirrors Perplexity's behavior.
  */
 const FALLBACK_TOP_RETRIEVED = 3;
-
-/**
- * Split (wide) Mingo layout metrics (Figma 113:60931 / 113:63630). The
- * "Current Chats" rail is a fixed 320px column; the chat block fills the rest
- * with a 400px floor. Below their sum the panel is too tight for two columns,
- * so the layout falls back to the stacked (single-column) view where the
- * history renders inline in the Mingo empty state. Purely width-driven and
- * self-contained — the host wires nothing.
- */
-const HISTORY_RAIL_WIDTH = 320;
-const CHAT_BLOCK_MIN_WIDTH = 400;
-const SPLIT_MIN_WIDTH = HISTORY_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 
 /** Persists the user's rail collapse choice across drawer open/close + reloads. */
 const RAIL_COLLAPSED_STORAGE_KEY = 'mingo-chat-history-collapsed';
@@ -1873,25 +1886,32 @@ function EmbeddableChatInner({
   // mode / archive page) it stays the stacked single-column layout with the
   // history inline in the empty state. Fully self-contained — the host opts
   // into nothing; the switch is width-driven inside this component.
+  //
+  // Measured off the panel NODE (state), not a ref read once on mount. In the
+  // `drawer` shell the panel body does not exist until the drawer opens, so a
+  // mount-time ref read saw `null`, bailed, and — with `[]` deps — never ran
+  // again: `panelWidth` stayed 0, `canSplit` stayed false, and EVERY drawer
+  // host was silently pinned to the stacked single-column list no matter how
+  // wide it was. Only `shell="none"` hosts (the panel is inline and present at
+  // mount) ever reached the split layout.
   const [panelWidth, setPanelWidth] = useState(0);
-  const panelMeasureRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const el = panelMeasureRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    if (!panelBoundary || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect?.width;
       if (typeof w === 'number') setPanelWidth(w);
     });
-    ro.observe(el);
-    setPanelWidth(el.clientWidth);
+    // `observe` fires the callback once with the current size, so no
+    // synchronous seed is needed (and a synchronous setState here would be a
+    // cascading render).
+    ro.observe(panelBoundary);
     return () => ro.disconnect();
-  }, []);
+  }, [panelBoundary]);
 
-  // One ref for two consumers: the width measurement above (a plain ref, read
-  // once on mount) and the collision-boundary context (state, so provider
-  // consumers re-render once the node exists).
+  // ONE node for two consumers: the width measurement above and the
+  // collision-boundary context. State, not a ref, so both re-run when the node
+  // appears (the drawer shell mounts its body only on open).
   const setPanelNode = useCallback((node: HTMLDivElement | null) => {
-    panelMeasureRef.current = node;
     setPanelBoundary(node);
   }, []);
 
@@ -2686,7 +2706,7 @@ function EmbeddableChatInner({
           resizable
           minSize={480}
           maxSize={1600}
-          defaultSize={drawerDefaultWidth()}
+          defaultSize={drawerDefaultWidth(historyListMode)}
           storageKey={DRAWER_WIDTH_KEY}
           resizeAriaLabel="Resize chat panel"
           overlayClassName="mingo-chat-overlay"
