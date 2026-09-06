@@ -24,6 +24,48 @@ import type { DialogItem } from './component.types';
 import type { ChatContextItem } from './context-item.types';
 import type { MessageSegment, ScrollAnchor } from './message.types';
 
+// ─── Dialog-list host contract (shared by the NATS + SSE adapters) ───────────
+
+/** Page-fetch parameters passed to a host `fetchDialogs` callback. The
+ *  adapter owns the cursor — the host only resolves it against the backend.
+ *  `search` is present ONLY when the adapter runs a server-side list search
+ *  (never spread as an `undefined` key). */
+export interface FetchDialogsParams {
+  cursor?: string;
+  limit?: number;
+  search?: string;
+}
+
+/** Successful `fetchDialogs` response. `nextCursor: null` means "no more
+ *  pages" — used to terminate the infinite-scroll observer in the list. */
+export interface FetchDialogsResult {
+  dialogs: DialogItem[];
+  nextCursor: string | null;
+}
+
+/**
+ * Dialog-management capabilities a transport exposes to `EmbeddableChat`.
+ * Structurally identical to the host-injected `mingoDialogCapabilities`
+ * prop — one shape, whether the list is host-owned (openframe `mingoState`)
+ * or adapter-owned (`UnifiedChatState.dialogCapabilities`).
+ */
+export interface ChatDialogCapabilities {
+  /** Show "Rename chat" in the row ⋯ menu and the conversation header. */
+  canRename?: boolean;
+  /** Show "Archive chat" in the row ⋯ menu and the conversation header. */
+  canArchive?: boolean;
+  /** Pages archived dialogs — presence gates the archive page + header button. */
+  fetchArchivedDialogs?: (params: FetchDialogsParams) => Promise<FetchDialogsResult>;
+  /** Restores an archived dialog — presence gates the restore button. */
+  unarchiveDialog?: (id: string) => Promise<void>;
+  /** Current list-search term (host/adapter owned; the list never filters). */
+  searchQuery?: string;
+  /** Presence wires the header magnifier + the rail's search field. */
+  onSearchChange?: (query: string) => void;
+  /** "Copy chat link" — the owner of the URL shape + clipboard write. */
+  onCopyLink?: (dialog: DialogItem) => void;
+}
+
 // ─── Per-dialog token usage (Mingo backend telemetry) ────────────────────────
 
 /**
@@ -404,6 +446,26 @@ export interface UnifiedChatState {
 
   /** Fetch the next page of historical messages for the active dialog. */
   loadMoreMessages: () => Promise<void>;
+
+  /**
+   * True when the active adapter OWNS a server-side dialog list (NATS
+   * managed-dialog mode, or the SSE/Guide adapter with
+   * `ChatRuntime.endpoints.chatConversationsUrl` set). `EmbeddableChat` gates
+   * the history list / archive / rename affordances on this flag — transport-
+   * agnostic, so Guide mode gets the same "Current Chats" UI as Mingo mode.
+   * Undefined/false = the single-thread panel (bare transports, host-injected
+   * `mingoState`, which drives the UI through the Mingo mode check instead).
+   */
+  dialogsManaged?: boolean;
+
+  /**
+   * Dialog-management capabilities the active adapter can honour. Only
+   * meaningful when `dialogsManaged` is true; `EmbeddableChat` reads it in
+   * preference to the legacy per-mode derivations so the row ⋯ menu, the
+   * archive page and the header search never advertise an action the
+   * transport hasn't wired.
+   */
+  dialogCapabilities?: ChatDialogCapabilities;
 
   // ─── Approval mutations (Mingo agent tool-call workflow) ──────────────────
 

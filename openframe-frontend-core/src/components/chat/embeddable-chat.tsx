@@ -1074,38 +1074,6 @@ function EmbeddableChatInner({
     return { guide: guideOptions };
   }, [modes, tableIdForDocumentType]);
 
-  // Resolve dialog-management capabilities (rename / archive / archive-page /
-  // restore) from a single source. With injected `mingoState` they come from
-  // `mingoDialogCapabilities` (the host doesn't pass `modes.mingo`); otherwise
-  // from the callback-config shape, where the presence of a callback IS the
-  // capability. Both feed the same gating below so the JSX has one source.
-  const mingoCaps = useMemo(() => {
-    if (mingoState) {
-      // Default OFF: the row ⋯ menu (Rename / Archive) and the archive page are
-      // shown only when the host explicitly opts in — same capability-gating as
-      // the archive button (`fetchArchivedDialogs` presence). Otherwise the menu
-      // would advertise actions the host hasn't actually wired (no-ops).
-      return {
-        canRename: mingoDialogCapabilities?.canRename ?? false,
-        canArchive: mingoDialogCapabilities?.canArchive ?? false,
-        fetchArchivedDialogs: mingoDialogCapabilities?.fetchArchivedDialogs,
-        unarchiveDialog: mingoDialogCapabilities?.unarchiveDialog,
-        searchQuery: mingoDialogCapabilities?.searchQuery,
-        onSearchChange: mingoDialogCapabilities?.onSearchChange,
-        onCopyLink: mingoDialogCapabilities?.onCopyLink,
-      };
-    }
-    return {
-      canRename: !!effectiveModes.mingo?.renameDialog,
-      canArchive: !!effectiveModes.mingo?.archiveDialog,
-      fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
-      unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
-      searchQuery: undefined as string | undefined,
-      onSearchChange: undefined as ((query: string) => void) | undefined,
-      onCopyLink: undefined as ((dialog: DialogItem) => void) | undefined,
-    };
-  }, [mingoState, mingoDialogCapabilities, effectiveModes]);
-
   // "Does Mingo mode exist?" — true via either the callback config OR injected
   // state. Gates the guide↔mingo back-chevron and the guide-mode banner.
   const hasMingoMode = !!effectiveModes.mingo || !!mingoState;
@@ -1239,7 +1207,62 @@ function EmbeddableChatInner({
     setDialogScope,
     hasMoreMessages,
     loadMoreMessages,
+    dialogsManaged,
+    dialogCapabilities,
   } = useUnifiedChat({ modes: effectiveModes, activeMode, mingoStateOverride: mingoState });
+
+  // Transport-agnostic "this panel has a conversation list" gate. Mingo mode
+  // keeps its list UI unconditionally (bare transports and the host-injected
+  // `mingoState` drive it through the mode itself); Guide mode gains the SAME
+  // rail / stacked list / archive / rename UI only when its adapter owns a
+  // server-side list (`ChatRuntime.endpoints.chatConversationsUrl`).
+  const historyListMode = activeMode === 'mingo' || dialogsManaged === true;
+
+  // Resolve dialog-management capabilities (rename / archive / archive-page /
+  // restore) from a single source. With injected `mingoState` they come from
+  // `mingoDialogCapabilities` (the host doesn't pass `modes.mingo`); otherwise
+  // from the callback-config shape, where the presence of a callback IS the
+  // capability. Both feed the same gating below so the JSX has one source.
+  const mingoCaps = useMemo(() => {
+    // Adapter-owned list (SSE with a conversations endpoint, NATS managed
+    // mode): the adapter says what it can honour. Checked FIRST so a Guide
+    // panel never inherits the Mingo config's callbacks.
+    if (dialogCapabilities) {
+      return {
+        canRename: dialogCapabilities.canRename ?? false,
+        canArchive: dialogCapabilities.canArchive ?? false,
+        fetchArchivedDialogs: dialogCapabilities.fetchArchivedDialogs,
+        unarchiveDialog: dialogCapabilities.unarchiveDialog,
+        searchQuery: dialogCapabilities.searchQuery,
+        onSearchChange: dialogCapabilities.onSearchChange,
+        onCopyLink: dialogCapabilities.onCopyLink,
+      };
+    }
+    if (mingoState) {
+      // Default OFF: the row ⋯ menu (Rename / Archive) and the archive page are
+      // shown only when the host explicitly opts in — same capability-gating as
+      // the archive button (`fetchArchivedDialogs` presence). Otherwise the menu
+      // would advertise actions the host hasn't actually wired (no-ops).
+      return {
+        canRename: mingoDialogCapabilities?.canRename ?? false,
+        canArchive: mingoDialogCapabilities?.canArchive ?? false,
+        fetchArchivedDialogs: mingoDialogCapabilities?.fetchArchivedDialogs,
+        unarchiveDialog: mingoDialogCapabilities?.unarchiveDialog,
+        searchQuery: mingoDialogCapabilities?.searchQuery,
+        onSearchChange: mingoDialogCapabilities?.onSearchChange,
+        onCopyLink: mingoDialogCapabilities?.onCopyLink,
+      };
+    }
+    return {
+      canRename: !!effectiveModes.mingo?.renameDialog,
+      canArchive: !!effectiveModes.mingo?.archiveDialog,
+      fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
+      unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
+      searchQuery: undefined as string | undefined,
+      onSearchChange: undefined as ((query: string) => void) | undefined,
+      onCopyLink: undefined as ((dialog: DialogItem) => void) | undefined,
+    };
+  }, [dialogCapabilities, mingoState, mingoDialogCapabilities, effectiveModes]);
 
   // ── One-shot Guide-mode launcher prompt ────────────────────────────────────
   // A host launcher (e.g. an "Ask Mingo about X" empty-state button) requests
@@ -1780,7 +1803,14 @@ function EmbeddableChatInner({
   // that wants a message-list skeleton (real header + composer, skeleton bubbles)
   // signals it via `isMessagesLoading` — treat that as an open conversation so
   // the content branch shows the skeleton instead of the new-user welcome.
-  const hasConversation = hasMessages || isOpeningDialog || isViewingArchived || (previewMode && isMessagesLoading);
+  // A managed Guide panel re-hydrating a stored/selected conversation shows the
+  // message skeleton too (instead of flashing the list) — SSE only reports
+  // `isMessagesLoading` while that fetch is in flight.
+  const hasConversation =
+    hasMessages ||
+    isOpeningDialog ||
+    isViewingArchived ||
+    ((previewMode || (activeMode === 'guide' && dialogsManaged === true)) && isMessagesLoading);
   // Opening a dialog whose history hasn't arrived yet — show a message-list
   // skeleton instead of an empty thread so the open reads as "loading" rather
   // than a blank flash before the bubbles stream in.
@@ -1929,7 +1959,7 @@ function EmbeddableChatInner({
   // page stays split-eligible: in wide mode it opens INSIDE the left rail (the
   // right chat block stays put), and only falls back to the full-panel archive
   // when stacked/collapsed.
-  const splitEligible = activeMode === 'mingo';
+  const splitEligible = historyListMode;
   const canSplit = panelWidth >= SPLIT_MIN_WIDTH;
   // Embedded previews (hero demo tabs) always use the compact single-column
   // header, never the two-column split — so `previewMode` opts out of `wideMingo`.
@@ -1960,7 +1990,7 @@ function EmbeddableChatInner({
   // the SAME render the conversation opened in. Guarded, so the extra render
   // pass takes the early exit.
   if (hasConversation && composeOpen) setComposeOpen(false);
-  const isMingoMode = activeMode === 'mingo';
+  const isMingoMode = historyListMode;
   // The stacked "Current Chats" list — the NARROW single-column Mingo view. It
   // is a narrow-only layout: in any wide layout the chat list lives in the rail,
   // and collapsing the rail (`wideCollapsed`) shows the chat / new-chat welcome
@@ -2042,7 +2072,9 @@ function EmbeddableChatInner({
     ? composeOpen
       ? {
           showBack: true,
-          title: 'New Chat',
+          // Guide's compose view is its own welcome (assistant name), not a
+          // Mingo "New Chat".
+          title: isGuideEmpty ? (headerAssistantName ?? 'Mingo Guide') : 'New Chat',
           subtitle: headerUserName,
           avatar: headerAvatar,
           backAriaLabel: 'Back to chats',
@@ -2212,7 +2244,7 @@ function EmbeddableChatInner({
                     <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
                       <div className="flex min-w-0 flex-col">
                         <p className="truncate leading-tight text-ods-text-primary text-h3">
-                          {headerShowBack ? headerTitle : 'New Chat'}
+                          {headerShowBack || isGuideEmpty ? headerTitle : 'New Chat'}
                         </p>
                         {headerPersonName && (
                           <p className="truncate leading-tight text-ods-text-secondary text-h6">{headerPersonName}</p>

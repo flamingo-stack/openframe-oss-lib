@@ -51,7 +51,7 @@
  *      Ask + Display buttons WORK out of the box.
  */
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { buildConfirmToolBody, readServerErrorMessage } from '../../../chat-protocol/confirm-tool';
 import { createSseFrameDecoder } from '../../../chat-protocol/decode';
 import type { ChatStreamEvent } from '../../../chat-protocol/events';
@@ -65,17 +65,21 @@ import { useChatStreamReducer } from '../stream/use-chat-stream-reducer';
 import type { DialogItem } from '../types/component.types';
 import type { Message, MessageSegment } from '../types/message.types';
 import type {
+  ChatDialogCapabilities,
+  FetchDialogsParams,
   UnifiedChatState,
   UnifiedChatMessage,
   UnifiedSendMessageOptions,
 } from '../types/unified-chat-state.types';
 import { createChatConversationStorage, pruneStaleChatConversationStorage } from '../utils/chat-conversation-storage';
+import { createChatConversationsApi } from '../utils/chat-conversations-api';
 import { buildDiscussPrompt } from '../utils/discuss-ref-prompt';
 import type { ScrollAnchor } from '../utils/scroll-anchor';
 import { sanitizeTitleForChat } from '../utils/slash-dispatch-utils';
 import type { WireCommandOverride } from '../utils/slash-dispatch-utils';
 import { defaultTableIdForDocumentType } from '../utils/source-icons';
 import { useChatHistoryHydration } from './use-chat-history-hydration';
+import { useManagedDialogList } from './use-managed-dialog-list';
 import { useSlashCommandRegistry, type SlashCommandSummary } from './use-slash-commands';
 
 // Canonical home of the per-turn meta row moved to the stream module in
@@ -316,8 +320,6 @@ export function useSseChatAdapter(
     createReducerOptions,
   });
 
-  const abortControllerRef = useRef<AbortController | null>(null);
-
   // ─── Conversation identity — server-minted id, restored once on mount ─────
   // Null = no conversation yet: the FIRST send goes out without an id, the
   // server mints one, and the metadata-frame capture (in the send loop below)
@@ -332,6 +334,20 @@ export function useSseChatAdapter(
     pruneStaleChatConversationStorage(source);
     conversationIdRef.current = conversationStorage.load()?.conversationId ?? null;
   }
+  // Render-visible mirror of the ref. The ref stays the SYNCHRONOUS send-time
+  // source (a capture mid-stream must be visible to the very next send); the
+  // state is what re-arms history hydration and drives `activeDialogId` when
+  // the user switches conversations. ONE writer for both + storage.
+  const [conversationId, setConversationId] = useState<string | null>(() => conversationIdRef.current);
+  const commitConversationId = useCallback(
+    (id: string | null) => {
+      conversationIdRef.current = id;
+      setConversationId(id);
+      if (id) conversationStorage.save({ conversationId: id });
+      else conversationStorage.clear();
+    },
+    [conversationStorage],
+  );
 
   // ─── Slash-command registry (displayRef lookup) ───────────────────────────
   // Reads from the SAME react-query cache entry as `<EmbeddableChat>`'s
@@ -405,13 +421,93 @@ export function useSseChatAdapter(
     active,
     source,
     historyUrl,
-    conversationIdRef,
+    conversationId,
     sendCountRef: hydrationSendCountRef,
     hydrateMessages,
     // Meta invalidation is a reducer concern here: `seedSseMaps` (inside
     // `hydrateMessages` above) already invalidates the snapshot.
     bumpMetaTick: noopBumpMetaTick,
   });
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  /** Switch the panel to another conversation (or to the draft state with
+   *  `null`): abort any in-flight stream, flush + reset the reducer, re-arm
+   *  the hydration guard, and commit the new id. `useChatHistoryHydration`
+   *  then re-fetches for a non-null id through its `conversationId` dep. */
+  const switchConversation = useCallback(
+    (id: string | null) => {
+      abortControllerRef.current?.abort();
+      flushDeltas();
+      mutate(r => r.reset());
+      hydrationSendCountRef.current = 0;
+      hydratedKeyRef.current = null;
+      commitConversationId(id);
+    },
+    [flushDeltas, mutate, hydratedKeyRef, commitConversationId],
+  );
+
+  // ─── Managed dialog list (only with `chatConversationsUrl`) ───────────────
+  // The SAME list state machine the NATS adapter runs; the host contract is
+  // the hub's conversations route, spelled out once in
+  // `chat-conversations-api.ts`. Without the endpoint the hook is inert and
+  // the return shape below keeps the single-thread stubs — zero behaviour
+  // change for hosts that never set it.
+  const conversationsUrl = runtime.endpoints.chatConversationsUrl;
+  const conversationsApi = useMemo(
+    () => (conversationsUrl ? createChatConversationsApi(conversationsUrl) : null),
+    [conversationsUrl],
+  );
+  const [dialogSearch, setDialogSearch] = useState('');
+  const fetchActiveDialogs = useMemo(
+    () =>
+      conversationsApi
+        ? (params: FetchDialogsParams) => conversationsApi.fetchDialogs({ ...params, status: 'active' })
+        : undefined,
+    [conversationsApi],
+  );
+  const fetchArchivedDialogs = useMemo(
+    () =>
+      conversationsApi
+        ? (params: FetchDialogsParams) => conversationsApi.fetchDialogs({ ...params, status: 'archived' })
+        : undefined,
+    [conversationsApi],
+  );
+  const {
+    dialogs,
+    isDialogsLoading,
+    dialogsError,
+    hasMoreDialogs,
+    reloadDialogs,
+    loadMoreDialogs,
+    renameDialog,
+    archiveDialog,
+    upsertDialogTop,
+    patchDialog,
+  } = useManagedDialogList({
+    active,
+    fetchDialogs: fetchActiveDialogs,
+    renameDialog: conversationsApi?.renameDialog,
+    archiveDialog: conversationsApi?.archiveDialog,
+    pageSize: 20,
+    search: conversationsApi ? dialogSearch : undefined,
+    logTag: '[useSseChatAdapter]',
+    // Archiving the OPEN conversation drops back to the draft state (the
+    // manager also clears the thread; both paths are idempotent).
+    onDialogRemoved: id => {
+      if (conversationIdRef.current === id) switchConversation(null);
+    },
+  });
+  const unarchiveDialog = useMemo(
+    () =>
+      conversationsApi
+        ? async (id: string) => {
+            await conversationsApi.unarchiveDialog(id);
+            reloadDialogs();
+          }
+        : undefined,
+    [conversationsApi, reloadDialogs],
+  );
 
   // ─── Send / stream loop ────────────────────────────────────────────────────
 
@@ -435,15 +531,19 @@ export function useSseChatAdapter(
    *  same conversation. The reducer ignores the field (identity is a
    *  transport/persistence concern, not render state). */
   const captureConversationId = useCallback(
-    (event: ChatStreamEvent): void => {
-      if (event.type !== 'metadata') return;
+    (event: ChatStreamEvent): boolean => {
+      if (event.type !== 'metadata') return false;
       const id = event.conversationId;
-      if (typeof id !== 'string' || !id) return;
-      if (conversationIdRef.current === id) return;
-      conversationIdRef.current = id;
-      conversationStorage.save({ conversationId: id });
+      if (typeof id !== 'string' || !id) return false;
+      if (conversationIdRef.current === id) return false;
+      // Mark the new id as ALREADY hydrated before it becomes render state:
+      // the turn being streamed IS its history, and a mount-style fetch here
+      // would prepend that same turn once the server has persisted it.
+      hydratedKeyRef.current = `${source}:${id}`;
+      commitConversationId(id);
+      return true;
     },
-    [conversationStorage],
+    [commitConversationId, hydratedKeyRef, source],
   );
 
   const sendMessage = useCallback(
@@ -460,19 +560,19 @@ export function useSseChatAdapter(
       // The server is the single source of conversation history: it re-reads
       // `chat_messages` by conversation id on every turn. The wire therefore
       // carries ONLY the new user message — never the prior conversation.
-      const conversationId = conversationIdRef.current;
+      const echoedConversationId = conversationIdRef.current;
       const targetPath = approvalAction ? endpointsRef.current.approvalToolUrl : endpointsRef.current.chatStreamUrl;
       const requestBody = approvalAction
         ? // Shared with every other transport that resolves a hub proposal —
           // the body shape is the hub's, not this adapter's. `conversationId`
           // is always present here: an approval can only happen inside an
           // established conversation (the proposal turn captured the id).
-          buildConfirmToolBody({ ...approvalAction, conversationId })
+          buildConfirmToolBody({ ...approvalAction, conversationId: echoedConversationId })
         : {
             messages: [{ role: 'user', content: text }],
             ...(commandOverride ? { commandOverride } : {}),
             ...(attachments && attachments.length > 0 ? { pendingAttachments: attachments } : {}),
-            ...(conversationId ? { conversationId } : {}),
+            ...(echoedConversationId ? { conversationId: echoedConversationId } : {}),
           };
 
       // Optimistic user bubble + assistant placeholder + phase 'thinking'
@@ -481,6 +581,7 @@ export function useSseChatAdapter(
 
       const ctrl = new AbortController();
       abortControllerRef.current = ctrl;
+      let mintedThisTurn = false;
 
       try {
         // `embedAuthedFetch` carries the bearer-act-as headers (+ Supabase
@@ -513,7 +614,18 @@ export function useSseChatAdapter(
             if (done) break;
             if (ctrl.signal.aborted) break;
             for (const event of frameDecoder.push(value)) {
-              captureConversationId(event);
+              if (captureConversationId(event)) {
+                mintedThisTurn = true;
+                // Optimistic row so the list shows the new conversation at
+                // once; the end-of-turn reload swaps in the server's title.
+                if (conversationsApi && !hidden) {
+                  upsertDialogTop({
+                    id: conversationIdRef.current ?? '',
+                    title: text.slice(0, 80),
+                    timestamp: new Date(),
+                  });
+                }
+              }
               applyEvent(event);
             }
           }
@@ -550,9 +662,26 @@ export function useSseChatAdapter(
         // path streams no text — and returns the phase to idle).
         flushDeltas();
         mutate(r => r.endSseTurn());
+        // Keep the managed list in step with the transcript: a first turn
+        // re-reads the list (server-derived title replaces the placeholder,
+        // the row is persisted by the time the stream ends); a later turn
+        // just bumps the row to the top.
+        if (conversationsApi && !ctrl.signal.aborted) {
+          if (mintedThisTurn) reloadDialogs();
+          else if (conversationIdRef.current) patchDialog(conversationIdRef.current, { timestamp: new Date() });
+        }
       }
     },
-    [mutate, applyEvent, flushDeltas, captureConversationId],
+    [
+      mutate,
+      applyEvent,
+      flushDeltas,
+      captureConversationId,
+      conversationsApi,
+      upsertDialogTop,
+      reloadDialogs,
+      patchDialog,
+    ],
   );
   sendMessageRef.current = sendMessage;
 
@@ -568,11 +697,34 @@ export function useSseChatAdapter(
     // server-side; the NEXT send goes out id-less and the server mints a
     // fresh conversation (echoed back and re-captured then). Resetting the
     // hydration guard means a re-captured id can hydrate again if needed.
-    conversationIdRef.current = null;
-    conversationStorage.clear();
+    commitConversationId(null);
     hydrationSendCountRef.current = 0;
     hydratedKeyRef.current = null;
-  }, [mutate, conversationStorage, hydratedKeyRef]);
+  }, [mutate, commitConversationId, hydratedKeyRef]);
+
+  /** Open a conversation from the managed list. Idempotent on the active id. */
+  const selectDialog = useCallback(
+    (id: string | null) => {
+      if (id === conversationIdRef.current) return;
+      switchConversation(id);
+    },
+    [switchConversation],
+  );
+
+  const dialogCapabilities = useMemo<ChatDialogCapabilities | undefined>(
+    () =>
+      conversationsApi
+        ? {
+            canRename: true,
+            canArchive: true,
+            fetchArchivedDialogs,
+            unarchiveDialog,
+            searchQuery: dialogSearch,
+            onSearchChange: setDialogSearch,
+          }
+        : undefined,
+    [conversationsApi, fetchArchivedDialogs, unarchiveDialog, dialogSearch],
+  );
 
   // ─── Public message mapping (sendIdx fan-out lookup) ──────────────────────
   // Index sources/scrollAnchor by USER-SEND count (`sendIdx`), not by
@@ -721,26 +873,48 @@ export function useSseChatAdapter(
     /** Cross-call usage breakdown (Haiku rewriter/classifier/summarizer
      *  token counts). null until the trailing usage frame lands. */
     currentUsageBreakdown: latestMeta?.breakdown ?? null,
-    // ─── Dialog management — stubs for v1 ────────────────────────────────
-    // Guide mode keeps ONE server-side conversation per stored id
-    // (`chat_conversations`, hydrated on mount). Surfacing multiple threads
-    // as a structured dialog list is a follow-up; for now the shape is
-    // satisfied with empty defaults so the unified contract type-checks and
-    // EmbeddableChat hides sidebar affordances when `dialogs.length === 0`.
-    dialogs: SSE_EMPTY_DIALOGS,
-    activeDialogId: null,
-    selectDialog: noopSelectDialog,
-    startNewDialog: noopStartNewDialog,
-    deleteDialog: noopDeleteDialog,
-    renameDialog: noopRenameDialog,
-    archiveDialog: noopArchiveDialog,
-    isDialogsLoading: false,
-    // SSE/guide has no server-side dialog list — never errors, nothing to retry.
-    dialogsError: false,
-    reloadDialogs: noopReloadDialogs,
-    isMessagesLoading: false,
-    hasMoreDialogs: false,
-    loadMoreDialogs: noopAsync,
+    // ─── Dialog management ───────────────────────────────────────────────
+    // With `chatConversationsUrl` the server transcript store IS the dialog
+    // list (shared `useManagedDialogList`); selecting a row re-hydrates
+    // through the history route. Without it (hosts that never set the
+    // endpoint) the single-thread stubs below are returned unchanged.
+    ...(conversationsApi
+      ? {
+          dialogs,
+          activeDialogId: conversationId,
+          selectDialog,
+          // New chat = `clearMessages` (the server mints on the next send);
+          // there is no create call.
+          startNewDialog: noopStartNewDialog,
+          deleteDialog: noopDeleteDialog,
+          renameDialog,
+          archiveDialog,
+          isDialogsLoading,
+          dialogsError,
+          reloadDialogs,
+          isMessagesLoading: isHydratingHistory,
+          hasMoreDialogs,
+          loadMoreDialogs,
+          dialogsManaged: true,
+          dialogCapabilities,
+        }
+      : {
+          dialogs: SSE_EMPTY_DIALOGS,
+          activeDialogId: null,
+          selectDialog: noopSelectDialog,
+          startNewDialog: noopStartNewDialog,
+          deleteDialog: noopDeleteDialog,
+          renameDialog: noopRenameDialog,
+          archiveDialog: noopArchiveDialog,
+          isDialogsLoading: false,
+          // No server-side dialog list — never errors, nothing to retry.
+          dialogsError: false,
+          reloadDialogs: noopReloadDialogs,
+          isMessagesLoading: false,
+          hasMoreDialogs: false,
+          loadMoreDialogs: noopAsync,
+          dialogsManaged: false,
+        }),
     hasMoreMessages: false,
     loadMoreMessages: noopAsync,
     approveRequest: noopApproveRequest,

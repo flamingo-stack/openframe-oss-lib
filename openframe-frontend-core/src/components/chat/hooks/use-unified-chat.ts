@@ -220,6 +220,11 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       setDialogScope,
       hasMoreMessages: activeState.hasMoreMessages,
       loadMoreMessages,
+      // Adapter-owned dialog list flag + capabilities (SSE with a
+      // conversations endpoint, NATS managed mode). Forwarded verbatim —
+      // `EmbeddableChat` gates the history UI on them.
+      dialogsManaged: activeState.dialogsManaged,
+      dialogCapabilities: activeState.dialogCapabilities,
       // Approvals
       approveRequest,
       rejectRequest,

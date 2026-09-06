@@ -35,8 +35,10 @@ export interface UseChatHistoryHydrationArgs {
   source: string;
   /** Resolved history endpoint (`<chatStreamUrl>/history` by default). */
   historyUrl: string;
-  /** The server-issued conversation id (null = nothing to hydrate). */
-  conversationIdRef: MutableRefObject<string | null>;
+  /** The server-issued conversation id (null = nothing to hydrate). A VALUE,
+   *  not a ref: switching conversations (`selectDialog`) must re-run the
+   *  fetch, so the id is an effect dependency. */
+  conversationId: string | null;
   /** User-send counter — set to the hydrated user-turn count so the next
    *  live send lands on the following `sendIdx`. */
   sendCountRef: MutableRefObject<number>;
@@ -64,7 +66,7 @@ export function useChatHistoryHydration({
   active,
   source,
   historyUrl,
-  conversationIdRef,
+  conversationId,
   sendCountRef,
   hydrateMessages,
   bumpMetaTick,
@@ -76,7 +78,6 @@ export function useChatHistoryHydration({
     if (!active) return undefined;
     // No stored conversation id → nothing to hydrate (fresh visitor / after
     // "new chat"); the first send establishes the conversation server-side.
-    const conversationId = conversationIdRef.current;
     if (!conversationId) return undefined;
     const key = `${source}:${conversationId}`;
     if (hydratedKeyRef.current === key) return undefined;
@@ -146,9 +147,9 @@ export function useChatHistoryHydration({
     return () => {
       cancelled = true;
     };
-    // `conversationIdRef`/`sendCountRef` are refs: stable identities, so
-    // listing them costs nothing and the effect still keys on the real inputs.
-  }, [active, source, historyUrl, hydrateMessages, bumpMetaTick, conversationIdRef, sendCountRef]);
+    // `sendCountRef` is a ref: a stable identity, so listing it costs nothing;
+    // `conversationId` is the real re-run trigger (dialog switch).
+  }, [active, source, historyUrl, conversationId, hydrateMessages, bumpMetaTick, sendCountRef]);
 
   return { isHydratingHistory, hydratedKeyRef };
 }
