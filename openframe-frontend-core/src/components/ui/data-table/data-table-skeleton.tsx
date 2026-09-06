@@ -109,14 +109,6 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
 }
 
 /**
- * Invisible rows that occupy exactly one row slot each.
- *
- * THE height reservation for a table whose page is short or empty — every call
- * site uses it (data-table's pad + empty branches AND the legacy `Table`'s), so
- * a padded page and an empty one are the same height by construction rather
- * than by matching guesses in each component.
- */
-/**
  * The empty state, floating centred over a full page's worth of reserved row
  * slots. Both table bodies render this — an empty table is exactly when a
  * collapsing one is most visible (the pagination and everything under it jump
@@ -155,6 +147,14 @@ export function ReservedEmptyState({
   );
 }
 
+/**
+ * Invisible rows that occupy exactly one row slot each.
+ *
+ * THE height reservation for a table whose page is short or empty — every call
+ * site uses it (data-table's pad + empty branches AND the legacy `Table`'s), so
+ * a padded page and an empty one are the same height by construction rather
+ * than by matching guesses in each component.
+ */
 export function PlaceholderRows({
   count,
   rowHeightClassName,
