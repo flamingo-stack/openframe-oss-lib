@@ -114,6 +114,33 @@ describe('useManagedDialogList', () => {
     expect(result.current.isDialogsLoading).toBe(false);
   });
 
+  it('re-arms when autoLoad turns on after mount (panel opened in the other mode)', async () => {
+    let resolve: ((v: ReturnType<typeof page>) => void) | undefined;
+    const fetchDialogs = vi.fn(
+      () =>
+        new Promise<ReturnType<typeof page>>(r => {
+          resolve = r;
+        }),
+    );
+    const { result, rerender } = renderHook(
+      ({ autoLoad }) => useManagedDialogList({ autoLoad, pageSize: 20, logTag: '[t]', fetchDialogs }),
+      { initialProps: { autoLoad: false } },
+    );
+    expect(result.current.isDialogsLoading).toBe(false);
+    expect(fetchDialogs).not.toHaveBeenCalled();
+
+    rerender({ autoLoad: true });
+    // Must NOT read as settled-and-empty for a frame before the effect fires.
+    expect(result.current.isDialogsLoading).toBe(true);
+    await waitFor(() => expect(fetchDialogs).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      resolve?.(page(['a']));
+      await Promise.resolve();
+    });
+    expect(result.current.isDialogsLoading).toBe(false);
+    expect(result.current.dialogs.map(d => d.id)).toEqual(['a']);
+  });
+
   it('an archive-style consumer (autoLoad false) is settled from the start', () => {
     const { result } = renderHook(() =>
       useManagedDialogList({

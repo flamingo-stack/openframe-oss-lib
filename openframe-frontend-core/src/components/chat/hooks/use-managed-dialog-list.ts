@@ -117,6 +117,16 @@ export function useManagedDialogList({
   const [settledSearch, setSettledSearch] = useState<string | null | undefined>(
     autoLoad && fetchDialogs ? undefined : null,
   );
+  // The seed above is a FIRST-RENDER value, so it misses a consumer that mounts
+  // with `autoLoad: false` and turns it on later (a panel opened in the other
+  // transport's mode, then switched into this one). Re-arm on that transition
+  // — adjusting state during render, the documented React pattern, guarded so
+  // the extra pass takes the early exit.
+  const [autoLoadWas, setAutoLoadWas] = useState(autoLoad);
+  if (autoLoad !== autoLoadWas) {
+    setAutoLoadWas(autoLoad);
+    if (autoLoad && fetchDialogs) setSettledSearch(undefined);
+  }
   const [isDialogsPending, setIsDialogsPending] = useState<boolean>(false);
   // Synchronous mirror: `loadMoreDialogs` must see a page-1 load dispatched in
   // the SAME tick, which the state value (a stale render closure) would miss.

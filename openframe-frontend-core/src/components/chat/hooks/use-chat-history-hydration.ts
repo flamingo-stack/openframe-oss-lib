@@ -108,8 +108,10 @@ export function useChatHistoryHydration({
         if (!res.ok) {
           // Releases the once-guard exactly like the catch below — this path
           // returns BEFORE it, and a transient 429/5xx must not mark the
-          // conversation hydrated for the rest of the mount.
-          if (hydratedKeyRef.current === key) hydratedKeyRef.current = null;
+          // conversation hydrated for the rest of the mount. `isCurrentRun` so
+          // a superseded run can't release a key its replacement re-claimed
+          // (same key string, different run).
+          if (isCurrentRun() && hydratedKeyRef.current === key) hydratedKeyRef.current = null;
           return;
         }
         // `.json()` is `any` — this is untrusted wire, so narrow it rather than
@@ -168,7 +170,7 @@ export function useChatHistoryHydration({
         // Fetch failed — start empty; the server still owns history (above).
         // Release the once-guard so re-selecting the conversation retries
         // (a transient 429/5xx must not mark it hydrated for the mount).
-        if (hydratedKeyRef.current === key) hydratedKeyRef.current = null;
+        if (isCurrentRun() && hydratedKeyRef.current === key) hydratedKeyRef.current = null;
       } finally {
         completed = true;
         // Only the latest run owns the flag (React no-ops updates after unmount).
@@ -182,7 +184,7 @@ export function useChatHistoryHydration({
       // on the guard, drops the in-flight response and never refetches — the
       // thread would render empty for the rest of the mount while the server
       // keeps answering from history the user cannot see.
-      if (!completed && hydratedKeyRef.current === key) hydratedKeyRef.current = null;
+      if (!completed && isCurrentRun() && hydratedKeyRef.current === key) hydratedKeyRef.current = null;
       // Release the skeleton unless a newer run has already claimed it (that
       // run raises the flag itself and owns clearing it).
       if (isCurrentRun()) setIsHydratingHistory(false);

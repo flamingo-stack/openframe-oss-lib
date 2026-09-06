@@ -2057,7 +2057,12 @@ function EmbeddableChatInner({
   // Chats" list header (search + archive, no back) and a "New Chat" compose
   // header (back to the list); conversations + guide keep the shared header
   // derivations. Wide mode uses its own two-cell header instead.
-  const narrowMingoEmpty = isMingoMode && !hasConversation && !archiveOpen;
+  // `!guideListIsEmpty` for the same reason as `stackedListView`: with nothing
+  // to list the BODY renders the Guide welcome, so a "Current Chats" header
+  // above it would be half of the empty screen the shortcut exists to remove.
+  // The else-branch header resolves to the assistant name via `isGuideEmpty`
+  // and keeps the archive entry point.
+  const narrowMingoEmpty = isMingoMode && !hasConversation && !archiveOpen && !guideListIsEmpty;
   const narrowHeaderProps: ChatPanelHeaderProps = narrowMingoEmpty
     ? composeOpen
       ? {
