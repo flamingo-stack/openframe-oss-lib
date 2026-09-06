@@ -10,7 +10,7 @@ const ROW_HEIGHT_DESKTOP = 'h-[66px] md:h-[78px]';
  * A `compact` row's floor. Compact rows are content-sized (`py-2`), but every
  * row in one table renders the same cell shapes, so pinning a minimum makes the
  * body's height a function of the ROW COUNT alone. Hosts do NOT reserve
- * `rows × 56` themselves any more: `skeletonRows` + `keepHeightWhenEmpty` hold
+ * `rows × 56` themselves any more: `skeletonRows` + `minRows` hold
  * a full page's height in every state (placeholders below), and a cell taller
  * than this floor (avatar + two lines) wants a non-compact, fixed-height row.
  */
