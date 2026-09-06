@@ -9,16 +9,12 @@ const ROW_HEIGHT_DESKTOP = 'h-[66px] md:h-[78px]';
 /**
  * A `compact` row's floor. Compact rows are content-sized (`py-2`), but every
  * row in one table renders the same cell shapes, so pinning a minimum makes the
- * body's height a function of the ROW COUNT alone — which is what lets a host
- * reserve space for a full page and stop the layout jumping between a full
- * page, a short last page and the skeleton. The skeleton uses it too, so the
- * loading state is exactly as tall as the rows that replace it.
+ * body's height a function of the ROW COUNT alone. Hosts do NOT reserve
+ * `rows × 56` themselves any more: `skeletonRows` + `keepHeightWhenEmpty` hold
+ * a full page's height in every state (placeholders below), and a cell taller
+ * than this floor (avatar + two lines) wants a non-compact, fixed-height row.
  */
 const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]';
-/** The same 56, as a number, for hosts reserving `rows x height` of space.
- *  A LITERAL class above and a literal number here: an interpolated Tailwind
- *  class is invisible to the scanner and is never generated. */
-const COMPACT_ROW_MIN_HEIGHT_PX = 56;
 const ROW_HEIGHT_MOBILE = 'h-[66px]';
 
 /**
@@ -137,4 +133,4 @@ export function TableCardSkeleton({
 }
 
 /** @deprecated */
-export { COMPACT_ROW_MIN_HEIGHT, COMPACT_ROW_MIN_HEIGHT_PX, ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE };
+export { COMPACT_ROW_MIN_HEIGHT, ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE };

@@ -110,6 +110,8 @@ export interface TableProps<T = TableRowData> {
    * that empties the list. Opt-in: an unpaginated table wants to collapse.
    */
   keepHeightWhenEmpty?: boolean;
+  /** Second line of the empty state (e.g. "Try adjusting the search"). */
+  emptyDescription?: string;
 
   // Styling
   className?: string;
@@ -278,6 +280,9 @@ export interface TableCardSkeletonProps {
 /** @deprecated Use types from `data-table` instead. */
 export interface TableEmptyStateProps {
   message?: string;
+  /** Second line under the title. Defaults to the generic search/filter hint
+   *  only when `message` is also absent. */
+  description?: string;
   icon?: ReactNode;
   action?: {
     label: string;

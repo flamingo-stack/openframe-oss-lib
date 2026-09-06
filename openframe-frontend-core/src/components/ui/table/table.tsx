@@ -103,6 +103,7 @@ export function Table<T = TableRowData>({
   emptyMessage,
   skeletonRows = 10,
   keepHeightWhenEmpty = false,
+  emptyDescription,
   className,
   containerClassName,
   headerClassName,
@@ -277,11 +278,11 @@ export function Table<T = TableRowData>({
             <div className="relative flex w-full flex-col gap-2">
               <TablePlaceholderRows rows={skeletonRows} compact={compact} />
               <div className="absolute inset-x-0 top-0 flex justify-center">
-                <TableEmptyState message={emptyMessage} />
+                <TableEmptyState message={emptyMessage} description={emptyDescription} />
               </div>
             </div>
           ) : (
-            <TableEmptyState message={emptyMessage} />
+            <TableEmptyState message={emptyMessage} description={emptyDescription} />
           )
         ) : (
           <>
