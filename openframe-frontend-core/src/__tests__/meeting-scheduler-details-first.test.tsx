@@ -19,7 +19,7 @@ const hookState = { isSubmitting: false };
 
 vi.mock('../hooks/use-meeting-booking', async importOriginal => ({
   // The sentinel keeps its ONE owner: only the hook itself is replaced.
-  ...((await importOriginal()) as Record<string, unknown>),
+  ...(await importOriginal()),
   useMeetingBooking: () => ({
     availability,
     isLoadingAvailability: false,
