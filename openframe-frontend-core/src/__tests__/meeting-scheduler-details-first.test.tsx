@@ -14,6 +14,8 @@ const availability: MeetingAvailability = {
 const book = vi.fn<(payload: Record<string, unknown>) => Promise<unknown>>();
 const refetchAvailability = vi.fn(() => Promise.resolve());
 const toast = vi.fn();
+/** Mutable so a test can flip the hook's in-flight flag between renders. */
+const hookState = { isSubmitting: false };
 
 vi.mock('../hooks/use-meeting-booking', async importOriginal => ({
   // The sentinel keeps its ONE owner: only the hook itself is replaced.
@@ -27,19 +29,25 @@ vi.mock('../hooks/use-meeting-booking', async importOriginal => ({
     setMonthOffset: vi.fn(),
     refetchAvailability,
     book,
-    isSubmitting: false,
+    isSubmitting: hookState.isSubmitting,
   }),
 }));
 vi.mock('../hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 
+// A factory, not a shared element: React bails out of re-rendering the SAME element object.
+const scheduler = () => (
+  <HubSpotMeetingScheduler meetingId="1" flow="details-first" initialAvailability={availability} />
+);
+
 async function continueFromDetails() {
-  render(<HubSpotMeetingScheduler meetingId="1" flow="details-first" initialAvailability={availability} />);
+  const view = render(scheduler());
   await screen.findByLabelText(/^Email/);
   fillIdentity();
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   // The calendar step: Back exists here (it never does on the form step).
   await screen.findByRole('button', { name: 'Back' });
   expect(screen.queryByLabelText(/^Email/)).not.toBeInTheDocument();
+  return view;
 }
 
 const timeChip = async () => {
@@ -52,6 +60,7 @@ const timeChip = async () => {
 };
 
 beforeEach(() => {
+  hookState.isSubmitting = false;
   book.mockReset();
   refetchAvailability.mockClear();
   toast.mockClear();
@@ -85,5 +94,16 @@ describe('HubSpotMeetingScheduler — details-first flow', () => {
     fireEvent.click(await timeChip());
     expect(await screen.findByLabelText(/^Email/)).toHaveValue('a@b.co');
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Booking failed' }));
+  });
+
+  it('while a POST is in flight the chips are disabled and the calendar cannot be paged', async () => {
+    const { rerender } = await continueFromDetails();
+    const chipsBefore = await timeChip();
+    expect(chipsBefore).not.toBeDisabled();
+    hookState.isSubmitting = true;
+    rerender(scheduler());
+    const chips = screen.getAllByRole('button').filter(b => /\d{1,2}:\d{2}/.test(b.textContent ?? ''));
+    expect(chips.length).toBeGreaterThan(0);
+    expect(chips.every(b => (b as HTMLButtonElement).disabled)).toBe(true);
   });
 });

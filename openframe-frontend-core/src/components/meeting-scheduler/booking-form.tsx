@@ -15,6 +15,7 @@ import {
   type BuiltInBookingField,
   type MeetingAvailability,
   type SupportedFormFieldType,
+  type MeetingFormField,
   type SupportedMeetingFormField,
   type BookingFormValues,
 } from '../../schemas/meeting-booking-schema';
@@ -133,7 +134,8 @@ const slotColumnClass = (row: BookingFieldRow, slot: BookingFieldSlot, index: nu
 /** What one control needs: the field, its DOM id, where it registers in the
  *  form, and the form's own register/control. */
 interface ControlArgs {
-  field: SupportedMeetingFormField & Partial<Pick<BuiltInBookingField, 'inputType' | 'autoComplete' | 'placeholder'>>;
+  /** A declared question, or a built-in carrying its control hints (everything on the declaration that is not wire data). */
+  field: SupportedMeetingFormField & Partial<Omit<BuiltInBookingField, keyof MeetingFormField | 'requiredMessage'>>;
   id: string;
   /** Top-level for the built-ins (`email`), `formFields.<name>` for declared questions. */
   registerName: string;

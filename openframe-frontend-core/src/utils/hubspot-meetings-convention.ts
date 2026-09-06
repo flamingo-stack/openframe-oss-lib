@@ -71,9 +71,11 @@ export function parseSchedulingLinkName(name: string): ParsedSchedulingLinkName 
   };
 }
 
-/** Whether a link name opts into the directory (has an Audience segment). */
+/** Whether a link name opts into the directory: its Audience segment slugifies
+ *  to a non-empty key — the SAME rule the directory groups by, so "listed" and
+ *  "has a group" can never disagree. */
 export function isListedSchedulingName(name: string): boolean {
-  return parseSchedulingLinkName(name).audienceLabel !== null;
+  return schedulingAudienceKey(parseSchedulingLinkName(name).audienceLabel ?? '') !== null;
 }
 
 /**

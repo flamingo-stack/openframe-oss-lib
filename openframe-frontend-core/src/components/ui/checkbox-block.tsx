@@ -4,6 +4,7 @@ import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { type ComponentRef, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { CheckboxCheckmarkIcon } from '../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon';
+import { RequiredMark } from './required-mark';
 
 interface CheckboxBlockProps {
   id?: string;
@@ -23,7 +24,8 @@ interface CheckboxBlockProps {
    */
   trailing?: ReactNode;
   disabled?: boolean;
-  /** Marks the box `aria-required` — a required consent is invisible to assistive tech without it. */
+  /** Marks the box `aria-required` AND draws the `RequiredMark` after the label — the
+   *  same pairing every required field carries, so neither signal stands alone. */
   required?: boolean;
   /** Error message displayed below the block (also triggers red border) */
   error?: string;
@@ -121,6 +123,7 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
             )}
           >
             {label}
+            {required && <RequiredMark />}
           </span>
           {description && (
             <span className={cn('!leading-4 text-h6', 'select-none break-words text-ods-text-secondary')}>
