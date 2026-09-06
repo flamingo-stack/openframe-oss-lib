@@ -17,6 +17,7 @@
  */
 
 import { readServerErrorMessage } from '../../../chat-protocol/confirm-tool';
+import { isRecord, unwrapEnvelope } from '../../../chat-protocol/wire-narrow';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import type { DialogItem } from '../types/component.types';
 import type { FetchDialogsParams, FetchDialogsResult } from '../types/unified-chat-state.types';
@@ -28,16 +29,6 @@ export interface ChatConversationsApi {
   renameDialog(id: string, title: string): Promise<void>;
   archiveDialog(id: string): Promise<void>;
   unarchiveDialog(id: string): Promise<void>;
-}
-
-/** Narrow one hop of an untrusted JSON body (`typeof null === 'object'`). */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-/** route-base `successResponse` wraps in `{ data }`; tolerate a raw body too. */
-function unwrapEnvelope(payload: unknown): unknown {
-  return isRecord(payload) && 'data' in payload ? payload.data : payload;
 }
 
 function toDialogItem(row: unknown): DialogItem | null {

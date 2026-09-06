@@ -79,7 +79,6 @@ import { useChatDialogManager } from './hooks/use-chat-dialog-manager';
 import { useChatIdentity } from './hooks/use-chat-identity';
 import { useCloseOnNavigation } from './hooks/use-close-on-navigation';
 import { useEmptyStateConfig } from './hooks/use-empty-state-config';
-import type { FetchDialogsParams, FetchDialogsResult } from './hooks/use-nats-chat-adapter';
 import { fetchSlashCommands, useSlashCommandRegistry, type SlashCommandSummary } from './hooks/use-slash-commands';
 import type { ChatSource, UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
@@ -91,10 +90,10 @@ import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { SourceActionButton } from './source-action-button';
-import type { ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
+import type { ChatInputRef, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 import type { MessageSegment, Message } from './types/message.types';
-import type { UnifiedChatState } from './types/unified-chat-state.types';
+import type { ChatDialogCapabilities, UnifiedChatState } from './types/unified-chat-state.types';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
@@ -214,23 +213,16 @@ export interface EmbeddableChatProps {
    * When the host injects `mingoState`, it doesn't pass `modes.mingo` (that
    * would re-activate the idle built-in adapter), so the rename/archive/
    * restore/archive-page affordances can't read their capability flags off the
-   * callback config. Supply them here instead. `canRename`/`canArchive` default
-   * to `true` when `mingoState` is set; the archive page + restore are shown
-   * only when their callbacks are provided. Ignored unless `mingoState` is set.
+   * callback config. Supply them here instead. Default OFF: the row ⋯ menu and
+   * the archive page appear only when the host opts in, so nothing advertises
+   * an action the host hasn't wired. Ignored unless `mingoState` is set.
+   *
+   * Same shape an adapter reports through `UnifiedChatState.dialogCapabilities`
+   * (`ChatDialogCapabilities`) — one type, whether the list is host-owned or
+   * adapter-owned. `onCopyLink` adds "Copy chat link" to the header ⋯ menu and
+   * every row menu; the host owns the URL shape and the clipboard write.
    */
-  mingoDialogCapabilities?: {
-    canRename?: boolean;
-    canArchive?: boolean;
-    fetchArchivedDialogs?: (params: FetchDialogsParams) => Promise<FetchDialogsResult>;
-    unarchiveDialog?: (id: string) => Promise<void>;
-    searchQuery?: string;
-    onSearchChange?: (query: string) => void;
-    /** Copy a shareable link to a conversation — adds "Copy chat link" to the
-     *  header ⋯ menu and every dialog row menu. The host owns the URL shape and
-     *  the clipboard write; the panel knows neither the app's routes nor whether
-     *  a clipboard is available. Omit to hide the action. */
-    onCopyLink?: (dialog: DialogItem) => void;
-  };
+  mingoDialogCapabilities?: ChatDialogCapabilities;
 
   /**
    * Controlled active-mode. When provided, `onActiveModeChange` MUST
@@ -1223,44 +1215,30 @@ function EmbeddableChatInner({
   // `mingoDialogCapabilities` (the host doesn't pass `modes.mingo`); otherwise
   // from the callback-config shape, where the presence of a callback IS the
   // capability. Both feed the same gating below so the JSX has one source.
-  const mingoCaps = useMemo(() => {
-    // Adapter-owned list (SSE with a conversations endpoint, NATS managed
-    // mode): the adapter says what it can honour. Checked FIRST so a Guide
-    // panel never inherits the Mingo config's callbacks.
-    if (dialogCapabilities) {
-      return {
-        canRename: dialogCapabilities.canRename ?? false,
-        canArchive: dialogCapabilities.canArchive ?? false,
-        fetchArchivedDialogs: dialogCapabilities.fetchArchivedDialogs,
-        unarchiveDialog: dialogCapabilities.unarchiveDialog,
-        searchQuery: dialogCapabilities.searchQuery,
-        onSearchChange: dialogCapabilities.onSearchChange,
-        onCopyLink: dialogCapabilities.onCopyLink,
-      };
-    }
-    if (mingoState) {
-      // Default OFF: the row ⋯ menu (Rename / Archive) and the archive page are
-      // shown only when the host explicitly opts in — same capability-gating as
-      // the archive button (`fetchArchivedDialogs` presence). Otherwise the menu
-      // would advertise actions the host hasn't actually wired (no-ops).
-      return {
-        canRename: mingoDialogCapabilities?.canRename ?? false,
-        canArchive: mingoDialogCapabilities?.canArchive ?? false,
-        fetchArchivedDialogs: mingoDialogCapabilities?.fetchArchivedDialogs,
-        unarchiveDialog: mingoDialogCapabilities?.unarchiveDialog,
-        searchQuery: mingoDialogCapabilities?.searchQuery,
-        onSearchChange: mingoDialogCapabilities?.onSearchChange,
-        onCopyLink: mingoDialogCapabilities?.onCopyLink,
-      };
-    }
+  // ONE `ChatDialogCapabilities`, from whichever source owns the list:
+  //   1. the ACTIVE ADAPTER (SSE with a conversations endpoint, or NATS
+  //      managed mode) — checked first so a Guide panel can never inherit the
+  //      Mingo config's callbacks;
+  //   2. the host-injected `mingoState`'s companion prop;
+  //   3. the legacy callback config, where a callback's PRESENCE is the
+  //      capability.
+  // `canRename`/`canArchive` default OFF everywhere: the ⋯ menu must never
+  // advertise an action nothing has wired.
+  const mingoCaps = useMemo<ChatDialogCapabilities>(() => {
+    const caps: ChatDialogCapabilities | undefined =
+      dialogCapabilities ??
+      (mingoState
+        ? mingoDialogCapabilities
+        : {
+            canRename: !!effectiveModes.mingo?.renameDialog,
+            canArchive: !!effectiveModes.mingo?.archiveDialog,
+            fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
+            unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
+          });
     return {
-      canRename: !!effectiveModes.mingo?.renameDialog,
-      canArchive: !!effectiveModes.mingo?.archiveDialog,
-      fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
-      unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
-      searchQuery: undefined as string | undefined,
-      onSearchChange: undefined as ((query: string) => void) | undefined,
-      onCopyLink: undefined as ((dialog: DialogItem) => void) | undefined,
+      ...caps,
+      canRename: caps?.canRename ?? false,
+      canArchive: caps?.canArchive ?? false,
     };
   }, [dialogCapabilities, mingoState, mingoDialogCapabilities, effectiveModes]);
 

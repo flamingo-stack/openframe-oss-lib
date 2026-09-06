@@ -18,15 +18,10 @@
  */
 
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { isRecord, unwrapEnvelope } from '../../../chat-protocol/wire-narrow';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../utils/auto-continuation-directive';
 import type { Message } from './use-chat';
-
-/** Narrow one hop of an untrusted JSON body to something with readable keys.
- *  `typeof null === 'object'`, so the null check is the whole point. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 export interface UseChatHistoryHydrationArgs {
   /** Mirrors the adapter's `active` gate — an idle (Mingo-mode) mount never fetches. */
@@ -51,6 +46,13 @@ export interface UseChatHistoryHydrationArgs {
   ) => void;
   /** Invalidates the adapter's `latestMeta` memo after hydration lands. */
   bumpMetaTick: () => void;
+  /** The server answered OK with ZERO rows for this id — it does not exist any
+   *  more, or is no longer ours (e.g. the thread was claimed by an account
+   *  after sign-in and this browser is now signed out). Distinct from a fetch
+   *  FAILURE, which keeps the id so a transient outage never loses context.
+   *  A host that persists the id should drop it here — otherwise every later
+   *  turn streams an answer the server refuses to record. */
+  onOrphanedConversation?: (conversationId: string) => void;
 }
 
 export interface UseChatHistoryHydrationResult {
@@ -70,17 +72,21 @@ export function useChatHistoryHydration({
   sendCountRef,
   hydrateMessages,
   bumpMetaTick,
+  onOrphanedConversation,
 }: UseChatHistoryHydrationArgs): UseChatHistoryHydrationResult {
   const [isHydratingHistory, setIsHydratingHistory] = useState(false);
   const hydratedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!active) return undefined;
-    // No stored conversation id → nothing to hydrate (fresh visitor / after
-    // "new chat"); the first send establishes the conversation server-side.
-    if (!conversationId) return undefined;
+    // The flag is owned by the fetch below and released in its `finally`; the
+    // CLEANUP releases it for every early exit and for a superseded run.
+    // `conversationId` is a DEPENDENCY (a dialog switch must re-fetch), so that
+    // path is reachable in normal use: before this, "new chat" or archiving the
+    // open thread mid-fetch left the flag stuck true forever and the panel
+    // wedged on a message skeleton.
+    if (!active || !conversationId) return () => setIsHydratingHistory(false);
     const key = `${source}:${conversationId}`;
-    if (hydratedKeyRef.current === key) return undefined;
+    if (hydratedKeyRef.current === key) return () => setIsHydratingHistory(false);
     hydratedKeyRef.current = key;
     let cancelled = false;
     setIsHydratingHistory(true);
@@ -95,9 +101,7 @@ export function useChatHistoryHydration({
         // `.json()` is `any` — this is untrusted wire, so narrow it rather than
         // asserting the shape we hope for.
         const payload: unknown = await res.json().catch(() => null);
-        // route-base successResponse envelope ({ data }) with a raw-body fallback.
-        const envelope = isRecord(payload) ? payload.data : undefined;
-        const body = envelope ?? payload;
+        const body = unwrapEnvelope(payload);
         const rawRows = isRecord(body) ? body.messages : undefined;
         // Non-object rows are DROPPED, not carried into the loop below. The
         // loop reads `row.role` unguarded, so a single `null` row threw a
@@ -105,7 +109,12 @@ export function useChatHistoryHydration({
         // hydration wholesale and rendering an EMPTY conversation on refresh.
         // Skipping the bad row keeps every good one.
         const rows: Array<Record<string, unknown>> = Array.isArray(rawRows) ? rawRows.filter(isRecord) : [];
-        if (cancelled || rows.length === 0) return;
+        if (cancelled) return;
+        if (rows.length === 0) {
+          // A well-formed EMPTY history: the id is gone or not ours.
+          onOrphanedConversation?.(conversationId);
+          return;
+        }
         const hydrated: Message[] = [];
         // Per-send "Sources used" chips, restored from the persisted audit
         // copy the history route projects as `sources` on assistant rows —
@@ -140,16 +149,24 @@ export function useChatHistoryHydration({
         bumpMetaTick();
       } catch {
         // Fetch failed — start empty; the server still owns history (above).
+        // Release the once-guard so re-selecting the conversation retries
+        // (a transient 429/5xx must not mark it hydrated for the mount).
+        if (hydratedKeyRef.current === key) hydratedKeyRef.current = null;
       } finally {
-        if (!cancelled) setIsHydratingHistory(false);
+        // Unconditional: a superseded run re-sets it synchronously on its own
+        // pass, and React no-ops state updates after unmount.
+        setIsHydratingHistory(false);
       }
     })();
     return () => {
       cancelled = true;
+      // A superseded run must not leave the skeleton up; the replacement run
+      // re-raises the flag itself when it starts fetching.
+      setIsHydratingHistory(false);
     };
     // `sendCountRef` is a ref: a stable identity, so listing it costs nothing;
     // `conversationId` is the real re-run trigger (dialog switch).
-  }, [active, source, historyUrl, conversationId, hydrateMessages, bumpMetaTick, sendCountRef]);
+  }, [active, source, historyUrl, conversationId, hydrateMessages, bumpMetaTick, onOrphanedConversation, sendCountRef]);
 
   return { isHydratingHistory, hydratedKeyRef };
 }

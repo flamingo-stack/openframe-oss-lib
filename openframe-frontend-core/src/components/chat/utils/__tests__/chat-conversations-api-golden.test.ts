@@ -47,6 +47,21 @@ describe('createChatConversationsApi', () => {
     ]);
   });
 
+  it('accepts a RAW body as well as the { data } envelope', async () => {
+    // `successResponse` is `NextResponse.json(data)` — no envelope. The
+    // envelope branch exists for embedders proxying a wrapped payload.
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        jsonResponse({ dialogs: [{ id: 'r', title: 'Raw', timestamp: '2026-09-06T10:00:00.000Z' }], nextCursor: null }),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = createChatConversationsApi('/api/docs/chat/conversations');
+    const result = await api.fetchDialogs({ status: 'active' });
+    expect(result.dialogs).toEqual([{ id: 'r', title: 'Raw', timestamp: new Date('2026-09-06T10:00:00.000Z') }]);
+    expect(result.nextCursor).toBeNull();
+  });
+
   it('GET omits empty optional params', async () => {
     const fetchMock = vi.fn(() => Promise.resolve(jsonResponse({ data: { dialogs: [], nextCursor: null } })));
     vi.stubGlobal('fetch', fetchMock);

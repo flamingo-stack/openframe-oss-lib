@@ -144,13 +144,16 @@ describe('useNatsChatAdapter — managed-dialog mode (characterization)', () => 
     expect(result.current.dialogs).toEqual([]);
   });
 
-  it('archive failure keeps the row and the active id', async () => {
+  it('archive failure keeps the row and the active id, and surfaces the error', async () => {
     const config = makeConfig({ archiveDialog: vi.fn(() => Promise.reject(new Error('down'))) });
     const { result } = renderHook(() => useNatsChatAdapter(config));
     await waitFor(() => expect(result.current.dialogs.length).toBe(2));
     act(() => result.current.selectDialog('a'));
     await act(async () => {
-      await result.current.archiveDialog('a');
+      // Re-thrown (was swallowed before the shared-hook extraction) so a
+      // confirmation modal can stay open instead of closing on a write the
+      // server rejected.
+      await expect(result.current.archiveDialog('a')).rejects.toThrow('down');
     });
     expect(result.current.dialogs.map(d => d.id)).toEqual(['a', 'b']);
     expect(result.current.activeDialogId).toBe('a');

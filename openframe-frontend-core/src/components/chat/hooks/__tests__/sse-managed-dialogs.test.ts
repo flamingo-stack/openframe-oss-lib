@@ -242,6 +242,40 @@ describe('useSseChatAdapter — managed conversation list', () => {
     expect(result.current.dialogCapabilities?.searchQuery).toBe('print');
   });
 
+  it('never wedges on the message skeleton when a hydration is superseded', async () => {
+    window.localStorage.setItem(CONVERSATION_KEY, JSON.stringify({ conversationId: 'a' }));
+    mockFetch({ list: () => listPayload(['a', 'b']) });
+    const { result } = renderHook(() => useSseChatAdapter(), { wrapper: makeWrapper(managedRuntime) });
+    await waitFor(() => expect(result.current.messages.length).toBe(2));
+
+    // "New chat" while a hydration could still be in flight: the loading flag
+    // must clear, or `hasConversation` pins the panel on a skeleton forever.
+    act(() => result.current.clearMessages());
+    await waitFor(() => expect(result.current.isMessagesLoading).toBe(false));
+    expect(result.current.activeDialogId).toBeNull();
+
+    // Same for selecting away mid-flight.
+    act(() => result.current.selectDialog('b'));
+    act(() => result.current.selectDialog(null));
+    await waitFor(() => expect(result.current.isMessagesLoading).toBe(false));
+  });
+
+  it('drops a stored id the server no longer recognizes (empty history)', async () => {
+    window.localStorage.setItem(CONVERSATION_KEY, JSON.stringify({ conversationId: 'gone' }));
+    const { fetchMock } = mockFetch({ list: () => listPayload([]) });
+    fetchMock.mockImplementation((url: string) => {
+      const u = String(url);
+      const json = (body: unknown) =>
+        Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) } as unknown as Response);
+      if (u.includes('/history')) return json({ data: { messages: [] } });
+      if (u.startsWith(CONVERSATIONS_URL)) return json(listPayload([]));
+      return json({ commands: [] });
+    });
+    const { result } = renderHook(() => useSseChatAdapter(), { wrapper: makeWrapper(managedRuntime) });
+    await waitFor(() => expect(window.localStorage.getItem(CONVERSATION_KEY)).toBeNull());
+    expect(result.current.activeDialogId).toBeNull();
+  });
+
   it('ZERO-REGRESSION: without chatConversationsUrl the single-thread stubs are returned', async () => {
     window.localStorage.setItem(CONVERSATION_KEY, JSON.stringify({ conversationId: 'a' }));
     const { calls } = mockFetch({});

@@ -1,6 +1,7 @@
 /**
  * Unit tests for the shared `useManagedDialogList` hook — the parts the NATS
- * characterization test cannot reach: `upsertDialogTop` dedupe, `patchDialog`,
+ * characterization test cannot reach: `upsertDialogTop` dedupe,
+ * `bumpDialogToTop` ordering, append dedupe, out-of-order page-1 responses,
  * the `onDialogRemoved` reasons, and the inert no-`fetchDialogs` shape.
  */
 
@@ -28,7 +29,7 @@ describe('useManagedDialogList', () => {
     expect(result.current.isDialogsLoading).toBe(false);
   });
 
-  it('upsertDialogTop prepends + dedupes; patchDialog patches in place', async () => {
+  it('upsertDialogTop prepends + dedupes; bumpDialogToTop re-heads the row', async () => {
     const fetchDialogs = vi.fn(() => Promise.resolve(page(['a', 'b'])));
     const { result } = renderHook(() =>
       useManagedDialogList({ active: true, pageSize: 20, logTag: '[t]', fetchDialogs }),
@@ -39,8 +40,64 @@ describe('useManagedDialogList', () => {
       ['b', 'B again'],
       ['a', 'Chat a'],
     ]);
-    act(() => result.current.patchDialog('a', { title: 'A patched' }));
-    expect(result.current.dialogs.find(d => d.id === 'a')?.title).toBe('A patched');
+    act(() => result.current.bumpDialogToTop('a'));
+    expect(result.current.dialogs.map(d => d.id)).toEqual(['a', 'b']);
+    expect(result.current.dialogs[0].timestamp).toBeInstanceOf(Date);
+    // Unknown id is a no-op, not an insert.
+    act(() => result.current.bumpDialogToTop('nope'));
+    expect(result.current.dialogs.map(d => d.id)).toEqual(['a', 'b']);
+  });
+
+  it('drops a superseded page-1 response and dedupes appended pages', async () => {
+    const resolvers: Array<(v: ReturnType<typeof page>) => void> = [];
+    const fetchDialogs = vi.fn(() => new Promise<ReturnType<typeof page>>(resolve => resolvers.push(resolve)));
+    const { result, rerender } = renderHook(
+      ({ search }) => useManagedDialogList({ active: true, pageSize: 20, logTag: '[t]', fetchDialogs, search }),
+      { initialProps: { search: 'a' } },
+    );
+    await waitFor(() => expect(resolvers.length).toBe(1));
+    rerender({ search: 'ab' });
+    await waitFor(() => expect(resolvers.length).toBe(2));
+
+    // The NEWER request resolves first, then the stale one lands.
+    await act(async () => {
+      resolvers[1](page(['new'], 'cursor-new'));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      resolvers[0](page(['stale'], 'cursor-stale'));
+      await Promise.resolve();
+    });
+    expect(result.current.dialogs.map(d => d.id)).toEqual(['new']);
+    expect(result.current.hasMoreDialogs).toBe(true);
+
+    // Appended pages drop ids already rendered (a row can move between pages).
+    await act(async () => {
+      const p = result.current.loadMoreDialogs();
+      resolvers[2](page(['new', 'later'], null));
+      await p;
+    });
+    expect(result.current.dialogs.map(d => d.id)).toEqual(['new', 'later']);
+  });
+
+  it('re-throws a failed archive/delete so a confirmation modal can stay open', async () => {
+    const { result } = renderHook(() =>
+      useManagedDialogList({
+        active: true,
+        pageSize: 20,
+        logTag: '[t]',
+        fetchDialogs: () => Promise.resolve(page(['a'])),
+        archiveDialog: () => Promise.reject(new Error('429')),
+        deleteDialog: () => Promise.reject(new Error('boom')),
+      }),
+    );
+    await waitFor(() => expect(result.current.dialogs.length).toBe(1));
+    await act(async () => {
+      await expect(result.current.archiveDialog('a')).rejects.toThrow('429');
+      await expect(result.current.deleteDialog('a')).rejects.toThrow('boom');
+    });
+    // The row survives a failed write.
+    expect(result.current.dialogs.map(d => d.id)).toEqual(['a']);
   });
 
   it('reports removal reasons AFTER the local removal', async () => {

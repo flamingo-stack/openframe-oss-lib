@@ -427,6 +427,16 @@ export function useSseChatAdapter(
     // Meta invalidation is a reducer concern here: `seedSseMaps` (inside
     // `hydrateMessages` above) already invalidates the snapshot.
     bumpMetaTick: noopBumpMetaTick,
+    // Drop a stored id the server no longer recognizes (deleted, or claimed by
+    // an account while this browser is signed out) — keeping it would stream
+    // answers the server refuses to persist. Guarded on "no live turn yet" so
+    // a just-minted id is never dropped.
+    onOrphanedConversation: useCallback(
+      (id: string) => {
+        if (conversationIdRef.current === id && state.messages.length === 0) commitConversationId(null);
+      },
+      [commitConversationId, state.messages.length],
+    ),
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -483,7 +493,7 @@ export function useSseChatAdapter(
     renameDialog,
     archiveDialog,
     upsertDialogTop,
-    patchDialog,
+    bumpDialogToTop,
   } = useManagedDialogList({
     active,
     fetchDialogs: fetchActiveDialogs,
@@ -618,12 +628,13 @@ export function useSseChatAdapter(
                 mintedThisTurn = true;
                 // Optimistic row so the list shows the new conversation at
                 // once; the end-of-turn reload swaps in the server's title.
-                if (conversationsApi && !hidden) {
-                  upsertDialogTop({
-                    id: conversationIdRef.current ?? '',
-                    title: text.slice(0, 80),
-                    timestamp: new Date(),
-                  });
+                // NEUTRAL placeholder — the SERVER owns titles (it strips slash
+                // commands + attachment markdown and cuts at a word boundary),
+                // so guessing here would flash a signed attachment URL or a
+                // `/command` token, and a naive slice can split an emoji.
+                const mintedId = conversationIdRef.current;
+                if (conversationsApi && !hidden && mintedId) {
+                  upsertDialogTop({ id: mintedId, title: 'New chat', timestamp: new Date() });
                 }
               }
               applyEvent(event);
@@ -667,8 +678,15 @@ export function useSseChatAdapter(
         // the row is persisted by the time the stream ends); a later turn
         // just bumps the row to the top.
         if (conversationsApi && !ctrl.signal.aborted) {
-          if (mintedThisTurn) reloadDialogs();
-          else if (conversationIdRef.current) patchDialog(conversationIdRef.current, { timestamp: new Date() });
+          if (mintedThisTurn) {
+            reloadDialogs();
+          } else if (conversationIdRef.current) {
+            // Re-insert at the TOP rather than patching in place: the server
+            // has moved this row to the head of `last_message_at desc`, so an
+            // in-place bump would leave the rail's order and its
+            // Today/Yesterday grouping disagreeing with the server.
+            bumpDialogToTop(conversationIdRef.current);
+          }
         }
       }
     },
@@ -680,7 +698,7 @@ export function useSseChatAdapter(
       conversationsApi,
       upsertDialogTop,
       reloadDialogs,
-      patchDialog,
+      bumpDialogToTop,
     ],
   );
   sendMessageRef.current = sendMessage;
