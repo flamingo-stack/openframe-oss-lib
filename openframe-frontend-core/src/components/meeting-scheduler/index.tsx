@@ -43,7 +43,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
-import { useMeetingBooking } from '../../hooks/use-meeting-booking';
+import { BOOKING_IN_FLIGHT_MESSAGE, useMeetingBooking } from '../../hooks/use-meeting-booking';
 import { useToast } from '../../hooks/use-toast';
 import {
   isSupportedFormField,
@@ -599,7 +599,7 @@ export function HubSpotMeetingScheduler({
   const handleSubmit = useCallback(
     async (payload: Record<string, unknown>) => {
       // Captured BEFORE the clear below: `book()` reports a re-entrant call as
-      // a VALIDATION code carrying the message 'Already submitting', and by
+      // a VALIDATION code carrying `BOOKING_IN_FLIGHT_MESSAGE`, and by
       // then this clear has already run — so a double-click would wipe a
       // visible SLOT_TAKEN alert on its way to being ignored.
       const priorError = bookingError;
@@ -607,7 +607,7 @@ export function HubSpotMeetingScheduler({
       const result = await book(payload);
 
       // Not an error: the hook's in-flight guard. No toast, no step change.
-      if (!result.ok && result.message === 'Already submitting') {
+      if (!result.ok && result.message === BOOKING_IN_FLIGHT_MESSAGE) {
         setBookingError(priorError);
         return;
       }
@@ -660,6 +660,11 @@ export function HubSpotMeetingScheduler({
 
   // ---- terminal / degraded states -----------------------------------------
 
+  /** The card's ONE back edge, per flow and step — the skeleton and the loaded
+   *  panel wire the same one, so a month load can never swap it for the host's
+   *  exit under a details-first visitor. */
+  const backEdge = detailsFirst ? (step === 'slot' ? backToDetails : onBack) : step === 'details' ? backToSlot : onBack;
+
   /**
    * The card states ONE height and everything inside derives from it (see
    * `MEETING_SCHEDULER_H`). details-first's tallest stage is the form, so it
@@ -670,11 +675,6 @@ export function HubSpotMeetingScheduler({
    * last-wins, so appending it after would make a host's own `h-*` unreachable,
    * which is the override the height-inside-CARD_CLASS arrangement allows today.
    */
-  /** The card's ONE back edge, per flow and step — the skeleton and the loaded
-   *  panel wire the same one, so a month load can never swap it for the host's
-   *  exit under a details-first visitor. */
-  const backEdge = detailsFirst ? (step === 'slot' ? backToDetails : onBack) : step === 'details' ? backToSlot : onBack;
-
   const cardClass = cn(CARD_CLASS, preset.height, formOnly && 'bg-ods-bg', className);
 
   /** One card SHAPE for every degraded return below. */
@@ -697,7 +697,7 @@ export function HubSpotMeetingScheduler({
                 the form belongs; without the step term, paging a month AFTER
                 Continue (which happens at `step === 'slot'`) would swap the
                 calendar out for a form skeleton and back. */}
-            {detailsFirst && step === 'details' ? (
+            {formOnly ? (
               // The SAME wrapper the loaded form gets, so the skeleton never
               // states its own inset.
               <div className={STEP_PANEL_CLASS}>
@@ -780,10 +780,10 @@ export function HubSpotMeetingScheduler({
             (detailsFirst
               ? // The form is step ONE here: no slot yet, and `timezone` is null
                 // on the server render, so neither may gate the PANEL. A link
-                // publishing no durations has no form worth showing — but while a
-                // refetch is in flight the form stays (a calendar skeleton is
-                // the wrong shape here).
-                durations.length > 0 || isFetchingAvailability
+                // publishing no durations has no form worth showing; it gets the
+                // "nothing published" message below at every moment, refetch or
+                // not — never a calendar skeleton in the form-only layout.
+                durations.length > 0
               : durationMs != null && selectedSlot != null && timezone) ? (
             <div className={cn(STEP_PANEL_CLASS, 'gap-[var(--spacing-system-m)]')}>
               {/* Top-aligned, and no back edge of its own: the ONE back edge
@@ -900,10 +900,12 @@ export function HubSpotMeetingScheduler({
                   // clicked chip spinning.
                   isSubmitting={detailsFirst ? isSubmitting : undefined}
                 />
-              ) : durations.length === 0 && !isFetchingAvailability ? (
+              ) : durations.length === 0 && (!isFetchingAvailability || formOnly) ? (
                 // The LINK publishes nothing at all — a different thing from a
                 // fully-booked month, and the only case the escape hatch is
-                // the right answer to.
+                // the right answer to. In the form-only layout it holds through
+                // a refetch too: the alternative frame is a calendar skeleton
+                // where a form belongs.
                 <div className="flex flex-col items-start gap-[var(--spacing-system-m)]">
                   <p className="text-ods-text-secondary text-h6">No call times are published right now.</p>
                   {escapeHatch}

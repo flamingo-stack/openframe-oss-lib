@@ -16,6 +16,7 @@ const refetchAvailability = vi.fn(() => Promise.resolve());
 const toast = vi.fn();
 
 vi.mock('../hooks/use-meeting-booking', () => ({
+  BOOKING_IN_FLIGHT_MESSAGE: 'Already submitting',
   useMeetingBooking: () => ({
     availability,
     isLoadingAvailability: false,

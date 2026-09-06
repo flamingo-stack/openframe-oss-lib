@@ -97,7 +97,9 @@ const SPAN_CLASS = {
   4: 'md:col-span-4',
 } as const;
 
-/** One field's skeleton: label + control footprint. */
+/** One field's skeleton: label + control footprint — the CSS twin of `FieldWrapper`'s
+ *  label row over `Input`'s `h-11 md:h-12` (the other skeleton heights below are
+ *  the same kind of twin: the textarea, the consent row, the `Button`). */
 const FIELD_SKELETON_CLASS = 'h-[4.75rem] w-full';
 
 /** The submit copy every standalone `BookingForm` gets; the slot-first preset reads the same constant. */
@@ -652,8 +654,10 @@ export function BookingForm({
  *
  * The slot-first skeleton (`SlotPickerSkeleton`) would put a grey calendar
  * where the form belongs — above the fold on a page whose entire content is
- * this card. Same footprint discipline as its sibling: fixed heights, no shift
- * when the real form swaps in.
+ * this card. Same footprint discipline as its sibling: fixed heights, and no
+ * shift when the real form swaps in for single-line fields. A textarea row is
+ * taller than its placeholder — the rows carry no type, so the skeleton cannot
+ * know which slot is one.
  */
 export function BookingFormSkeleton({ fieldRows, footerNote }: { fieldRows?: BookingFieldRow[]; footerNote?: string }) {
   return (
@@ -700,12 +704,17 @@ export function BookingFormSkeleton({ fieldRows, footerNote }: { fieldRows?: Boo
  */
 function normalizeFieldRows(fieldRows: BookingFieldRow[], resolves: (name: string) => boolean = () => true) {
   const seen = new Set<string>();
-  const rows = fieldRows
-    .map(row => {
-      const kept = row.filter(slot => resolves(slot.name) && !seen.has(slot.name) && Boolean(seen.add(slot.name)));
-      return kept.length === row.length ? kept : kept.map((slot): BookingFieldSlot => ({ name: slot.name }));
-    })
-    .filter(row => row.length > 0);
+  const rows: BookingFieldRow[] = [];
+  for (const row of fieldRows) {
+    const kept: BookingFieldSlot[] = [];
+    for (const slot of row) {
+      if (!resolves(slot.name) || seen.has(slot.name)) continue;
+      seen.add(slot.name);
+      kept.push(slot);
+    }
+    if (kept.length === 0) continue;
+    rows.push(kept.length === row.length ? kept : kept.map((slot): BookingFieldSlot => ({ name: slot.name })));
+  }
   const named = new Set(fieldRows.flat().map(slot => slot.name));
   const unplacedBuiltIns = BUILT_IN_BOOKING_FIELDS.filter(f => !named.has(f.name));
   return { rows, unplacedBuiltIns, named };

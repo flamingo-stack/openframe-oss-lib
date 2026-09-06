@@ -236,6 +236,11 @@ export const FORM_FIELD_TYPES_WITH_OPTIONS: readonly SupportedFormFieldType[] = 
   type => FORM_FIELD_TYPES[type].hasOptions,
 );
 
+/** Whether a raw HubSpot field type is one whose answers come from declared options. */
+export function formFieldTypeHasOptions(type: string): boolean {
+  return (FORM_FIELD_TYPES_WITH_OPTIONS as readonly string[]).includes(type);
+}
+
 export function isSupportedFormField(field: MeetingFormField): field is SupportedMeetingFormField {
   return Object.prototype.hasOwnProperty.call(FORM_FIELD_TYPES, field.type);
 }
