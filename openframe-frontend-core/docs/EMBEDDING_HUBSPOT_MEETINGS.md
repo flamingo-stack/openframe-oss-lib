@@ -180,7 +180,8 @@ POSTed with the picked slot. Every existing embed is unchanged by default.
 
 What differs per flow is data — `SCHEDULER_FLOW_PRESETS[flow]` (first step, the
 card height a host reserves, the submit copy). `SchedulerDegradedCard` renders a
-host's own fallback in the same box: `<SchedulerDegradedCard flow="details-first">`.
+host's own fallback in the same box and the same type:
+`<SchedulerDegradedCard flow="details-first" message="…" action={<Button …/>} />`.
 `detailsForm` is the component-level override for a host that must wrap
 `BookingForm` itself; prefer `detailsFormProps`.
 

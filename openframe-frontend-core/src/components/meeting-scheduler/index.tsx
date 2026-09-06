@@ -336,13 +336,25 @@ const CARD_DEGRADED_CLASS = cn(
 export function SchedulerDegradedCard({
   flow = 'slot-first',
   className,
+  message,
+  action,
   children,
 }: {
   flow?: SchedulerFlow;
   className?: string;
-  children: ReactNode;
+  /** The one line the stage says, in the card's own type — so a host's fallback never picks a different scale. */
+  message?: string;
+  /** The one way out (the escape hatch, or a host's own link). */
+  action?: ReactNode;
+  children?: ReactNode;
 }) {
-  return <div className={cn(CARD_DEGRADED_CLASS, SCHEDULER_FLOW_PRESETS[flow].height, className)}>{children}</div>;
+  return (
+    <div className={cn(CARD_DEGRADED_CLASS, SCHEDULER_FLOW_PRESETS[flow].height, className)}>
+      {message && <p className="text-ods-text-secondary text-h6">{message}</p>}
+      {action}
+      {children}
+    </div>
+  );
 }
 
 /**
@@ -657,10 +669,7 @@ export function HubSpotMeetingScheduler({
 
   /** One card SHAPE for every degraded return below. */
   const degraded = (message: string) => (
-    <SchedulerDegradedCard flow={flow} className={className}>
-      <p className="text-ods-text-secondary text-h6">{message}</p>
-      {escapeHatch}
-    </SchedulerDegradedCard>
+    <SchedulerDegradedCard flow={flow} className={className} message={message} action={escapeHatch} />
   );
   const degradedCard = degraded("We couldn't load available call times. Please try again shortly.");
 
