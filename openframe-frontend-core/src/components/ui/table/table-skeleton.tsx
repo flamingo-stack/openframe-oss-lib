@@ -21,6 +21,43 @@ const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]';
 const COMPACT_ROW_MIN_HEIGHT_PX = 56;
 const ROW_HEIGHT_MOBILE = 'h-[66px]';
 
+/**
+ * Invisible rows that hold a row's exact box (outer border included, so a
+ * placeholder is 68px / 80px like the row it stands in for — not 66 / 78; and
+ * the compact floor for compact tables, not the fixed height). The Table pads
+ * a short page with these up to `skeletonRows`, and, with
+ * `keepHeightWhenEmpty`, stacks them under the empty state too — so a full
+ * page, a short last page, the skeleton and "no results" are all the same
+ * height and the layout never jumps between them.
+ */
+export function TablePlaceholderRows({ rows, compact }: { rows: number; compact?: boolean }) {
+  if (rows <= 0) return null;
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, index) => (
+        <div
+          key={`placeholder-${index}`}
+          className="pointer-events-none relative overflow-hidden rounded-[6px] border border-transparent"
+          aria-hidden="true"
+        >
+          <div
+            className={cn(
+              'hidden items-center gap-4 px-4 md:flex',
+              compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_DESKTOP),
+            )}
+          />
+          <div
+            className={cn(
+              'flex items-center justify-start gap-3 px-3 md:hidden',
+              compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_MOBILE),
+            )}
+          />
+        </div>
+      ))}
+    </>
+  );
+}
+
 /** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
 export function TableCardSkeleton({
   columns,

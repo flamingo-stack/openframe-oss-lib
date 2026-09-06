@@ -9,7 +9,7 @@ import { CursorPagination } from '../cursor-pagination';
 import { TableEmptyState } from './table-empty-state';
 import { TableHeader } from './table-header';
 import { TableRow } from './table-row';
-import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, TableCardSkeleton } from './table-skeleton';
+import { TableCardSkeleton, TablePlaceholderRows } from './table-skeleton';
 import type { RowAction, TableColumn, TableProps, TableRowData } from './types';
 import { useTableMotion } from './use-table-motion';
 
@@ -102,6 +102,7 @@ export function Table<T = TableRowData>({
   loading = false,
   emptyMessage,
   skeletonRows = 10,
+  keepHeightWhenEmpty = false,
   className,
   containerClassName,
   headerClassName,
@@ -269,7 +270,19 @@ export function Table<T = TableRowData>({
             hasChevron={Boolean(rowHref)}
           />
         ) : data.length === 0 ? (
-          <TableEmptyState message={emptyMessage} />
+          keepHeightWhenEmpty ? (
+            /* Same box as a full page: the placeholders hold the rows' height
+               and the empty state floats over them — TOP-aligned, not centred,
+               so a 20-row reservation still shows the message above the fold. */
+            <div className="relative flex w-full flex-col gap-2">
+              <TablePlaceholderRows rows={skeletonRows} compact={compact} />
+              <div className="absolute inset-x-0 top-0 flex justify-center">
+                <TableEmptyState message={emptyMessage} />
+              </div>
+            </div>
+          ) : (
+            <TableEmptyState message={emptyMessage} />
+          )
         ) : (
           <>
             {/* Real data rows. When `animateRowReorder` is on, wrap ONLY these
@@ -313,19 +326,9 @@ export function Table<T = TableRowData>({
             {/* Infinite scroll: sentinel element */}
             {infiniteScroll?.hasNextPage && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
             {/* Invisible placeholder rows to maintain consistent table height (disabled for infinite scroll) */}
-            {!infiniteScroll &&
-              Array.from({ length: Math.max(0, skeletonRows - data.length) }).map((_, index) => (
-                <div
-                  key={`placeholder-${index}`}
-                  className="pointer-events-none relative overflow-hidden rounded-[6px]"
-                  aria-hidden="true"
-                >
-                  {/* Desktop placeholder - invisible but takes up space */}
-                  <div className={cn('hidden items-center gap-4 px-4 py-0 md:flex', ROW_HEIGHT_DESKTOP)} />
-                  {/* Mobile placeholder - invisible but takes up space */}
-                  <div className={cn('flex items-center justify-start gap-3 px-3 py-0 md:hidden', ROW_HEIGHT_MOBILE)} />
-                </div>
-              ))}
+            {!infiniteScroll && (
+              <TablePlaceholderRows rows={Math.max(0, skeletonRows - data.length)} compact={compact} />
+            )}
           </>
         )}
       </div>

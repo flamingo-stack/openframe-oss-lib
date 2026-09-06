@@ -102,6 +102,14 @@ export interface TableProps<T = TableRowData> {
 
   // Skeleton configuration
   skeletonRows?: number; // Number of skeleton rows to show when loading (default: 10)
+  /**
+   * Keep the body `skeletonRows` rows tall when there are NO rows: the empty
+   * state is centred over invisible placeholder rows instead of collapsing.
+   * With `skeletonRows` = the page size, a full page, a short last page, the
+   * skeleton and "no results" are all one height — no layout jump on a filter
+   * that empties the list. Opt-in: an unpaginated table wants to collapse.
+   */
+  keepHeightWhenEmpty?: boolean;
 
   // Styling
   className?: string;
