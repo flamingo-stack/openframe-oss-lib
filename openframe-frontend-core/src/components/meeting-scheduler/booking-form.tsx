@@ -116,8 +116,17 @@ export function BookingForm({
   // smallest ODS step that houses it.
   const FORM_STACK = 'flex flex-col gap-[var(--spacing-system-l)]';
 
+  // `data-hs-do-not-collect` is LOAD-BEARING. Hosts that run the HubSpot
+  // tracking tag (the OpenFrame dashboard does, via GTM) also get HubSpot's
+  // collected-forms script, which binds to EVERY <form> on the page and
+  // re-posts its fields to HubSpot as a "non-HubSpot form" submission — in
+  // parallel with the real booking that already reaches HubSpot through the
+  // host proxy. That double-counted the contact's conversions and, with no
+  // id/name on this element, named the phantom form after its class list
+  // ("Dashboard | OpenFrame: .flex, .flex-col, …"). The attribute is the
+  // script's own opt-out, checked at bind time, so the form is never observed.
   return (
-    <form onSubmit={submit} className={FORM_STACK} noValidate>
+    <form onSubmit={submit} className={FORM_STACK} noValidate data-hs-do-not-collect="true">
       <HoneypotField {...honeypotInputProps} />
 
       {/* Email first, name pair below — the order the desktop and mobile mocks
