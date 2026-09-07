@@ -1,6 +1,9 @@
 package com.openframe.client.service.auth;
 
 import com.openframe.client.dto.AgentTokenResponse;
+import com.openframe.client.exception.ClientNotFoundException;
+import com.openframe.client.exception.RefreshCountExceededException;
+import com.openframe.client.exception.RefreshTokenExpiredException;
 import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
 import com.openframe.security.jwt.JwtService;
@@ -34,10 +37,7 @@ public class RefreshTokenHandler {
 
         String clientId = jwt.getSubject();
         OAuthClient client = clientRepository.findByClientId(clientId)
-                .orElseThrow(() -> {
-                    log.error("Client not found: {}", clientId);
-                    return new IllegalArgumentException("Client not found");
-                });
+                .orElseThrow(() -> new ClientNotFoundException("Client not found: " + clientId));
 
         String accessToken = accessTokenGenerator.generate(client, REFRESH_TOKEN_GRANT_TYPE);
         String newRefreshToken = refreshTokenGenerator.generateNext(clientId, refreshCount);
@@ -54,14 +54,14 @@ public class RefreshTokenHandler {
     private void validateExpiration(Jwt jwt) {
         Instant expiresAt = jwt.getExpiresAt();
         if (expiresAt != null && expiresAt.isBefore(Instant.now())) {
-            throw new IllegalArgumentException("Refresh token has expired");
+            throw new RefreshTokenExpiredException("Refresh token has expired");
         }
     }
 
     private void validateRefreshCount(long refreshCount) {
         long maxRefreshCount = refreshTokenGenerator.getMaxRefreshCount();
         if (refreshCount >= maxRefreshCount) {
-            throw new IllegalArgumentException("Maximum refresh count reached");
+            throw new RefreshCountExceededException("Maximum refresh count reached");
         }
     }
 
