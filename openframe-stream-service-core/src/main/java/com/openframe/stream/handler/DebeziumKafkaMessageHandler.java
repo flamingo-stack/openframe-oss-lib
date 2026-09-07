@@ -30,26 +30,21 @@ public abstract class DebeziumKafkaMessageHandler
     protected IntegratedToolEvent transform(DeserializedDebeziumMessage debeziumMessage,
                                             IntegratedToolEnrichedData enrichedData) {
         IntegratedToolEvent message = new IntegratedToolEvent();
-        try {
-            message.setToolEventId(debeziumMessage.getToolEventId());
-            message.setUserId(enrichedData.getUserId());
-            message.setDeviceId(enrichedData.getMachineId());
-            message.setHostname(enrichedData.getHostname());
-            message.setOrganizationId(enrichedData.getOrganizationId());
-            message.setOrganizationName(enrichedData.getOrganizationName());
-            message.setIngestDay(debeziumMessage.getIngestDay());
-            message.setToolType(debeziumMessage.getIntegratedToolType().name());
-            message.setEventType(debeziumMessage.getUnifiedEventType().name());
-            message.setSeverity(debeziumMessage.getUnifiedEventType().getSeverity().name());
-            message.setSummary(debeziumMessage.getMessage() == null || debeziumMessage.getMessage().isBlank()
-                    ? debeziumMessage.getUnifiedEventType().getSummary()
-                    : debeziumMessage.getMessage());
-            message.setEventTimestamp(debeziumMessage.getEventTimestamp());
-            message.setTenantId(enrichedData.getTenantId());
-        } catch (Exception e) {
-            log.error("Error processing Kafka message", e);
-            throw e;
-        }
+        message.setToolEventId(debeziumMessage.getToolEventId());
+        message.setUserId(enrichedData.getUserId());
+        message.setDeviceId(enrichedData.getMachineId());
+        message.setHostname(enrichedData.getHostname());
+        message.setOrganizationId(enrichedData.getOrganizationId());
+        message.setOrganizationName(enrichedData.getOrganizationName());
+        message.setIngestDay(debeziumMessage.getIngestDay());
+        message.setToolType(debeziumMessage.getIntegratedToolType().name());
+        message.setEventType(debeziumMessage.getUnifiedEventType().name());
+        message.setSeverity(debeziumMessage.getUnifiedEventType().getSeverity().name());
+        message.setSummary(debeziumMessage.getMessage() == null || debeziumMessage.getMessage().isBlank()
+                ? debeziumMessage.getUnifiedEventType().getSummary()
+                : debeziumMessage.getMessage());
+        message.setEventTimestamp(debeziumMessage.getEventTimestamp());
+        message.setTenantId(enrichedData.getTenantId());
         return message;
     }
 
