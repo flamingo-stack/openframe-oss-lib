@@ -6,22 +6,6 @@ import com.microsoft.playwright.TimeoutError;
 import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.WaitForSelectorState;
 
-/**
- * Page Object for the Devices list page.
- * URL: /devices/
- *
- * <p>Layout (table view – default):
- * <pre>
- * ┌─ Heading "Devices"  (H1)
- * ├─ View toggle  [Table active] [Grid inactive]
- * ├─ Add Device button
- * ├─ Search bar  "Search for Devices"
- * ├─ Filter Tags button  →  "Sort and Filter" modal dialog
- * ├─ Column header row  DEVICE | STATUS | OS | ORGANIZATION | "N results"
- * └─ Device rows  (cursor-pointer cards)
- *    └─ per row:  device icon | name | status+date | OS | org | ⋮ context menu | ↗ open-in-new-tab link
- * </pre>
- */
 public class DevicesPage {
 
     public static final String URL_FRAGMENT = "/devices";
@@ -181,16 +165,10 @@ public class DevicesPage {
         return page.locator(PAGE_HEADING);
     }
 
-    /**
-     * The Table-view toggle button (first in the container; active by default).
-     */
     public Locator tableViewButton() {
         return page.locator(TABLE_VIEW_BTN);
     }
 
-    /**
-     * The Grid-view toggle button (second in the container).
-     */
     public Locator gridViewButton() {
         return page.locator(GRID_VIEW_BTN);
     }
@@ -207,30 +185,18 @@ public class DevicesPage {
         return page.locator(OPEN_FILTERS_BTN);
     }
 
-    /**
-     * Span showing "N results" in the column header row.
-     */
     public Locator resultsCount() {
         return page.locator(RESULTS_COUNT);
     }
 
-    /**
-     * All device-row cards currently rendered.
-     */
     public Locator deviceRows() {
         return page.locator(DEVICE_ROW);
     }
 
-    /**
-     * First device-row card whose visible text contains {@code name}.
-     */
     public Locator deviceRowByName(String name) {
         return page.locator(DEVICE_ROW + ":has-text('" + name + "')").first();
     }
 
-    /**
-     * The three-dot "More actions" button inside the named device row.
-     */
     public Locator rowMenuButtonByName(String deviceName) {
         return deviceRowByName(deviceName).locator(ROW_MENU_BTN).first();
     }
@@ -249,60 +215,28 @@ public class DevicesPage {
         return page.locator(FILTER_APPLY_BTN);
     }
 
-    /**
-     * The checkbox for a tag key in the "Tag Keys" section.
-     *
-     * @param tagKey exact key name as shown in the UI, e.g. {@code "new_tag"}
-     */
     public Locator filterTagKeyCheckbox(String tagKey) {
         return page.locator(String.format(FILTER_TAG_KEY_CHECKBOX_BY_NAME, tagKey));
     }
 
     // ── Additional locators ───────────────────────────────────────────────────────
 
-    /**
-     * The active filter chip in the search bar whose text equals {@code chipText}.
-     * Text format: {@code "key:value"}, e.g. {@code "purpose:auto_test"}.
-     *
-     * @param chipText the exact chip label (key + ":" + value, lowercase)
-     */
     public Locator activeFilterChip(String chipText) {
         return page.locator(String.format(ACTIVE_FILTER_CHIP_BY_TEXT, chipText)).first();
     }
 
 // ── Additional actions ────────────────────────────────────────────────────────
 
-    /**
-     * Clicks the "Clear all" button in the search bar to remove all active filter
-     * chips and waits for the result list to settle.
-     *
-     * <p>Only available when at least one filter chip is active (i.e. the button
-     * is visible). Safe to call after {@link #filterByTag}.
-     *
-     * @return this page object for fluent chaining
-     */
     public DevicesPage clearAllFilters() {
         page.locator(CLEAR_ALL_FILTERS_BTN).click();
         page.waitForLoadState(LoadState.NETWORKIDLE);
         return this;
     }
 
-    /**
-     * The container for a tag key's value list.
-     * Only present in the DOM once the corresponding key checkbox is checked.
-     *
-     * @param tagKey exact key name, e.g. {@code "new_tag"}
-     */
     public Locator filterTagValueSection(String tagKey) {
         return page.locator(String.format(FILTER_TAG_VALUE_SECTION_BY_KEY, tagKey));
     }
 
-    /**
-     * The checkbox for a specific value inside a tag key's value section.
-     *
-     * @param tagKey   exact key name, e.g. {@code "new_tag"}
-     * @param tagValue exact value name, e.g. {@code "windows"}
-     */
     public Locator filterTagValueCheckbox(String tagKey, String tagValue) {
         return page.locator(String.format(FILTER_TAG_VALUE_CHECKBOX_BY_NAME, tagKey, tagValue));
     }
@@ -313,44 +247,26 @@ public class DevicesPage {
         return page.locator(CTX_MENU);
     }
 
-    /**
-     * "Remote Shell" — DIV[role=menuitem] with a submenu arrow.
-     */
     public Locator ctxRemoteShellItem() {
         return page.locator(String.format(CTX_ITEM_BY_TEXT, "Remote Shell"));
     }
 
-    /**
-     * "Remote Control" — rendered as an {@code <a>} link to {@code /remote-desktop/}.
-     */
     public Locator ctxRemoteControlItem() {
         return page.locator(String.format(CTX_ITEM_BY_TEXT, "Remote Control"));
     }
 
-    /**
-     * "Manage Files" — rendered as an {@code <a>} link to {@code /file-manager/}.
-     */
     public Locator ctxManageFilesItem() {
         return page.locator(String.format(CTX_ITEM_BY_TEXT, "Manage Files"));
     }
 
-    /**
-     * "Run Script" — DIV[role=menuitem].
-     */
     public Locator ctxRunScriptItem() {
         return page.locator(String.format(CTX_ITEM_BY_TEXT, "Run Script"));
     }
 
-    /**
-     * "Archive Device" — DIV[role=menuitem].
-     */
     public Locator ctxArchiveItem() {
         return page.locator(String.format(CTX_ITEM_BY_TEXT, "Archive Device"));
     }
 
-    /**
-     * "Delete Device" — DIV[role=menuitem].
-     */
     public Locator ctxDeleteItem() {
         return page.locator(String.format(CTX_ITEM_BY_TEXT, "Delete Device"));
     }
@@ -361,26 +277,16 @@ public class DevicesPage {
         return pageHeading().innerText().trim();
     }
 
-    /**
-     * Parses "N results" → N.
-     */
     public int getResultsCount() {
         String text = resultsCount().innerText().trim();
         return Integer.parseInt(text.replaceAll("\\D+", ""));
     }
 
-    /**
-     * Returns true when the Table-view button is the active toggle.
-     * Active state is indicated by the {@code bg-ods-accent} Tailwind class.
-     */
     public boolean isTableViewActive() {
         String cls = tableViewButton().getAttribute("class");
         return cls != null && cls.contains("bg-ods-accent");
     }
 
-    /**
-     * Returns true when the Grid-view button is the active toggle.
-     */
     public boolean isGridViewActive() {
         String cls = gridViewButton().getAttribute("class");
         return cls != null && cls.contains("bg-ods-accent");
@@ -388,43 +294,28 @@ public class DevicesPage {
 
     // ── Actions ───────────────────────────────────────────────────────────────
 
-    /**
-     * Types into the search bar and waits for network activity to settle.
-     */
     public DevicesPage searchFor(String query) {
         searchInput().fill(query);
         page.waitForLoadState(LoadState.NETWORKIDLE);
         return this;
     }
 
-    /**
-     * Clears the search bar and waits for network activity to settle.
-     */
     public DevicesPage clearSearch() {
         searchInput().clear();
         page.waitForLoadState(LoadState.NETWORKIDLE);
         return this;
     }
 
-    /**
-     * Switches to Grid view.
-     */
     public DevicesPage switchToGridView() {
         gridViewButton().click();
         return this;
     }
 
-    /**
-     * Switches to Table view.
-     */
     public DevicesPage switchToTableView() {
         tableViewButton().click();
         return this;
     }
 
-    /**
-     * Clicks "Filter Tags" and waits for the modal to become visible.
-     */
     public DevicesPage openFilterPanel() {
         openFiltersButton().click();
         filterPanel().waitFor(new Locator.WaitForOptions()
@@ -433,9 +324,6 @@ public class DevicesPage {
         return this;
     }
 
-    /**
-     * Clicks "Apply Filters", waits for the modal to close, then for NETWORKIDLE.
-     */
     public DevicesPage applyFilters() {
         filterApplyButton().click();
         filterPanel().waitFor(new Locator.WaitForOptions()
@@ -445,28 +333,11 @@ public class DevicesPage {
         return this;
     }
 
-    /**
-     * Clicks "Reset Filters" inside the open panel (panel remains open).
-     */
     public DevicesPage resetFilters() {
         filterResetButton().click();
         return this;
     }
 
-    /**
-     * Opens the filter panel, checks the given tag key (if not already checked)
-     * so that its value list expands, then checks the given tag value, and applies
-     * the filter.
-     *
-     * <p>Multiple calls can be chained to build a multi-value selection before
-     * {@link #applyFilters()} — in that case call {@link #openFilterPanel()} once,
-     * use {@link #filterTagKeyCheckbox} / {@link #filterTagValueCheckbox} directly,
-     * and call {@link #applyFilters()} at the end.
-     *
-     * @param tagKey   exact key name as shown in the UI (e.g. {@code "new_tag"})
-     * @param tagValue exact value name as shown in the UI (e.g. {@code "windows"})
-     * @return this page object for fluent chaining
-     */
     public DevicesPage filterByTag(String tagKey, String tagValue) {
         openFilterPanel();
 
@@ -483,10 +354,6 @@ public class DevicesPage {
         return applyFilters();
     }
 
-    /**
-     * Opens the three-dot context menu on the named device row and waits for
-     * it to become visible.
-     */
     public DevicesPage openContextMenuFor(String deviceName) {
         rowMenuButtonByName(deviceName).click();
         contextMenu().waitFor(new Locator.WaitForOptions()
@@ -495,13 +362,6 @@ public class DevicesPage {
         return this;
     }
 
-    /**
-     * Clicks "Remote Control" in the currently open context menu.
-     * "Remote Control" is an {@code <a>} link; clicking it navigates to
-     * {@code /devices/details/{id}/remote-desktop/}.
-     *
-     * @return the resulting {@link RemoteDesktopPage}
-     */
     public RemoteDesktopPage clickRemoteControlInMenu() {
         ctxRemoteControlItem().click();
         page.waitForURL(
@@ -510,11 +370,6 @@ public class DevicesPage {
         return new RemoteDesktopPage(page);
     }
 
-    /**
-     * Clicks a device row by name and waits for the detail page to load.
-     *
-     * @return the resulting {@link DeviceDetailsPage}
-     */
     public DeviceDetailsPage openDevice(String deviceName) {
         // The list can hold many devices (and only renders a subset at a time),
         // so narrow it down via the search box before clicking the row.
@@ -545,11 +400,6 @@ public class DevicesPage {
         return deviceDetailsPage;
     }
 
-    /**
-     * Returns true when the page is fully loaded:
-     * the URL contains {@value #URL_FRAGMENT} and the visible "Add Device"
-     * button is present.
-     */
     public boolean isLoaded() {
         return page.url().contains(URL_FRAGMENT) && addDeviceButton().isVisible();
     }
