@@ -1,0 +1,253 @@
+# Software inventory (read side) + install / uninstall / update dispatch (write side).
+#
+# The wire contract is stable so the frontend can start binding against it;
+# resolvers currently return null / empty because the feature is stubbed under
+# a Conditional-property. Enable via openframe.software-management.enabled=true.
+
+extend type Query {
+    """Single software row by id (Relay global id). Null when unknown."""
+    software(id: ID!): Software
+
+    """Paginated list of software titles installed across the tenant's fleet.
+    One row = one software title (aggregated across devices)."""
+    softwares(
+        filter: SoftwareFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): SoftwareConnection!
+
+    """Devices that have a given software title installed, with each device's own
+    installed version and per-device software status (OUTDATED / SCHEDULED_UPDATE / …).
+    Powers the Software → Devices tab."""
+    softwareDevices(
+        softwareId: ID!,
+        filter: SoftwareOnDeviceFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): SoftwareOnDeviceConnection!
+
+    """CVEs affecting a given software title. Powers the Software → Vulnerabilities tab."""
+    softwareVulnerabilities(
+        softwareId: ID!,
+        filter: SoftwareVulnerabilityFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): SoftwareVulnerabilityConnection!
+
+    """Faceted filter-option counts for the software list — Type / Source / Version-status /
+    Vulnerability-severity dropdowns. Mirrors scriptFilters / deviceFilters."""
+    softwareFilters(filter: SoftwareFilterInput, search: String): SoftwareFilters!
+}
+
+extend type Mutation {
+    """Dispatch an install of the given software title to the target machines.
+    Idempotent — a machine that already has the latest version is a no-op on the agent."""
+    installSoftware(input: InstallSoftwareInput!): DispatchResponse!
+
+    """Dispatch an uninstall of the given software title from the target machines."""
+    uninstallSoftware(input: UninstallSoftwareInput!): DispatchResponse!
+
+    """Schedule a deferred update of the given software title on the target machines
+    at the specified server-time instant."""
+    scheduleUpdateSoftware(input: ScheduleUpdateSoftwareInput!): DispatchResponse!
+
+    """Cancel a scheduled software install / uninstall / update by its executionId,
+    if still in a cancellable state."""
+    cancelScheduledSoftware(executionId: ID!): DispatchResponse!
+}
+
+# ────────── Software (aggregate row) ──────────
+
+type Software {
+    id: ID!
+    name: String!
+    publisher: String
+
+    """Application vs Driver."""
+    type: SoftwareType
+
+    """Package-manager source — WINGET / CHOCOLATEY / BREW / UNMANAGED."""
+    source: SoftwareSource
+
+    """Most-recent version installed anywhere in the fleet — shown as CURRENT VERSION."""
+    currentVersion: String
+
+    """Most up-to-date known version — shown as Latest Version on the detail page."""
+    latestVersion: String
+
+    """UP_TO_DATE / OUTDATED / UNKNOWN — drives the "OUTDATED" chip in the list."""
+    versionStatus: SoftwareVersionStatus
+
+    """Additional older versions in use across the fleet, beyond currentVersion.
+    Shows as "+N older versions" line in the list."""
+    olderVersionsCount: Int
+
+    """Number of devices with this software installed."""
+    devicesCount: Int
+
+    """Vulnerability roll-up — highest severity + CVE count for the badge."""
+    vulnerabilitySummary: SoftwareVulnerabilitySummary
+
+    """False when the vulnerability scanner could not find a matching CPE entry
+    — shown as "no CPE match" instead of a severity badge."""
+    cpeMatched: Boolean
+}
+
+type SoftwareVulnerabilitySummary {
+    highestSeverity: SoftwareCveSeverity
+    cveCount: Int!
+}
+
+# ────────── Software on device (per-device row) ──────────
+
+type SoftwareOnDevice {
+    device: Machine!
+    softwareVersion: String
+    status: SoftwareOnDeviceStatus
+}
+
+# ────────── Vulnerability (CVE row) ──────────
+
+type SoftwareVulnerability {
+    cveId: String!
+    severity: SoftwareCveSeverity
+    cvssScore: Float
+    affectedVersion: String
+    publishedAt: String
+}
+
+# ────────── Enums ──────────
+
+enum SoftwareType {
+    APPLICATION
+    DRIVER
+}
+
+enum SoftwareSource {
+    WINGET
+    CHOCOLATEY
+    BREW
+    UNMANAGED
+}
+
+enum SoftwareVersionStatus {
+    UP_TO_DATE
+    OUTDATED
+    UNKNOWN
+}
+
+enum SoftwareCveSeverity {
+    CRITICAL
+    HIGH
+    MEDIUM
+    LOW
+    NONE
+}
+
+"""Per-device software state: static (UP_TO_DATE / OUTDATED) or in a lifecycle
+transition (SCHEDULED_UPDATE / UNINSTALLING / SCHEDULED_UNINSTALL)."""
+enum SoftwareOnDeviceStatus {
+    UP_TO_DATE
+    OUTDATED
+    SCHEDULED_UPDATE
+    UNINSTALLING
+    SCHEDULED_UNINSTALL
+}
+
+# ────────── Connections (Relay-style) ──────────
+
+type SoftwareConnection {
+    edges: [SoftwareEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type SoftwareEdge {
+    node: Software!
+    cursor: String!
+}
+
+type SoftwareOnDeviceConnection {
+    edges: [SoftwareOnDeviceEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type SoftwareOnDeviceEdge {
+    node: SoftwareOnDevice!
+    cursor: String!
+}
+
+type SoftwareVulnerabilityConnection {
+    edges: [SoftwareVulnerabilityEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type SoftwareVulnerabilityEdge {
+    node: SoftwareVulnerability!
+    cursor: String!
+}
+
+# ────────── Facet dropdowns ──────────
+
+type SoftwareFilters {
+    types: [SoftwareFilterOption!]!
+    sources: [SoftwareFilterOption!]!
+    versionStatuses: [SoftwareFilterOption!]!
+    severities: [SoftwareFilterOption!]!
+}
+
+type SoftwareFilterOption {
+    value: String!
+    label: String!
+    count: Int!
+}
+
+# ────────── Inputs ──────────
+
+input SoftwareFilterInput {
+    types: [SoftwareType!]
+    sources: [SoftwareSource!]
+    versionStatuses: [SoftwareVersionStatus!]
+    minSeverity: SoftwareCveSeverity
+    deviceTagIds: [ID!]
+}
+
+input SoftwareOnDeviceFilterInput {
+    statuses: [SoftwareOnDeviceStatus!]
+    deviceTagIds: [ID!]
+}
+
+input SoftwareVulnerabilityFilterInput {
+    severities: [SoftwareCveSeverity!]
+}
+
+input InstallSoftwareInput {
+    softwareId: ID!
+    machineIds: [ID!]!
+}
+
+input UninstallSoftwareInput {
+    softwareId: ID!
+    machineIds: [ID!]!
+}
+
+input ScheduleUpdateSoftwareInput {
+    softwareId: ID!
+    machineIds: [ID!]!
+    """ISO-8601 UTC instant of when to fire the update."""
+    scheduledAt: String!
+}
