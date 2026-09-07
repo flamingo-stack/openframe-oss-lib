@@ -1,4 +1,17 @@
 import type { SVGProps } from "react";
+
+/**
+ * Canonical GitHub brand icon.
+ *
+ * NOTE (MAJORLEA-006 / MAJORLEA-009-2): This is the single canonical
+ * GitHub-branded icon for @flamingo/ui-kit / openframe-frontend-core.
+ * Other GitHub-branded components in this `brand-logos` directory
+ * (e.g. GithubCircleIcon, GithubLogoIcon, GithubLogo1Icon) are considered
+ * deprecated variants and should NOT be used by new consumers. All apps
+ * (major-league-github, openframe-oss-frontend, etc.) should import
+ * `GithubIcon` from this module to avoid visual drift across the product.
+ */
+import type { SVGProps } from "react";
 export interface GithubIconProps
   extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
   className?: string;
