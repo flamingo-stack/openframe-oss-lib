@@ -22,15 +22,18 @@ public class KafkaRecoveryHandlerImpl implements KafkaRecoveryHandler {
     @Override
     public void enqueue(Throwable ex, String topic, String key, Object payload, Map<String, Object> headers) {
         // Structured error summary
-        log.error(
-                "Kafka RECOVER invoked: topic={} key={} headers={} errorClass={} errorMsg={} payload~={}",
-                topic,
-                key,
-                headers,
-                (ex == null ? "null" : ex.getClass().getName()),
-                (ex == null ? "null" : String.valueOf(ex.getMessage())),
-                (payload == null ? "null" : payload.toString()),
-                ex // attach stacktrace
-        );
+        if (log.isErrorEnabled()) {
+            log.error(
+                    "Kafka RECOVER invoked: topic={} key={} headers={} errorClass={} errorMsg={} payloadType={} payloadPresent={}",
+                    topic,
+                    key,
+                    headers,
+                    ex == null ? null : ex.getClass().getName(),
+                    ex == null ? null : ex.getMessage(),
+                    payload == null ? null : payload.getClass().getName(),
+                    payload != null,
+                    ex // attach stacktrace
+            );
+        }
     }
 }
