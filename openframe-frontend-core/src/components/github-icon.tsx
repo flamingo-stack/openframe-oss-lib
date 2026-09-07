@@ -6,6 +6,17 @@ interface GitHubIconProps {
   height?: number;
 }
 
+/**
+ * Canonical GitHubIcon implementation.
+ *
+ * This is the single source of truth for the GitHub brand icon in this
+ * shared library. It is exported from this package's public entry points
+ * (including the `@flamingo/ui-kit/components/icons` surface) so that all
+ * consuming frontends (major-league-github, openframe-oss-frontend, etc.)
+ * import this component rather than re-implementing their own local copy.
+ * Do NOT duplicate this component elsewhere — import it from
+ * `@flamingo/ui-kit` instead.
+ */
 export const GitHubIcon: React.FC<GitHubIconProps> = ({ className = '', width = 15, height = 14 }) => {
   return (
     <svg
@@ -23,3 +34,4 @@ export const GitHubIcon: React.FC<GitHubIconProps> = ({ className = '', width = 
     </svg>
   );
 };
+
