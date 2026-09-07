@@ -18,6 +18,9 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.util.StringUtils;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -193,6 +196,17 @@ public abstract class GenericKafkaProducer {
     }
 
     private static String redact(String s) {
-        return (s == null) ? "null" : (s.length() <= 6 ? "***" : s.substring(0, 3) + "…");
+        if (s == null) return "null";
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(s.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (int i = 0; i < 4 && i < hash.length; i++) {
+                hex.append(String.format("%02x", hash[i]));
+            }
+            return "***" + hex;
+        } catch (NoSuchAlgorithmException e) {
+            return "***";
+        }
     }
 }
