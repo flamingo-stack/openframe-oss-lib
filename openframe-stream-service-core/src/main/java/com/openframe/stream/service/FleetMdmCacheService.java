@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.Optional;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
@@ -115,8 +115,12 @@ public class FleetMdmCacheService {
             FleetMdmClient client = clientFor(eventTenantId);
             Host host = client != null ? client.getHostById(hostId.longValue()) : null;
             return host != null ? host.getUuid() : null;
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             log.error("Error fetching agent ID for host: {}", hostId, e);
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Interrupted while fetching agent ID for host: {}", hostId, e);
             return null;
         }
     }
@@ -151,18 +155,16 @@ public class FleetMdmCacheService {
                 log.warn("Fleet MDM API returned null for query_id: {} (query may have been deleted)", queryId);
             }
             return query;
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             log.error("Fleet MDM API call failed for query_id: {}. Cause: {}", queryId, e.getMessage(), e);
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Interrupted while calling Fleet MDM API for query_id: {}. Cause: {}", queryId, e.getMessage(), e);
             return null;
         }
     }
 
-    /**
-     * Get policy definition from cache or Fleet MDM API
-     *
-     * @param policyId the policy ID
-     * @return the Policy object, or null if not found
-     */
     /**
      * Evict a policy from cache. Call when a policy mutation event is detected
      * (edited_policy, deleted_policy, etc.) to ensure fresh data on next lookup.
@@ -182,32 +184,64 @@ public class FleetMdmCacheService {
         log.debug("Evicted policy cache for policy_id: {} tenant: {}", policyId, eventTenantId);
     }
 
-    @Cacheable(value = "fleetPolicyCache", key = "#policyId", unless = "#result == null || !#result.isPresent()")
-    public Optional<Policy> getPolicyById(Long policyId) {
+    /**
+     * Get policy definition from cache or Fleet MDM API
+     *
+     * @param policyId the policy ID
+     * @return the Policy object
+     * @throws NoSuchElementException if no policy is found for the given ID
+     */
+    @Cacheable(value = "fleetPolicyCache", key = "#policyId", unless = "#result == null")
+    public Policy getPolicyById(Long policyId) {
         return getPolicyById(policyId, null);
     }
 
     /**
      * Tenant-aware variant for the shared cluster (see class javadoc; tenant-scoped cache key).
+     *
+     * @throws NoSuchElementException if no policy is found for the given ID
      */
-    @Cacheable(value = "fleetPolicyCache", key = "(#eventTenantId ?: 'default') + ':' + #policyId", unless = "#result == null || !#result.isPresent()")
-    public Optional<Policy> getPolicyById(Long policyId, String eventTenantId) {
+    @Cacheable(value = "fleetPolicyCache", key = "(#eventTenantId ?: 'default') + ':' + #policyId", unless = "#result == null")
+    public Policy getPolicyById(Long policyId, String eventTenantId) {
         log.debug("Cache miss for policy_id: {}, calling Fleet MDM API", policyId);
         try {
             FleetMdmClient client = clientFor(eventTenantId);
             if (client == null) {
                 log.warn("FleetMdmClient is not initialized, cannot fetch policy_id: {}", policyId);
-                return Optional.empty();
+                throw new NoSuchElementException("FleetMdmClient is not initialized, cannot fetch policy_id: " + policyId);
             }
-            Optional<Policy> policy = Optional.ofNullable(client.getPolicyById(policyId));
-            policy.ifPresentOrElse(
-                    p -> log.debug("Successfully fetched policy_id: {}, name: '{}'", policyId, p.getName()),
-                    () -> log.warn("Fleet MDM API returned null for policy_id: {} (policy may have been deleted)", policyId)
-            );
+            Policy policy = client.getPolicyById(policyId);
+            if (policy != null) {
+                log.debug("Successfully fetched policy_id: {}, name: '{}'", policyId, policy.getName());
+            } else {
+                log.warn("Fleet MDM API returned null for policy_id: {} (policy may have been deleted)", policyId);
+                throw new NoSuchElementException("No policy found for policy_id: " + policyId);
+            }
             return policy;
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             log.error("Fleet MDM API call failed for policy_id: {}. Cause: {}", policyId, e.getMessage(), e);
-            return Optional.empty();
+            throw new NoSuchElementException("No policy found for policy_id: " + policyId);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Interrupted while calling Fleet MDM API for policy_id: {}. Cause: {}", policyId, e.getMessage(), e);
+            throw new NoSuchElementException("No policy found for policy_id: " + policyId);
+        }
+    }
+
+    /**
+     * Predicate form to check policy existence without relying on Optional (see
+     * {@link #getPolicyById(Long, String)}).
+     *
+     * @param policyId the policy ID
+     * @param eventTenantId the event's resolved tenant, or null for the deployment client
+     * @return true if the policy exists and could be resolved
+     */
+    public boolean hasPolicyById(Long policyId, String eventTenantId) {
+        try {
+            getPolicyById(policyId, eventTenantId);
+            return true;
+        } catch (NoSuchElementException e) {
+            return false;
         }
     }
 
