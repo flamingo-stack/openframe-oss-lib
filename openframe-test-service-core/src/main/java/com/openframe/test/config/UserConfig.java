@@ -33,7 +33,7 @@ public class UserConfig {
             if (envVar != null && !envVar.trim().isEmpty()) {
                 email = envVar;
             } else {
-                throw new RuntimeException("TEST_USER_EMAIL environment variable is not set");
+                throw new MissingTestCredentialException("TEST_USER_EMAIL environment variable is not set");
             }
             log.debug("TEST_USER_EMAIL: {}", email);
         }
@@ -46,9 +46,8 @@ public class UserConfig {
             if (envVar != null && !envVar.trim().isEmpty()) {
                 password = envVar;
             } else {
-                throw new RuntimeException("TEST_USER_PASSWORD environment variable is not set");
+                throw new MissingTestCredentialException("TEST_USER_PASSWORD environment variable is not set");
             }
-            log.debug("TEST_USER_PASSWORD: {}", password);
         }
         return password;
     }
@@ -72,6 +71,12 @@ public class UserConfig {
         }
         String envVar = System.getenv(envVarName);
         return envVar != null && !envVar.trim().isEmpty();
+    }
+
+    public static class MissingTestCredentialException extends RuntimeException {
+        public MissingTestCredentialException(String message) {
+            super(message);
+        }
     }
 
 }
