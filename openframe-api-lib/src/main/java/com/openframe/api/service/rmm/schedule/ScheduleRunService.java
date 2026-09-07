@@ -22,13 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Backs the "Schedule Runs" tab. One row per {@link ScheduleScriptExecution} header;
- * the {@code respondedMachineCount} numerator (X in "X / Y devices") is computed at
- * read time via one batch aggregation over the leaf collection, so page-render is
- * two Mongo round-trips regardless of page size (list + count query, then one
- * responded-devices aggregation for all rows).
- */
+// Backs the "Schedule Runs" tab.
 @Service
 @RequiredArgsConstructor
 @Slf4j
