@@ -41,6 +41,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -80,7 +81,8 @@ public class KnowledgeBaseDataFetcher {
     public KnowledgeBaseItem knowledgeBaseItem(@InputArgument @NotBlank String id) {
         String rawId = RELAY.fromGlobalId(id).getId();
         log.debug("Fetching KB item by global ID: {}, rawId: {}", id, rawId);
-        return knowledgeBaseService.getItem(rawId).orElse(null);
+        return knowledgeBaseService.getItem(rawId)
+                .orElseThrow(() -> new NoSuchElementException("Knowledge base item not found: " + rawId));
     }
 
     @DgsQuery
@@ -214,7 +216,8 @@ public class KnowledgeBaseDataFetcher {
         String rawTagId = RELAY.fromGlobalId(tagId).getId();
         log.info("Adding tag {} to KB item {}", rawTagId, rawItemId);
         knowledgeBaseTagService.addTagToItem(rawItemId, rawTagId);
-        return knowledgeBaseService.getItem(rawItemId).orElse(null);
+        return knowledgeBaseService.getItem(rawItemId)
+                .orElseThrow(() -> new NoSuchElementException("Knowledge base item not found: " + rawItemId));
     }
 
     @DgsMutation
