@@ -210,10 +210,9 @@ public class RestProxyService {
                             .body(upstream.getBody()))
                     .onErrorResume(this::buildErrorResponse)
                     .doOnSuccess(response -> log.debug("Successfully proxied request to {}", tool.getName()))
-                    .doOnError(error -> log.error("Failed to proxy request to {}: {}", tool.getName(),
-                            error.getMessage()));
+                    .doOnError(error -> log.error("Failed to proxy request to {}", tool.getName(), error));
         } catch (Exception e) {
-            log.error("Failed to proxy request to {}: {}", tool.getName(), e.getMessage());
+            log.error("Failed to proxy request to {}", tool.getName(), e);
             return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()));
         }
         return monoResponseEntity;
@@ -252,7 +251,7 @@ public class RestProxyService {
                                 .trustManager(InsecureTrustManagerFactory.INSTANCE)
                                 .build());
                     } catch (SSLException e) {
-                        log.error("Error configuring SSL context: {}", e.getMessage());
+                        log.error("Error configuring SSL context", e);
                     }
                 })
                 .doOnConnected(conn -> {
