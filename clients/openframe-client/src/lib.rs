@@ -668,6 +668,8 @@ impl Client {
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();
 
+        crate::services::package_update::PackageManagerUpdateRunManager::new().start();
+
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
 

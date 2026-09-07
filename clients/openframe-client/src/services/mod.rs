@@ -23,6 +23,7 @@ pub mod nats_connection_manager;
 pub mod nats_message_publisher;
 pub mod openframe_client_info_service;
 pub mod openframe_client_update_service;
+pub mod package_update;
 pub mod registration_processor;
 pub mod result_outbox_run_manager;
 pub mod result_store;
