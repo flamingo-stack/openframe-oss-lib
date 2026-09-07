@@ -29,6 +29,7 @@ public class NatsStreamManagementService {
                 jetStreamManagement.addStream(streamConfiguration);
             }
         } catch (Exception e) {
+            log.error("Error during stream creation with configuration: {}", streamConfiguration, e);
             throw new NatsException("Error during stream creation with configuration: " + streamConfiguration, e);
         }
     }
@@ -44,8 +45,10 @@ public class NatsStreamManagementService {
                 log.info("Stream {} doesn't exist", streamName);
                 return false;
             }
+            log.error("Api error during stream {} retrieve", streamName, e);
             throw new NatsException("Api error during stream " + streamName + " retrieve", e);
         } catch (Exception e) {
+            log.error("Error during stream {} retrieve", streamName, e);
             throw new NatsException("Error during stream " + streamName + " retrieve", e);
         }
     }
