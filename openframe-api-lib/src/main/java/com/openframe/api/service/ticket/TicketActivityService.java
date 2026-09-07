@@ -16,35 +16,35 @@ public class TicketActivityService {
 
     private final TicketRepository ticketRepository;
 
-    public Optional<Ticket> recordActivity(String ticketId) {
+    public boolean recordActivity(String ticketId) {
         if (ticketId == null) {
-            return Optional.empty();
+            return false;
         }
         try {
-            return ticketRepository.updateLastActivityAt(ticketId, Instant.now());
+            return ticketRepository.updateLastActivityAt(ticketId, Instant.now()).isPresent();
         } catch (Exception e) {
-            log.warn("Failed to stamp activity for ticket {}", ticketId, e);
-            return Optional.empty();
+            log.error("Failed to stamp activity for ticket {}", ticketId, e);
+            return false;
         }
     }
 
-    public Optional<Ticket> recordOutboundMessage(String ticketId) {
+    public boolean recordOutboundMessage(String ticketId) {
         return stamp(ticketId, Instant.now(), true);
     }
 
-    public Optional<Ticket> recordClientMessage(String ticketId) {
+    public boolean recordClientMessage(String ticketId) {
         return stamp(ticketId, Instant.now(), false);
     }
 
-    private Optional<Ticket> stamp(String ticketId, Instant now, boolean awaitingClient) {
+    private boolean stamp(String ticketId, Instant now, boolean awaitingClient) {
         if (ticketId == null) {
-            return Optional.empty();
+            return false;
         }
         try {
-            return ticketRepository.updateActivityAndAwaiting(ticketId, now, awaitingClient ? now : null);
+            return ticketRepository.updateActivityAndAwaiting(ticketId, now, awaitingClient ? now : null).isPresent();
         } catch (Exception e) {
-            log.warn("Failed to stamp activity for ticket {} (awaiting={})", ticketId, awaitingClient, e);
-            return Optional.empty();
+            log.error("Failed to stamp activity for ticket {} (awaiting={})", ticketId, awaitingClient, e);
+            return false;
         }
     }
 }
