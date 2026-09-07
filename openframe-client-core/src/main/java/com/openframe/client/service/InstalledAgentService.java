@@ -100,7 +100,7 @@ public class InstalledAgentService {
 
     private void validateAgentType(String agentType) {
         if (agentType == null || agentType.trim().isEmpty()) {
-            throw new IllegalArgumentException("Agent type cannot be empty");
+            throw new InvalidAgentIdException("Agent type cannot be empty");
         }
     }
 }
