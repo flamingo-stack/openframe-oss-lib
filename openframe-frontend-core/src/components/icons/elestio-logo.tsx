@@ -4,7 +4,10 @@ import React from 'react';
  * Official Elestio logo with unique IDs to prevent gradient/clip-path collisions
  * when the same SVG is rendered multiple times on the page.
  */
-/** @deprecated Use icons from icons-v2-generated instead. */
+/**
+ * @deprecated Use icons from icons-v2-generated instead. This component is retained
+ * only for existing usages; do not add new usages or new icons to this deprecated set.
+ */
 export const ElestioLogo = ({ className, ...props }: { className?: string } & React.SVGProps<SVGSVGElement>) => {
   // Generate unique ID suffix to avoid ID collisions between instances
   const uniqueId = React.useId();
