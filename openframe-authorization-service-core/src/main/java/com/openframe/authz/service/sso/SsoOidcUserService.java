@@ -18,6 +18,8 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -105,15 +107,36 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
         }
     }
 
-    private void provisionOrRefresh(String tenantId,
-                                    String email,
-                                    String normalizedEmail,
-                                    OidcUser user,
-                                    String provider,
-                                    String pictureUrl) {
+    private AuthUser provisionOrRefresh(String tenantId,
+                                        String email,
+                                        String normalizedEmail,
+                                        OidcUser user,
+                                        String provider,
+                                        String pictureUrl) {
         AuthUser authUser = userService.findActiveByEmailAndTenant(normalizedEmail, tenantId)
                 .orElseGet(() -> registerUser(tenantId, email, user, provider));
         registrationProcessor.postProcessAutoProvision(authUser, pictureUrl);
+        return authUser;
+    }
+
+    /**
+     * Auto-provision for the EMAIL-LESS login (which runs tenant-less under the onboarding
+     * pseudo-tenant): resolve the tenant from the verified email's domain via the GLOBAL domain
+     * policy and provision there, so a shared-domain user logs in instead of being sent to
+     * registration. Deliberately only the global-policy branch, NOT per-tenant custom configs —
+     * a tenant with its own provider app must sign in through that app (the forbidden-provider
+     * rule), and provisioning it via the generic button would create a user the very next check
+     * rejects. Callers must have already established that the email is trusted for routing.
+     */
+    public Optional<AuthUser> autoProvisionByGlobalDomain(String provider, OidcUser user) {
+        String email = resolveEmail(user);
+        if (email == null || email.isBlank()) {
+            return Optional.empty();
+        }
+        String normalizedEmail = email.toLowerCase(ROOT);
+        String domain = normalizedEmail.substring(normalizedEmail.lastIndexOf('@') + 1);
+        return globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
+                .map(tenantId -> provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, resolvePictureUrl(user)));
     }
 
     /**
