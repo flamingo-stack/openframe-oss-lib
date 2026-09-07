@@ -2,10 +2,7 @@ package com.openframe.sdk.fleetmdm.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.util.List;
 
@@ -13,9 +10,6 @@ import java.util.List;
  * Response wrapper for host search results from Fleet MDM
  */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class HostSearchResponse {
     
@@ -36,4 +30,3 @@ public class HostSearchResponse {
     @JsonProperty("query")
     private String query;
 }
-
