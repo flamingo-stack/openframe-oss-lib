@@ -226,14 +226,25 @@ public class ScriptDispatchService {
 
         // 4. Fan out: ONE message per machine (vs. the old N-per-machine). subject:
         //    machine.{machineId}.script-schedule-execution.
-        machineIds.forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
-                ScriptScheduleExecutionMessage.builder()
-                        .executionId(executionId)
-                        .scheduleId(scheduleId)
-                        .machineId(machineId)
-                        .initiatedBy(initiatedBy)
-                        .scripts(scheduledScripts)
-                        .build()));
+        //    Per OPENFRAM-005-3, each publish is isolated so a failure for one machine
+        //    never aborts the fan-out for the rest or propagates out of runSchedule —
+        //    the header + leaf rows are already durably persisted as RUNNING, and
+        //    clients reconcile any missed publish via catch-up.
+        machineIds.forEach(machineId -> {
+            try {
+                scriptScheduleNatsPublisher.publish(machineId,
+                        ScriptScheduleExecutionMessage.builder()
+                                .executionId(executionId)
+                                .scheduleId(scheduleId)
+                                .machineId(machineId)
+                                .initiatedBy(initiatedBy)
+                                .scripts(scheduledScripts)
+                                .build());
+            } catch (Exception e) {
+                log.error("Failed to publish schedule execution message scheduleId={} executionId={} machineId={}",
+                        scheduleId, executionId, machineId, e);
+            }
+        });
 
         log.info("Dispatched schedule run scheduleId={} executionId={} scripts={} machines={}",
                 scheduleId, executionId, runnableScripts.size(), machineIds.size());
