@@ -103,7 +103,8 @@ public class HubspotApiEmailService implements EmailService {
         );
 
         if (log.isDebugEnabled()) {
-            log.debug("[HubSpot API] {} Payload: {}", debugContext, payload);
+            log.debug("[HubSpot API] {} sending email with {} custom propert{}", debugContext,
+                    customProperties.size(), customProperties.size() == 1 ? "y" : "ies");
         }
 
         webClient.post()
