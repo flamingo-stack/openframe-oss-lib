@@ -2,7 +2,10 @@ package com.openframe.data.document.device;
 import com.openframe.data.document.TenantScoped;
 import com.openframe.data.document.rmm.script.OsType;
 import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -12,6 +15,9 @@ import java.time.Instant;
 import java.util.List;
 
 @Data
+@Builder(toBuilder = true)
+@NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = "machines")
 public class Machine implements TenantScoped {
     @Id
@@ -55,3 +61,4 @@ public class Machine implements TenantScoped {
     private Instant updatedAt;     // Last time device info was updated (replaces lastModifiedAt)
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
 }
+
