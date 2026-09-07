@@ -2,6 +2,7 @@ package com.openframe.data.document.tenant;
 
 import com.openframe.data.document.sso.SSOConfig;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class SSOPerTenantConfig extends SSOConfig {
 
     @CreatedDate
