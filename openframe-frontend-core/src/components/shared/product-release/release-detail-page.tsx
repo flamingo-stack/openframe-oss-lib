@@ -71,13 +71,6 @@ export interface DeliverySectionProps {
   isLoading: boolean;
 }
 
-// Type for the useRelease hook result
-export interface UseReleaseResult {
-  data: unknown;
-  error: Error | null;
-  isLoading: boolean;
-}
-
 export interface VideoDisplaySectionProps {
   mainVideoUrl?: string | null;
   youtubeUrl?: string | null;
@@ -100,10 +93,23 @@ export interface VideoDisplaySectionProps {
 }
 
 export interface ReleaseDetailPageProps {
-  slug: string;
-  initialData?: unknown; // Optional pre-fetched data for admin preview
-  // Required: Hook for fetching release data (must be from app-level to use correct QueryClient)
-  useRelease: (slug: string | undefined) => UseReleaseResult;
+  /**
+   * The release to render — already RESOLVED by the host: an SSR/admin-preview
+   * payload, the data from the host's own release query, or both.
+   *
+   * This page deliberately does not take a hook (it used to take a
+   * `useRelease` prop and call it): a hook-shaped prop is called from inside
+   * this component, where nothing — not the `rules-of-hooks` lint, not the
+   * compiler, not the host — can guarantee it runs unconditionally, exactly
+   * once, per render. The host calls its own hook at the top level of its own
+   * component (which it must anyway, to reach its QueryClient) and passes the
+   * result down as these three props.
+   */
+  release?: unknown;
+  /** True while the host is still fetching and has nothing to render yet. */
+  isLoading?: boolean;
+  /** Fetch failure — rendered as the not-found state. */
+  error?: Error | null;
   // Injectable components for app-specific rendering
   MarkdownRenderer?: ComponentType<MarkdownRendererProps>;
   RoadmapSection?: ComponentType<RoadmapSectionProps>;
@@ -139,9 +145,9 @@ const DefaultMarkdownRenderer = RichMarkdownRenderer;
 
 export function ReleaseDetailPage({
   authorHref,
-  slug,
-  initialData,
-  useRelease,
+  release: releaseInput,
+  isLoading = false,
+  error = null,
   MarkdownRenderer = DefaultMarkdownRenderer,
   RoadmapSection,
   DeliverySection,
@@ -158,9 +164,7 @@ export function ReleaseDetailPage({
   // <main>) for hosts whose layout already provides the container.
   const renderShell = (node: ReactNode) =>
     shell ? <PageShell>{node}</PageShell> : <div className="page-shell-content">{node}</div>;
-  // Use pre-fetched data if provided (admin preview), otherwise fetch via hook (public)
-  const { data: fetchedRelease, error, isLoading } = useRelease(initialData ? undefined : slug);
-  const release = (initialData || fetchedRelease) as Record<string, unknown> | undefined;
+  const release = releaseInput as Record<string, unknown> | undefined;
 
   // Back-button config — mirrors DevSectionPage / LegalDocumentPage.
   // Default: { label: 'Back to home', href: '/' }. Pass `false` to hide
@@ -179,8 +183,8 @@ export function ReleaseDetailPage({
   const [deliveryLoading, setDeliveryLoading] = useState(false);
 
   useEffect(() => {
-    // `release` is a fresh object identity whenever `useRelease` resolves or
-    // refetches, so this effect can re-run with two request pairs open at once.
+    // `release` is a fresh object identity whenever the host's query resolves
+    // or refetches, so this effect can re-run with two request pairs open at once.
     // Gate every write so a superseded run cannot paint the previous release's
     // roadmap/delivery rows, or drop a loading flag the live run still needs.
     let cancelled = false;
@@ -240,8 +244,9 @@ export function ReleaseDetailPage({
     };
   }, [release, RoadmapSection, DeliverySection, roadmapApiEndpoint, deliveryApiEndpoint]);
 
-  // Don't show loading skeleton if we have initialData
-  if (!initialData && isLoading) {
+  // The host reports `isLoading` only when it has nothing to render yet, so a
+  // pre-fetched (SSR / admin-preview) release never flashes the skeleton.
+  if (isLoading && !release) {
     // `bare` + `PageShell` so the loading state matches the loaded page's full
     // width / padding / min-height (the wrapper supplies the page chrome).
     return renderShell(
