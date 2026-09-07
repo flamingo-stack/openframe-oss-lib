@@ -18,5 +18,9 @@ import lombok.Data;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PackageManagerMissingMessage {
 
+    // the stream must capture what the consumer filters on — both sides read these
+    public static final String STREAM = "PACKAGE_MANAGER_MISSING";
+    public static final String SUBJECT_FILTER = "machine.*.package-manager-missing";
+
     private PackageManagerType packageManager;
 }

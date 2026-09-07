@@ -1,5 +1,6 @@
 package com.openframe.management.initializer;
 
+import com.openframe.data.nats.rmm.model.PackageManagerMissingMessage;
 import com.openframe.management.service.NatsStreamManagementService;
 import io.nats.client.api.RetentionPolicy;
 import io.nats.client.api.StorageType;
@@ -96,8 +97,8 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
             // agent -> server: "package manager X is not installed" reports
             // Re-sent every agent check cycle, so cap age to keep the stream small
             StreamConfiguration.builder()
-                    .name("PACKAGE_MANAGER_MISSING")
-                    .subjects(List.of("machine.*.package-manager-missing"))
+                    .name(PackageManagerMissingMessage.STREAM)
+                    .subjects(List.of(PackageManagerMissingMessage.SUBJECT_FILTER))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .maxAge(Duration.ofHours(1))

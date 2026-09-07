@@ -36,12 +36,12 @@ public class PackageManagerMissingListener extends AbstractJetStreamPushListener
 
     @Override
     protected String getStreamName() {
-        return "PACKAGE_MANAGER_MISSING";
+        return PackageManagerMissingMessage.STREAM;
     }
 
     @Override
     protected String getSubject() {
-        return "machine.*.package-manager-missing";
+        return PackageManagerMissingMessage.SUBJECT_FILTER;
     }
 
     @Override
