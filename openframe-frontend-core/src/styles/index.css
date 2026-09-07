@@ -2,6 +2,7 @@
 @import './ods-colors.css';
 @import './ods-design-tokens.css';
 @import './ods-interaction-states.css';
+@import './ods-effects.css';
 @import './ods-responsive-tokens.css';
 @import './app-globals.css';
 @import './chat-animations.css';

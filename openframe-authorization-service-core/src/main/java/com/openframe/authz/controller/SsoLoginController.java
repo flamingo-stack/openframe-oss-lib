@@ -1,5 +1,7 @@
 package com.openframe.authz.controller;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import com.openframe.authz.dto.RegistrationAttribution;
 import com.openframe.authz.dto.SsoLoginInitRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
@@ -7,6 +9,8 @@ import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoFlowCookies;
 import com.openframe.authz.security.SsoLoginCookiePayload;
 import com.openframe.authz.service.sso.SsoAuthorizeData;
+import com.openframe.authz.service.sso.SignupTicketService;
+import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.sso.SsoLoginService;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import com.openframe.authz.util.OidcUserUtils;
@@ -25,6 +29,8 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,7 +41,7 @@ import java.io.IOException;
 import java.util.Locale;
 import java.util.UUID;
 
-import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_LOGIN;
+import static com.openframe.core.constants.SsoFlowCookieNames.OF_SSO_LOGIN;
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
 import static com.openframe.authz.web.AuthStateUtils.clearCookie;
 import static com.openframe.authz.web.AuthStateUtils.clearOtherSsoFlowCookies;
@@ -57,6 +63,8 @@ import static org.springframework.util.StringUtils.hasText;
 public class SsoLoginController {
 
     private final SsoLoginService ssoLoginService;
+    private final SignupTicketService signupTicketService;
+    private final SsoIdentityService ssoIdentityService;
     private final SsoFlowCookies ssoFlowCookies;
     private final SsoCookieCodec ssoCookieCodec;
     private final TenantRegistrationService registrationService;
@@ -69,10 +77,10 @@ public class SsoLoginController {
         try {
             // Unlike registration/invite starts, the session is NOT cleared here: an anonymous
             // visitor has none worth keeping, and the OAuth dance creates a fresh one anyway.
-            clearOtherSsoFlowCookies(httpResponse, COOKIE_SSO_LOGIN);
+            clearOtherSsoFlowCookies(httpResponse, OF_SSO_LOGIN);
 
             SsoAuthorizeData data = ssoLoginService.startLogin(request);
-            ssoFlowCookies.write(httpResponse, COOKIE_SSO_LOGIN, data.cookieValue(), data.cookieTtlSeconds());
+            ssoFlowCookies.write(httpResponse, OF_SSO_LOGIN, data.cookieValue(), data.cookieTtlSeconds());
 
             seeOther(httpResponse, data.redirectPath());
         } catch (Exception e) {
@@ -88,8 +96,16 @@ public class SsoLoginController {
      * the page shows before sending the user back to login.
      */
     @GetMapping(path = "/login/sso/pending")
-    public PendingSsoIdentity pendingSsoIdentity(Authentication authentication, HttpServletRequest httpRequest) {
+    public PendingSsoIdentity pendingSsoIdentity(@RequestParam(value = "ticket", required = false) String ticket,
+                                                 Authentication authentication,
+                                                 HttpServletRequest httpRequest) {
         try {
+            if (hasText(ticket)) {
+                // Mobile: the auth sheet's cookies never reach the app's process, so the pending
+                // identity is resolved by the opaque ticket instead of the session.
+                var payload = requireTicket(ticket);
+                return new PendingSsoIdentity(payload.email(), payload.firstName(), payload.lastName(), payload.provider());
+            }
             OidcUser user = requireSessionOidcUser(authentication);
             SsoLoginCookiePayload payload = requireLoginFlowCookie(httpRequest);
             String[] names = OidcUserUtils.resolveNames(user);
@@ -101,6 +117,64 @@ public class SsoLoginController {
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         }
+    }
+
+    public record SignupTicketCompleteRequest(String ticket,
+                                              String tenantName,
+                                              String tenantDomain,
+                                              RegistrationAttribution attribution) {}
+
+    public record SignupTicketCompleteResponse(String tenantId) {}
+
+    /**
+     * Mobile counterpart of the session-bound complete: registers the tenant for the identity the
+     * ticket names server-side (the client cannot alter it) and binds the ticket to the new user —
+     * the BFF then redeems it at the token endpoint via the signup-ticket grant. Retry-safe: a
+     * ticket already bound answers the same tenant again; single use is enforced at the mint.
+     */
+    @PostMapping(path = "/login/sso/complete", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public SignupTicketCompleteResponse completeSsoRegistrationByTicket(@RequestBody SignupTicketCompleteRequest body) {
+        try {
+            if (!hasText(body.ticket()) || !hasText(body.tenantName()) || !hasText(body.tenantDomain())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ticket, tenantName and tenantDomain are required");
+            }
+            var payload = requireTicket(body.ticket());
+            if (payload.bound()) {
+                return new SignupTicketCompleteResponse(payload.tenantId());
+            }
+            if (payload.subject() != null
+                    && ssoIdentityService.findBySubject(payload.provider(), payload.subject()).isPresent()) {
+                // Invariant: one SSO account — one user, platform-wide.
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "already_linked");
+            }
+
+            TenantRegistrationRequest reg = TenantRegistrationRequest.builder()
+                    .email(payload.email().toLowerCase(Locale.ROOT))
+                    .firstName(payload.firstName() != null ? payload.firstName() : "")
+                    .lastName(payload.lastName() != null ? payload.lastName() : "")
+                    .password(UUID.randomUUID().toString())
+                    .tenantName(body.tenantName())
+                    .tenantDomain(body.tenantDomain().toLowerCase(Locale.ROOT))
+                    .emailPreVerified(payload.emailVerified())
+                    .attribution(body.attribution())
+                    .build();
+
+            var tenant = registrationService.registerTenant(reg);
+            String userId = ssoLoginService.ownerUserId(payload.email(), tenant.getId());
+            signupTicketService.bind(body.ticket(), userId, tenant.getId());
+            return new SignupTicketCompleteResponse(tenant.getId());
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    private SignupTicketService.SignupTicketPayload requireTicket(String ticket) {
+        return signupTicketService.peek(ticket)
+                .orElseThrow(() -> new IllegalStateException("Signup session expired. Please sign in again."));
     }
 
     public record PendingSsoIdentity(String email, String firstName, String lastName, String provider) {}
@@ -123,6 +197,8 @@ public class SsoLoginController {
             OidcUser user = requireSessionOidcUser(authentication);
             SsoLoginCookiePayload payload = requireLoginFlowCookie(httpRequest);
 
+            ssoIdentityService.ensureNotAlreadyLinked(payload.provider(), user.getClaims());
+
             String email = OidcUserUtils.resolveEmail(user);
             if (!hasText(email)) {
                 throw new IllegalStateException("Email not provided by SSO provider.");
@@ -143,7 +219,7 @@ public class SsoLoginController {
 
             var tenant = registrationService.registerTenant(reg);
 
-            clearCookie(httpResponse, COOKIE_SSO_LOGIN);
+            clearCookie(httpResponse, OF_SSO_LOGIN);
             foundAtRoot(httpResponse, Redirects.oauthContinuePath(tenant.getId(), payload.redirectTo(), payload.authMobile()));
         } catch (Exception e) {
             authErrorResponder.send(httpResponse, httpRequest, "sso-login-complete", e,
@@ -160,7 +236,7 @@ public class SsoLoginController {
     }
 
     private SsoLoginCookiePayload requireLoginFlowCookie(HttpServletRequest request) {
-        Cookie cookie = WebUtils.getCookie(request, COOKIE_SSO_LOGIN);
+        Cookie cookie = WebUtils.getCookie(request, OF_SSO_LOGIN);
         if (cookie == null) {
             throw new IllegalStateException("SSO session expired. Please sign in again.");
         }

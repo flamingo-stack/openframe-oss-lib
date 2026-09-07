@@ -6,6 +6,9 @@ import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.core.exception.BadRequestException;
+import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
 import com.openframe.data.nats.rmm.publisher.CommandNatsPublisher;
@@ -39,9 +42,9 @@ public class CommandDispatchService {
     private final CommandExecutionService commandExecutionService;
 
     public DispatchResponse runCommand(RunCommandInput input) {
-        // Target must be a real (tenant-scoped) machine — don't dispatch into the void.
-        deviceService.findByMachineId(input.getMachineId())
-                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + input.getMachineId()));
+        // Target must be a real (tenant-scoped) machine — don't dispatch into the void
+        // or into a device that's on its way out.
+        verifyMachine(input.getMachineId());
 
         String executionId = UUID.randomUUID().toString();
 
@@ -71,11 +74,8 @@ public class CommandDispatchService {
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
 
         // Verify every target up front — reject the whole batch if any machine
-        // is unknown, so we never half-dispatch.
-        for (String machineId : machineIds) {
-            deviceService.findByMachineId(machineId)
-                    .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
-        }
+        // is unknown or in an inactive status, so we never half-dispatch.
+        machineIds.forEach(this::verifyMachine);
 
         String executionId = UUID.randomUUID().toString();
 
@@ -99,6 +99,15 @@ public class CommandDispatchService {
         return DispatchResponse.builder()
                 .executionId(executionId)
                 .build();
+    }
+
+    private void verifyMachine(String machineId) {
+        Machine machine = deviceService.findByMachineId(machineId)
+                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
+        if (!DeviceStatus.DISPATCH_ELIGIBLE.contains(machine.getStatus())) {
+            throw new BadRequestException(
+                    "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + machineId);
+        }
     }
 
     /**

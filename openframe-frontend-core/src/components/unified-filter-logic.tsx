@@ -3,6 +3,9 @@
 import { useTransition } from 'react';
 import { useSearchParams, useRouter } from '../embed-shims/next-navigation';
 import { scrollElementIntoView } from '../utils/scroll-into-view';
+// Top of file, not the mid-file import block below: this one is used inside
+// the hook at the top of the file, so `no-use-before-define` is right about it.
+import { positiveInt } from '../utils/search-params';
 
 /**
  * Unified AND Filter Logic
@@ -78,7 +81,7 @@ export function useUnifiedFiltering(config: FilterConfig) {
     const tags = searchParams?.get('tags')?.split(',').filter(Boolean) || [];
     const filters = searchParams?.getAll('filter') || [];
     const pricing = searchParams?.get('pricing') || undefined;
-    const page = parseInt(searchParams?.get('page') || '1');
+    const page = positiveInt(searchParams?.get('page'), 1);
 
     return {
       search,

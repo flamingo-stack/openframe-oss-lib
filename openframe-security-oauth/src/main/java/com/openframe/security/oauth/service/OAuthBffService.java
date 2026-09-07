@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,8 @@ import reactor.core.scheduler.Schedulers;
 
 import java.net.URI;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -216,9 +219,9 @@ public class OAuthBffService {
      * means the identity has no account and the app should branch into registration.
      */
     public Mono<String> appleNativeDiscoverTenant(String identityToken, String nonce, ServerHttpRequest request) {
-        java.util.Map<String, String> body = nonce != null && !nonce.isBlank()
-                ? java.util.Map.of("identityToken", identityToken, "nonce", nonce)
-                : java.util.Map.of("identityToken", identityToken);
+        Map<String, String> body = nonce != null && !nonce.isBlank()
+                ? Map.of("identityToken", identityToken, "nonce", nonce)
+                : Map.of("identityToken", identityToken);
         return webClientBuilder.build()
                 .post()
                 .uri(authServerUrl + "/oauth/apple/native/discover")
@@ -248,7 +251,7 @@ public class OAuthBffService {
                                                   String tenantName, String tenantDomain,
                                                   String firstName, String lastName,
                                                   ServerHttpRequest request) {
-        java.util.Map<String, String> body = new java.util.HashMap<>();
+        Map<String, String> body = new HashMap<>();
         body.put("identityToken", identityToken);
         if (hasText(nonce)) body.put("nonce", nonce);
         body.put("tenantName", tenantName);
@@ -261,7 +264,7 @@ public class OAuthBffService {
                 .headers(h -> headersContributor.contribute(h, request))
                 .bodyValue(body)
                 .retrieve()
-                .onStatus(org.springframework.http.HttpStatusCode::is4xxClientError, resp ->
+                .onStatus(HttpStatusCode::is4xxClientError, resp ->
                         resp.bodyToMono(String.class).defaultIfEmpty("Registration failed. Please try again.")
                                 .flatMap(b -> {
                                     log.warn("Apple native registration rejected ({}): {}", resp.statusCode(), b);
@@ -282,6 +285,65 @@ public class OAuthBffService {
         return "Registration failed. Please try again.";
     }
 
+
+    /**
+     * Finishes a mobile SSO signup: registers the tenant on the auth server for the identity the
+     * ticket names, then redeems the ticket at the token endpoint (signup-ticket grant) for the
+     * new user's tokens. 4xx bodies from registration (domain taken, expired ticket) surface as
+     * IllegalArgumentException so the app sees the actual reason.
+     */
+    public Mono<TokenResponse> completeSignupTicket(String ticket,
+                                                    String tenantName,
+                                                    String tenantDomain,
+                                                    Map<String, Object> attribution,
+                                                    ServerHttpRequest request) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("ticket", ticket);
+        body.put("tenantName", tenantName);
+        body.put("tenantDomain", tenantDomain);
+        if (attribution != null && !attribution.isEmpty()) {
+            body.put("attribution", attribution);
+        }
+        return webClientBuilder.build()
+                .post()
+                .uri(authServerUrl + "/oauth/login/sso/complete")
+                .headers(h -> headersContributor.contribute(h, request))
+                .bodyValue(body)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, resp ->
+                        resp.bodyToMono(String.class).defaultIfEmpty("")
+                                .flatMap(b -> {
+                                    log.warn("Signup ticket completion rejected ({}): {}", resp.statusCode(), b);
+                                    return Mono.error(new IllegalArgumentException(extractErrorMessage(b)));
+                                }))
+                .bodyToMono(SignupTicketCompleteResponse.class)
+                .flatMap(completed -> mintWithSignupTicket(completed.tenantId(), ticket, request));
+    }
+
+    public record SignupTicketCompleteResponse(String tenantId) {}
+
+    private Mono<TokenResponse> mintWithSignupTicket(String tenantId, String ticket, ServerHttpRequest request) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "urn:openframe:params:oauth:grant-type:signup-ticket");
+        form.add("ticket", ticket);
+        return webClientBuilder.build()
+                .post()
+                .uri(String.format("%s/%s/oauth2/token", authServerUrl, tenantId))
+                .headers(h -> {
+                    h.add(com.openframe.core.constants.HttpHeaders.AUTHORIZATION, basicAuth(clientId, clientSecret));
+                    headersContributor.contribute(h, request);
+                })
+                .header(ACCEPT, "application/json")
+                .body(BodyInserters.fromFormData(form))
+                .retrieve()
+                .onStatus(st -> st.is4xxClientError() || st.is5xxServerError(), resp ->
+                        resp.bodyToMono(String.class).defaultIfEmpty("")
+                                .flatMap(b -> {
+                                    log.warn("Signup ticket mint rejected for tenant {} ({}): {}", tenantId, resp.statusCode(), b);
+                                    return Mono.error(new IllegalStateException("Sign-up failed. Please try again."));
+                                }))
+                .bodyToMono(TokenResponse.class);
+    }
 
     public Mono<TokenResponse> appleNativeExchange(String tenantId,
                                                    String identityToken,

@@ -47,6 +47,9 @@ export interface SchedulerContextPanelProps {
    *  states the length and a live selector beside a filled-in form invites a
    *  change that would throw the form away. Going Back restores them. */
   locked?: boolean;
+  /** A POST is in flight: the duration chips and the zone control stay MOUNTED
+   *  (nothing may shift under the spinning chip) but accept no input. */
+  disabled?: boolean;
   /** Whether the timezone picker renders. Default true: the zone governs every
    *  time on screen, the form's summary line included, so it stays reachable
    *  right up to the confirmation — where there is nothing left to re-read. */
@@ -165,6 +168,7 @@ export function SchedulerContextPanel({
   onBack,
   backLabel = 'Back',
   locked = false,
+  disabled = false,
   showTimezone = true,
   className,
 }: SchedulerContextPanelProps) {
@@ -248,6 +252,7 @@ export function SchedulerContextPanel({
                     key={ms}
                     variant={selectedDurationMs === ms ? undefined : 'outline'}
                     size="small-legacy"
+                    disabled={disabled}
                     onClick={() => onSelectDuration(ms)}
                   >
                     {formatDurationCompact(ms / 1000)}
@@ -270,6 +275,7 @@ export function SchedulerContextPanel({
             {timezone ? (
               <Autocomplete
                 value={timezone}
+                disabled={disabled}
                 onChange={tz => {
                   if (tz) onTimezoneChange?.(tz);
                 }}

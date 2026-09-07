@@ -20,8 +20,10 @@ import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
+import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +63,7 @@ class ScheduleScriptServiceTest {
     private ScriptScheduleRepository scheduleRepository;
     private ScriptService scriptService;
     private TenantIdProvider tenantIdProvider;
+    private ScheduleDeviceLocalDispatchRepository deviceLocalDispatchRepository;
     private ScheduleScriptService scheduleService;
 
     private CreateScriptScheduleInput createInput;
@@ -70,7 +73,9 @@ class ScheduleScriptServiceTest {
         scheduleRepository = mock(ScriptScheduleRepository.class);
         scriptService = mock(ScriptService.class);
         tenantIdProvider = mock(TenantIdProvider.class);
-        scheduleService = new ScheduleScriptService(scheduleRepository, new ScriptScheduleMapper(), scriptService, tenantIdProvider);
+        deviceLocalDispatchRepository = mock(ScheduleDeviceLocalDispatchRepository.class);
+        scheduleService = new ScheduleScriptService(scheduleRepository, new ScriptScheduleMapper(), scriptService,
+                tenantIdProvider, deviceLocalDispatchRepository);
 
         createInput = new CreateScriptScheduleInput();
         createInput.setName("Nightly Maintenance");
@@ -740,5 +745,67 @@ class ScheduleScriptServiceTest {
         s.setId(SCHEDULE_ID);
         s.setStatus(ScriptStatus.DELETED);
         return s;
+    }
+
+    private void makeDeviceLocalCreateInput() {
+        createInput.setTrigger(ScheduleScriptTrigger.DATE_TIME);
+        createInput.setTimeReference(ScheduleTimeReference.DEVICE_LOCAL);
+        createInput.setStartAt(Instant.parse("2026-09-15T09:00:00Z"));   // wall-clock carrier
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+    }
+
+    @Test
+    @DisplayName("create DEVICE_LOCAL: valid one-shot persists with nextRunAt null and startAt kept")
+    void createDeviceLocal_valid_persistsWithNullNextRun() {
+        makeDeviceLocalCreateInput();
+        when(scheduleRepository.save(any())).thenAnswer(inv -> {
+            ScheduleScript s = inv.getArgument(0);
+            s.setId(SCHEDULE_ID);
+            return s;
+        });
+
+        ScriptScheduleResponse result = scheduleService.create(createInput, "user-1");
+
+        assertThat(result.getTimeReference()).isEqualTo(ScheduleTimeReference.DEVICE_LOCAL);
+        assertThat(result.getStartAt()).isEqualTo(Instant.parse("2026-09-15T09:00:00Z"));
+        ArgumentCaptor<ScheduleScript> saved = ArgumentCaptor.forClass(ScheduleScript.class);
+        verify(scheduleRepository).save(saved.capture());
+        assertThat(saved.getValue().getNextRunAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("create DEVICE_LOCAL: missing startAt (wall-clock) is rejected")
+    void createDeviceLocal_missingStartAt_rejected() {
+        makeDeviceLocalCreateInput();
+        createInput.setStartAt(null);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("startAt");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create DEVICE_LOCAL: repeat is not supported (one-shot only)")
+    void createDeviceLocal_withRepeat_rejected() {
+        makeDeviceLocalCreateInput();
+        createInput.setRepeat(1800L);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("repeat");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create DEVICE_LOCAL: off-grid startAt (xx:07) is rejected")
+    void createDeviceLocal_offGrid_rejected() {
+        makeDeviceLocalCreateInput();
+        createInput.setStartAt(Instant.parse("2026-09-15T09:07:00Z"));
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("30-minute");
+        verify(scheduleRepository, never()).save(any());
     }
 }

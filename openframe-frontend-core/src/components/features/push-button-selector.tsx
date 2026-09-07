@@ -7,8 +7,11 @@ import { UnifiedSkeleton } from '../loading';
 import { Badge, Input } from '../ui';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
-export interface SelectableOption {
-  id: string; // Selection ID (UUID for platforms, value for others)
+/** Option ids are whatever the consumer keys its rows by — string (UUID / enum value) or numeric row id. */
+export type SelectableOptionId = string | number;
+
+export interface SelectableOption<Id extends SelectableOptionId = string> {
+  id: Id; // Selection ID (UUID / value for platforms, numeric row id for DB-keyed rows)
   name: string; // Primary identifier (platform enum or item name)
   displayName?: string; // Optional display name (for platforms)
   description?: string;
@@ -51,10 +54,10 @@ export interface PushButtonSelectorLazyLoad {
   maxHeight?: string;
 }
 
-interface PushButtonSelectorProps {
-  options: SelectableOption[];
-  selectedIds: string[];
-  onSelectionChange: (selectedIds: string[]) => void;
+interface PushButtonSelectorProps<Id extends SelectableOptionId = string> {
+  options: SelectableOption<Id>[];
+  selectedIds: Id[];
+  onSelectionChange: (selectedIds: Id[]) => void;
   multiSelect?: boolean;
   title?: string;
   helpText?: string;
@@ -116,7 +119,7 @@ function PushButtonSelectorError({ message, title }: { message: string; title?: 
   );
 }
 
-export function PushButtonSelector({
+export function PushButtonSelector<Id extends SelectableOptionId = string>({
   options,
   selectedIds,
   onSelectionChange,
@@ -134,7 +137,7 @@ export function PushButtonSelector({
   lazyLoad,
   emptyMessage,
   footer,
-}: PushButtonSelectorProps) {
+}: PushButtonSelectorProps<Id>) {
   // Lazy-load sentinel: observe within the scroll viewport so onLoadMore
   // fires as the user approaches the bottom. Hooks run unconditionally
   // (before the early returns) per the rules of hooks. Pass a STABLE
@@ -209,7 +212,7 @@ export function PushButtonSelector({
     console.warn('[PushButtonSelector] Invalid selected IDs filtered:', invalidIds);
   }
 
-  const toggleSelection = (optionId: string) => {
+  const toggleSelection = (optionId: Id) => {
     if (multiSelect) {
       const isSelected = validSelectedIds.includes(optionId);
       if (isSelected) {
@@ -226,7 +229,7 @@ export function PushButtonSelector({
   const getSelectedOptions = () => options.filter(option => validSelectedIds.includes(option.id));
 
   // Helper to render a single option
-  const renderOption = (option: SelectableOption) => {
+  const renderOption = (option: SelectableOption<Id>) => {
     const isSelected = validSelectedIds.includes(option.id);
 
     const optionEl = (
@@ -297,8 +300,8 @@ export function PushButtonSelector({
     }
 
     // Group options by section
-    const optionsBySection = new Map<string, SelectableOption[]>();
-    const ungroupedOptions: SelectableOption[] = [];
+    const optionsBySection = new Map<string, SelectableOption<Id>[]>();
+    const ungroupedOptions: SelectableOption<Id>[] = [];
 
     options.forEach(option => {
       if (option.section) {

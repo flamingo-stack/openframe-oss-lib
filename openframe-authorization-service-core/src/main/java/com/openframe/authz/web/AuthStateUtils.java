@@ -1,14 +1,11 @@
 package com.openframe.authz.web;
 
+
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import java.util.List;
-
-import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_INVITE;
-import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_LOGIN;
-import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_REG;
+import com.openframe.core.constants.SsoFlowCookieNames;
 
 public final class AuthStateUtils {
     private AuthStateUtils() {
@@ -16,17 +13,25 @@ public final class AuthStateUtils {
 
     public static final String JSESSIONID = "JSESSIONID";
 
-    private static final List<String> SSO_FLOW_COOKIES = List.of(COOKIE_SSO_REG, COOKIE_SSO_INVITE, COOKIE_SSO_LOGIN);
-
     /**
      * Drops any SSO flow cookie other than the one about to be issued. Without this an abandoned flow
      * leaves its cookie alive for the full TTL, and the callback then has two flows to choose between.
      */
     public static void clearOtherSsoFlowCookies(HttpServletResponse response, String keepCookieName) {
-        for (String name : SSO_FLOW_COOKIES) {
+        for (String name : SsoFlowCookieNames.ALL) {
             if (!name.equals(keepCookieName)) {
                 clearCookie(response, name);
             }
+        }
+    }
+
+    /**
+     * Drops every SSO flow cookie. Used on flow failure: a cookie that outlives its failed flow
+     * keeps injecting its state into subsequent logins and steals their callbacks.
+     */
+    public static void clearSsoFlowCookies(HttpServletResponse response) {
+        for (String name : SsoFlowCookieNames.ALL) {
+            clearCookie(response, name);
         }
     }
 
