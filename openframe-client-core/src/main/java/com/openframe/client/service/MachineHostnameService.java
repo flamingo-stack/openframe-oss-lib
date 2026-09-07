@@ -7,8 +7,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
-
 import static com.openframe.data.document.device.DeviceStatus.DELETED;
 import static com.openframe.data.document.device.DeviceStatus.PENDING_DELETION;
 
@@ -20,27 +18,27 @@ public class MachineHostnameService {
     private final MachineRepository machineRepository;
 
     public void updateHostname(String machineId, String hostname) {
-        Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
-        if (foundMachine.isEmpty()) {
-            log.warn("Hostname update for unknown machine {}, ignoring", machineId);
-            return;
+        if (hostname == null || hostname.isBlank()) {
+            throw new IllegalArgumentException("hostname must not be blank for machineId=" + machineId);
         }
 
-        Machine machine = foundMachine.get();
-        DeviceStatus status = machine.getStatus();
-        if (status == PENDING_DELETION || status == DELETED) {
-            log.debug("Ignoring hostname update for machineId={} in status {}", machineId, status);
-            return;
-        }
+        machineRepository.findByMachineId(machineId).ifPresentOrElse(machine -> {
+            DeviceStatus status = machine.getStatus();
+            if (status == PENDING_DELETION || status == DELETED) {
+                log.debug("Ignoring hostname update for machineId={} in status {}", machineId, status);
+                return;
+            }
 
-        if (hostname.equals(machine.getHostname())) {
-            log.debug("Hostname for machineId={} is already {}, nothing to update", machineId, hostname);
-            return;
-        }
+            if (hostname.equals(machine.getHostname())) {
+                log.debug("Hostname for machineId={} is already {}, nothing to update", machineId, hostname);
+                return;
+            }
 
-        machine.setHostname(hostname);
-        machineRepository.save(machine);
+            machine.setHostname(hostname);
+            machineRepository.save(machine);
 
-        log.info("Updated hostname for machineId={} to {}", machineId, hostname);
+            log.info("Updated hostname for machineId={} to {}", machineId, hostname);
+        }, () -> log.warn("Hostname update for unknown machine {}, ignoring", machineId));
     }
 }
+
