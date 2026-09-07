@@ -16,7 +16,7 @@ import static org.mockito.Mockito.mock;
 
 class RestProxyServiceFleetTenantHeaderTest {
 
-    private static final String FLEET = "fleetmdm-server";
+    private static final String FLEET = IntegratedToolKeys.FLEETMDM_SERVER;
     private static final String OTHER_TOOL = "tactical-rmm";
     private static final String TENANT_ID_HEADER = "X-Tenant-Id";
     private static final String TENANT_ID = "3f2c9a1e-tenant";
