@@ -75,10 +75,17 @@ impl ToolConnectionService {
     async fn persist(&self, list: &[ToolConnection]) -> Result<()> {
         let json = serde_json::to_string_pretty(list)
             .context("Failed to serialize tool connections to JSON")?;
-        fs::write(&self.file_path, json).with_context(|| {
+        let tmp_path = self.file_path.with_extension("json.tmp");
+        fs::write(&tmp_path, json).with_context(|| {
             format!(
-                "Failed to write tool connections file: {:?}",
-                self.file_path
+                "Failed to write temporary tool connections file: {:?}",
+                tmp_path
+            )
+        })?;
+        fs::rename(&tmp_path, &self.file_path).with_context(|| {
+            format!(
+                "Failed to rename temporary tool connections file {:?} to {:?}",
+                tmp_path, self.file_path
             )
         })?;
         Ok(())
