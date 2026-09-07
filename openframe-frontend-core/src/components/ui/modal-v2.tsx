@@ -119,7 +119,11 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
       document.addEventListener('focusin', containFocus);
       // Focus dropped to <body> by NODE REMOVAL (a closing menu unmounting the
       // focused item) dispatches NO focusin — bounded re-asserts cover it.
-      const reasserts = [80, 240, 500].map(ms =>
+      // NOTE: this is timing-based, not event-based, so it is inherently
+      // fragile against slow devices or deeply nested Radix layers animating
+      // close simultaneously (tracked as tech debt) — the 700ms tail here
+      // widens the safety margin but does not eliminate the race.
+      const reasserts = [80, 240, 500, 700].map(ms =>
         setTimeout(() => {
           if (modalStack[modalStack.length - 1] !== stackId) return;
           const panel = panelRef.current;
@@ -241,7 +245,7 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
           <div
             data-state={state}
             className={cn(
-              'absolute inset-0 bg-ods-overlay backdrop-blur-[2px] md:backdrop-blur-none',
+              'absolute inset-0 bg-black/50 backdrop-blur-[2px] md:backdrop-blur-none',
               'duration-200 fill-mode-forwards',
               'data-[state=open]:animate-in data-[state=open]:fade-in-0',
               'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
