@@ -132,6 +132,10 @@ export interface TicketLiveProviderProps {
    * around the whole `AppLayout`, so every cold load remounted the app shell and the
    * page under it — visibly, as a chat drawer opened by a deep link replaying its
    * open animation. Mount it always and pass the answer here instead.
+   *
+   * One consequence of mounting it always: a `ChatRuntime` must be above it even
+   * while disabled. The identity resolver reads one unconditionally (Rules of
+   * Hooks) and throws without it; `enabled` gates the request, not the read.
    */
   enabled?: boolean;
 }
