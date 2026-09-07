@@ -1,11 +1,13 @@
 package com.openframe.test.data.redis;
 
 import com.openframe.test.config.RedisConfig;
+import lombok.extern.slf4j.Slf4j;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
+@Slf4j
 public class Redis {
 
     /**
@@ -33,7 +35,7 @@ public class Redis {
                     cursor = scanResult.getCursor();
                 } while (!cursor.equals(ScanParams.SCAN_POINTER_START));
             } catch (Exception e) {
-                // Node unreachable or does not own the slot — try the next seed.
+                log.debug("Node {} unreachable or does not own the slot: {}", node, e.getMessage());
             }
         }
         return null;
