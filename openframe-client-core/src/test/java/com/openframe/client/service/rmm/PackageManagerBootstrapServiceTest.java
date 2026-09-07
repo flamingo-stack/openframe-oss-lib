@@ -179,6 +179,16 @@ class PackageManagerBootstrapServiceTest {
     }
 
     @Test
+    @DisplayName("archived machine: not dispatch-eligible, report is ignored — same bar as runScript")
+    void ignoresArchivedMachine() {
+        givenMachine(DeviceStatus.ARCHIVED);
+
+        service.installIfAbsent(MACHINE_ID, PackageManagerType.BREW);
+
+        verify(scriptNatsPublisher, never()).publishScript(anyString(), any());
+    }
+
+    @Test
     @DisplayName("system script not seeded yet: report is ignored, the agent re-reports later")
     void ignoresWhenScriptNotSeeded() {
         givenMachine(DeviceStatus.ONLINE);

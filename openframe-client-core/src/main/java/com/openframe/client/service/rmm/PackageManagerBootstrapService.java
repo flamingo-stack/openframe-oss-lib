@@ -22,9 +22,6 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.openframe.data.document.device.DeviceStatus.DELETED;
-import static com.openframe.data.document.device.DeviceStatus.PENDING_DELETION;
-
 /**
  * Dispatches the seeded bootstrap SYSTEM script when an agent reports a missing
  * package manager. Mirrors the api-lib single-run dispatch (persist a RUNNING
@@ -59,7 +56,9 @@ public class PackageManagerBootstrapService {
         }
         Machine machine = foundMachine.get();
         DeviceStatus status = machine.getStatus();
-        if (status == PENDING_DELETION || status == DELETED) {
+        // same bar as every dispatch path (runScript/runCommand/schedules): only ONLINE/OFFLINE
+        // machines get scripts — an off-boarding or archived device does not
+        if (!DeviceStatus.DISPATCH_ELIGIBLE.contains(status)) {
             log.debug("Ignoring package-manager report for machineId={} in status {}", machineId, status);
             return;
         }
