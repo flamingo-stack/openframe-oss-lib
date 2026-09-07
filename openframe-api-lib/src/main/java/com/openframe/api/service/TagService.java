@@ -7,6 +7,7 @@ import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TagService {
 
@@ -24,11 +26,6 @@ public class TagService {
     private final TagAssignmentRepository tagAssignmentRepository;
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
-
-    public TagService(TagRepository tagRepository, TagAssignmentRepository tagAssignmentRepository) {
-        this.tagRepository = tagRepository;
-        this.tagAssignmentRepository = tagAssignmentRepository;
-    }
 
     public Optional<Tag> findById(String id) {
         return tagRepository.findById(id);
