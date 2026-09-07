@@ -5,6 +5,20 @@ import { cn } from '../../../utils/cn';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../tooltip';
 import type { QueryReportTableHeaderProps } from './types';
 
+export function useTruncationTooltip<T extends HTMLElement = HTMLDivElement>() {
+  const textRef = useRef<T>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
+
+  const checkTruncation = useCallback(() => {
+    const el = textRef.current;
+    if (el) {
+      setIsTruncated(el.scrollWidth > el.clientWidth);
+    }
+  }, []);
+
+  return { textRef, isTruncated, checkTruncation };
+}
+
 export function QueryReportTableHeader({
   columns,
   columnWidth,
@@ -23,15 +37,7 @@ export function QueryReportTableHeader({
 }
 
 function TruncatedHeaderCell({ value, width }: { value: string; width: number }) {
-  const textRef = useRef<HTMLDivElement>(null);
-  const [isTruncated, setIsTruncated] = useState(false);
-
-  const checkTruncation = useCallback(() => {
-    const el = textRef.current;
-    if (el) {
-      setIsTruncated(el.scrollWidth > el.clientWidth);
-    }
-  }, []);
+  const { textRef, isTruncated, checkTruncation } = useTruncationTooltip<HTMLDivElement>();
 
   return (
     <TooltipProvider delayDuration={300}>
