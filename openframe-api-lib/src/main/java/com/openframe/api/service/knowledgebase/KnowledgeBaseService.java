@@ -69,8 +69,9 @@ public class KnowledgeBaseService {
         return queryMixed(filter, search, restrictToItemIds, normalized);
     }
 
-    public Optional<KnowledgeBaseItem> getItem(String id) {
-        return repository.findById(id);
+    public KnowledgeBaseItem getItem(String id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new IllegalStateException("Knowledge base item not found: " + id));
     }
 
     public List<KnowledgeBaseItem> getAllFolders() {
@@ -288,7 +289,7 @@ public class KnowledgeBaseService {
         List<KnowledgeBaseItem> displayedFolders = isFirstPage
                 ? (allFolders.size() > limit ? allFolders.subList(0, limit) : allFolders)
                 : List.of();
-        boolean foldersTruncated = isFirstPage && allFolders.size() > displayedFolders.size();
+        boolean foldersTruncated = allFolders.size() > displayedFolders.size();
 
         int articleLimit = Math.max(0, limit - displayedFolders.size());
         PagedArticles paged = articleLimit > 0
