@@ -77,10 +77,18 @@ public class UserInstalledAgentListener extends AbstractJetStreamPushListener {
 
             message.ack();
             log.info("User installed agent processed successfully and acked");
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.error("Permanently unparseable user installed agent message, subject={}, sid={}",
+                    subject, message.getSID(), e);
+            // Malformed payload will never parse successfully; ack to avoid infinite redelivery
+            message.ack();
         } catch (Exception e) {
-            log.error("Unexpected error processing user installed agent: {}", messagePayload, e);
+            long deliveredCount = message.metaData().deliveredCount();
+            log.error("Unexpected error processing user installed agent: subject={}, sid={}, deliveryCount={}",
+                    subject, message.getSID(), deliveredCount, e);
             // Don't ack the message and let it be redelivered
             log.info("Leaving message unacked for potential redelivery: user installed agent");
         }
     }
 }
+
