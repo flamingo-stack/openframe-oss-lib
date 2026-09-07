@@ -97,11 +97,33 @@ public class ScriptService {
     }
 
     /**
-     * Optional, non-throwing lookup — empty for a missing, soft-deleted, or
-     * other-tenant script. Mirrors the {@code Optional}-returning finders the
-     * other entities expose for Relay {@code node(id)} refetch.
+     * Non-throwing existence check — {@code false} for a missing,
+     * soft-deleted, or other-tenant script. Pair with {@link #getById(String)}
+     * to retrieve the script once existence has been confirmed.
      */
-    public Optional<ScriptResponse> findById(String id) {
+    public boolean existsById(String id) {
+        return findVisible(id).isPresent();
+    }
+
+    /**
+     * Throwing lookup — backs Relay {@code node(id)} refetch. Callers should
+     * generally guard with {@link #existsById(String)} first when a missing
+     * script is an expected outcome rather than an error.
+     *
+     * @throws NotFoundException if the script does not exist, belongs to a
+     *         different tenant, or has been soft-deleted.
+     */
+    public ScriptResponse getById(String id) {
+        return findVisible(id)
+                .orElseThrow(() -> new NotFoundException("Script not found: " + id));
+    }
+
+    /**
+     * Shared visibility-filtered lookup used by {@link #existsById(String)}
+     * and {@link #getById(String)}, reusing the same "DELETED means not
+     * found" rule as {@link #loadVisibleOrThrow(String, String)}.
+     */
+    private Optional<ScriptResponse> findVisible(String id) {
         return scriptRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
                 .filter(script -> script.getStatus() != ScriptStatus.DELETED)
                 .map(scriptMapper::toResponse);
@@ -110,10 +132,11 @@ public class ScriptService {
     /**
      * Batch lookup of scripts by id in the current pod's tenant — backs the
      * {@code scriptDataLoader} that resolves {@code Execution.scriptName} at read
-     * time. Unlike {@link #findById(String)} this deliberately INCLUDES
-     * soft-deleted scripts: a History row must keep resolving its script's name
-     * even after the script is deleted. Unknown ids are simply absent from the
-     * result (no placeholder), so callers map by {@link ScriptResponse#getId()}.
+     * time. Unlike {@link #existsById(String)} / {@link #getById(String)} this
+     * deliberately INCLUDES soft-deleted scripts: a History row must keep
+     * resolving its script's name even after the script is deleted. Unknown
+     * ids are simply absent from the result (no placeholder), so callers map
+     * by {@link ScriptResponse#getId()}.
      */
     public List<ScriptResponse> getScriptsByIds(Collection<String> ids) {
         if (ids == null || ids.isEmpty()) {
@@ -164,9 +187,10 @@ public class ScriptService {
 
         List<ScriptResponse> views = items.stream().map(scriptMapper::toResponse).toList();
 
+        PageInfo pageInfo = buildPageInfo(views, hasMore, normalized);
         return CountedGenericQueryResult.<ScriptResponse>builder()
                 .items(views)
-                .pageInfo(buildPageInfo(views, hasMore, normalized))
+                .pageInfo(pageInfo)
                 .filteredCount((int) filteredCount)
                 .build();
     }
