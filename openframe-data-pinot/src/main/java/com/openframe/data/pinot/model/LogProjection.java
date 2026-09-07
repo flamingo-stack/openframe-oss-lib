@@ -23,6 +23,7 @@ public class LogProjection {
     public String hostname;
     public String organizationId;
     public String organizationName;
+    public String tenantId;
     public String summary;
     public Instant eventTimestamp;
 }
