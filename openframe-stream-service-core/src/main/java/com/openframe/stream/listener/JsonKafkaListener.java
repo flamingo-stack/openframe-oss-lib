@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @ConditionalOnProperty(name = "openframe.cluster.mode", havingValue = "tenant", matchIfMissing = true)
+@ConditionalOnProperty(name = "openframe.oss-tenant.kafka.topics.inbound.meshcentral-events.name")
 public class JsonKafkaListener {
 
     private final GenericJsonMessageProcessor messageProcessor;
@@ -33,9 +34,11 @@ public class JsonKafkaListener {
                     "${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-query-result-events.name}",
                     "${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-policy-membership-events.name}"
             },
-            groupId = "${spring.oss-tenant.kafka.consumer.group-id}"
+            groupId = "${spring.oss-tenant.kafka.consumer.group-id}",
+            containerFactory = "ossTenantKafkaListenerContainerFactory"
     )
     public void listenIntegratedToolsEvents(@Payload CommonDebeziumMessage debeziumMessage, @Header(KafkaHeader.MESSAGE_TYPE_HEADER) MessageType messageType) {
         messageProcessor.process(debeziumMessage, messageType);
     }
 }
+
