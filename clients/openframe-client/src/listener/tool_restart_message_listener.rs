@@ -8,7 +8,6 @@ use crate::models::ToolRestartMessage;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::tool_restart_service::RestartOutcome;
 use crate::services::tool_restart_service::ToolRestartService;
-use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::AgentConfigurationService;
 use anyhow::Result;
 use async_nats::jetstream;
@@ -24,7 +23,6 @@ pub struct ToolRestartMessageListener {
     nats_connection_manager: NatsConnectionManager,
     tool_restart_service: ToolRestartService,
     config_service: AgentConfigurationService,
-    tool_run_manager: ToolRunManager,
 }
 
 impl ToolRestartMessageListener {
@@ -34,13 +32,11 @@ impl ToolRestartMessageListener {
         nats_connection_manager: NatsConnectionManager,
         tool_restart_service: ToolRestartService,
         config_service: AgentConfigurationService,
-        tool_run_manager: ToolRunManager,
     ) -> Self {
         Self {
             nats_connection_manager,
             tool_restart_service,
             config_service,
-            tool_run_manager,
         }
     }
 
@@ -146,14 +142,9 @@ impl ToolRestartMessageListener {
 
         let listener = self.clone();
         let label = format!("tool-restart:{}", tool_agent_id);
-        park_or_dispatch(
-            self.tool_run_manager.clone(),
-            message,
-            label,
-            move |msg| async move {
-                listener.dispatch(msg, tool_agent_id).await;
-            },
-        )
+        park_or_dispatch(message, label, move |msg| async move {
+            listener.dispatch(msg, tool_agent_id).await;
+        })
         .await;
 
         Ok(())
