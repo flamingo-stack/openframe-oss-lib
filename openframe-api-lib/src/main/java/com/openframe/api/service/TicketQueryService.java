@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.NoSuchElementException;
 
 // TODO: Expand with full cursor pagination/sort methods when PSA migrates from ai-agent to OSS
 @Service
@@ -24,8 +24,13 @@ public class TicketQueryService {
 
     private final TicketRepository ticketRepository;
 
-    public Optional<Ticket> findById(String ticketId) {
-        return ticketRepository.findById(ticketId);
+    public boolean existsById(String ticketId) {
+        return ticketRepository.findById(ticketId).isPresent();
+    }
+
+    public Ticket getById(String ticketId) {
+        return ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new NoSuchElementException("Ticket not found: " + ticketId));
     }
 
     public List<Ticket> searchTickets(TicketQueryFilter filter, String search, int limit) {
@@ -34,3 +39,4 @@ public class TicketQueryService {
                 query, null, limit, SORT_FIELD_CREATED_AT, SORT_DIRECTION_DESC);
     }
 }
+
