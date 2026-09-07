@@ -66,6 +66,10 @@ public class FleetEventDeserializer extends IntegratedToolEventDeserializer {
         if (message.isEmpty()) {
             message = parseStringField(after, FIELD_DETAILS);
         }
+        if (message.isEmpty()) {
+            log.warn("No message could be derived for Fleet event (activityType={}, id={}): both mapping and details field are missing/blank",
+                    activityType.orElse("unknown"), parseStringField(after, FIELD_ID).orElse("unknown"));
+        }
         return message;
     }
 
