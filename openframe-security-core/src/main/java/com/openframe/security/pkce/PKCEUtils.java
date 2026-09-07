@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 
@@ -58,7 +59,7 @@ public final class PKCEUtils {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(codeVerifier.getBytes(StandardCharsets.US_ASCII));
             return base64UrlEncode(hash);
-        } catch (Exception e) {
+        } catch (NoSuchAlgorithmException e) {
             log.error("Failed to compute PKCE challenge", e);
             throw new IllegalStateException("Failed to compute PKCE challenge", e);
         }
