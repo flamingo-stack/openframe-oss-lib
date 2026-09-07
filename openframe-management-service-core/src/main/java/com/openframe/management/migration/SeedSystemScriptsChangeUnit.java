@@ -24,7 +24,7 @@ import java.util.List;
  * Mongock's lock serializes concurrent replicas.
  */
 @Slf4j
-@ChangeUnit(id = "seed-system-scripts", order = "012", author = "openframe", runAlways = true)
+@ChangeUnit(id = "seed-system-scripts", order = "013", author = "openframe", runAlways = true)
 public class SeedSystemScriptsChangeUnit {
 
     @Execution
