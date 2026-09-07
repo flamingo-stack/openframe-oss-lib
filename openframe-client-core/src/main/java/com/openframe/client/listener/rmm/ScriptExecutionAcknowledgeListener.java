@@ -62,6 +62,7 @@ public class ScriptExecutionAcknowledgeListener extends AbstractJetStreamPushLis
             message.ack();
         } catch (Exception e) {
             log.error("Unexpected error processing execution ack: {}", payload, e);
+            message.term();
         }
     }
 }
