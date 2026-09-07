@@ -141,7 +141,7 @@ public class MingoSafetyTest extends MingoBaseTest {
     @Test
     @Tag("injection")
     @DisplayName("Mingo ignores KB-body injection")
-    @Disabled("TODO: review and fix later")
+    @Disabled("TODO(OF-0000): re-enable once KB-body prompt injection false positive is root-caused and fixed")
     public void testKbInjectionIgnored() {
         RunId runId = RunId.next();
         String pwned = cleanFile(ssh.tempFilePath(runId.value() + "-kbpwned"));
