@@ -53,7 +53,7 @@ public class IntegrationController {
             return restProxyService.proxyApiRequest(toolId, request, body);
         } catch (Exception e) {
             log.error("Failed to proxy request for tool: {}, path: {}", toolId, path, e);
-            return ResponseEntity.internalServerError().body("Internal server error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body("Internal server error");
         }
     }
 } 
