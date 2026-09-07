@@ -1,16 +1,12 @@
 package com.openframe.api.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
 import java.time.Instant;
 
-@Data
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
 public class AgentRegistrationSecretResponse {
 
     private String id;
