@@ -14,4 +14,4 @@ public class AgentRegistrationSecretResponse {
     private Instant createdAt;
     private boolean active;
 
-} 
+}

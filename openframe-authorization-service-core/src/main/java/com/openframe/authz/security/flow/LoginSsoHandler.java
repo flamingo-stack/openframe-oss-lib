@@ -8,6 +8,7 @@ import com.openframe.authz.security.SsoLoginCookiePayload;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.sso.SignupTicketService;
 import com.openframe.authz.service.sso.SsoIdentityService;
+import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
@@ -46,6 +47,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
     private final SsoCookieCodec ssoCookieCodec;
     private final SignupTicketService signupTicketService;
     private final SsoIdentityService ssoIdentityService;
+    private final SsoOidcUserService ssoOidcUserService;
     private final EmailTrustPolicy emailTrustPolicy;
     private final UserService userService;
     private final TenantService tenantService;
@@ -88,7 +90,12 @@ public class LoginSsoHandler implements SsoFlowHandler {
 
         if (authUser == null) {
             requireEmailTrustedForRouting(provider, user);
-            authUser = userService.findActiveByEmail(email).orElse(null);
+            authUser = userService.findActiveByEmail(email)
+                    // Shared-domain tenants (global domain policy, no custom app) auto-provision the
+                    // user on first login — same as the email-discovery path — instead of dropping
+                    // to the registration screen. Email is already trusted (gate above).
+                    .or(() -> ssoOidcUserService.autoProvisionByGlobalDomain(provider, user))
+                    .orElse(null);
             if (authUser == null) {
                 continueIntoRegistration(request, response, authentication, payload, provider, user, email);
                 return;
