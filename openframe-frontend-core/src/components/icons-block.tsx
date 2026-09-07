@@ -1,6 +1,6 @@
 'use client';
 
-import { Sun, Moon, CheckCircle, Github, PlusCircle } from 'lucide-react';
+import { Sun, Moon, CheckCircle, PlusCircle } from 'lucide-react';
 import type React from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import { useIsHydrated } from '../hooks/ui/use-is-hydrated';
@@ -12,14 +12,13 @@ import {
   CommunityIcon,
   CompareIcon,
 } from './icons-stub';
+import { OpenmspLogo } from './openmsp-logo';
 
 // Map lucide icons
 const SunIcon = Sun;
 const MoonIcon = Moon;
 const CheckCircleIcon = CheckCircle;
-const GitHubIcon = Github;
 const PlusCircleIcon = PlusCircle;
-const OpenmspLogo = () => <div>Logo</div>;
 
 interface IconsBlockProps {
   /**
@@ -40,7 +39,6 @@ const availableIcons = [
   SunIcon,
   MoonIcon,
   CheckCircleIcon,
-  GitHubIcon,
   PlusCircleIcon,
   OpenmspLogo,
 ];
