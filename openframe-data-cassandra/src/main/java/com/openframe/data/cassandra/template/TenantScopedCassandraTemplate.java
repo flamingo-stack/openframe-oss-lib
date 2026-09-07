@@ -7,7 +7,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.cassandra.core.CassandraOperations;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -58,13 +57,31 @@ public class TenantScopedCassandraTemplate {
     }
 
     /**
+     * Checks whether an entity with the given primary key exists. The keyBuilder
+     * receives the resolved tenant_id and returns the fully-populated key; this keeps
+     * callers from constructing keys without tenant_id.
+     */
+    public <T, K> boolean existsById(Function<String, K> keyBuilder, Class<T> entityType) {
+        String tenantId = requireTenantId();
+        K key = keyBuilder.apply(tenantId);
+        return delegate.selectOneById(key, entityType) != null;
+    }
+
+    /**
      * Point lookup by primary key. The keyBuilder receives the resolved tenant_id and
      * returns the fully-populated key; this keeps callers from constructing keys
      * without tenant_id.
+     *
+     * @throws CassandraEntityNotFoundException if no entity exists for the resolved key
      */
-    public <T, K> Optional<T> findById(Function<String, K> keyBuilder, Class<T> entityType) {
+    public <T, K> T getById(Function<String, K> keyBuilder, Class<T> entityType) {
         String tenantId = requireTenantId();
         K key = keyBuilder.apply(tenantId);
-        return Optional.ofNullable(delegate.selectOneById(key, entityType));
+        T entity = delegate.selectOneById(key, entityType);
+        if (entity == null) {
+            throw new CassandraEntityNotFoundException(
+                    "No " + entityType.getSimpleName() + " found for the resolved key");
+        }
+        return entity;
     }
 }
