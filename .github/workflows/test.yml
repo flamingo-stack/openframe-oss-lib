@@ -61,6 +61,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
 
       - name: Set up Java 21
         uses: actions/setup-java@v4
@@ -117,6 +118,8 @@ jobs:
 
       - uses: actions/checkout@v4
         if: steps.should_run.outputs.run == 'true'
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         if: steps.should_run.outputs.run == 'true'
@@ -238,6 +241,8 @@ jobs:
 
       - uses: actions/checkout@v4
         if: steps.should_run.outputs.run == 'true'
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         if: steps.should_run.outputs.run == 'true'
@@ -281,6 +286,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Prepare Rust tools
         uses: ./.github/steps/rust-setup
@@ -310,6 +317,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.ref }}
+          persist-credentials: false
 
       - name: Delete PR ${{ github.event.pull_request.number }} java snapshots
         env:
@@ -350,3 +358,4 @@ jobs:
       - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: exit 1
       - run: echo "All checks passed"
+
