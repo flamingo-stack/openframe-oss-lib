@@ -30,27 +30,7 @@ import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-/**
- * MongoTemplate-backed implementation of {@link CustomScriptExecutionRepository}.
- *
- * <p>The list / count / facet queries are owner-agnostic — {@link ExecutionOwnerScope}
- * decides which owner field narrows the base predicate. Facet queries drop the "own"
- * filter arm so their dropdowns keep offering every switchable value.
- *
- * <p>Cursor pagination is implemented on {@code _id}: descending by default
- * ({@code newest first}), with the cursor comparison flipped when paginating backward.
- * The predicate is tenant-scoped + owner-scoped so it hits the compound index prefix;
- * the {@code _id} sort/cursor is a natural tiebreaker.
- *
- * <p>The cursor value is parsed into a Mongo {@link ObjectId} before being applied —
- * comparing a String against a BSON {@code ObjectId} field does not match correctly
- * under Mongo's type-bracketing rules. An invalid cursor (anything not a valid 24-char
- * hex {@code ObjectId}, or a compound cursor missing its separator / with unparseable
- * epoch millis) is rejected fail-fast with
- * {@link com.openframe.core.exception.BadRequestException}. Silent fallback would drop
- * the cursor while preserving {@code backward=true}, returning the OLDEST rows in ASC
- * order alongside cursor-based {@code pageInfo} — a wrong-order surprise for the client.
- */
+// MongoTemplate-backed implementation of CustomScriptExecutionRepository; owner-agnostic queries with ObjectId-backed cursor pagination.
 @Slf4j
 @Repository
 @RequiredArgsConstructor
