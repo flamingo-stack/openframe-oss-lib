@@ -3,6 +3,7 @@ package com.openframe.stream.handler.rmm;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.openframe.data.cassandra.model.CommandResult;
 import com.openframe.data.cassandra.repository.CommandResultRepository;
 import com.openframe.data.model.enums.Destination;
@@ -68,9 +69,18 @@ public class CommandResultCassandraMessageHandler
 
         log.debug("Handling command result (Cassandra write): executionId={} machineId={}", executionId, machineId);
 
+        String resultJson;
+        try {
+            resultJson = buildResultJson(after);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize command result JSON for executionId={} machineId={} — skipping command_results write",
+                    executionId, machineId, e);
+            return;
+        }
+
         CommandResult row = new CommandResult();
         row.setKey(new CommandResult.CommandResultKey(executionId, machineId));
-        row.setResult(buildResultJson(after));
+        row.setResult(resultJson);
 
         // The command_results table has a table-level default_time_to_live, so a
         // plain save self-expires — no per-write TTL needed.
@@ -79,7 +89,7 @@ public class CommandResultCassandraMessageHandler
     }
 
     /** Pack exactly the agent's result fields into one JSON string. */
-    private String buildResultJson(JsonNode after) {
+    private String buildResultJson(JsonNode after) throws JsonProcessingException {
         ObjectNode result = mapper.createObjectNode();
         putText(result, after, FIELD_EXECUTION_ID);
         putText(result, after, FIELD_MACHINE_ID);
@@ -89,13 +99,7 @@ public class CommandResultCassandraMessageHandler
         putLong(result, after, FIELD_EXECUTION_TIME_MS);
         putBool(result, after, FIELD_TIMED_OUT);
         putText(result, after, FIELD_ERROR);
-        try {
-            return mapper.writeValueAsString(result);
-        } catch (Exception e) {
-            log.error("Failed to serialize command result JSON for executionId={}",
-                    text(after, FIELD_EXECUTION_ID), e);
-            return null;
-        }
+        return mapper.writeValueAsString(result);
     }
 
     private static String text(JsonNode after, String field) {
