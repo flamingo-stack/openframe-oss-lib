@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-
+import { BOOKING_BASE } from '../../__tests__/fixtures/meeting-booking';
 import {
   isSupportedFormField,
   makeBookingSchema,
@@ -91,15 +91,7 @@ describe('MAX_MONTH_OFFSET', () => {
 });
 
 describe('makeBookingSchema × SUPPORTED_FORM_FIELD_TYPES', () => {
-  const base = {
-    meetingId: 'm1',
-    startTimeMs: 1_785_769_200_000,
-    durationMs: 1_800_000,
-    firstName: 'Ada',
-    lastName: 'Lovelace',
-    email: 'ada@example.com',
-    timezone: 'UTC',
-  };
+  const base = BOOKING_BASE;
 
   it('every supported type yields a working validator (renderer and factory move together)', () => {
     for (const type of SUPPORTED_FORM_FIELD_TYPES) {
@@ -112,7 +104,10 @@ describe('makeBookingSchema × SUPPORTED_FORM_FIELD_TYPES', () => {
       };
       expect(isSupportedFormField(field)).toBe(true);
       const schema = makeBookingSchema([field], null);
-      const answer = type === 'checkbox' ? true : type === 'select' || type === 'radio' ? 'a' : 'hello';
+      // One well-formed answer per type: a boolean for the box, an option for the
+      // pickers, a decimal literal for a Number property, free text otherwise.
+      const answer =
+        type === 'checkbox' ? true : type === 'select' || type === 'radio' ? 'a' : type === 'number' ? '42' : 'hello';
       const ok = schema.safeParse({ ...base, formFields: { [field.name]: answer } });
       expect(ok.success).toBe(true);
       const missing = schema.safeParse({ ...base, formFields: {} });
