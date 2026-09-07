@@ -38,7 +38,7 @@ impl Default for RefreshTiming {
     fn default() -> Self {
         Self {
             margin: Duration::from_secs(5 * 60),
-            min_lead: Duration::from_secs(15),
+            min_lead: Duration::from_secs(30),
             fallback_interval: Duration::from_secs(30 * 60),
             max_ttl: Duration::from_secs(24 * 3600),
             min_interval: Duration::from_secs(60),
@@ -70,12 +70,6 @@ impl TokenRefreshRunManager {
             deactivation,
             timing: RefreshTiming::default(),
         }
-    }
-
-    #[cfg(test)]
-    fn with_timing(mut self, timing: RefreshTiming) -> Self {
-        self.timing = timing;
-        self
     }
 
     pub fn start(&self) {
@@ -115,15 +109,11 @@ impl TokenRefreshRunManager {
                         wait.as_secs()
                     );
                     sleep(wait).await;
+                    let (sent_wall, sent_mono) = (Utc::now().timestamp(), Instant::now());
                     if let Ok(Ok(response)) =
                         timeout(timing.reauth_timeout, auth_service.reauthenticate()).await
                     {
-                        schedule = schedule_after_refresh(
-                            &timing,
-                            &response,
-                            Utc::now().timestamp(),
-                            Instant::now(),
-                        );
+                        schedule = schedule_after_refresh(&timing, &response, sent_wall, sent_mono);
                     }
                     continue;
                 }
@@ -132,14 +122,11 @@ impl TokenRefreshRunManager {
 
                 // Retry on the short interval until a refresh succeeds.
                 loop {
+                    let (sent_wall, sent_mono) = (Utc::now().timestamp(), Instant::now());
                     match timeout(timing.reauth_timeout, auth_service.reauthenticate()).await {
                         Ok(Ok(response)) => {
-                            schedule = schedule_after_refresh(
-                                &timing,
-                                &response,
-                                Utc::now().timestamp(),
-                                Instant::now(),
-                            );
+                            schedule =
+                                schedule_after_refresh(&timing, &response, sent_wall, sent_mono);
                             info!("Proactively refreshed access token; shared_token.enc updated");
                             break;
                         }
@@ -232,19 +219,24 @@ impl RefreshTiming {
     }
 }
 
-/// Schedule after a successful refresh: the server-granted lifetime counted from receipt, never sooner than `min_interval`.
+/// Schedule after a successful refresh: the server-granted lifetime counted from the moment the request was
+/// sent (`sent_wall`/`sent_mono`, so latency shortens the lead rather than the token), never sooner than `min_interval`.
 fn schedule_after_refresh(
     timing: &RefreshTiming,
     response: &AgentTokenResponse,
-    now_wall: i64,
-    now_mono: Instant,
+    sent_wall: i64,
+    sent_mono: Instant,
 ) -> RefreshSchedule {
     let times = jwt::token_times_unix(&response.access_token);
-    let ttl = response
-        .expires_in
-        .filter(|secs| *secs > 0)
-        .or_else(|| times.and_then(|t| t.ttl_secs()))
-        .map(|secs| timing.ttl_from_secs(secs));
+    // The shorter of `expires_in` and `exp - iat`, so neither claim alone can stretch the interval.
+    let ttl = match (
+        response.expires_in.filter(|secs| *secs > 0),
+        times.and_then(|t| t.ttl_secs()),
+    ) {
+        (Some(declared), Some(claimed)) => Some(declared.min(claimed)),
+        (declared, claimed) => declared.or(claimed),
+    }
+    .map(|secs| timing.ttl_from_secs(secs));
     let delay = match ttl {
         Some(ttl) => ttl
             .saturating_sub(timing.lead_for(ttl))
@@ -256,7 +248,7 @@ fn schedule_after_refresh(
     };
 
     // Device clock minus server clock, measured against the freshly minted `iat`.
-    if let Some(skew) = times.and_then(|t| t.iat).map(|iat| now_wall - iat) {
+    if let Some(skew) = times.and_then(|t| t.iat).map(|iat| sent_wall - iat) {
         if skew.unsigned_abs() >= SKEW_WARN.as_secs() {
             warn!(
                 skew_s = skew,
@@ -265,35 +257,29 @@ fn schedule_after_refresh(
         }
     }
 
-    RefreshSchedule::after(now_mono, now_wall, delay, timing.min_interval)
+    RefreshSchedule::after(sent_mono, sent_wall, delay, timing.min_interval)
 }
 
-/// Schedule for the token found at startup: its receipt time is unknown, so the device clock estimates the
-/// remaining life, trusted only within the token's own lifetime — a skewed clock costs at most one early refresh.
+/// Schedule for the token found at startup. Its age on the device clock is the only evidence of how much life
+/// it has left and a skewed clock makes that worthless, so refresh at once — unless the clock says initial
+/// authentication minted it moments ago, in which case count its lifetime from now.
 fn schedule_for_existing(
     timing: &RefreshTiming,
     token: &str,
     now_wall: i64,
     now_mono: Instant,
 ) -> RefreshSchedule {
-    let Some(times) = jwt::token_times_unix(token) else {
-        warn!("Token refresh: access token has no decodable exp; using fallback interval");
-        return RefreshSchedule::after(
-            now_mono,
-            now_wall,
-            timing.fallback_interval,
-            Duration::ZERO,
-        );
-    };
-    let Some(ttl) = times.ttl_secs().map(|secs| timing.ttl_from_secs(secs)) else {
-        return RefreshSchedule::after(now_mono, now_wall, Duration::ZERO, Duration::ZERO);
-    };
-    let remaining = times.exp - now_wall;
-    // More life left than the token ever had: the clock is behind and the real remainder is unknowable.
-    let delay = if remaining > ttl.as_secs() as i64 {
-        Duration::ZERO
-    } else {
-        Duration::from_secs(remaining.max(0) as u64).saturating_sub(timing.lead_for(ttl))
+    let times = jwt::token_times_unix(token);
+    let age = times.and_then(|t| t.iat).map(|iat| now_wall - iat);
+    let minted_just_now =
+        age.is_some_and(|age| (0..timing.min_interval.as_secs() as i64).contains(&age));
+    let delay = match (minted_just_now, times.and_then(|t| t.ttl_secs())) {
+        (true, Some(ttl)) => {
+            let ttl = timing.ttl_from_secs(ttl);
+            ttl.saturating_sub(timing.lead_for(ttl))
+                .saturating_sub(Duration::from_secs(age.unwrap_or(0) as u64))
+        }
+        _ => Duration::ZERO,
     };
     RefreshSchedule::after(now_mono, now_wall, delay, Duration::ZERO)
 }
