@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.springframework.util.StringUtils.hasText;
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 import static com.openframe.authz.util.OidcUserUtils.resolveNames;
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
@@ -74,7 +75,7 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
                 return;
             }
             String email = resolveEmail(user);
-            if (email == null || email.isBlank()) {
+            if (!hasText(email)) {
                 return;
             }
 
@@ -114,7 +115,16 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
                                         String provider,
                                         String pictureUrl) {
         AuthUser authUser = userService.findActiveByEmailAndTenant(normalizedEmail, tenantId)
-                .orElseGet(() -> registerUser(tenantId, email, user, provider));
+                .orElseGet(() -> {
+                    // Global single-active-email: tenant registration enforces it, so auto-provision
+                    // must too — otherwise a second tenant mints a duplicate that then breaks every
+                    // global email lookup (IncorrectResultSizeDataAccessException).
+                    if (userService.hasActiveAccountInAnotherTenant(normalizedEmail, tenantId)) {
+                        throw new IllegalStateException(
+                                "This account is already registered under a different organization.");
+                    }
+                    return registerUser(tenantId, email, user, provider);
+                });
         registrationProcessor.postProcessAutoProvision(authUser, pictureUrl);
         return authUser;
     }
@@ -130,7 +140,7 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
      */
     public Optional<AuthUser> autoProvisionByGlobalDomain(String provider, OidcUser user) {
         String email = resolveEmail(user);
-        if (email == null || email.isBlank()) {
+        if (!hasText(email)) {
             return Optional.empty();
         }
         String normalizedEmail = email.toLowerCase(ROOT);
