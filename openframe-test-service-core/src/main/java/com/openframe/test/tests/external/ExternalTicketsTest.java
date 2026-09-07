@@ -65,7 +65,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
                     .ifPresent(archived -> ExternalTicketApi.transitionRaw(
                             created.getId(), archived.getId(), "extapi suite teardown"));
         } catch (Exception e) {
-            log.warn("Could not archive ticket {} during teardown: {}", created.getId(), e.getMessage());
+            log.warn("Could not archive ticket {} during teardown", created.getId(), e);
         }
     }
 
