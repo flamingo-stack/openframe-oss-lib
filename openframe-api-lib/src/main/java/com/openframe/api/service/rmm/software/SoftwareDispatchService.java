@@ -8,16 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-/**
- * Write-side service for the Software Management feature — dispatches install /
- * uninstall / scheduled-update / cancel operations to agents via the RMM
- * pipeline (system-preset scripts per package-manager source).
- *
- * <p><b>Stub</b>: every method returns {@code null}. Real implementation will
- * reuse the RMM {@code Script}/{@code SystemScriptDispatchService} pipeline
- * with a package-manager-specific script per software source (WINGET / CHOCO /
- * BREW). Gated by {@code openframe.software-management.enabled}.
- */
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "openframe.software-management.enabled", havingValue = "true")

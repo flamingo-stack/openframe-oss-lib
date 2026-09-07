@@ -15,7 +15,6 @@ public class ScheduleUpdateSoftwareInput {
     @NotEmpty
     private List<String> machineIds;
 
-    /** UTC instant at which the update should fire on each device. */
     @NotNull
     private Instant scheduledAt;
 }

@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Aggregate software row — one per software title, rolled up across the tenant's fleet. */
 @Data
 @Builder
 @NoArgsConstructor

@@ -5,11 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Per-device row for a software title. The {@code device} GraphQL field is
- * resolved in the DataFetcher by looking up {@code machineId} against the
- * device service.
- */
 @Data
 @Builder
 @NoArgsConstructor

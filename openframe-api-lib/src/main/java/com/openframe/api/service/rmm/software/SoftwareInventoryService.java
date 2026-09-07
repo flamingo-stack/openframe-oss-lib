@@ -10,16 +10,6 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Read-side service for the Software Management feature — aggregate list of
- * software titles, per-title device list, and per-title CVE list.
- *
- * <p><b>Stub</b>: every method returns {@code null} / {@code Optional.empty()} /
- * {@code List.of()}. Real implementation will read from a Mongo materialized
- * view populated by a Fleet REST poller (see software management design). The
- * bean is gated by {@code openframe.software-management.enabled} so it is not
- * loaded in production until the feature is turned on.
- */
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "openframe.software-management.enabled", havingValue = "true")
