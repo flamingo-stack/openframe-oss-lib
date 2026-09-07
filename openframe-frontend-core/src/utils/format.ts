@@ -184,7 +184,7 @@ export interface NameInitialsOptions {
 export function nameInitials(
   name: string | null | undefined,
   fallback: string = 'E',
-  options: NameInitialsOptions = {}
+  options: NameInitialsOptions = {},
 ): string {
   const { maxLetters = 2, pick: mode = 'all' } = options;
   const source = typeof name === 'string' ? name.trim() : '';

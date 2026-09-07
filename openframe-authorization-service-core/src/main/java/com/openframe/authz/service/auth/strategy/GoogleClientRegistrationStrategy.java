@@ -4,8 +4,8 @@ import com.openframe.authz.config.oidc.AbstractOidcProviderProperties;
 import com.openframe.authz.config.oidc.GoogleSSOProperties;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.data.document.sso.SSOConfig;
-import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.stereotype.Component;
 
 import static com.openframe.authz.config.oidc.GoogleSSOProperties.GOOGLE;
@@ -43,5 +43,3 @@ public class GoogleClientRegistrationStrategy extends BaseOidcClientRegistration
         }
     }
 }
-
-

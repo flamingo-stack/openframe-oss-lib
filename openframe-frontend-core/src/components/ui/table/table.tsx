@@ -6,10 +6,11 @@ import { Chevron02RightIcon } from '../../icons-v2-generated';
 import { Pagination } from '../../pagination';
 import { Button } from '../button';
 import { CursorPagination } from '../cursor-pagination';
+import { PlaceholderRows, ReservedEmptyState } from '../data-table/data-table-skeleton';
 import { TableEmptyState } from './table-empty-state';
 import { TableHeader } from './table-header';
 import { TableRow } from './table-row';
-import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, TableCardSkeleton } from './table-skeleton';
+import { COMPACT_ROW_MIN_HEIGHT, TableCardSkeleton } from './table-skeleton';
 import type { RowAction, TableColumn, TableProps, TableRowData } from './types';
 import { useTableMotion } from './use-table-motion';
 
@@ -102,6 +103,10 @@ export function Table<T = TableRowData>({
   loading = false,
   emptyMessage,
   skeletonRows = 10,
+  minRows,
+  emptyState,
+  keepHeightWhenEmpty,
+  emptyDescription,
   className,
   containerClassName,
   headerClassName,
@@ -134,6 +139,14 @@ export function Table<T = TableRowData>({
   // ONLY when `animateRowReorder` is set, so the default table stays motion-free.
   const tableMotion = useTableMotion(Boolean(animateRowReorder));
   const columnsWithActions = injectSyntheticColumns(columns, rowActions, renderRowActions, rowHref, actionsColumnWidth);
+
+  // ONE resolution of the two vocabularies, so the render below never asks
+  // which spelling the caller used. `minRows` is the current one; the two
+  // deprecated props shipped a release earlier and hosts pin exact versions,
+  // so they keep working rather than silently doing nothing.
+  const reservedRows = minRows ?? (keepHeightWhenEmpty ? skeletonRows : undefined);
+  const resolvedEmptyState =
+    emptyState ?? (emptyDescription ? { title: emptyMessage, description: emptyDescription } : undefined);
   const getRowHref = (item: T): string | undefined => {
     if (onRowClick || !rowHref) return undefined;
     return rowHref(item) ?? undefined;
@@ -269,7 +282,22 @@ export function Table<T = TableRowData>({
             hasChevron={Boolean(rowHref)}
           />
         ) : data.length === 0 ? (
-          <TableEmptyState message={emptyMessage} />
+          /* `minRows` promises a STABLE height, and an empty table is exactly
+             when a collapsing one is most visible — the pagination and
+             everything under it jump the moment a filter matches nothing. So
+             reserve the same slots and centre the empty state over them,
+             identically to `DataTableBody`. */
+          reservedRows ? (
+            <ReservedEmptyState
+              count={reservedRows}
+              gapClassName="gap-2"
+              innerHeightClassName={compact ? COMPACT_ROW_MIN_HEIGHT : undefined}
+            >
+              <TableEmptyState message={emptyMessage} emptyState={resolvedEmptyState} />
+            </ReservedEmptyState>
+          ) : (
+            <TableEmptyState message={emptyMessage} emptyState={resolvedEmptyState} />
+          )
         ) : (
           <>
             {/* Real data rows. When `animateRowReorder` is on, wrap ONLY these
@@ -312,20 +340,15 @@ export function Table<T = TableRowData>({
             )}
             {/* Infinite scroll: sentinel element */}
             {infiniteScroll?.hasNextPage && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
-            {/* Invisible placeholder rows to maintain consistent table height (disabled for infinite scroll) */}
-            {!infiniteScroll &&
-              Array.from({ length: Math.max(0, skeletonRows - data.length) }).map((_, index) => (
-                <div
-                  key={`placeholder-${index}`}
-                  className="pointer-events-none relative overflow-hidden rounded-[6px]"
-                  aria-hidden="true"
-                >
-                  {/* Desktop placeholder - invisible but takes up space */}
-                  <div className={cn('hidden items-center gap-4 px-4 py-0 md:flex', ROW_HEIGHT_DESKTOP)} />
-                  {/* Mobile placeholder - invisible but takes up space */}
-                  <div className={cn('flex items-center justify-start gap-3 px-3 py-0 md:hidden', ROW_HEIGHT_MOBILE)} />
-                </div>
-              ))}
+            {/* Invisible placeholder rows to maintain consistent table height
+                (disabled for infinite scroll). `minRows` when the host opted
+                in, else the legacy pad-to-`skeletonRows`. */}
+            {!infiniteScroll && (
+              <PlaceholderRows
+                count={Math.max(0, (reservedRows ?? skeletonRows) - data.length)}
+                innerHeightClassName={compact ? COMPACT_ROW_MIN_HEIGHT : undefined}
+              />
+            )}
           </>
         )}
       </div>

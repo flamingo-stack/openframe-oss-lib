@@ -196,7 +196,7 @@ mux-player::part(button):hover {
 }
 mux-player::part(center play button) {
   background: transparent;
-  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
+  filter: var(--ods-shadow-glyph);
 }
 mux-player::part(center play button):hover {
   background: transparent;

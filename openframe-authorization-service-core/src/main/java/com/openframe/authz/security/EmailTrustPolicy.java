@@ -1,11 +1,13 @@
 package com.openframe.authz.security;
 
+import com.openframe.authz.config.oidc.MicrosoftSSOProperties;
 import com.openframe.authz.util.OidcUserUtils;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+
+import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
 
 /**
  * Whether a provider-asserted email is trustworthy enough to ROUTE INTO AN EXISTING ACCOUNT.
@@ -17,22 +19,15 @@ import java.util.Map;
  * their emails are Microsoft-verified sign-in aliases with no directory admin who could forge
  * them, so they are trusted without {@code xms_edov} (which is never issued on MSA tokens).
  */
-@Slf4j
 @Component
+@RequiredArgsConstructor
 public class EmailTrustPolicy {
 
-    private static final String MICROSOFT = "microsoft";
-
-    /**
-     * Directory id Microsoft issues ALL personal-account tokens under, published in the identity
-     * platform's token-claims reference. Configurable for test stubs; the default is the value.
-     */
-    @Value("${openframe.sso.microsoft.personal-accounts-tenant-id:9188040d-6c67-4c5b-b112-36a304b66dad}")
-    private String personalAccountsTenantId;
+    private final MicrosoftSSOProperties microsoftProps;
 
     public boolean emailTrustedForRouting(String provider, Map<String, Object> claims) {
         if (MICROSOFT.equals(provider)) {
-            if (personalAccountsTenantId.equals(claims.get("tid"))) {
+            if (microsoftProps.getPersonalAccountsTenantId().equals(claims.get("tid"))) {
                 return true;
             }
             Object edov = claims.get("xms_edov");
