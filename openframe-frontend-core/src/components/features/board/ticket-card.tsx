@@ -21,7 +21,14 @@ import { cn } from '../../../utils/cn';
 import { formatTicketRelativeTime, formatTicketFullTimestamp } from '../../../utils/date-utils';
 import { holdMoveDragEffect } from '../../../utils/drag-effect';
 import { getReadableTextColor } from '../../../utils/ods-color-utils';
-import { LaptopIcon, Flag02Icon, MessagesIcon, UserCheckIcon } from '../../icons-v2-generated';
+import {
+  ClockIcon,
+  DotsLoaderIcon,
+  LaptopIcon,
+  Flag02Icon,
+  MessagesIcon,
+  UserCheckIcon,
+} from '../../icons-v2-generated';
 import { DeletedUserAvatar } from '../../ui/deleted-user-avatar';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { Tag } from '../../ui/tag';
@@ -30,7 +37,7 @@ import { BoardTicketApproval } from './board-ticket-approval';
 import { useBoardLift, useDropAim } from './drop-aim';
 import { DROP_LINE_ATTRIBUTE } from './lane-geometry';
 import { useIsLanding } from './pending-move';
-import type { BoardPriority, BoardTicket } from './types';
+import type { BoardPriority, BoardTicket, BoardTicketActivityKind } from './types';
 import { TICKET_ID_ATTRIBUTE } from './use-lane-scroll-anchor';
 
 const PRIORITY_COLOR_CLASS: Record<BoardPriority, string> = {
@@ -49,6 +56,13 @@ export const DRAG_PREVIEW_OPACITY = 0.9;
 
 const MAX_VISIBLE_TAGS = 2;
 const MAX_VISIBLE_ASSIGNEES = 3;
+
+const ACTIVITY_DEFAULT_LABEL: Record<BoardTicketActivityKind, string> = {
+  'ai-working': 'AI assistant is working',
+  'user-typing': 'User typing',
+  'waiting-external': 'Waiting for client response',
+  stale: 'No activity',
+};
 
 /** Shared card shell (border / padding / bg). Same footprint for the draggable
  *  board card and the static {@link TicketCardView}. */
@@ -156,6 +170,21 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
         <div className="flex items-center gap-[var(--spacing-system-xxs)] text-ods-open-yellow text-h6">
           <UserCheckIcon className="size-4 shrink-0" />
           <span className="truncate">Escalated by User</span>
+        </div>
+      )}
+      {ticket.activity && (
+        <div
+          className={cn(
+            'flex items-center gap-[var(--spacing-system-xxs)] text-h6',
+            ticket.activity.kind === 'stale' ? 'text-ods-open-yellow' : 'text-ods-text-secondary',
+          )}
+        >
+          {ticket.activity.kind === 'stale' ? (
+            <ClockIcon className="size-4 shrink-0" />
+          ) : (
+            <DotsLoaderIcon className="size-4 shrink-0" />
+          )}
+          <span className="truncate">{ticket.activity.label ?? ACTIVITY_DEFAULT_LABEL[ticket.activity.kind]}</span>
         </div>
       )}
       {showNewMessage && (

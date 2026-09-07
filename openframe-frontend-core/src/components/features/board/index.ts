@@ -21,6 +21,8 @@ export type {
   BoardColumnDef,
   BoardPriority,
   BoardTicket,
+  BoardTicketActivity,
+  BoardTicketActivityKind,
   BoardTicketAssignee,
   BoardTicketPendingApproval,
 } from './types';
