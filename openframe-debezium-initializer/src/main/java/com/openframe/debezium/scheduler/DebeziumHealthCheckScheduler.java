@@ -7,40 +7,29 @@ import com.openframe.debezium.naming.ConnectorNameStrategy;
 import com.openframe.debezium.service.ConnectorRecoveryManager;
 import com.openframe.debezium.service.DebeziumService;
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 @ConditionalOnProperty(name = "openframe.debezium.health-check.enabled", havingValue = "true")
 public class DebeziumHealthCheckScheduler {
 
     private final DebeziumService debeziumService;
     private final ConnectorRecoveryManager recoveryManager;
-    private final IntegratedToolService integratedToolService;
+    private final Optional<IntegratedToolService> integratedToolService;
     private final TenantIdProvider tenantIdProvider;
     private final ConnectorNameStrategy nameStrategy;
-
-    @Autowired
-    public DebeziumHealthCheckScheduler(DebeziumService debeziumService,
-                                        ConnectorRecoveryManager recoveryManager,
-                                        @Autowired(required = false) IntegratedToolService integratedToolService,
-                                        TenantIdProvider tenantIdProvider,
-                                        ConnectorNameStrategy nameStrategy) {
-        this.debeziumService = debeziumService;
-        this.recoveryManager = recoveryManager;
-        this.integratedToolService = integratedToolService;
-        this.tenantIdProvider = tenantIdProvider;
-        this.nameStrategy = nameStrategy;
-    }
 
     @PostConstruct
     public void init() {
@@ -59,7 +48,7 @@ public class DebeziumHealthCheckScheduler {
 
         // Only reconcile/create connectors if a tenant is registered — prevents creating
         // connectors on empty clusters (e.g. before the first customer signs up).
-        if (integratedToolService != null && tenantIdProvider.isTenantRegistered()) {
+        if (integratedToolService.isPresent() && tenantIdProvider.isTenantRegistered()) {
             reconcileMissingConnectors();
         }
 
@@ -68,7 +57,7 @@ public class DebeziumHealthCheckScheduler {
 
     private void reconcileMissingConnectors() {
         try {
-            List<IntegratedTool> tools = integratedToolService.getAllTools();
+            List<IntegratedTool> tools = integratedToolService.get().getAllTools();
             Set<String> expectedBaseNames = debeziumService.extractExpectedConnectorNames(tools);
             if (expectedBaseNames.isEmpty()) {
                 return;
