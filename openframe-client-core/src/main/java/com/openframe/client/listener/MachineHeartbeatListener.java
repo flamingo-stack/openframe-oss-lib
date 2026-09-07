@@ -1,6 +1,7 @@
 package com.openframe.client.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.client.exception.NatsException;
 import com.openframe.client.service.MachineStatusService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import io.nats.client.Connection;
@@ -44,14 +45,14 @@ public class MachineHeartbeatListener {
 
         } catch (Exception e) {
             log.error("Failed to subscribe to machine heartbeats", e);
-            throw new RuntimeException("Failed to subscribe to machine heartbeats", e);
+            throw new NatsException("Failed to subscribe to machine heartbeats", e);
         }
     }
 
     private void handleMessage(Message message) {
         String subject = message.getSubject();
 
-        String machineId = machineIdExtractor.extract(subject);;
+        String machineId = machineIdExtractor.extract(subject);
         try {
             // Generate timestamp at service side
             Instant eventTimestamp = Instant.now();
