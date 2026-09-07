@@ -137,6 +137,8 @@ public class MachineTagEventAspect {
     /**
      * Intercepts TagAssignment repository deleteByEntityIdAndTagIdAndEntityType operations.
      * Uses @Around to capture affected entity BEFORE the delete, then re-syncs to Pinot.
+     * If pre-delete capture fails, the delete is not performed since the resulting Pinot
+     * re-sync would be permanently skipped, leaving Pinot out of sync with the source of truth.
      */
     @Around("execution(* com.openframe.data.repository.tag.TagAssignmentRepository.deleteByEntityIdAndTagIdAndEntityType(..)) && args(entityId, tagId, entityType)")
     public Object aroundTagAssignmentDelete(ProceedingJoinPoint joinPoint, String entityId, String tagId, Object entityType) throws Throwable {
@@ -146,7 +148,9 @@ public class MachineTagEventAspect {
                 machineTagEventService.processTagAssignmentDelete(entityId, tagId);
             }
         } catch (Exception e) {
-            log.error("Error in pre-delete processing for entityId={}, tagId={}: {}", entityId, tagId, e.getMessage(), e);
+            throw new IllegalStateException(
+                    "Pre-delete processing failed for entityId=" + entityId + ", tagId=" + tagId
+                            + "; aborting delete to avoid Pinot desync", e);
         }
         return joinPoint.proceed();
     }
@@ -154,6 +158,8 @@ public class MachineTagEventAspect {
     /**
      * Intercepts TagAssignment repository deleteByTagId operations.
      * Uses @Around to capture all affected machineIds BEFORE the delete, then re-syncs to Pinot.
+     * If pre-delete capture fails, the delete is not performed since the resulting Pinot
+     * re-sync would be permanently skipped, leaving Pinot out of sync with the source of truth.
      */
     @Around("execution(* com.openframe.data.repository.tag.TagAssignmentRepository.deleteByTagId(..)) && args(tagId)")
     public Object aroundTagAssignmentDeleteByTagId(ProceedingJoinPoint joinPoint, String tagId) throws Throwable {
@@ -161,7 +167,9 @@ public class MachineTagEventAspect {
             log.debug("TagAssignment deleteByTagId operation detected for tagId={}", tagId);
             machineTagEventService.processTagAssignmentDeleteByTagId(tagId);
         } catch (Exception e) {
-            log.error("Error in pre-delete processing for tagId={}: {}", tagId, e.getMessage(), e);
+            throw new IllegalStateException(
+                    "Pre-delete processing failed for tagId=" + tagId
+                            + "; aborting delete to avoid Pinot desync", e);
         }
         return joinPoint.proceed();
     }
@@ -172,20 +180,15 @@ public class MachineTagEventAspect {
      */
     @Around("execution(* com.openframe.data.repository.tag.TagRepository.save(..)) && args(tag)")
     public Object aroundTagSave(ProceedingJoinPoint joinPoint, Object tag) throws Throwable {
-        try {
-            log.debug("Tag save operation detected, capturing state and delegating to service");
-            Tag tagEntity = (Tag) tag;
+        log.debug("Tag save operation detected, capturing state and delegating to service");
+        Tag tagEntity = (Tag) tag;
 
-            Tag result = (Tag) joinPoint.proceed();
+        Tag result = (Tag) joinPoint.proceed();
 
-            if (tagEntity != null && tagEntity.getId() != null) {
-                machineTagEventService.processTagSave(tagEntity);
-            }
-            return result;
-        } catch (Exception e) {
-            log.error("Error in aroundTagSave aspect: {}", e.getMessage(), e);
-            throw e;
+        if (tagEntity != null && tagEntity.getId() != null) {
+            machineTagEventService.processTagSave(tagEntity);
         }
+        return result;
     }
 
     /**
@@ -194,29 +197,25 @@ public class MachineTagEventAspect {
      */
     @Around("execution(* com.openframe.data.repository.tag.TagRepository.saveAll(..)) && args(tags)")
     public Object aroundTagSaveAll(ProceedingJoinPoint joinPoint, Object tags) throws Throwable {
-        try {
-            log.debug("Tag saveAll operation detected, capturing states and delegating to service");
-            Iterable<Tag> tagEntities = (Iterable<Tag>) tags;
+        log.debug("Tag saveAll operation detected, capturing states and delegating to service");
+        Iterable<Tag> tagEntities = (Iterable<Tag>) tags;
 
-            Map<String, Tag> originalTags = new HashMap<>();
-            for (Tag tag : tagEntities) {
-                if (tag.getId() != null) {
-                    originalTags.put(tag.getId(), tag);
-                    log.debug("Captured original tag state for ID: {}", tag.getId());
-                }
+        Map<String, Tag> originalTags = new HashMap<>();
+        for (Tag tag : tagEntities) {
+            if (tag.getId() != null) {
+                originalTags.put(tag.getId(), tag);
+                log.debug("Captured original tag state for ID: {}", tag.getId());
             }
-
-            Iterable<Tag> results = (Iterable<Tag>) joinPoint.proceed();
-
-            for (Tag tag : results) {
-                if (originalTags.containsKey(tag.getId())) {
-                    machineTagEventService.processTagSave(tag);
-                }
-            }
-            return results;
-        } catch (Exception e) {
-            log.error("Error in aroundTagSaveAll aspect: {}", e.getMessage(), e);
-            throw e;
         }
+
+        Iterable<Tag> results = (Iterable<Tag>) joinPoint.proceed();
+
+        for (Tag tag : results) {
+            if (originalTags.containsKey(tag.getId())) {
+                machineTagEventService.processTagSave(tag);
+            }
+        }
+        return results;
     }
 }
+
