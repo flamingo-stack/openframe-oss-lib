@@ -13,6 +13,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.util.NoSuchElementException;
+
 /**
  * Service for machine and organization cache operations using Spring Cache abstraction
  * Uses lightweight DTOs to avoid serialization issues and reduce cache size
@@ -33,9 +35,10 @@ public class MachineIdCacheService {
      * Returns only essential fields (machineId, hostname, organizationId)
      *
      * @param agentId the agent ID
-     * @return the CachedMachineInfo object, or null if not found
+     * @return the CachedMachineInfo object
+     * @throws NoSuchElementException if no machine is found for the given agent ID
      */
-    @Cacheable(value = "machineCache", key = "#agentId", unless = "#result == null")
+    @Cacheable(value = "machineCache", key = "#agentId")
     public CachedMachineInfo getMachine(String agentId) {
         log.debug("Fetching machine info for agent: {}", agentId);
         try {
@@ -48,14 +51,16 @@ public class MachineIdCacheService {
                     machine.getHostname(),
                     machine.getOrganizationId()
                 ))
-                .orElse(null);
+                .orElseThrow(() -> new NoSuchElementException("No machine found for agent: " + agentId));
+        } catch (NoSuchElementException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error fetching machine info for agent: {}", agentId, e);
-            return null;
+            throw new IllegalStateException("Error fetching machine info for agent: " + agentId, e);
         }
     }
 
-    @Cacheable(value = "tenantMachineCache", key = "#tenantId + ':' + #toolType + ':' + #agentId", unless = "#result == null")
+    @Cacheable(value = "tenantMachineCache", key = "#tenantId + ':' + #toolType + ':' + #agentId")
     public CachedMachineInfo getMachine(String tenantId, ToolType toolType, String agentId) {
         log.debug("Fetching machine info for agent: {} (tenant: {}, tool: {})", agentId, tenantId, toolType);
         try {
@@ -68,10 +73,14 @@ public class MachineIdCacheService {
                     machine.getHostname(),
                     machine.getOrganizationId()
                 ))
-                .orElse(null);
+                .orElseThrow(() -> new NoSuchElementException(
+                    "No machine found for agent: " + agentId + " (tenant: " + tenantId + ", tool: " + toolType + ")"));
+        } catch (NoSuchElementException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error fetching machine info for agent: {} (tenant: {}, tool: {})", agentId, tenantId, toolType, e);
-            return null;
+            throw new IllegalStateException(
+                "Error fetching machine info for agent: " + agentId + " (tenant: " + tenantId + ", tool: " + toolType + ")", e);
         }
     }
 
@@ -80,9 +89,10 @@ public class MachineIdCacheService {
      * {@link ToolConnection} indirection used by {@link #getMachine(String)}.
      *
      * @param machineId openframe-native machineId
-     * @return the {@link CachedMachineInfo}, or {@code null} if the machine is not found in the local store
+     * @return the {@link CachedMachineInfo}
+     * @throws NoSuchElementException if the machine is not found in the local store
      */
-    @Cacheable(value = "machineByIdCache", key = "#machineId", unless = "#result == null")
+    @Cacheable(value = "machineByIdCache", key = "#machineId")
     public CachedMachineInfo getMachineByMachineId(String machineId) {
         log.debug("Fetching machine info by machineId: {}", machineId);
         try {
@@ -92,10 +102,12 @@ public class MachineIdCacheService {
                     machine.getHostname(),
                     machine.getOrganizationId()
                 ))
-                .orElse(null);
+                .orElseThrow(() -> new NoSuchElementException("No machine found for machineId: " + machineId));
+        } catch (NoSuchElementException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error fetching machine info by machineId: {}", machineId, e);
-            return null;
+            throw new IllegalStateException("Error fetching machine info by machineId: " + machineId, e);
         }
     }
 
@@ -104,9 +116,10 @@ public class MachineIdCacheService {
      * Returns only essential fields (organizationId, name)
      *
      * @param organizationId the organization ID
-     * @return the CachedOrganizationInfo object, or null if not found
+     * @return the CachedOrganizationInfo object
+     * @throws NoSuchElementException if no organization is found for the given ID
      */
-    @Cacheable(value = "organizationCache", key = "#organizationId", unless = "#result == null")
+    @Cacheable(value = "organizationCache", key = "#organizationId")
     public CachedOrganizationInfo getOrganization(String organizationId) {
         log.debug("Fetching organization info for ID: {}", organizationId);
         try {
@@ -115,10 +128,12 @@ public class MachineIdCacheService {
                     org.getOrganizationId(),
                     org.getName()
                 ))
-                .orElse(null);
+                .orElseThrow(() -> new NoSuchElementException("No organization found for ID: " + organizationId));
+        } catch (NoSuchElementException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error fetching organization info for ID: {}", organizationId, e);
-            return null;
+            throw new IllegalStateException("Error fetching organization info for ID: " + organizationId, e);
         }
     }
 }
