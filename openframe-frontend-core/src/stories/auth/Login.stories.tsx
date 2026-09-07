@@ -49,6 +49,8 @@ function LoginPage(initial: Partial<LoginFormProps>) {
           onEmailChange={setEmail}
           submitDisabled={!isValid}
           onSubmitClick={() => {}}
+          termsUrl="#terms"
+          privacyPolicyUrl="#privacy"
         />
       ) : (
         <div className="flex min-h-[240px] items-center justify-center rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xl)] text-ods-text-secondary text-h4">
