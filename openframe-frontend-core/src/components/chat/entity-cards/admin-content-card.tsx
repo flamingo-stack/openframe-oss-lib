@@ -1,11 +1,12 @@
 'use client';
 
 import type React from 'react';
-import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
 import { PlatformBadge } from '../../features/platform-badge';
+import { Card } from '../../ui/card';
+import { useCoverImageFallback } from './use-cover-image-fallback';
 
 interface PlatformInfo {
   platform_id?: string;
@@ -51,22 +52,16 @@ export function AdminContentCard({
   actions,
   className,
 }: AdminContentCardProps) {
-  const [imageError, setImageError] = useState(false);
-  // WHICH url finished loading, rather than a bare flag reset from an effect on
-  // every url change. The reset is then implicit — a new url simply is not the
-  // one that loaded — so the skeleton is back in the SAME render that swapped
-  // the src, instead of one commit later where the new image briefly showed
-  // through at full opacity before being faded back out.
-  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
-  const displayUrl = imageUrl && !imageError ? imageUrl : placeholderUrl;
-  const imageLoaded = Boolean(displayUrl) && loadedUrl === displayUrl;
+  const { displayUrl, imageLoaded, handleLoad, handleError } = useCoverImageFallback({
+    imageUrl,
+    placeholderUrl,
+  });
   const imageBgColor = useImageEdgeColor(displayUrl || null, 'transparent');
 
   return (
-    <article
+    <Card
       className={cn(
-        'group h-full overflow-hidden rounded-2xl',
-        'border border-ods-border bg-ods-card',
+        'group h-full overflow-hidden',
         'flex flex-col',
         'transition-all duration-300 ease-out',
         'hover:-translate-y-1 hover:shadow-lg hover:shadow-ods-accent/[0.08]',
@@ -91,8 +86,8 @@ export function AdminContentCard({
                 imageLoaded ? 'opacity-100' : 'opacity-0',
               )}
               unoptimized
-              onLoad={() => setLoadedUrl(displayUrl ?? null)}
-              onError={() => setImageError(true)}
+              onLoad={handleLoad}
+              onError={handleError}
             />
           </>
         ) : (
@@ -133,6 +128,6 @@ export function AdminContentCard({
           <div className="mt-auto flex items-center justify-between border-t border-ods-border pt-3">{actions}</div>
         )}
       </div>
-    </article>
+    </Card>
   );
 }
