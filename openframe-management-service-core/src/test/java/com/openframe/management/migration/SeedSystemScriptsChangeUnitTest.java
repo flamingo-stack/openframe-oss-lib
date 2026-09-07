@@ -61,17 +61,20 @@ class SeedSystemScriptsChangeUnitTest {
         assertEquals(PrivilegeLevel.ADMIN, brew.getPrivilegeLevel());
         assertEquals(ScriptStatus.ACTIVE, brew.getStatus());
         assertNotNull(brew.getContentHash());
-        assertTrue(brew.getScriptBody().contains("tar xz --strip-components 1"));
+        assertTrue(brew.getScriptBody().contains("NONINTERACTIVE=1"));
         // the installer must never run brew itself as root
         assertTrue(brew.getScriptBody().contains("sudo -u \"$CONSOLE_USER\""));
 
         Script choco = byName(scripts, SystemScriptCode.INSTALL_CHOCOLATEY.canonicalName());
         assertEquals(ScriptShell.POWERSHELL, choco.getShell());
+        assertEquals(PrivilegeLevel.ADMIN, choco.getPrivilegeLevel());
         assertTrue(choco.getScriptBody().contains("community.chocolatey.org/install.ps1"));
-        assertTrue(choco.getScriptBody().trim().endsWith("exit $LASTEXITCODE"));
 
         Script winget = byName(scripts, SystemScriptCode.INSTALL_WINGET.canonicalName());
-        assertTrue(winget.getScriptBody().contains("Repair-WinGetPackageManager -AllUsers"));
+        // the Appx registration and PATH fix are per-user, so winget must NOT run elevated
+        assertEquals(PrivilegeLevel.USER, winget.getPrivilegeLevel());
+        assertTrue(winget.getScriptBody().contains("Repair-WinGetPackageManager -Force -Latest"));
+        assertTrue(winget.getScriptBody().contains("--accept-source-agreements"));
     }
 
     @Test
@@ -86,7 +89,7 @@ class SeedSystemScriptsChangeUnitTest {
 
         changeUnit.execution(scriptRepository, tenantIdProvider);
 
-        assertTrue(stale.getScriptBody().contains("tar xz --strip-components 1"));
+        assertTrue(stale.getScriptBody().contains("NONINTERACTIVE=1"));
         assertNotNull(stale.getContentHash());
         assertTrue(!"stale-hash".equals(stale.getContentHash()));
     }

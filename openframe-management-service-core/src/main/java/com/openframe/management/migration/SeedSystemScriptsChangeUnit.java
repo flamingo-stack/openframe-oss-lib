@@ -1,6 +1,5 @@
 package com.openframe.management.migration;
 
-import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -68,7 +67,7 @@ public class SeedSystemScriptsChangeUnit {
                 .name(canonicalName)
                 .description(definition.getDescription())
                 .shell(definition.getShell())
-                .privilegeLevel(PrivilegeLevel.ADMIN)
+                .privilegeLevel(definition.getPrivilegeLevel())
                 .scriptBody(body)
                 .supportedPlatforms(List.of(definition.getOsType()))
                 .system(true)
@@ -82,7 +81,7 @@ public class SeedSystemScriptsChangeUnit {
                          SystemScriptDefinition definition, String body, String contentHash) {
         script.setDescription(definition.getDescription());
         script.setShell(definition.getShell());
-        script.setPrivilegeLevel(PrivilegeLevel.ADMIN);
+        script.setPrivilegeLevel(definition.getPrivilegeLevel());
         script.setScriptBody(body);
         script.setSupportedPlatforms(List.of(definition.getOsType()));
         script.setContentHash(contentHash);
