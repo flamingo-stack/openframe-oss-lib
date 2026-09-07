@@ -12,9 +12,11 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import lombok.extern.slf4j.Slf4j;
 
 import java.nio.charset.StandardCharsets;
 
+@Slf4j
 @Configuration
 public class KafkaConfig {
 
@@ -27,6 +29,7 @@ public class KafkaConfig {
                     String stringValue = new String(source, StandardCharsets.UTF_8);
                     return MessageType.valueOf(stringValue.toUpperCase());
                 } catch (IllegalArgumentException e) {
+                    log.warn("Unrecognized Kafka message-type header value: {}", new String(source, StandardCharsets.UTF_8), e);
                     return null;
                 }
             }
