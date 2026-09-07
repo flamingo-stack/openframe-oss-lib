@@ -6,6 +6,7 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceLocalTimeDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
@@ -41,6 +42,7 @@ class DeviceLocalScheduleServiceTest {
     private static final String TENANT = "tenant-1";
     private static final String SCHEDULE_ID = "sched-local-1";
     private static final Instant START_AT = Instant.parse("2026-09-15T09:00:00Z");
+    private static final long RECONNECT_WINDOW = 1800L;
 
     @Mock private ScriptScheduleRepository scheduleRepository;
     @Mock private ScheduleDeviceTargetResolver targetResolver;
@@ -55,15 +57,14 @@ class DeviceLocalScheduleServiceTest {
     void setUp() {
         service = new DeviceLocalScheduleService(scheduleRepository, targetResolver, machineRepository,
                 dispatchRepository, fireDispatcher, timezoneRequestPublisher);
-        ReflectionTestUtils.setField(service, "catchupSeconds", 86400L);
+        ReflectionTestUtils.setField(service, "catchupSeconds", RECONNECT_WINDOW);
     }
 
     @Test
     @DisplayName("one-shot online device due: fired once, pointer recorded FIRED at the occurrence's wall-clock")
     void oneShotDue_firesOnceRecordsPointer() {
-        // Kyiv is UTC+3 in September → local 09:00 == 06:00Z. now is just after that.
-        Instant now = Instant.parse("2026-09-15T06:30:00Z");
-        stubSchedule(null, List.of("m-kyiv"));
+        Instant now = Instant.parse("2026-09-15T06:05:00Z");
+        stubSchedule(skip(null), List.of("m-kyiv"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(online("m-kyiv", "Europe/Kyiv")));
 
@@ -73,31 +74,28 @@ class DeviceLocalScheduleServiceTest {
         verify(fireDispatcher).dispatch(any(ScheduleScript.class), eq(List.of("m-kyiv")), eq(now));
         ScheduleLocalMachineTimeDispatch saved = capturedSave();
         assertThat(saved.getStatus()).isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.FIRED);
-        assertThat(saved.getLastOccurrenceAt()).isEqualTo(START_AT);   // occurrence 0 = startAt wall-clock
+        assertThat(saved.getLastOccurrenceAt()).isEqualTo(START_AT);
     }
 
     @Test
     @DisplayName("recurring hourly online device: fires the CURRENT occurrence, pointer at that occurrence's wall-clock")
     void recurringDue_firesCurrentOccurrence() {
-        Instant now = Instant.parse("2026-09-15T09:30:00Z");
-        stubSchedule(3600L, List.of("m-kyiv"));
+        Instant now = Instant.parse("2026-09-15T09:05:00Z");
+        stubSchedule(skip(3600L), List.of("m-kyiv"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(online("m-kyiv", "Europe/Kyiv")));
 
         service.runDueDeviceLocalSchedules(now);
 
         verify(fireDispatcher).dispatch(any(ScheduleScript.class), eq(List.of("m-kyiv")), eq(now));
-        ScheduleLocalMachineTimeDispatch saved = capturedSave();
-        assertThat(saved.getStatus()).isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.FIRED);
-        // occurrence 3 = 09:00 + 3h wall-clock = 12:00, encoded UTC
-        assertThat(saved.getLastOccurrenceAt()).isEqualTo(Instant.parse("2026-09-15T12:00:00Z"));
+        assertThat(capturedSave().getLastOccurrenceAt()).isEqualTo(Instant.parse("2026-09-15T12:00:00Z"));
     }
 
     @Test
-    @DisplayName("recurring device whose current occurrence is already the recorded one: not re-fired")
+    @DisplayName("recurring current occurrence already recorded: not re-fired (but timezone kept refreshed)")
     void recurringCurrentAlreadyHandled_notReFired() {
-        Instant now = Instant.parse("2026-09-15T09:30:00Z");   // current occurrence 12:00 (as above)
-        stubScheduleNoDispatchStub(3600L, List.of("m-kyiv"));
+        Instant now = Instant.parse("2026-09-15T09:05:00Z");
+        stubScheduleNoDispatchStub(skip(3600L), List.of("m-kyiv"));
         when(dispatchRepository.findByScheduleIdAndMachineIdIn(eq(SCHEDULE_ID), any()))
                 .thenReturn(List.of(pointer("m-kyiv", Instant.parse("2026-09-15T12:00:00Z"))));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
@@ -105,7 +103,7 @@ class DeviceLocalScheduleServiceTest {
 
         service.runDueDeviceLocalSchedules(now);
 
-        verify(timezoneRequestPublisher).request("m-kyiv", SCHEDULE_ID);   // recurring keeps refreshing
+        verify(timezoneRequestPublisher).request("m-kyiv", SCHEDULE_ID);
         verifyNoInteractions(fireDispatcher);
         verify(dispatchRepository, never()).save(any());
     }
@@ -113,8 +111,8 @@ class DeviceLocalScheduleServiceTest {
     @Test
     @DisplayName("online device whose occurrence has not arrived yet: re-requested, not fired")
     void notYet_requestedNotFired() {
-        Instant now = Instant.parse("2026-09-15T06:30:00Z");
-        stubSchedule(null, List.of("m-ny"));
+        Instant now = Instant.parse("2026-09-15T06:05:00Z");
+        stubSchedule(skip(null), List.of("m-ny"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(online("m-ny", "America/New_York")));
 
@@ -128,8 +126,8 @@ class DeviceLocalScheduleServiceTest {
     @Test
     @DisplayName("online device with no known timezone yet: requested and deferred — not fired, not recorded")
     void noStoredTimezone_deferred() {
-        Instant now = Instant.parse("2026-09-15T06:30:00Z");
-        stubSchedule(null, List.of("m-new"));
+        Instant now = Instant.parse("2026-09-15T06:05:00Z");
+        stubSchedule(skip(null), List.of("m-new"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(online("m-new", null)));
 
@@ -141,10 +139,10 @@ class DeviceLocalScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("one-shot already handled for this device: skipped entirely — no refresh, no fire")
+    @DisplayName("one-shot already handled: skipped entirely — no refresh, no fire")
     void oneShotAlreadyHandled_skipped() {
-        Instant now = Instant.parse("2026-09-15T06:30:00Z");
-        stubScheduleNoDispatchStub(null, List.of("m-kyiv"));
+        Instant now = Instant.parse("2026-09-15T06:05:00Z");
+        stubScheduleNoDispatchStub(skip(null), List.of("m-kyiv"));
         when(dispatchRepository.findByScheduleIdAndMachineIdIn(eq(SCHEDULE_ID), any()))
                 .thenReturn(List.of(pointer("m-kyiv", START_AT)));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
@@ -158,33 +156,59 @@ class DeviceLocalScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("non-online device: never run and never requested; left for a later sweep while in window")
-    void notOnline_neitherRunNorRequested() {
-        Instant now = Instant.parse("2026-09-15T06:30:00Z");
-        stubSchedule(null, List.of("m-off"));
+    @DisplayName("SKIP + offline at the occurrence: MISSED immediately, no retry, no dispatch")
+    void skipOffline_missedImmediately() {
+        Instant now = Instant.parse("2026-09-15T06:05:00Z");   // Kyiv occurrence 06:00Z is due
+        stubSchedule(skip(null), List.of("m-off"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(offline("m-off", "Europe/Kyiv")));
 
         service.runDueDeviceLocalSchedules(now);
 
-        verifyNoInteractions(timezoneRequestPublisher);
+        verifyNoInteractions(fireDispatcher);
+        assertThat(capturedSave().getStatus()).isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.MISSED);
+    }
+
+    @Test
+    @DisplayName("RETRY + offline still inside the reconnect window: wait — not missed, not fired")
+    void retryOffline_withinWindow_waits() {
+        Instant now = Instant.parse("2026-09-15T06:05:00Z");   // 5 min past the 06:00Z occurrence, window 30 min
+        stubSchedule(retry(null, RECONNECT_WINDOW), List.of("m-off"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(offline("m-off", "Europe/Kyiv")));
+
+        service.runDueDeviceLocalSchedules(now);
+
         verifyNoInteractions(fireDispatcher);
         verify(dispatchRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("non-online one-shot past its run window: marked MISSED so it stops being scanned")
-    void notOnlineBeyondWindow_markedMissed() {
-        Instant now = Instant.parse("2026-09-17T06:30:00Z");   // two days after the Kyiv run
-        stubSchedule(null, List.of("m-off"));
+    @DisplayName("RETRY + offline past the reconnect window: MISSED")
+    void retryOffline_pastWindow_missed() {
+        Instant now = Instant.parse("2026-09-15T06:40:00Z");   // 40 min past the 06:00Z occurrence, window 30 min
+        stubSchedule(retry(null, RECONNECT_WINDOW), List.of("m-off"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(offline("m-off", "Europe/Kyiv")));
 
         service.runDueDeviceLocalSchedules(now);
 
         verifyNoInteractions(fireDispatcher);
-        ScheduleLocalMachineTimeDispatch saved = capturedSave();
-        assertThat(saved.getStatus()).isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.MISSED);
+        assertThat(capturedSave().getStatus()).isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.MISSED);
+    }
+
+    @Test
+    @DisplayName("RETRY + online inside the window: fired normally")
+    void retryOnline_withinWindow_fires() {
+        Instant now = Instant.parse("2026-09-15T06:05:00Z");
+        stubSchedule(retry(null, RECONNECT_WINDOW), List.of("m-kyiv"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(online("m-kyiv", "Europe/Kyiv")));
+
+        service.runDueDeviceLocalSchedules(now);
+
+        verify(fireDispatcher).dispatch(any(ScheduleScript.class), eq(List.of("m-kyiv")), eq(now));
+        assertThat(capturedSave().getStatus()).isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.FIRED);
     }
 
     private ScheduleLocalMachineTimeDispatch capturedSave() {
@@ -194,19 +218,28 @@ class DeviceLocalScheduleServiceTest {
         return captor.getValue();
     }
 
-    private void stubSchedule(Long repeat, List<String> targets) {
-        stubScheduleNoDispatchStub(repeat, targets);
+    private void stubSchedule(ScheduleScript schedule, List<String> targets) {
+        stubScheduleNoDispatchStub(schedule, targets);
         when(dispatchRepository.findByScheduleIdAndMachineIdIn(eq(SCHEDULE_ID), any())).thenReturn(List.of());
     }
 
-    private void stubScheduleNoDispatchStub(Long repeat, List<String> targets) {
+    private void stubScheduleNoDispatchStub(ScheduleScript schedule, List<String> targets) {
         when(scheduleRepository.findByStatusAndTriggerAndTimeReference(
                 ScriptStatus.ACTIVE, ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL))
-                .thenReturn(List.of(deviceLocalSchedule(repeat)));
+                .thenReturn(List.of(schedule));
         when(targetResolver.resolveTargetMachineIds(any(ScheduleScript.class))).thenReturn(targets);
     }
 
-    private static ScheduleScript deviceLocalSchedule(Long repeat) {
+    private static ScheduleScript skip(Long repeat) {
+        return schedule(repeat, ScheduleOfflineBehavior.SKIP, null);
+    }
+
+    private static ScheduleScript retry(Long repeat, Long reconnectWindowSeconds) {
+        return schedule(repeat, ScheduleOfflineBehavior.RETRY_ON_RECONNECT, reconnectWindowSeconds);
+    }
+
+    private static ScheduleScript schedule(Long repeat, ScheduleOfflineBehavior offlineBehavior,
+                                           Long reconnectWindowSeconds) {
         return ScheduleScript.builder()
                 .id(SCHEDULE_ID)
                 .tenantId(TENANT)
@@ -214,6 +247,8 @@ class DeviceLocalScheduleServiceTest {
                 .status(ScriptStatus.ACTIVE)
                 .trigger(ScheduleScriptTrigger.DATE_TIME)
                 .timeReference(ScheduleTimeReference.DEVICE_LOCAL)
+                .offlineBehavior(offlineBehavior)
+                .reconnectWindowSeconds(reconnectWindowSeconds)
                 .startAt(START_AT)
                 .repeat(repeat)
                 .build();

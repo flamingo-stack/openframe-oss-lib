@@ -4,6 +4,7 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceLocalTimeDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
@@ -92,6 +93,7 @@ public class DeviceLocalScheduleService {
 
         LocalDateTime startWallClock = LocalDateTime.ofInstant(startAt, ZoneOffset.UTC);
         Long repeat = schedule.getRepeat();
+        long window = fireWindowSeconds(schedule);
 
         for (String machineId : targets) {
             Machine machine = machinesById.get(machineId);
@@ -100,18 +102,18 @@ public class DeviceLocalScheduleService {
             }
             ScheduleLocalMachineTimeDispatch sentinel = sentinelByMachine.get(machineId);
             if (machine.getStatus() == DeviceStatus.ONLINE) {
-                evaluateOnline(schedule, machine, startWallClock, repeat, now, sentinel);
+                evaluateOnline(schedule, machine, startWallClock, repeat, now, sentinel, window);
             } else {
-                houseKeepNotOnline(schedule, machine, startWallClock, repeat, now, sentinel);
+                evaluateOffline(schedule, machine, startWallClock, repeat, now, sentinel, window);
             }
         }
     }
 
     private void evaluateOnline(ScheduleScript schedule, Machine machine, LocalDateTime startWallClock, Long repeat,
-                                Instant now, ScheduleLocalMachineTimeDispatch sentinel) {
+                                Instant now, ScheduleLocalMachineTimeDispatch sentinel, long window) {
         String machineId = machine.getMachineId();
 
-        if (repeat == null && sentinel != null && sentinel.getLastOccurrenceAt() != null) {
+        if (repeat == null && isHandled(sentinel)) {
             return;
         }
 
@@ -124,12 +126,8 @@ public class DeviceLocalScheduleService {
             return;
         }
 
-        ZoneId zone;
-        try {
-            zone = ZoneId.of(zoneId);
-        } catch (DateTimeException e) {
-            log.warn("DEVICE_LOCAL scheduleId={} machineId={} has invalid stored timezone '{}' — skipping",
-                    schedule.getId(), machineId, zoneId);
+        ZoneId zone = parseZone(schedule, machineId, zoneId);
+        if (zone == null) {
             return;
         }
 
@@ -143,10 +141,10 @@ public class DeviceLocalScheduleService {
         }
 
         Instant fireAt = occurrence.atZone(zone).toInstant();
-        if (now.isAfter(fireAt.plusSeconds(catchupSeconds))) {
+        if (now.isAfter(fireAt.plusSeconds(window))) {
             record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.MISSED, sentinel);
-            log.warn("DEVICE_LOCAL scheduleId={} machineId={} missed occurrence (fireAt={}, now={}) beyond the "
-                    + "catch-up window — marked MISSED, advancing", schedule.getId(), machineId, fireAt, now);
+            log.warn("DEVICE_LOCAL scheduleId={} machineId={} occurrence fireAt={} past the fire window ({}s) at "
+                    + "now={} — marked MISSED, advancing", schedule.getId(), machineId, fireAt, window, now);
             return;
         }
 
@@ -158,22 +156,56 @@ public class DeviceLocalScheduleService {
                 schedule.getId(), machineId, zone, fireAt);
     }
 
-    private void houseKeepNotOnline(ScheduleScript schedule, Machine machine, LocalDateTime startWallClock, Long repeat,
-                                    Instant now, ScheduleLocalMachineTimeDispatch sentinel) {
-        if (repeat != null) {
+    private void evaluateOffline(ScheduleScript schedule, Machine machine, LocalDateTime startWallClock, Long repeat,
+                                 Instant now, ScheduleLocalMachineTimeDispatch sentinel, long window) {
+        if (repeat == null && isHandled(sentinel)) {
             return;
         }
-        Instant occurrenceAt = startWallClock.toInstant(ZoneOffset.UTC);
+        String machineId = machine.getMachineId();
+        String zoneId = machine.getTimezone();
+
+        if (isBlank(zoneId)) {
+            if (repeat == null) {
+                Instant occurrenceAt = startWallClock.toInstant(ZoneOffset.UTC);
+                if (!isAlreadyHandled(sentinel, occurrenceAt)
+                        && now.isAfter(latestPossibleFireAt(startWallClock, null).plusSeconds(window))) {
+                    record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.MISSED, sentinel);
+                    log.warn("DEVICE_LOCAL scheduleId={} machineId={} offline with no known timezone past its run "
+                            + "window — marked MISSED", schedule.getId(), machineId);
+                }
+            }
+            return;
+        }
+
+        ZoneId zone = parseZone(schedule, machineId, zoneId);
+        if (zone == null) {
+            return;
+        }
+        LocalDateTime occurrence = currentDueOccurrence(startWallClock, repeat, zone, now);
+        if (occurrence == null) {
+            return;
+        }
+        Instant occurrenceAt = occurrence.toInstant(ZoneOffset.UTC);
         if (isAlreadyHandled(sentinel, occurrenceAt)) {
             return;
         }
-        Instant latestPossibleFireAt = latestPossibleFireAt(startWallClock, machine.getTimezone());
-        if (now.isAfter(latestPossibleFireAt.plusSeconds(catchupSeconds))) {
-            record(schedule, machine.getMachineId(), occurrenceAt, now,
-                    ScheduleDeviceLocalTimeDispatchStatus.MISSED, sentinel);
-            log.warn("DEVICE_LOCAL scheduleId={} machineId={} stayed non-online past its one-shot run window "
-                    + "— marked MISSED", schedule.getId(), machine.getMachineId());
+
+        Instant fireAt = occurrence.atZone(zone).toInstant();
+        boolean retry = schedule.getOfflineBehavior() == ScheduleOfflineBehavior.RETRY_ON_RECONNECT;
+        if (retry && !now.isAfter(fireAt.plusSeconds(window))) {
+            return;
         }
+        record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.MISSED, sentinel);
+        log.warn("DEVICE_LOCAL scheduleId={} machineId={} offline at occurrence fireAt={} (offlineBehavior={}) "
+                + "— marked MISSED, advancing", schedule.getId(), machineId, fireAt, schedule.getOfflineBehavior());
+    }
+
+    private long fireWindowSeconds(ScheduleScript schedule) {
+        if (schedule.getOfflineBehavior() == ScheduleOfflineBehavior.RETRY_ON_RECONNECT
+                && schedule.getReconnectWindowSeconds() != null && schedule.getReconnectWindowSeconds() > 0) {
+            return schedule.getReconnectWindowSeconds();
+        }
+        return catchupSeconds;
     }
 
     private static LocalDateTime currentDueOccurrence(LocalDateTime startWallClock, Long repeat, ZoneId zone,
@@ -193,6 +225,20 @@ public class DeviceLocalScheduleService {
             occurrence = startWallClock.plusSeconds(k * repeat);
         }
         return occurrence;
+    }
+
+    private ZoneId parseZone(ScheduleScript schedule, String machineId, String zoneId) {
+        try {
+            return ZoneId.of(zoneId);
+        } catch (DateTimeException e) {
+            log.warn("DEVICE_LOCAL scheduleId={} machineId={} has invalid stored timezone '{}' — skipping",
+                    schedule.getId(), machineId, zoneId);
+            return null;
+        }
+    }
+
+    private static boolean isHandled(ScheduleLocalMachineTimeDispatch sentinel) {
+        return sentinel != null && sentinel.getLastOccurrenceAt() != null;
     }
 
     private static boolean isAlreadyHandled(ScheduleLocalMachineTimeDispatch sentinel, Instant occurrenceAt) {

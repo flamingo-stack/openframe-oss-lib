@@ -76,7 +76,7 @@ public class ScheduleScriptService {
         ScheduleScriptTrigger trigger = defaultTrigger(input.getTrigger());
         ScheduleTimeReference timeReference = defaultTimeReference(input.getTimeReference());
         validateTiming(trigger, input.getStartAt(), input.getRepeat());
-        validateOfflineBehavior(trigger, timeReference, input.getOfflineBehavior(),
+        validateOfflineBehavior(trigger, input.getOfflineBehavior(),
                 input.getReconnectWindowSeconds(), input.getRepeat());
         validateOsTypes(input.getSupportedPlatforms(), input.getScriptIds());
         validateCustomParams(input.getScriptIds(), input.getScriptCustomParams());
@@ -200,7 +200,7 @@ public class ScheduleScriptService {
         ScheduleScriptTrigger trigger = defaultTrigger(input.getTrigger());
         ScheduleTimeReference timeReference = defaultTimeReference(input.getTimeReference());
         validateTiming(trigger, input.getStartAt(), input.getRepeat());
-        validateOfflineBehavior(trigger, timeReference, input.getOfflineBehavior(),
+        validateOfflineBehavior(trigger, input.getOfflineBehavior(),
                 input.getReconnectWindowSeconds(), input.getRepeat());
         validateOsTypes(input.getSupportedPlatforms(), input.getScriptIds());
         validateCustomParams(input.getScriptIds(), input.getScriptCustomParams());
@@ -334,7 +334,7 @@ public class ScheduleScriptService {
         return instant.getNano() == 0 && Math.floorMod(instant.getEpochSecond(), SLOT_SECONDS) == 0;
     }
 
-    private static void validateOfflineBehavior(ScheduleScriptTrigger trigger, ScheduleTimeReference timeReference,
+    private static void validateOfflineBehavior(ScheduleScriptTrigger trigger,
                                                 ScheduleOfflineBehavior offlineBehavior,
                                                 Long reconnectWindowSeconds, Long repeatSeconds) {
         if (offlineBehavior != ScheduleOfflineBehavior.RETRY_ON_RECONNECT) {
@@ -342,9 +342,6 @@ public class ScheduleScriptService {
         }
         if (trigger != ScheduleScriptTrigger.DATE_TIME) {
             throw new BadRequestException("RETRY_ON_RECONNECT is only valid for a DATE_TIME schedule");
-        }
-        if (timeReference == ScheduleTimeReference.DEVICE_LOCAL) {
-            throw new BadRequestException("RETRY_ON_RECONNECT is not supported for a DEVICE_LOCAL schedule");
         }
         if (reconnectWindowSeconds == null || reconnectWindowSeconds <= 0) {
             throw new BadRequestException(
