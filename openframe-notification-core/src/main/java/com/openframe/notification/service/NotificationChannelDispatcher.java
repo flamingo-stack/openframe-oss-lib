@@ -43,8 +43,8 @@ public class NotificationChannelDispatcher {
         try {
             channel.deliver(userId, saved, category);
         } catch (RuntimeException ex) {
-            log.warn("Channel {} failed for user={} on notification {} — swallowed, in-app delivery is unaffected: {}",
-                    channel.name(), userId, saved.getId(), ex.getMessage());
+            log.warn("Channel {} failed for user={} on notification {} — swallowed, in-app delivery is unaffected",
+                    channel.name(), userId, saved.getId(), ex);
         }
     }
 }
