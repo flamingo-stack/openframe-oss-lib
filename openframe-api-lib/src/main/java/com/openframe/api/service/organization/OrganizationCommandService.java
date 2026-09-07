@@ -3,6 +3,7 @@ package com.openframe.api.service.organization;
 import com.openframe.api.dto.organization.CreateOrganizationRequest;
 import com.openframe.api.dto.organization.UpdateOrganizationRequest;
 import com.openframe.api.dto.organization.UpdateOrganizationStatusRequest;
+import com.openframe.api.exception.OrganizationNotFoundException;
 import com.openframe.api.mapper.OrganizationMapper;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
@@ -50,7 +51,7 @@ public class OrganizationCommandService {
         log.debug("Updating organization {} from request", id);
         
         Organization existing = organizationService.getOrganizationByOrganizationId(id)
-                .orElseThrow(() -> new IllegalArgumentException("Organization not found with id: " + id));
+                .orElseThrow(() -> new OrganizationNotFoundException(id));
         
         // Update with request data (only non-null fields)
         Organization toUpdate = organizationMapper.updateEntity(existing, request);
@@ -65,8 +66,12 @@ public class OrganizationCommandService {
      * @param request status update request
      */
     public void updateOrganizationStatus(String id, UpdateOrganizationStatusRequest request) {
+        organizationService.getOrganizationByOrganizationId(id)
+                .orElseThrow(() -> new OrganizationNotFoundException(id));
+
         var newStatus = OrganizationStatus.valueOf(request.status().name());
         log.debug("Updating organization {} status to {}", id, newStatus);
         organizationService.updateOrganizationStatus(id, newStatus);
     }
 }
+
