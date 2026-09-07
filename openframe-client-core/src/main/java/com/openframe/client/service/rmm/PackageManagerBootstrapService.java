@@ -56,8 +56,6 @@ public class PackageManagerBootstrapService {
         }
         Machine machine = foundMachine.get();
         DeviceStatus status = machine.getStatus();
-        // same bar as every dispatch path (runScript/runCommand/schedules): only ONLINE/OFFLINE
-        // machines get scripts — an off-boarding or archived device does not
         if (!DeviceStatus.DISPATCH_ELIGIBLE.contains(status)) {
             log.debug("Ignoring package-manager report for machineId={} in status {}", machineId, status);
             return;
@@ -66,7 +64,6 @@ public class PackageManagerBootstrapService {
         String tenantId = machine.getTenantId();
         Optional<Script> foundScript = scriptRepository.findSystemScript(packageManager.bootstrapScript(), tenantId);
         if (foundScript.isEmpty()) {
-            // seeded on management-service startup; the agent re-reports later
             log.warn("Bootstrap script {} not seeded for tenant {}, ignoring report from machineId={}",
                     packageManager.bootstrapScript(), tenantId, machineId);
             return;
