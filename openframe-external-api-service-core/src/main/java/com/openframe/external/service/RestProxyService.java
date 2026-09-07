@@ -31,6 +31,7 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.openframe.core.constants.HttpHeaders.*;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
@@ -38,6 +39,12 @@ import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 @Service
 @Slf4j
 public class RestProxyService {
+
+    private static final Set<String> SENSITIVE_HEADER_NAMES = Set.of(
+            AUTHORIZATION.toLowerCase()
+    );
+
+    private static final long MAX_RESPONSE_BODY_BYTES = 10L * 1024 * 1024; // 10MB
 
     private final IntegratedToolRepository toolRepository;
     private final ProxyUrlResolver proxyUrlResolver;
@@ -55,53 +62,57 @@ public class RestProxyService {
 
     public ResponseEntity<String> proxyApiRequest(String toolId, HttpServletRequest request, String body) {
         log.info("Received proxy request for tool: {}, method: {}, path: {}", toolId, request.getMethod(), request.getRequestURI());
-        
-        Optional<IntegratedTool> toolOpt = toolRepository.findByKey(toolId);
-        
-        if (toolOpt.isEmpty()) {
-            log.warn("Tool not found: {}", toolId);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Tool not found: " + toolId);
-        }
-        
-        IntegratedTool tool = toolOpt.get();
-        log.info("Found tool: {} (enabled: {})", tool.getName(), tool.isEnabled());
-        
-        if (!tool.isEnabled()) {
-            log.warn("Tool {} is not enabled", tool.getName());
-            return ResponseEntity.badRequest().body("Tool " + tool.getName() + " is not enabled");
-        }
 
-        try {
-            URI originalUri = new URI(request.getRequestURL().toString());
-            if (request.getQueryString() != null) {
-                originalUri = new URI(originalUri + "?" + request.getQueryString());
-            }
-            log.info("Original URI: {}", originalUri);
+        return toolRepository.findByKey(toolId)
+                .map(tool -> {
+                    log.info("Found tool: {} (enabled: {})", tool.getName(), tool.isEnabled());
 
-            Optional<ToolUrl> optionalToolUrl = toolUrlService.getUrlByToolType(tool, ToolUrlType.API);
-            if (optionalToolUrl.isEmpty()) {
-                log.error("Tool URL not found for tool: {}", toolId);
-                return ResponseEntity.badRequest().body("Tool URL not found for tool: " + toolId);
-            }
-            ToolUrl toolUrl = optionalToolUrl.get();
-            log.info("Tool URL: {}", toolUrl.getUrl());
+                    if (!tool.isEnabled()) {
+                        log.warn("Tool {} is not enabled", tool.getName());
+                        return ResponseEntity.badRequest().body("Tool " + tool.getName() + " is not enabled");
+                    }
 
-            URI targetUri = proxyUrlResolver.resolve(toolId, toolUrl.getUrl(), toolUrl.getPort(), originalUri, "/tools");
-            log.info("Target URI resolved to: {}", targetUri);
+                    try {
+                        URI originalUri = new URI(request.getRequestURL().toString());
+                        if (request.getQueryString() != null) {
+                            originalUri = new URI(originalUri + "?" + request.getQueryString());
+                        }
+                        log.info("Original URI: {}", originalUri);
 
-            String method = request.getMethod();
-            Map<String, String> headers = buildApiRequestHeaders(tool);
-            log.debug("Headers: {}", headers);
+                        Optional<ToolUrl> optionalToolUrl = toolUrlService.getUrlByToolType(tool, ToolUrlType.API);
+                        return optionalToolUrl
+                                .map(toolUrl -> {
+                                    log.info("Tool URL: {}", toolUrl.getUrl());
+                                    try {
+                                        URI targetUri = proxyUrlResolver.resolve(toolId, toolUrl.getUrl(), toolUrl.getPort(), request.getRequestURL().toString() != null ? new URI(request.getRequestURL().toString() + (request.getQueryString() != null ? "?" + request.getQueryString() : "")) : null, "/tools");
+                                        log.info("Target URI resolved to: {}", targetUri);
 
-            return proxy(tool, targetUri, method, headers, body);
-            
-        } catch (URISyntaxException e) {
-            log.error("Invalid URI syntax for tool: {}", toolId, e);
-            return ResponseEntity.badRequest().body("Invalid URI: " + e.getMessage());
-        } catch (Exception e) {
-            log.error("Error proxying request for tool: {}", toolId, e);
-            return ResponseEntity.internalServerError().body("Internal server error: " + e.getMessage());
-        }
+                                        String method = request.getMethod();
+                                        Map<String, String> headers = buildApiRequestHeaders(tool);
+                                        log.debug("Headers: {}", maskSensitiveHeaders(headers));
+
+                                        return proxy(tool, targetUri, method, headers, body);
+                                    } catch (URISyntaxException e) {
+                                        log.error("Invalid URI syntax for tool: {}", toolId, e);
+                                        return ResponseEntity.badRequest().body("Invalid URI: " + e.getMessage());
+                                    }
+                                })
+                                .orElseGet(() -> {
+                                    log.error("Tool URL not found for tool: {}", toolId);
+                                    return ResponseEntity.badRequest().body("Tool URL not found for tool: " + toolId);
+                                });
+                    } catch (URISyntaxException e) {
+                        log.error("Invalid URI syntax for tool: {}", toolId, e);
+                        return ResponseEntity.badRequest().body("Invalid URI: " + e.getMessage());
+                    } catch (Exception e) {
+                        log.error("Error proxying request for tool: {}", toolId, e);
+                        return ResponseEntity.internalServerError().body("Internal server error: " + e.getMessage());
+                    }
+                })
+                .orElseGet(() -> {
+                    log.warn("Tool not found: {}", toolId);
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Tool not found: " + toolId);
+                });
     }
 
     private Map<String, String> buildApiRequestHeaders(IntegratedTool tool) {
@@ -132,6 +143,18 @@ public class RestProxyService {
         return headers;
     }
 
+    private Map<String, String> maskSensitiveHeaders(Map<String, String> headers) {
+        Map<String, String> masked = new HashMap<>();
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+            if (SENSITIVE_HEADER_NAMES.contains(entry.getKey().toLowerCase())) {
+                masked.put(entry.getKey(), "***REDACTED***");
+            } else {
+                masked.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return masked;
+    }
+
     private ResponseEntity<String> proxy(IntegratedTool tool, URI targetUri, String method, 
                                        Map<String, String> proxyHeaders, String body) {
         log.info("Starting proxy request to {} - method: {}, URI: {}", tool.getName(), method, targetUri);
@@ -142,7 +165,11 @@ public class RestProxyService {
 
             for (Map.Entry<String, String> header : proxyHeaders.entrySet()) {
                 httpRequest.setHeader(header.getKey(), header.getValue());
-                log.debug("Added header: {} = {}", header.getKey(), header.getValue());
+                if (SENSITIVE_HEADER_NAMES.contains(header.getKey().toLowerCase())) {
+                    log.debug("Added header: {} = ***REDACTED***", header.getKey());
+                } else {
+                    log.debug("Added header: {} = {}", header.getKey(), header.getValue());
+                }
             }
 
             if (isNotEmpty(body)) {
@@ -156,8 +183,16 @@ public class RestProxyService {
             return httpClient.execute(httpRequest, response -> {
                 int statusCode = response.getCode();
                 HttpEntity entity = response.getEntity();
+                if (entity != null && entity.getContentLength() > MAX_RESPONSE_BODY_BYTES) {
+                    log.error("Response from {} exceeded max allowed size of {} bytes", tool.getName(), MAX_RESPONSE_BODY_BYTES);
+                    return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Response too large");
+                }
                 String responseBody = entity != null ? EntityUtils.toString(entity) : "";
-                
+                if (responseBody.length() > MAX_RESPONSE_BODY_BYTES) {
+                    log.error("Buffered response from {} exceeded max allowed size of {} bytes", tool.getName(), MAX_RESPONSE_BODY_BYTES);
+                    return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Response too large");
+                }
+
                 log.info("Successfully proxied request to {} - status: {}, response length: {}", 
                         tool.getName(), statusCode, responseBody.length());
                 log.debug("Response body: {}", responseBody.length() > 1000 ? 
