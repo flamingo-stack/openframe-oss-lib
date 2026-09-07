@@ -199,6 +199,31 @@ export const ScrollFadingCompact: Story = {
   decorators: [constrainedDecorator(280)],
 };
 
+const withReference = (ticket: ChatTicketItemData): ChatTicketItemData => ({
+  ...ticket,
+  subtitle: `Ticket Number: ${ticket.ticketNumber} \u2022 ${ticket.timeAgo}`,
+});
+
+/** `subtitle` override: the host owns the secondary line. The Fae client
+ *  labels the reference so it stays quotable but visually secondary
+ *  (`Ticket Number: N • time`). */
+export const SubtitleOverride: Story = {
+  args: {
+    tickets: mockTickets.slice(0, 4).map(withReference),
+  },
+  decorators: [constrainedDecorator()],
+};
+
+/** Unread row (Figma fae-chat 1-5592): the notice replaces the reference
+ *  line and both the line and the chevron turn brand yellow until the
+ *  customer opens the ticket. */
+export const Unread: Story = {
+  args: {
+    tickets: [{ ...mockTickets[0], unread: true }, ...mockTickets.slice(1, 4).map(withReference)],
+  },
+  decorators: [constrainedDecorator()],
+};
+
 /** Loading state — skeleton placeholder rows shown while tickets load. */
 export const Loading: Story = {
   args: {
