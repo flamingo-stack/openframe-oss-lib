@@ -70,44 +70,23 @@ export const InteractiveCard = React.forwardRef<HTMLDivElement, InteractiveCardP
     // Auto-enable clickable if onClick is provided
     const isClickable = clickable !== undefined ? clickable : !!onClick;
 
+    const [isHovered, setIsHovered] = React.useState(false);
+
     const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
       if (isClickable && onClick) {
         onClick(e);
       }
     };
 
-    const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    const handleMouseEnter = () => {
       if (hoverAccentColor && isClickable) {
-        const card = e.currentTarget;
-        card.style.borderColor = hoverAccentColor;
-        // Change h3 titles
-        const title = card.querySelector('h3');
-        if (title) {
-          title.style.color = hoverAccentColor;
-        }
-        // Change primary text elements (large values, main content)
-        // Exclude button text from color change
-        const primaryTexts = card.querySelectorAll<HTMLElement>('.text-ods-text-primary:not(button):not(button *)');
-        for (const text of primaryTexts) {
-          text.style.color = hoverAccentColor;
-        }
+        setIsHovered(true);
       }
     };
 
-    const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+    const handleMouseLeave = () => {
       if (hoverAccentColor && isClickable) {
-        const card = e.currentTarget;
-        card.style.borderColor = '';
-        // Reset h3 titles
-        const title = card.querySelector('h3');
-        if (title) {
-          title.style.color = '';
-        }
-        // Reset primary text elements
-        const primaryTexts = card.querySelectorAll<HTMLElement>('.text-ods-text-primary:not(button):not(button *)');
-        for (const text of primaryTexts) {
-          text.style.color = '';
-        }
+        setIsHovered(false);
       }
     };
 
@@ -136,7 +115,10 @@ export const InteractiveCard = React.forwardRef<HTMLDivElement, InteractiveCardP
           hoverAccentColor
             ? // A CSS custom property — React accepts it at runtime but
               // `CSSProperties` has no index signature for `--*`.
-              ({ '--hover-accent': hoverAccentColor } as React.CSSProperties)
+              ({
+                '--hover-accent': hoverAccentColor,
+                borderColor: isHovered ? hoverAccentColor : undefined,
+              } as React.CSSProperties)
             : undefined
         }
         {...props}
