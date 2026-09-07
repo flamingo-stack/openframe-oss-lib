@@ -1,5 +1,7 @@
 package com.openframe.api.service;
 
+import com.openframe.api.exception.DomainAlreadyExistsException;
+import com.openframe.api.exception.GenericDomainNotAllowedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -96,7 +98,7 @@ public class DomainValidationService {
         }
         boolean anyExists = domainExistenceValidator.anyExists(domains);
         if (anyExists) {
-            throw new IllegalArgumentException("One or more domains already exist in the system");
+            throw new DomainAlreadyExistsException("One or more domains already exist in the system");
         }
     }
 
@@ -109,7 +111,7 @@ public class DomainValidationService {
                 .toList();
 
         if (!found.isEmpty()) {
-            throw new IllegalArgumentException("Generic domains not allowed: " + found);
+            throw new GenericDomainNotAllowedException("Generic domains not allowed: " + found);
         }
     }
 
