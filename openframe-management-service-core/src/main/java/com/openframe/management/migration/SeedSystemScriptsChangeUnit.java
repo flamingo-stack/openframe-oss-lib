@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Ensures the package-manager bootstrap scripts exist for the tenant: seeds a
@@ -53,10 +54,20 @@ public class SeedSystemScriptsChangeUnit {
 
     private void refreshIfStale(ScriptRepository scriptRepository, Script script,
                                 SystemScriptDefinition definition, String body, String contentHash) {
-        if (contentHash.equals(script.getContentHash())) {
+        if (upToDate(script, definition, contentHash)) {
             return;
         }
         refresh(scriptRepository, script, definition, body, contentHash);
+    }
+
+    // the hash covers only the body, so metadata drift must be checked separately
+    private static boolean upToDate(Script script, SystemScriptDefinition definition, String contentHash) {
+        return contentHash.equals(script.getContentHash())
+                && definition.getShell() == script.getShell()
+                && definition.getPrivilegeLevel() == script.getPrivilegeLevel()
+                && Objects.equals(definition.getDefaultTimeoutSeconds(), script.getDefaultTimeoutSeconds())
+                && Objects.equals(definition.getDescription(), script.getDescription())
+                && Objects.equals(List.of(definition.getOsType()), script.getSupportedPlatforms());
     }
 
     private void create(ScriptRepository scriptRepository, String tenantId,
@@ -68,6 +79,7 @@ public class SeedSystemScriptsChangeUnit {
                 .description(definition.getDescription())
                 .shell(definition.getShell())
                 .privilegeLevel(definition.getPrivilegeLevel())
+                .defaultTimeoutSeconds(definition.getDefaultTimeoutSeconds())
                 .scriptBody(body)
                 .supportedPlatforms(List.of(definition.getOsType()))
                 .system(true)
@@ -82,6 +94,7 @@ public class SeedSystemScriptsChangeUnit {
         script.setDescription(definition.getDescription());
         script.setShell(definition.getShell());
         script.setPrivilegeLevel(definition.getPrivilegeLevel());
+        script.setDefaultTimeoutSeconds(definition.getDefaultTimeoutSeconds());
         script.setScriptBody(body);
         script.setSupportedPlatforms(List.of(definition.getOsType()));
         script.setContentHash(contentHash);

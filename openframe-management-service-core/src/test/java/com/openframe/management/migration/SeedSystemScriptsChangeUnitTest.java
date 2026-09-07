@@ -75,6 +75,32 @@ class SeedSystemScriptsChangeUnitTest {
         assertEquals(PrivilegeLevel.USER, winget.getPrivilegeLevel());
         assertTrue(winget.getScriptBody().contains("Repair-WinGetPackageManager -Force -Latest"));
         assertTrue(winget.getScriptBody().contains("--accept-source-agreements"));
+
+        // the watchdog derives its stuck-threshold from the row's timeout, so a long
+        // bootstrap (CLT download) must carry an explicit one
+        assertEquals(3600, brew.getDefaultTimeoutSeconds());
+        assertEquals(1800, winget.getDefaultTimeoutSeconds());
+    }
+
+    @Test
+    void refreshesWhenOnlyMetadataDrifted() {
+        when(scriptRepository.findSystemScript(any(), any())).thenReturn(Optional.empty());
+        when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        changeUnit.execution(scriptRepository, tenantIdProvider);
+        ArgumentCaptor<Script> seeded = ArgumentCaptor.forClass(Script.class);
+        verify(scriptRepository, times(3)).save(seeded.capture());
+
+        Script drifted = byName(seeded.getAllValues(), SystemScriptCode.INSTALL_WINGET.canonicalName());
+        drifted.setPrivilegeLevel(PrivilegeLevel.ADMIN); // body (and hash) untouched
+
+        ScriptRepository secondRepo = mock(ScriptRepository.class);
+        when(secondRepo.findSystemScript(any(), any())).thenAnswer(inv ->
+                inv.getArgument(0) == SystemScriptCode.INSTALL_WINGET ? Optional.of(drifted) : Optional.empty());
+        when(secondRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        changeUnit.execution(secondRepo, tenantIdProvider);
+
+        assertEquals(PrivilegeLevel.USER, drifted.getPrivilegeLevel());
     }
 
     @Test
