@@ -2,6 +2,7 @@ package com.openframe.test.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.openframe.test.config.EnvironmentConfig;
 
 /**
  * Step 2 – authentication method picker.
@@ -14,7 +15,7 @@ import com.microsoft.playwright.Page;
  */
 public class AuthMethodPage {
 
-    public static final String URL = "https://openframe.build/auth/login";
+    public static final String URL = EnvironmentConfig.getAuthUrl() + "auth/login";
 
     private final Page page;
 
