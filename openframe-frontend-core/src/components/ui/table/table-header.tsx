@@ -6,6 +6,10 @@ import { Arrow01DownIcon } from '../../icons-v2-generated/arrows/arrow-01-down-i
 import { Arrow01UpIcon } from '../../icons-v2-generated/arrows/arrow-01-up-icon';
 import { SwitchVrIcon } from '../../icons-v2-generated/arrows/switch-vr-icon';
 import { Checkbox } from '../checkbox';
+// TODO(migration): TableColumnFilterDropdown is @deprecated in favor of `DataTable*` equivalents.
+// This component must be migrated to use the `data-table` filter dropdown before
+// table-column-filter-dropdown.tsx can be removed. Do not remove the deprecated
+// dependency without updating this usage first.
 import { TableColumnFilterDropdown } from './table-column-filter-dropdown';
 import type { TableColumn, TableHeaderProps, TableRowData } from './types';
 import { getHideClasses } from './utils';
