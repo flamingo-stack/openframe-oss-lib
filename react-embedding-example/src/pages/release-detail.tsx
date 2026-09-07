@@ -12,8 +12,10 @@ import type { RoadmapItem } from '@flamingo-stack/openframe-frontend-core/compon
 import { EP } from '../config/endpoints'
 
 /**
- * Host-supplied data hook — ReleaseDetailPage REQUIRES this so it fetches through the
- * app's QueryClient. Points at the hub's public single-release route
+ * Host-side data hook — called at the top level of the route below, so it runs
+ * against the app's QueryClient. ReleaseDetailPage takes the RESOLVED release,
+ * never a hook, so nothing crosses the prop boundary that React cannot see.
+ * Points at the hub's public single-release route
  * (`/content/api/releases/<slug>`); a miss surfaces the lib's error state (no crash).
  * Caption `<track>` URLs are built by the lib page itself from the release's SRT
  * columns via the runtime endpoints (proxied automatically — see README
@@ -80,10 +82,12 @@ function DeliverySection({ data, isLoading }: { data: DeliveryResponse | null; i
 
 export function ReleaseDetailRoute() {
   const { slug = '' } = useParams()
+  const { data: release, error, isLoading } = useRelease(slug)
   return (
     <ReleaseDetailPage
-      slug={slug}
-      useRelease={useRelease}
+      release={release}
+      isLoading={isLoading}
+      error={error}
       RoadmapSection={RoadmapSection}
       DeliverySection={DeliverySection}
       VideoDisplaySection={VideoDisplaySection}
