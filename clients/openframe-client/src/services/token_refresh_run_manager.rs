@@ -1,17 +1,51 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use tokio::time::{sleep, timeout, Duration, Instant};
+use tokio::time::{sleep, timeout, Duration};
 use tracing::{debug, error, info, warn};
 
 use crate::models::AgentTokenResponse;
-use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::AgentAuthService;
 use crate::utils::jwt;
 
 /// Device-vs-server clock difference worth a warning.
 const SKEW_WARN: Duration = Duration::from_secs(5 * 60);
+
+/// Time since boot on a clock that keeps counting through sleep and hibernation. `Instant` does not on macOS
+/// (`CLOCK_UPTIME_RAW`) and Linux (`CLOCK_MONOTONIC`), so a deadline kept on it would slip by the length of every nap.
+mod boot_clock {
+    use std::time::Duration;
+
+    #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+    pub fn now() -> Duration {
+        // Linux counts sleep on CLOCK_BOOTTIME; Apple's CLOCK_MONOTONIC does too (only CLOCK_UPTIME_RAW stops).
+        #[cfg(target_os = "linux")]
+        let id = libc::CLOCK_BOOTTIME;
+        #[cfg(target_vendor = "apple")]
+        let id = libc::CLOCK_MONOTONIC;
+        let mut ts = libc::timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
+        // SAFETY: `ts` is a valid out-pointer for the duration of the call and `id` is a supported clock.
+        let rc = unsafe { libc::clock_gettime(id, &mut ts) };
+        debug_assert_eq!(rc, 0, "clock_gettime failed");
+        Duration::new(
+            ts.tv_sec.max(0) as u64,
+            ts.tv_nsec.clamp(0, 999_999_999) as u32,
+        )
+    }
+
+    /// `Instant` is `QueryPerformanceCounter`, which Windows documents as counting through standby and hibernation.
+    #[cfg(not(any(target_os = "linux", target_vendor = "apple")))]
+    pub fn now() -> Duration {
+        use std::sync::OnceLock;
+        use std::time::Instant;
+        static START: OnceLock<Instant> = OnceLock::new();
+        START.get_or_init(Instant::now).elapsed()
+    }
+}
 
 /// Refresh timing; production values by default, shrunk in tests to run the real loop at millisecond scale.
 #[derive(Debug, Clone, Copy)]
@@ -24,9 +58,9 @@ struct RefreshTiming {
     fallback_interval: Duration,
     /// Cap on a lifetime read from the token, so a bogus claim can't overflow the timers.
     max_ttl: Duration,
-    /// Floor between two refreshes whatever any clock says — the guard against a hot loop.
+    /// Floor between two refreshes whatever the token says — the guard against a hot loop.
     min_interval: Duration,
-    /// The wait is sliced so a resume from suspend (wall clock jumps, monotonic clock may not) is noticed within a slice.
+    /// The wait is sliced so the boot clock is re-read after a sleep the tokio timer did not count.
     wait_slice: Duration,
     /// Delay between refresh attempts after a failure.
     retry_interval: Duration,
@@ -53,20 +87,14 @@ impl Default for RefreshTiming {
 #[derive(Clone)]
 pub struct TokenRefreshRunManager {
     auth_service: AgentAuthService,
-    config_service: AgentConfigurationService,
     deactivation: Arc<DeactivationService>,
     timing: RefreshTiming,
 }
 
 impl TokenRefreshRunManager {
-    pub fn new(
-        auth_service: AgentAuthService,
-        config_service: AgentConfigurationService,
-        deactivation: Arc<DeactivationService>,
-    ) -> Self {
+    pub fn new(auth_service: AgentAuthService, deactivation: Arc<DeactivationService>) -> Self {
         Self {
             auth_service,
-            config_service,
             deactivation,
             timing: RefreshTiming::default(),
         }
@@ -74,30 +102,15 @@ impl TokenRefreshRunManager {
 
     pub fn start(&self) {
         let auth_service = self.auth_service.clone();
-        let config_service = self.config_service.clone();
         let deactivation = self.deactivation.clone();
         let timing = self.timing;
 
         info!("Starting proactive token refresh run manager");
 
         tokio::spawn(async move {
-            let mut schedule = match config_service.get_access_token().await {
-                Ok(token) if !token.is_empty() => {
-                    schedule_for_existing(&timing, &token, Utc::now().timestamp(), Instant::now())
-                }
-                Ok(_) => RefreshSchedule::now(),
-                Err(e) => {
-                    warn!(
-                        "Token refresh: cannot read access token ({e:#}); using fallback interval"
-                    );
-                    RefreshSchedule::after(
-                        Instant::now(),
-                        Utc::now().timestamp(),
-                        timing.fallback_interval,
-                        Duration::ZERO,
-                    )
-                }
-            };
+            // Refresh once at start: the stored token's remaining life is unknowable without trusting the
+            // device clock, and shared_token.enc must be valid before the tools connect.
+            let mut schedule = RefreshSchedule::now();
 
             loop {
                 // Tenant-gone suspension: this loop is the single backoff probe. Its outcome is
@@ -109,11 +122,11 @@ impl TokenRefreshRunManager {
                         wait.as_secs()
                     );
                     sleep(wait).await;
-                    let (sent_wall, sent_mono) = (Utc::now().timestamp(), Instant::now());
+                    let (sent_wall, sent_boot) = (Utc::now().timestamp(), boot_clock::now());
                     if let Ok(Ok(response)) =
                         timeout(timing.reauth_timeout, auth_service.reauthenticate()).await
                     {
-                        schedule = schedule_after_refresh(&timing, &response, sent_wall, sent_mono);
+                        schedule = schedule_after_refresh(&timing, &response, sent_wall, sent_boot);
                     }
                     continue;
                 }
@@ -122,11 +135,11 @@ impl TokenRefreshRunManager {
 
                 // Retry on the short interval until a refresh succeeds.
                 loop {
-                    let (sent_wall, sent_mono) = (Utc::now().timestamp(), Instant::now());
+                    let (sent_wall, sent_boot) = (Utc::now().timestamp(), boot_clock::now());
                     match timeout(timing.reauth_timeout, auth_service.reauthenticate()).await {
                         Ok(Ok(response)) => {
                             schedule =
-                                schedule_after_refresh(&timing, &response, sent_wall, sent_mono);
+                                schedule_after_refresh(&timing, &response, sent_wall, sent_boot);
                             info!("Proactively refreshed access token; shared_token.enc updated");
                             break;
                         }
@@ -152,51 +165,34 @@ impl TokenRefreshRunManager {
     }
 }
 
-/// When the next refresh is due: the same delay on both clocks. `due_at` (monotonic) can't be moved by
-/// a wall-clock jump; `due_wall` (device wall-clock seconds) catches a resume from suspend, where the
-/// monotonic clock may have stood still. `not_before` floors either trigger.
+/// When the next refresh is due, on the boot clock: the token's lifetime counted from the request, unmoved by
+/// wall-clock steps and still counting through sleep.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RefreshSchedule {
-    not_before: Instant,
-    due_at: Instant,
-    due_wall: i64,
+    due: Duration,
 }
 
 impl RefreshSchedule {
-    fn after(now_mono: Instant, now_wall: i64, delay: Duration, floor: Duration) -> Self {
-        // Whole seconds rounded up, so the wall deadline never precedes the monotonic one.
-        let delay_secs = delay.as_secs() + u64::from(delay.subsec_nanos() > 0);
+    fn after(now_boot: Duration, delay: Duration) -> Self {
         Self {
-            not_before: now_mono + floor,
-            due_at: now_mono + delay,
-            due_wall: now_wall.saturating_add(delay_secs as i64),
+            due: now_boot.saturating_add(delay),
         }
     }
 
     fn now() -> Self {
-        Self::after(
-            Instant::now(),
-            Utc::now().timestamp(),
-            Duration::ZERO,
-            Duration::ZERO,
-        )
+        Self::after(boot_clock::now(), Duration::ZERO)
     }
 
-    /// Sleep until due, in slices so a wall-clock jump past the deadline is caught within a slice.
+    /// Sleep until due, in slices: tokio timers run on `Instant`, which stands still through sleep on macOS and
+    /// Linux, so the boot clock is re-read after every slice and a nap costs at most one slice of lateness.
     async fn wait(&self, slice: Duration) {
-        let remaining = self.due_at.saturating_duration_since(Instant::now());
+        let remaining = self.due.saturating_sub(boot_clock::now());
         if !remaining.is_zero() {
             debug!("Next proactive token refresh in {}s", remaining.as_secs());
         }
         loop {
-            let now = Instant::now();
-            let floor = self.not_before.saturating_duration_since(now);
-            if !floor.is_zero() {
-                sleep(floor).await;
-                continue;
-            }
-            let remaining = self.due_at.saturating_duration_since(now);
-            if remaining.is_zero() || Utc::now().timestamp() >= self.due_wall {
+            let remaining = self.due.saturating_sub(boot_clock::now());
+            if remaining.is_zero() {
                 return;
             }
             sleep(remaining.min(slice)).await;
@@ -220,12 +216,13 @@ impl RefreshTiming {
 }
 
 /// Schedule after a successful refresh: the server-granted lifetime counted from the moment the request was
-/// sent (`sent_wall`/`sent_mono`, so latency shortens the lead rather than the token), never sooner than `min_interval`.
+/// sent (`sent_boot`, so latency shortens the lead rather than the token), never sooner than `min_interval`.
+/// `sent_wall` only feeds the clock-skew warning.
 fn schedule_after_refresh(
     timing: &RefreshTiming,
     response: &AgentTokenResponse,
     sent_wall: i64,
-    sent_mono: Instant,
+    sent_boot: Duration,
 ) -> RefreshSchedule {
     let times = jwt::token_times_unix(&response.access_token);
     // The shorter of `expires_in` and `exp - iat`, so neither claim alone can stretch the interval.
@@ -248,7 +245,10 @@ fn schedule_after_refresh(
     };
 
     // Device clock minus server clock, measured against the freshly minted `iat`.
-    if let Some(skew) = times.and_then(|t| t.iat).map(|iat| sent_wall - iat) {
+    if let Some(skew) = times
+        .and_then(|t| t.iat)
+        .and_then(|iat| sent_wall.checked_sub(iat))
+    {
         if skew.unsigned_abs() >= SKEW_WARN.as_secs() {
             warn!(
                 skew_s = skew,
@@ -257,31 +257,7 @@ fn schedule_after_refresh(
         }
     }
 
-    RefreshSchedule::after(sent_mono, sent_wall, delay, timing.min_interval)
-}
-
-/// Schedule for the token found at startup. Its age on the device clock is the only evidence of how much life
-/// it has left and a skewed clock makes that worthless, so refresh at once — unless the clock says initial
-/// authentication minted it moments ago, in which case count its lifetime from now.
-fn schedule_for_existing(
-    timing: &RefreshTiming,
-    token: &str,
-    now_wall: i64,
-    now_mono: Instant,
-) -> RefreshSchedule {
-    let times = jwt::token_times_unix(token);
-    let age = times.and_then(|t| t.iat).map(|iat| now_wall - iat);
-    let minted_just_now =
-        age.is_some_and(|age| (0..timing.min_interval.as_secs() as i64).contains(&age));
-    let delay = match (minted_just_now, times.and_then(|t| t.ttl_secs())) {
-        (true, Some(ttl)) => {
-            let ttl = timing.ttl_from_secs(ttl);
-            ttl.saturating_sub(timing.lead_for(ttl))
-                .saturating_sub(Duration::from_secs(age.unwrap_or(0) as u64))
-        }
-        _ => Duration::ZERO,
-    };
-    RefreshSchedule::after(now_mono, now_wall, delay, Duration::ZERO)
+    RefreshSchedule::after(sent_boot, delay)
 }
 
 #[cfg(test)]

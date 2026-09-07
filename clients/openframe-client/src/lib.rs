@@ -295,11 +295,8 @@ impl Client {
 
         // Initialize proactive token refresh run manager (keeps shared_token.enc valid
         // independent of NATS reconnects)
-        let token_refresh_run_manager = TokenRefreshRunManager::new(
-            auth_service.clone(),
-            config_service.clone(),
-            deactivation_service.clone(),
-        );
+        let token_refresh_run_manager =
+            TokenRefreshRunManager::new(auth_service.clone(), deactivation_service.clone());
 
         // Initialize NATS connection manager
         let ws_url = format!("wss://{}", initial_configuration_service.get_server_url()?);

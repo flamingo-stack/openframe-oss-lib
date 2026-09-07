@@ -1,12 +1,14 @@
 use super::*;
 use crate::clients::AuthClient;
 use crate::platform::directories::DirectoryManager;
+use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::shared_token_service::SharedTokenService;
 use crate::services::EncryptionService;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use std::sync::Mutex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
+use tokio::time::Instant;
 
 const ISSUED: i64 = 1_800_000_000;
 const TTL: i64 = 3600;
@@ -61,6 +63,10 @@ fn fresh(expires_in: Option<i64>) -> AgentTokenResponse {
     response(token(Some(ISSUED), ISSUED + TTL), expires_in)
 }
 
+fn delay_of(schedule: RefreshSchedule, sent_boot: Duration) -> Duration {
+    schedule.due - sent_boot
+}
+
 #[test]
 fn production_timing_matches_the_documented_values() {
     let timing = RefreshTiming::default();
@@ -76,233 +82,162 @@ fn production_timing_matches_the_documented_values() {
 
 #[test]
 fn refresh_delay_comes_from_token_lifetime_not_device_clock() {
-    let now = Instant::now();
+    let sent = boot_clock::now();
     // Device clock three hours ahead: the new token already looks expired to the wall clock.
-    let schedule = schedule_after_refresh(&PROD, &fresh(Some(TTL)), ISSUED + THREE_HOURS, now);
-    assert_eq!(schedule.due_at - now, Duration::from_secs(3300));
-    assert_eq!(schedule.not_before - now, PROD.min_interval);
+    let schedule = schedule_after_refresh(&PROD, &fresh(Some(TTL)), ISSUED + THREE_HOURS, sent);
+    assert_eq!(delay_of(schedule, sent), Duration::from_secs(3300));
 }
 
 #[test]
 fn refresh_delay_is_the_same_with_an_accurate_clock() {
-    let now = Instant::now();
-    let schedule = schedule_after_refresh(&PROD, &fresh(Some(TTL)), ISSUED, now);
-    assert_eq!(schedule.due_at - now, Duration::from_secs(3300));
+    let sent = boot_clock::now();
+    let schedule = schedule_after_refresh(&PROD, &fresh(Some(TTL)), ISSUED, sent);
+    assert_eq!(delay_of(schedule, sent), Duration::from_secs(3300));
+}
+
+#[test]
+fn refresh_delay_is_the_same_with_the_clock_far_behind() {
+    let sent = boot_clock::now();
+    let schedule = schedule_after_refresh(&PROD, &fresh(Some(TTL)), ISSUED - 86_400, sent);
+    assert_eq!(delay_of(schedule, sent), Duration::from_secs(3300));
 }
 
 #[test]
 fn refresh_never_sooner_than_min_interval() {
-    let now = Instant::now();
+    let sent = boot_clock::now();
     let schedule = schedule_after_refresh(
         &PROD,
         &response(token(Some(ISSUED), ISSUED + 20), Some(20)),
         ISSUED,
-        now,
+        sent,
     );
-    assert_eq!(schedule.due_at - now, PROD.min_interval);
+    assert_eq!(delay_of(schedule, sent), PROD.min_interval);
 }
 
 #[test]
 fn lifetime_falls_back_to_jwt_claims_without_expires_in() {
-    let now = Instant::now();
-    let schedule = schedule_after_refresh(&PROD, &fresh(None), ISSUED, now);
-    assert_eq!(schedule.due_at - now, Duration::from_secs(3300));
+    let sent = boot_clock::now();
+    let schedule = schedule_after_refresh(&PROD, &fresh(None), ISSUED, sent);
+    assert_eq!(delay_of(schedule, sent), Duration::from_secs(3300));
 }
 
 #[test]
 fn lifetime_falls_back_to_jwt_claims_when_expires_in_is_not_positive() {
-    let now = Instant::now();
+    let sent = boot_clock::now();
     for expires_in in [Some(0), Some(-1)] {
-        let schedule = schedule_after_refresh(&PROD, &fresh(expires_in), ISSUED, now);
-        assert_eq!(schedule.due_at - now, Duration::from_secs(3300));
+        let schedule = schedule_after_refresh(&PROD, &fresh(expires_in), ISSUED, sent);
+        assert_eq!(delay_of(schedule, sent), Duration::from_secs(3300));
     }
 }
 
 #[test]
 fn lifetime_is_the_shorter_of_expires_in_and_jwt_claims() {
-    let now = Instant::now();
-    let schedule = schedule_after_refresh(&PROD, &fresh(Some(7200)), ISSUED, now);
-    assert_eq!(schedule.due_at - now, Duration::from_secs(3300));
-    let schedule = schedule_after_refresh(&PROD, &fresh(Some(1800)), ISSUED, now);
-    assert_eq!(schedule.due_at - now, Duration::from_secs(1500));
+    let sent = boot_clock::now();
+    let schedule = schedule_after_refresh(&PROD, &fresh(Some(7200)), ISSUED, sent);
+    assert_eq!(delay_of(schedule, sent), Duration::from_secs(3300));
+    let schedule = schedule_after_refresh(&PROD, &fresh(Some(1800)), ISSUED, sent);
+    assert_eq!(delay_of(schedule, sent), Duration::from_secs(1500));
 }
 
 #[test]
 fn unknown_lifetime_uses_fallback_interval() {
-    let now = Instant::now();
+    let sent = boot_clock::now();
     let schedule = schedule_after_refresh(
         &PROD,
         &response(token(None, ISSUED + TTL), None),
         ISSUED,
-        now,
+        sent,
     );
-    assert_eq!(schedule.due_at - now, PROD.fallback_interval);
-    assert_eq!(
-        schedule.due_wall,
-        ISSUED + PROD.fallback_interval.as_secs() as i64
-    );
+    assert_eq!(delay_of(schedule, sent), PROD.fallback_interval);
 }
 
 #[test]
 fn bogus_lifetime_is_capped() {
-    let now = Instant::now();
+    let sent = boot_clock::now();
     let schedule = schedule_after_refresh(
         &PROD,
         &response(token(None, ISSUED + TTL), Some(i64::MAX)),
         ISSUED,
-        now,
+        sent,
     );
-    assert_eq!(schedule.due_at - now, PROD.max_ttl - PROD.margin);
+    assert_eq!(delay_of(schedule, sent), PROD.max_ttl - PROD.margin);
 }
 
 #[test]
-fn wall_deadline_follows_the_device_clock_from_receipt() {
-    let now = Instant::now();
-    let schedule = schedule_after_refresh(&PROD, &fresh(Some(TTL)), ISSUED + THREE_HOURS, now);
-    assert_eq!(schedule.due_wall, ISSUED + THREE_HOURS + 3300);
-}
-
-#[test]
-fn wall_deadline_is_set_without_iat() {
-    let now = Instant::now();
+fn extreme_claims_do_not_panic() {
+    let sent = boot_clock::now();
+    // `exp - iat` would overflow; the lifetime falls back to `expires_in`.
     let schedule = schedule_after_refresh(
         &PROD,
-        &response(token(None, ISSUED + TTL), Some(TTL)),
+        &response(token(Some(-1), i64::MAX), Some(TTL)),
         ISSUED,
-        now,
+        sent,
     );
-    assert_eq!(schedule.due_at - now, Duration::from_secs(3300));
-    assert_eq!(schedule.due_wall, ISSUED + 3300);
-}
-
-#[test]
-fn existing_token_minted_just_now_waits_out_its_lifetime() {
-    let now = Instant::now();
-    // Initial authentication ran 10 s ago by the device clock.
-    let schedule =
-        schedule_for_existing(&PROD, &token(Some(ISSUED), ISSUED + TTL), ISSUED + 10, now);
-    assert_eq!(schedule.due_at - now, Duration::from_secs(3290));
-    assert_eq!(schedule.not_before, now);
-}
-
-#[test]
-fn existing_token_older_than_min_interval_refreshes_immediately() {
-    let now = Instant::now();
-    // Ten minutes old by a clock that may be off by any amount: its real remaining life is unknowable.
-    let schedule =
-        schedule_for_existing(&PROD, &token(Some(ISSUED), ISSUED + TTL), ISSUED + 600, now);
-    assert_eq!(schedule.due_at, now);
-    assert_eq!(schedule.not_before, now);
-}
-
-#[test]
-fn existing_expired_token_refreshes_immediately() {
-    let now = Instant::now();
-    let schedule = schedule_for_existing(
+    assert_eq!(delay_of(schedule, sent), Duration::from_secs(3300));
+    // `now - iat` would overflow; the skew check is skipped.
+    let schedule = schedule_after_refresh(
         &PROD,
-        &token(Some(ISSUED), ISSUED + TTL),
-        ISSUED + TTL + 1,
-        now,
+        &response(token(Some(i64::MIN), ISSUED + TTL), Some(TTL)),
+        i64::MAX,
+        sent,
     );
-    assert_eq!(schedule.due_at, now);
-}
-
-#[test]
-fn existing_token_refreshes_immediately_when_clock_is_behind() {
-    let now = Instant::now();
-    // Device clock a day behind: the token looks minted in the future.
-    let schedule = schedule_for_existing(
+    assert_eq!(delay_of(schedule, sent), Duration::from_secs(3300));
+    // Nothing usable at all: fallback interval.
+    let schedule = schedule_after_refresh(
         &PROD,
-        &token(Some(ISSUED), ISSUED + TTL),
-        ISSUED - 86_400,
-        now,
+        &response(token(Some(-1), i64::MAX), None),
+        ISSUED,
+        sent,
     );
-    assert_eq!(schedule.due_at, now);
+    assert_eq!(delay_of(schedule, sent), PROD.fallback_interval);
 }
 
 #[test]
-fn existing_token_without_iat_refreshes_immediately() {
-    let now = Instant::now();
-    let schedule = schedule_for_existing(&PROD, &token(None, ISSUED + TTL), ISSUED, now);
-    assert_eq!(schedule.due_at, now);
+fn after_adds_the_delay_on_the_boot_clock() {
+    let now = boot_clock::now();
+    let schedule = RefreshSchedule::after(now, Duration::from_secs(3300));
+    assert_eq!(schedule.due, now + Duration::from_secs(3300));
+    assert_eq!(
+        RefreshSchedule::after(Duration::MAX, Duration::from_secs(1)).due,
+        Duration::MAX
+    );
 }
 
 #[test]
-fn existing_undecodable_token_refreshes_immediately() {
-    let now = Instant::now();
-    let schedule = schedule_for_existing(&PROD, "not-a-jwt", ISSUED, now);
-    assert_eq!(schedule.due_at, now);
-}
-
-#[test]
-fn after_stamps_the_same_delay_on_both_clocks() {
-    let now = Instant::now();
-    let schedule =
-        RefreshSchedule::after(now, ISSUED, Duration::from_secs(3300), PROD.min_interval);
-    assert_eq!(schedule.due_at - now, Duration::from_secs(3300));
-    assert_eq!(schedule.due_wall, ISSUED + 3300);
-    assert_eq!(schedule.not_before - now, PROD.min_interval);
-}
-
-#[test]
-fn after_rounds_the_wall_deadline_up() {
-    let now = Instant::now();
-    let schedule = RefreshSchedule::after(now, ISSUED, Duration::from_millis(50), Duration::ZERO);
-    assert_eq!(schedule.due_wall, ISSUED + 1);
-    assert_eq!(schedule.not_before, now);
+fn boot_clock_keeps_pace_with_instant() {
+    let (b0, i0) = (boot_clock::now(), Instant::now());
+    std::thread::sleep(Duration::from_millis(30));
+    let (b1, i1) = (boot_clock::now(), Instant::now());
+    let boot = b1 - b0;
+    let mono = i1 - i0;
+    assert!(
+        boot >= Duration::from_millis(30),
+        "boot clock advanced {boot:?}"
+    );
+    let drift = boot.abs_diff(mono);
+    assert!(
+        drift < Duration::from_millis(50),
+        "boot vs Instant drift {drift:?}"
+    );
 }
 
 #[tokio::test]
-async fn wait_ignores_a_future_wall_deadline() {
-    let now = Instant::now();
-    let schedule = RefreshSchedule {
-        not_before: now,
-        due_at: now + Duration::from_millis(50),
-        due_wall: Utc::now().timestamp() + 3600,
-    };
+async fn wait_returns_once_due_passes() {
+    let schedule = RefreshSchedule::after(boot_clock::now(), Duration::from_millis(50));
     let started = Instant::now();
     schedule.wait(Duration::from_millis(10)).await;
     assert!(started.elapsed() >= Duration::from_millis(50));
 }
 
 #[tokio::test]
-async fn wait_returns_early_when_wall_deadline_passed() {
-    let now = Instant::now();
-    let schedule = RefreshSchedule {
-        not_before: now,
-        due_at: now + Duration::from_secs(3600),
-        due_wall: Utc::now().timestamp() - 1,
-    };
+async fn wait_returns_at_once_when_already_due() {
+    let schedule = RefreshSchedule::after(
+        boot_clock::now().saturating_sub(Duration::from_secs(1)),
+        Duration::ZERO,
+    );
     let started = Instant::now();
     schedule.wait(PROD.wait_slice).await;
-    assert!(started.elapsed() < Duration::from_secs(1));
-}
-
-#[tokio::test]
-async fn wait_notices_the_wall_deadline_arriving_mid_wait() {
-    // Resume from suspend: the monotonic deadline is hours away, the wall clock reaches its deadline first.
-    let now = Instant::now();
-    let schedule = RefreshSchedule {
-        not_before: now,
-        due_at: now + Duration::from_secs(3600),
-        due_wall: Utc::now().timestamp() + 1,
-    };
-    let started = Instant::now();
-    schedule.wait(Duration::from_millis(50)).await;
-    assert!(started.elapsed() < Duration::from_secs(3));
-}
-
-#[tokio::test]
-async fn wall_deadline_cannot_bypass_the_floor() {
-    let now = Instant::now();
-    let schedule = RefreshSchedule {
-        not_before: now + Duration::from_millis(50),
-        due_at: now + Duration::from_secs(3600),
-        due_wall: Utc::now().timestamp() - 1,
-    };
-    let started = Instant::now();
-    schedule.wait(PROD.wait_slice).await;
-    assert!(started.elapsed() >= Duration::from_millis(50));
+    assert!(started.elapsed() < Duration::from_millis(100));
 }
 
 /// Minimal HTTP/1.1 token endpoint: every request gets a token minted `issued_offset` seconds from now.
@@ -385,8 +320,8 @@ async fn registered_manager(dir: &tempfile::TempDir, base_url: String) -> TokenR
     let deactivation = DeactivationService::new(&dm);
     let auth_client = AuthClient::new(base_url, reqwest::Client::new(), deactivation.clone());
     let shared = SharedTokenService::new(dm, EncryptionService::new());
-    let auth = AgentAuthService::new(auth_client, config.clone(), shared);
-    TokenRefreshRunManager::new(auth, config, deactivation).with_timing(FAST)
+    let auth = AgentAuthService::new(auth_client, config, shared);
+    TokenRefreshRunManager::new(auth, deactivation).with_timing(FAST)
 }
 
 fn min_gap(hits: &[Instant]) -> Option<Duration> {
@@ -430,7 +365,7 @@ async fn real_loop_has_the_same_cadence_with_an_accurate_clock() {
 }
 
 #[tokio::test]
-async fn real_loop_refreshes_the_stale_token_once_and_then_waits_out_the_lifetime() {
+async fn real_loop_refreshes_once_at_start_and_then_waits_out_the_lifetime() {
     let server = mock_auth_server(TTL, -THREE_HOURS).await;
     let dir = tempfile::tempdir().unwrap();
     registered_manager(&dir, server.url.clone()).await.start();

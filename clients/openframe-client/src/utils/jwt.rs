@@ -10,9 +10,11 @@ pub struct JwtTimes {
 }
 
 impl JwtTimes {
-    /// Lifetime the issuer granted (`exp - iat`); `None` without `iat` or when it isn't positive.
+    /// Lifetime the issuer granted (`exp - iat`); `None` without `iat`, when it isn't positive, or when the claims overflow.
     pub fn ttl_secs(&self) -> Option<i64> {
-        self.iat.map(|iat| self.exp - iat).filter(|ttl| *ttl > 0)
+        self.iat
+            .and_then(|iat| self.exp.checked_sub(iat))
+            .filter(|ttl| *ttl > 0)
     }
 }
 

@@ -31,6 +31,14 @@ fn ttl_is_none_when_not_positive() {
 }
 
 #[test]
+fn ttl_is_none_when_claims_overflow() {
+    let token = make_token(r#"{"iat":-1,"exp":9223372036854775807}"#);
+    assert_eq!(token_times_unix(&token).unwrap().ttl_secs(), None);
+    let token = make_token(r#"{"iat":9223372036854775807,"exp":-9223372036854775808}"#);
+    assert_eq!(token_times_unix(&token).unwrap().ttl_secs(), None);
+}
+
+#[test]
 fn none_without_exp_claim() {
     let token = make_token(r#"{"iat":1699996400,"sub":"machine"}"#);
     assert_eq!(token_times_unix(&token), None);
