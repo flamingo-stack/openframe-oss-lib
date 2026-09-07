@@ -237,17 +237,28 @@ public class RunScriptPage {
     // ── Environment Vars ─────────────────────────────────────────────────────
 
     /**
+     * Computes the absolute index of the environment-var "Key" input for the
+     * given 0-based env-var index.
+     * <p>
+     * Env var key inputs are the SECOND group of "Key" placeholders on the page:
+     * script argument keys come first, so the script argument count is used
+     * as an offset. Centralized here so the DOM-ordering assumption is only
+     * encoded in one place.
+     */
+    private int envVarKeyIndex(int index) {
+        return getScriptArgumentCount() + index;
+    }
+
+    /**
      * Sets the key and value for the environment variable at the given 0-based index.
      * The first existing env var (index 0) is pre-populated from the script definition.
      */
     public void setEnvironmentVar(int index, String key, String value) {
         Locator keyInputs = page.locator("input[placeholder='Key']");
         Locator valueInputs = page.locator("input[placeholder='Enter Value']");
-        // Env var key inputs are the SECOND group of "Key" placeholders.
-        // Script arg keys come first (count them to offset correctly).
-        int argCount = getScriptArgumentCount();
-        keyInputs.nth(argCount + index).clear();
-        keyInputs.nth(argCount + index).fill(key);
+        int keyIndex = envVarKeyIndex(index);
+        keyInputs.nth(keyIndex).clear();
+        keyInputs.nth(keyIndex).fill(key);
         valueInputs.nth(index).clear();
         valueInputs.nth(index).fill(value);
     }
@@ -256,8 +267,7 @@ public class RunScriptPage {
      * Returns the key of the environment variable at the given 0-based index.
      */
     public String getEnvironmentVarKey(int index) {
-        int argCount = getScriptArgumentCount();
-        return page.locator("input[placeholder='Key']").nth(argCount + index).inputValue();
+        return page.locator("input[placeholder='Key']").nth(envVarKeyIndex(index)).inputValue();
     }
 
     /**
@@ -287,8 +297,7 @@ public class RunScriptPage {
      * env var delete buttons start after the script arg delete buttons.
      */
     public void deleteEnvironmentVar(int index) {
-        int argCount = getScriptArgumentCount();
-        page.locator("button[aria-label='Delete argument']").nth(argCount + index).click();
+        page.locator("button[aria-label='Delete argument']").nth(envVarKeyIndex(index)).click();
     }
 
     // ── Device search & filter ────────────────────────────────────────────────
