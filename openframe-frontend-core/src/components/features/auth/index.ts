@@ -7,6 +7,7 @@ export * from './complete-account-form';
 export * from './create-organization-form';
 export * from './invite-link-invalid-modal';
 export * from './labeled-divider';
+export * from './legal-links';
 export * from './login-form';
 export * from './openframe-sso-login-form';
 export * from './openframe-sso-signup-form';
