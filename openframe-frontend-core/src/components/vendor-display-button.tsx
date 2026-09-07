@@ -17,7 +17,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
       // `externalUrl` is the caller-resolved platform base URL (the openmsp SSOT via
       // getPlatformProductionUrl, scheme-normalized). The old `process.env.NEXT_PUBLIC_OPENMSP_URL`
       // override is gone — it's stored scheme-less, which made this a relative window.open().
-      window.open(`${externalUrl}/vendor/${vendor.slug}`, '_blank', 'noopener,noreferrer');
+      window.open(`${externalUrl}/vendor/${encodeURIComponent(vendor.slug)}`, '_blank', 'noopener,noreferrer');
     } else if (onClick && vendor.slug) {
       onClick(vendor.slug);
     }
