@@ -2,6 +2,7 @@ name: OpenFrame OSS Libs Test
 
 permissions:
   contents: read
+  pull-requests: read
 
 on:
   pull_request:
@@ -27,6 +28,26 @@ jobs:
     uses: ./.github/workflows/changes.yaml
     if: github.event.pull_request.state == 'open' && !github.event.pull_request.draft
 
+
+  scan:
+    name: "Scan Code"
+    runs-on: ubuntu-latest
+    needs: [changes]
+    permissions:
+      contents: read
+      packages: read
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Scan code
+        uses: ./.github/steps/trivy
+        with:
+          scan: code
 
   test-java:
     name: Test Java
@@ -80,7 +101,7 @@ jobs:
     name: Test Node (${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: [changes]
-    # npm's defaults allow 970s of silence per hung registry socket; these bound it to 115s 
+    # npm's defaults allow 970s of silence per hung registry socket; these bound it to 115s
     env:
       NPM_CONFIG_FETCH_TIMEOUT: 30000
       NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 15000
@@ -323,7 +344,7 @@ jobs:
     needs: [changes, test-java, test-node, test-node-cycles, test-rust]
     runs-on: ubuntu-latest
     if: |
-      always() && 
+      always() &&
       (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || !contains(needs.*.result, 'skipped'))
     steps:
       - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
