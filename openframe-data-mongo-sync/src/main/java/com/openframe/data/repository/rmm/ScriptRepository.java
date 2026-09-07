@@ -1,5 +1,6 @@
 package com.openframe.data.repository.rmm;
 
+import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -39,6 +40,12 @@ public interface ScriptRepository extends MongoRepository<Script, String>, Custo
      * so this may return a soft-deleted document; callers filter as needed.
      */
     Optional<Script> findByTenantIdAndName(String tenantId, String name);
+
+    Optional<Script> findByTenantIdAndNameAndSystemTrue(String tenantId, String name);
+
+    default Optional<Script> findSystemScript(SystemScriptCode code, String tenantId) {
+        return findByTenantIdAndNameAndSystemTrue(tenantId, code.canonicalName());
+    }
 
     /**
      * Duplicate-name check for {@code create}. Ignores {@code DELETED} rows —

@@ -57,6 +57,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String FIELD_CREATED_BY = "createdBy";
+    private static final String FIELD_SYSTEM = "system";
 
     // tag_assignments fields used to resolve the tagIds filter into script ids.
     private static final String FIELD_TA_TAG_ID = "tagId";
@@ -103,6 +104,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
      */
     private Criteria buildBaseCriteria(String tenantId, ScriptQueryFilter filter, String search) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
+        applySystemShield(criteria);
         applyStatusFilter(criteria, filter);
         applyShellsFilter(criteria, filter);
         applyPlatformsFilter(criteria, filter);
@@ -135,6 +137,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
      */
     private Criteria facetCriteria(String tenantId, ScriptQueryFilter filter, String excludeField) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
+        applySystemShield(criteria);
         applyStatusFilter(criteria, filter);
         if (!FIELD_SHELL.equals(excludeField)) {
             applyShellsFilter(criteria, filter);
@@ -179,6 +182,10 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
     @Override
     public String getDefaultSortField() {
         return FIELD_ID;
+    }
+
+    private static void applySystemShield(Criteria criteria) {
+        criteria.and(FIELD_SYSTEM).ne(true);
     }
 
     private static void applyStatusFilter(Criteria criteria, ScriptQueryFilter filter) {
