@@ -82,14 +82,14 @@ class ScriptExecutedEnrichmentIntegrationTest {
 
         // 3. Stub the Mongo/Redis-backed lookups; real cache layer is irrelevant here.
         when(machineIdCacheService.getMachineByMachineId(MACHINE_ID))
-                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, ORG_ID));
+                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, null, ORG_ID));
         when(machineIdCacheService.getOrganization(ORG_ID))
                 .thenReturn(new CachedOrganizationInfo(ORG_ID, ORG_NAME));
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
 
         // 4. Enrich via the new direct-Machine-lookup service (Option C path).
         RmmEnrichmentService enrichmentService =
-                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider);
+                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider, new MachineDisplayNameResolver());
         IntegratedToolEnrichedData enriched = enrichmentService.getExtraParams(deserialized);
 
         // 5. The four dashboard-visible fields must ALL be non-null — that's the
@@ -123,13 +123,13 @@ class ScriptExecutedEnrichmentIntegrationTest {
                 .isEqualTo(MACHINE_ID);
 
         when(machineIdCacheService.getMachineByMachineId(MACHINE_ID))
-                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, ORG_ID));
+                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, null, ORG_ID));
         when(machineIdCacheService.getOrganization(ORG_ID))
                 .thenReturn(new CachedOrganizationInfo(ORG_ID, ORG_NAME));
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
 
         RmmEnrichmentService enrichmentService =
-                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider);
+                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider, new MachineDisplayNameResolver());
         IntegratedToolEnrichedData enriched = enrichmentService.getExtraParams(deserialized);
 
         assertThat(enriched.getMachineId()).isEqualTo(MACHINE_ID);
