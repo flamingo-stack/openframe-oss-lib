@@ -1,3 +1,4 @@
+/** @deprecated Use icons from icons-v2-generated instead. */
 interface CartaIconProps {
   className?: string;
   color?: string;
@@ -18,3 +19,4 @@ export const CartaIcon = ({ className = 'w-6 h-6', color = 'var(--ods-system-gre
     />
   </svg>
 );
+
