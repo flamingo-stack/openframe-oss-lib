@@ -338,6 +338,7 @@
     "build:fast": "NODE_OPTIONS='--max-old-space-size=8192' tsup --no-dts",
     "clean": "rm -rf dist node_modules/.cache",
     "prepack": "NODE_OPTIONS='--max-old-space-size=8192' npm run build",
+    "prepublishOnly": "node scripts/check-publish-manifest.mjs",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
