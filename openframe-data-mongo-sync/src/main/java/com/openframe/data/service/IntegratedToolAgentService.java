@@ -5,6 +5,7 @@ import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.IntegratedToolAgentConfiguration;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.document.toolagent.ToolAgentStatus;
+import com.openframe.data.exception.ToolAgentNotFoundException;
 import com.openframe.data.repository.toolagent.IntegratedToolAgentRepository;
 import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +50,7 @@ public class IntegratedToolAgentService {
      */
     public IntegratedToolAgent getByKey(String key) {
         return agentRepository.findByKey(key)
-                .orElseThrow(() -> new IllegalStateException("No tool agent configuration found by key " + key));
+                .orElseThrow(() -> new ToolAgentNotFoundException("No tool agent configuration found by key " + key));
     }
 
     /**
@@ -66,7 +67,7 @@ public class IntegratedToolAgentService {
      */
     public IntegratedToolAgent getByUuid(String uuid) {
         return agentRepository.findById(uuid)
-                .orElseThrow(() -> new IllegalStateException("No tool agent configuration found by id " + uuid));
+                .orElseThrow(() -> new ToolAgentNotFoundException("No tool agent configuration found by id " + uuid));
     }
 
     /**
@@ -83,7 +84,7 @@ public class IntegratedToolAgentService {
     @Deprecated
     public IntegratedToolAgent getById(String id) {
         return agentRepository.findById(id)
-                .orElseThrow(() -> new IllegalStateException("No tool agent configuration found by id " + id));
+                .orElseThrow(() -> new ToolAgentNotFoundException("No tool agent configuration found by id " + id));
     }
 
     public List<IntegratedToolAgent> findByReleaseVersionTrue() {
