@@ -59,6 +59,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_STATUS = "status";
+    private static final String FIELD_SOURCE = "source";
     private static final String FIELD_INITIATED_BY = "initiatedBy";
     private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_EXECUTION_ID = "executionId";
@@ -185,6 +186,11 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                 .and(OWNER_FIELDS.get(owner.type())).is(owner.id());
         if (filter == null) {
             return criteria;
+        }
+        // never dropped by facets: source is not a facet field, and the service-level
+        // exclusion must hold in every counted bucket
+        if (filter.getExcludedSources() != null && !filter.getExcludedSources().isEmpty()) {
+            criteria.and(FIELD_SOURCE).nin(filter.getExcludedSources());
         }
         if (!FIELD_STATUS.equals(excludedField)
                 && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
