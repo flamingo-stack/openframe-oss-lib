@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -26,6 +29,8 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(value = "openframe.sso.apple.revocation.enabled", havingValue = "true", matchIfMissing = true)
 public class AppleTokenRevocationScheduler {
 
+    private static final int PAGE_SIZE = 200;
+
     private final AppleUserTokenRepository tokenRepository;
     private final AuthUserRepository authUserRepository;
     private final AppleTokenService appleTokenService;
@@ -35,19 +40,25 @@ public class AppleTokenRevocationScheduler {
     public void revokeTokensOfDeletedUsers() {
         int revoked = 0;
         int failed = 0;
-        for (AppleUserToken token : tokenRepository.findAll()) {
-            boolean userGone = authUserRepository.findById(token.getUserId())
-                    .map(user -> user.getStatus() == UserStatus.DELETED)
-                    .orElse(true);
-            if (!userGone) {
-                continue;
+        Pageable pageable = PageRequest.of(0, PAGE_SIZE);
+        Page<AppleUserToken> page;
+        do {
+            page = tokenRepository.findAll(pageable);
+            for (AppleUserToken token : page.getContent()) {
+                boolean userGone = authUserRepository.findById(token.getUserId())
+                        .map(user -> user.getStatus() == UserStatus.DELETED)
+                        .orElse(true);
+                if (!userGone) {
+                    continue;
+                }
+                if (appleTokenService.revokeAndForget(token)) {
+                    revoked++;
+                } else {
+                    failed++;
+                }
             }
-            if (appleTokenService.revokeAndForget(token)) {
-                revoked++;
-            } else {
-                failed++;
-            }
-        }
+            pageable = pageable.next();
+        } while (page.hasNext());
         if (revoked > 0 || failed > 0) {
             log.info("event=apple-token-revocation-sweep revoked={} failed={}", revoked, failed);
         }
