@@ -22,25 +22,50 @@ public class SSOConfigService {
     private final List<DefaultProviderConfig> defaultProviderConfigs;
 
     /**
-     * Get ACTIVE SSO configuration by tenant and provider.
+     * Whether an ACTIVE SSO configuration exists for the given tenant and provider.
      */
-    public Optional<SSOPerTenantConfig> getSSOConfig(String tenantId, String provider) {
-        return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(tenantId, provider);
+    public boolean hasSSOConfig(String tenantId, String provider) {
+        return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(tenantId, provider).isPresent();
+    }
+
+    /**
+     * Get ACTIVE SSO configuration by tenant and provider.
+     *
+     * @throws NoSuchElementException if no active configuration exists
+     */
+    public SSOPerTenantConfig ssoConfig(String tenantId, String provider) {
+        return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(tenantId, provider)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "No active SSO config for tenant '" + tenantId + "' and provider '" + provider + "'"));
+    }
+
+    /**
+     * Whether an effective ACTIVE SSO configuration exists for a tenant and provider,
+     * falling back to global properties-based SSO config if tenant-specific config is absent.
+     */
+    public boolean hasEffectiveSSOConfig(String tenantId, String provider) {
+        return effectiveSSOConfigOptional(tenantId, provider).isPresent();
     }
 
     /**
      * Get effective ACTIVE SSO configuration for a tenant and provider.
      * Falls back to global properties-based SSO config if tenant-specific config is absent.
+     *
+     * @throws NoSuchElementException if no effective configuration exists
      */
-    public Optional<SSOConfig> getEffectiveSSOConfig(String tenantId, String provider) {
-        Optional<SSOPerTenantConfig> perTenant = getSSOConfig(tenantId, provider);
-        if (perTenant.isPresent()) {
-            return Optional.of(perTenant.get());
-        }
-        return defaultProviderConfigs.stream()
-                .filter(cfg -> cfg.providerId().equalsIgnoreCase(provider))
-                .findFirst()
-                .flatMap(cfg -> buildFromDefaults(provider, cfg));
+    public SSOConfig effectiveSSOConfig(String tenantId, String provider) {
+        return effectiveSSOConfigOptional(tenantId, provider)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "No effective SSO config for tenant '" + tenantId + "' and provider '" + provider + "'"));
+    }
+
+    private Optional<SSOConfig> effectiveSSOConfigOptional(String tenantId, String provider) {
+        Optional<SSOPerTenantConfig> perTenant = ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(tenantId, provider);
+        return perTenant.map(cfg -> (SSOConfig) cfg)
+                .or(() -> defaultProviderConfigs.stream()
+                        .filter(cfg -> cfg.providerId().equalsIgnoreCase(provider))
+                        .findFirst()
+                        .flatMap(cfg -> buildFromDefaults(provider, cfg)));
     }
 
     private Optional<SSOConfig> buildFromDefaults(String provider, DefaultProviderConfig defaults) {
@@ -101,9 +126,24 @@ public class SSOConfigService {
 
 
     /**
-     * Find enabled, auto-provisioning SSO config by email domain (lowercased).
+     * Whether an enabled, auto-provisioning SSO config exists for the given email domain (lowercased).
      */
-    public Optional<SSOPerTenantConfig> findAutoProvisionByDomain(String domain) {
+    public boolean hasAutoProvisionByDomain(String domain) {
+        return autoProvisionByDomainOptional(domain).isPresent();
+    }
+
+    /**
+     * Find enabled, auto-provisioning SSO config by email domain (lowercased).
+     *
+     * @throws NoSuchElementException if no such configuration exists
+     */
+    public SSOPerTenantConfig autoProvisionByDomain(String domain) {
+        return autoProvisionByDomainOptional(domain)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "No auto-provisioning SSO config for domain '" + domain + "'"));
+    }
+
+    private Optional<SSOPerTenantConfig> autoProvisionByDomainOptional(String domain) {
         if (!StringUtils.hasText(domain)) {
             return Optional.empty();
         }
