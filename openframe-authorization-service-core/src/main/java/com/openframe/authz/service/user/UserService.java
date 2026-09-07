@@ -41,6 +41,19 @@ public class UserService {
                 .filter(user -> user.getStatus() == UserStatus.ACTIVE);
     }
 
+    /**
+     * Whether the email already has an ACTIVE account in a tenant OTHER than the given one.
+     * Auto-provisioning consults this before creating a user: tenant registration enforces global
+     * single-active-email, but the per-tenant provisioning guard alone would let a second tenant
+     * mint a duplicate — after which every global findActiveByEmail throws
+     * IncorrectResultSizeDataAccessException.
+     */
+    public boolean hasActiveAccountInAnotherTenant(String email, String tenantId) {
+        String normalized = email.trim().toLowerCase(Locale.ROOT);
+        return userRepository.findAllByEmailAndStatus(normalized, ACTIVE).stream()
+                .anyMatch(u -> !u.getTenantId().equals(tenantId));
+    }
+
     public Optional<AuthUser> findActiveByEmail(String email) {
         return userRepository.findByEmailAndStatus(email, ACTIVE);
     }
