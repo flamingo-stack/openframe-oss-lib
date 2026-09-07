@@ -17,6 +17,10 @@ interface CheckboxWithDescriptionProps {
   className?: string;
 }
 
+// Shared visual styles kept in sync with the base Checkbox primitive (see ./checkbox)
+const checkboxRootStyles =
+  'peer mt-0.5 h-5 w-5 shrink-0 rounded-sm border border-ods-border bg-ods-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-ods-accent data-[state=checked]:bg-ods-accent';
+
 const CheckboxWithDescription = forwardRef<HTMLDivElement, CheckboxWithDescriptionProps>(
   ({ id, checked, onCheckedChange, title, description, disabled, className }, ref) => (
     <div
@@ -32,9 +36,7 @@ const CheckboxWithDescription = forwardRef<HTMLDivElement, CheckboxWithDescripti
         checked={checked}
         onCheckedChange={onCheckedChange}
         disabled={disabled}
-        className={cn(
-          'peer mt-0.5 h-5 w-5 shrink-0 rounded-sm border border-ods-border bg-ods-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-ods-accent data-[state=checked]:bg-ods-accent',
-        )}
+        className={cn(checkboxRootStyles)}
       >
         <CheckboxPrimitive.Indicator className={cn('flex items-center justify-center text-ods-text-on-accent')}>
           <CheckboxCheckmarkIcon size={10} />
