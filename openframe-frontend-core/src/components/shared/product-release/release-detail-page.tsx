@@ -4,6 +4,10 @@ import { AlertTriangle, ExternalLink, BookMarked, Sparkles, TrendingUp, Wrench }
 import { useState, useEffect, Fragment, type ComponentType, type ReactNode } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
+// PageShell (wide) — match the related-content/FAQ rail container the hub
+// renders below this view (was ArticleDetailLayout, 1280px — narrower than
+// the rail, see hub detail-container alignment decision 2026-06-10).
+import { useSelfFetch } from '../../../hooks/use-self-fetch';
 import type { TagAssoc } from '../../../types/blog';
 import type { EntityAuthor } from '../../../types/entity-author';
 import type { ChangelogEntry } from '../../../types/product-release';
@@ -21,9 +25,6 @@ import {
   type VideoBiteStripProfile,
 } from '../../features/video-bites-shared';
 import { GitHubIcon } from '../../icons/github-icon';
-// PageShell (wide) — match the related-content/FAQ rail container the hub
-// renders below this view (was ArticleDetailLayout, 1280px — narrower than
-// the rail, see hub detail-container alignment decision 2026-06-10).
 import { PageShell } from '../../layout/article-detail-layout';
 import { PageLayout } from '../../layout/page-layout';
 import { Card, CardContent } from '../../ui/card';
@@ -93,23 +94,27 @@ export interface VideoDisplaySectionProps {
 }
 
 export interface ReleaseDetailPageProps {
+  /** Release to fetch. Not needed when `initialData` is supplied. */
+  slug?: string;
+  /** Pre-fetched release (SSR / RSC / admin preview) — skips the client fetch. */
+  initialData?: unknown;
   /**
-   * The release to render — already RESOLVED by the host: an SSR/admin-preview
-   * payload, the data from the host's own release query, or both.
+   * Base GET endpoint for one release; the slug is appended. Default
+   * `/api/releases` — the same knob, and the same default, as
+   * `<ProductReleasesView>` takes for the list.
    *
-   * This page deliberately does not take a hook (it used to take a
-   * `useRelease` prop and call it): a hook-shaped prop is called from inside
-   * this component, where nothing — not the `rules-of-hooks` lint, not the
-   * compiler, not the host — can guarantee it runs unconditionally, exactly
-   * once, per render. The host calls its own hook at the top level of its own
-   * component (which it must anyway, to reach its QueryClient) and passes the
-   * result down as these three props.
+   * This page fetches its own release (via `useSelfFetch`, like every other
+   * self-fetching content surface here) rather than taking a host-supplied
+   * `useRelease` hook, which is what it used to do. A hook passed as a prop is
+   * called from inside this component, where nothing — not `rules-of-hooks`,
+   * not the compiler, not the host — can guarantee it runs unconditionally,
+   * exactly once, per render; and every host was writing the same hook anyway.
+   * Nothing about the read was host-specific: `contentFetch` already carries
+   * the host's embed auth (registered `EmbedAuthAdapter` → bearer +
+   * 401-refresh), so an authed embedder configures a base URL here, not a
+   * fetcher.
    */
-  release?: unknown;
-  /** True while the host is still fetching and has nothing to render yet. */
-  isLoading?: boolean;
-  /** Fetch failure — rendered as the not-found state. */
-  error?: Error | null;
+  endpoint?: string;
   // Injectable components for app-specific rendering
   MarkdownRenderer?: ComponentType<MarkdownRendererProps>;
   RoadmapSection?: ComponentType<RoadmapSectionProps>;
@@ -143,11 +148,14 @@ export interface ReleaseDetailPageProps {
 // override via the `MarkdownRenderer` prop.
 const DefaultMarkdownRenderer = RichMarkdownRenderer;
 
+/** Single-release route — the hub's public API shape, mirroring `<ProductReleasesView>`. */
+const DEFAULT_ENDPOINT = '/api/releases';
+
 export function ReleaseDetailPage({
   authorHref,
-  release: releaseInput,
-  isLoading = false,
-  error = null,
+  slug,
+  initialData,
+  endpoint = DEFAULT_ENDPOINT,
   MarkdownRenderer = DefaultMarkdownRenderer,
   RoadmapSection,
   DeliverySection,
@@ -164,7 +172,19 @@ export function ReleaseDetailPage({
   // <main>) for hosts whose layout already provides the container.
   const renderShell = (node: ReactNode) =>
     shell ? <PageShell>{node}</PageShell> : <div className="page-shell-content">{node}</div>;
-  const release = releaseInput as Record<string, unknown> | undefined;
+  // The release read. `initialData` (SSR / RSC / admin preview) seeds it and
+  // skips the first fetch; a slug-less, seed-less mount fetches nothing and
+  // falls through to the not-found state below.
+  // A host that passes `null` for "no server data" must not seed the read with
+  // it — a seeded read never fetches, and would render not-found forever.
+  const seed = initialData == null ? undefined : (initialData as Record<string, unknown>);
+  const {
+    data: release,
+    isLoading,
+    error,
+  } = useSelfFetch<Record<string, unknown>>(slug ? `${endpoint}/${encodeURIComponent(slug)}` : null, {
+    initialData: seed,
+  });
 
   // Back-button config — mirrors DevSectionPage / LegalDocumentPage.
   // Default: { label: 'Back to home', href: '/' }. Pass `false` to hide
@@ -183,7 +203,7 @@ export function ReleaseDetailPage({
   const [deliveryLoading, setDeliveryLoading] = useState(false);
 
   useEffect(() => {
-    // `release` is a fresh object identity whenever the host's query resolves
+    // `release` is a fresh object identity whenever the release read resolves
     // or refetches, so this effect can re-run with two request pairs open at once.
     // Gate every write so a superseded run cannot paint the previous release's
     // roadmap/delivery rows, or drop a loading flag the live run still needs.
@@ -244,7 +264,7 @@ export function ReleaseDetailPage({
     };
   }, [release, RoadmapSection, DeliverySection, roadmapApiEndpoint, deliveryApiEndpoint]);
 
-  // The host reports `isLoading` only when it has nothing to render yet, so a
+  // `isLoading` is false whenever `initialData` seeded the read, so a
   // pre-fetched (SSR / admin-preview) release never flashes the skeleton.
   if (isLoading && !release) {
     // `bare` + `PageShell` so the loading state matches the loaded page's full
