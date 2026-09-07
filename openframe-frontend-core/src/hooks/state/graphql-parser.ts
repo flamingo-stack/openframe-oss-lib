@@ -7,10 +7,10 @@
 
 import { type DocumentNode, type VariableDefinitionNode, type TypeNode, visit } from 'graphql';
 
-/**
- * JavaScript type that can be represented in URL parameters
- */
-export type JSType = 'string' | 'number' | 'boolean' | 'array' | 'object';
+// `JSType` is OWNED by the search-params leaf (server and client share it).
+// Imported, not re-exported: a second export site is a second place to look
+// when you want to know where the type lives.
+import type { JSType } from '../../utils/search-params';
 
 /**
  * Variable definition extracted from GraphQL query

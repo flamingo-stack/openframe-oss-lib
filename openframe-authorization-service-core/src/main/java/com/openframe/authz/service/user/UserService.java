@@ -1,6 +1,7 @@
 package com.openframe.authz.service.user;
 
 import com.openframe.data.document.auth.AuthUser;
+import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.data.repository.auth.AuthUserRepository;
 import com.openframe.authz.service.processor.UserEmailVerifiedProcessor;
@@ -33,6 +34,11 @@ public class UserService {
 
     public Optional<AuthUser> findById(String userId) {
         return userRepository.findById(userId);
+    }
+
+    public Optional<AuthUser> findActiveById(String userId) {
+        return userRepository.findById(userId)
+                .filter(user -> user.getStatus() == UserStatus.ACTIVE);
     }
 
     public Optional<AuthUser> findActiveByEmail(String email) {

@@ -79,7 +79,6 @@ import { useChatDialogManager } from './hooks/use-chat-dialog-manager';
 import { useChatIdentity } from './hooks/use-chat-identity';
 import { useCloseOnNavigation } from './hooks/use-close-on-navigation';
 import { useEmptyStateConfig } from './hooks/use-empty-state-config';
-import type { FetchDialogsParams, FetchDialogsResult } from './hooks/use-nats-chat-adapter';
 import { fetchSlashCommands, useSlashCommandRegistry, type SlashCommandSummary } from './hooks/use-slash-commands';
 import type { ChatSource, UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
@@ -91,10 +90,10 @@ import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { SourceActionButton } from './source-action-button';
-import type { ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
+import type { ChatInputRef, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 import type { MessageSegment, Message } from './types/message.types';
-import type { UnifiedChatState } from './types/unified-chat-state.types';
+import type { ChatDialogCapabilities, UnifiedChatState } from './types/unified-chat-state.types';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
@@ -105,16 +104,41 @@ import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
 import { getSourceIconName } from './utils/source-icons';
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta';
 
+/**
+ * Split (wide) Mingo layout metrics (Figma 113:60931 / 113:63630). The
+ * "Current Chats" rail is a fixed 320px column; the chat block fills the rest
+ * with a 400px floor. Below their sum the panel is too tight for two columns,
+ * so the layout falls back to the stacked (single-column) view where the
+ * history renders inline in the Mingo empty state. Purely width-driven and
+ * self-contained — the host wires nothing.
+ */
+const HISTORY_RAIL_WIDTH = 320;
+const CHAT_BLOCK_MIN_WIDTH = 400;
+const SPLIT_MIN_WIDTH = HISTORY_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
+
 // Desktop drawer opens at this fraction of the viewport width (clamped to the
 // Drawer's own min/max). The user can still resize (persisted per DRAWER_WIDTH_KEY).
 const DRAWER_DEFAULT_WIDTH_RATIO = 0.5;
 // Bump the suffix whenever the default policy changes so previously-persisted
 // widths (e.g. the old fixed 750px / earlier 30% default) reset on next open.
-const DRAWER_WIDTH_KEY = 'mingo-chat-width-v3';
+const DRAWER_WIDTH_KEY = 'mingo-chat-width-v4';
 const DRAWER_DEFAULT_WIDTH_PX = 750; // SSR fallback before the viewport is known
-function drawerDefaultWidth(): number {
+/**
+ * A panel that owns a dialog list opens WIDE ENOUGH TO SPLIT, so the "Current
+ * Chats" rail sits beside the conversation instead of replacing it.
+ *
+ * 50% of the viewport is under `SPLIT_MIN_WIDTH` on any screen narrower than
+ * 1440, which silently downgraded every such user to the stacked single-column
+ * list — the layout meant for phones. The floor is the measured panel width the
+ * split needs plus a few px of chrome, and the Drawer still clamps it to the
+ * viewport, so a genuinely small screen keeps the stacked view.
+ */
+const SPLIT_DEFAULT_WIDTH_ALLOWANCE = 16;
+function drawerDefaultWidth(withHistoryRail: boolean): number {
   if (typeof window === 'undefined') return DRAWER_DEFAULT_WIDTH_PX;
-  return Math.round(window.innerWidth * DRAWER_DEFAULT_WIDTH_RATIO);
+  const ratioWidth = Math.round(window.innerWidth * DRAWER_DEFAULT_WIDTH_RATIO);
+  if (!withHistoryRail) return ratioWidth;
+  return Math.max(ratioWidth, SPLIT_MIN_WIDTH + SPLIT_DEFAULT_WIDTH_ALLOWANCE);
 }
 
 // =============================================================================
@@ -214,23 +238,16 @@ export interface EmbeddableChatProps {
    * When the host injects `mingoState`, it doesn't pass `modes.mingo` (that
    * would re-activate the idle built-in adapter), so the rename/archive/
    * restore/archive-page affordances can't read their capability flags off the
-   * callback config. Supply them here instead. `canRename`/`canArchive` default
-   * to `true` when `mingoState` is set; the archive page + restore are shown
-   * only when their callbacks are provided. Ignored unless `mingoState` is set.
+   * callback config. Supply them here instead. Default OFF: the row ⋯ menu and
+   * the archive page appear only when the host opts in, so nothing advertises
+   * an action the host hasn't wired. Ignored unless `mingoState` is set.
+   *
+   * Same shape an adapter reports through `UnifiedChatState.dialogCapabilities`
+   * (`ChatDialogCapabilities`) — one type, whether the list is host-owned or
+   * adapter-owned. `onCopyLink` adds "Copy chat link" to the header ⋯ menu and
+   * every row menu; the host owns the URL shape and the clipboard write.
    */
-  mingoDialogCapabilities?: {
-    canRename?: boolean;
-    canArchive?: boolean;
-    fetchArchivedDialogs?: (params: FetchDialogsParams) => Promise<FetchDialogsResult>;
-    unarchiveDialog?: (id: string) => Promise<void>;
-    searchQuery?: string;
-    onSearchChange?: (query: string) => void;
-    /** Copy a shareable link to a conversation — adds "Copy chat link" to the
-     *  header ⋯ menu and every dialog row menu. The host owns the URL shape and
-     *  the clipboard write; the panel knows neither the app's routes nor whether
-     *  a clipboard is available. Omit to hide the action. */
-    onCopyLink?: (dialog: DialogItem) => void;
-  };
+  mingoDialogCapabilities?: ChatDialogCapabilities;
 
   /**
    * Controlled active-mode. When provided, `onActiveModeChange` MUST
@@ -423,18 +440,6 @@ const mentionTokenOf = (key: string, markerByType: Map<string, string>): string 
  * retrieved sources instead of zero chips. Mirrors Perplexity's behavior.
  */
 const FALLBACK_TOP_RETRIEVED = 3;
-
-/**
- * Split (wide) Mingo layout metrics (Figma 113:60931 / 113:63630). The
- * "Current Chats" rail is a fixed 320px column; the chat block fills the rest
- * with a 400px floor. Below their sum the panel is too tight for two columns,
- * so the layout falls back to the stacked (single-column) view where the
- * history renders inline in the Mingo empty state. Purely width-driven and
- * self-contained — the host wires nothing.
- */
-const HISTORY_RAIL_WIDTH = 320;
-const CHAT_BLOCK_MIN_WIDTH = 400;
-const SPLIT_MIN_WIDTH = HISTORY_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 
 /** Persists the user's rail collapse choice across drawer open/close + reloads. */
 const RAIL_COLLAPSED_STORAGE_KEY = 'mingo-chat-history-collapsed';
@@ -1074,38 +1079,6 @@ function EmbeddableChatInner({
     return { guide: guideOptions };
   }, [modes, tableIdForDocumentType]);
 
-  // Resolve dialog-management capabilities (rename / archive / archive-page /
-  // restore) from a single source. With injected `mingoState` they come from
-  // `mingoDialogCapabilities` (the host doesn't pass `modes.mingo`); otherwise
-  // from the callback-config shape, where the presence of a callback IS the
-  // capability. Both feed the same gating below so the JSX has one source.
-  const mingoCaps = useMemo(() => {
-    if (mingoState) {
-      // Default OFF: the row ⋯ menu (Rename / Archive) and the archive page are
-      // shown only when the host explicitly opts in — same capability-gating as
-      // the archive button (`fetchArchivedDialogs` presence). Otherwise the menu
-      // would advertise actions the host hasn't actually wired (no-ops).
-      return {
-        canRename: mingoDialogCapabilities?.canRename ?? false,
-        canArchive: mingoDialogCapabilities?.canArchive ?? false,
-        fetchArchivedDialogs: mingoDialogCapabilities?.fetchArchivedDialogs,
-        unarchiveDialog: mingoDialogCapabilities?.unarchiveDialog,
-        searchQuery: mingoDialogCapabilities?.searchQuery,
-        onSearchChange: mingoDialogCapabilities?.onSearchChange,
-        onCopyLink: mingoDialogCapabilities?.onCopyLink,
-      };
-    }
-    return {
-      canRename: !!effectiveModes.mingo?.renameDialog,
-      canArchive: !!effectiveModes.mingo?.archiveDialog,
-      fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
-      unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
-      searchQuery: undefined as string | undefined,
-      onSearchChange: undefined as ((query: string) => void) | undefined,
-      onCopyLink: undefined as ((dialog: DialogItem) => void) | undefined,
-    };
-  }, [mingoState, mingoDialogCapabilities, effectiveModes]);
-
   // "Does Mingo mode exist?" — true via either the callback config OR injected
   // state. Gates the guide↔mingo back-chevron and the guide-mode banner.
   const hasMingoMode = !!effectiveModes.mingo || !!mingoState;
@@ -1239,7 +1212,31 @@ function EmbeddableChatInner({
     setDialogScope,
     hasMoreMessages,
     loadMoreMessages,
-  } = useUnifiedChat({ modes: effectiveModes, activeMode, mingoStateOverride: mingoState });
+    dialogCapabilities,
+  } = useUnifiedChat({
+    modes: effectiveModes,
+    activeMode,
+    mingoStateOverride: mingoState,
+    injectedDialogCapabilities: mingoDialogCapabilities,
+  });
+
+  // THE conversation-list gate. `dialogCapabilities` is present iff the ACTIVE
+  // state owns a conversation list, so the panel never asks which transport it
+  // is talking to: `useUnifiedChat` already resolved which state won, and the
+  // adapters already know whether they own a list. Absent = single-thread.
+  const historyListMode = dialogCapabilities !== undefined;
+
+  // Non-optional view of the same object for the JSX below. `canRename` /
+  // `canArchive` default OFF: the ⋯ menu must never advertise an action
+  // nothing has wired.
+  const mingoCaps = useMemo<ChatDialogCapabilities>(
+    () => ({
+      ...dialogCapabilities,
+      canRename: dialogCapabilities?.canRename ?? false,
+      canArchive: dialogCapabilities?.canArchive ?? false,
+    }),
+    [dialogCapabilities],
+  );
 
   // ── One-shot Guide-mode launcher prompt ────────────────────────────────────
   // A host launcher (e.g. an "Ask Mingo about X" empty-state button) requests
@@ -1780,7 +1777,17 @@ function EmbeddableChatInner({
   // that wants a message-list skeleton (real header + composer, skeleton bubbles)
   // signals it via `isMessagesLoading` — treat that as an open conversation so
   // the content branch shows the skeleton instead of the new-user welcome.
-  const hasConversation = hasMessages || isOpeningDialog || isViewingArchived || (previewMode && isMessagesLoading);
+  // …and so does a panel loading the messages of a dialog it ALREADY has
+  // selected — a restored conversation on mount, where nothing was clicked so
+  // `isOpeningDialog` is false. Keyed on the dialog id being set rather than on
+  // any transport: `isMessagesLoading` is only ever about the ACTIVE dialog.
+  const isLoadingActiveDialogMessages = activeDialogId != null && isMessagesLoading;
+  const hasConversation =
+    hasMessages ||
+    isOpeningDialog ||
+    isViewingArchived ||
+    isLoadingActiveDialogMessages ||
+    (previewMode && isMessagesLoading);
   // Opening a dialog whose history hasn't arrived yet — show a message-list
   // skeleton instead of an empty thread so the open reads as "loading" rather
   // than a blank flash before the bubbles stream in.
@@ -1865,26 +1872,38 @@ function EmbeddableChatInner({
   // mode / archive page) it stays the stacked single-column layout with the
   // history inline in the empty state. Fully self-contained — the host opts
   // into nothing; the switch is width-driven inside this component.
+  //
+  // Measured off the panel NODE (state), not a ref read once on mount. In the
+  // `drawer` shell the panel body does not exist until the drawer opens, so a
+  // mount-time ref read saw `null`, bailed, and — with `[]` deps — never ran
+  // again: `panelWidth` stayed 0, `canSplit` stayed false, and EVERY drawer
+  // host was silently pinned to the stacked single-column list no matter how
+  // wide it was. Only `shell="none"` hosts (the panel is inline and present at
+  // mount) ever reached the split layout.
   const [panelWidth, setPanelWidth] = useState(0);
-  const panelMeasureRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const el = panelMeasureRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    if (!panelBoundary || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect?.width;
       if (typeof w === 'number') setPanelWidth(w);
     });
-    ro.observe(el);
-    setPanelWidth(el.clientWidth);
+    ro.observe(panelBoundary);
     return () => ro.disconnect();
-  }, []);
+  }, [panelBoundary]);
 
-  // One ref for two consumers: the width measurement above (a plain ref, read
-  // once on mount) and the collision-boundary context (state, so provider
-  // consumers re-render once the node exists).
+  // ONE node for two consumers: the width measurement above and the
+  // collision-boundary context. State, not a ref, so both re-run when the node
+  // appears (the drawer shell mounts its body only on open).
+  //
+  // The width is ALSO seeded here, in the commit-phase ref callback: the
+  // ResizeObserver's first callback is delivered asynchronously, so seeding
+  // only there would leave a split-eligible panel painting one stacked frame at
+  // width 0 before flipping. Seeding in the effect instead is what the
+  // pre-refactor code did, but `react-hooks/set-state-in-effect` rejects it in
+  // a reactive (non-mount-only) effect.
   const setPanelNode = useCallback((node: HTMLDivElement | null) => {
-    panelMeasureRef.current = node;
     setPanelBoundary(node);
+    if (node) setPanelWidth(node.clientWidth);
   }, []);
 
   // Rail collapse toggle (Figma ⟶| control), persisted so it survives the
@@ -1929,7 +1948,7 @@ function EmbeddableChatInner({
   // page stays split-eligible: in wide mode it opens INSIDE the left rail (the
   // right chat block stays put), and only falls back to the full-panel archive
   // when stacked/collapsed.
-  const splitEligible = activeMode === 'mingo';
+  const splitEligible = historyListMode;
   const canSplit = panelWidth >= SPLIT_MIN_WIDTH;
   // Embedded previews (hero demo tabs) always use the compact single-column
   // header, never the two-column split — so `previewMode` opts out of `wideMingo`.
@@ -1960,23 +1979,44 @@ function EmbeddableChatInner({
   // the SAME render the conversation opened in. Guarded, so the extra render
   // pass takes the early exit.
   if (hasConversation && composeOpen) setComposeOpen(false);
-  const isMingoMode = activeMode === 'mingo';
+  const isMingoMode = historyListMode;
   // The stacked "Current Chats" list — the NARROW single-column Mingo view. It
   // is a narrow-only layout: in any wide layout the chat list lives in the rail,
   // and collapsing the rail (`wideCollapsed`) shows the chat / new-chat welcome
   // in the fill column (navigation is via re-expanding the rail), NOT the list.
   // Requires no open conversation, no archive, and not composing (the composer
   // lives on the compose view).
-  const stackedListView = isMingoMode && !hasConversation && !archiveOpen && !wideMingo && !composeOpen;
+  // …unless the list owner asked to skip an empty one
+  // (`emptyListSkipsToCompose`), in which case a settled-empty, unsearched list
+  // lands on the composer instead of a "Current Chats" screen with nothing in
+  // it. Whether that is the right landing is the list owner's policy, not this
+  // component's guess — a public panel skips, a workspace panel keeps the list.
+  // Gated on the first page having settled so it never flashes mid-load.
+  const emptyListSkipped =
+    mingoCaps.emptyListSkipsToCompose === true &&
+    dialogs.length === 0 &&
+    !dialogsInitialLoading &&
+    !mingoCaps.searchQuery;
+  const stackedListView =
+    isMingoMode && !hasConversation && !archiveOpen && !wideMingo && !composeOpen && !emptyListSkipped;
 
   // Shared header derivations — consumed by the stacked `ChatPanelHeader`, its
   // mobile fallback, and the desktop split header's right cell, so the title /
   // back / ⋯ semantics can't drift between layouts.
   const headerShowBack = hasConversation || guideCanReturnToMingo;
+  /**
+   * What a conversation with nothing in it is called — ONE definition, read by
+   * the shared header derivation below, the narrow compose header and the wide
+   * split header, so a draft can't be titled three different ways.
+   *
+   * Guide's empty state IS the assistant's own welcome screen, so it wears the
+   * assistant name; anywhere else a draft is a "New Chat".
+   */
+  const freshConversationTitle = isGuideEmpty ? (headerAssistantName ?? 'Mingo Guide') : 'New Chat';
   const headerTitle = hasConversation
-    ? activeDialog?.title || 'New Chat'
+    ? activeDialog?.title || freshConversationTitle
     : isGuideEmpty
-      ? (headerAssistantName ?? 'Mingo Guide')
+      ? freshConversationTitle
       : 'Current Chats';
   const headerBackAriaLabel = hasConversation ? (isViewingArchived ? 'Back to archive' : 'Back') : 'Back to Mingo';
   const headerOnBack = hasConversation ? handleBack : () => handleActiveModeChange('mingo');
@@ -2037,12 +2077,16 @@ function EmbeddableChatInner({
   // Chats" list header (search + archive, no back) and a "New Chat" compose
   // header (back to the list); conversations + guide keep the shared header
   // derivations. Wide mode uses its own two-cell header instead.
-  const narrowMingoEmpty = isMingoMode && !hasConversation && !archiveOpen;
+  // `!emptyListSkipped` for the same reason as `stackedListView`: with the list
+  // skipped the BODY renders the welcome, so a "Current Chats" header above it
+  // would be half of the empty screen the skip exists to remove. The
+  // else-branch header keeps the assistant name and the archive entry point.
+  const narrowMingoEmpty = isMingoMode && !hasConversation && !archiveOpen && !emptyListSkipped;
   const narrowHeaderProps: ChatPanelHeaderProps = narrowMingoEmpty
     ? composeOpen
       ? {
           showBack: true,
-          title: 'New Chat',
+          title: freshConversationTitle,
           subtitle: headerUserName,
           avatar: headerAvatar,
           backAriaLabel: 'Back to chats',
@@ -2212,7 +2256,7 @@ function EmbeddableChatInner({
                     <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
                       <div className="flex min-w-0 flex-col">
                         <p className="truncate leading-tight text-ods-text-primary text-h3">
-                          {headerShowBack ? headerTitle : 'New Chat'}
+                          {headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
                         </p>
                         {headerPersonName && (
                           <p className="truncate leading-tight text-ods-text-secondary text-h6">{headerPersonName}</p>
@@ -2659,7 +2703,7 @@ function EmbeddableChatInner({
           resizable
           minSize={480}
           maxSize={1600}
-          defaultSize={drawerDefaultWidth()}
+          defaultSize={drawerDefaultWidth(historyListMode)}
           storageKey={DRAWER_WIDTH_KEY}
           resizeAriaLabel="Resize chat panel"
           overlayClassName="mingo-chat-overlay"
