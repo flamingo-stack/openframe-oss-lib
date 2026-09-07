@@ -3,6 +3,7 @@ package com.openframe.data.service;
 import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.clientconfiguration.PublishState;
+import com.openframe.data.exception.ClientConfigurationNotFoundException;
 import com.openframe.data.repository.clientconfiguration.OpenFrameClientConfigurationRepository;
 import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,7 @@ public class OpenFrameClientConfigurationService {
 
     public OpenFrameClientConfiguration get() {
         return repository.findByTenantId(tenantIdProvider.getTenantId())
-                .orElseThrow(() -> new IllegalStateException("No openframe client configuration found"));
+                .orElseThrow(() -> new ClientConfigurationNotFoundException("No openframe client configuration found"));
     }
 
     public Optional<OpenFrameClientConfiguration> findById(String id) {
