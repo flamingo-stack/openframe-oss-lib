@@ -5,6 +5,19 @@ use tracing::info;
 #[cfg(windows)]
 use super::get_powershell_path;
 
+/// Escape a string for safe interpolation into a PowerShell double-quoted string literal.
+///
+/// Escapes backslashes, double-quotes, backticks and dollar signs so that the
+/// resulting value cannot break out of the string literal or trigger PowerShell
+/// variable/subexpression expansion.
+fn escape_powershell_string(input: &str) -> String {
+    input
+        .replace('`', "``")
+        .replace('$', "`$")
+        .replace('"', "`\"")
+        .replace('\\', "\\\\")
+}
+
 /// Generate a PowerShell script to cleanup the OpenFrame binary after process exit
 ///
 /// This script will:
@@ -17,9 +30,9 @@ pub fn generate_binary_cleanup_script(
     current_pid: u32,
     bin_dir: Option<&PathBuf>,
 ) -> String {
-    let install_path_str = install_path.to_string_lossy().replace("\\", "\\\\");
+    let install_path_str = escape_powershell_string(&install_path.to_string_lossy());
     let bin_dir_str = bin_dir
-        .map(|p| p.to_string_lossy().replace("\\", "\\\\"))
+        .map(|p| escape_powershell_string(&p.to_string_lossy()))
         .unwrap_or_default();
 
     format!(
@@ -253,23 +266,15 @@ pub fn execute_binary_cleanup_script(install_path: &Path, bin_dir: Option<&PathB
 
     #[cfg(not(target_os = "windows"))]
     {
-        Command::new("powershell.exe")
-            .args(&[
-                "-NoProfile",
-                "-WindowStyle",
-                "Hidden",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                &script_path.to_string_lossy(),
-            ])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .context("Failed to spawn binary cleanup script")?;
+        let _ = script_path;
+        return Err(anyhow!(
+            "Binary cleanup script execution is only supported on Windows"
+        ));
     }
 
-    info!("Binary cleanup script started successfully");
+    #[cfg(target_os = "windows")]
+    {
+        info!("Binary cleanup script started successfully");
+    }
     Ok(())
 }
