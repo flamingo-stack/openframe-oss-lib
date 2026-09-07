@@ -17,22 +17,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.List;
 
-/**
- * GraphQL resolver for the Software Management surface — All Software list,
- * per-title Devices tab, per-title Vulnerabilities tab, and install / uninstall
- * / scheduled-update mutations.
- *
- * <p><b>Skeleton</b>: wire contract is stable so the frontend can bind against
- * it, but resolvers delegate to stub services that return {@code null} /
- * empty. The whole component is gated by
- * {@code openframe.software-management.enabled} — omit the flag in prod until
- * the feature is ready.
- *
- * <p>Faceted filters, nested {@code SoftwareOnDevice.device} resolver, and
- * {@code Software.vulnerabilitySummary} field resolver will be added when the
- * backing services are implemented; today the DTOs already carry the summary
- * inline, so the default field resolvers cover the read-path.
- */
 @DgsComponent
 @ConditionalOnProperty(name = "openframe.software-management.enabled", havingValue = "true")
 @RequiredArgsConstructor
@@ -41,8 +25,6 @@ public class SoftwareDataFetcher {
 
     private final SoftwareInventoryService softwareInventoryService;
     private final SoftwareDispatchService softwareDispatchService;
-
-    // ────────── Queries ──────────
 
     @DgsQuery
     public SoftwareResponse software(@InputArgument String id) {
@@ -82,8 +64,6 @@ public class SoftwareDataFetcher {
         return null;
     }
 
-    // ────────── Mutations ──────────
-
     @DgsMutation
     public DispatchResponse installSoftware(@InputArgument InstallSoftwareInput input) {
         return softwareDispatchService.install(input, currentUserId());
@@ -104,17 +84,9 @@ public class SoftwareDataFetcher {
         return softwareDispatchService.cancelScheduled(executionId, currentUserId());
     }
 
-    /**
-     * Placeholder — will be replaced with the standard security-context helper
-     * used by the rest of the datafetchers (see {@code CommandDataFetcher}).
-     * Returns {@code null} in the stub.
-     */
     private String currentUserId() {
         return null;
     }
 
-    // Suppress unused-import warning in the stub — List<SoftwareResponse> shape
-    // is referenced from the service layer once the real implementation lands.
-    @SuppressWarnings("unused")
     private static final List<SoftwareResponse> UNUSED_SHAPE_REFERENCE = List.of();
 }
