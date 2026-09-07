@@ -18,7 +18,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.NoSuchElementException;
 
 /**
  * Service for querying organizations with filtering and search.
@@ -31,8 +31,13 @@ public class OrganizationQueryService {
 
     private final OrganizationRepository organizationRepository;
 
-    public Optional<Organization> findByOrganizationId(String organizationId) {
-        return organizationRepository.findByOrganizationId(organizationId);
+    public boolean existsByOrganizationId(String organizationId) {
+        return organizationRepository.findByOrganizationId(organizationId).isPresent();
+    }
+
+    public Organization getByOrganizationId(String organizationId) {
+        return organizationRepository.findByOrganizationId(organizationId)
+                .orElseThrow(() -> new NoSuchElementException("Organization not found for organizationId: " + organizationId));
     }
 
     /**

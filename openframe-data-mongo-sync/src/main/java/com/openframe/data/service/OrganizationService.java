@@ -32,46 +32,101 @@ public class OrganizationService {
     private final MachineRepository machineRepository;
 
     /**
-     * Get organization by ID (excluding deleted)
+     * Check whether an organization exists by ID (excluding deleted)
      * @param id organization document ID
-     * @return Optional containing the organization if found and not deleted
+     * @return true if found and not deleted
      */
-    public Optional<Organization> getOrganizationById(String id) {
+    public boolean hasOrganizationById(String id) {
+        log.debug("Checking existence of organization by ID: {}", id);
+        return organizationRepository.findById(id)
+                .filter(org -> !org.isDeleted())
+                .isPresent();
+    }
+
+    /**
+     * Get organization by ID (excluding deleted), throwing if not found
+     * @param id organization document ID
+     * @return the organization if found and not deleted
+     * @throws NoSuchElementException if not found or deleted
+     */
+    public Organization getOrganizationByIdOrThrow(String id) {
         log.debug("Fetching organization by ID: {}", id);
         return organizationRepository.findById(id)
-                .filter(org -> !org.isDeleted());
+                .filter(org -> !org.isDeleted())
+                .orElseThrow(() -> new NoSuchElementException("Organization not found with id: " + id));
     }
 
     /**
-     * Get organization by organizationId (excluding deleted)
+     * Check whether an organization exists by organizationId (excluding deleted)
      * @param organizationId unique organization identifier
-     * @return Optional containing the organization if found and not deleted
+     * @return true if found and not deleted
      */
-    public Optional<Organization> getOrganizationByOrganizationId(String organizationId) {
+    public boolean hasOrganizationByOrganizationId(String organizationId) {
+        log.debug("Checking existence of organization by organizationId: {}", organizationId);
+        return organizationRepository.findByOrganizationId(organizationId)
+                .filter(org -> !org.isDeleted())
+                .isPresent();
+    }
+
+    /**
+     * Get organization by organizationId (excluding deleted), throwing if not found
+     * @param organizationId unique organization identifier
+     * @return the organization if found and not deleted
+     * @throws NoSuchElementException if not found or deleted
+     */
+    public Organization getOrganizationByOrganizationIdOrThrow(String organizationId) {
         log.debug("Fetching organization by organizationId: {}", organizationId);
         return organizationRepository.findByOrganizationId(organizationId)
-                .filter(org -> !org.isDeleted());
+                .filter(org -> !org.isDeleted())
+                .orElseThrow(() -> new NoSuchElementException("Organization not found with organizationId: " + organizationId));
     }
 
     /**
-     * Get organization by name (excluding deleted)
+     * Check whether an organization exists by name (excluding deleted)
      * @param name organization name
-     * @return Optional containing the organization if found and not deleted
+     * @return true if found and not deleted
      */
-    public Optional<Organization> getOrganizationByName(String name) {
+    public boolean hasOrganizationByName(String name) {
+        log.debug("Checking existence of organization by name: {}", name);
+        return organizationRepository.findByName(name)
+                .filter(org -> !org.isDeleted())
+                .isPresent();
+    }
+
+    /**
+     * Get organization by name (excluding deleted), throwing if not found
+     * @param name organization name
+     * @return the organization if found and not deleted
+     * @throws NoSuchElementException if not found or deleted
+     */
+    public Organization getOrganizationByNameOrThrow(String name) {
         log.debug("Fetching organization by name: {}", name);
         return organizationRepository.findByName(name)
-                .filter(org -> !org.isDeleted());
+                .filter(org -> !org.isDeleted())
+                .orElseThrow(() -> new NoSuchElementException("Organization not found with name: " + name));
     }
 
     /**
-     * Get the default organization (excluding deleted and archived)
-     * @return Optional containing the default organization if found and active
+     * Check whether the default organization exists (excluding deleted and archived)
+     * @return true if the default organization is found and active
      */
-    public Optional<Organization> getDefaultOrganization() {
+    public boolean hasDefaultOrganization() {
+        log.debug("Checking existence of default organization");
+        return organizationRepository.findByIsDefaultTrue()
+                .filter(org -> org.getStatus() == OrganizationStatus.ACTIVE)
+                .isPresent();
+    }
+
+    /**
+     * Get the default organization (excluding deleted and archived), throwing if not found
+     * @return the default organization if found and active
+     * @throws NoSuchElementException if not found or not active
+     */
+    public Organization getDefaultOrganizationOrThrow() {
         log.debug("Fetching default organization");
         return organizationRepository.findByIsDefaultTrue()
-                .filter(org -> org.getStatus() == OrganizationStatus.ACTIVE);
+                .filter(org -> org.getStatus() == OrganizationStatus.ACTIVE)
+                .orElseThrow(() -> new NoSuchElementException("Default organization not found"));
     }
 
     /**
@@ -98,7 +153,7 @@ public class OrganizationService {
      * Check if an organization can be archived.
      * Returns true if all associated devices are in ARCHIVED or DELETED status (or no devices exist).
      *
-     * @param id organization document ID
+     * @param id organization business identifier (organizationId)
      * @return true if organization can be archived
      */
     public boolean canArchiveOrganization(String id) {

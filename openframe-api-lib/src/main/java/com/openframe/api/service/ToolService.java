@@ -13,7 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.NoSuchElementException;
 
 @Service
 @RequiredArgsConstructor
@@ -22,9 +22,15 @@ public class ToolService {
     
     private final IntegratedToolRepository integratedToolRepository;
 
-    public Optional<IntegratedTool> findById(String id) {
+    public boolean existsById(String id) {
+        log.debug("Checking if integrated tool exists by ID: {}", id);
+        return integratedToolRepository.findById(id).isPresent();
+    }
+
+    public IntegratedTool getById(String id) {
         log.debug("Finding integrated tool by ID: {}", id);
-        return integratedToolRepository.findById(id);
+        return integratedToolRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Integrated tool not found for ID: " + id));
     }
 
     public ToolList queryTools(ToolFilterCriteria filterOptions, String search, SortInput sort) {

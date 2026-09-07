@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -90,11 +91,33 @@ public class LogService {
         return result;
     }
 
-    public Optional<LogDetails> findLogDetails(String ingestDay, String toolType, String eventType,
-                                               Instant timestamp, String toolEventId) {
+    public boolean logDetailsExist(String ingestDay, String toolType, String eventType,
+                                    Instant timestamp, String toolEventId) {
+        UnifiedLogEvent.UnifiedLogEventKey key = buildLogEventKey(ingestDay, toolType, eventType, timestamp, toolEventId);
+        return unifiedLogEventRepository.findById(key).isPresent();
+    }
+
+    public LogDetails getLogDetails(String ingestDay, String toolType, String eventType,
+                                     Instant timestamp, String toolEventId) {
         log.debug("Finding log details for ingestDay: {}, toolType: {}, eventType: {}, timestamp: {}, toolEventId: {}",
                 ingestDay, toolType, eventType, timestamp, toolEventId);
 
+        UnifiedLogEvent.UnifiedLogEventKey key = buildLogEventKey(ingestDay, toolType, eventType, timestamp, toolEventId);
+
+        Optional<UnifiedLogEvent> logEvent = unifiedLogEventRepository.findById(key);
+
+        if (logEvent.isPresent()) {
+            LogDetails details = mapToLogDetails(logEvent.get());
+            log.debug("Successfully retrieved audit details");
+            return details;
+        } else {
+            log.debug("Log details not found");
+            throw new NoSuchElementException("Log details not found for toolEventId: " + toolEventId);
+        }
+    }
+
+    private UnifiedLogEvent.UnifiedLogEventKey buildLogEventKey(String ingestDay, String toolType, String eventType,
+                                                                 Instant timestamp, String toolEventId) {
         UnifiedLogEvent.UnifiedLogEventKey key = new UnifiedLogEvent.UnifiedLogEventKey();
         key.setIngestDay(ingestDay);
         key.setToolType(toolType);
@@ -102,17 +125,7 @@ public class LogService {
         key.setEventType(eventType);
         key.setEventTimestamp(timestamp);
         key.setToolEventId(toolEventId);
-
-        Optional<UnifiedLogEvent> logEvent = unifiedLogEventRepository.findById(key);
-
-        if (logEvent.isPresent()) {
-            LogDetails details = mapToLogDetails(logEvent.get());
-            log.debug("Successfully retrieved audit details");
-            return Optional.of(details);
-        } else {
-            log.debug("Log details not found");
-            return Optional.empty();
-        }
+        return key;
     }
 
     public LogFilters getLogFilters(LogFilterCriteria filters) {

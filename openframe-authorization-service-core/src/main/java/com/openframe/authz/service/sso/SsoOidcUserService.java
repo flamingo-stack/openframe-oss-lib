@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
@@ -82,10 +83,8 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
             ssoConfigService
                     .getSSOConfig(tenantId, provider)
                     .filter(SSOPerTenantConfig::isEnabled)
+                    .filter(SSOPerTenantConfig::isAutoProvisionUsers)
                     .ifPresentOrElse(cfg -> {
-                        if (!cfg.isAutoProvisionUsers()) {
-                            return;
-                        }
                         if (isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
                             provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, pictureUrl);
                         }
@@ -121,16 +120,19 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
      * only when the tenant has a per-tenant config for the provider with auto-provisioning enabled
      * and the email's domain on its allowlist. Used by the native Apple exchange; the web flow keeps
      * its own path through {@link #loadUser}.
+     * <p>
+     * Per OFJAVA-035, this does not return {@code Optional}; pair {@link #canResolveOrProvision}
+     * with this throwing getter.
      */
-    public java.util.Optional<AuthUser> resolveOrProvision(String tenantId,
-                                                           String provider,
-                                                           String email,
-                                                           String firstName,
-                                                           String lastName) {
+    public AuthUser resolveOrProvision(String tenantId,
+                                        String provider,
+                                        String email,
+                                        String firstName,
+                                        String lastName) {
         String normalizedEmail = email.trim().toLowerCase(ROOT);
         java.util.Optional<AuthUser> existing = userService.findActiveByEmailAndTenant(normalizedEmail, tenantId);
         if (existing.isPresent()) {
-            return existing;
+            return existing.get();
         }
         boolean provisionable = ssoConfigService.getSSOConfig(tenantId, provider)
                 .filter(SSOPerTenantConfig::isEnabled)
@@ -138,18 +140,40 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
                 .map(cfg -> isEmailAllowedByDomains(cfg.getAllowedDomains(), normalizedEmail))
                 .orElse(false);
         if (!provisionable) {
-            return java.util.Optional.empty();
+            throw new NoSuchElementException(
+                    "Cannot resolve or provision user for tenantId=" + tenantId + ", provider=" + provider);
         }
         AuthUser user = userService.registerOrReactivateFromSso(
                 tenantId, normalizedEmail, firstName, lastName, List.of(ADMIN), provider);
         registrationProcessor.postProcessAutoProvision(user, null);
-        return java.util.Optional.of(user);
+        return user;
+    }
+
+    /**
+     * Predicate counterpart to {@link #resolveOrProvision}: returns whether resolving or
+     * provisioning the user would succeed, without throwing or performing provisioning as a
+     * side effect of checking. Callers must check this before calling the throwing getter.
+     */
+    public boolean canResolveOrProvision(String tenantId,
+                                         String provider,
+                                         String email,
+                                         String firstName,
+                                         String lastName) {
+        String normalizedEmail = email.trim().toLowerCase(ROOT);
+        if (userService.findActiveByEmailAndTenant(normalizedEmail, tenantId).isPresent()) {
+            return true;
+        }
+        return ssoConfigService.getSSOConfig(tenantId, provider)
+                .filter(SSOPerTenantConfig::isEnabled)
+                .filter(SSOPerTenantConfig::isAutoProvisionUsers)
+                .map(cfg -> isEmailAllowedByDomains(cfg.getAllowedDomains(), normalizedEmail))
+                .orElse(false);
     }
 
     private AuthUser registerUser(String tenantId, String email, OidcUser user, String provider) {
         // Apple's ID token never carries names; the helper falls back to the one-time "user" form
         // parameter of the current (form_post callback) request when the provider is Apple.
-        String[] names = AppleUserParam.namesOrAppleFallback(resolveNames(user), provider, null);
+        String[] names = AppleUserParam.namesOrAppleFallback(resolveNames(user), provider, AppleUserParam.NO_APPLE_FORM_PARAM);
         return userService.registerOrReactivateFromSso(tenantId, email, names[0], names[1], List.of(ADMIN), provider);
     }
 

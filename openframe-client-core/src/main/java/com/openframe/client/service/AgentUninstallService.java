@@ -29,7 +29,7 @@ public class AgentUninstallService {
             log.info("Uninstall requested for unknown machine {}, treating as already deregistered", machineId);
             return;
         }
-        clientSecretValidator.validate(client.get(), clientSecret);
+        client.ifPresent(c -> clientSecretValidator.validate(c, clientSecret));
 
         Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
         if (foundMachine.isEmpty()) {
@@ -37,7 +37,7 @@ public class AgentUninstallService {
             return;
         }
 
-        Machine machine = foundMachine.get();
+        Machine machine = foundMachine.orElseThrow();
         if (machine.getStatus() == DeviceStatus.DELETED) {
             log.info("Machine {} is already deleted, uninstall is a no-op", machineId);
             return;
@@ -52,3 +52,4 @@ public class AgentUninstallService {
         log.info("Machine {} deregistered on uninstall", machineId);
     }
 }
+
