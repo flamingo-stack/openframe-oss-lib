@@ -28,6 +28,11 @@ public class PackageSearchService {
     public PackageSearchService(List<PackageManagerClient> clientList) {
         this.clients = clientList.stream()
                 .collect(toUnmodifiableMap(PackageManagerClient::getPackageManagerType, identity()));
+        for (PackageManagerType packageManager : PackageManagerType.values()) {
+            if (!clients.containsKey(packageManager)) {
+                throw new IllegalStateException("no package manager client registered for " + packageManager);
+            }
+        }
     }
 
     public PackageSearchResult search(PackageSearchInput input) {
@@ -62,3 +67,4 @@ public class PackageSearchService {
         return client;
     }
 }
+
