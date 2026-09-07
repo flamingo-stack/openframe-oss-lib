@@ -1,5 +1,7 @@
 package com.openframe.authz.controller;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import com.openframe.authz.dto.RegistrationAttribution;
 import com.openframe.authz.dto.SsoLoginInitRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
@@ -8,6 +10,7 @@ import com.openframe.authz.security.SsoFlowCookies;
 import com.openframe.authz.security.SsoLoginCookiePayload;
 import com.openframe.authz.service.sso.SsoAuthorizeData;
 import com.openframe.authz.service.sso.SignupTicketService;
+import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.sso.SsoLoginService;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import com.openframe.authz.util.OidcUserUtils;
@@ -38,7 +41,7 @@ import java.io.IOException;
 import java.util.Locale;
 import java.util.UUID;
 
-import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_LOGIN;
+import static com.openframe.core.constants.SsoFlowCookieNames.OF_SSO_LOGIN;
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
 import static com.openframe.authz.web.AuthStateUtils.clearCookie;
 import static com.openframe.authz.web.AuthStateUtils.clearOtherSsoFlowCookies;
@@ -61,6 +64,7 @@ public class SsoLoginController {
 
     private final SsoLoginService ssoLoginService;
     private final SignupTicketService signupTicketService;
+    private final SsoIdentityService ssoIdentityService;
     private final SsoFlowCookies ssoFlowCookies;
     private final SsoCookieCodec ssoCookieCodec;
     private final TenantRegistrationService registrationService;
@@ -73,10 +77,10 @@ public class SsoLoginController {
         try {
             // Unlike registration/invite starts, the session is NOT cleared here: an anonymous
             // visitor has none worth keeping, and the OAuth dance creates a fresh one anyway.
-            clearOtherSsoFlowCookies(httpResponse, COOKIE_SSO_LOGIN);
+            clearOtherSsoFlowCookies(httpResponse, OF_SSO_LOGIN);
 
             SsoAuthorizeData data = ssoLoginService.startLogin(request);
-            ssoFlowCookies.write(httpResponse, COOKIE_SSO_LOGIN, data.cookieValue(), data.cookieTtlSeconds());
+            ssoFlowCookies.write(httpResponse, OF_SSO_LOGIN, data.cookieValue(), data.cookieTtlSeconds());
 
             seeOther(httpResponse, data.redirectPath());
         } catch (Exception e) {
@@ -138,6 +142,11 @@ public class SsoLoginController {
             if (payload.bound()) {
                 return new SignupTicketCompleteResponse(payload.tenantId());
             }
+            if (payload.subject() != null
+                    && ssoIdentityService.findBySubject(payload.provider(), payload.subject()).isPresent()) {
+                // Invariant: one SSO account — one user, platform-wide.
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "already_linked");
+            }
 
             TenantRegistrationRequest reg = TenantRegistrationRequest.builder()
                     .email(payload.email().toLowerCase(Locale.ROOT))
@@ -188,6 +197,8 @@ public class SsoLoginController {
             OidcUser user = requireSessionOidcUser(authentication);
             SsoLoginCookiePayload payload = requireLoginFlowCookie(httpRequest);
 
+            ssoIdentityService.ensureNotAlreadyLinked(payload.provider(), user.getClaims());
+
             String email = OidcUserUtils.resolveEmail(user);
             if (!hasText(email)) {
                 throw new IllegalStateException("Email not provided by SSO provider.");
@@ -208,7 +219,7 @@ public class SsoLoginController {
 
             var tenant = registrationService.registerTenant(reg);
 
-            clearCookie(httpResponse, COOKIE_SSO_LOGIN);
+            clearCookie(httpResponse, OF_SSO_LOGIN);
             foundAtRoot(httpResponse, Redirects.oauthContinuePath(tenant.getId(), payload.redirectTo(), payload.authMobile()));
         } catch (Exception e) {
             authErrorResponder.send(httpResponse, httpRequest, "sso-login-complete", e,
@@ -225,7 +236,7 @@ public class SsoLoginController {
     }
 
     private SsoLoginCookiePayload requireLoginFlowCookie(HttpServletRequest request) {
-        Cookie cookie = WebUtils.getCookie(request, COOKIE_SSO_LOGIN);
+        Cookie cookie = WebUtils.getCookie(request, OF_SSO_LOGIN);
         if (cookie == null) {
             throw new IllegalStateException("SSO session expired. Please sign in again.");
         }
