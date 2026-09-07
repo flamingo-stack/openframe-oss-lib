@@ -64,10 +64,18 @@ public class DeviceService {
     private final DeviceFilterOptionMapper deviceFilterOptionMapper;
     private final TenantIdProvider tenantIdProvider;
 
-    public Optional<Machine> findByMachineId(@NotBlank String machineId) {
+    public boolean hasMachine(@NotBlank String machineId) {
+        log.debug("Checking existence of machine by ID: {}", machineId);
+        boolean exists = machineRepository.findByMachineId(machineId).isPresent();
+        log.debug("Found machine: {}", exists);
+        return exists;
+    }
+
+    public Machine machineById(@NotBlank String machineId) {
         log.debug("Finding machine by ID: {}", machineId);
-        Optional<Machine> result = machineRepository.findByMachineId(machineId);
-        log.debug("Found machine: {}", result.isPresent());
+        Machine result = machineRepository.findByMachineId(machineId)
+                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
+        log.debug("Found machine: {}", result != null);
         return result;
     }
 
@@ -193,10 +201,10 @@ public class DeviceService {
         List<Machine> allWithOne = machineRepository.findMachinesWithCursor(tenantId, filter, search,
                 normalizedPagination.getCursor(), normalizedPagination.getLimit() + 1,
                 sortField, sortDirection.name());
-        List<Machine> pageItems = allWithOne.size() > normalizedPagination.getLimit()
+        boolean hasNextPage = allWithOne.size() > normalizedPagination.getLimit();
+        List<Machine> pageItems = hasNextPage
                 ? allWithOne.subList(0, normalizedPagination.getLimit())
                 : allWithOne;
-        boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
 
         PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
 
