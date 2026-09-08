@@ -786,14 +786,34 @@ class ScheduleScriptServiceTest {
     }
 
     @Test
-    @DisplayName("create DEVICE_LOCAL: repeat is not supported (one-shot only)")
-    void createDeviceLocal_withRepeat_rejected() {
+    @DisplayName("create DEVICE_LOCAL: recurring (repeat on the 30-min grid) is accepted and persisted")
+    void createDeviceLocal_withRepeat_accepted() {
         makeDeviceLocalCreateInput();
-        createInput.setRepeat(1800L);
+        createInput.setRepeat(86400L);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> {
+            ScheduleScript s = inv.getArgument(0);
+            s.setId(SCHEDULE_ID);
+            return s;
+        });
+
+        ScriptScheduleResponse result = scheduleService.create(createInput, "user-1");
+
+        assertThat(result.getRepeat()).isEqualTo(86400L);
+        assertThat(result.getTimeReference()).isEqualTo(ScheduleTimeReference.DEVICE_LOCAL);
+        ArgumentCaptor<ScheduleScript> saved = ArgumentCaptor.forClass(ScheduleScript.class);
+        verify(scheduleRepository).save(saved.capture());
+        assertThat(saved.getValue().getNextRunAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("create DEVICE_LOCAL: an off-grid repeat is still rejected")
+    void createDeviceLocal_offGridRepeat_rejected() {
+        makeDeviceLocalCreateInput();
+        createInput.setRepeat(1000L);   // not a multiple of 1800
 
         assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("repeat");
+                .hasMessageContaining("30-minute");
         verify(scheduleRepository, never()).save(any());
     }
 
