@@ -83,45 +83,7 @@ class SeedSystemScriptsChangeUnitTest {
     }
 
     @Test
-    void refreshesWhenOnlyMetadataDrifted() {
-        when(scriptRepository.findSystemScript(any(), any())).thenReturn(Optional.empty());
-        when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        changeUnit.execution(scriptRepository, tenantIdProvider);
-        ArgumentCaptor<Script> seeded = ArgumentCaptor.forClass(Script.class);
-        verify(scriptRepository, times(3)).save(seeded.capture());
-
-        Script drifted = byName(seeded.getAllValues(), SystemScriptCode.INSTALL_WINGET.canonicalName());
-        drifted.setPrivilegeLevel(PrivilegeLevel.ADMIN); // body (and hash) untouched
-
-        ScriptRepository secondRepo = mock(ScriptRepository.class);
-        when(secondRepo.findSystemScript(any(), any())).thenAnswer(inv ->
-                inv.getArgument(0) == SystemScriptCode.INSTALL_WINGET ? Optional.of(drifted) : Optional.empty());
-        when(secondRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        changeUnit.execution(secondRepo, tenantIdProvider);
-
-        assertEquals(PrivilegeLevel.USER, drifted.getPrivilegeLevel());
-    }
-
-    @Test
-    void refreshesTheScriptWhenTheShippedBodyChanged() {
-        Script stale = new Script();
-        stale.setName(SystemScriptCode.INSTALL_BREW.canonicalName());
-        stale.setSystem(true);
-        stale.setContentHash("stale-hash");
-        when(scriptRepository.findSystemScript(any(), any())).thenAnswer(inv ->
-                inv.getArgument(0) == SystemScriptCode.INSTALL_BREW ? Optional.of(stale) : Optional.empty());
-        when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        changeUnit.execution(scriptRepository, tenantIdProvider);
-
-        assertTrue(stale.getScriptBody().contains("NONINTERACTIVE=1"));
-        assertNotNull(stale.getContentHash());
-        assertTrue(!"stale-hash".equals(stale.getContentHash()));
-    }
-
-    @Test
-    void leavesUpToDateScriptsUntouched() {
+    void skipsScriptsThatAlreadyExist() {
         when(scriptRepository.findSystemScript(any(), any())).thenReturn(Optional.empty());
         when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         changeUnit.execution(scriptRepository, tenantIdProvider);

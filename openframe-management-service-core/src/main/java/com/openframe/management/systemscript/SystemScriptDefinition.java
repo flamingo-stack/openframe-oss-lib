@@ -14,6 +14,8 @@ import lombok.Getter;
  * choco installs machine-wide under SYSTEM/ADMIN, and winget MUST run as the
  * logged-in USER — the Appx registration and PATH fix are per-user.
  */
+// Seeded once per tenant. Changing a body/metadata here does NOT re-seed existing
+// tenants — add a new migration to update them.
 @Getter
 @AllArgsConstructor
 public enum SystemScriptDefinition {

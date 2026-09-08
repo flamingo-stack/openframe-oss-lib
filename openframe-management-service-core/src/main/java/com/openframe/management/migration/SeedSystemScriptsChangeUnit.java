@@ -15,64 +15,34 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Objects;
 
-/**
- * Ensures the package-manager bootstrap scripts exist for the tenant: seeds a
- * missing script and re-seeds one whose stored contentHash no longer matches
- * the shipped body. {@code runAlways} on purpose — the bodies ship with the
- * lib, so every release with a changed body reconciles on next startup, and
- * Mongock's lock serializes concurrent replicas.
- */
 @Slf4j
-@ChangeUnit(id = "seed-system-scripts", order = "013", author = "openframe", runAlways = true)
+@ChangeUnit(id = "seed-system-scripts", order = "013", author = "openframe")
 public class SeedSystemScriptsChangeUnit {
 
     @Execution
     public void execution(ScriptRepository scriptRepository, TenantIdProvider tenantIdProvider) {
         String tenantId = tenantIdProvider.getTenantId();
         for (SystemScriptDefinition definition : SystemScriptDefinition.values()) {
-            ensure(scriptRepository, tenantId, definition);
+            seedIfAbsent(scriptRepository, tenantId, definition);
         }
-        log.info("System script definitions ensured for tenant {}", tenantId);
+        log.info("System scripts seeded for tenant {}", tenantId);
     }
 
     @RollbackExecution
     public void rollback() {
-        // seeded scripts are reconciled forward on every run — nothing to undo
     }
 
-    private void ensure(ScriptRepository scriptRepository, String tenantId, SystemScriptDefinition definition) {
-        String body = loadBody(definition);
-        String contentHash = sha256(body);
-
+    private void seedIfAbsent(ScriptRepository scriptRepository, String tenantId, SystemScriptDefinition definition) {
         scriptRepository.findSystemScript(definition.getCode(), tenantId)
                 .ifPresentOrElse(
-                        script -> refreshIfStale(scriptRepository, script, definition, body, contentHash),
-                        () -> create(scriptRepository, tenantId, definition, body, contentHash));
+                        script -> log.debug("System script {} already present for tenant {}", script.getName(), tenantId),
+                        () -> create(scriptRepository, tenantId, definition));
     }
 
-    private void refreshIfStale(ScriptRepository scriptRepository, Script script,
-                                SystemScriptDefinition definition, String body, String contentHash) {
-        if (upToDate(script, definition, contentHash)) {
-            return;
-        }
-        refresh(scriptRepository, script, definition, body, contentHash);
-    }
-
-    // the hash covers only the body, so metadata drift must be checked separately
-    private static boolean upToDate(Script script, SystemScriptDefinition definition, String contentHash) {
-        return contentHash.equals(script.getContentHash())
-                && definition.getShell() == script.getShell()
-                && definition.getPrivilegeLevel() == script.getPrivilegeLevel()
-                && Objects.equals(definition.getDefaultTimeoutSeconds(), script.getDefaultTimeoutSeconds())
-                && Objects.equals(definition.getDescription(), script.getDescription())
-                && Objects.equals(List.of(definition.getOsType()), script.getSupportedPlatforms());
-    }
-
-    private void create(ScriptRepository scriptRepository, String tenantId,
-                        SystemScriptDefinition definition, String body, String contentHash) {
+    private void create(ScriptRepository scriptRepository, String tenantId, SystemScriptDefinition definition) {
         String canonicalName = definition.getCode().canonicalName();
+        String body = loadBody(definition);
         Script script = Script.builder()
                 .tenantId(tenantId)
                 .name(canonicalName)
@@ -83,23 +53,10 @@ public class SeedSystemScriptsChangeUnit {
                 .scriptBody(body)
                 .supportedPlatforms(List.of(definition.getOsType()))
                 .system(true)
-                .contentHash(contentHash)
+                .contentHash(sha256(body))
                 .build();
         Script saved = scriptRepository.save(script);
         log.info("Seeded system script {} id={}", canonicalName, saved.getId());
-    }
-
-    private void refresh(ScriptRepository scriptRepository, Script script,
-                         SystemScriptDefinition definition, String body, String contentHash) {
-        script.setDescription(definition.getDescription());
-        script.setShell(definition.getShell());
-        script.setPrivilegeLevel(definition.getPrivilegeLevel());
-        script.setDefaultTimeoutSeconds(definition.getDefaultTimeoutSeconds());
-        script.setScriptBody(body);
-        script.setSupportedPlatforms(List.of(definition.getOsType()));
-        script.setContentHash(contentHash);
-        scriptRepository.save(script);
-        log.info("Refreshed system script {} to contentHash={}", script.getName(), contentHash);
     }
 
     private static String loadBody(SystemScriptDefinition definition) {
