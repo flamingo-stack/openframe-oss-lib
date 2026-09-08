@@ -321,13 +321,24 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
       ? buildPlaceholderUrl(effectiveData.title, effectiveData.siteName || domain)
       : null;
 
-  // THE precedence rule, in one place (see the component doc).
-  const imageCandidates = [curatedImage, effectiveData?.image, effectiveData?.originalImage, placeholderImageUrl];
-  const resolvedImageUrl = imageCandidates.find(u => !!u && !failedImages.has(u)) ?? null;
+  // THE precedence rule, in one place (see the component doc). Each candidate
+  // carries its SLOT, so the winner is identified by where it came from and
+  // never by string-comparing the resolved url back against the inputs: two
+  // slots can legitimately hold the same url (an embedder passing the outlet's
+  // own image as `curatedImage`), and `===` would then pick the render branch
+  // by coincidence.
+  const imageCandidates: { source: 'curated' | 'og' | 'og-original' | 'placeholder'; url?: string | null }[] = [
+    { source: 'curated', url: curatedImage },
+    { source: 'og', url: effectiveData?.image },
+    { source: 'og-original', url: effectiveData?.originalImage },
+    { source: 'placeholder', url: placeholderImageUrl },
+  ];
+  const resolvedImage = imageCandidates.find(c => !!c.url && !failedImages.has(c.url)) ?? null;
+  const resolvedImageUrl = resolvedImage?.url ?? null;
 
   const hasImage = !!resolvedImageUrl;
-  const isCuratedImage = !!resolvedImageUrl && resolvedImageUrl === curatedImage;
-  const isPlaceholder = !!resolvedImageUrl && resolvedImageUrl === placeholderImageUrl && !isCuratedImage;
+  const isCuratedImage = resolvedImage?.source === 'curated';
+  const isPlaceholder = resolvedImage?.source === 'placeholder';
   const bgColor = useImageEdgeColor(resolvedImageUrl ?? null, 'var(--color-bg-surface)');
 
   const renderSkeleton = () =>
