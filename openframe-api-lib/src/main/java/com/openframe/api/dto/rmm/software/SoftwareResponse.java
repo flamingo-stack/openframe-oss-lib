@@ -13,7 +13,6 @@ public class SoftwareResponse {
     private String id;
     private String name;
     private String publisher;
-    private SoftwareType type;
     private SoftwareSource source;
     private String currentVersion;
     private String latestVersion;

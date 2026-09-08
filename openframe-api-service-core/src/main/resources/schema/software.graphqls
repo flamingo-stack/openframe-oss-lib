@@ -1,4 +1,4 @@
-# Software inventory (read side) + install / uninstall / update dispatch (write side).
+# Software inventory (read side, thin proxy over Fleet MDM REST).
 #
 # The wire contract is stable so the frontend can start binding against it;
 # resolvers currently return null / empty because the feature is stubbed under
@@ -51,32 +51,12 @@ extend type Query {
     softwareFilters(filter: SoftwareFilterInput, search: String): SoftwareFilters!
 }
 
-extend type Mutation {
-    """Dispatch an install of the given software title to the target machines.
-    Idempotent — a machine that already has the latest version is a no-op on the agent."""
-    installSoftware(input: InstallSoftwareInput!): DispatchResponse!
-
-    """Dispatch an uninstall of the given software title from the target machines."""
-    uninstallSoftware(input: UninstallSoftwareInput!): DispatchResponse!
-
-    """Schedule a deferred update of the given software title on the target machines
-    at the specified server-time instant."""
-    scheduleUpdateSoftware(input: ScheduleUpdateSoftwareInput!): DispatchResponse!
-
-    """Cancel a scheduled software install / uninstall / update by its executionId,
-    if still in a cancellable state."""
-    cancelScheduledSoftware(executionId: ID!): DispatchResponse!
-}
-
 # ────────── Software (aggregate row) ──────────
 
 type Software {
     id: ID!
     name: String!
     publisher: String
-
-    """Application vs Driver."""
-    type: SoftwareType
 
     """Package-manager source — WINGET / CHOCOLATEY / BREW / UNMANAGED."""
     source: SoftwareSource
@@ -129,11 +109,6 @@ type SoftwareVulnerability {
 }
 
 # ────────── Enums ──────────
-
-enum SoftwareType {
-    APPLICATION
-    DRIVER
-}
 
 enum SoftwareSource {
     WINGET
@@ -204,7 +179,6 @@ type SoftwareVulnerabilityEdge {
 # ────────── Facet dropdowns ──────────
 
 type SoftwareFilters {
-    types: [SoftwareFilterOption!]!
     sources: [SoftwareFilterOption!]!
     versionStatuses: [SoftwareFilterOption!]!
     severities: [SoftwareFilterOption!]!
@@ -219,7 +193,6 @@ type SoftwareFilterOption {
 # ────────── Inputs ──────────
 
 input SoftwareFilterInput {
-    types: [SoftwareType!]
     sources: [SoftwareSource!]
     versionStatuses: [SoftwareVersionStatus!]
     minSeverity: SoftwareCveSeverity
@@ -233,21 +206,4 @@ input SoftwareOnDeviceFilterInput {
 
 input SoftwareVulnerabilityFilterInput {
     severities: [SoftwareCveSeverity!]
-}
-
-input InstallSoftwareInput {
-    softwareId: ID!
-    machineIds: [ID!]!
-}
-
-input UninstallSoftwareInput {
-    softwareId: ID!
-    machineIds: [ID!]!
-}
-
-input ScheduleUpdateSoftwareInput {
-    softwareId: ID!
-    machineIds: [ID!]!
-    """ISO-8601 UTC instant of when to fire the update."""
-    scheduledAt: String!
 }
