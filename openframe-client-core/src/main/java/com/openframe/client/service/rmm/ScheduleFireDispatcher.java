@@ -95,34 +95,32 @@ public class ScheduleFireDispatcher {
         }
     }
 
-    /**
-     * Arm (or refresh) one reconnect-retry sentinel per offline device. Keyed by
-     * (tenant, schedule, machine) — a later fire supersedes any stale sentinel by resetting it to
-     * NEW with a fresh window, so the collection never grows unbounded.
-     */
     private void armReconnectRetry(ScheduleScript schedule, List<String> machineIds, Instant now) {
         Instant expiresAt = now.plusSeconds(schedule.getReconnectWindowSeconds());
         for (String machineId : machineIds) {
-            DeviceFirstOnlineDispatch row = dispatchRepository
-                    .findByTenantIdAndMachineIdAndScheduleId(schedule.getTenantId(), machineId, schedule.getId())
-                    .orElseGet(() -> DeviceFirstOnlineDispatch.builder()
-                            .tenantId(schedule.getTenantId())
-                            .machineId(machineId)
-                            .scheduleId(schedule.getId())
-                            .build());
-            row.setStatus(DeviceOnlineDispatchStatus.NEW);
-            row.setFirstSeenAt(now);
-            row.setExpiresAt(expiresAt);
-            row.setDispatchedAt(null);
-            try {
-                dispatchRepository.save(row);
-            } catch (DuplicateKeyException raced) {
-                log.debug("reconnect-retry sentinel armed concurrently: machineId={} scheduleId={}",
-                        machineId, schedule.getId());
-            }
+            armReconnectRetry(schedule, machineId, now, expiresAt);
         }
         log.info("Armed reconnect-retry for {} offline device(s) scheduleId={} tenantId={} expiresAt={}",
                 machineIds.size(), schedule.getId(), schedule.getTenantId(), expiresAt);
+    }
+
+    public void armReconnectRetry(ScheduleScript schedule, String machineId, Instant firstSeenAt, Instant expiresAt) {
+        DeviceFirstOnlineDispatch row = dispatchRepository
+                .findByTenantIdAndMachineIdAndScheduleId(schedule.getTenantId(), machineId, schedule.getId())
+                .orElseGet(() -> DeviceFirstOnlineDispatch.builder()
+                        .tenantId(schedule.getTenantId())
+                        .machineId(machineId)
+                        .scheduleId(schedule.getId())
+                        .build());
+        row.setStatus(DeviceOnlineDispatchStatus.NEW);
+        row.setFirstSeenAt(firstSeenAt);
+        row.setExpiresAt(expiresAt);
+        try {
+            dispatchRepository.save(row);
+        } catch (DuplicateKeyException raced) {
+            log.debug("reconnect-retry sentinel armed concurrently: machineId={} scheduleId={}",
+                    machineId, schedule.getId());
+        }
     }
 
     /**
