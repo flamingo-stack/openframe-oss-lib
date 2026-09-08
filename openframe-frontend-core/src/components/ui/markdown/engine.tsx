@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * MarkdownEngine — THE one react-markdown pipeline for every surface
@@ -21,15 +21,18 @@
  *   → urlTransform: cardAwareUrlTransform
  *   → components: buildBaseComponents(...) spread-last componentOverrides
  */
-import React, { memo, useMemo } from 'react';
+import type React from 'react';
+import { memo, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
-import type { PluggableList } from 'unified';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
+import type { PluggableList } from 'unified';
 import type { ResolveLinkResult } from '../../../types/doc-source';
+import { buildBaseComponents } from './base-components';
+import { HeadingIdMapContext, HeadingLineOffsetContext, useHeadingIdMap, type HeadingSection } from './heading-ids';
 import {
   buildEffectiveTagSet,
   buildSanitizeSchema,
@@ -37,15 +40,8 @@ import {
   escapeUnknownHtmlTags,
   rehypeStripUnsafe,
 } from './sanitize';
-import { resolveTextSizeConfig, type TextSizeConfig } from './text-size';
-import {
-  HeadingIdMapContext,
-  HeadingLineOffsetContext,
-  useHeadingIdMap,
-  type HeadingSection,
-} from './heading-ids';
-import { buildBaseComponents } from './base-components';
 import { completeStreamingTail, splitStreamingBlocks } from './streaming';
+import { resolveTextSizeConfig, type TextSizeConfig } from './text-size';
 
 export type { ResolveLinkResult };
 
@@ -114,7 +110,7 @@ export interface MarkdownEngineProps {
  * React key = position index — identical blocks at different positions
  * never alias (see ./streaming.ts).
  */
-const StreamingBlockRenderer = memo(function StreamingBlockRenderer({
+const StreamingBlockRenderer = memo(function StreamingBlockRendererImpl({
   text,
   remarkPlugins,
   rehypePlugins,
@@ -228,15 +224,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
       // rich's embed overrides, etc. always win over the base map.
       ...componentOverrides,
     }),
-    [
-      textSizes,
-      demoteMarkdownH1ToH2,
-      brokenLinks,
-      currentPath,
-      onInternalLinkClick,
-      onResolveLink,
-      componentOverrides,
-    ],
+    [textSizes, demoteMarkdownH1ToH2, brokenLinks, currentPath, onInternalLinkClick, onResolveLink, componentOverrides],
   );
 
   // Streaming block plan (only computed on the streaming path).
@@ -250,7 +238,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     // spam (polite + additions). Streaming caret/pulse affordances live in
     // chat components and honor prefers-reduced-motion there.
     <div aria-live="polite" aria-relevant="additions text">
-      {streamingBlocks.map((block) => (
+      {streamingBlocks.map(block => (
         // Each unit is parsed on its own, so hast positions restart at 1;
         // the offset maps them back onto the document-wide heading-id map.
         <HeadingLineOffsetContext.Provider key={block.index} value={block.startLine - 1}>

@@ -2,7 +2,7 @@ package com.openframe.api.dataloader;
 
 import com.netflix.graphql.dgs.DgsDataLoader;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
-import com.openframe.api.service.rmm.ScriptService;
+import com.openframe.api.service.rmm.script.ScriptService;
 import lombok.RequiredArgsConstructor;
 import org.dataloader.BatchLoader;
 

@@ -2,6 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.NotificationSettingsView;
 import com.openframe.api.dto.NotificationTypeSetting;
+import com.openframe.api.dto.NotificationTypeSettingInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSettings;
@@ -30,19 +31,19 @@ public class NotificationSettingsService {
     }
 
     public NotificationSettingsView update(String userId, boolean enabled,
-                                           List<NotificationTypeSetting> typeSettings) {
+                                           List<NotificationTypeSettingInput> typeSettings) {
         Set<NotificationSettingGroup> mutedGroups = toMutedGroups(typeSettings);
         settingsRepository.saveSettings(userId, enabled, mutedGroups);
         return get(userId);
     }
 
     /** Null means "not sent" — a legacy master-only write keeps the stored muted set. */
-    private static Set<NotificationSettingGroup> toMutedGroups(List<NotificationTypeSetting> typeSettings) {
+    private static Set<NotificationSettingGroup> toMutedGroups(List<NotificationTypeSettingInput> typeSettings) {
         if (typeSettings == null) {
             return null;
         }
         Set<NotificationSettingGroup> muted = EnumSet.noneOf(NotificationSettingGroup.class);
-        for (NotificationTypeSetting setting : typeSettings) {
+        for (NotificationTypeSettingInput setting : typeSettings) {
             NotificationSettingGroup group = setting.getGroup();
             if (group == null) {
                 throw new BadRequestException("typeSettings entries require a group");
@@ -59,7 +60,8 @@ public class NotificationSettingsService {
         List<NotificationTypeSetting> groups = new ArrayList<>();
         for (NotificationSettingGroup group : NotificationSettingGroup.values()) {
             boolean groupEnabled = isGroupEnabled(settings, group);
-            groups.add(new NotificationTypeSetting(group, groupEnabled));
+            String label = group.getLabel();
+            groups.add(new NotificationTypeSetting(group, label, groupEnabled));
         }
         return new NotificationSettingsView(master, groups);
     }

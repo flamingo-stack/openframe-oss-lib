@@ -1,9 +1,10 @@
 package com.openframe.authz.security.flow;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import com.openframe.authz.dto.InvitationRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
-import com.openframe.authz.security.SsoRegistrationConstants;
 import com.openframe.authz.service.user.InvitationRegistrationService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,7 +28,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
 
     @Override
     public String cookieName() {
-        return SsoRegistrationConstants.COOKIE_SSO_INVITE;
+        return SsoFlowCookieNames.OF_SSO_INVITE;
     }
 
     @Override

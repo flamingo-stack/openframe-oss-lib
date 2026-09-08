@@ -13,18 +13,15 @@
  * `createContext is not a function`.
  */
 
-import {
-  AccessCodeValidation,
-  AccessCodeValidationResponse,
-  AccessCodeConsumptionResponse
-} from '../types/access-code-cohorts';
+import type { AccessCodeValidationResponse, AccessCodeConsumptionResponse } from '../types/access-code-cohorts';
+import { apiErrorMessage } from './common';
 
 /** Endpoints required by the standalone client utilities. The
  *  `useAccessCodeIntegration` hook (in `hooks/`) resolves these from
  *  `EndpointsRuntimeContext.accessCode` automatically. */
 export interface AccessCodeEndpoints {
-  validateUrl: string
-  consumeUrl: string
+  validateUrl: string;
+  consumeUrl: string;
 }
 
 /**
@@ -55,15 +52,15 @@ export async function validateAccessCode(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email, code } as AccessCodeValidation),
+      body: JSON.stringify({ email, code }),
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || 'Validation request failed');
+      const failure: unknown = await response.json().catch(() => null);
+      throw new Error(apiErrorMessage(failure, 'Validation request failed'));
     }
 
-    return await response.json() as AccessCodeValidationResponse;
+    return (await response.json()) as AccessCodeValidationResponse;
   } catch (error) {
     return {
       valid: false,
@@ -102,15 +99,15 @@ export async function consumeAccessCode(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email, code } as AccessCodeValidation),
+      body: JSON.stringify({ email, code }),
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || 'Consumption request failed');
+      const failure: unknown = await response.json().catch(() => null);
+      throw new Error(apiErrorMessage(failure, 'Consumption request failed'));
     }
 
-    return await response.json() as AccessCodeConsumptionResponse;
+    return (await response.json()) as AccessCodeConsumptionResponse;
   } catch (error) {
     return {
       success: false,

@@ -1,16 +1,16 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import type { JsMsg, Msg, NatsSubscribeOptions } from './nats'
-import { useOptionalNats } from './nats-provider'
+import { useRef, useEffect, useState, useCallback } from 'react';
+import type { JsMsg, Msg, NatsSubscribeOptions } from './nats';
+import { useOptionalNats } from './nats-provider';
 
 export interface UseNatsSubscriptionOptions extends NatsSubscribeOptions {
-  enabled?: boolean
+  enabled?: boolean;
 }
 
 export interface UseNatsSubscriptionReturn {
-  isSubscribed: boolean
-  isReady: boolean
+  isSubscribed: boolean;
+  isReady: boolean;
 }
 
 /**
@@ -23,77 +23,82 @@ export function useNatsSubscription(
   onMessage: (msg: Msg) => void | Promise<void>,
   options?: UseNatsSubscriptionOptions,
 ): UseNatsSubscriptionReturn {
-  const nats = useOptionalNats()
-  const handlerRef = React.useRef(onMessage)
-  React.useEffect(() => {
-    handlerRef.current = onMessage
-  }, [onMessage])
+  const nats = useOptionalNats();
+  const handlerRef = useRef(onMessage);
+  useEffect(() => {
+    handlerRef.current = onMessage;
+  }, [onMessage]);
 
-  const [isSubscribed, setIsSubscribed] = React.useState(false)
+  const enabled = options?.enabled !== false;
+  const queue = options?.queue;
+  const max = options?.max;
+  const reconnectionCount = nats?.reconnectionCount ?? 0;
+  const isReady = !!nats?.isReady;
+  const client = nats?.client ?? null;
 
-  const enabled = options?.enabled !== false
-  const queue = options?.queue
-  const max = options?.max
-  const reconnectionCount = nats?.reconnectionCount ?? 0
-  const isReady = !!nats?.isReady
-  const client = nats?.client ?? null
+  // Not independent state. The effect below subscribes synchronously and
+  // unconditionally whenever all four preconditions hold, and unsubscribes in
+  // its cleanup — so "is there a live subscription" IS this predicate, and
+  // storing it meant every subscribe and every teardown paid a second render
+  // pass to report something the first render already knew.
+  //
+  // It also removes a spurious flap: a reconnect-driven re-subscribe used to
+  // run `setIsSubscribed(false)` (cleanup) then `setIsSubscribed(true)` in the
+  // same commit, so the value briefly described a gap that consumers could
+  // never observe anyway.
+  const isSubscribed = Boolean(client) && isReady && Boolean(subject) && enabled;
 
-  React.useEffect(() => {
-    if (!client || !isReady || !subject || !enabled) {
-      setIsSubscribed(false)
-      return
-    }
+  useEffect(() => {
+    if (!client || !isReady || !subject || !enabled) return undefined;
 
-    const sub = client.subscribeBytes(
-      subject,
-      (msg) => handlerRef.current(msg),
-      { queue, max },
-    )
-    setIsSubscribed(true)
+    const sub = client.subscribeBytes(subject, msg => handlerRef.current(msg), { queue, max });
 
     return () => {
-      setIsSubscribed(false)
       try {
-        sub.unsubscribe()
+        sub.unsubscribe();
       } catch {
         // ignore
       }
-    }
+    };
     // reconnectionCount intentionally in deps: re-subscribe after reconnect
-  }, [client, isReady, subject, enabled, queue, max, reconnectionCount])
+  }, [client, isReady, subject, enabled, queue, max, reconnectionCount]);
 
-  return { isSubscribed, isReady }
+  return { isSubscribed, isReady };
 }
 
-export type UseNatsJsonSubscriptionOptions = UseNatsSubscriptionOptions
+export type UseNatsJsonSubscriptionOptions = UseNatsSubscriptionOptions;
 
 export function useNatsJsonSubscription<T = unknown>(
   subject: string | null,
   onPayload: (payload: T, msg: Msg) => void | Promise<void>,
   options?: UseNatsJsonSubscriptionOptions,
 ): UseNatsSubscriptionReturn {
-  const handlerRef = React.useRef(onPayload)
-  React.useEffect(() => {
-    handlerRef.current = onPayload
-  }, [onPayload])
+  const handlerRef = useRef(onPayload);
+  useEffect(() => {
+    handlerRef.current = onPayload;
+  }, [onPayload]);
 
-  const decoderRef = React.useRef<TextDecoder | null>(null)
-  if (!decoderRef.current && typeof TextDecoder !== 'undefined') {
-    decoderRef.current = new TextDecoder()
-  }
+  // One decoder for the hook's lifetime. `useState`'s lazy initialiser instead
+  // of a ref filled on first render: the guard is exactly the lazy-init shape
+  // `useState` exists for, and it keeps the construction out of render. Null
+  // on a server render, where `TextDecoder` may be absent — `wrapped` only
+  // ever runs client-side, but the guard below keeps that explicit.
+  const [decoder] = useState<TextDecoder | null>(() => (typeof TextDecoder !== 'undefined' ? new TextDecoder() : null));
 
-  const wrapped = React.useCallback(async (msg: Msg) => {
-    const decoder = decoderRef.current
-    if (!decoder) return
-    try {
-      const parsed = JSON.parse(decoder.decode(msg.data)) as T
-      await handlerRef.current(parsed, msg)
-    } catch {
-      // ignore malformed payloads
-    }
-  }, [])
+  const wrapped = useCallback(
+    async (msg: Msg) => {
+      if (!decoder) return;
+      try {
+        const parsed = JSON.parse(decoder.decode(msg.data)) as T;
+        await handlerRef.current(parsed, msg);
+      } catch {
+        // ignore malformed payloads
+      }
+    },
+    [decoder],
+  );
 
-  return useNatsSubscription(subject, wrapped, options)
+  return useNatsSubscription(subject, wrapped, options);
 }
 
-export type NatsJsMsg = JsMsg
+export type NatsJsMsg = JsMsg;

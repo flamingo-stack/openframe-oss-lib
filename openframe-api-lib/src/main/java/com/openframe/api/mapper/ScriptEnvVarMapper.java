@@ -1,7 +1,7 @@
 package com.openframe.api.mapper;
 
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
-import com.openframe.data.document.rmm.ScriptEnvVar;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
 
 import java.util.List;
 

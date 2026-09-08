@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * CustomerInterviewCard (pure presentation). Two densities — `default`
@@ -8,14 +8,11 @@
  * and pass the resolved detail URL via `href`.
  */
 
-import React from 'react'
-import { Card } from '../../ui/card'
-import { cn } from '../../../utils/cn'
-import { Video } from 'lucide-react'
-import type { CustomerInterview } from '../../../types/customer-interview'
-import { EntityPortraitCard } from './entity-portrait-card'
-import { useEntityCardLink } from './use-entity-card-link'
-import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
+import { Video } from 'lucide-react';
+import Image from '../../../embed-shims/next-image';
+import type { CustomerInterview } from '../../../types/customer-interview';
+import { cn } from '../../../utils/cn';
+import { Card } from '../../ui/card';
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -28,23 +25,26 @@ import {
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
-} from '../utils/compact-card-classes'
-import { hideOnError } from './use-cover-image-fallback'
+} from '../utils/compact-card-classes';
+import { EntityPortraitCard } from './entity-portrait-card';
+import { hideOnError } from './use-cover-image-fallback';
+import { useEntityCardLink } from './use-entity-card-link';
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
 export interface CustomerInterviewCardProps {
-  interview: CustomerInterview
-  href: string
+  interview: CustomerInterview;
+  href: string;
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
    *  `computeIsNewTab`. Defaults to same-tab. */
-  target?: '_blank'
-  rel?: 'noopener noreferrer'
-  targetPlatform?: string | null
+  target?: '_blank';
+  rel?: 'noopener noreferrer';
+  targetPlatform?: string | null;
   /** OG placeholder URL fallback when `interview.featured_image` is missing. */
-  placeholderUrl?: string | null
-  size?: 'default' | 'sm' | 'portrait'
+  placeholderUrl?: string | null;
+  size?: 'default' | 'sm' | 'portrait';
   /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
-  showTypeBadge?: boolean
-  className?: string
+  showTypeBadge?: boolean;
+  className?: string;
 }
 
 /** `portrait` shares the default skeleton shape (same zone boxes). */
@@ -65,30 +65,30 @@ export function CustomerInterviewCardSkeleton({ size = 'default' }: { size?: 'de
           </span>
         </span>
       </span>
-    )
+    );
   }
   return (
-    <div className="bg-ods-card border border-ods-border rounded-lg overflow-hidden p-6 flex flex-col gap-6 animate-pulse">
+    <div className="flex animate-pulse flex-col gap-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card p-6">
       {/* Aspect matches the loaded image slot (OG 1200×630) */}
-      <div className="w-full aspect-[1200/630] rounded-sm bg-ods-bg" />
+      <div className="aspect-[1200/630] w-full rounded-sm bg-ods-bg" />
       <div className="space-y-2">
-        <div className="h-5 w-3/4 bg-ods-bg rounded" />
-        <div className="h-5 w-1/2 bg-ods-bg rounded" />
+        <div className="h-5 w-3/4 rounded bg-ods-bg" />
+        <div className="h-5 w-1/2 rounded bg-ods-bg" />
       </div>
       <div className="space-y-2">
-        <div className="h-3 w-full bg-ods-bg/60 rounded" />
-        <div className="h-3 w-5/6 bg-ods-bg/60 rounded" />
-        <div className="h-3 w-4/5 bg-ods-bg/60 rounded" />
+        <div className="h-3 w-full rounded bg-ods-bg/60" />
+        <div className="h-3 w-5/6 rounded bg-ods-bg/60" />
+        <div className="h-3 w-4/5 rounded bg-ods-bg/60" />
       </div>
-      <div className="h-[60px] flex items-center gap-3 mt-auto">
+      <div className="mt-auto flex h-[60px] items-center gap-3">
         <div className="h-12 w-12 rounded-full bg-ods-bg" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 w-2/3 bg-ods-bg rounded" />
-          <div className="h-3 w-1/2 bg-ods-bg/60 rounded" />
+          <div className="h-4 w-2/3 rounded bg-ods-bg" />
+          <div className="h-3 w-1/2 rounded bg-ods-bg/60" />
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export function CustomerInterviewCard({
@@ -107,23 +107,26 @@ export function CustomerInterviewCard({
     targetPlatform,
     target: targetProp,
     rel: relProp,
-  })
+  });
   const placeholderUrl = useEntityCardPlaceholder({
     title: interview.title,
     placeholderUrl: placeholderUrlProp,
     aspect: size === 'sm' ? 'square' : 'wide',
-  })
-  const thumbnailUrl = interview.featured_image || placeholderUrl || null
+  });
+  const thumbnailUrl = interview.featured_image || placeholderUrl || null;
 
   if (size === 'sm') {
     return (
       <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {thumbnailUrl ? (
-            <img
+            <Image
               src={thumbnailUrl}
               alt={interview.title}
-              className="absolute inset-0 block w-full h-full object-contain"
+              className="object-contain"
+              fill
+              sizes="56px"
+              unoptimized
               onError={hideOnError}
             />
           ) : null}
@@ -143,13 +146,11 @@ export function CustomerInterviewCard({
             </span>
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className={COMPACT_CARD_SUMMARY}>
-              {interview.video_summary || COMPACT_CARD_ROW_FILLER}
-            </span>
+            <span className={COMPACT_CARD_SUMMARY}>{interview.video_summary || COMPACT_CARD_ROW_FILLER}</span>
           </span>
         </span>
       </a>
-    )
+    );
   }
 
   if (size === 'portrait') {
@@ -172,91 +173,94 @@ export function CustomerInterviewCard({
         }}
         className={className}
       />
-    )
+    );
   }
 
   return (
     <a href={href} target={target} rel={rel} className={cn('block h-full', className)}>
-      <Card className="bg-ods-card border border-ods-border hover:border-ods-accent transition-colors p-6 flex flex-col gap-6 overflow-hidden">
+      <Card className="flex flex-col gap-6 overflow-hidden border border-ods-border bg-ods-card p-6 transition-colors hover:border-ods-accent">
         {/* Fixed aspect matching standard OG card source (1200×630, 1.91:1)
             — image renders with near-zero CSS-side crop, subject anchored
             consistently via center-66% safe-zone convention. */}
-        <div className="w-full aspect-[1200/630] rounded-sm overflow-hidden bg-ods-bg shrink-0 relative">
+        <div className="relative aspect-[1200/630] w-full shrink-0 overflow-hidden rounded-sm bg-ods-bg">
           {thumbnailUrl ? (
             <>
-              <img
+              <Image
                 src={thumbnailUrl}
                 alt={interview.title}
-                className="w-full h-full object-cover"
+                className="object-cover"
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                unoptimized
                 onError={hideOnError}
               />
               {interview.main_video_url && (
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                  <div className="w-16 h-16 rounded-full bg-ods-accent/90 flex items-center justify-center">
-                    <Video className="w-8 h-8 text-ods-text-on-accent" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ods-accent/90">
+                    <Video className="h-8 w-8 text-ods-text-on-accent" />
                   </div>
                 </div>
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-ods-bg">
-              <Video className="w-12 h-12 text-ods-text-secondary" />
+            <div className="flex h-full w-full items-center justify-center bg-ods-bg">
+              <Video className="h-12 w-12 text-ods-text-secondary" />
             </div>
           )}
         </div>
 
         <div className="shrink-0">
-          <h3 className="text-h3 text-ods-text-primary line-clamp-2 break-words">
-            {interview.title}
-          </h3>
+          <h3 className="line-clamp-2 break-words text-ods-text-primary text-h3">{interview.title}</h3>
         </div>
 
         {interview.video_summary && (
           <div className="shrink-0">
-            <p className="text-h6 text-ods-text-secondary line-clamp-3">
-              {interview.video_summary}
-            </p>
+            <p className="line-clamp-3 text-ods-text-secondary text-h6">{interview.video_summary}</p>
           </div>
         )}
 
-        <div className="h-[60px] flex items-center shrink-0 mt-auto">
-          <div className="flex items-center gap-3 min-w-0 w-full">
-            <div className="relative shrink-0 w-12 h-12">
+        <div className="mt-auto flex h-[60px] shrink-0 items-center">
+          <div className="flex w-full min-w-0 items-center gap-3">
+            <div className="relative h-12 w-12 shrink-0">
               {interview.user?.avatar_url ? (
-                <img
+                <Image
                   src={interview.user.avatar_url}
                   alt={interview.user?.full_name || 'Customer'}
-                  className="w-12 h-12 rounded-full object-cover bg-ods-bg border border-ods-border"
+                  className="h-12 w-12 rounded-full border border-ods-border bg-ods-bg object-cover"
+                  width={48}
+                  height={48}
+                  unoptimized
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-ods-bg border border-ods-border flex items-center justify-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-ods-border bg-ods-bg">
                   <span className="text-ods-text-secondary text-h4">
                     {(interview.user?.full_name || 'A').charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}
               {interview.msp?.icon_url && (
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-ods-text-primary ring-1 ring-ods-bg overflow-hidden flex items-center justify-center">
-                  <img
+                <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-ods-text-primary ring-1 ring-ods-bg">
+                  <Image
                     src={interview.msp.icon_url}
                     alt={interview.msp.name || 'MSP'}
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
+                    width={24}
+                    height={24}
+                    unoptimized
                   />
                 </div>
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-h6 text-ods-text-primary truncate">
+              <p className="truncate text-ods-text-primary text-h6">
                 {interview.user?.full_name || 'Anonymous'}
                 {interview.msp?.name && <span className="text-ods-text-secondary"> • {interview.msp.name}</span>}
               </p>
-              <p className="text-h6 text-ods-text-secondary truncate">
-                {interview.user?.job_title || ' '}
-              </p>
+              <p className="truncate text-ods-text-secondary text-h6">{interview.user?.job_title || ' '}</p>
             </div>
           </div>
         </div>
       </Card>
     </a>
-  )
+  );
 }

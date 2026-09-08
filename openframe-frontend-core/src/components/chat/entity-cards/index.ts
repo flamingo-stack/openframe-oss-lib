@@ -14,44 +14,29 @@ export {
   EntityMetadataAuthorCell,
   EMPTY_AUTHOR_PLACEHOLDER,
   type EntityAuthorCardProps,
-} from './entity-author-card'
-export { BlogImagePlaceholder } from './blog-image-placeholder'
-export {
-  EntityPortraitCard,
-  type EntityPortraitCardProps,
-  type EntityPortraitPerson,
-} from './entity-portrait-card'
-export {
-  useCoverImageFallback,
-  hideOnError,
-  type CoverImageFallback,
-} from './use-cover-image-fallback'
-export { AdminContentCard } from './admin-content-card'
-export { EmployeeEntryCard, EmployeeEntryCardSkeleton, EmployeeEntryBadge } from './employee-entry-card'
-export type { EmployeeEntryCardData, EmployeeEntryCardProps } from './employee-entry-card'
-export { WhatIShippedCard, WhatIShippedCardSkeleton } from './what-i-shipped-card'
-export type { WhatIShippedCardData, WhatIShippedCardProps } from './what-i-shipped-card'
-export { HowIWorkCard, HowIWorkCardSkeleton } from './how-i-work-card'
-export type { HowIWorkCardData, HowIWorkCardProps } from './how-i-work-card'
+} from './entity-author-card';
+export { BlogImagePlaceholder } from './blog-image-placeholder';
+export { EntityPortraitCard, type EntityPortraitCardProps, type EntityPortraitPerson } from './entity-portrait-card';
+export { useCoverImageFallback, hideOnError, type CoverImageFallback } from './use-cover-image-fallback';
+export { AdminContentCard } from './admin-content-card';
+export { EmployeeEntryCard, EmployeeEntryCardSkeleton, EmployeeEntryBadge } from './employee-entry-card';
+export type { EmployeeEntryCardData, EmployeeEntryCardProps } from './employee-entry-card';
+export { WhatIShippedCard, WhatIShippedCardSkeleton } from './what-i-shipped-card';
+export type { WhatIShippedCardData, WhatIShippedCardProps } from './what-i-shipped-card';
+export { HowIWorkCard, HowIWorkCardSkeleton } from './how-i-work-card';
+export type { HowIWorkCardData, HowIWorkCardProps } from './how-i-work-card';
 
 // Moved-into-subdir flat cards
-export { BlockCard, type BlockCardProps } from './block-card'
-export {
-  ChatTicketItem,
-  type ChatTicketItemData,
-  type ChatTicketItemProps,
-} from './chat-ticket-item'
-export {
-  ChatVideoEntityCard,
-  type ChatVideoEntityCardProps,
-} from './chat-video-entity-card'
+export { BlockCard, type BlockCardProps } from './block-card';
+export { ChatTicketItem, type ChatTicketItemData, type ChatTicketItemProps } from './chat-ticket-item';
+export { ChatVideoEntityCard, type ChatVideoEntityCardProps } from './chat-video-entity-card';
 export {
   ProductReleaseCard,
   ProductReleaseCardSkeleton,
   type ProductReleaseCardProps,
   type ProductReleaseCardSize,
   type ProductReleaseCardAnchorProps,
-} from './product-release-card'
+} from './product-release-card';
 // Card-prop builders: `defaultBuildProductReleaseCardProps` (sm chat default) +
 // `buildProductReleaseCardProps` (RICH lg builder — the ProductReleasesView
 // default; lifted from the hub so embedders get the full metadata grid).
@@ -59,84 +44,64 @@ export {
   defaultBuildProductReleaseCardProps,
   buildProductReleaseCardProps,
   type ProductReleaseCardDerivedProps,
-} from './product-release-card-defaults'
+} from './product-release-card-defaults';
 
 // Refactored pure-presentation cards
-export { BlogCard, BlogCardSkeleton, type BlogCardProps } from './blog-card'
-export {
-  CaseStudyCard,
-  CaseStudyCardSkeleton,
-  type CaseStudyCardProps,
-} from './case-study-card'
+export { BlogCard, BlogCardSkeleton, type BlogCardProps } from './blog-card';
+export { CaseStudyCard, CaseStudyCardSkeleton, type CaseStudyCardProps } from './case-study-card';
 export {
   CustomerInterviewCard,
   CustomerInterviewCardSkeleton,
   type CustomerInterviewCardProps,
-} from './customer-interview-card'
-export {
-  InvestorUpdateCard,
-  InvestorUpdateCardSkeleton,
-  type InvestorUpdateCardProps,
-} from './investor-update-card'
+} from './customer-interview-card';
+export { InvestorUpdateCard, InvestorUpdateCardSkeleton, type InvestorUpdateCardProps } from './investor-update-card';
 export {
   OnboardingGuideCard,
   OnboardingGuideCardSkeleton,
   type OnboardingGuideCardProps,
-} from './onboarding-guide-card'
-export {
-  RoadmapCard,
-  RoadmapCardSkeleton,
-  type RoadmapCardProps,
-  type VoteType,
-} from './roadmap-card'
-export {
-  RoadmapVoteButton,
-  type RoadmapVoteButtonProps,
-} from './roadmap-vote-button'
-export { TaskTypeIcon, type TaskTypeIconProps } from './task-type-icon'
+} from './onboarding-guide-card';
+export { RoadmapCard, RoadmapCardSkeleton, type RoadmapCardProps, type VoteType } from './roadmap-card';
+export { RoadmapVoteButton, type RoadmapVoteButtonProps } from './roadmap-vote-button';
+export { TaskTypeIcon, type TaskTypeIconProps } from './task-type-icon';
 export {
   GitHubActivityCard,
   GitHubActivityCardSkeleton,
   type GitHubActivityCardProps,
   type GitHubActivityCardAnchorProps,
-} from './github-activity-card'
+} from './github-activity-card';
 export {
   SlackMessageCard,
   SlackMessageCardSkeleton,
   type SlackMessageCardProps,
   type SlackMessageCardAnchorProps,
-} from './slack-message-card'
+} from './slack-message-card';
 export {
   HubspotTicketCard,
   HubspotTicketCardSkeleton,
   type HubspotTicketCardProps,
   type HubspotTicketCardAnchorProps,
-} from './hubspot-ticket-card'
+} from './hubspot-ticket-card';
 export {
   DataRoomDocCard,
   DataRoomDocCardSkeleton,
   type DataRoomDocCardProps,
   type DataRoomDocCardAnchorProps,
-} from './data-room-doc-card'
-export {
-  ProgramCard,
-  ProgramCardSkeleton,
-  type ProgramCardProps,
-} from './program-card'
+} from './data-room-doc-card';
+export { ProgramCard, ProgramCardSkeleton, type ProgramCardProps } from './program-card';
 export {
   CampaignCardAdmin,
   CampaignCardAdminSkeleton,
   type CampaignCardItem,
   type CampaignCardAdminProps,
   type CampaignCardAdminAnchorProps,
-} from './campaign-card-admin'
+} from './campaign-card-admin';
 export {
   GenericEntityCard,
   GenericEntityCardSkeleton,
   type GenericEntityCardItem,
   type GenericEntityCardProps,
   type GenericEntityCardAnchorProps,
-} from './generic-entity-card'
+} from './generic-entity-card';
 
 // Per-type dispatch + ChatCardLoader — single switch over canonical
 // chat cards. Adding a new card type = one entry in `CHAT_CARD_REGISTRY`
@@ -146,12 +111,9 @@ export {
   ChatCardLoader,
   type ChatCardRenderOptions,
   type ChatCardDispatchExtras,
-} from './dispatch'
+} from './dispatch';
 
 // Program author-ref + video-bites profile adapter — re-exported through the
 // PACKAGE-EXPORTED chat barrel so the hub can value-import them (deep paths
 // into chat/types/* are not in the package exports map and 404 at runtime).
-export {
-  programItemToStripProfile,
-  type ProgramAuthorRef,
-} from '../types/entities/program-types'
+export { programItemToStripProfile, type ProgramAuthorRef } from '../types/entities/program-types';

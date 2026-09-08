@@ -9,7 +9,7 @@
  */
 export function fixUrlDoubleSlashes(url: string): string {
   if (!url) return url;
-  
+
   // Split on protocol to preserve it
   const protocolMatch = url.match(/^(https?:\/\/)/);
   if (protocolMatch) {
@@ -19,7 +19,7 @@ export function fixUrlDoubleSlashes(url: string): string {
     const fixedRest = rest.replace(/\/+/g, '/');
     return protocol + fixedRest;
   }
-  
+
   // For relative URLs, just fix multiple slashes
   return url.replace(/\/+/g, '/');
 }
@@ -33,14 +33,11 @@ export function joinUrlPath(...segments: string[]): string {
   return segments
     .map((segment, index) => {
       // Remove leading slash from all but first segment
-      if (index > 0 && segment.startsWith('/')) {
-        segment = segment.substring(1);
-      }
+      const withoutLeading = index > 0 && segment.startsWith('/') ? segment.substring(1) : segment;
       // Remove trailing slash from all but last segment
-      if (index < segments.length - 1 && segment.endsWith('/')) {
-        segment = segment.substring(0, segment.length - 1);
-      }
-      return segment;
+      return index < segments.length - 1 && withoutLeading.endsWith('/')
+        ? withoutLeading.substring(0, withoutLeading.length - 1)
+        : withoutLeading;
     })
     .filter(segment => segment.length > 0)
     .join('/');

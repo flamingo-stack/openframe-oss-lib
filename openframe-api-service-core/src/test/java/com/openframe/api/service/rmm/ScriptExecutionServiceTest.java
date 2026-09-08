@@ -3,12 +3,15 @@ package com.openframe.api.service.rmm;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.data.document.rmm.ExecutionSource;
-import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.api.service.rmm.script.ScriptExecutionService;
+import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.rmm.script.ScriptExecution;
+
+import java.util.Optional;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.api.mapper.ScriptExecutionMapper;
-import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.document.rmm.filter.ExecutionFacetField;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -26,6 +29,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -59,6 +63,25 @@ class ScriptExecutionServiceTest {
         // create()/createBatch() now map the SAVED entity to a DTO, so save must echo its
         // argument back — otherwise the mock's null return NPEs in the mapper.
         lenient().when(scriptExecutionRepository.save(any(ScriptExecution.class))).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    @DisplayName("get: returns the mapped execution when it exists in the current tenant")
+    void get_returnsWhenPresent() {
+        ScriptExecution row = ScriptExecution.builder()
+                .id("doc-1").tenantId(TENANT_ID).executionId(EXECUTION_ID).scriptId(SCRIPT_ID).machineId(MACHINE_ID)
+                .build();
+        when(scriptExecutionRepository.findByTenantIdAndId(TENANT_ID, "doc-1")).thenReturn(Optional.of(row));
+
+        assertThat(service.get("doc-1").getId()).isEqualTo("doc-1");
+    }
+
+    @Test
+    @DisplayName("get: throws NotFoundException when the id is absent (or in another tenant)")
+    void get_throwsWhenMissing() {
+        when(scriptExecutionRepository.findByTenantIdAndId(TENANT_ID, "missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.get("missing")).isInstanceOf(NotFoundException.class);
     }
 
     @Test
@@ -263,16 +286,18 @@ class ScriptExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("list: a null filter forwards a null query filter (no status constraint)")
-    void list_nullFilter_forwardsNull() {
+    @DisplayName("list: a null filter still forwards the service-level source exclusion — bootstrap runs never reach History")
+    void list_nullFilter_forwardsSourceExclusion() {
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
         when(scriptExecutionRepository.findPage(eq(TENANT_ID), eq(ExecutionOwnerScope.forScript(SCRIPT_ID)), any(), any(), any(), any(), anyBoolean(), anyInt(), any()))
                 .thenReturn(List.of());
 
         service.list(ExecutionOwnerScope.forScript(SCRIPT_ID), null, null, null, pagination);
 
-        verify(scriptExecutionRepository).findPage(eq(TENANT_ID), eq(ExecutionOwnerScope.forScript(SCRIPT_ID)), eq(null), any(), any(), any(), anyBoolean(), anyInt(), any());
-        verify(scriptExecutionRepository).count(eq(TENANT_ID), eq(ExecutionOwnerScope.forScript(SCRIPT_ID)), eq(null), any());
+        ArgumentCaptor<ScriptExecutionQueryFilter> forwarded = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
+        verify(scriptExecutionRepository).findPage(eq(TENANT_ID), eq(ExecutionOwnerScope.forScript(SCRIPT_ID)), forwarded.capture(), any(), any(), any(), anyBoolean(), anyInt(), any());
+        assertThat(forwarded.getValue().getExcludedSources()).containsExactly(ExecutionSource.SYSTEM_BOOTSTRAP);
+        assertThat(forwarded.getValue().getStatuses()).isNull();
     }
 
     @Test

@@ -1,7 +1,7 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,7 +75,7 @@ class CustomScriptExecutionRepositoryImplIT extends BaseMongoIntegrationTest {
 
         CustomScriptExecutionRepository.LeafStatusCounts counts = repository.countLeavesByStatus(TENANT, EXEC);
 
-        assertThat(counts.running()).isEqualTo(2L);
+        assertThat(counts.inProgress()).isEqualTo(2L);
         assertThat(counts.failed()).isEqualTo(1L);
     }
 
@@ -87,7 +87,7 @@ class CustomScriptExecutionRepositoryImplIT extends BaseMongoIntegrationTest {
 
         CustomScriptExecutionRepository.LeafStatusCounts counts = repository.countLeavesByStatus(TENANT, EXEC);
 
-        assertThat(counts.running()).isZero();
+        assertThat(counts.inProgress()).isZero();
         assertThat(counts.failed()).isZero();
     }
 }

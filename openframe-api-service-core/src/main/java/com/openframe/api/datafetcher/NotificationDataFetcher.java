@@ -15,6 +15,7 @@ import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
 import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.notification.readstate.NotificationReadStateService;
 import com.openframe.security.authentication.ActorType;
@@ -27,7 +28,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -88,12 +88,18 @@ public class NotificationDataFetcher {
     @DgsQuery
     public List<UnreadCategoryCount> unreadCountsByCategory() {
         Recipient r = currentRecipient();
-        Map<NotificationCategory, Long> counts = readStateService.unreadCountsByCategory(r.id(), r.type());
-        List<UnreadCategoryCount> result = new ArrayList<>(counts.size());
-        for (Map.Entry<NotificationCategory, Long> entry : counts.entrySet()) {
-            result.add(new UnreadCategoryCount(entry.getKey(), entry.getValue()));
-        }
-        return result;
+        String recipientId = r.id();
+        RecipientType recipientType = r.type();
+        Map<NotificationCategory, Long> counts = readStateService.unreadCountsByCategory(recipientId, recipientType);
+        return notificationMapper.toCategoryCounts(counts);
+    }
+
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
+    @DgsMutation
+    public long markNotificationsReadForEntity(@InputArgument NotificationEntityType entityType,
+                                               @InputArgument String entityId) {
+        Recipient r = currentRecipient();
+        return readStateService.markEntityAsRead(r.id(), r.type(), entityType, entityId);
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")

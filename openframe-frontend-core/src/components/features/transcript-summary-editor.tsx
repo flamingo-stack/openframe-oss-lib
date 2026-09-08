@@ -1,7 +1,5 @@
-"use client";
+'use client';
 
-import React from 'react';
-import { Sparkles } from 'lucide-react';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
@@ -95,31 +93,24 @@ export function TranscriptSummaryEditor({
         <div className="mb-2">
           <div className="flex items-center gap-2">
             <Label htmlFor="video-summary">{videoSummaryLabel}</Label>
-            {isAIGenerated && (
-              <AIGeneratedBadge />
-            )}
+            {isAIGenerated && <AIGeneratedBadge />}
             {videoSummaryConfidence !== undefined && videoSummaryConfidence !== null && (
-              <ConfidenceBadge
-                confidence={videoSummaryConfidence}
-                showLabel={true}
-                showPercentage={true}
-                size="sm"
-              />
+              <ConfidenceBadge confidence={videoSummaryConfidence} showLabel={true} showPercentage={true} size="sm" />
             )}
           </div>
-          <p className="text-h6 text-ods-text-secondary mt-1">{videoSummaryHelperText}</p>
+          <p className="mt-1 text-ods-text-secondary text-h6">{videoSummaryHelperText}</p>
         </div>
         <div
-          className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
+          className="overflow-hidden rounded-lg border border-ods-border bg-ods-card"
           style={{ minHeight: `${videoSummaryMinHeight}px` }}
         >
           <Textarea
             id="video-summary"
             value={videoSummary}
-            onChange={(e) => onVideoSummaryChange(e.target.value)}
+            onChange={e => onVideoSummaryChange(e.target.value)}
             placeholder={videoSummaryPlaceholder}
             disabled={disabled}
-            className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
+            className="h-full w-full resize-none border-0 bg-transparent p-4 text-ods-text-primary text-code placeholder:text-ods-text-secondary/50 focus:outline-none focus:ring-0"
             style={{ minHeight: `${videoSummaryMinHeight}px`, lineHeight: '1.6' }}
           />
         </div>
@@ -130,31 +121,24 @@ export function TranscriptSummaryEditor({
         <div className="mb-2">
           <div className="flex items-center gap-2">
             <Label htmlFor="transcript">{transcriptLabel}</Label>
-            {isAIGenerated && (
-              <AIGeneratedBadge />
-            )}
+            {isAIGenerated && <AIGeneratedBadge />}
             {transcriptConfidence !== undefined && transcriptConfidence !== null && (
-              <ConfidenceBadge
-                confidence={transcriptConfidence}
-                showLabel={true}
-                showPercentage={true}
-                size="sm"
-              />
+              <ConfidenceBadge confidence={transcriptConfidence} showLabel={true} showPercentage={true} size="sm" />
             )}
           </div>
-          <p className="text-h6 text-ods-text-secondary mt-1">{transcriptHelperText}</p>
+          <p className="mt-1 text-ods-text-secondary text-h6">{transcriptHelperText}</p>
         </div>
         <div
-          className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
+          className="overflow-hidden rounded-lg border border-ods-border bg-ods-card"
           style={{ minHeight: `${transcriptMinHeight}px` }}
         >
           <Textarea
             id="transcript"
             value={transcript}
-            onChange={(e) => onTranscriptChange(e.target.value)}
+            onChange={e => onTranscriptChange(e.target.value)}
             placeholder={transcriptPlaceholder}
             disabled={disabled}
-            className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
+            className="h-full w-full resize-none border-0 bg-transparent p-4 text-ods-text-primary text-code placeholder:text-ods-text-secondary/50 focus:outline-none focus:ring-0"
             style={{ minHeight: `${transcriptMinHeight}px`, lineHeight: '1.6' }}
           />
         </div>

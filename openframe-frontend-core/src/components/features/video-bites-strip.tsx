@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * <VideoBitesStrip> — THE unified public video-bites surface (Figma
@@ -25,21 +25,19 @@
  * starts only on hover (`<Video playOnHover>` — sound at 50%, muted fallback).
  */
 
-import React, { useMemo, useState } from 'react';
+import type React from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../utils/cn';
-import { useVideoWarmup } from './use-video-warmup';
-import { VideoHoverPreviewSurface } from './video-hover-preview';
+import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
+import { UserDisplay } from '../user-display';
 import { CardHitLayer } from './card-hit-layer';
+import { CardsStrip, STRIP_CELL_MAX_WIDTH } from './cards-strip';
+import { useVideoWarmup } from './use-video-warmup';
+import { DEFAULT_VIDEO_BITES_TITLE, sortBitesByCreatedAtDesc, type VideoBiteStripProfile } from './video-bites-shared';
+import { VideoHoverPreviewSurface } from './video-hover-preview';
 import { detectAspectRatio, RATIO_TO_CSS_ASPECT, ratioToCategory } from './video-ratio-tabs';
 import type { VideoTeaserWithRatio } from './video-ratio-tabs';
-import {
-  DEFAULT_VIDEO_BITES_TITLE,
-  sortBitesByCreatedAtDesc,
-  type VideoBiteStripProfile,
-} from './video-bites-shared';
-import { CardsStrip, STRIP_CELL_MAX_WIDTH } from './cards-strip';
-import { UserDisplay } from '../user-display';
-import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 
 // NOTE: the title constant / profile adapter / sort comparator live in the
 // server-safe leaf `video-bites-shared.ts` (its own published subpath). The
@@ -242,20 +240,43 @@ export function VideoBiteCard({
   const activate = () => (controlled ? onActivate?.(key) : setSelfActive(true));
   const deactivate = () => (controlled ? onDeactivate?.(key) : setSelfActive(false));
 
+  // Inline title editor auto-grow. The height is a DOM MEASUREMENT
+  // (`scrollHeight` of the wrapped text), so it is written to the node from a
+  // layout effect rather than from inside a callback ref. Dependency-less on
+  // purpose — that reproduces the callback ref's cadence exactly (an inline
+  // arrow ref is torn down and re-attached on every commit, so it re-measured
+  // every time), which is what keeps the box in step with a `bite.title` the
+  // parent changed from outside the editor. Null-guarded: the textarea only
+  // exists while `titleEditable`. Runs before paint, so a title that wraps to
+  // two lines never paints one frame at one line.
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
+  useIsomorphicLayoutEffect(() => {
+    const el = titleInputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 40)}px`;
+  });
+
   const navigate = () => {
     if (bite.onNavigate) bite.onNavigate();
     else onBiteNavigate?.(bite, index);
   };
 
-  const handlePointerEnter = () => { if (!isTouch) activate(); };
-  const handlePointerLeave = () => { if (!isTouch) deactivate(); };
-  const handleClick = () => { if (isTouch && !isActive) activate(); };
+  const handlePointerEnter = () => {
+    if (!isTouch) activate();
+  };
+  const handlePointerLeave = () => {
+    if (!isTouch) deactivate();
+  };
+  const handleClick = () => {
+    if (isTouch && !isActive) activate();
+  };
 
   // Bottom-docked detail (Figma node 4033:90369): title row + profile row +
   // chevron affordance. The WHOLE footer is the navigation target — it links
   // to the entity the bite originated from. In the editor the title row is
   // the inline title editor (edited directly on the card).
-  const titleClass = "text-h6 text-ods-text-primary";
+  const titleClass = 'text-h6 text-ods-text-primary';
   const overlayContent = (
     <>
       {titleEditable ? (
@@ -268,30 +289,29 @@ export function VideoBiteCard({
           placeholder="Title (optional)"
           aria-label="Bite title"
           rows={1}
-          onChange={e => {
-            e.target.style.height = 'auto';
-            e.target.style.height = `${Math.min(e.target.scrollHeight, 40)}px`;
-            onTitleChange?.(e.target.value);
-          }}
-          ref={el => {
-            if (el) {
-              el.style.height = 'auto';
-              el.style.height = `${Math.min(el.scrollHeight, 40)}px`;
-            }
-          }}
+          // No resize here: the textarea is CONTROLLED, so the height must
+          // follow the value React actually commits, not the one the user just
+          // typed. Sizing from the change event grew the box for text React
+          // then reverted whenever the parent did not adopt the new value
+          // (deferred/transition state, or a rejected edit), leaving a
+          // two-line-tall box over one line of text until some later commit.
+          onChange={e => onTitleChange?.(e.target.value)}
+          // `height` is intentionally absent from the class list / style — the
+          // layout effect above owns it, because it is a live measurement.
+          ref={titleInputRef}
           onBlur={e => onTitleCommit?.(e.target.value)}
           onClick={e => e.stopPropagation()}
           className={cn(
             titleClass,
-            'w-full max-h-10 resize-none overflow-hidden bg-transparent outline-none',
-            'placeholder:text-ods-text-secondary border-b border-transparent focus:border-ods-border',
+            'max-h-10 w-full resize-none overflow-hidden bg-transparent outline-none',
+            'border-b border-transparent placeholder:text-ods-text-secondary focus:border-ods-border',
           )}
         />
       ) : (
         bite.title && <p className={cn(titleClass, 'line-clamp-2')}>{bite.title}</p>
       )}
       {(profile || hasTarget) && (
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
           {profile && (
             <UserDisplay
               name={profile.name}
@@ -303,9 +323,7 @@ export function VideoBiteCard({
               className="flex-1"
             />
           )}
-          {hasTarget && (
-            <Chevron02RightIcon className="w-5 h-5 shrink-0 ml-auto text-ods-text-primary" />
-          )}
+          {hasTarget && <Chevron02RightIcon className="ml-auto h-5 w-5 shrink-0 text-ods-text-primary" />}
         </div>
       )}
     </>
@@ -315,9 +333,9 @@ export function VideoBiteCard({
   // black — NOT a glassy backdrop blur; Figma has no background blur here),
   // full soft-grey border, p-16/gap-16, large soft drop shadow.
   const overlayClass = cn(
-    'absolute inset-x-0 bottom-0 p-3 gap-2 bg-black/75 border border-ods-border shadow-2xl',
+    'absolute inset-x-0 bottom-0 gap-2 border border-ods-border bg-black/75 p-3 shadow-2xl',
     'flex flex-col transition-opacity duration-200',
-    isActive ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100',
+    isActive ? 'opacity-100' : 'opacity-0 group-focus-within/card:opacity-100 group-hover/card:opacity-100',
     // Non-interactive while invisible so it never swallows clicks on the
     // resting card / player controls.
     isActive ? 'pointer-events-auto' : 'pointer-events-none',
@@ -385,7 +403,7 @@ export function VideoBiteCard({
       // hover area is exactly this card root: media + overlay + toolbar.
       data-strip-card-key={key}
       className={cn(
-        'relative rounded-md border border-ods-border bg-ods-card overflow-hidden group/card',
+        'group/card relative overflow-hidden rounded-md border border-ods-border bg-ods-card',
         height !== undefined ? 'shrink-0' : 'w-full',
         className,
       )}

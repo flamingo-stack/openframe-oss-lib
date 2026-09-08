@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 interface LivestormIconProps extends React.SVGProps<SVGSVGElement> {
   className?: string;
@@ -12,12 +12,7 @@ interface LivestormIconProps extends React.SVGProps<SVGSVGElement> {
  * Default color is 'currentColor' for easy styling
  */
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function LivestormIcon({
-  className = '',
-  size = 24,
-  color = 'currentColor',
-  ...props
-}: LivestormIconProps) {
+export function LivestormIcon({ className = '', size = 24, color = 'currentColor', ...props }: LivestormIconProps) {
   return (
     <svg
       width={size}

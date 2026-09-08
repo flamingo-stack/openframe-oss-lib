@@ -4,6 +4,7 @@ import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.notification.NotificationView;
+import com.openframe.api.dto.notification.UnreadCategoryCount;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -24,6 +26,12 @@ public class GraphQLNotificationMapper {
 
     public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
         return CursorPaginationCriteria.fromConnectionArgs(args);
+    }
+
+    public List<UnreadCategoryCount> toCategoryCounts(Map<NotificationCategory, Long> counts) {
+        return counts.entrySet().stream()
+                .map(entry -> new UnreadCategoryCount(entry.getKey(), entry.getValue()))
+                .toList();
     }
 
     public NotificationView toView(Notification notification, boolean read) {

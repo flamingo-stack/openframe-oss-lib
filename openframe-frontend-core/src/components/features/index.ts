@@ -1,7 +1,7 @@
-"use client"
+'use client';
 
 // Feature Components exports
-export { DynamicThemeProvider, useDynamicTheme } from '../providers/dynamic-theme-provider'
+export { DynamicThemeProvider, useDynamicTheme } from '../providers/dynamic-theme-provider';
 // Canonical ODS theme system — thin wrapper over `next-themes`
 // (manual light/dark, default dark, no-flash handled by next-themes).
 // Headless by design: apps build their own toggle button via the lib's
@@ -16,40 +16,40 @@ export {
   type Theme,
   type ThemeProviderProps,
   type UseThemeToggleResult,
-} from '../providers/theme-provider'
-export * from './array-entry-manager'
-export * from './auth'
-export * from './auth-providers-list'
-export * from './changelog-manager'
-export * from './changelog-sections-manager'
-export * from './clickup-tasks-manager'
-export * from './command-box'
-export * from './entity-tag-badges'
-export * from './error-boundary'
-export * from './figma-prototype-viewer'
-export * from './filters-dropdown'
-export * from './github-releases-manager'
-export * from './knowledge-base-links-manager'
-export * from './loading-provider'
-export * from './media-gallery-manager'
-export * from './more-about-button'
-export * from './os-type-badge'
-export * from './os-type-badge-group'
-export * from './parallax-image-showcase'
-export * from './paths-display'
-export * from './platform-badge'
-export * from './platform-filter'
-export * from './provider-button'
-export * from './push-button-selector'
-export * from './release-media-manager'
-export * from './section-selector'
-export * from './select-button'
-export * from './seo-editor-preview'
-export * from './social-links-manager'
-export * from './start-with-openframe-button'
-export * from './status-filter-component'
-export * from './tags-selector'
-export * from './warning-block'
+} from '../providers/theme-provider';
+export * from './array-entry-manager';
+export * from './auth';
+export * from './auth-providers-list';
+export * from './changelog-manager';
+export * from './changelog-sections-manager';
+export * from './clickup-tasks-manager';
+export * from './command-box';
+export * from './entity-tag-badges';
+export * from './error-boundary';
+export * from './figma-prototype-viewer';
+export * from './filters-dropdown';
+export * from './github-releases-manager';
+export * from './knowledge-base-links-manager';
+export * from './loading-provider';
+export * from './media-gallery-manager';
+export * from './more-about-button';
+export * from './os-type-badge';
+export * from './os-type-badge-group';
+export * from './parallax-image-showcase';
+export * from './paths-display';
+export * from './platform-badge';
+export * from './platform-filter';
+export * from './provider-button';
+export * from './push-button-selector';
+export * from './release-media-manager';
+export * from './section-selector';
+export * from './select-button';
+export * from './seo-editor-preview';
+export * from './social-links-manager';
+export * from './start-with-openframe-button';
+export * from './status-filter-component';
+export * from './tags-selector';
+export * from './warning-block';
 // Unified video primitives — single source of truth across all platforms.
 // `<Video>` replaces the deleted `<VideoPlayer>` + `<YouTubeEmbed>` pair;
 // `<CardsStrip>` is THE horizontal card-strip engine (render-prop mode for
@@ -58,40 +58,40 @@ export * from './warning-block'
 // wrappers (`<VideoBitesDisplay>` is a deprecated shim over the strip);
 // `video-ratio-tabs` keeps the aspect-ratio primitives (tabs/grid = admin-only);
 // `video-bites-shared` is the SERVER-SAFE leaf (also its own published subpath).
-export * from './cards-strip'
-export * from './video'
-export * from './video-center-badge'
-export * from './video-ratio-tabs'
-export * from './video-bites-shared'
-export * from './video-bites-strip'
-export * from './video-bites-display'
-export * from './card-hit-layer'
-export * from './video-hover-preview'
-export * from './entity-video-section'
-export * from './walkthrough-video'
-export * from './use-walkthrough-video'
-export * from './use-video-warmup'
-export * from './captions-url'
-export * from './use-captions'
-export * from './video-source-selector'
-export * from './transcript-summary-editor'
-export * from './subtitles-editor'
-export * from './highlight-video-section'
-export * from './highlight-config-section'
-export * from './entity-summary-editor'
-export * from './transcribe-summarize-section'
-export * from './video-clips-section'
-export * from './highlight-generation-section'
-export * from './highlight-video-preview'
-export * from './transcribe-and-summarize-combined-section'
-export * from './highlight-video-combined-section'
-export * from './view-toggle'
+export * from './cards-strip';
+export * from './video';
+export * from './video-center-badge';
+export * from './video-ratio-tabs';
+export * from './video-bites-shared';
+export * from './video-bites-strip';
+export * from './video-bites-display';
+export * from './card-hit-layer';
+export * from './video-hover-preview';
+export * from './entity-video-section';
+export * from './walkthrough-video';
+export * from './use-walkthrough-video';
+export * from './use-video-warmup';
+export * from './captions-url';
+export * from './use-captions';
+export * from './video-source-selector';
+export * from './transcript-summary-editor';
+export * from './subtitles-editor';
+export * from './highlight-video-section';
+export * from './highlight-config-section';
+export * from './entity-summary-editor';
+export * from './transcribe-summarize-section';
+export * from './video-clips-section';
+export * from './highlight-generation-section';
+export * from './highlight-video-preview';
+export * from './transcribe-and-summarize-combined-section';
+export * from './highlight-video-combined-section';
+export * from './view-toggle';
 // AI Enrich components
-export * from './ai-enrich'
-export * from './policy-configuration-panel'
-export * from './waitlist-form'
-export * from './notifications'
-export * from './time-tracker'
-export * from './board'
-export * from './sortable-list'
-export * from './ticket-status-config-list'
+export * from './ai-enrich';
+export * from './policy-configuration-panel';
+export * from './waitlist-form';
+export * from './notifications';
+export * from './time-tracker';
+export * from './board';
+export * from './sortable-list';
+export * from './ticket-status-config-list';

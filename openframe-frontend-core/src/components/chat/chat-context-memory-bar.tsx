@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<ChatContextMemoryBar>` — the composer's CONTEXT MEMORY strip
@@ -21,28 +21,28 @@
  * has nothing remembered, so it has no permanent footprint.
  */
 
-import type * as React from 'react'
-import { useEffect, useRef, useState } from 'react'
-import { Ellipsis01Icon } from '../icons-v2-generated/interface/ellipsis-01-icon'
-import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon'
-import { cn } from '../../utils/cn'
-import { CONTEXT_ICON_CLASS, CONTEXT_LABEL_CLASS, CONTEXT_ROW_CLASS } from './context-items-list'
-import type { ChatContextItem } from './types/context-item.types'
+import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { cn } from '../../utils/cn';
+import { Ellipsis01Icon } from '../icons-v2-generated/interface/ellipsis-01-icon';
+import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { CONTEXT_ICON_CLASS, CONTEXT_LABEL_CLASS, CONTEXT_ROW_CLASS } from './context-items-list';
+import type { ChatContextItem } from './types/context-item.types';
 
-const itemKey = (item: { type: string; id: string }) => `${item.type}:${item.id}`
+const itemKey = (item: { type: string; id: string }) => `${item.type}:${item.id}`;
 
 export interface ChatContextMemoryBarProps {
   /** Remembered entities, most-recent-first. Empty → the bar renders nothing. */
-  items: ChatContextItem[]
+  items: ChatContextItem[];
   /** Drop one entity from the host's memory (dropdown row `×`). When omitted the
    *  list is read-only. */
-  onRemove?: (item: ChatContextItem) => void
+  onRemove?: (item: ChatContextItem) => void;
   /** Lead-glyph resolver — the composer passes its entity-type icon map, so the
    *  rows match the picker and the assigned chips. */
-  resolveIcon?: (item: ChatContextItem) => React.ReactNode
+  resolveIcon?: (item: ChatContextItem) => ReactNode;
   /** External disable (e.g. while a message is streaming). */
-  disabled?: boolean
-  className?: string
+  disabled?: boolean;
+  className?: string;
 }
 
 export function ChatContextMemoryBar({
@@ -52,14 +52,15 @@ export function ChatContextMemoryBar({
   disabled = false,
   className,
 }: ChatContextMemoryBarProps) {
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // Removing the last remembered entity unmounts the bar; close first so a
-  // stale popover can't outlive its trigger.
-  useEffect(() => {
-    if (items.length === 0) setOpen(false)
-  }, [items.length])
+  // stale popover can't outlive its trigger. Closed while rendering, not from
+  // an effect — an effect runs AFTER the commit that already removed the
+  // trigger, which is exactly the frame this exists to prevent. Guarded on
+  // `open`, so the extra render pass takes the early exit.
+  if (items.length === 0 && open) setOpen(false);
 
   // Outside-press close. Registered only while open. The root wraps BOTH the
   // trigger and the popover, so a press on the `⋯` (inside root) is ignored here
@@ -72,20 +73,20 @@ export function ChatContextMemoryBar({
   // wasn't closing it. Capture runs top-down before any of that, so the handler
   // always fires. `touchstart` covers tap-to-dismiss on touch devices.
   useEffect(() => {
-    if (!open) return
+    if (!open) return undefined;
     const onOutside = (e: Event) => {
-      if (rootRef.current?.contains(e.target as Node)) return
-      setOpen(false)
-    }
-    document.addEventListener('mousedown', onOutside, true)
-    document.addEventListener('touchstart', onOutside, true)
+      if (rootRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', onOutside, true);
+    document.addEventListener('touchstart', onOutside, true);
     return () => {
-      document.removeEventListener('mousedown', onOutside, true)
-      document.removeEventListener('touchstart', onOutside, true)
-    }
-  }, [open])
+      document.removeEventListener('mousedown', onOutside, true);
+      document.removeEventListener('touchstart', onOutside, true);
+    };
+  }, [open]);
 
-  if (items.length === 0) return null
+  if (items.length === 0) return null;
 
   return (
     // `relative` anchors the popover to this strip; `bottom-full` floats it
@@ -98,12 +99,12 @@ export function ChatContextMemoryBar({
       )}
       onKeyDown={e => {
         if (e.key === 'Escape' && open) {
-          e.preventDefault()
-          setOpen(false)
+          e.preventDefault();
+          setOpen(false);
         }
       }}
     >
-      <p className="min-w-0 flex-1 truncate text-h6 text-ods-text-secondary">
+      <p className="min-w-0 flex-1 truncate text-ods-text-secondary text-h6">
         {items.length} recently viewed {items.length === 1 ? 'item' : 'items'} in context
       </p>
 
@@ -155,5 +156,5 @@ export function ChatContextMemoryBar({
         </div>
       )}
     </div>
-  )
+  );
 }

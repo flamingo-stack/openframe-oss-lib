@@ -60,7 +60,12 @@ export const TicketDetails: Story = {
       {
         id: 'status',
         label: 'Status',
-        value: { type: 'status', status: 'AI_ASSISTANCE', options: statusOptions, onSelect: id => alert(`Status: ${id}`) },
+        value: {
+          type: 'status',
+          status: 'AI_ASSISTANCE',
+          options: statusOptions,
+          onSelect: id => alert(`Status: ${id}`),
+        },
       },
     ],
   },

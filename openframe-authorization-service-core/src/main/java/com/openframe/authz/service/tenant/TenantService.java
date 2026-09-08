@@ -61,10 +61,6 @@ public class TenantService {
         return tenantRepository.findById(tenantId);
     }
 
-    public Optional<Tenant> findFirst() {
-        return tenantRepository.findAll().stream().findFirst();
-    }
-
     /**
      * Save tenant
      */

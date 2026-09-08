@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * THE generic, embeddable per-platform demo-video widget, in the two placements
@@ -54,33 +54,38 @@
  *   - open: pause the hover preview synchronously (pointerdown), force the
  *     surface inactive for the whole open duration, reset the YouTube suspend.
  *   - close: snapshot then pause the theater player (file) / suspend (YouTube).
- *     NOTE: this theater's Content carries no exit animation, so Radix unmounts
- *     it in the same commit and the iframe dies before the suspend postMessage
- *     can run. The suspend path exists for hosts that DO animate the exit; here
- *     the unmount itself is what stops the audio.
+ *     NOTE: Radix wraps Portal and Content in `Presence`, which dispatches
+ *     UNMOUNT from its OWN layout effect — so the Content survives one extra
+ *     render after `open` flips false, even with no exit animation. That extra
+ *     render is what makes the falling-edge `useLayoutEffect` below safe: the
+ *     theater player is still mounted when it runs. (An earlier version of this
+ *     note claimed the unmount happens in the same commit; it does not, and
+ *     that mistake is what produced a since-deleted 37-finding lint exemption.)
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import type React from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
-import { Button } from '../ui/button';
-import { SquareAvatar } from '../ui/square-avatar';
-import { DialogPortal, DialogOverlay } from '../ui/dialog';
-import { VideoHoverPreviewSurface } from './video-hover-preview';
-import { CardHitLayer } from './card-hit-layer';
-import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
-import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { VolumeUpIcon } from '../icons-v2-generated/audio-and-visual/volume-up-icon';
-import { PauseIcon } from '../icons-v2-generated/media-playback/pause-icon';
-import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
-import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-xmark-icon';
-import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
 import {
   WALKTHROUGH_VIDEO_DISMISS_KEY,
   isWalkthroughDismissed,
   dismissWalkthrough,
 } from '../../utils/dismissal-storage';
 import { WALKTHROUGH_OPEN_QUERY_PARAM } from '../../utils/walkthrough-deep-link';
+import { VolumeUpIcon } from '../icons-v2-generated/audio-and-visual/volume-up-icon';
+import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-xmark-icon';
+import { PauseIcon } from '../icons-v2-generated/media-playback/pause-icon';
+import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
+import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { Button } from '../ui/button';
+import { DialogPortal, DialogOverlay } from '../ui/dialog';
+import { SquareAvatar } from '../ui/square-avatar';
+import { CardHitLayer } from './card-hit-layer';
+import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
+import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
+import { VideoHoverPreviewSurface } from './video-hover-preview';
 
 /** Wire-shape data for the widget. Kept as the shared contract the hub DAL
  *  re-exports as `PublicWalkthroughVideo & { id }`. `mainVideoUrl`/`youtubeUrl`
@@ -158,6 +163,27 @@ type WalkthroughVideoProps = FloatingWalkthroughVideoProps & { placement: 'float
  *  which must agree or a finished video reopens at its own last frame. */
 const isAtEnd = (duration: number, time: number) => duration > 0 && duration - time < 1;
 
+/** The theater's load-time seed, computed from whatever card player is LIVE.
+ *  Pure and module-scope on purpose: the only reader is the host-open sync,
+ *  which runs during render (see there for why it cannot be an effect), and a
+ *  helper keeps that block down to a single ref read instead of six. */
+function theaterSeedFromLive(
+  live: VideoPlayerHandle | null,
+  fallbackTime: number,
+  fallbackMuted: boolean,
+): { time: number; muted: boolean } {
+  const time = live?.getCurrentTime() ?? 0;
+  const atEnd = isAtEnd(live?.getDuration() ?? 0, time);
+  return {
+    // At end -> start over, never rewind to an unrelated older anchor.
+    time: atEnd ? 0 : time > 0.5 ? time : fallbackTime,
+    // Trust the live element only when it has actually been playing; a
+    // freshly remounted poster-mode player reports muted=false and would
+    // silently discard the user's last explicit mute.
+    muted: live && time > 0.5 ? live.getMuted() : fallbackMuted,
+  };
+}
+
 const WALKTHROUGH_Z = 'z-[9980]'; // one layer BELOW the chat dock (z-[9990]).
 
 interface Handoff {
@@ -194,12 +220,14 @@ function WalkthroughVideo({
   // --- mount gate (never LCP; cookie read happens post-delay, no hydration mismatch) ---
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const hasVideo = video != null;
+  const videoId = video?.id;
   useEffect(() => {
     let idleHandle: number | null = null;
     // Wait for the data: on the embedder path `video` starts null, so the
     // dismissal id was 'dismissed' on the first pass and a dismissed card
     // flashed for the length of a second appear-delay before hiding.
-    if (!video) return;   // wait for data — see the id-based dep below
+    if (!hasVideo) return undefined; // wait for data — see the id-based dep below
     const timer = setTimeout(() => {
       const reveal = () => {
         if (dismissEnabled && isWalkthroughDismissed(storageKey, dismissalId)) {
@@ -222,20 +250,29 @@ function WalkthroughVideo({
       const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback;
       if (idleHandle !== null && typeof cic === 'function') cic(idleHandle);
     };
-    // `video?.id`, not the object: a new identity (embedder refetch, re-seeded
+    // `videoId`, not the object: a new identity (embedder refetch, re-seeded
     // RSC payload) would otherwise restart the appear delay.
-  }, [appearDelayMs, dismissEnabled, storageKey, dismissalId, video?.id]);
+  }, [appearDelayMs, dismissEnabled, storageKey, dismissalId, hasVideo, videoId]);
 
-  // --- environment preferences (read after mount; no SSR access) ---
-  const [previewSuppressed, setPreviewSuppressed] = useState(false);
-  useEffect(() => {
+  // --- environment preferences (read after hydration; no SSR access) ---
+  // Derived, not stored: both inputs are plain reads of the environment, and
+  // the only reason they could not happen during render was that neither exists
+  // on the server. `useIsHydrated` states exactly that gate, so the answer is
+  // available in the first render that can act on it instead of arriving a
+  // commit later — the commit in which a reduced-motion visitor had already
+  // been handed a hoverable preview.
+  const hydrated = useIsHydrated();
+  const previewSuppressed = useMemo(() => {
+    if (!hydrated) return false;
     try {
       const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
       const conn = (navigator as unknown as { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
       const saveData = conn?.saveData === true || conn?.effectiveType === '2g' || conn?.effectiveType === 'slow-2g';
-      setPreviewSuppressed(Boolean(reducedMotion || saveData));
-    } catch { /* ignore */ }
-  }, []);
+      return Boolean(reducedMotion || saveData);
+    } catch {
+      return false;
+    }
+  }, [hydrated]);
 
   // --- controlled/uncontrolled open ---
   // Deep link: read ONCE, synchronously, on the first client render — the
@@ -258,9 +295,7 @@ function WalkthroughVideo({
   // OPEN transition only (the prevOpen sync below), right before a fresh
   // theater constructs — never on close, where the closing player is still
   // mounted and a prop flip would restart it (see the sync's comment).
-  const [pausedOpenSession, setPausedOpenSession] = useState(
-    Boolean(defaultOpen && defaultOpenPaused) || deepLinkHit,
-  );
+  const [pausedOpenSession, setPausedOpenSession] = useState(Boolean(defaultOpen && defaultOpenPaused) || deepLinkHit);
 
   // --- refs & continuation state ---
   const previewHandleRef = useRef<VideoPlayerHandle | null>(null);
@@ -281,7 +316,7 @@ function WalkthroughVideo({
   const [handoff, setHandoff] = useState<Handoff | null>(null);
   const [suspended, setSuspended] = useState(false);
   const [theaterStart, setTheaterStart] = useState<{ time: number; muted: boolean }>({ time: 0, muted: false });
-  const [footerHidden, setFooterHidden] = useState(false);
+  const [footerObservation, setFooterObservation] = useState<{ key: string; hidden: boolean } | null>(null);
   const [cardFallback, setCardFallback] = useState<VideoMutedFallbackState>({ muted: false, blocked: false });
   // Card-player transport state, driving the persistent mute/play TOGGLES.
   // Separate from `cardFallback` (which is the autoplay-blocked prompt).
@@ -302,30 +337,32 @@ function WalkthroughVideo({
   const previewAllowed = !previewSuppressed && !isYouTube;
 
   // --- footer fade (re-query on pathname change; null-tolerant) ---
+  // The observation is TAGGED with the conditions it was made under, and the
+  // flag is derived by comparing that tag to the current ones. That is what
+  // removes the three `setFooterHidden(false)` resets the effect used to
+  // perform — each of them a synchronous setState in an effect body — and it
+  // covers a case they did not: an observation left over from a selector that
+  // has since stopped matching now expires instead of pinning the card hidden.
+  const footerFadeKey = `${mounted ? 1 : 0}|${inline ? 1 : 0}|${hideNearSelector}|${pathname}`;
+  const footerHidden = footerObservation?.key === footerFadeKey && footerObservation.hidden;
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted) return undefined;
     // An inline card scrolls WITH the page — fading it out over the footer
     // would blank the very block the visitor scrolled down to.
-    if (inline) {
-      setFooterHidden(false);
-      return;
-    }
+    if (inline) return undefined;
     const el = typeof document !== 'undefined' ? document.querySelector(hideNearSelector) : null;
-    if (!el || typeof IntersectionObserver === 'undefined') {
-      setFooterHidden(false);
-      return;
-    }
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
     const io = new IntersectionObserver(
-      entries => setFooterHidden(entries[0]?.isIntersecting ?? false),
+      entries => setFooterObservation({ key: footerFadeKey, hidden: entries[0]?.isIntersecting ?? false }),
       { rootMargin: '0px 0px -40px 0px' },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [mounted, inline, hideNearSelector, pathname]);
+  }, [mounted, inline, hideNearSelector, pathname, footerFadeKey]);
 
   // --- tab-hidden: pause resume-mode playback, keep the timestamp ---
   useEffect(() => {
-    if (!resumeMode) return;
+    if (!resumeMode) return undefined;
     const onVis = () => {
       if (document.visibilityState === 'hidden') {
         const h = resumeHandleRef.current;
@@ -347,12 +384,23 @@ function WalkthroughVideo({
   // Depends on cardMode too: a player that MOUNTS while the card is already
   // hidden (e.g. the footer scrolled into view during the theater) would
   // otherwise autoplay behind an invisible, pointer-inert card.
+  // The two STATE halves are adjusted while rendering: behind the footer the
+  // card is pointer-inert, so "paused" and "not hovered" are simply what being
+  // hidden MEANS. Both are guarded on the state they write, so the render pass
+  // React schedules for them takes the early exit — and doing it here means the
+  // transport toggles never commit a frame reading "playing" over a card the
+  // visitor cannot reach.
+  if (footerHidden && !cardPaused) setCardPaused(true);
+  if (footerHidden && hovered) setHovered(false);
+
   useEffect(() => {
     if (!footerHidden) return;
     const h = resumeHandleRef.current ?? previewHandleRef.current;
-    try { h?.pause(); } catch { /* ignore */ }
-    setCardPaused(true);
-    setHovered(false);
+    try {
+      h?.pause();
+    } catch {
+      /* ignore */
+    }
     // `resumeMode`/`hovered` (not the derived cardMode, declared below) are the
     // inputs that decide whether a player is mounted.
   }, [footerHidden, resumeMode, hovered]);
@@ -367,7 +415,13 @@ function WalkthroughVideo({
   // below. Without it, a controlled host flipping `open` in response to
   // `onOpenChange` looks identical to a genuinely host-originated open, and
   // the sync clobbers the seed/snapshot the handler just computed.
-  const selfDrivenForRef = useRef<boolean | null>(null);
+  //
+  // STATE, not a ref: the sync's rising edge has to read it during render, and
+  // it is a plain "which transition did I originate" latch, not an imperative
+  // handle. Every write is an event handler that flips `open` in the same
+  // batch, so the value is always committed by the render that observes it.
+  // Compared, never cleared — a discarded render attempt decides identically.
+  const [selfDrivenFor, setSelfDrivenFor] = useState<boolean | null>(null);
 
   // Set on every close so the focus Radix restores to the hit layer can't be
   // mistaken for the user tabbing to the card. CONSUMED BY THE FOCUS HANDLER
@@ -375,25 +429,28 @@ function WalkthroughVideo({
   const justClosedRef = useRef(false);
   const justClosedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const commitOpen = useCallback((next: boolean) => {
-    if (!next) {
-      // CONSUMED BY THE FOCUS HANDLER, not by a timer racing Radix.
-      // Radix's FocusScope restores focus from its OWN `setTimeout(…, 0)`,
-      // registered during cleanup — i.e. AFTER any timer we schedule here.
-      // A timer-cleared latch was therefore always false by the time the
-      // restore landed, and Escape-close still restarted preview audio.
-      // The timer below is only a safety valve for the case where no focus
-      // restoration arrives at all (host-driven close, no focus to return).
-      justClosedRef.current = true;
-      if (justClosedTimerRef.current) clearTimeout(justClosedTimerRef.current);
-      justClosedTimerRef.current = setTimeout(() => {
-        justClosedTimerRef.current = null;
-        justClosedRef.current = false;
-      }, 400);
-    }
-    if (openProp === undefined) setOpenState(next);
-    onOpenChange?.(next);
-  }, [openProp, onOpenChange]);
+  const commitOpen = useCallback(
+    (next: boolean) => {
+      if (!next) {
+        // CONSUMED BY THE FOCUS HANDLER, not by a timer racing Radix.
+        // Radix's FocusScope restores focus from its OWN `setTimeout(…, 0)`,
+        // registered during cleanup — i.e. AFTER any timer we schedule here.
+        // A timer-cleared latch was therefore always false by the time the
+        // restore landed, and Escape-close still restarted preview audio.
+        // The timer below is only a safety valve for the case where no focus
+        // restoration arrives at all (host-driven close, no focus to return).
+        justClosedRef.current = true;
+        if (justClosedTimerRef.current) clearTimeout(justClosedTimerRef.current);
+        justClosedTimerRef.current = setTimeout(() => {
+          justClosedTimerRef.current = null;
+          justClosedRef.current = false;
+        }, 400);
+      }
+      if (openProp === undefined) setOpenState(next);
+      onOpenChange?.(next);
+    },
+    [openProp, onOpenChange],
+  );
 
   // Synchronous preview pause on pointerdown — the window-capture activation
   // waiter unmutes a pre-activation preview on the first pointerdown; without
@@ -403,11 +460,15 @@ function WalkthroughVideo({
     // player, so pausing only the preview left a playing card audible through
     // the whole pointerdown -> click -> commit window.
     const h = resumeHandleRef.current ?? previewHandleRef.current;
-    try { h?.pause(); } catch { /* ignore */ }
+    try {
+      h?.pause();
+    } catch {
+      /* ignore */
+    }
     // Keep the toggle honest: an aborted press (pointerdown then drag away)
     // otherwise left it reading "Pause" over a paused video.
     setCardPaused(true);
-  }, []);
+  }, [setCardPaused]);
 
   const openTheater = useCallback(() => {
     // Captured BEFORE `pausePreviewNow()` below. NOTE this only helps keyboard
@@ -438,8 +499,7 @@ function WalkthroughVideo({
     // permanently in-viewport and is NEVER unmounted — it keeps currentTime
     // from a hover abandoned minutes ago. Reading it unconditionally made
     // "Play Demo Video" silently start 10s in. Only a LIVE mode may seed.
-    const liveHandle =
-      resumeHandleRef.current ?? (cardModeRef.current === 'preview' ? previewHandleRef.current : null);
+    const liveHandle = resumeHandleRef.current ?? (cardModeRef.current === 'preview' ? previewHandleRef.current : null);
     const liveTime = liveHandle?.getCurrentTime() ?? 0;
     // A preview that ran to completion keeps its currentTime, so without the
     // same at-end guard the close path uses, clicking the card would open the
@@ -449,7 +509,7 @@ function WalkthroughVideo({
     const start = {
       // At end -> start over. Falling back to `handoff.time` here would rewind
       // to an unrelated older anchor (e.g. 3:20) instead of restarting.
-      time: liveAtEnd ? 0 : (liveTime > 0.5 ? liveTime : (handoff?.time ?? 0)),
+      time: liveAtEnd ? 0 : liveTime > 0.5 ? liveTime : (handoff?.time ?? 0),
       // Live element wins over remembered intent (the theater's own chrome may
       // have changed it) — EXCEPT when the element is muted only because
       // autoplay policy forced it, which is not intent.
@@ -460,37 +520,43 @@ function WalkthroughVideo({
       // Trust the live element only when it has actually been playing; a
       // freshly remounted poster-mode player always reports muted=false and
       // would silently discard the user's last explicit mute.
-      muted: (cardFallback.muted && !userMutedRef.current)
-        ? false
-        : ((liveHandle && (liveTime > 0.5 || liveWasPlaying))
+      muted:
+        cardFallback.muted && !userMutedRef.current
+          ? false
+          : liveHandle && (liveTime > 0.5 || liveWasPlaying)
             ? liveHandle.getMuted()
-            : userMutedRef.current),
+            : userMutedRef.current,
     };
     setTheaterStart(start);
-    setHovered(false);          // force preview inactive
-    setSuspended(false);        // reset YouTube suspend for this open
+    setHovered(false); // force preview inactive
+    setSuspended(false); // reset YouTube suspend for this open
     endedLatchRef.current = false;
-    setHandoff(null);           // resume player unmounts
-    selfDrivenForRef.current = true;
+    setHandoff(null); // resume player unmounts
+    setSelfDrivenFor(true);
     commitOpen(true);
-  }, [handoff, cardFallback.muted, commitOpen]);
+  }, [handoff, cardFallback.muted, commitOpen, pausePreviewNow, setHovered, setSuspended, setHandoff]);
 
   // Sync for open/close transitions the card did NOT originate — a host
   // driving the controlled `open` prop from its own UI. Card-originated
-  // transitions are latched by `selfDrivenRef` and skipped here, because the
+  // transitions are latched by `selfDrivenFor` and skipped here, because the
   // handler already did the seeding (and a controlled host flips `open` in
   // RESPONSE to that handler, which is indistinguishable from a host-driven
   // change without the latch). `defaultOpen` is NOT covered: it is the
   // uncontrolled initial value, and the initial `theaterStart` already equals
-  // what this seed would compute. This MUST run during the
-  // render that flips `open` — not in an effect: the Dialog's Content (and
-  // therefore MuxPlayer) mounts in that same render, and `startTime` /
-  // `autoPlay` / `startMuted` are LOAD-TIME props read once at construction.
-  // An effect commits one render too late, so the player would already have
-  // been built from the previous `theaterStart` and a stale `suspended`
-  // would post `pauseVideo` at mount. This is React's documented
-  // "adjust state while rendering" pattern; the extra render is discarded
-  // before children are committed.
+  // what this seed would compute.
+  //
+  // WHY THE RISING EDGE IS STILL IN RENDER (it is NOT about load-time props —
+  // that argument was tested and is false): the theater's Content is behind
+  // Radix `Presence`, which starts `unmounted` and only dispatches MOUNT from
+  // its own layout effect, so MuxPlayer is constructed one render AFTER the
+  // flip either way — a `useLayoutEffect` seeds it just as early (measured).
+  // The real constraint is the SOURCE: `resumeMode` collapses in this very
+  // render, so `VideoHoverPreviewSurface` re-keys its inner <Video> and the
+  // resume player is destroyed in this commit. Its `useImperativeHandle`
+  // cleanup nulls `resumeHandleRef` in the mutation phase, i.e. BEFORE any
+  // layout effect here can run. Render is the last point at which the live
+  // mini-player is readable at all — everything that does NOT read it moved
+  // to `useLayoutEffect` below.
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
@@ -508,194 +574,274 @@ function WalkthroughVideo({
     // (concurrent interruption, error retry, a host wrapping setOpen in
     // startTransition). A read-and-clear would decide differently on the
     // retry; an equality test gives the same answer every time.
-    const selfDriven = selfDrivenForRef.current === open;
+    const selfDriven = selfDrivenFor === open;
     if (openProp !== undefined && !selfDriven) {
       if (open) {
         // A host open has no originating gesture, but resume mode DOES have a
         // live element — reading only `handoff` discarded however long the mini
         // player had been running since the close. Mirrors openTheater's seed.
-        const liveResume = resumeHandleRef.current;
-        const liveTime = liveResume?.getCurrentTime() ?? 0;
-        const liveAtEnd = isAtEnd(liveResume?.getDuration() ?? 0, liveTime);
-        setTheaterStart({
-          time: liveAtEnd ? 0 : (liveTime > 0.5 ? liveTime : (handoff?.time ?? 0)),
-          muted: liveResume && liveTime > 0.5 ? liveResume.getMuted() : userMutedRef.current,
-        });
+        // `userMuted` (state), not `userMutedRef`: the two are kept in lockstep
+        // and a ref must not be read during render.
+        setTheaterStart(theaterSeedFromLive(resumeHandleRef.current, handoff?.time ?? 0, userMuted));
         setHovered(false);
         setSuspended(false);
-        endedLatchRef.current = false;
         setHandoff(null);
-      } else {
-        // Falling edge: the host bypassed handleOpenChange, so without this the
-        // position, the mute intent and the ended state are all simply lost.
-        const h = theaterHandleRef.current;
-        if (h && !isYouTube) {
-          const time = h.getCurrentTime();
-          const muted = h.getMuted();
-          const paused = h.getPaused();
-          const atEnd = isAtEnd(h.getDuration(), time);
-          try { h.pause(); } catch { /* already gone */ }
-          if (!(muted && theaterForcedMuteRef.current && !userMutedRef.current)) {
-            userMutedRef.current = muted;
-            setUserMuted(muted);
-          }
-          setHandoff(
-            (endedLatchRef.current && paused && atEnd) || time < 1
-              ? null
-              : { time, muted, playing: !paused },
-          );
-        } else if (isYouTube) {
-          setSuspended(true);
-        }
+      } else if (isYouTube) {
+        // The file theater's falling edge needs the live player and lives in
+        // the layout effect below; YouTube only flips a flag, so it stays here
+        // where the still-mounted iframe sees it in this same commit.
+        setSuspended(true);
       }
     }
   }
 
-  const handleOpenChange = useCallback((next: boolean) => {
-    if (next) { openTheater(); return; }
-    // This close IS the card's own — a controlled host will flip `open` in
-    // response, and the sync above must not re-snapshot the player we are
-    // about to pause (it would read paused=true and downgrade a playing
-    // handoff to paused).
-    selfDrivenForRef.current = false;
-    // Closing: snapshot + stop the theater player BEFORE the exit animation.
-    if (isYouTube) {
-      setSuspended(true);
-      commitOpen(false);
+  // The half of the host-driven sync that does NOT have to be in render.
+  // `useLayoutEffect`, not `useEffect`: on the falling edge the theater player
+  // is still mounted during this commit (Radix `Presence` only dispatches
+  // UNMOUNT from its own layout effect, so the Content is torn down in the
+  // NEXT render) — a passive effect would run after that teardown and the
+  // snapshot would read a dead handle. Verified, not assumed.
+  //
+  // Its own ref latch rather than `prevOpen`: that state has already been
+  // advanced by the render above by the time this runs. Both latches compare
+  // rather than clear, so a discarded render attempt changes nothing.
+  const prevOpenCommittedRef = useRef(open);
+  useLayoutEffect(() => {
+    if (prevOpenCommittedRef.current === open) return;
+    prevOpenCommittedRef.current = open;
+    if (open) {
+      // Cleared before the theater Content is constructed (next render), so
+      // `onEnded` from the previous session can never leak into this one.
+      // Out of render because a ref write is a side effect: a discarded
+      // render attempt used to clear a latch for a session never committed.
+      // Unconditional (not gated on `selfDriven` the way the seed is): every
+      // other rising edge already cleared it in `openTheater`, so this is a
+      // no-op there rather than a second policy.
+      endedLatchRef.current = false;
       return;
     }
+    if (openProp === undefined || selfDrivenFor === open || isYouTube) return;
+    // Falling edge: the host bypassed handleOpenChange, so without this the
+    // position, the mute intent and the ended state are all simply lost.
     const h = theaterHandleRef.current;
-    if (h) {
-      const time = h.getCurrentTime();
-      const muted = h.getMuted();
-      // The theater's own chrome can mute/unmute; that IS user intent, so it
-      // must flow back or reopening would contradict what they just did.
-      // EXCEPT when the element is muted only because unmuted autoplay was
-      // rejected: promoting that into intent silently muted every later hover
-      // preview and every later theater open, for the whole session, with no
-      // gesture from the user. Mirrors the same test `openTheater` already
-      // applies in the opposite direction.
-      const policyForcedMute = muted && theaterForcedMuteRef.current && !userMutedRef.current;
-      if (!policyForcedMute) {
-        userMutedRef.current = muted;
-        setUserMuted(muted);
-      }
-      const paused = h.getPaused();
-      const duration = h.getDuration();
-      const atEnd = isAtEnd(duration, time);
+    if (!h) return;
+    const time = h.getCurrentTime();
+    const muted = h.getMuted();
+    const paused = h.getPaused();
+    const atEnd = isAtEnd(h.getDuration(), time);
+    try {
       h.pause();
-      if (!paused) {
-        // Live playing snapshot always wins (beats a stale ended latch).
-        setHandoff({ time, muted, playing: true });
-      } else if (endedLatchRef.current && atEnd) {
-        setHandoff(null);       // finished — plain poster, no continuation
-      } else if (time < 1) {
-        setHandoff(null);       // degenerate close — keep hover preview enabled
-      } else {
-        setHandoff({ time, muted, playing: false });
-      }
+    } catch {
+      /* already gone */
     }
-    commitOpen(false);
-  }, [isYouTube, commitOpen, openTheater]);
+    if (!(muted && theaterForcedMuteRef.current && !userMutedRef.current)) {
+      userMutedRef.current = muted;
+      setUserMuted(muted);
+    }
+    setHandoff((endedLatchRef.current && paused && atEnd) || time < 1 ? null : { time, muted, playing: !paused });
+    // `selfDrivenFor` is a dep only so the closure is current; a change to it
+    // alone cannot re-run the body — the latch above takes the early exit.
+  }, [open, openProp, isYouTube, selfDrivenFor, setHandoff]);
 
-  const onCardFallbackChange = useCallback((s: VideoMutedFallbackState) => {
-    setCardFallback(s);
-    setCardMuted(s.muted);   // sync the toggle with fallback / chrome unmutes
-  }, []);
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      if (next) {
+        openTheater();
+        return;
+      }
+      // This close IS the card's own — a controlled host will flip `open` in
+      // response, and the sync above must not re-snapshot the player we are
+      // about to pause (it would read paused=true and downgrade a playing
+      // handoff to paused).
+      setSelfDrivenFor(false);
+      // Closing: snapshot + stop the theater player BEFORE the exit animation.
+      if (isYouTube) {
+        setSuspended(true);
+        commitOpen(false);
+        return;
+      }
+      const h = theaterHandleRef.current;
+      if (h) {
+        const time = h.getCurrentTime();
+        const muted = h.getMuted();
+        // The theater's own chrome can mute/unmute; that IS user intent, so it
+        // must flow back or reopening would contradict what they just did.
+        // EXCEPT when the element is muted only because unmuted autoplay was
+        // rejected: promoting that into intent silently muted every later hover
+        // preview and every later theater open, for the whole session, with no
+        // gesture from the user. Mirrors the same test `openTheater` already
+        // applies in the opposite direction.
+        const policyForcedMute = muted && theaterForcedMuteRef.current && !userMutedRef.current;
+        if (!policyForcedMute) {
+          userMutedRef.current = muted;
+          setUserMuted(muted);
+        }
+        const paused = h.getPaused();
+        const duration = h.getDuration();
+        const atEnd = isAtEnd(duration, time);
+        h.pause();
+        if (!paused) {
+          // Live playing snapshot always wins (beats a stale ended latch).
+          setHandoff({ time, muted, playing: true });
+        } else if (endedLatchRef.current && atEnd) {
+          setHandoff(null); // finished — plain poster, no continuation
+        } else if (time < 1) {
+          setHandoff(null); // degenerate close — keep hover preview enabled
+        } else {
+          setHandoff({ time, muted, playing: false });
+        }
+      }
+      commitOpen(false);
+    },
+    [isYouTube, commitOpen, openTheater],
+  );
 
-  // Seed transport state whenever a card player (re)starts.
+  const onCardFallbackChange = useCallback(
+    (s: VideoMutedFallbackState) => {
+      setCardFallback(s);
+      setCardMuted(s.muted); // sync the toggle with fallback / chrome unmutes
+    },
+    [setCardFallback, setCardMuted],
+  );
+
+  // Seed transport state whenever a card player (re)starts. Reads the handoff
+  // through a ref: it is the value AT START, and as a dependency it would
+  // re-seed the toggles every time the host refreshed the object mid-playback.
+  const handoffRef = useRef(handoff);
   useEffect(() => {
-    if (resumeMode) { setCardMuted(handoff?.muted ?? false); setCardPaused(handoff?.playing === false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    handoffRef.current = handoff;
+  });
+  useEffect(() => {
+    if (resumeMode) {
+      setCardMuted(handoffRef.current?.muted ?? false);
+      setCardPaused(handoffRef.current?.playing === false);
+    }
   }, [resumeMode]);
   // A fresh hover starts a fresh preview — clear the paused flag, and re-seed
   // the mute toggle from the user's standing intent so an explicit mute is not
   // silently undone by the hover-start path (which unmutes the element).
-  useEffect(() => {
-    if (hovered) { setCardPaused(false); setCardMuted(userMutedRef.current); }
-  }, [hovered]);
+  //
+  // Adjusted while rendering rather than from an effect, so the toggles are
+  // already correct in the render that mounts the preview player instead of
+  // being corrected on the pass after it. Reads the `userMuted` STATE, not
+  // `userMutedRef` — a ref must not be read during render, and the two are kept
+  // in lockstep (every write to the ref sets the state on the next line).
+  const [hoverSeeded, setHoverSeeded] = useState(hovered);
+  if (hoverSeeded !== hovered) {
+    setHoverSeeded(hovered);
+    if (hovered) {
+      setCardPaused(false);
+      setCardMuted(userMuted);
+    }
+  }
 
-  const dismiss = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    pausePreviewNow();
-    if (dismissEnabled) dismissWalkthrough(storageKey, dismissalId);
-    setDismissed(true);
-  }, [dismissEnabled, storageKey, dismissalId, pausePreviewNow]);
+  const dismiss = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      pausePreviewNow();
+      if (dismissEnabled) dismissWalkthrough(storageKey, dismissalId);
+      setDismissed(true);
+    },
+    [dismissEnabled, storageKey, dismissalId, pausePreviewNow],
+  );
 
   // Card controls act on whichever player is live (resume continuation or the
   // hover preview). The internal glyph is unreachable under the activation
   // overlay (hideMutedBadge), so these are the only affordances.
-  const activeHandle = () => (resumeMode ? resumeHandleRef.current : previewHandleRef.current);
+  const activeHandle = useCallback(
+    () => (resumeMode ? resumeHandleRef.current : previewHandleRef.current),
+    [resumeMode],
+  );
 
   /** Big centered glyph — the muted-fallback prompt (unmute, or play when even
    *  muted autoplay was blocked). Unchanged bite grammar. */
-  const onUnmuteOrPlay = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    const h = activeHandle();
-    if (!h) return;
-    try {
-      // Branch on the LABEL this button is currently rendering, so the action
-      // always matches the words. Guarding the unmute on `!userMutedRef.current`
-      // (the previous attempt) turned the "Unmute" case into a no-op — and
-      // because the corner mute toggle hides while this glyph is up, that left
-      // the card with NO way to restore sound. A control that hides itself on
-      // use is a dead end; see the state-model note at the top of this file.
-      // Recomputed here, NOT read from the render-scoped `controlIsPlay`
-      // (declared below this callback — reading it would repeat the stale
-      // closure bug that silently restarted the theater at 0:00).
-      const actionIsPlay = cardFallback.blocked || cardPaused;
-      if (actionIsPlay) {
-        void h.play();
-        setCardPaused(false);
-      } else {
-        h.setMuted(false);
-        setCardMuted(false);
-        userMutedRef.current = false;
-        setUserMuted(false);
-        void h.play();
-        setCardPaused(false);
+  const onUnmuteOrPlay = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const h = activeHandle();
+      if (!h) return;
+      try {
+        // Branch on the LABEL this button is currently rendering, so the action
+        // always matches the words. Guarding the unmute on `!userMutedRef.current`
+        // (the previous attempt) turned the "Unmute" case into a no-op — and
+        // because the corner mute toggle hides while this glyph is up, that left
+        // the card with NO way to restore sound. A control that hides itself on
+        // use is a dead end; see the state-model note at the top of this file.
+        // Recomputed here, NOT read from the render-scoped `controlIsPlay`
+        // (declared below this callback — reading it would repeat the stale
+        // closure bug that silently restarted the theater at 0:00).
+        const actionIsPlay = cardFallback.blocked || cardPaused;
+        if (actionIsPlay) {
+          void h.play();
+          setCardPaused(false);
+        } else {
+          h.setMuted(false);
+          setCardMuted(false);
+          userMutedRef.current = false;
+          setUserMuted(false);
+          void h.play();
+          setCardPaused(false);
+        }
+      } catch {
+        /* ignore */
       }
-    } catch { /* ignore */ }
-  }, [resumeMode, cardFallback.blocked, cardPaused]);
+    },
+    [cardFallback.blocked, cardPaused, activeHandle, setCardPaused, setCardMuted, setUserMuted],
+  );
 
   /** Mute TOGGLE — stays on screen in both states so the user can come back. */
-  const onToggleMute = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    const h = activeHandle();
-    if (!h) return;
-    // Live element, not the `cardMuted` snapshot: the module-level activation
-    // waiter can unmute between this button's pointerdown and its click, which
-    // made the first press of a button labelled "Unmute" mute instead.
-    // Read the LIVE element, never `cardMuted`: the two diverge whenever the
-    // player's own chrome changed mute without telling us. (`getMuted()`
-    // returns `false` rather than nullish on a torn-down element, so a `??`
-    // fallback here would silently invert the button — hence the null guard
-    // above rather than a default.)
-    const next = !h.getMuted();
-    try {
-      h.setMuted(next);
-      if (!next && !cardPaused) void h.play();   // never override an explicit pause
-      setCardMuted(next);
-      userMutedRef.current = next;
-      setUserMuted(next);
-    } catch { /* ignore */ }
-  }, [resumeMode, cardMuted, cardPaused]);
+  const onToggleMute = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const h = activeHandle();
+      if (!h) return;
+      // Live element, not the `cardMuted` snapshot: the module-level activation
+      // waiter can unmute between this button's pointerdown and its click, which
+      // made the first press of a button labelled "Unmute" mute instead.
+      // Read the LIVE element, never `cardMuted`: the two diverge whenever the
+      // player's own chrome changed mute without telling us. (`getMuted()`
+      // returns `false` rather than nullish on a torn-down element, so a `??`
+      // fallback here would silently invert the button — hence the null guard
+      // above rather than a default.)
+      const next = !h.getMuted();
+      try {
+        h.setMuted(next);
+        if (!next && !cardPaused) void h.play(); // never override an explicit pause
+        setCardMuted(next);
+        userMutedRef.current = next;
+        setUserMuted(next);
+      } catch {
+        /* ignore */
+      }
+    },
+    [cardPaused, activeHandle, setCardMuted, setUserMuted],
+  );
 
   /** Play/pause TOGGLE. Deliberately does NOT tear down the resume player
    *  (an earlier version cleared the handoff, which unmounted the mini player
    *  and made the controls vanish with no way back). */
-  const onTogglePlay = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    const h = activeHandle();
-    if (!h) return;
-    try {
-      // Same predicate the label renders from (`controlIsPlay`). Branching on
-      // raw `cardPaused` meant that in the blocked state the button read "Play"
-      // but took the pause branch, so the first press did nothing.
-      if (cardFallback.blocked || cardPaused) { void h.play(); setCardPaused(false); }
-      else { h.pause(); setCardPaused(true); }
-    } catch { /* ignore */ }
-  }, [resumeMode, cardFallback.blocked, cardPaused]);
+  const onTogglePlay = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const h = activeHandle();
+      if (!h) return;
+      try {
+        // Same predicate the label renders from (`controlIsPlay`). Branching on
+        // raw `cardPaused` meant that in the blocked state the button read "Play"
+        // but took the pause branch, so the first press did nothing.
+        if (cardFallback.blocked || cardPaused) {
+          void h.play();
+          setCardPaused(false);
+        } else {
+          h.pause();
+          setCardPaused(true);
+        }
+      } catch {
+        /* ignore */
+      }
+    },
+    [cardFallback.blocked, cardPaused, activeHandle, setCardPaused],
+  );
 
   const summaryTitle = video?.title || undefined;
 
@@ -704,15 +850,10 @@ function WalkthroughVideo({
   // it and silently dropped the skip-list.
   const presenterAvatarSrc = video?.presenterAvatarUrl ?? null;
 
-  const embedUrlKey = useMemo(() => `${video?.mainVideoUrl ?? ''}|${video?.youtubeUrl ?? ''}`, [video?.mainVideoUrl, video?.youtubeUrl]);
-
-  if (!video || (!video.mainVideoUrl && !video.youtubeUrl)) return null;
-
-  // The collapsed card is suppressed by the appear-delay mount gate and by
-  // dismissal — but the THEATER (Dialog) is NOT. A host that controls
-  // `open={true}` must be able to force the theater even before the card has
-  // appeared or after it was dismissed, so the gate lives on the card only.
-  const showCard = mounted && !dismissed;
+  const embedUrlKey = useMemo(
+    () => `${video?.mainVideoUrl ?? ''}|${video?.youtubeUrl ?? ''}`,
+    [video?.mainVideoUrl, video?.youtubeUrl],
+  );
 
   // Gate on `!resumeMode`, NOT `!handoff`: a non-playing handoff is only a
   // remembered timestamp. Gating on `handoff` froze the card as an inert poster
@@ -723,17 +864,40 @@ function WalkthroughVideo({
   // ONE derived mode drives every branch below. Deriving a single discriminant
   // (instead of testing raw booleans at each call site) is what keeps the card
   // consistent: 'resume' and 'preview' are mutually exclusive by construction,
-  // so a player can never be half-mounted or a control half-shown.
-  const cardMode: 'resume' | 'preview' | 'poster' =
-    resumeMode ? 'resume' : cardActive ? 'preview' : 'poster';
+  // so a player can never be half-mounted or a control half-shown. Derived
+  // ABOVE the early return so the latest-ref effect below it stays
+  // unconditional.
+  const cardMode: 'resume' | 'preview' | 'poster' = resumeMode ? 'resume' : cardActive ? 'preview' : 'poster';
+
+  // Latest-ref mirror of `cardMode`, read only by `openTheater` (an event
+  // handler) to decide which live player it is handing off from. Refreshed in
+  // an unconditional effect rather than assigned during render: a render
+  // attempt React discards (concurrent interruption, error retry) must not
+  // leave the ref describing a card layout that was never committed, or the
+  // next click would hand off from a player that is not on screen.
+  useEffect(() => {
+    cardModeRef.current = cardMode;
+  });
+
+  if (!video || (!video.mainVideoUrl && !video.youtubeUrl)) return null;
+
+  // The collapsed card is suppressed by the appear-delay mount gate and by
+  // dismissal — but the THEATER (Dialog) is NOT. A host that controls
+  // `open={true}` must be able to force the theater even before the card has
+  // appeared or after it was dismissed, so the gate lives on the card only.
+  const showCard = mounted && !dismissed;
+
+  // `cardMode === 'resume'` is exactly `resumeMode`, which already required
+  // `handoff !== null` — but the derived string discriminant carries none of
+  // that for the compiler. Re-derive the handoff once so the resume props
+  // below read it directly instead of asserting it back into existence.
+  const resumeHandoff = resumeMode ? handoff : null;
 
   // Big centered glyph = the muted-fallback prompt (bite grammar), nothing else.
   // Gated on an actual player: `cardFallback` is only ever rewritten by a
   // mounted one, so after it unmounts (e.g. the resume clip ended) a stale
   // `muted:true` left an orphan glyph that played from 0 with sound and no
   // transport controls.
-  cardModeRef.current = cardMode;
-
   const showBigUnmute = cardFallback.muted && cardMode !== 'poster';
   // "Play" whenever the action will start playback: autoplay was blocked, or
   // the user paused. Otherwise the label understated what the button does.
@@ -772,16 +936,22 @@ function WalkthroughVideo({
         'aspect-video transition-opacity duration-200',
         // Inline: the HOST owns the width — the card only keeps 16:9 within it.
         inline ? 'w-full' : 'w-[min(52vw,192px)] sm:w-80',
-        footerHidden ? 'opacity-0 pointer-events-none' : 'opacity-100',
+        footerHidden ? 'pointer-events-none opacity-0' : 'opacity-100',
         className,
       )}
       // `mouse` only: pointerenter also fires for touch, which started a
       // preview on every tap. Focus mirrors hover so keyboard users can reach
       // the transport controls at all.
-      onPointerEnter={e => { if (e.pointerType === 'mouse' && previewAllowed && !resumeMode) setHovered(true); }}
-      onPointerLeave={e => { if (e.pointerType === 'mouse') setHovered(false); }}
+      onPointerEnter={e => {
+        if (e.pointerType === 'mouse' && previewAllowed && !resumeMode) setHovered(true);
+      }}
+      onPointerLeave={e => {
+        if (e.pointerType === 'mouse') setHovered(false);
+      }}
       // Re-arm hover after a close that left the pointer parked on the card.
-      onPointerMove={e => { if (e.pointerType === 'mouse' && previewAllowed && !resumeMode && !hovered) setHovered(true); }}
+      onPointerMove={e => {
+        if (e.pointerType === 'mouse' && previewAllowed && !resumeMode && !hovered) setHovered(true);
+      }}
       // Keyboard intent only. Chrome focuses buttons on click, so a raw focus
       // mirror autostarted an unmuted preview with the pointer nowhere near
       // the card. `:focus-visible` alone is NOT enough: Radix restores focus
@@ -794,7 +964,11 @@ function WalkthroughVideo({
         // `matches` THROWS SyntaxError on engines that don't know
         // :focus-visible (Safari < 15.4) — that would escape a React handler.
         let keyboard = false;
-        try { keyboard = el.matches?.(':focus-visible') ?? false; } catch { keyboard = false; }
+        try {
+          keyboard = el.matches?.(':focus-visible') ?? false;
+        } catch {
+          keyboard = false;
+        }
         // Consume the latch: the FIRST focus after a close is Radix returning
         // focus to this element, never the user arriving at it.
         if (justClosedRef.current) {
@@ -807,7 +981,9 @@ function WalkthroughVideo({
         }
         if (previewAllowed && !resumeMode && keyboard) setHovered(true);
       }}
-      onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHovered(false); }}
+      onBlurCapture={e => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setHovered(false);
+      }}
     >
       {/* Media layer is CLICK-TRANSPARENT: a paused/idle player must never
           swallow the click. Every click that isn't on a control falls through
@@ -840,8 +1016,8 @@ function WalkthroughVideo({
           // loses to MuxPlayer re-issuing play when media is ready, which left
           // audio running behind an invisible, pointer-inert card.
           autoPlay={cardMode === 'resume' && handoff?.playing !== false && !footerHidden}
-          startTime={cardMode === 'resume' ? handoff!.time : undefined}
-          startMuted={cardMode === 'resume' ? handoff!.muted : false}
+          startTime={resumeHandoff?.time}
+          startMuted={resumeHandoff?.muted ?? false}
           onEnded={cardMode === 'resume' ? () => setHandoff(null) : () => setCardPaused(true)}
         />
       </div>
@@ -862,7 +1038,7 @@ function WalkthroughVideo({
 
       {/* Title pill — its own positioned element (bottom-left), never a child
           of the hit layer. pointer-events-none so clicks fall through to it. */}
-      <span className="pointer-events-none absolute bottom-[var(--spacing-system-xsf)] left-[var(--spacing-system-xsf)] z-20 flex max-w-[calc(100%-2*var(--spacing-system-xsf))] items-center gap-[var(--spacing-system-xsf)] rounded-full bg-ods-overlay py-[var(--spacing-system-xxs)] pl-[var(--spacing-system-xxs)] pr-[var(--spacing-system-sf)] text-h6 text-ods-text-primary">
+      <span className="pointer-events-none absolute bottom-[var(--spacing-system-xsf)] left-[var(--spacing-system-xsf)] z-20 flex max-w-[calc(100%-2*var(--spacing-system-xsf))] items-center gap-[var(--spacing-system-xsf)] rounded-full bg-ods-overlay py-[var(--spacing-system-xxs)] pl-[var(--spacing-system-xxs)] pr-[var(--spacing-system-sf)] text-ods-text-primary text-h6">
         {presenterAvatarSrc ? (
           <SquareAvatar src={presenterAvatarSrc} alt="" sizePx={20} variant="round" className="shrink-0 border-0" />
         ) : (
@@ -1034,8 +1210,12 @@ function WalkthroughVideo({
               startMuted={theaterStart.muted}
               autoActivate={!pausedOpenSession}
               suspended={suspended}
-              onMutedFallbackChange={st => { theaterForcedMuteRef.current = st.muted; }}
-              onEnded={() => { endedLatchRef.current = true; }}
+              onMutedFallbackChange={st => {
+                theaterForcedMuteRef.current = st.muted;
+              }}
+              onEnded={() => {
+                endedLatchRef.current = true;
+              }}
             />
             {/* Radix `asChild` so the shared Button IS the close trigger (same
                 pattern as every other dialog close in the lib). */}

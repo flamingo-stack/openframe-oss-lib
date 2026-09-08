@@ -1,7 +1,7 @@
-'use client'
+'use client';
 
-import { SquareAvatar } from './square-avatar'
-import { cn } from '../../utils/cn'
+import { cn } from '../../utils/cn';
+import { SquareAvatar } from './square-avatar';
 
 /**
  * AvatarStack — the shared overlapping-avatar cluster ("facepile"): up to
@@ -12,26 +12,26 @@ import { cn } from '../../utils/cn'
  */
 
 export interface AvatarStackPerson {
-  name: string
-  avatarUrl?: string | null
+  name: string;
+  avatarUrl?: string | null;
   /** Stable render key — pass when names can collide or be blank
    *  (e.g. ClickUp member id). Falls back to name+index. */
-  key?: string | number
+  key?: string | number;
 }
 
 export interface AvatarStackProps {
-  people: AvatarStackPerson[]
+  people: AvatarStackPerson[];
   /** Avatars shown before collapsing into the "+N" circle. */
-  max?: number
+  max?: number;
   /** Size bucket (also sizes the "+N" circle). `xs` (24px) is for
    *  dense card meta rows (chat compact cards, delivery rows). */
-  size?: 'xs' | 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   /** Ring color class separating overlapped avatars from each other —
    *  MUST match the surface the stack sits on (default: card surface).
    *  Without the surface-colored ring, overlapping photos read as one
    *  smeared blob — the ring is what makes a stack look deliberate. */
-  ringClassName?: string
-  className?: string
+  ringClassName?: string;
+  className?: string;
 }
 
 const OVERFLOW_CIRCLE_SIZE: Record<NonNullable<AvatarStackProps['size']>, string> = {
@@ -39,7 +39,7 @@ const OVERFLOW_CIRCLE_SIZE: Record<NonNullable<AvatarStackProps['size']>, string
   sm: 'h-8 w-8',
   md: 'h-10 w-10',
   lg: 'h-12 w-12',
-}
+};
 
 export function AvatarStack({
   people,
@@ -48,14 +48,14 @@ export function AvatarStack({
   ringClassName = 'ring-ods-card',
   className,
 }: AvatarStackProps) {
-  if (people.length === 0) return null
-  const visible = people.slice(0, max)
-  const overflow = people.slice(max)
+  if (people.length === 0) return null;
+  const visible = people.slice(0, max);
+  const overflow = people.slice(max);
   return (
     <div
       className={cn('flex items-center', className)}
       role="group"
-      aria-label={`Assignees: ${people.map((p) => p.name).join(', ')}`}
+      aria-label={`Assignees: ${people.map(p => p.name).join(', ')}`}
     >
       {visible.map((person, i) => (
         <SquareAvatar
@@ -74,9 +74,9 @@ export function AvatarStack({
       ))}
       {overflow.length > 0 && (
         <span
-          title={overflow.map((p) => p.name).join(', ')}
+          title={overflow.map(p => p.name).join(', ')}
           className={cn(
-            'relative z-0 flex shrink-0 items-center justify-center rounded-full ring-2 bg-ods-bg text-ods-text-secondary',
+            'relative z-0 flex shrink-0 items-center justify-center rounded-full bg-ods-bg text-ods-text-secondary ring-2',
             ringClassName,
             size === 'xs' ? '-ml-2 text-badge' : '-ml-3 text-h6',
             OVERFLOW_CIRCLE_SIZE[size],
@@ -86,5 +86,5 @@ export function AvatarStack({
         </span>
       )}
     </div>
-  )
+  );
 }

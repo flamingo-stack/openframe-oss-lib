@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 /**
  * @deprecated This icon module is deprecated. Use `@flamingo-stack/openframe-frontend-core/components/icons-v2` instead.
@@ -48,7 +48,7 @@ export { RemoteControlIcon } from './remote-control-icon';
 export { ShellIcon } from './shell-icon';
 export { MingoIcon } from './mingo-icon';
 export { PoliciesIcon } from './policies-icon';
-export { QueriesIcon } from './queries-icon'
+export { QueriesIcon } from './queries-icon';
 export { DocumentIcon } from './document-icon';
 export { SlidersIcon } from './sliders-icon';
 
@@ -129,12 +129,12 @@ export { CustomTimeIcon } from './custom-time-icon';
 export { CustomExternalLinkIcon } from './custom-external-link-icon';
 
 // Vendor Showcase Icons
-export { 
+export {
   VendorShowcaseMainIcon,
   TransparentTrustedIcon,
   ModularHellIcon,
   RapidInnovationIcon,
-  LowerTCOIcon
+  LowerTCOIcon,
 } from './vendor-showcase-icons';
 
 // AI and Feature Icons
@@ -150,7 +150,7 @@ export {
   ScriptGenerationIcon,
   PatchPolicyIcon,
   BulkOperationsIcon,
-  AuditLoggingIcon
+  AuditLoggingIcon,
 } from './openframe-ai-icons';
 
 // Tool Directory Icons
@@ -190,7 +190,6 @@ export { JumpInIcon } from './jump-in-icon';
 
 // Utility exports
 export * from './icon-utils';
-
 
 // Shell type icons
 export { PowerShellIcon } from './powershell-icon';

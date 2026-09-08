@@ -1,64 +1,64 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { Chevron02DownIcon } from '../icons-v2-generated'
-import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu'
-import type { ButtonProps, SplitButtonIconAction } from './button'
-import { Button, SplitButton } from './button'
-import { Skeleton } from './skeleton'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
+import React from 'react';
+import { cn } from '../../utils/cn';
+import { Chevron02DownIcon } from '../icons-v2-generated';
+import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu';
+import type { ButtonProps, SplitButtonIconAction } from './button';
+import { Button, SplitButton } from './button';
+import { Skeleton } from './skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 
 export type PageActionButton = {
   /** Button label. Omit to render an icon-only button. */
-  label?: string
+  label?: string;
   /** Accessible name. Required for icon-only buttons (when `label` is omitted). */
-  ariaLabel?: string
+  ariaLabel?: string;
   /** Click handler. Optional when `href` or `submenu` is provided. */
-  onClick?: () => void
-  icon?: React.ReactNode
+  onClick?: () => void;
+  icon?: React.ReactNode;
   /** `overlay` is media chrome only — SplitButton has no divider colour for it. */
-  variant?: Exclude<ButtonProps['variant'], 'overlay' | 'glyph'>
-  disabled?: boolean
+  variant?: Exclude<ButtonProps['variant'], 'overlay' | 'glyph'>;
+  disabled?: boolean;
   /**
    * For SplitButton actions (when `iconAction` is set): disables only the main
    * half. Combine with `iconAction.disabled` for icon-only disable. Ignored
    * for non-SplitButton actions.
    */
-  mainDisabled?: boolean
-  loading?: boolean
+  mainDisabled?: boolean;
+  loading?: boolean;
   /** Show action only on mobile (below md). Default: visible on all screens. */
-  showOnlyMobile?: boolean
+  showOnlyMobile?: boolean;
   /**
    * Render the desktop button as icon-only (label hidden, icon centered). The full
    * label still appears in the mobile "..." dropdown. The desktop icon is forced to
    * `text-ods-text-primary`; the mobile row keeps the caller-provided icon color.
    */
-  iconOnlyOnDesktop?: boolean
+  iconOnlyOnDesktop?: boolean;
   /** Render as a link (next/link). Mutually exclusive with `submenu`. */
-  href?: string
+  href?: string;
   /** Forwarded to next/link's prefetch. Only applies when `href` is set. */
-  prefetch?: boolean
+  prefetch?: boolean;
   /** Open link in a new tab. Only applies when `href` is set. */
-  openInNewTab?: boolean
+  openInNewTab?: boolean;
   /**
    * Render the action as a `SplitButton` (two independent click targets).
    * The main half runs `onClick`/`href`; the icon half runs its own action.
    * Mutually exclusive with `submenu`.
    */
-  iconAction?: SplitButtonIconAction
+  iconAction?: SplitButtonIconAction;
   /**
    * Render a button with a chevron that opens a dropdown. The whole button is
    * a single click target — clicking anywhere opens the menu.
    * Mutually exclusive with `iconAction` and `href`/`onClick`.
    */
-  submenu?: ActionsMenuItem[]
+  submenu?: ActionsMenuItem[];
   /** When set, the rendered desktop button is wrapped in a hover tooltip. */
-  tooltip?: React.ReactNode
-}
+  tooltip?: React.ReactNode;
+};
 
 function actionKey(action: PageActionButton, idx: number) {
-  return `${action.label ?? action.ariaLabel ?? 'action'}-${idx}`
+  return `${action.label ?? action.ariaLabel ?? 'action'}-${idx}`;
 }
 
 function actionToMenuItems(action: PageActionButton, idx: number): ActionsMenuItem[] {
@@ -66,44 +66,46 @@ function actionToMenuItems(action: PageActionButton, idx: number): ActionsMenuIt
     // When a split-button action collapses into the merged mobile "..." menu,
     // its chevron disappears and its children become sibling rows. Prefix
     // each child with the parent label.
-    if (!action.label) return action.submenu
+    if (!action.label) return action.submenu;
     return action.submenu.map(item => ({
       ...item,
       label: `${action.label} (${item.label})`,
-    }))
+    }));
   }
 
-  if (!action.label) return []
-  return [{
-    id: `action-${idx}`,
-    label: action.label,
-    icon: action.icon,
-    onClick: action.onClick,
-    disabled: action.disabled,
-    href: action.href,
-    iconAction: action.iconAction
-      ? {
-          icon: action.iconAction.icon,
-          'aria-label': action.iconAction['aria-label'],
-          onClick: action.iconAction.onClick as (() => void) | undefined,
-          href: action.iconAction.href,
-          openInNewTab: action.iconAction.openInNewTab,
-          disabled: action.iconAction.disabled,
-        }
-      : undefined,
-  }]
+  if (!action.label) return [];
+  return [
+    {
+      id: `action-${idx}`,
+      label: action.label,
+      icon: action.icon,
+      onClick: action.onClick,
+      disabled: action.disabled,
+      href: action.href,
+      iconAction: action.iconAction
+        ? {
+            icon: action.iconAction.icon,
+            'aria-label': action.iconAction['aria-label'],
+            onClick: action.iconAction.onClick as (() => void) | undefined,
+            href: action.iconAction.href,
+            openInNewTab: action.iconAction.openInNewTab,
+            disabled: action.iconAction.disabled,
+          }
+        : undefined,
+    },
+  ];
 }
 
 interface RenderOptions {
   /** Force the rendered button to be icon-only (label hidden). */
-  iconOnly?: boolean
+  iconOnly?: boolean;
   /** Stretch the button to fill flex parent (used in mobile bottom bar). */
-  fullWidth?: boolean
+  fullWidth?: boolean;
 }
 
 function renderActionButton(action: PageActionButton, opts: RenderOptions = {}): React.ReactNode {
-  const button = renderRawActionButton(action, opts)
-  if (!action.tooltip) return button
+  const button = renderRawActionButton(action, opts);
+  if (!action.tooltip) return button;
   return (
     <TooltipProvider delayDuration={0}>
       <Tooltip>
@@ -111,7 +113,7 @@ function renderActionButton(action: PageActionButton, opts: RenderOptions = {}):
         <TooltipContent>{action.tooltip}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
-  )
+  );
 }
 
 function renderRawActionButton(action: PageActionButton, opts: RenderOptions = {}): React.ReactNode {
@@ -132,7 +134,7 @@ function renderRawActionButton(action: PageActionButton, opts: RenderOptions = {
       >
         {action.label}
       </SplitButton>
-    )
+    );
   }
 
   // Submenu — single click target with a trailing chevron divider.
@@ -153,15 +155,17 @@ function renderRawActionButton(action: PageActionButton, opts: RenderOptions = {
           </Button>
         }
       />
-    )
+    );
   }
 
   // Icon-only button (no label, or explicitly icon-only on desktop).
-  const isIconOnly = opts.iconOnly || !action.label || action.iconOnlyOnDesktop
+  const isIconOnly = opts.iconOnly || !action.label || action.iconOnlyOnDesktop;
   if (isIconOnly) {
-    const iconNode = action.iconOnlyOnDesktop
-      ? <span className="inline-flex [&_svg]:!text-ods-text-primary">{action.icon}</span>
-      : action.icon
+    const iconNode = action.iconOnlyOnDesktop ? (
+      <span className="inline-flex [&_svg]:!text-ods-text-primary">{action.icon}</span>
+    ) : (
+      action.icon
+    );
     return (
       <Button
         variant={action.variant}
@@ -175,7 +179,7 @@ function renderRawActionButton(action: PageActionButton, opts: RenderOptions = {
         leftIcon={iconNode}
         aria-label={action.label ?? action.ariaLabel}
       />
-    )
+    );
   }
 
   // Default labeled button.
@@ -193,38 +197,40 @@ function renderRawActionButton(action: PageActionButton, opts: RenderOptions = {
     >
       {action.label}
     </Button>
-  )
+  );
 }
 
 export interface PageActionsProps {
-  variant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
-  actions: PageActionButton[]
-  menuActions?: ActionsMenuGroup[]
+  variant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary';
+  actions: PageActionButton[];
+  menuActions?: ActionsMenuGroup[];
   /**
-   * Desktop-only slot rendered before the action buttons (e.g. a `TabSelector`
-   * for view-mode toggles). Hidden on mobile and never merged into the "…" menu.
-   * Honored by the `icon-buttons` and `menu-primary` variants.
+   * Slot rendered before the action buttons (e.g. a `TabSelector` for
+   * view-mode toggles). Honored by the `icon-buttons` and `menu-primary`
+   * variants. On mobile, `icon-buttons` hides it; `menu-primary` surfaces it
+   * as the header row INSIDE the "…" menu (the tickets design — the view
+   * switcher must stay reachable where the header has no room for it).
    */
-  selector?: React.ReactNode
-  className?: string
+  selector?: React.ReactNode;
+  className?: string;
   /**
    * Render placeholders instead of the actions — for pages whose action SET
    * depends on data still in flight. Opt-in: a page whose actions are already
    * final while its title loads keeps rendering them.
    */
-  loading?: boolean
+  loading?: boolean;
 }
 
-const ACTIONS_GAP = 'gap-[var(--spacing-system-xs)]'
+const ACTIONS_GAP = 'gap-[var(--spacing-system-xs)]';
 
 /** Matches `Button` size="icon" / size="default" exactly, so a placeholder and the
  *  button that replaces it occupy the same box at both breakpoints. `rounded-md`
  *  is the same token `Button` itself uses — a raw `6px` would agree today and
  *  drift the moment a platform overrides `--radius`. */
-const SKELETON_HEIGHT = 'h-11 md:h-12'
-const SKELETON_ICON_WIDTH = 'w-11 md:w-12'
-const SKELETON_LABEL_WIDTH = 'w-[120px] md:w-[140px]'
-const SKELETON_RADIUS = 'rounded-md'
+const SKELETON_HEIGHT = 'h-11 md:h-12';
+const SKELETON_ICON_WIDTH = 'w-11 md:w-12';
+const SKELETON_LABEL_WIDTH = 'w-[120px] md:w-[140px]';
+const SKELETON_RADIUS = 'rounded-md';
 
 /**
  * Placeholders for actions whose SHAPE isn't known yet — the page is still
@@ -255,18 +261,18 @@ function ActionSkeletons({
   fullWidth,
   emptyFallback = 'icon',
 }: {
-  actions: PageActionButton[]
-  fullWidth?: boolean
-  emptyFallback?: 'icon' | 'label'
+  actions: PageActionButton[];
+  fullWidth?: boolean;
+  emptyFallback?: 'icon' | 'label';
 }) {
-  const items = actions.length > 0 ? actions : [null]
+  const items = actions.length > 0 ? actions : [null];
   return (
     <>
       {items.map((action, idx) => {
         // Mirrors `renderRawActionButton`'s `isIconOnly`. The mobile bottom bar
         // stretches only labelled buttons (`fullWidth: !!action.label`), so an
         // icon action keeps its square box there too.
-        const isIconOnly = action ? !action.label || !!action.iconOnlyOnDesktop : emptyFallback === 'icon'
+        const isIconOnly = action ? !action.label || !!action.iconOnlyOnDesktop : emptyFallback === 'icon';
         return (
           <Skeleton
             // Static placeholder list — index IS the identity here.
@@ -277,15 +283,15 @@ function ActionSkeletons({
               isIconOnly ? SKELETON_ICON_WIDTH : fullWidth ? 'flex-1' : SKELETON_LABEL_WIDTH,
             )}
           />
-        )
+        );
       })}
     </>
-  )
+  );
 }
 
 /** Mobile placeholder for the variants that collapse to ONE trigger (icon button or "…"). */
 function MobileTriggerSkeleton() {
-  return <Skeleton className={cn(SKELETON_HEIGHT, SKELETON_ICON_WIDTH, SKELETON_RADIUS)} />
+  return <Skeleton className={cn(SKELETON_HEIGHT, SKELETON_ICON_WIDTH, SKELETON_RADIUS)} />;
 }
 
 export function PageActions({
@@ -297,14 +303,30 @@ export function PageActions({
   loading,
 }: PageActionsProps) {
   if (variant === 'icon-buttons') {
-    return <IconButtonsVariant actions={actions} menuActions={menuActions} selector={selector} className={className} loading={loading} />
+    return (
+      <IconButtonsVariant
+        actions={actions}
+        menuActions={menuActions}
+        selector={selector}
+        className={className}
+        loading={loading}
+      />
+    );
   }
 
   if (variant === 'menu-primary') {
-    return <MenuPrimaryVariant actions={actions} menuActions={menuActions || []} selector={selector} className={className} loading={loading} />
+    return (
+      <MenuPrimaryVariant
+        actions={actions}
+        menuActions={menuActions || []}
+        selector={selector}
+        className={className}
+        loading={loading}
+      />
+    );
   }
 
-  return <PrimaryButtonsVariant actions={actions} className={className} loading={loading} />
+  return <PrimaryButtonsVariant actions={actions} className={className} loading={loading} />;
 }
 
 function IconButtonsVariant({
@@ -314,38 +336,33 @@ function IconButtonsVariant({
   className,
   loading,
 }: {
-  actions: PageActionButton[]
-  menuActions?: ActionsMenuGroup[]
-  selector?: React.ReactNode
-  className?: string
-  loading?: boolean
+  actions: PageActionButton[];
+  menuActions?: ActionsMenuGroup[];
+  selector?: React.ReactNode;
+  className?: string;
+  loading?: boolean;
 }) {
-  const desktopActions = actions.filter(a => !a.showOnlyMobile)
-  const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
+  const desktopActions = actions.filter(a => !a.showOnlyMobile);
+  const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0);
 
-  const isSingleAction = actions.length === 1 && !actions[0].submenu?.length
-  const singleAction = isSingleAction ? actions[0] : null
-  const useSingleActionMobile = isSingleAction && !hasMenuActions
+  const isSingleAction = actions.length === 1 && !actions[0].submenu?.length;
+  const singleAction = isSingleAction ? actions[0] : null;
+  const useSingleActionMobile = isSingleAction && !hasMenuActions;
 
-  const mobileMenuGroups = [
-    { items: actions.flatMap(actionToMenuItems) },
-    ...(menuActions ?? []),
-  ]
-  const hasMobileMenuItems = mobileMenuGroups.some(g => g.items.length > 0)
+  const mobileMenuGroups = [{ items: actions.flatMap(actionToMenuItems) }, ...(menuActions ?? [])];
+  const hasMobileMenuItems = mobileMenuGroups.some(g => g.items.length > 0);
 
   return (
     <>
       {/* Desktop: every action as an icon button + optional overflow menu */}
-      <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
+      <div className={cn('hidden items-center md:flex', ACTIONS_GAP, className)}>
         {selector}
         {loading ? (
           <ActionSkeletons actions={desktopActions} />
         ) : (
           <>
             {desktopActions.map((action, idx) => (
-              <React.Fragment key={actionKey(action, idx)}>
-                {renderActionButton(action)}
-              </React.Fragment>
+              <React.Fragment key={actionKey(action, idx)}>{renderActionButton(action)}</React.Fragment>
             ))}
             {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
           </>
@@ -363,7 +380,7 @@ function IconButtonsVariant({
         ) : null}
       </div>
     </>
-  )
+  );
 }
 
 /**
@@ -375,38 +392,36 @@ function PrimaryButtonsVariant({
   className,
   loading,
 }: {
-  actions: PageActionButton[]
-  className?: string
-  loading?: boolean
+  actions: PageActionButton[];
+  className?: string;
+  loading?: boolean;
 }) {
   // Sort: outline first, accent last (rightmost on desktop).
   const sortedActions = [...actions].sort((a, b) => {
-    if (a.variant === 'accent' && b.variant !== 'accent') return 1
-    if (a.variant !== 'accent' && b.variant === 'accent') return -1
-    return 0
-  })
+    if (a.variant === 'accent' && b.variant !== 'accent') return 1;
+    if (a.variant !== 'accent' && b.variant === 'accent') return -1;
+    return 0;
+  });
 
-  const desktopActions = sortedActions.filter(a => !a.showOnlyMobile)
+  const desktopActions = sortedActions.filter(a => !a.showOnlyMobile);
 
   return (
     <>
-      <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
+      <div className={cn('hidden items-center md:flex', ACTIONS_GAP, className)}>
         {loading ? (
           // No overflow trigger in this variant — an unknown action set settles
           // into a labelled button, not a square one.
           <ActionSkeletons actions={desktopActions} emptyFallback="label" />
         ) : (
           desktopActions.map((action, idx) => (
-            <React.Fragment key={`desktop-${actionKey(action, idx)}`}>
-              {renderActionButton(action)}
-            </React.Fragment>
+            <React.Fragment key={`desktop-${actionKey(action, idx)}`}>{renderActionButton(action)}</React.Fragment>
           ))
         )}
       </div>
 
       <MobileBottomActions actions={sortedActions} loading={loading} />
     </>
-  )
+  );
 }
 
 /**
@@ -420,24 +435,21 @@ function MenuPrimaryVariant({
   className,
   loading,
 }: {
-  actions: PageActionButton[]
-  menuActions: ActionsMenuGroup[]
-  selector?: React.ReactNode
-  className?: string
-  loading?: boolean
+  actions: PageActionButton[];
+  menuActions: ActionsMenuGroup[];
+  selector?: React.ReactNode;
+  className?: string;
+  loading?: boolean;
 }) {
-  const desktopActions = actions.filter(a => !a.showOnlyMobile)
-  const hasMenuActions = menuActions.some(g => g.items.length > 0)
+  const desktopActions = actions.filter(a => !a.showOnlyMobile);
+  const hasMenuActions = menuActions.some(g => g.items.length > 0);
 
-  const mobileMenuGroups = [
-    { items: actions.flatMap(actionToMenuItems) },
-    ...menuActions,
-  ]
-  const hasMobileMenuItems = mobileMenuGroups.some(g => g.items.length > 0)
+  const mobileMenuGroups = [{ items: actions.flatMap(actionToMenuItems) }, ...menuActions];
+  const hasMobileMenuItems = mobileMenuGroups.some(g => g.items.length > 0);
 
   return (
     <>
-      <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
+      <div className={cn('hidden items-center md:flex', ACTIONS_GAP, className)}>
         {selector}
         {loading ? (
           <ActionSkeletons actions={desktopActions} />
@@ -454,23 +466,32 @@ function MenuPrimaryVariant({
       </div>
 
       <div className={cn('flex md:hidden', className)}>
-        {loading ? <MobileTriggerSkeleton /> : hasMobileMenuItems ? <ActionsMenuDropdown groups={mobileMenuGroups} /> : null}
+        {loading ? (
+          <MobileTriggerSkeleton />
+        ) : hasMobileMenuItems || selector ? (
+          // The selector rides into the menu as its header row: on mobile the
+          // title row has no room for it, and hiding it entirely (what
+          // `icon-buttons` does) would leave no way to switch views at all.
+          <ActionsMenuDropdown groups={mobileMenuGroups} header={selector} />
+        ) : null}
       </div>
     </>
-  )
+  );
 }
 
 function MobileBottomActions({ actions, loading }: { actions: PageActionButton[]; loading?: boolean }) {
   return (
-    <div className={cn(
-      'fixed md:hidden bottom-0 left-0 right-0 z-50',
-      'bg-ods-card border-t border-ods-border',
-      // `lf` (24px at every breakpoint), NOT `l` — this bar is `md:hidden`, so the
-      // only value it ever uses is the MOBILE one, and `l` is 16px there. The
-      // fixed variant is what keeps the 24px the bar has always had.
-      'flex items-start p-[var(--spacing-system-lf)]',
-      ACTIONS_GAP,
-    )}>
+    <div
+      className={cn(
+        'fixed bottom-0 left-0 right-0 z-50 md:hidden',
+        'border-t border-ods-border bg-ods-card',
+        // `lf` (24px at every breakpoint), NOT `l` — this bar is `md:hidden`, so the
+        // only value it ever uses is the MOBILE one, and `l` is 16px there. The
+        // fixed variant is what keeps the 24px the bar has always had.
+        'flex items-start p-[var(--spacing-system-lf)]',
+        ACTIONS_GAP,
+      )}
+    >
       {loading ? (
         <ActionSkeletons actions={actions} fullWidth emptyFallback="label" />
       ) : (
@@ -481,11 +502,11 @@ function MobileBottomActions({ actions, loading }: { actions: PageActionButton[]
         ))
       )}
     </div>
-  )
+  );
 }
 
 export function usePageActionsBottomPadding(variant: PageActionsProps['variant']) {
-  return variant === 'primary-buttons' || variant === 'menu-primary' ? 'pb-40 md:pb-0' : ''
+  return variant === 'primary-buttons' || variant === 'menu-primary' ? 'pb-40 md:pb-0' : '';
 }
 
-export default PageActions
+export default PageActions;

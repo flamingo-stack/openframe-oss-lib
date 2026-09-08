@@ -2,9 +2,11 @@ package com.openframe.notification.readstate;
 
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
+import com.openframe.notification.spec.NotificationEntityRef;
 import com.openframe.notification.support.BaseMongoIntegrationTest;
 import com.openframe.notification.support.ReadStateIntegrationTestApplication;
 import jakarta.validation.ConstraintViolationException;
@@ -24,6 +26,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 
 @SpringBootTest(classes = ReadStateIntegrationTestApplication.class)
 @Tag("integration")
@@ -187,6 +190,76 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
 
         Map<NotificationCategory, Long> counts = service.unreadCountsByCategory(ALICE, U);
         assertThat(counts).containsEntry(CAT_TICKETS, 2L).containsEntry(CAT_MINGO, 1L);
+    }
+
+    @Test
+    @DisplayName("Given UNREAD rows on two tickets and a dialog, when unreadCountsByEntity is called for TICKET, then only the ticket ids come back, each with its own count, and the dialog is not in the map")
+    void unread_counts_by_entity() {
+        NotificationEntityRef ticketOne = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-1").orElseThrow();
+        NotificationEntityRef ticketTwo = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-2").orElseThrow();
+        NotificationEntityRef dialog = NotificationEntityRef.of(NotificationEntityType.DIALOG, "dialog-1").orElseThrow();
+        service.createForAudience("n1", CAT_TICKETS, "title", ticketOne, U, Set.of(ALICE));
+        service.createForAudience("n2", CAT_TICKETS, "title", ticketOne, U, Set.of(ALICE));
+        service.createForAudience("n3", CAT_TICKETS, "title", ticketTwo, U, Set.of(ALICE));
+        service.createForAudience("n4", CAT_MINGO, "title", dialog, U, Set.of(ALICE));
+
+        Map<String, Long> counts = service.unreadCountsByEntity(ALICE, U, NotificationEntityType.TICKET);
+
+        assertThat(counts).containsOnly(entry("ticket-1", 2L), entry("ticket-2", 1L));
+    }
+
+    @Test
+    @DisplayName("Given rows carrying no entity at all, when unreadCountsByEntity is called, then they are skipped rather than grouped under a null id — a null bucket would break the non-null GraphQL contract")
+    void unread_counts_by_entity_skips_rows_without_entity() {
+        service.createForAudience("n1", CAT_TICKETS, "title", U, Set.of(ALICE));
+        NotificationEntityRef ticket = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-1").orElseThrow();
+        service.createForAudience("n2", CAT_TICKETS, "title", ticket, U, Set.of(ALICE));
+
+        Map<String, Long> counts = service.unreadCountsByEntity(ALICE, U, NotificationEntityType.TICKET);
+
+        assertThat(counts).containsOnly(entry("ticket-1", 1L));
+    }
+
+    @Test
+    @DisplayName("Given the same ticket unread for two recipients, when unreadCountsByEntity is called, then each recipient sees only their own row")
+    void unread_counts_by_entity_are_per_recipient() {
+        NotificationEntityRef ticket = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-1").orElseThrow();
+        service.createForAudience("n1", CAT_TICKETS, "title", ticket, U, Set.of(ALICE, BOB));
+        service.markRead(BOB, U, "n1");
+
+        assertThat(service.unreadCountsByEntity(ALICE, U, NotificationEntityType.TICKET))
+                .containsOnly(entry("ticket-1", 1L));
+        assertThat(service.unreadCountsByEntity(BOB, U, NotificationEntityType.TICKET)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Given unread rows on two tickets, when markEntityAsRead is called for one, then only that ticket's rows flip and the other ticket keeps its count")
+    void mark_entity_as_read_clears_one_entity_only() {
+        NotificationEntityRef ticketOne = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-1").orElseThrow();
+        NotificationEntityRef ticketTwo = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-2").orElseThrow();
+        service.createForAudience("n1", CAT_TICKETS, "title", ticketOne, U, Set.of(ALICE));
+        service.createForAudience("n2", CAT_TICKETS, "title", ticketOne, U, Set.of(ALICE));
+        service.createForAudience("n3", CAT_TICKETS, "title", ticketTwo, U, Set.of(ALICE));
+
+        long flipped = service.markEntityAsRead(ALICE, U, NotificationEntityType.TICKET, "ticket-1");
+
+        assertThat(flipped).isEqualTo(2L);
+        assertThat(service.unreadCountsByEntity(ALICE, U, NotificationEntityType.TICKET))
+                .containsOnly(entry("ticket-2", 1L));
+    }
+
+    @Test
+    @DisplayName("Given a row the recipient already deleted, when markEntityAsRead is called for that entity, then the deleted row stays deleted — a discarded card must not come back as read")
+    void mark_entity_as_read_leaves_deleted_rows_alone() {
+        NotificationEntityRef ticket = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-1").orElseThrow();
+        service.createForAudience("n1", CAT_TICKETS, "title", ticket, U, Set.of(ALICE));
+        service.deleteNotification(ALICE, U, "n1");
+
+        long flipped = service.markEntityAsRead(ALICE, U, NotificationEntityType.TICKET, "ticket-1");
+
+        assertThat(flipped).isZero();
+        List<NotificationReadState> rows = service.findRecipients("n1");
+        assertThat(rows).singleElement().extracting(NotificationReadState::getStatus).isEqualTo(ReadStatus.DELETED);
     }
 
 }

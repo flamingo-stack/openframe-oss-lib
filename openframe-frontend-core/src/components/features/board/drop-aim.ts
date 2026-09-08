@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
-import { createContext, useContext } from 'react'
-import type { BoardTicket } from './types'
+import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+import { createContext, useContext } from 'react';
+import type { BoardTicket } from './types';
 
 /**
  * Where the drop currently points, resolved once for the whole board.
@@ -15,36 +15,36 @@ import type { BoardTicket } from './types'
  * follows the answer wherever the answer came from.
  */
 export interface DropAim {
-  columnId: string
+  columnId: string;
   /** The card the preview hangs off, or `null` for a lane with nothing in it. */
-  ticketId: string | null
+  ticketId: string | null;
   /** Which side of that card. Meaningless when `ticketId` is `null`. */
-  edge: Edge | null
+  edge: Edge | null;
   /** The card being carried, drawn faded in the room it opened. */
-  ticket: BoardTicket
+  ticket: BoardTicket;
 }
 
-export const DropAimContext = createContext<DropAim | null>(null)
+export const DropAimContext = createContext<DropAim | null>(null);
 
 /**
  * Picking a card up from the keyboard. Separate from the aim so a card can offer
  * it without subscribing to something that changes on every pointer move.
  */
-export const BoardLiftContext = createContext<((ticketId: string) => void) | null>(null)
+export const BoardLiftContext = createContext<((ticketId: string) => void) | null>(null);
 
 export function useBoardLift(): ((ticketId: string) => void) | null {
-  return useContext(BoardLiftContext)
+  return useContext(BoardLiftContext);
 }
 
 /** Null while no drag is pointing anywhere the board would accept. */
 export function useDropAim(): DropAim | null {
-  return useContext(DropAimContext)
+  return useContext(DropAimContext);
 }
 
 /** Whether two aims would draw the same thing — used to keep a pointer moving
  *  inside one card from re-rendering the board on every frame. */
 export function isSameAim(a: DropAim | null, b: DropAim | null): boolean {
-  if (a === b) return true
-  if (!a || !b) return false
-  return a.columnId === b.columnId && a.ticketId === b.ticketId && a.edge === b.edge
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.columnId === b.columnId && a.ticketId === b.ticketId && a.edge === b.edge;
 }

@@ -8,12 +8,12 @@
  * hub-internal mappers.
  */
 
-const CLICKUP_APP_BASE = 'https://app.clickup.com'
+const CLICKUP_APP_BASE = 'https://app.clickup.com';
 
 /** ClickUp task detail page in the ClickUp UI. Returns `null` when the
  *  external id is missing so consumers don't end up with a
  *  `.../t/undefined` link. */
 export function clickupTaskUrl(externalId: string | null | undefined): string | null {
-  if (!externalId) return null
-  return `${CLICKUP_APP_BASE}/t/${externalId}`
+  if (!externalId) return null;
+  return `${CLICKUP_APP_BASE}/t/${externalId}`;
 }

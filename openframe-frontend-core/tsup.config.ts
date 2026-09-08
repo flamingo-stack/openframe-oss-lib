@@ -1,4 +1,4 @@
-import { defineConfig } from 'tsup'
+import { defineConfig } from 'tsup';
 
 // Config is split into two builds: client and server/universal.
 //
@@ -29,13 +29,21 @@ export default defineConfig([
       'types/navigation': 'src/types/navigation.ts',
       'types/announcement': 'src/types/announcement.ts',
       'assets/index': 'src/assets/index.ts',
-      'fonts': 'src/fonts.ts',
+      fonts: 'src/fonts.ts',
       'tailwind.config': './tailwind.config.ts',
       'utils/index': 'src/utils/index.ts',
       // Humanity signals — pure + server-safe (no React, no browser APIs).
       // Its own entry so the hub's server-side `verifyHuman` can import
       // `./utils/humanity-signals` without pulling the full utils barrel.
       'utils/humanity-signals': 'src/utils/humanity-signals.ts',
+      // JSX-free leaves, each with its own `exports` subpath so hub SCRIPTS and
+      // `server-only` modules import them without React or the utils barrel.
+      'utils/platform-identity': 'src/utils/platform-identity.ts',
+      'utils/search-params': 'src/utils/search-params.ts',
+      'utils/ods-spacing': 'src/utils/ods-spacing.ts',
+      'utils/csv': 'src/utils/csv.ts',
+      'utils/common': 'src/utils/common.ts',
+      'utils/social-platforms': 'src/utils/social-platforms.ts',
       // Bite element identity — pure + isomorphic (no React, no browser
       // APIs beyond crypto.randomUUID). Its own entry so the hub's Mux
       // pipeline DALs import `./utils/video-bite-id` without the barrel.
@@ -106,7 +114,7 @@ export default defineConfig([
   // bundle as a Client Component boundary.
   {
     entry: {
-      'index': 'src/index.ts',
+      index: 'src/index.ts',
       'nats/index': 'src/nats/index.ts',
       'components/index': 'src/components/index.ts',
       'components/ui/index': 'src/components/ui/index.ts',
@@ -176,4 +184,4 @@ export default defineConfig([
       js: '"use client";',
     },
   },
-])
+]);

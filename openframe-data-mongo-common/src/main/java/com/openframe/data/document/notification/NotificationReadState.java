@@ -25,7 +25,11 @@ import java.time.Instant;
                 def = "{'recipientId': 1, 'recipientType': 1, 'status': 1}"),
         @CompoundIndex(
                 name = "recipient_category_status",
-                def = "{'recipientId': 1, 'recipientType': 1, 'category': 1, 'status': 1}")
+                def = "{'recipientId': 1, 'recipientType': 1, 'category': 1, 'status': 1}"),
+        // Never edit a live index def in place — startup dies with IndexOptionsConflict.
+        @CompoundIndex(
+                name = "tenant_recipient_entity_status",
+                def = "{'tenantId': 1, 'recipientId': 1, 'recipientType': 1, 'entityType': 1, 'status': 1, 'entityId': 1}")
 })
 @Data
 @Builder
@@ -45,6 +49,10 @@ public class NotificationReadState implements TenantScoped {
     private ReadStatus status;
 
     private NotificationCategory category;
+
+    private NotificationEntityType entityType;
+
+    private String entityId;
 
     private String title;
 

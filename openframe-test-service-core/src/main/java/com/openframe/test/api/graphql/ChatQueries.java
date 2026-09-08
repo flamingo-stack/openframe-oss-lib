@@ -27,6 +27,7 @@ public class ChatQueries {
                                     toolCalls { toolName toolType toolCallArguments approvalType }
                                 }
                                 ... on ErrorData { error details }
+                                ... on AskData { question options { label description } }
                             }
                         }
                     }

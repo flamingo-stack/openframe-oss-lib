@@ -17,8 +17,8 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScheduleRunMapper;
-import com.openframe.api.service.rmm.ScheduleRunFilterService;
-import com.openframe.api.service.rmm.ScheduleRunService;
+import com.openframe.api.service.rmm.schedule.ScheduleRunFilterService;
+import com.openframe.api.service.rmm.schedule.ScheduleRunService;
 
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -52,6 +52,11 @@ public class ScheduleRunDataFetcher {
     public String scheduleRunNodeId(DgsDataFetchingEnvironment dfe) {
         ScheduleRunResponse run = dfe.getSource();
         return RELAY.toGlobalId("ScheduleRun", run.getId());
+    }
+
+    @DgsQuery
+    public ScheduleRunResponse scheduleRun(@InputArgument @NotBlank String id) {
+        return scheduleRunService.get(decodeId(id));
     }
 
     @DgsQuery

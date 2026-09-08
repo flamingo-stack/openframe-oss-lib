@@ -1,1 +1,1 @@
-export * from './ticket-status-config-list'
+export * from './ticket-status-config-list';

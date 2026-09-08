@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * <CrossfadePanels> — THE keep-mounted tab-panel stack: every panel stays in
@@ -35,24 +35,24 @@
  * visibility signal.
  */
 
-import React from 'react'
-import { cn } from '../../utils/cn'
+import type React from 'react';
+import { cn } from '../../utils/cn';
 
 export interface CrossfadePanel {
-  id: string
-  content: React.ReactNode
+  id: string;
+  content: React.ReactNode;
 }
 
 export interface CrossfadePanelsProps {
   /** Which panel is shown. Unknown id → all panels hidden (renders the
    *  stack's reserved height, nothing visible). */
-  activeId: string | undefined
-  panels: ReadonlyArray<CrossfadePanel>
+  activeId: string | undefined;
+  panels: ReadonlyArray<CrossfadePanel>;
   /** Crossfade duration in ms. Default 300. */
-  durationMs?: number
-  className?: string
+  durationMs?: number;
+  className?: string;
   /** Extra classes for every panel wrapper (e.g. `min-w-0` is built in). */
-  panelClassName?: string
+  panelClassName?: string;
 }
 
 export function CrossfadePanels({
@@ -62,17 +62,17 @@ export function CrossfadePanels({
   className,
   panelClassName,
 }: CrossfadePanelsProps) {
-  if (panels.length === 0) return null
+  if (panels.length === 0) return null;
   return (
     <div className={cn('grid w-full', className)}>
       {panels.map(p => {
-        const active = p.id === activeId
+        const active = p.id === activeId;
         return (
           <div
             key={p.id}
             className={cn(
               'col-start-1 row-start-1 min-w-0 transition-[opacity,visibility] ease-out motion-reduce:transition-none',
-              active ? 'visible opacity-100 z-[1]' : 'invisible opacity-0 pointer-events-none',
+              active ? 'visible z-[1] opacity-100' : 'pointer-events-none invisible opacity-0',
               panelClassName,
             )}
             style={{ transitionDuration: `${durationMs}ms` }}
@@ -81,8 +81,8 @@ export function CrossfadePanels({
           >
             {p.content}
           </div>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

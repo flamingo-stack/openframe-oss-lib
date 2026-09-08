@@ -40,7 +40,16 @@ public class MingoTicketingTest extends MingoBaseTest {
         RunId runId = RunId.next();
         String title = "E2E-" + runId;
 
-        RunResult result = prompt("Create a support ticket titled exactly \"" + title
+        // "workspace ticketing tools" is load-bearing, not padding. An intent router classifies the
+        // message before Mingo sees it, and its rule is that wording naming neither system reads both
+        // ways: a bare "create a support ticket" could mean opening one *with* the OpenFrame team or
+        // creating a PSA ticket *in* the workspace. It answers ASK, the run stops on a disambiguation
+        // question, and no ticket is ever created -- which is what this test hit once ASK shipped.
+        // Naming the system routes it to the workspace tools and lets Mingo act. The status-change
+        // case below is safe for the same reason from the other direction: "ticket #<n>" is the
+        // router's own example of unambiguous workspace wording.
+        RunResult result = prompt("In my workspace ticketing tools, not as an OpenFrame support request,"
+                + " create a ticket titled exactly \"" + title
                 + "\" describing an office printer that is jammed and offline. If you need to choose an"
                 + " organization, pick any available one.");
 

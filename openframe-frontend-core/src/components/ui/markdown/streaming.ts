@@ -17,31 +17,31 @@
  *   mis-wrapped, which is worse than the brief flicker it prevents.
  */
 
-import { createFenceTracker, isBlankLine, type FenceTracker } from '../../../utils/markdown-fences'
+import { createFenceTracker, isBlankLine, type FenceTracker } from '../../../utils/markdown-fences';
 
 export interface StreamingBlock {
   /** Raw markdown source of this unit (including trailing blank lines). */
-  text: string
+  text: string;
   /** Position index — cache key component so identical blocks never alias. */
-  index: number
+  index: number;
   /**
    * 1-based line of this unit's first line WITHIN the whole document.
    * Each unit is parsed by its own `ReactMarkdown`, so hast positions are
    * unit-relative; the engine adds `startLine - 1` back to look ids up in
    * the document-wide heading-id map (see ./heading-ids.ts).
    */
-  startLine: number
+  startLine: number;
   /**
    * True when this unit may be render-cached: it is complete (not the
    * trailing unit), atomic, and free of cross-block / late-resolving
    * constructs (card/mention markers, reference definitions/uses,
    * footnotes).
    */
-  memoizable: boolean
+  memoizable: boolean;
 }
 
 /** Constructs that resolve across blocks or after the text settles. */
-const NON_MEMOIZABLE_RE = /card:\/\/|mention:\/\/|^\s*\[[^\]]*\]:\s|\]\[|\[\^/m
+const NON_MEMOIZABLE_RE = /card:\/\/|mention:\/\/|^\s*\[[^\]]*\]:\s|\]\[|\[\^/m;
 
 /**
  * Raw HTML block-level containers. A blank line inside an OPEN one of these
@@ -51,14 +51,34 @@ const NON_MEMOIZABLE_RE = /card:\/\/|mention:\/\/|^\s*\[[^\]]*\]:\s|\]\[|\[\^/m
  * widget mid-stream — and the wrong render getting cached).
  */
 const RAW_BLOCK_TAGS = new Set([
-  'details', 'div', 'table', 'section', 'article', 'aside', 'blockquote',
-  'figure', 'form', 'fieldset', 'header', 'footer', 'main', 'nav', 'dl',
-  'ol', 'ul', 'pre', 'video', 'audio', 'picture', 'iframe', 'template',
+  'details',
+  'div',
+  'table',
+  'section',
+  'article',
+  'aside',
+  'blockquote',
+  'figure',
+  'form',
+  'fieldset',
+  'header',
+  'footer',
+  'main',
+  'nav',
+  'dl',
+  'ol',
+  'ul',
+  'pre',
+  'video',
+  'audio',
+  'picture',
+  'iframe',
+  'template',
   'svg',
-])
+]);
 
 /** `<tag …>` / `</tag>` occurrences, used for raw-HTML depth tracking. */
-const HTML_TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*)>/g
+const HTML_TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*)>/g;
 
 /**
  * A start tag whose `>` has NOT arrived yet on this line
@@ -66,7 +86,7 @@ const HTML_TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*)>/g
  * for RAW_BLOCK_TAGS — restricting it there keeps prose like `a <b` from
  * latching the scanner into "inside a tag" forever.
  */
-const DANGLING_OPEN_TAG_RE = /<([a-zA-Z][a-zA-Z0-9-]*)(?:\s[^>]*)?$/
+const DANGLING_OPEN_TAG_RE = /<([a-zA-Z][a-zA-Z0-9-]*)(?:\s[^>]*)?$/;
 
 /**
  * A line that may START a raw HTML block. CommonMark puts the `<` at column
@@ -77,7 +97,7 @@ const DANGLING_OPEN_TAG_RE = /<([a-zA-Z][a-zA-Z0-9-]*)(?:\s[^>]*)?$/
  * unit was marked memoizable — contradicting the "unbalanced raw-HTML units
  * are never cached" policy this module documents.
  */
-const HTML_BLOCK_START_RE = /^\s{0,7}<\/?[a-zA-Z]/
+const HTML_BLOCK_START_RE = /^\s{0,7}<\/?[a-zA-Z]/;
 
 /**
  * Cap on how long the raw-HTML latch may suppress cutting. An unclosed
@@ -101,7 +121,7 @@ const HTML_BLOCK_START_RE = /^\s{0,7}<\/?[a-zA-Z]/
  * which is the common case (an LLM mid-emission always has one) and costs a
  * full reparse of the entire message on every token.
  */
-const HTML_LATCH_LINE_LIMIT = 200
+const HTML_LATCH_LINE_LIMIT = 200;
 
 /**
  * Two properties of the fence tracker, stated so they stop being accidents.
@@ -134,7 +154,7 @@ const HTML_LATCH_LINE_LIMIT = 200
  * document", so the splitter and the tail-completer can never disagree
  * about which fence is open.
  */
-interface ScanState {
+class ScanState {
   /**
    * Fenced-code state machine. NOT a local copy: `createFenceTracker` lives
    * in the server-safe `utils/markdown-fences` and is the SAME instance
@@ -143,86 +163,83 @@ interface ScanState {
    * `FENCE_RE` plus its own open/close state machine, cross-referenced by a
    * comment) is precisely the drift that produced the `~~~` bug.
    */
-  fences: FenceTracker
+  readonly fences: FenceTracker = createFenceTracker();
   /** Depth of currently open raw HTML block containers. */
-  htmlDepth: number
+  private htmlDepth = 0;
   /** Raw-block tag name of a start tag still waiting for its `>`, or null. */
-  pendingOpenTag: string | null
+  private pendingOpenTag: string | null = null;
   /** Consecutive lines spent with the raw-HTML latch engaged. */
-  htmlLatchLines: number
-}
+  private htmlLatchLines = 0;
 
-function createScanState(): ScanState {
-  return {
-    fences: createFenceTracker(),
-    htmlDepth: 0,
-    pendingOpenTag: null,
-    htmlLatchLines: 0,
+  /** Raw-HTML state is unbalanced (a container or a start tag is still open). */
+  htmlLatched(): boolean {
+    return this.htmlDepth > 0 || this.pendingOpenTag !== null;
   }
-}
 
-/** Raw-HTML state is unbalanced (a container or a start tag is still open). */
-function htmlLatched(state: ScanState): boolean {
-  return state.htmlDepth > 0 || state.pendingOpenTag !== null
-}
+  /** True while raw-HTML state forbids cutting (latch cap not yet reached). */
+  htmlBlocksCut(): boolean {
+    return this.htmlLatched() && this.htmlLatchLines <= HTML_LATCH_LINE_LIMIT;
+  }
 
-/** True while raw-HTML state forbids cutting (latch cap not yet reached). */
-function htmlBlocksCut(state: ScanState): boolean {
-  return htmlLatched(state) && state.htmlLatchLines <= HTML_LATCH_LINE_LIMIT
-}
+  /** Opaque snapshot of the raw-HTML position — compared, never inspected, by
+   *  the splitter to detect that a line moved the scanner. */
+  htmlMark(): string {
+    return `${this.htmlDepth}:${this.pendingOpenTag ?? ''}`;
+  }
 
-/** Scan `line` from `from` for complete tags, then record any dangling opener. */
-function scanTags(state: ScanState, line: string, from: number): void {
-  HTML_TAG_RE.lastIndex = from
-  let m: RegExpExecArray | null
-  let end = from
-  while ((m = HTML_TAG_RE.exec(line)) !== null) {
-    end = HTML_TAG_RE.lastIndex
-    const tag = m[2].toLowerCase()
-    if (!RAW_BLOCK_TAGS.has(tag)) continue
-    if (m[1] === '/') {
-      if (state.htmlDepth > 0) state.htmlDepth--
-    } else if (!m[3].trimEnd().endsWith('/')) {
-      state.htmlDepth++
+  /** Scan `line` from `from` for complete tags, then record any dangling opener. */
+  private scanTags(line: string, from: number): void {
+    HTML_TAG_RE.lastIndex = from;
+    let m: RegExpExecArray | null;
+    let end = from;
+    while ((m = HTML_TAG_RE.exec(line)) !== null) {
+      end = HTML_TAG_RE.lastIndex;
+      const tag = m[2].toLowerCase();
+      if (!RAW_BLOCK_TAGS.has(tag)) continue;
+      if (m[1] === '/') {
+        if (this.htmlDepth > 0) this.htmlDepth--;
+      } else if (!m[3].trimEnd().endsWith('/')) {
+        this.htmlDepth++;
+      }
+    }
+    const dangling = DANGLING_OPEN_TAG_RE.exec(line.slice(end));
+    if (dangling && RAW_BLOCK_TAGS.has(dangling[1].toLowerCase())) {
+      this.pendingOpenTag = dangling[1].toLowerCase();
     }
   }
-  const dangling = DANGLING_OPEN_TAG_RE.exec(line.slice(end))
-  if (dangling && RAW_BLOCK_TAGS.has(dangling[1].toLowerCase())) {
-    state.pendingOpenTag = dangling[1].toLowerCase()
-  }
-}
 
-/** Advance `state` across one raw source line (mutates). */
-function scanLine(state: ScanState, line: string): void {
-  // A start tag spanning lines wins over everything: its continuation lines
-  // are attribute soup, not markdown.
-  if (state.pendingOpenTag !== null) {
-    const gt = line.indexOf('>')
-    if (gt === -1) {
-      state.htmlLatchLines++
-      return
+  /** Advance across one raw source line (mutates). */
+  scanLine(line: string): void {
+    // A start tag spanning lines wins over everything: its continuation lines
+    // are attribute soup, not markdown.
+    if (this.pendingOpenTag !== null) {
+      const gt = line.indexOf('>');
+      if (gt === -1) {
+        this.htmlLatchLines++;
+        return;
+      }
+      const selfClosing = line.slice(0, gt).trimEnd().endsWith('/');
+      const tag = this.pendingOpenTag;
+      this.pendingOpenTag = null;
+      if (!selfClosing && RAW_BLOCK_TAGS.has(tag)) this.htmlDepth++;
+      this.scanTags(line, gt + 1);
+      this.htmlLatchLines = this.htmlLatched() ? this.htmlLatchLines + 1 : 0;
+      return;
     }
-    const selfClosing = line.slice(0, gt).trimEnd().endsWith('/')
-    const tag = state.pendingOpenTag
-    state.pendingOpenTag = null
-    if (!selfClosing && RAW_BLOCK_TAGS.has(tag)) state.htmlDepth++
-    scanTags(state, line, gt + 1)
-    state.htmlLatchLines = htmlLatched(state) ? state.htmlLatchLines + 1 : 0
-    return
+
+    // Fence delimiters and fence content are both opaque to the HTML scanner —
+    // only `text` lines carry markup that can shift raw-HTML depth.
+    if (this.fences.push(line) !== 'text') return;
+
+    // Depth > 0 means we are INSIDE a container, where the closing tag may sit
+    // anywhere on a line (`some text </details>`). Scanning only column-0..3
+    // lines there meant such a close never decremented, so the latch stuck.
+    // At depth 0 only a line that can BEGIN a raw HTML block is considered, so
+    // `a < b` prose can't shift depth.
+    if (this.htmlDepth === 0 && !HTML_BLOCK_START_RE.test(line)) return;
+    this.scanTags(line, 0);
+    this.htmlLatchLines = this.htmlLatched() ? this.htmlLatchLines + 1 : 0;
   }
-
-  // Fence delimiters and fence content are both opaque to the HTML scanner —
-  // only `text` lines carry markup that can shift raw-HTML depth.
-  if (state.fences.push(line) !== 'text') return
-
-  // Depth > 0 means we are INSIDE a container, where the closing tag may sit
-  // anywhere on a line (`some text </details>`). Scanning only column-0..3
-  // lines there meant such a close never decremented, so the latch stuck.
-  // At depth 0 only a line that can BEGIN a raw HTML block is considered, so
-  // `a < b` prose can't shift depth.
-  if (state.htmlDepth === 0 && !HTML_BLOCK_START_RE.test(line)) return
-  scanTags(state, line, 0)
-  state.htmlLatchLines = htmlLatched(state) ? state.htmlLatchLines + 1 : 0
 }
 
 /**
@@ -253,15 +270,14 @@ function scanLine(state: ScanState, line: string): void {
  * in both the exotic-blank and CRLF spellings.
  */
 export function splitStreamingBlocks(content: string): StreamingBlock[] {
-  const lines = content.split('\n')
-  const units: string[][] = []
-  const unitTouchedHtml: boolean[] = []
-  let current: string[] = []
-  let currentTouchedHtml = false
-  const state = createScanState()
+  const lines = content.split('\n');
+  const units: string[][] = [];
+  const unitTouchedHtml: boolean[] = [];
+  let current: string[] = [];
+  let currentTouchedHtml = false;
+  const state = new ScanState();
 
-  const isListOrQuote = (line: string) =>
-    /^\s{0,3}(?:[-+*]\s|\d{1,9}[.)]\s|>)/.test(line)
+  const isListOrQuote = (line: string) => /^\s{0,3}(?:[-+*]\s|\d{1,9}[.)]\s|>)/.test(line);
 
   /**
    * FIRST non-blank line of the accumulated unit — i.e. what this unit IS.
@@ -293,41 +309,35 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
    */
   const firstNonBlank = (arr: string[]): string | undefined => {
     for (const line of arr) {
-      if (!isBlankLine(line)) return line
+      if (!isBlankLine(line)) return line;
     }
-    return undefined
-  }
+    return undefined;
+  };
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    const depthBefore = state.htmlDepth
-    const pendingBefore = state.pendingOpenTag
-    scanLine(state, line)
-    if (
-      state.htmlDepth !== depthBefore ||
-      state.pendingOpenTag !== pendingBefore ||
-      htmlLatched(state)
-    )
-      currentTouchedHtml = true
-    current.push(line)
+    const line = lines[i];
+    const markBefore = state.htmlMark();
+    state.scanLine(line);
+    if (state.htmlMark() !== markBefore || state.htmlLatched()) currentTouchedHtml = true;
+    current.push(line);
 
-    const isBlank = isBlankLine(line)
+    const isBlank = isBlankLine(line);
     // Never cut inside an open fence, nor inside an unbalanced raw HTML
     // block container / a start tag still waiting for its `>`.
-    if (!isBlank || state.fences.openChar() !== null || htmlBlocksCut(state)) continue
+    if (!isBlank || state.fences.openChar() !== null || state.htmlBlocksCut()) continue;
 
     // Candidate boundary at a blank line outside fences. Look ahead to the
     // next non-blank line to decide whether cutting here is provably safe.
-    let j = i + 1
-    while (j < lines.length && isBlankLine(lines[j])) j++
-    if (j >= lines.length) continue // trailing blanks stay with the tail
+    let j = i + 1;
+    while (j < lines.length && isBlankLine(lines[j])) j++;
+    if (j >= lines.length) continue; // trailing blanks stay with the tail
 
-    const next = lines[j]
-    if (/^\s/.test(next)) continue // indented continuation — unprovable
-    const unitOpener = firstNonBlank(current)
+    const next = lines[j];
+    if (/^\s/.test(next)) continue; // indented continuation — unprovable
+    const unitOpener = firstNonBlank(current);
     if (isListOrQuote(next) && unitOpener !== undefined && isListOrQuote(unitOpener)) {
       // Loose list / multi-paragraph blockquote continuation — do not cut.
-      continue
+      continue;
     }
 
     // A unit whose entire content is whitespace is not a block — with 2+
@@ -336,24 +346,24 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
     // instance (and a React key) that renders nothing. Leave `current`
     // accumulating so the blanks fold into the NEXT unit; line numbering
     // (and therefore `startLine`) is unaffected either way.
-    if (current.every(isBlankLine)) continue
+    if (current.every(isBlankLine)) continue;
 
-    units.push(current)
-    unitTouchedHtml.push(currentTouchedHtml)
-    current = []
-    currentTouchedHtml = false
+    units.push(current);
+    unitTouchedHtml.push(currentTouchedHtml);
+    current = [];
+    currentTouchedHtml = false;
   }
   if (current.length) {
-    units.push(current)
-    unitTouchedHtml.push(currentTouchedHtml)
+    units.push(current);
+    unitTouchedHtml.push(currentTouchedHtml);
   }
 
-  let cursorLine = 1
+  let cursorLine = 1;
   return units.map((unitLines, idx) => {
-    const text = unitLines.join('\n')
-    const isTail = idx === units.length - 1
-    const startLine = cursorLine
-    cursorLine += unitLines.length
+    const text = unitLines.join('\n');
+    const isTail = idx === units.length - 1;
+    const startLine = cursorLine;
+    cursorLine += unitLines.length;
     return {
       text,
       index: idx,
@@ -366,8 +376,8 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
       // scanner's depth unchanged, so it stays memoizable — correctly: its
       // parse cannot be invalidated by later tokens.
       memoizable: !isTail && !unitTouchedHtml[idx] && !NON_MEMOIZABLE_RE.test(text),
-    }
-  })
+    };
+  });
 }
 
 /**
@@ -381,10 +391,10 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
  * and appends the RECORDED opener so a `~~~` block is closed with `~~~`.
  */
 export function completeStreamingTail(content: string): string {
-  const state = createScanState()
-  for (const line of content.split('\n')) scanLine(state, line)
-  const openChar = state.fences.openChar()
-  if (openChar === null) return content
-  const closer = openChar.repeat(state.fences.openLength())
-  return content.endsWith('\n') ? `${content}${closer}` : `${content}\n${closer}`
+  const state = new ScanState();
+  for (const line of content.split('\n')) state.scanLine(line);
+  const openChar = state.fences.openChar();
+  if (openChar === null) return content;
+  const closer = openChar.repeat(state.fences.openLength());
+  return content.endsWith('\n') ? `${content}${closer}` : `${content}\n${closer}`;
 }

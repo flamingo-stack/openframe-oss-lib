@@ -16,52 +16,104 @@
  * ============================================================================= */
 
 @keyframes mingo-chat-overlay-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @keyframes mingo-chat-overlay-out {
-  from { opacity: 1; }
-  to   { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 @keyframes mingo-chat-slide-in-right {
-  from { opacity: 0; transform: translate3d(100%, 0, 0); }
-  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+  from {
+    opacity: 0;
+    transform: translate3d(100%, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 @keyframes mingo-chat-slide-out-right {
-  from { opacity: 1; transform: translate3d(0, 0, 0); }
-  to   { opacity: 0; transform: translate3d(100%, 0, 0); }
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(100%, 0, 0);
+  }
 }
 
 @keyframes mingo-chat-slide-in-bottom {
-  from { opacity: 0; transform: translate3d(0, 100%, 0); }
-  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+  from {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 @keyframes mingo-chat-slide-out-bottom {
-  from { opacity: 1; transform: translate3d(0, 0, 0); }
-  to   { opacity: 0; transform: translate3d(0, 100%, 0); }
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
 }
 
 @keyframes mingo-chat-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @keyframes mingo-chat-fade-out {
-  from { opacity: 1; }
-  to   { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
-.mingo-chat-overlay[data-state="open"]  { animation: mingo-chat-overlay-in  200ms cubic-bezier(0.05, 0.7, 0.1, 1) both; }
-.mingo-chat-overlay[data-state="closed"] { animation: mingo-chat-overlay-out 150ms cubic-bezier(0.3, 0, 0.8, 0.15) both; }
+.mingo-chat-overlay[data-state='open'] {
+  animation: mingo-chat-overlay-in 200ms cubic-bezier(0.05, 0.7, 0.1, 1) both;
+}
+.mingo-chat-overlay[data-state='closed'] {
+  animation: mingo-chat-overlay-out 150ms cubic-bezier(0.3, 0, 0.8, 0.15) both;
+}
 
 /* Mobile: bottom-sheet motion */
-.mingo-chat-content[data-state="open"]   { animation: mingo-chat-slide-in-bottom  250ms cubic-bezier(0.05, 0.7, 0.1, 1) both; }
-.mingo-chat-content[data-state="closed"] { animation: mingo-chat-slide-out-bottom 200ms cubic-bezier(0.3, 0, 0.8, 0.15) both; }
+.mingo-chat-content[data-state='open'] {
+  animation: mingo-chat-slide-in-bottom 250ms cubic-bezier(0.05, 0.7, 0.1, 1) both;
+}
+.mingo-chat-content[data-state='closed'] {
+  animation: mingo-chat-slide-out-bottom 200ms cubic-bezier(0.3, 0, 0.8, 0.15) both;
+}
 
 /* Desktop (>=768px): side-panel motion */
 @media (min-width: 768px) {
-  .mingo-chat-content[data-state="open"]   { animation-name: mingo-chat-slide-in-right; }
-  .mingo-chat-content[data-state="closed"] { animation-name: mingo-chat-slide-out-right; }
+  .mingo-chat-content[data-state='open'] {
+    animation-name: mingo-chat-slide-in-right;
+  }
+  .mingo-chat-content[data-state='closed'] {
+    animation-name: mingo-chat-slide-out-right;
+  }
 }
 
 /* =============================================================================
@@ -74,8 +126,12 @@
  * light-streak shimmer.
  * ---------------------------------------------------------------------------*/
 @keyframes mingo-edge-spin {
-  from { transform: translate(-50%, -50%) rotate(0deg); }
-  to   { transform: translate(-50%, -50%) rotate(360deg); }
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
 }
 
 /* Ring mask: clips the rotating conic layer to a 3px band along the frame's
@@ -84,9 +140,13 @@
 .mingo-edge-frame {
   overflow: hidden;
   padding: 3px;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
   mask-composite: exclude;
 }
 
@@ -111,8 +171,12 @@
 }
 
 @keyframes mingo-shimmer {
-  from { transform: translateX(-160%) skewX(-18deg); }
-  to   { transform: translateX(260%) skewX(-18deg); }
+  from {
+    transform: translateX(-160%) skewX(-18deg);
+  }
+  to {
+    transform: translateX(260%) skewX(-18deg);
+  }
 }
 
 .mingo-shimmer {
@@ -126,6 +190,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mingo-edge { animation: none; }
-  .group\/mingo:hover .mingo-shimmer { animation: none; opacity: 0; }
+  .mingo-edge {
+    animation: none;
+  }
+  .group\/mingo:hover .mingo-shimmer {
+    animation: none;
+    opacity: 0;
+  }
 }

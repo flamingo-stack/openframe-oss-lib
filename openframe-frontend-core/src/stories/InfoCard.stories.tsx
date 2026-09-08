@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { InfoCard } from '../components'
-import { ShieldCheckIcon } from '../components/icons-v2-generated/security'
-import { FlamingoLogo } from '../components/icons'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { InfoCard } from '../components';
+import { FlamingoLogo } from '../components/icons';
+import { ShieldCheckIcon } from '../components/icons-v2-generated/security';
 
 const meta = {
   title: 'UI/InfoCard',
@@ -16,10 +16,10 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof InfoCard>
+} satisfies Meta<typeof InfoCard>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const DiskC: Story = {
   args: {
@@ -33,12 +33,12 @@ export const DiskC: Story = {
       progress: { value: 42.6 },
     },
   },
-  render: (args) => (
+  render: args => (
     <div className="w-80">
       <InfoCard {...args} />
     </div>
   ),
-}
+};
 
 export const DiskD: Story = {
   args: {
@@ -52,12 +52,12 @@ export const DiskD: Story = {
       progress: { value: 62.3, warningThreshold: 60, criticalThreshold: 85 },
     },
   },
-  render: (args) => (
+  render: args => (
     <div className="w-80">
       <InfoCard {...args} />
     </div>
   ),
-}
+};
 
 export const PhysicalRAM: Story = {
   args: {
@@ -71,12 +71,12 @@ export const PhysicalRAM: Story = {
       progress: { value: 57.5 },
     },
   },
-  render: (args) => (
+  render: args => (
     <div className="w-80">
       <InfoCard {...args} />
     </div>
   ),
-}
+};
 
 export const WithCopyableValues: Story = {
   args: {
@@ -96,12 +96,12 @@ export const WithCopyableValues: Story = {
       },
     },
   },
-  render: (args) => (
+  render: args => (
     <div className="w-96">
       <InfoCard {...args} />
     </div>
   ),
-}
+};
 
 export const WithItemIcon: Story = {
   args: {
@@ -118,12 +118,12 @@ export const WithItemIcon: Story = {
       ],
     },
   },
-  render: (args) => (
+  render: args => (
     <div className="w-96">
       <InfoCard {...args} />
     </div>
   ),
-}
+};
 
 export const WithFooter: Story = {
   args: {
@@ -143,12 +143,12 @@ export const WithFooter: Story = {
       },
     },
   },
-  render: (args) => (
+  render: args => (
     <div className="w-96">
       <InfoCard {...args} />
     </div>
   ),
-}
+};
 
 export const WithFooterWithoutLink: Story = {
   args: {
@@ -165,12 +165,12 @@ export const WithFooterWithoutLink: Story = {
       },
     },
   },
-  render: (args) => (
+  render: args => (
     <div className="w-96">
       <InfoCard {...args} />
     </div>
   ),
-}
+};
 
 export const Grid: Story = {
   args: { data: { items: [] } },
@@ -211,4 +211,4 @@ export const Grid: Story = {
       />
     </div>
   ),
-}
+};

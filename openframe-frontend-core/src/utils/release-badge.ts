@@ -17,8 +17,8 @@
  * card metadata. The admin form's `releaseTypeOptions.color` array uses a
  * different color vocabulary — different concern; don't unify here.)
  */
-export type ReleaseType = 'major' | 'minor' | 'patch' | 'beta' | 'alpha'
-export type ReleaseTypeBadgeColor = 'error' | 'cyan' | 'success' | 'warning'
+export type ReleaseType = 'major' | 'minor' | 'patch' | 'beta' | 'alpha';
+export type ReleaseTypeBadgeColor = 'error' | 'cyan' | 'success' | 'warning';
 
 /**
  * Accepts a wider input type than `ReleaseType` because list-API rows can
@@ -27,20 +27,18 @@ export type ReleaseTypeBadgeColor = 'error' | 'cyan' | 'success' | 'warning'
  * to decide whether to render a colored badge or fall back to an em-dash, so
  * an undefined return is the correct failure mode (badge hidden), not a crash.
  */
-export function releaseTypeToBadgeColor(
-  t: ReleaseType | string | null | undefined,
-): ReleaseTypeBadgeColor | undefined {
+export function releaseTypeToBadgeColor(t: ReleaseType | string | null | undefined): ReleaseTypeBadgeColor | undefined {
   switch (t) {
     case 'major':
-      return 'error'
+      return 'error';
     case 'minor':
-      return 'cyan'
+      return 'cyan';
     case 'patch':
-      return 'success'
+      return 'success';
     case 'beta':
     case 'alpha':
-      return 'warning'
+      return 'warning';
     default:
-      return undefined
+      return undefined;
   }
 }

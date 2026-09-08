@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { PhoneInput } from '../components/ui/phone-input';
-import { useState } from 'react';
 import type { CountryCode } from 'libphonenumber-js';
+import { useState } from 'react';
+import type { ComponentProps } from 'react';
+import { PhoneInput } from '../components/ui/phone-input';
 
 const meta = {
   title: 'UI/PhoneInput',
@@ -10,7 +11,7 @@ const meta = {
     layout: 'padded',
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ maxWidth: 480 }}>
         <Story />
       </div>
@@ -21,7 +22,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function PhoneInputControlled(props: Partial<React.ComponentProps<typeof PhoneInput>>) {
+function PhoneInputControlled(props: Partial<ComponentProps<typeof PhoneInput>>) {
   const [phone, setPhone] = useState(props.value ?? '');
   const [country, setCountry] = useState<CountryCode>(props.countryCode ?? 'US');
   const [isInvalid, setIsInvalid] = useState(false);
@@ -36,9 +37,7 @@ function PhoneInputControlled(props: Partial<React.ComponentProps<typeof PhoneIn
         onValidationChange={setIsInvalid}
         {...props}
       />
-      {isInvalid && (
-        <p className="text-sm text-[var(--ods-attention-yellow-warning)]">Invalid phone number</p>
-      )}
+      {isInvalid && <p className="text-sm text-[var(--ods-attention-yellow-warning)]">Invalid phone number</p>}
     </div>
   );
 }
@@ -121,7 +120,7 @@ export const NarrowContainer: Story = {
     onCountryChange: () => {},
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ maxWidth: 300, border: '1px dashed var(--ods-border)', padding: 16 }}>
         <Story />
       </div>
