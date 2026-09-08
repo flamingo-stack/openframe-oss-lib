@@ -101,7 +101,7 @@ All client calls use `/content/api/...`. Per-surface retargeting:
 | Onboarding catalog/detail | `/content/api/onboarding-guides[/:slug\|/sections]` | props-driven fetch (`content-api.ts`) |
 | Roadmap | `/content/api/roadmap`, `/roadmap/vote`, `/roadmap/:id` | `items` + `buildRefreshUrl` + `votingOptions` |
 | Delivery | `/content/api/delivery/{completed,in-progress}` | `completedApiEndpoint` / `inProgressApiEndpoint` |
-| Release detail | `/content/api/product-releases/:slug`, `/roadmap` | host `useRelease` + injected section |
+| Release detail | `/content/api/product-releases/:slug`, `/roadmap` | host-resolved `release` / `isLoading` / `error` + injected section |
 | Authors (`ArticleAuthorByline` + `RelatedContentSection authorId`) | `/content/api/related-content?authorId=…` + per-type list endpoints, `/content/api/image-proxy` (avatar) | `apiBaseUrl` prop + ambient `ChatRuntime` |
 | Legal | `/content/api/legal/:docType` | `apiEndpoint` |
 | Contact | `/content/api/contact` | `EndpointsRuntime.contactUrl` |
