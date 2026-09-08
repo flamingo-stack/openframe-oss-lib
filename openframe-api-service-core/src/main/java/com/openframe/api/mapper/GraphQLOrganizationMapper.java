@@ -24,9 +24,6 @@ import java.util.stream.Collectors;
 @Component
 public class GraphQLOrganizationMapper {
 
-    /**
-     * Convert GraphQL filter input to internal filter options.
-     */
     public OrganizationFilterOptions toFilterOptions(OrganizationFilterInput input) {
         if (input == null) {
             return null;
@@ -43,19 +40,11 @@ public class GraphQLOrganizationMapper {
                 .build();
     }
 
-    /**
-     * Convert GraphQL pagination input to internal pagination criteria.
-     */
     public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
         return CursorPaginationCriteria.fromConnectionArgs(args);
     }
 
-    /**
-     * Convert the typed {@link OrganizationSortInput} into the generic
-     * {@link SortInput} consumed by the service layer. {@code LAST_ACTIVITY}
-     * maps to the underlying Mongo field {@code updatedAt}. When no sort is
-     * provided the spec default {@code LAST_ACTIVITY DESC} is applied.
-     */
+    // No sort provided defaults to LAST_ACTIVITY DESC per spec.
     public SortInput toSortInput(OrganizationSortInput orderBy) {
         SortDirection direction = (orderBy != null && orderBy.getDirection() != null)
                 ? orderBy.getDirection()
@@ -66,9 +55,6 @@ public class GraphQLOrganizationMapper {
                 .build();
     }
 
-    /**
-     * Convert organization query result to GraphQL connection.
-     */
     public CountedGenericConnection<GenericEdge<Organization>> toOrganizationConnection(CountedGenericQueryResult<Organization> result) {
         // The organizations query always sorts by last activity, so per-edge
         // cursors use the compound (lastActivityAt, _id) keyset — consistent
@@ -87,3 +73,4 @@ public class GraphQLOrganizationMapper {
                 .build();
     }
 }
+

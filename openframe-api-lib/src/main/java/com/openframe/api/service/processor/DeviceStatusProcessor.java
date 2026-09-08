@@ -8,10 +8,6 @@ import com.openframe.data.document.device.Machine;
  */
 public interface DeviceStatusProcessor {
 
-    /**
-     * Process after a device status has been updated.
-     *
-     * @param machine The machine with updated status
-     */
+    // Called post-update so implementations can react to the new status without blocking the update itself
     void postProcessStatusUpdated(Machine machine);
 }

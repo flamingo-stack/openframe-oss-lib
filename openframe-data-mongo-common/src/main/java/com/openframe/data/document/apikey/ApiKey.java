@@ -46,16 +46,10 @@ public class ApiKey implements TenantScoped {
     private String createdBy;
     private String updatedBy;
 
-    /**
-     * Check if the API key is expired
-     */
     public boolean isExpired() {
         return expiresAt != null && Instant.now().isAfter(expiresAt);
     }
 
-    /**
-     * Check if the API key is active (enabled and not expired)
-     */
     public boolean isActive() {
         return enabled && !isExpired();
     }
