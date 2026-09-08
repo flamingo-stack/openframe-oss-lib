@@ -39,7 +39,7 @@ class PackageManagerMissingListenerTest {
 
         listener.handleMessage(message);
 
-        verify(bootstrapService).installIfAbsent("m-42", PackageManagerType.BREW);
+        verify(bootstrapService).dispatchInstall("m-42", PackageManagerType.BREW);
         verify(message).ack();
     }
 
@@ -50,7 +50,7 @@ class PackageManagerMissingListenerTest {
 
         listener.handleMessage(message);
 
-        verify(bootstrapService, never()).installIfAbsent(anyString(), any());
+        verify(bootstrapService, never()).dispatchInstall(anyString(), any());
         verify(message).ack();
     }
 
@@ -61,14 +61,14 @@ class PackageManagerMissingListenerTest {
 
         listener.handleMessage(message);
 
-        verify(bootstrapService, never()).installIfAbsent(anyString(), any());
+        verify(bootstrapService, never()).dispatchInstall(anyString(), any());
         verify(message).ack();
     }
 
     @Test
     @DisplayName("transient service failure: left unacked so JetStream redelivers")
     void leavesUnackedOnServiceFailure() {
-        doThrow(new RuntimeException("mongo down")).when(bootstrapService).installIfAbsent(anyString(), any());
+        doThrow(new RuntimeException("mongo down")).when(bootstrapService).dispatchInstall(anyString(), any());
         Message message = message("machine.m-42.package-manager-missing", "{\"packageManager\":\"CHOCO\"}");
 
         listener.handleMessage(message);

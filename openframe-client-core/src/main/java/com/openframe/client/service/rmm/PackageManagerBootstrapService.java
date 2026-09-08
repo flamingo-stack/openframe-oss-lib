@@ -38,17 +38,15 @@ import java.util.UUID;
 @Slf4j
 public class PackageManagerBootstrapService {
 
-    private static final String INITIATED_BY = "system";
-
     private final MachineRepository machineRepository;
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptBootstrapNatsPublisher scriptBootstrapNatsPublisher;
 
-    @Value("${openframe.rmm.package-manager-bootstrap.cooldown-seconds:1800}")
+    @Value("${openframe.rmm.package-manager-bootstrap.cooldown-seconds}")
     private long cooldownSeconds;
 
-    public void installIfAbsent(String machineId, PackageManagerType packageManager) {
+    public void dispatchInstall(String machineId, PackageManagerType packageManager) {
         Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
         if (foundMachine.isEmpty()) {
             log.warn("Package-manager report for unknown machine {}, ignoring", machineId);
@@ -110,7 +108,6 @@ public class PackageManagerBootstrapService {
                 .machineId(machineId)
                 .privilegeLevel(script.getPrivilegeLevel())
                 .timeoutSeconds(script.getDefaultTimeoutSeconds())
-                .initiatedBy(INITIATED_BY)
                 .source(ExecutionSource.SYSTEM_BOOTSTRAP)
                 .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(now)

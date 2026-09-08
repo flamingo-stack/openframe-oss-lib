@@ -75,7 +75,7 @@ public class PackageManagerMissingListener extends AbstractJetStreamPushListener
             }
 
             log.info("Processing package-manager report: machineId={} packageManager={}", machineId, packageManager);
-            bootstrapService.installIfAbsent(machineId, packageManager);
+            bootstrapService.dispatchInstall(machineId, packageManager);
 
             message.ack();
         } catch (JsonProcessingException | IllegalArgumentException permanentlyBad) {

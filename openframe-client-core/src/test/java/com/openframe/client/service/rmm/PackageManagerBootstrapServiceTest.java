@@ -102,7 +102,7 @@ class PackageManagerBootstrapServiceTest {
         when(scriptExecutionRepository.findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
                 any(), any(), any(), any())).thenReturn(Optional.empty());
 
-        service.installIfAbsent(MACHINE_ID, PackageManagerType.WINGET);
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.WINGET);
 
         ArgumentCaptor<ScriptExecution> row = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(row.capture());
@@ -128,7 +128,7 @@ class PackageManagerBootstrapServiceTest {
         givenSeededScript();
         givenLastExecution(ExecutionStatus.RUNNING, Instant.now().minusSeconds(COOLDOWN_SECONDS * 10));
 
-        service.installIfAbsent(MACHINE_ID, PackageManagerType.WINGET);
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.WINGET);
 
         verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
         verify(scriptExecutionRepository, never()).save(any());
@@ -141,7 +141,7 @@ class PackageManagerBootstrapServiceTest {
         givenSeededScript();
         givenLastExecution(ExecutionStatus.FAILED, Instant.now().minusSeconds(60));
 
-        service.installIfAbsent(MACHINE_ID, PackageManagerType.WINGET);
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.WINGET);
 
         verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
     }
@@ -153,7 +153,7 @@ class PackageManagerBootstrapServiceTest {
         givenSeededScript();
         givenLastExecution(ExecutionStatus.FAILED, Instant.now().minusSeconds(COOLDOWN_SECONDS + 60));
 
-        service.installIfAbsent(MACHINE_ID, PackageManagerType.WINGET);
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.WINGET);
 
         verify(scriptBootstrapNatsPublisher).publishBootstrapScript(anyString(), any(ScriptMessage.class));
     }
@@ -163,7 +163,7 @@ class PackageManagerBootstrapServiceTest {
     void ignoresUnknownMachine() {
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
 
-        service.installIfAbsent(MACHINE_ID, PackageManagerType.BREW);
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.BREW);
 
         verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
     }
@@ -173,7 +173,7 @@ class PackageManagerBootstrapServiceTest {
     void ignoresDeletedMachine() {
         givenMachine(DeviceStatus.PENDING_DELETION);
 
-        service.installIfAbsent(MACHINE_ID, PackageManagerType.BREW);
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.BREW);
 
         verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
     }
@@ -183,7 +183,7 @@ class PackageManagerBootstrapServiceTest {
     void ignoresArchivedMachine() {
         givenMachine(DeviceStatus.ARCHIVED);
 
-        service.installIfAbsent(MACHINE_ID, PackageManagerType.BREW);
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.BREW);
 
         verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
     }
@@ -195,7 +195,7 @@ class PackageManagerBootstrapServiceTest {
         when(scriptRepository.findSystemScript(SystemScriptCode.INSTALL_BREW, TENANT_ID))
                 .thenReturn(Optional.empty());
 
-        service.installIfAbsent(MACHINE_ID, PackageManagerType.BREW);
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.BREW);
 
         verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
         verify(scriptExecutionRepository, never()).save(any());
