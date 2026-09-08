@@ -20,15 +20,11 @@ import { MESSAGE_TYPE } from '../components/chat/types/message.types';
 import type { AskOptionData } from '../components/chat/types/message.types';
 import { ESCALATION_STATE, escalationResolvedStatus } from './events';
 import type { ApprovalToolCall, ChatStreamEvent } from './events';
+import { isRecord } from './wire-narrow';
 
 /** Minimal structural view of a NATS chunk (see `ChunkData` in
  *  `src/components/chat/types/network.types.ts`). */
 type NatsChunk = Record<string, unknown>;
-
-/** Narrow an unknown wire value to something with string-keyed properties. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 /** Wire string field, or `undefined` when the backend sent anything else. */
 function str(value: unknown): string | undefined {

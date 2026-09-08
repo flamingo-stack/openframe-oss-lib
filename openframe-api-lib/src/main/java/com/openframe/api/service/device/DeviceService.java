@@ -36,7 +36,9 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -216,11 +218,20 @@ public class DeviceService {
                 .build();
     }
 
+    /** Statuses a device may have to be offered to / kept on a script schedule: only live agents. */
+    private static final Set<DeviceStatus> SCHEDULE_ALLOWED_STATUSES = EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
+
+    /** Every status other than {@link #SCHEDULE_ALLOWED_STATUSES}, applied as a {@code $nin} on top of any user filter. */
+    private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
+            .filter(status -> !SCHEDULE_ALLOWED_STATUSES.contains(status))
+            .map(Enum::name)
+            .toList();
+
     private MachineQueryFilter scheduleDeviceFilter(DeviceFilterCriteria filter,
                                                     Collection<OsType> osTypeScope,
                                                     Collection<String> restrictToMachineIds) {
         MachineQueryFilter out = machineFilter(filter, osTypeScope, restrictToMachineIds);
-        out.setExcludeStatuses(List.of(DeviceStatus.DELETED.name(), DeviceStatus.ARCHIVED.name(), DeviceStatus.PENDING.name()));
+        out.setExcludeStatuses(SCHEDULE_EXCLUDED_STATUSES);
         return out;
     }
 

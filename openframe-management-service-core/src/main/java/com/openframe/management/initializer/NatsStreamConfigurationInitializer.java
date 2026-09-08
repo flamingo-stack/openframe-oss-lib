@@ -10,6 +10,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.List;
 
 @Component
@@ -68,6 +69,23 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .subjects(List.of("machine.*.hostname"))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
+                    .build(),
+            // server -> agent: "report your timezone" requests for DEVICE_LOCAL schedules
+            // Re-sent every 30-minute sweep per pending device, so cap age to keep the stream small
+            StreamConfiguration.builder()
+                    .name("MACHINE_TIMEZONE_REQUEST")
+                    .subjects(List.of("machine.*.timezone.request"))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
+                    .maxAge(Duration.ofHours(1))
+                    .build(),
+            // agent -> server: reported IANA timezone (reply to the request above)
+            StreamConfiguration.builder()
+                    .name("MACHINE_TIMEZONE")
+                    .subjects(List.of("machine.*.timezone"))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
+                    .maxAge(Duration.ofHours(1))
                     .build(),
             StreamConfiguration.builder()
                     .name("EXECUTION_ACKNOWLEDGE")

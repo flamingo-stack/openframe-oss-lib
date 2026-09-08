@@ -21,6 +21,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.ZoneId;
+import java.util.Set;
 
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
 import static com.openframe.core.exception.ErrorCode.CLIENT_SECRET_INVALID;
@@ -35,6 +37,7 @@ public class AgentRegistrationService {
     private static final String AGENT_ROLE = "AGENT";
     private static final String CLIENT_ID_TEMPLATE = "agent_%s";
     private static final String OPENFRAME_CLIENT_AGENT_TYPE = "openframe-client";
+    private static final Set<String> AVAILABLE_ZONES = ZoneId.getAvailableZoneIds();
 
     private final OAuthClientRepository oauthClientRepository;
     private final MachineRepository machineRepository;
@@ -170,6 +173,13 @@ public class AgentRegistrationService {
         if (isNotBlank(request.getUserId())) {
             machine.setUserId(request.getUserId());
         }
+        if (isNotBlank(request.getTimezone()) && isValidZone(request.getTimezone())) {
+            machine.setTimezone(request.getTimezone());
+        }
+    }
+
+    private static boolean isValidZone(String timezone) {
+        return AVAILABLE_ZONES.contains(timezone);
     }
 
     private static OsType normalizeOsType(String rawOsType) {

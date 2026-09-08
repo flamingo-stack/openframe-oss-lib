@@ -18,6 +18,7 @@
 
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
 import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from '../chat/chat-attachment-bar';
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments';
 import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown';
@@ -76,7 +77,7 @@ export function TicketOpenForm({ onSubmit, isSubmitting, supportSystemDown }: Ti
 
   return (
     <Card className="p-6">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6 md:flex-row">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6 md:flex-row" {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}>
         <div className="min-w-0 flex-1 md:max-w-md">
           <h2 className="mb-2 text-ods-text-primary text-h2">Need Support?</h2>
           <p className="text-ods-text-secondary text-h6">
