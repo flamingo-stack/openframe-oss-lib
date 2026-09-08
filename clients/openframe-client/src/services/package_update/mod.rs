@@ -44,6 +44,42 @@ pub trait ManagerUpdater: Send + Sync {
     fn interpret(&self, result: &ExecResult) -> UpdateOutcome;
 }
 
+#[cfg(target_os = "windows")]
+mod markers {
+    pub const NOT_PRESENT: &str = "__NOT_PRESENT__";
+    pub const LATEST: &str = "__LATEST__|";
+    pub const FROM: &str = "__FROM__|";
+    pub const TO: &str = "__TO__|";
+}
+
+#[cfg(target_os = "windows")]
+fn marker(stdout: &str, prefix: &str) -> Option<String> {
+    stdout
+        .lines()
+        .find_map(|line| line.trim().strip_prefix(prefix).map(|v| v.trim().to_string()))
+}
+
+#[cfg(target_os = "windows")]
+fn interpret_markers(result: &ExecResult) -> UpdateOutcome {
+    if result.stdout.contains(markers::NOT_PRESENT) {
+        return UpdateOutcome::NotPresent;
+    }
+    if let Some(version) = marker(&result.stdout, markers::LATEST) {
+        return UpdateOutcome::AlreadyLatest {
+            version: Some(version),
+        };
+    }
+    if result.retcode != 0 {
+        return UpdateOutcome::Failed {
+            detail: result.stderr.clone(),
+        };
+    }
+    UpdateOutcome::Updated {
+        from: marker(&result.stdout, markers::FROM),
+        to: marker(&result.stdout, markers::TO),
+    }
+}
+
 fn managers() -> Vec<Box<dyn ManagerUpdater>> {
     #[cfg(target_os = "macos")]
     {
