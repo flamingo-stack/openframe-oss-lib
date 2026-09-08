@@ -85,7 +85,13 @@ public class MingoMdmTest extends MingoBaseTest {
         String name = "E2E-" + runId;
         Policy seed = seedPolicy(name);
 
-        RunResult result = prompt("Assign the machine " + target.getHostname()
+        // "the online machine", not "the machine": the tenant carries several device records with this
+        // hostname -- an enroll/uninstall cycle leaves the old one behind as OFFLINE -- and asked to
+        // assign a name that matches three devices, the assistant correctly stops and asks which one
+        // rather than guessing. It never calls the assign tool, the policy ends up with no host, and
+        // the case fails on an ambiguity that is data, not behaviour. Naming the state the case
+        // actually means resolves it to the one device that matters here.
+        RunResult result = prompt("Assign the online machine " + target.getHostname()
                 + " to the Fleet MDM policy named \"" + name + "\".");
 
         Policy after = MonitoringApi.getPolicy(seed.getId());
