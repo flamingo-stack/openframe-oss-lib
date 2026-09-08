@@ -1229,3 +1229,295 @@ describe('ordering of surviving realtime messages', () => {
     expect(ids(merged)).toEqual([H_U0.id, outOfOrder.id, AWAY_U.id, AWAY_A.id]);
   });
 });
+
+describe('sliding history window (refetch after the thread grew)', () => {
+  // Pages are fetched newest-first with a fixed count, so a refetch after the
+  // thread has grown returns the newest rows and the head of what is on screen
+  // is no longer in it. Everything older than that window must survive, in
+  // place: it cannot have a twin the window could dedupe it against.
+  const persisted = (n: number, role: 'user' | 'assistant', seq?: number): TestMessage => ({
+    id: `dddd${String(n).padStart(4, '0')}`,
+    role,
+    content: role === 'user' ? `q${n}` : txt(`a${n}`),
+    timestamp: t(10_000 + n),
+    ...(seq !== undefined ? { streamSeq: seq } : {}),
+  });
+  const head = [persisted(1, 'user'), persisted(2, 'assistant', 2)];
+  const refetched = [
+    persisted(5, 'user'),
+    persisted(6, 'assistant', 6),
+    persisted(7, 'user'),
+    persisted(8, 'assistant', 8),
+  ];
+  const windowWith = (sixth: TestMessage) => [refetched[0], sixth, refetched[2], refetched[3]];
+  const merge = (existingMessages: TestMessage[], processedHistory: TestMessage[] = refetched, fetchedAt = 99_000) =>
+    mergeHistoryWithRealtime({
+      processedHistory,
+      rawHistoryIds: new Set(ids(processedHistory)),
+      existingMessages,
+      streamingMessageId: null,
+      historyFetchedAt: fetchedAt,
+      historyMaxStreamSeq: maxPersistedStreamSeq([
+        { messages: processedHistory.map(m => ({ lastChunkStreamSeq: m.streamSeq })) },
+      ]),
+      realtimeSeenStreamSeq: 8,
+    });
+
+  it('keeps persisted rows that fell out of the refetched window IN FRONT of it, in order', () => {
+    // These used to be appended after the window — the start of the
+    // conversation showed up below the newest reply on every refetch.
+    const onScreen = Array.from({ length: 12 }, (_, i) => {
+      const n = i + 1;
+      return n % 2 === 0 ? persisted(n, 'assistant', n) : persisted(n, 'user');
+    });
+    expect(ids(merge(onScreen, onScreen.slice(4)))).toEqual(ids(onScreen));
+  });
+
+  it('keeps a live turn before the first window row even when its text repeats a window row', () => {
+    // The thread's own window rows fix the boundary, so a row above them is
+    // older whatever its content says — no clock, seq or text heuristics.
+    const live: TestMessage[] = [
+      { id: 'optimistic-3', role: 'user', content: 'q5', timestamp: t(10_003) },
+      { id: 'assistant-4', role: 'assistant', content: txt('a6'), timestamp: t(10_004), streamSeq: 4 },
+    ];
+    expect(ids(merge([...head, ...live, ...refetched]))).toEqual([...ids(head), ...ids(live), ...ids(refetched)]);
+  });
+
+  it('judges rows on their own when the thread holds no window row — a live turn older than the window is kept', () => {
+    // Turns streamed live and never refetched are still synthetics. Once the
+    // window slid past them, same-role coverage read "a persisted row reached
+    // this seq" and DROPPED the assistant reply — with no twin on screen to
+    // stand in for it — while the optimistic prompt was kept out of order.
+    const live: TestMessage[] = [
+      { id: 'optimistic-3', role: 'user', content: 'q3', timestamp: t(10_003) },
+      { id: 'assistant-4', role: 'assistant', content: txt('a4'), timestamp: t(10_004), streamSeq: 4 },
+    ];
+    expect(ids(merge([...head, ...live]))).toEqual([...ids(head), ...ids(live), ...ids(refetched)]);
+  });
+
+  it('pins the twin guard: a cut-short copy of a window turn is left to coverage even when its seq reads older', () => {
+    // The window's first assistant row is unstamped (async stamping lag), so by
+    // seq alone the live copy looks older than the window. Its answer text is
+    // a prefix of that row's: it is the row's twin, and coverage drops it.
+    const unstamped: TestMessage = {
+      id: 'dddd0006',
+      role: 'assistant',
+      content: txt('a6 and then'),
+      timestamp: t(10_006),
+    };
+    const snapshot = windowWith(unstamped);
+    const cutShort: TestMessage = {
+      id: 'assistant-6',
+      role: 'assistant',
+      content: txt('a6'),
+      timestamp: t(10_006),
+      streamSeq: 6,
+    };
+    expect(ids(merge([cutShort], snapshot))).toEqual(ids(snapshot));
+  });
+
+  it('pins the twin guard the other way: a persisted row still being written is the twin of the fuller live copy', () => {
+    const lagging: TestMessage = { id: 'dddd0006', role: 'assistant', content: txt('a6'), timestamp: t(10_006) };
+    const snapshot = windowWith(lagging);
+    const fuller: TestMessage = {
+      id: 'assistant-6',
+      role: 'assistant',
+      content: txt('a6 and then'),
+      timestamp: t(10_006),
+      streamSeq: 6,
+    };
+    expect(ids(merge([fuller], snapshot))).toEqual(ids(snapshot));
+  });
+
+  it('keeps a trailing live turn AFTER the window — the boundary only bounds what is older', () => {
+    const live: TestMessage[] = [
+      { id: 'optimistic-9', role: 'user', content: 'q9', timestamp: t(99_500) },
+      { id: 'assistant-10', role: 'assistant', content: txt('a10'), timestamp: t(99_600), streamSeq: 10 },
+    ];
+    expect(ids(merge([...head, ...refetched, ...live]))).toEqual([...ids(head), ...ids(refetched), ...ids(live)]);
+  });
+
+  it('never pulls a host-minted tail row above the window it sits behind', () => {
+    // A non-synthetic, non-optimistic id is read as persisted only when the
+    // thread holds no window row; behind the window it is the live tail.
+    const preview: TestMessage = {
+      id: 'ticket-preview-1',
+      role: 'assistant',
+      content: txt('preview'),
+      timestamp: t(99_500),
+    };
+    expect(ids(merge([...refetched, preview]))).toEqual([...ids(refetched), preview.id]);
+  });
+
+  it('never reads a host-minted row newer than the fetch as persisted history, even with no window row in the thread', () => {
+    // openframe-chat's call shape: the thread is the live tail only. A ticket
+    // preview it minted after the fetch must neither anchor the live rows in
+    // front nor be dropped as a disjoint persisted row.
+    const live: TestMessage[] = [
+      { id: 'user-5', role: 'user', content: 'q5', timestamp: t(99_500), streamSeq: 5 },
+      { id: 'assistant-6', role: 'assistant', content: txt('a6'), timestamp: t(99_600), streamSeq: 6 },
+    ];
+    const preview: TestMessage = {
+      id: 'ticket-preview-1',
+      role: 'assistant',
+      content: txt('preview'),
+      timestamp: t(99_900),
+    };
+    const snapshot = [persisted(5, 'user'), persisted(6, 'assistant', 6)];
+    expect(ids(merge([...live, preview], snapshot))).toEqual([...ids(snapshot), preview.id]);
+    expect(ids(merge([preview], snapshot))).toEqual([...ids(snapshot), preview.id]);
+  });
+
+  it('does not read a message sent AFTER the fetch as older than the window on a clock behind the server', () => {
+    // Client clock 9_000, window rows stamped 10_005+ by the server, fetch at
+    // client 8_000: the send happened after the fetch, so it cannot predate a
+    // window that fetch returned.
+    const sent: TestMessage = { id: 'optimistic-x', role: 'user', content: 'a new question', timestamp: t(9_000) };
+    expect(ids(merge([sent], refetched, 8_000))).toEqual([...ids(refetched), sent.id]);
+  });
+
+  it('anchors on the last persisted row when the thread holds no window row: everything before it is older', () => {
+    // Text collisions with the window ("continue"-style prompts, short
+    // answers) cannot demote a row that precedes a persisted row the window
+    // itself lacks.
+    const live: TestMessage[] = [
+      { id: 'optimistic-1', role: 'user', content: 'q5', timestamp: t(10_001) },
+      { id: 'assistant-2', role: 'assistant', content: txt('a6'), timestamp: t(10_002), streamSeq: 2 },
+    ];
+    const older = [persisted(3, 'user'), persisted(4, 'assistant', 4)];
+    expect(ids(merge([...live, ...older]))).toEqual([...ids(live), ...ids(older), ...ids(refetched)]);
+  });
+
+  it('heals a copy a previous merge placed in front once a window row proves it by request id', () => {
+    // A tool turn whose persisted row was unstamped when first refetched read
+    // as older and went in front. Now stamped and in the window, the shared
+    // tool id says which turn the live copy is: back to coverage, gone.
+    const toolTurn = (id: string, seq?: number): TestMessage => ({
+      id,
+      role: 'assistant',
+      content: [tool('call-6', 'EXECUTED_TOOL')],
+      timestamp: t(10_006),
+      ...(seq !== undefined ? { streamSeq: seq } : {}),
+    });
+    const stale = toolTurn('assistant-6', 6);
+    const snapshot = windowWith(toolTurn('dddd0006', 6));
+    expect(ids(merge([stale, ...snapshot], snapshot))).toEqual(ids(snapshot));
+  });
+
+  it('keeps an older system notice on seq alone — its persisted twin is stamped, and empty text is no identity', () => {
+    const notice: TestMessage = { id: 'system-3', role: 'user', content: '', timestamp: t(10_003), streamSeq: 3 };
+    const windowNotice: TestMessage = { id: 'dddd0006', role: 'user', content: '', timestamp: t(10_006), streamSeq: 6 };
+    const snapshot = windowWith(windowNotice);
+    expect(ids(merge([notice], snapshot))).toEqual([notice.id, ...ids(snapshot)]);
+  });
+
+  it("drops a cut-short copy of the window's oldest stamped turn even though its seq reads older", () => {
+    // A copy carries its LAST CONSUMED chunk's seq, which is below its twin's
+    // stamp whenever the client missed the tail — the reconnect race. Every
+    // window assistant is stamped, so seq alone would promote it; its text is a
+    // prefix of the twin's, and the verdict wins.
+    const full = { ...persisted(6, 'assistant', 6), content: txt('a6 and then more') };
+    const snapshot = windowWith(full);
+    const cutShort: TestMessage = {
+      id: 'assistant-2',
+      role: 'assistant',
+      content: txt('a6'),
+      timestamp: t(10_006),
+      streamSeq: 4,
+    };
+    const prompt: TestMessage = { id: 'optimistic-1', role: 'user', content: 'q5', timestamp: t(10_005) };
+    expect(ids(merge([prompt, cutShort], snapshot))).toEqual(ids(snapshot));
+  });
+
+  it('drops persisted rows disjoint from the window when nothing live bridges them', () => {
+    // Rows added while this client was unsubscribed for a page or more: the
+    // thread's persisted rows and the window share nothing, and the next older
+    // page would land above the thread's rows. The window alone is the thread.
+    expect(ids(merge(head))).toEqual(ids(refetched));
+  });
+
+  it('trusts seq for an assistant copy when every assistant row in the window is stamped, even a text-less one', () => {
+    const thinkingOnly: TestMessage = {
+      id: 'assistant-3',
+      role: 'assistant',
+      content: [{ type: 'thinking', text: 'hmm' }],
+      timestamp: t(10_003),
+      streamSeq: 3,
+    };
+    expect(ids(merge([thinkingOnly]))).toEqual([thinkingOnly.id, ...ids(refetched)]);
+  });
+});
+
+describe('computeHistoryPrepend after a window slide', () => {
+  const persisted = (
+    n: number,
+    role: 'user' | 'assistant',
+    text = role === 'user' ? `q${n}` : `a${n}`,
+  ): TestMessage => ({
+    id: `cccc${String(n).padStart(4, '0')}`,
+    role,
+    content: role === 'user' ? text : txt(text),
+    timestamp: t(20_000 + n),
+    ...(role === 'assistant' ? { streamSeq: n } : {}),
+  });
+  const snapshot = [persisted(5, 'user'), persisted(6, 'assistant')];
+
+  it('leaves out the persisted twins of live rows the thread still shows above the boundary', () => {
+    // The thread kept turn 3/4 live (see the window-boundary tests); the older
+    // page now carries their persisted rows. Prepending them would render the
+    // turn twice; the persisted copy waits for the next full merge.
+    const live: TestMessage[] = [
+      { id: 'optimistic-3', role: 'user', content: 'q3', timestamp: t(20_003) },
+      { id: 'assistant-4', role: 'assistant', content: txt('a4'), timestamp: t(20_004), streamSeq: 4 },
+    ];
+    const olderPages = [
+      persisted(1, 'user'),
+      persisted(2, 'assistant'),
+      persisted(3, 'user'),
+      persisted(4, 'assistant'),
+      ...snapshot,
+    ];
+    const result = computeHistoryPrepend(olderPages, [...live, ...snapshot]);
+    if (!result) throw new Error('computeHistoryPrepend returned null for a page with older messages');
+    expect(ids(result.newMessages)).toEqual(['cccc0001', 'cccc0002']);
+  });
+
+  it('matches a repeated prompt positionally — the live row twins the NEWEST same-text row before the boundary', () => {
+    const live: TestMessage[] = [{ id: 'optimistic-3', role: 'user', content: 'continue', timestamp: t(20_003) }];
+    const olderPages = [
+      persisted(1, 'user', 'continue'),
+      persisted(2, 'assistant'),
+      persisted(3, 'user', 'continue'),
+      persisted(4, 'assistant'),
+      ...snapshot,
+    ];
+    const result = computeHistoryPrepend(olderPages, [...live, ...snapshot]);
+    if (!result) throw new Error('computeHistoryPrepend returned null for a page with older messages');
+    expect(ids(result.newMessages)).toEqual(['cccc0001', 'cccc0002', 'cccc0004']);
+  });
+
+  it('prepends everything when nothing live sits above the boundary', () => {
+    const olderPages = [persisted(3, 'user'), persisted(4, 'assistant'), ...snapshot];
+    const result = computeHistoryPrepend(olderPages, snapshot);
+    if (!result) throw new Error('computeHistoryPrepend returned null for a page with older messages');
+    expect(ids(result.newMessages)).toEqual(['cccc0003', 'cccc0004']);
+  });
+
+  it('claims one persisted answer per live answer, newest first, and only in the cut-short direction', () => {
+    // A live "Done." above the boundary twins the newest persisted "Done." on
+    // the page — not an older turn that merely opens with it.
+    const live: TestMessage[] = [
+      { id: 'assistant-4', role: 'assistant', content: txt('Done.'), timestamp: t(20_004), streamSeq: 4 },
+    ];
+    const olderPages = [
+      persisted(1, 'user'),
+      persisted(2, 'assistant', 'Done. Anything else?'),
+      persisted(3, 'user'),
+      persisted(4, 'assistant', 'Done.'),
+      ...snapshot,
+    ];
+    const result = computeHistoryPrepend(olderPages, [...live, ...snapshot]);
+    if (!result) throw new Error('computeHistoryPrepend returned null for a page with older messages');
+    expect(ids(result.newMessages)).toEqual(['cccc0001', 'cccc0002', 'cccc0003']);
+  });
+});

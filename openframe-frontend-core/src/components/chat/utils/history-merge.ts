@@ -63,6 +63,33 @@ function isSyntheticRealtimeId(id: string): boolean {
   return SYNTHETIC_REALTIME_ID_PREFIXES.some(prefix => id.startsWith(prefix));
 }
 
+/** Host-minted user bubble of a send in flight. Deliberately NOT one of the
+ *  synthetic-realtime prefixes — see the note above them. */
+function isOptimisticId(id: string): boolean {
+  return id.startsWith('optimistic-');
+}
+
+/** Peer `MESSAGE_REQUEST` echo (another session's send). Its persisted twin is
+ *  the one row kind the backend never stamps with a `lastChunkStreamSeq`, so
+ *  seq can never prove it in or out of a snapshot — every site that treats
+ *  `user-` specially exists for that, and all of them go when the backend
+ *  starts stamping user rows. */
+function isUserRequestSyntheticId(id: string): boolean {
+  return id.startsWith('user-');
+}
+
+/** A row this client made up and never fetched. Everything else (`welcome-`
+ *  included) reads as a persisted row where the thread's own shape cannot say
+ *  otherwise. */
+function isClientMintedId(id: string): boolean {
+  return isSyntheticRealtimeId(id) || isOptimisticId(id);
+}
+
+/** The host's greeting on a fresh dialog: never persisted, belongs at the top. */
+function isWelcomeId(id: string): boolean {
+  return id.startsWith('welcome-');
+}
+
 /** Rendered answer text of an assistant message (TEXT segments, or a plain string). Used to
  *  recognise a replayed synthetic as the twin of an already-persisted turn when the stream-seq
  *  signal can't prove it (see the trailing-turn fallback below). Empty for tool/approval-only
@@ -118,13 +145,71 @@ function turnRequestKeys(content: MessageContent): Set<string> {
   return keys;
 }
 
-/** Whether `content` carries any of `keys` — see `turnRequestKeys`. */
-function sharesRequestKey(content: MessageContent, keys: ReadonlySet<string>): boolean {
-  if (keys.size === 0) return false;
-  for (const key of turnRequestKeys(content)) {
-    if (keys.has(key)) return true;
+/** Whether any of a turn's `keys` (see `turnRequestKeys`) is in `others`. */
+function sharesRequestKey(keys: ReadonlySet<string>, others: ReadonlySet<string>): boolean {
+  if (keys.size === 0 || others.size === 0) return false;
+  for (const key of keys) {
+    if (others.has(key)) return true;
   }
   return false;
+}
+
+/** A user row's identity is its text; empty text is no identity (system rows
+ *  persist with `content: ''`). `''` for any other row. */
+function userText(m: MergeableChatMessage): string {
+  return m.role === 'user' && typeof m.content === 'string' ? m.content : '';
+}
+
+/** What a set of rows says about the turns they render, so another copy of one
+ *  of those turns can be recognised under a DIFFERENT id: the backend request
+ *  ids their segments carry, their answer texts and their user texts. The text
+ *  maps count occurrences for the callers that pair copies positionally (a
+ *  repeated prompt twins the NEWEST unclaimed same-text row); `twinVerdict`
+ *  itself reads them as presence. Empty user text carries no identity (system
+ *  rows persist with `content: ''`) and is left out. */
+interface TwinSignals {
+  requestKeys: Set<string>;
+  assistantTexts: Map<string, number>;
+  userContents: Map<string, number>;
+}
+
+function collectTwinSignals(rows: readonly MergeableChatMessage[]): TwinSignals {
+  const signals: TwinSignals = { requestKeys: new Set(), assistantTexts: new Map(), userContents: new Map() };
+  for (const row of rows) {
+    for (const key of turnRequestKeys(row.content)) signals.requestKeys.add(key);
+    if (row.role === 'assistant') {
+      const text = assistantAnswerText(row.content);
+      if (text !== '') signals.assistantTexts.set(text, (signals.assistantTexts.get(text) ?? 0) + 1);
+      continue;
+    }
+    const text = userText(row);
+    if (text !== '') signals.userContents.set(text, (signals.userContents.get(text) ?? 0) + 1);
+  }
+  return signals;
+}
+
+type TwinVerdict = 'twin' | 'distinct' | 'unknown';
+
+/** Whether `m` renders one of the turns `signals` describe. 'twin': a shared
+ *  request id, a user text held verbatim, or an answer text that is a prefix
+ *  either way of one held — streaming only appends, so a copy cut short, or a
+ *  persisted row still being written, is a prefix of the full one. 'unknown':
+ *  the row carries nothing a twin could be recognised by (no user text, no
+ *  request id, no answer text), so "no match" says nothing about it. */
+function twinVerdict(signals: TwinSignals, m: MergeableChatMessage): TwinVerdict {
+  if (m.role !== 'assistant') {
+    const text = userText(m);
+    if (text === '') return 'unknown';
+    return signals.userContents.has(text) ? 'twin' : 'distinct';
+  }
+  const keys = turnRequestKeys(m.content);
+  if (keys.size > 0) return sharesRequestKey(keys, signals.requestKeys) ? 'twin' : 'distinct';
+  const text = assistantAnswerText(m.content);
+  if (text === '') return 'unknown';
+  for (const other of signals.assistantTexts.keys()) {
+    if (other.startsWith(text) || text.startsWith(other)) return 'twin';
+  }
+  return 'distinct';
 }
 
 /** Flattens DESC-sorted message pages (newest page first, newest message
@@ -308,7 +393,7 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
     // `approvalRequestId`, widened to tool calls.
     const trailingKeys = turnRequestKeys(historyTrailingAssistant.content);
     const isSameTurn = (m: M): boolean =>
-      m.id === historyTrailingAssistant.id || (trailingKeys.size > 0 && sharesRequestKey(m.content, trailingKeys));
+      m.id === historyTrailingAssistant.id || sharesRequestKey(turnRequestKeys(m.content), trailingKeys);
     const richerTwin = existingMessages.find(
       m =>
         m !== historyTrailingAssistant &&
@@ -339,42 +424,112 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   const trailingAssistantText =
     lastProcessed && lastProcessed.role === 'assistant' ? assistantAnswerText(lastProcessed.content) : '';
 
-  // Positional content multiset for `user-` synthetic dedup. The backend
-  // persists user MESSAGE_REQUEST rows WITHOUT a `lastChunkStreamSeq`, so a
-  // replayed/echoed `user-` synthetic can be covered by neither seq (its twin
-  // adds 0 to every seq max) nor wall-clock (replay re-mints a fresh
-  // timestamp). Match it by TEXT against persisted user rows, positionally: the
-  // k-th `user-` synthetic with a text is the twin of the k-th persisted user
-  // row with that text. This drops a replay/echo once its own row is in the
-  // snapshot (kills the client→viewer duplicate, trailing twin or not) while
-  // keeping a LATER same-text turn whose row hasn't persisted yet — which the
-  // old first-match `findIndex` dropped, losing a repeated message.
-  const persistedUserContentCounts = new Map<string, number>();
-  for (const pm of processedToUse) {
-    if (pm.role === 'user' && typeof pm.content === 'string') {
-      persistedUserContentCounts.set(pm.content, (persistedUserContentCounts.get(pm.content) ?? 0) + 1);
-    }
-  }
+  // Content identity of the window, for recognising copies of its turns under
+  // other ids; its `userContents` multiset is also what the `user-` branch of
+  // `keepRealtime` pairs echoes against positionally (rationale there).
+  const windowSignals = collectTwinSignals(processedToUse);
   const seenUserSyntheticByContent = new Map<string, number>();
 
-  const realtimeMessages = existingMessages.filter(m => {
-    // Pin wins over everything: the twin may carry a persisted Mongo id (the
-    // chunk processors ADOPT an in-progress trailing assistant after a prior
-    // merge), in which case `processedIds`/`rawHistoryIds` would drop it even
-    // though the pin branch above already removed history's copy — vanishing
-    // the whole turn.
-    if (pinnedSyntheticIds.has(m.id)) return true;
-    if (droppedSyntheticIds.has(m.id)) return false;
-    if (processedIds.has(m.id)) return false;
-    if (rawHistoryIds?.has(m.id)) return false;
-    if (m.role === 'user' && m.id.startsWith('optimistic-') && typeof m.content === 'string') {
+  // The window boundary. `processedHistory` is what the host FETCHED, and hosts
+  // fetch newest-first with a fixed page count: once the thread has grown, the
+  // same fetch returns the newest N×limit rows and the head of what is on
+  // screen is no longer in it. Those rows have no twin the window could hold,
+  // so the dedup rules below must never see them — coverage read a synthetic
+  // older than the window as "a persisted row reached this seq" and DROPPED it,
+  // and an unordered keep appended a persisted row AFTER the newest reply. Both
+  // were the reported "conversation reverts to an earlier state after a
+  // refresh". Rows older than the window are kept verbatim, in their existing
+  // order, in FRONT of it.
+  //
+  // `existingMessages` is chronological (every write path appends, prepends an
+  // older page, or is this merge), so the thread's own shape decides first:
+  //   - where it holds window rows, the first of them is the boundary. Rows
+  //     from it on are the window and its live tail, whatever their id or
+  //     clock says — a host-minted tail row such as a ticket preview must not
+  //     be pulled to the top. One exception before it: a client-minted row
+  //     that shares a request id with a window row IS that row's copy, placed
+  //     by a previous merge while the row's stamp was missing, and goes back to
+  //     coverage so the placement heals instead of being cemented.
+  //   - where it holds none (every window row is the persisted twin of a
+  //     synthetic, or the store was empty), the window IS the newest persisted
+  //     rows, so a persisted id absent from it is older by construction — and
+  //     so is everything before the last such row. "Persisted" needs the row
+  //     to predate the fetch: a host-minted row newer than it (a ticket
+  //     preview) is not history, whatever its id. Unless the thread holds no
+  //     client-minted row at all: then nothing bridges those rows to the
+  //     window, the gap is rows this client never saw, and the next older page
+  //     would be prepended above them out of order — the window alone is the
+  //     thread, the rest is refetchable (a `welcome-` bubble is not, and stays).
+  // Only rows past both anchors are judged on their own:
+  //   - a seq-stamped synthetic below every stamped window row: seq is
+  //     monotonic per dialog, but a copy CUT SHORT carries its last consumed
+  //     chunk's seq, below its twin's stamp — so `twinVerdict` decides where it
+  //     has a signal, and seq decides an 'unknown' only where it cannot
+  //     mislead: not for a `user-` / optimistic copy (twin never stamped), nor
+  //     for an assistant copy while the window holds an unstamped assistant
+  //     row. A `direct-` / `system-` copy has a stamped twin, so seq is exact.
+  //   - an unstamped synthetic / optimistic row: minted BEFORE the fetch
+  //     (`historyFetchedAt`, client clock like the row's own stamp, so a send
+  //     after the fetch never qualifies), timestamped before the window's
+  //     oldest row (server clock — a client clock behind the server can still
+  //     misread a pre-fetch row, hence the verdict too) and 'distinct'.
+  //     Replay-minted synthetics carry fresh timestamps and never qualify.
+  const isInWindow = (m: M): boolean => processedIds.has(m.id) || (rawHistoryIds?.has(m.id) ?? false);
+  const firstWindowIndex = existingMessages.findIndex(isInWindow);
+  const isPersistedOlder = (m: M): boolean =>
+    !isClientMintedId(m.id) && (m.timestamp?.getTime() ?? 0) <= historyFetchedAt;
+  let lastOlderPersistedIndex = -1;
+  if (firstWindowIndex < 0) {
+    for (const [index, m] of existingMessages.entries()) {
+      if (isPersistedOlder(m) && !pinnedSyntheticIds.has(m.id) && !droppedSyntheticIds.has(m.id)) {
+        lastOlderPersistedIndex = index;
+      }
+    }
+  }
+  let windowMinSeq = Number.POSITIVE_INFINITY;
+  let windowMinTime = Number.POSITIVE_INFINITY;
+  let windowHasUnstampedAssistant = false;
+  for (const pm of processedToUse) {
+    if (typeof pm.streamSeq === 'number') {
+      if (pm.streamSeq < windowMinSeq) windowMinSeq = pm.streamSeq;
+    } else if (pm.role === 'assistant') {
+      windowHasUnstampedAssistant = true;
+    }
+    const time = pm.timestamp?.getTime();
+    if (typeof time === 'number' && time < windowMinTime) windowMinTime = time;
+  }
+  const threadHasClientMintedRow = existingMessages.some(m => isClientMintedId(m.id));
+  const seqCanMislead = (m: M): boolean =>
+    m.role === 'assistant' ? windowHasUnstampedAssistant : isUserRequestSyntheticId(m.id) || isOptimisticId(m.id);
+  const isOlderThanWindow = (m: M, index: number): boolean => {
+    if (m.id === streamingMessageId) return false;
+    if (firstWindowIndex >= 0) {
+      if (index >= firstWindowIndex) return false;
+      return !(isClientMintedId(m.id) && sharesRequestKey(turnRequestKeys(m.content), windowSignals.requestKeys));
+    }
+    if (index < lastOlderPersistedIndex) return true;
+    if (!isClientMintedId(m.id)) return isPersistedOlder(m);
+    if (typeof m.streamSeq === 'number') {
+      if (!Number.isFinite(windowMinSeq) || m.streamSeq >= windowMinSeq) return false;
+      const verdict = twinVerdict(windowSignals, m);
+      return verdict === 'unknown' ? !seqCanMislead(m) : verdict === 'distinct';
+    }
+    const time = m.timestamp?.getTime();
+    if (typeof time !== 'number' || time > historyFetchedAt) return false;
+    if (!Number.isFinite(windowMinTime) || time >= windowMinTime) return false;
+    return twinVerdict(windowSignals, m) === 'distinct';
+  };
+
+  // The dedup rules for a row at or after the window boundary.
+  const keepRealtime = (m: M): boolean => {
+    if (m.role === 'user' && isOptimisticId(m.id) && typeof m.content === 'string') {
       // Content-dedup only when the message predates the snapshot — a
       // just-sent message whose text repeats an earlier turn ("yes", "ok")
       // must not vanish against stale history. Wall-clock, not seq coverage:
       // optimistic messages are minted on send, never by chunk replay, so
       // their timestamps are trustworthy.
       const canBeInSnapshot = (m.timestamp?.getTime() ?? 0) <= historyFetchedAt;
-      return !(canBeInSnapshot && processedToUse.some(pm => pm.role === 'user' && pm.content === m.content));
+      return !(canBeInSnapshot && windowSignals.userContents.has(m.content));
     }
     // Freshness rule: a synthetic whose turn is represented in the snapshot
     // (under its persisted Mongo id) must be dropped or the turn renders
@@ -394,7 +549,7 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       // which carry the chunk seq), so seq coverage can NEVER see them (the twin
       // adds 0 to every seq max) and wall-clock can't either (replay re-mints a
       // fresh timestamp). Dedup them purely by TEXT, matched positionally
-      // against persisted user rows (see `persistedUserContentCounts`): drop the
+      // against persisted user rows (`windowSignals.userContents`): drop the
       // synthetic once its own row is in the snapshot — trailing twin or not,
       // killing the client→viewer duplicate — while keeping a later same-text
       // turn whose row hasn't persisted yet. `direct-` / `system-` synthetics
@@ -404,11 +559,11 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       // `lastChunkStreamSeq`; the durable fix is the backend stamping it (as it
       // already does for DIRECT/SYSTEM), which also stops the replay at the
       // source via a correct `optStartSeq`.
-      if (m.role === 'user' && m.id.startsWith('user-') && typeof m.content === 'string') {
+      if (m.role === 'user' && isUserRequestSyntheticId(m.id) && typeof m.content === 'string') {
         const seen = (seenUserSyntheticByContent.get(m.content) ?? 0) + 1;
         seenUserSyntheticByContent.set(m.content, seen);
         // No persisted row for THIS occurrence slot → keep (nothing renders it).
-        if ((persistedUserContentCounts.get(m.content) ?? 0) < seen) return true;
+        if ((windowSignals.userContents.get(m.content) ?? 0) < seen) return true;
         // A same-text persisted twin exists for this slot. User rows carry no
         // persisted seq, so that twin may be THIS message's OWN row (drop — it
         // renders the message) OR an OLDER identical-text turn while this is a
@@ -471,9 +626,32 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       if (covered) return false;
     }
     return true;
-  });
+  };
 
-  return [...processedToUse, ...realtimeMessages];
+  const olderThanWindowMessages: M[] = [];
+  const realtimeMessages: M[] = [];
+  for (const [index, m] of existingMessages.entries()) {
+    // Pin wins over everything: the twin may carry a persisted Mongo id (the
+    // chunk processors ADOPT an in-progress trailing assistant after a prior
+    // merge), in which case `processedIds`/`rawHistoryIds` would drop it even
+    // though the pin branch above already removed history's copy — vanishing
+    // the whole turn.
+    if (pinnedSyntheticIds.has(m.id)) {
+      realtimeMessages.push(m);
+      continue;
+    }
+    if (droppedSyntheticIds.has(m.id) || isInWindow(m)) continue;
+    // Persisted rows disjoint from the window with nothing live between — see
+    // the boundary note: the gap is rows this client never saw.
+    if (firstWindowIndex < 0 && !threadHasClientMintedRow && isPersistedOlder(m) && !isWelcomeId(m.id)) continue;
+    if (isOlderThanWindow(m, index)) {
+      olderThanWindowMessages.push(m);
+      continue;
+    }
+    if (keepRealtime(m)) realtimeMessages.push(m);
+  }
+
+  return [...olderThanWindowMessages, ...processedToUse, ...realtimeMessages];
 }
 
 export interface HistoryPrependResult<M extends MergeableChatMessage> {
@@ -484,39 +662,81 @@ export interface HistoryPrependResult<M extends MergeableChatMessage> {
 
 /** Pagination path (an older page arrived via fetchNextPage): everything on
  *  screen stays; collect only the messages above the first already-known id,
- *  plus a content refresh for that boundary message if it changed. Returns
- *  null when there is nothing to apply. */
+ *  plus a content refresh for that boundary message if it changed. Persisted
+ *  twins of client-minted rows the thread still shows above that boundary are
+ *  left out (see the note in the body). Returns null when there is nothing to
+ *  apply. */
 export function computeHistoryPrepend<M extends MergeableChatMessage>(
   processedHistory: M[],
   existingMessages: M[],
 ): HistoryPrependResult<M> | null {
   const existingIds = new Set(existingMessages.map(m => m.id));
-  const newMessages: M[] = [];
-  let boundaryMessageIndex = -1;
+  const boundaryMessageIndex = processedHistory.findIndex(m => existingIds.has(m.id));
+  const newEnd = boundaryMessageIndex >= 0 ? boundaryMessageIndex : processedHistory.length;
+  const boundaryIndexInExisting =
+    boundaryMessageIndex >= 0
+      ? existingMessages.findIndex(m => m.id === processedHistory[boundaryMessageIndex].id)
+      : -1;
 
-  for (let i = 0; i < processedHistory.length; i++) {
-    if (existingIds.has(processedHistory[i].id)) {
-      boundaryMessageIndex = i;
-      break;
+  // Turns the thread still shows under client-minted ids ABOVE the boundary
+  // streamed live and fell out of the refetch window before any snapshot
+  // replaced them (the window boundary in `mergeHistoryWithRealtime`). The
+  // older page carries their persisted twins; prepending those would render
+  // each such turn twice, so they are left out — the persisted copy takes over
+  // at the next full merge, whose window then reaches them. Matched from the
+  // boundary backwards and one claim per live row, because the live rows are
+  // the NEWEST turns before it: a repeated prompt or a shared opener further up
+  // the page is a different turn and stays. The page is persisted in full, so
+  // an answer text twins only in the cut-short direction (the live copy is a
+  // prefix of the persisted one).
+  const liveAboveBoundary =
+    boundaryIndexInExisting > 0
+      ? existingMessages.slice(0, boundaryIndexInExisting).filter(m => isClientMintedId(m.id))
+      : [];
+  const twinIndices = new Set<number>();
+  if (liveAboveBoundary.length > 0) {
+    const liveSignals = collectTwinSignals(liveAboveBoundary);
+    const userTwinsLeft = new Map(liveSignals.userContents);
+    const assistantTwinsLeft = new Map(liveSignals.assistantTexts);
+    for (let i = newEnd - 1; i >= 0; i--) {
+      const pm = processedHistory[i];
+      if (pm.role === 'user') {
+        const text = userText(pm);
+        const left = text === '' ? 0 : (userTwinsLeft.get(text) ?? 0);
+        if (left === 0) continue;
+        userTwinsLeft.set(text, left - 1);
+        twinIndices.add(i);
+      } else if (pm.role === 'assistant') {
+        const keys = turnRequestKeys(pm.content);
+        if (keys.size > 0) {
+          if (sharesRequestKey(keys, liveSignals.requestKeys)) twinIndices.add(i);
+          continue;
+        }
+        const text = assistantAnswerText(pm.content);
+        if (text === '') continue;
+        for (const [liveText, left] of assistantTwinsLeft) {
+          if (left === 0 || !text.startsWith(liveText)) continue;
+          assistantTwinsLeft.set(liveText, left - 1);
+          twinIndices.add(i);
+          break;
+        }
+      }
     }
-    newMessages.push(processedHistory[i]);
   }
+  const newMessages = processedHistory.slice(0, newEnd).filter((_, i) => !twinIndices.has(i));
 
   let boundaryMessageId: string | undefined;
   let boundaryUpdates: { content: MessageContent } | undefined;
 
-  if (boundaryMessageIndex >= 0) {
+  if (boundaryIndexInExisting >= 0) {
     const boundaryMessage = processedHistory[boundaryMessageIndex];
-    const existingBoundary = existingMessages.find(m => m.id === boundaryMessage.id);
+    const existingBoundary = existingMessages[boundaryIndexInExisting];
+    const existingContent = JSON.stringify(existingBoundary.content);
+    const newContent = JSON.stringify(boundaryMessage.content);
 
-    if (existingBoundary) {
-      const existingContent = JSON.stringify(existingBoundary.content);
-      const newContent = JSON.stringify(boundaryMessage.content);
-
-      if (existingContent !== newContent) {
-        boundaryMessageId = boundaryMessage.id;
-        boundaryUpdates = { content: boundaryMessage.content };
-      }
+    if (existingContent !== newContent) {
+      boundaryMessageId = boundaryMessage.id;
+      boundaryUpdates = { content: boundaryMessage.content };
     }
   }
 
