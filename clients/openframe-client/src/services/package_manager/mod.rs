@@ -2,10 +2,13 @@
 mod brew;
 #[cfg(target_os = "windows")]
 mod choco;
+pub mod missing;
 #[cfg(target_os = "windows")]
 mod winget;
 
 use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
+use serde::Serialize;
+use std::path::Path;
 use tokio::time::{interval, Duration};
 use tracing::info;
 
@@ -13,11 +16,52 @@ const UPDATE_INTERVAL: Duration = Duration::from_secs(3600);
 const UPDATE_TIMEOUT_SECS: u32 = 600;
 const SETUP_FAILURE_RETCODE: i32 = 85;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum ManagerId {
     Brew,
     Choco,
     Winget,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Presence {
+    Present,
+    Absent,
+    Unknown,
+}
+
+impl ManagerId {
+    pub fn for_current_platform() -> &'static [ManagerId] {
+        #[cfg(target_os = "macos")]
+        {
+            &[ManagerId::Brew]
+        }
+        #[cfg(target_os = "windows")]
+        {
+            &[ManagerId::Choco, ManagerId::Winget]
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            &[]
+        }
+    }
+
+    pub fn presence(self) -> Presence {
+        match self {
+            ManagerId::Brew => {
+                if Path::new("/opt/homebrew/bin/brew").exists()
+                    || Path::new("/usr/local/bin/brew").exists()
+                {
+                    Presence::Present
+                } else {
+                    Presence::Absent
+                }
+            }
+            // TODO(windows): real choco/winget detection; Unknown until Windows work.
+            ManagerId::Choco | ManagerId::Winget => Presence::Unknown,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -54,9 +98,11 @@ mod markers {
 
 #[cfg(target_os = "windows")]
 fn marker(stdout: &str, prefix: &str) -> Option<String> {
-    stdout
-        .lines()
-        .find_map(|line| line.trim().strip_prefix(prefix).map(|v| v.trim().to_string()))
+    stdout.lines().find_map(|line| {
+        line.trim()
+            .strip_prefix(prefix)
+            .map(|v| v.trim().to_string())
+    })
 }
 
 #[cfg(target_os = "windows")]
@@ -112,6 +158,10 @@ impl PackageManagerUpdateRunManager {
                 ticker.tick().await;
 
                 for manager in managers() {
+                    if manager.id().presence() == Presence::Absent {
+                        continue;
+                    }
+
                     let code = manager.update_script();
                     let params = ScriptParams {
                         code: &code,
