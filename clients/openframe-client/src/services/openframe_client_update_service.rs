@@ -16,7 +16,6 @@ use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::io::AsyncWriteExt;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -435,7 +434,8 @@ impl OpenFrameClientUpdateService {
         }
     }
 
-    /// Writes the extracted binary to a temp file (tmp + fsync + rename) for the updater script
+    /// Writes the extracted binary to a temp file for the updater script. The UUID name means
+    /// nothing can read it before we return, so no atomic-rename or fsync ceremony is needed.
     async fn stage_binary(&self, binary_bytes: &[u8], binary_name: &str) -> Result<PathBuf> {
         let temp_dir = std::env::temp_dir();
         let binary_path = temp_dir.join(format!(
@@ -443,24 +443,9 @@ impl OpenFrameClientUpdateService {
             Uuid::new_v4(),
             binary_name
         ));
-        let tmp_path = binary_path.with_extension("tmp");
-        let mut file = tokio::fs::File::create(&tmp_path)
-            .await
-            .context("Failed to create staged binary file")?;
-        file.write_all(binary_bytes)
+        tokio::fs::write(&binary_path, binary_bytes)
             .await
             .context("Failed to write staged binary")?;
-        // write_all can leave the last chunk in flight, and sync_all would swallow its error
-        file.flush()
-            .await
-            .context("Failed to complete staged binary write")?;
-        file.sync_all()
-            .await
-            .context("Failed to fsync staged binary")?;
-        drop(file);
-        tokio::fs::rename(&tmp_path, &binary_path)
-            .await
-            .context("Failed to finalize staged binary")?;
         Ok(binary_path)
     }
 
