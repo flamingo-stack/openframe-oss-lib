@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /* ============================================================================
  * ⛔️ FROZEN — DO NOT MODIFY (AI agents & contributors, read this first)
@@ -44,46 +44,46 @@
  * Additive + default-preserving.
  * ========================================================================== */
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import type { ActionsMenuGroup } from '../ui/actions-menu'
-import { type PageActionButton } from '../ui/page-actions'
-import { TitleBlock } from './title-block'
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import type { ActionsMenuGroup } from '../ui/actions-menu';
+import type { PageActionButton } from '../ui/page-actions';
+import { TitleBlock } from './title-block';
 
 export interface PageLayoutProps {
-  children: React.ReactNode
-  title?: string
-  subtitle?: string
-  image?: { src: string; alt?: string }
-  backButton?: { label?: string; onClick: () => void }
-  actions?: PageActionButton[]
-  actionsVariant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary'
-  menuActions?: ActionsMenuGroup[]
+  children: React.ReactNode;
+  title?: string;
+  subtitle?: string;
+  image?: { src: string; alt?: string };
+  backButton?: { label?: string; onClick: () => void };
+  actions?: PageActionButton[];
+  actionsVariant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary';
+  menuActions?: ActionsMenuGroup[];
   /** Desktop-only slot (e.g. a `TabSelector`) rendered with the actions. Hidden on mobile. */
-  selector?: React.ReactNode
+  selector?: React.ReactNode;
   /** Header visual variant. `card` adds a card background, border, and padding on mobile. */
-  headerVariant?: 'plain' | 'card'
-  className?: string
-  contentClassName?: string
-  showHeader?: boolean
+  headerVariant?: 'plain' | 'card';
+  className?: string;
+  contentClassName?: string;
+  showHeader?: boolean;
   /** Title typography size, forwarded to `TitleBlock`. Default `'h2'` (frozen
    *  baseline). Pass `'h1'` for the unified Help Center pages. */
-  titleSize?: 'h1' | 'h2'
+  titleSize?: 'h1' | 'h2';
   /** Optional node rendered inline next to the title (e.g. a status `Tag`), forwarded to `TitleBlock`. */
-  titleAdornment?: React.ReactNode
+  titleAdornment?: React.ReactNode;
   /** When true, the title/subtitle render as line-box-accurate skeleton bars (forwarded to
    *  `TitleBlock`). Header height stays identical to the loaded state — for page skeletons. */
-  loading?: boolean
+  loading?: boolean;
   /** Render the header ACTIONS as placeholders (their set depends on data still loading). */
-  loadingActions?: boolean
+  loadingActions?: boolean;
   /** When the subtitle row occupies the layout (forwarded to `TitleBlock`):
    *  `'when-set'` (default), `'while-loading'` (skeleton bar while loading, collapses
    *  if the record has no subtitle), or `'always'` (never collapses). */
-  subtitleRow?: 'when-set' | 'while-loading' | 'always'
+  subtitleRow?: 'when-set' | 'while-loading' | 'always';
   /** When true, a long title wraps onto multiple lines instead of the frozen single-line
    *  ellipsis clamp (forwarded to `TitleBlock`). For content detail pages whose h1 is CMS
    *  data of arbitrary length. Additive + default-preserving. */
-  titleWrap?: boolean
+  titleWrap?: boolean;
 }
 
 /**
@@ -112,12 +112,12 @@ export function PageLayout({
   subtitleRow,
   titleWrap,
 }: PageLayoutProps) {
-  const hasActions = actions && actions.length > 0
-  const needsBottomPadding = hasActions && actionsVariant === 'primary-buttons'
-  const hasHeader = showHeader && (title || subtitle || image || backButton || hasActions || selector || loading)
+  const hasActions = actions && actions.length > 0;
+  const needsBottomPadding = hasActions && actionsVariant === 'primary-buttons';
+  const hasHeader = showHeader && (title || subtitle || image || backButton || hasActions || selector || loading);
 
   return (
-    <div className={cn('flex flex-col w-full', className)}>
+    <div className={cn('flex w-full flex-col', className)}>
       {hasHeader && (
         <TitleBlock
           title={title}
@@ -138,14 +138,20 @@ export function PageLayout({
         />
       )}
 
-      <div className={cn('flex flex-col flex-1 gap-[var(--spacing-system-l)]', needsBottomPadding && 'pb-28 md:pb-0', contentClassName)}>
+      <div
+        className={cn(
+          'flex flex-1 flex-col gap-[var(--spacing-system-l)]',
+          needsBottomPadding && 'pb-28 md:pb-0',
+          contentClassName,
+        )}
+      >
         {children}
       </div>
     </div>
-  )
+  );
 }
 
-export type { PageActionButton } from '../ui/page-actions'
-export { TitleBlock, TITLE_BLOCK_MIN_HEIGHT } from './title-block'
-export type { TitleBlockProps } from './title-block'
-export default PageLayout
+export type { PageActionButton } from '../ui/page-actions';
+export { TitleBlock, TITLE_BLOCK_MIN_HEIGHT } from './title-block';
+export type { TitleBlockProps } from './title-block';
+export default PageLayout;

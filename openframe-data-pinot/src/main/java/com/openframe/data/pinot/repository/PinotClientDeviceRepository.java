@@ -124,7 +124,8 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     }
 
     /**
-     * Executes a faceted filter-option query, counting every device except DELETED:
+     * Executes a faceted filter-option query, counting every device except DELETED
+     * (unless the caller explicitly requested DELETED in {@code statuses}):
      * SELECT {facetField}, COUNT(*) as count FROM devices WHERE <filters excluding facetField> GROUP BY {facetField} ORDER BY count DESC LIMIT {MAX_FILTER_OPTIONS}
      * The explicit LIMIT overrides Pinot's default GROUP BY cap of 10 groups so every bucket is returned.
      */
@@ -170,7 +171,10 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     }
 
     /**
-     * Applies the shared device filter set to a builder, excluding only DELETED devices.
+     * Applies the shared device filter set to a builder. DELETED devices are excluded by default,
+     * but a caller that explicitly lists DELETED in {@code statuses} opts into counting them
+     * (archive page and dashboard archived-devices card); the lift applies to the facet queries too,
+     * so the status facet can return a DELETED bucket.
      * If {@code excludeField} matches a filter's field, that filter is skipped (used for faceted filter-option queries).
      */
     private void applyDeviceFilters(PinotQueryBuilder queryBuilder,
@@ -181,8 +185,11 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                     List<String> tagKeys,
                                     List<String> tagKeyValues,
                                     String excludeField) {
-        queryBuilder.whereNotEquals(STATUS, DELETED.name());
-        applyStatusFilter(queryBuilder, statuses, excludeField);
+        List<String> requestedStatuses = sanitizeStatuses(statuses);
+        if (!requestedStatuses.contains(DELETED.name())) {
+            queryBuilder.whereNotEquals(STATUS, DELETED.name());
+        }
+        applyStatusFilter(queryBuilder, requestedStatuses, excludeField);
         applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
     }
 
@@ -200,28 +207,32 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                           List<String> tagKeyValues,
                                           String excludeField) {
         queryBuilder.whereIn(STATUS, ACTIVE_STATUSES);
-        applyStatusFilter(queryBuilder, statuses, excludeField);
+        applyStatusFilter(queryBuilder, sanitizeStatuses(statuses), excludeField);
         applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
     }
 
+    private static List<String> sanitizeStatuses(List<String> statuses) {
+        if (statuses == null) {
+            return List.of();
+        }
+        return statuses.stream()
+                .filter(status -> status != null && !status.isBlank())
+                .toList();
+    }
+
     /**
-     * Applies the caller-supplied status filter verbatim (blank values dropped). The base status
-     * restriction is applied separately by the caller, so a selection with no overlap with the allowed
-     * universe becomes a contradiction that correctly yields zero rows rather than broadening the query.
+     * Applies the caller-supplied status filter verbatim. The base status restriction is applied
+     * separately by the caller, so a selection with no overlap with the allowed universe becomes
+     * a contradiction that correctly yields zero rows rather than broadening the query.
      * Skipped when status is the faceted field.
      */
     private void applyStatusFilter(PinotQueryBuilder queryBuilder,
-                                   List<String> statuses,
+                                   List<String> requestedStatuses,
                                    String excludeField) {
-        if (STATUS.equals(excludeField) || statuses == null) {
+        if (STATUS.equals(excludeField) || requestedStatuses.isEmpty()) {
             return;
         }
-        List<String> requestedStatuses = statuses.stream()
-                .filter(status -> status != null && !status.isBlank())
-                .toList();
-        if (!requestedStatuses.isEmpty()) {
-            queryBuilder.whereOr(STATUS, requestedStatuses);
-        }
+        queryBuilder.whereOr(STATUS, requestedStatuses);
     }
 
     private void applyNonStatusFilters(PinotQueryBuilder queryBuilder,

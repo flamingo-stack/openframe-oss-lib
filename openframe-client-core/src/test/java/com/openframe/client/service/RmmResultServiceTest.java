@@ -3,6 +3,7 @@ package com.openframe.client.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.publisher.EventLogsPublisher;
+import com.openframe.client.service.rmm.RmmResultService;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
 import com.openframe.data.nats.rmm.model.ScriptResultMessage;

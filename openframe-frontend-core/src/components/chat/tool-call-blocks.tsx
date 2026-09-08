@@ -1,7 +1,7 @@
-"use client"
+'use client';
 
-import { cn } from "../../utils/cn"
-import { formatToolArgValue, formatToolResult } from "./utils/tool-call-helpers"
+import { cn } from '../../utils/cn';
+import { formatToolArgValue, formatToolResult } from './utils/tool-call-helpers';
 
 /**
  * Monospace code body shared by ArgRow / ResultBlock.
@@ -10,7 +10,7 @@ import { formatToolArgValue, formatToolResult } from "./utils/tool-call-helpers"
  * scale, no transform) — the token this file was originally flagged for.
  */
 const CODE_PRE_CLASS =
-  "bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-sf)] w-full max-h-64 overflow-auto overscroll-contain text-code text-ods-text-primary whitespace-pre"
+  'bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-sf)] w-full max-h-64 overflow-auto overscroll-contain text-code text-ods-text-primary whitespace-pre';
 
 /**
  * Single arg row: inline `key: value` or labeled `<pre>` block.
@@ -18,25 +18,25 @@ const CODE_PRE_CLASS =
  * surfaces render long script bodies / JSON the same way.
  */
 export function ArgRow({ argKey, value }: { argKey: string; value: unknown }) {
-  const formatted = formatToolArgValue(value)
+  const formatted = formatToolArgValue(value);
 
-  if (formatted.kind === "inline") {
+  if (formatted.kind === 'inline') {
     return (
-      <div className="flex gap-[var(--spacing-system-xxs)] items-start w-full">
+      <div className="flex w-full items-start gap-[var(--spacing-system-xxs)]">
         <span className="shrink-0 text-ods-text-secondary">{argKey}:</span>
-        <span className="flex-1 min-w-0 text-ods-text-primary break-all">{formatted.text}</span>
+        <span className="min-w-0 flex-1 break-all text-ods-text-primary">{formatted.text}</span>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-xxs)] items-start w-full">
+    <div className="flex w-full flex-col items-start gap-[var(--spacing-system-xxs)]">
       <span className="text-ods-text-secondary">{argKey}:</span>
       <pre className={CODE_PRE_CLASS}>
         <code>{formatted.text}</code>
       </pre>
     </div>
-  )
+  );
 }
 
 /**
@@ -44,26 +44,26 @@ export function ArgRow({ argKey, value }: { argKey: string; value: unknown }) {
  * output and as a scrollable `<pre>` for code / JSON / multiline output.
  */
 export function ResultBlock({ result, className }: { result: string | undefined | null; className?: string }) {
-  const formatted = formatToolResult(result)
-  if (!formatted.text) return null
+  const formatted = formatToolResult(result);
+  if (!formatted.text) return null;
 
-  if (formatted.kind === "inline") {
+  if (formatted.kind === 'inline') {
     return (
-      <div className={cn("flex flex-col gap-[var(--spacing-system-xxs)] items-start w-full", className)}>
+      <div className={cn('flex w-full flex-col items-start gap-[var(--spacing-system-xxs)]', className)}>
         <span className="text-ods-text-secondary">Result:</span>
-        <span className="text-ods-text-primary break-all">{formatted.text}</span>
+        <span className="break-all text-ods-text-primary">{formatted.text}</span>
       </div>
-    )
+    );
   }
 
   return (
-    <div className={cn("flex flex-col gap-[var(--spacing-system-xxs)] items-start w-full", className)}>
+    <div className={cn('flex w-full flex-col items-start gap-[var(--spacing-system-xxs)]', className)}>
       <span className="text-ods-text-secondary">Result:</span>
       <pre className={CODE_PRE_CLASS}>
         <code>{formatted.text}</code>
       </pre>
     </div>
-  )
+  );
 }
 
 /**
@@ -72,10 +72,10 @@ export function ResultBlock({ result, className }: { result: string | undefined 
  * `toolExplanation` and the actual command moves into the body (Figma 1972-6100).
  */
 export function CommandBlock({ command, className }: { command: string; className?: string }) {
-  if (!command) return null
+  if (!command) return null;
   return (
     <pre className={cn(CODE_PRE_CLASS, className)}>
       <code>{command}</code>
     </pre>
-  )
+  );
 }

@@ -151,6 +151,42 @@ async fn same_batch_two_scripts_coexist() {
 }
 
 #[tokio::test]
+async fn enqueue_persists_without_a_journal_row() {
+    let (s, _d) = store();
+    // enqueue does NOT create a journal entry (unlike complete).
+    s.enqueue("ack:ex".to_string(), "subj".to_string(), b"hi".to_vec())
+        .await
+        .unwrap();
+    assert!(
+        !s.has_batch("ex").await.unwrap(),
+        "enqueue must not journal"
+    );
+    let pending = s.pending_keys().await.unwrap();
+    assert_eq!(pending, vec![("ack:ex".to_string(), "subj".to_string())]);
+    assert_eq!(
+        s.load_payload("ack:ex".to_string()).await.unwrap().unwrap(),
+        b"hi"
+    );
+}
+
+#[tokio::test]
+async fn ack_and_result_entries_coexist_under_distinct_keys() {
+    let (s, _d) = store();
+    s.enqueue(
+        "ack:ex".to_string(),
+        "ack-subj".to_string(),
+        b"ack".to_vec(),
+    )
+    .await
+    .unwrap();
+    let r = ResultStore::encode_result(&result("ex", "a"), payload_limit(None));
+    s.enqueue(entry_key("ex", Some("a")), "result-subj".to_string(), r)
+        .await
+        .unwrap();
+    assert_eq!(s.pending_keys().await.unwrap().len(), 2);
+}
+
+#[tokio::test]
 async fn oversize_result_is_truncated_under_limit() {
     let limit = payload_limit(None);
     let mut r = result("ex", "a");

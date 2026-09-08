@@ -34,10 +34,7 @@ type Story = StoryObj<typeof meta>;
 const renderItem = (value: string, id: string, label: string, disabled = false) => (
   <div className="flex items-center gap-3" key={value}>
     <RadioGroupItem value={value} id={id} disabled={disabled} />
-    <label
-      htmlFor={id}
-      className="text-base text-ods-text-primary cursor-pointer select-none"
-    >
+    <label htmlFor={id} className="cursor-pointer select-none text-base text-ods-text-primary">
       {label}
     </label>
   </div>
@@ -45,7 +42,7 @@ const renderItem = (value: string, id: string, label: string, disabled = false) 
 
 export const Default: Story = {
   args: {},
-  render: (args) => (
+  render: args => (
     <RadioGroup {...args}>
       {renderItem('option-1', 'default-1', 'Option 1')}
       {renderItem('option-2', 'default-2', 'Option 2')}
@@ -56,7 +53,7 @@ export const Default: Story = {
 
 export const WithDefaultValue: Story = {
   args: { defaultValue: 'option-2' },
-  render: (args) => (
+  render: args => (
     <RadioGroup {...args}>
       {renderItem('option-1', 'dv-1', 'Option 1')}
       {renderItem('option-2', 'dv-2', 'Option 2')}
@@ -67,7 +64,7 @@ export const WithDefaultValue: Story = {
 
 export const Disabled: Story = {
   args: { disabled: true, defaultValue: 'option-1' },
-  render: (args) => (
+  render: args => (
     <RadioGroup {...args}>
       {renderItem('option-1', 'd-1', 'Option 1')}
       {renderItem('option-2', 'd-2', 'Option 2')}
@@ -77,7 +74,7 @@ export const Disabled: Story = {
 
 export const DisabledItem: Story = {
   args: { defaultValue: 'option-1' },
-  render: (args) => (
+  render: args => (
     <RadioGroup {...args}>
       {renderItem('option-1', 'di-1', 'Option 1')}
       {renderItem('option-2', 'di-2', 'Option 2 (disabled)', true)}
@@ -88,7 +85,7 @@ export const DisabledItem: Story = {
 
 export const Horizontal: Story = {
   args: { orientation: 'horizontal', defaultValue: 'small' },
-  render: (args) => (
+  render: args => (
     <RadioGroup {...args} className="flex flex-row gap-6">
       {renderItem('small', 'h-s', 'Small')}
       {renderItem('medium', 'h-m', 'Medium')}
@@ -117,13 +114,13 @@ export const Controlled: Story = {
 export const FlamingoTheme: Story = {
   args: { defaultValue: 'option-2' },
   decorators: [
-    (Story) => (
+    Story => (
       <div data-app-type="flamingo">
         <Story />
       </div>
     ),
   ],
-  render: (args) => (
+  render: args => (
     <RadioGroup {...args}>
       {renderItem('option-1', 'f-1', 'Option 1')}
       {renderItem('option-2', 'f-2', 'Option 2')}

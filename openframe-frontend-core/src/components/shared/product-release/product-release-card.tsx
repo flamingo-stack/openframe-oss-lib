@@ -1,20 +1,12 @@
-'use client'
+'use client';
 
-import React from 'react'
-import Image from '../../../embed-shims/next-image'
-import { InteractiveCard } from '../../ui/interactive-card'
-import { StatusBadge } from '../../ui/status-badge'
-import { SquareAvatar } from '../../ui/square-avatar'
-import {
-  AlertTriangle,
-  Eye,
-  Package,
-  Play,
-  Sparkles,
-  TrendingUp,
-  Wrench,
-} from 'lucide-react'
-import { cn } from '../../../utils/cn'
+import { AlertTriangle, Eye, Package, Play, Sparkles, TrendingUp, Wrench } from 'lucide-react';
+import type React from 'react';
+import Image from '../../../embed-shims/next-image';
+import { cn } from '../../../utils/cn';
+import { InteractiveCard } from '../../ui/interactive-card';
+import { SquareAvatar } from '../../ui/square-avatar';
+import { StatusBadge } from '../../ui/status-badge';
 
 /**
  * Card density. Two variants, both actively used across openframe + flamingo
@@ -38,7 +30,7 @@ import { cn } from '../../../utils/cn'
  * column) was deleted in the 2026-05 DRY pass — it had a single consumer
  * (the hub's RelatedContentSection) that has since moved to `lg`.
  */
-export type ProductReleaseCardSize = 'lg' | 'sm'
+export type ProductReleaseCardSize = 'lg' | 'sm';
 
 /**
  * Minimal structural `<a>` prop bundle the consumer composes (typically
@@ -53,28 +45,28 @@ export type ProductReleaseCardSize = 'lg' | 'sm'
  * used (back-compat for the public `/releases` page).
  */
 export interface ProductReleaseCardAnchorProps {
-  href: string
-  target?: '_blank'
-  rel?: 'noopener noreferrer'
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+  href: string;
+  target?: '_blank';
+  rel?: 'noopener noreferrer';
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
 export interface ProductReleaseCardProps {
   /** Release title */
-  title: string
+  title: string;
   /** Release summary/description */
-  summary?: string | null
+  summary?: string | null;
   /** Version string (e.g., "1.2.0") */
-  version: string
+  version: string;
   /** Formatted date string for display */
-  formattedDate: string
+  formattedDate: string;
   /**
    * Legacy click handler — kept for back-compat with public-page callers
    * (e.g. `/releases` tab) that route via `router.push()` directly. When
    * `anchorProps` is also supplied, `anchorProps` wins and this is
    * ignored.
    */
-  onClick?: () => void
+  onClick?: () => void;
   /**
    * `<a>` prop bundle from the consumer's `useNavLink` (or equivalent).
    * When provided, the card's outer element renders as a real anchor so
@@ -83,44 +75,44 @@ export interface ProductReleaseCardProps {
    * writes NO click logic of its own. This is the path every other
    * entity card uses; `onClick` is only kept for the one legacy caller.
    */
-  anchorProps?: ProductReleaseCardAnchorProps
+  anchorProps?: ProductReleaseCardAnchorProps;
   /** Additional CSS classes */
-  className?: string
+  className?: string;
   /** Card density. Defaults to `'lg'` (the canonical large card). */
-  size?: ProductReleaseCardSize
+  size?: ProductReleaseCardSize;
 
   // ─── Catalog-only props (ignored by `default` / `sm` branches) ─────────
   /** Cover image URL. Falls back to a neutral `Package`-icon placeholder. */
-  coverImage?: string | null
+  coverImage?: string | null;
   /** Drives the Play overlay on the cover. Caller sets `true` when the cover
    *  came from a `*_video_thumbnail` field. */
-  hasVideoCover?: boolean
+  hasVideoCover?: boolean;
   /** Release type for the metadata grid's first cell. */
-  releaseType?: 'major' | 'minor' | 'patch' | 'beta' | 'alpha'
+  releaseType?: 'major' | 'minor' | 'patch' | 'beta' | 'alpha';
   /** Release status for the metadata grid's second cell. */
-  releaseStatus?: 'alpha' | 'beta' | 'stable' | 'deprecated'
+  releaseStatus?: 'alpha' | 'beta' | 'stable' | 'deprecated';
   /** Pre-computed `StatusBadge` colorScheme for the release-type chip. The
    *  hub consumer maps `release_type → colorScheme` via its local helper so
    *  the OSS card stays mapping-agnostic. */
-  releaseTypeBadgeColor?: 'error' | 'cyan' | 'success' | 'warning'
+  releaseTypeBadgeColor?: 'error' | 'cyan' | 'success' | 'warning';
   /** View count for the optional microline below the metadata grid. Hidden
    *  when zero or undefined. */
-  viewCount?: number
+  viewCount?: number;
   /** Hydrated author (from the hub DAL's `hydrateAuthor`). When present,
    *  renders as the last cell of the metadata grid. */
   author?: {
-    full_name: string
-    avatar_url: string | null
-    job_title: string | null
-  }
+    full_name: string;
+    avatar_url: string | null;
+    job_title: string | null;
+  };
   /** Per-category counts for the changelog stats strip. The whole strip
    *  is hidden when total === 0. */
   changelogCounts?: {
-    features: number
-    fixes: number
-    improvements: number
-    breaking: number
-  }
+    features: number;
+    fixes: number;
+    improvements: number;
+    breaking: number;
+  };
 }
 
 export function ProductReleaseCard({
@@ -160,7 +152,7 @@ export function ProductReleaseCard({
       (changelogCounts?.features ?? 0) +
       (changelogCounts?.fixes ?? 0) +
       (changelogCounts?.improvements ?? 0) +
-      (changelogCounts?.breaking ?? 0)
+      (changelogCounts?.breaking ?? 0);
 
     // Build the metadata-grid cell array — mirrors the hub's
     // EntityAuthorCard composition. ALWAYS render all 3 value cells
@@ -175,11 +167,11 @@ export function ProductReleaseCard({
     // StatusBadge for the Type cell) so empty badges don't look broken
     // next to populated badges.
     type ValueCell = {
-      value: string
-      label: string
-      uppercase: boolean
-      colorScheme?: 'error' | 'cyan' | 'success' | 'warning'
-    }
+      value: string;
+      label: string;
+      uppercase: boolean;
+      colorScheme?: 'error' | 'cyan' | 'success' | 'warning';
+    };
     const valueCells: ValueCell[] = [
       releaseType && releaseTypeBadgeColor
         ? {
@@ -203,38 +195,36 @@ export function ProductReleaseCard({
             uppercase: false,
           }
         : { value: '—', label: 'Released', uppercase: false },
-    ]
+    ];
     // EMPTY_AUTHOR_PLACEHOLDER shape — mirrors the hub's
     // EMPTY_AUTHOR_PLACEHOLDER constant exported from
     // components/shared/entity-author-card.tsx (hub can't be imported
     // here; the two are kept in lockstep per the inline-duplication
     // policy documented in the catalog branch comment above).
-    const effectiveAuthor = author?.full_name
-      ? author
-      : { full_name: '—', avatar_url: null, job_title: 'Unknown' }
+    const effectiveAuthor = author?.full_name ? author : { full_name: '—', avatar_url: null, job_title: 'Unknown' };
     // Fixed 4-cell grid (Type / Status / Released / Author) so the
     // skeleton's shape matches the loaded card exactly. The earlier
     // dynamic `gridColsClass` ternary collapsed missing cells and
     // caused 28-56px reflow on resolve.
-    const gridColsClass = 'md:grid-cols-4'
-    const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border'
+    const gridColsClass = 'md:grid-cols-4';
+    const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border';
 
     const frameClass = cn(
-      'group bg-ods-card border border-ods-border rounded-lg overflow-hidden',
-      'flex flex-col p-6 gap-4',
-      'transition-all duration-300 ease-out transform hover:translate-y-[-2px]',
+      'group overflow-hidden rounded-lg border border-ods-border bg-ods-card',
+      'flex flex-col gap-4 p-6',
+      'transform transition-all duration-300 ease-out hover:translate-y-[-2px]',
       'hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08]',
       'focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ods-bg',
       'no-underline',
       className,
-    )
+    );
 
     const innerLayout = (
       <>
         {/* HERO ZONE — cover LEFT + version pill + title + summary RIGHT */}
-        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-          <div className="w-full md:w-[256px] flex-shrink-0">
-            <div className="relative rounded-lg overflow-hidden w-full aspect-[1200/630] bg-ods-bg">
+        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
+          <div className="w-full flex-shrink-0 md:w-[256px]">
+            <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-lg bg-ods-bg">
               {coverImage ? (
                 <Image
                   src={coverImage}
@@ -246,28 +236,26 @@ export function ProductReleaseCard({
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-ods-text-secondary">
-                  <Package className="w-8 h-8" />
+                  <Package className="h-8 w-8" />
                 </div>
               )}
               {hasVideoCover && coverImage && (
                 <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <Play className="w-10 h-10 text-ods-text-on-dark" fill="white" />
+                  <Play className="h-10 w-10 text-ods-text-on-dark" fill="white" />
                 </span>
               )}
             </div>
           </div>
-          <div className="flex-1 min-w-0 flex flex-col">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-code font-semibold text-ods-text-primary truncate">
-                v{version}
-              </span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="mb-3 flex items-center gap-3">
+              <span className="truncate font-semibold text-ods-text-primary text-code">v{version}</span>
             </div>
             {/* Title — reserve a fixed 2-line height so cards with
                 1-line titles don't shrink and the catalog skeleton-to-
                 content transition is shift-free. Mirrors the
                 onboarding-guide catalog card. */}
-            <div className="min-h-[60px] md:min-h-[72px] flex items-start mb-3">
-              <h3 className="font-['Azeret_Mono'] font-semibold text-xl md:text-2xl text-ods-text-primary leading-tight line-clamp-2">
+            <div className="mb-3 flex min-h-[60px] items-start md:min-h-[72px]">
+              <h3 className="line-clamp-2 font-['Azeret_Mono'] text-xl font-semibold leading-tight text-ods-text-primary md:text-2xl">
                 {title}
               </h3>
             </div>
@@ -278,7 +266,7 @@ export function ProductReleaseCard({
                 Heights derived from text-sm md:text-base × leading-relaxed
                 (1.625): 14×1.625×3 ≈ 68 px mobile, 16×1.625×3 ≈ 78 px desktop. */}
             <div className="min-h-[68px] md:min-h-[78px]">
-              <p className="font-['DM_Sans'] text-sm md:text-base text-ods-text-secondary leading-relaxed line-clamp-3">
+              <p className="line-clamp-3 font-['DM_Sans'] text-sm leading-relaxed text-ods-text-secondary md:text-base">
                 {summary ?? ''}
               </p>
             </div>
@@ -290,30 +278,30 @@ export function ProductReleaseCard({
             (zero reflow on resolve). When `totalChangelog === 0`, an
             empty-state line takes the same vertical space as the
             populated row. */}
-        <div className="border-t border-ods-border pt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-h6 text-ods-text-secondary">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-ods-border pt-3 text-ods-text-secondary text-h6">
           {totalChangelog > 0 && changelogCounts ? (
             <>
               {changelogCounts.features > 0 && (
                 <span className="inline-flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Sparkles className="h-3.5 w-3.5" />
                   {changelogCounts.features} {changelogCounts.features === 1 ? 'feature' : 'features'}
                 </span>
               )}
               {changelogCounts.fixes > 0 && (
                 <span className="inline-flex items-center gap-1.5">
-                  <Wrench className="w-3.5 h-3.5" />
+                  <Wrench className="h-3.5 w-3.5" />
                   {changelogCounts.fixes} {changelogCounts.fixes === 1 ? 'fix' : 'fixes'}
                 </span>
               )}
               {changelogCounts.improvements > 0 && (
                 <span className="inline-flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5" />
+                  <TrendingUp className="h-3.5 w-3.5" />
                   {changelogCounts.improvements} {changelogCounts.improvements === 1 ? 'improvement' : 'improvements'}
                 </span>
               )}
               {changelogCounts.breaking > 0 && (
                 <span className="inline-flex items-center gap-1.5 text-ods-warning">
-                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <AlertTriangle className="h-3.5 w-3.5" />
                   {changelogCounts.breaking} breaking
                 </span>
               )}
@@ -333,14 +321,11 @@ export function ProductReleaseCard({
           className={cn(
             'grid grid-cols-1',
             gridColsClass,
-            'border border-ods-border rounded-md overflow-hidden w-full',
+            'w-full overflow-hidden rounded-md border border-ods-border',
           )}
         >
           {valueCells.map((cell, i) => (
-            <div
-              key={`${cell.label}-${i}`}
-              className={cn('bg-ods-card p-4 flex flex-col gap-3', dividerClass)}
-            >
+            <div key={`${cell.label}-${i}`} className={cn('flex flex-col gap-3 bg-ods-card p-4', dividerClass)}>
               <div className="flex flex-col gap-0">
                 {cell.colorScheme ? (
                   <StatusBadge
@@ -362,13 +347,11 @@ export function ProductReleaseCard({
                     {cell.uppercase ? cell.value.toLocaleUpperCase() : cell.value}
                   </p>
                 )}
-                <p className="text-h6 text-ods-text-secondary">
-                  {cell.label}
-                </p>
+                <p className="text-ods-text-secondary text-h6">{cell.label}</p>
               </div>
             </div>
           ))}
-          <div className="bg-ods-card p-4 flex items-center gap-3">
+          <div className="flex items-center gap-3 bg-ods-card p-4">
             <SquareAvatar
               src={effectiveAuthor.avatar_url ?? undefined}
               alt={effectiveAuthor.full_name}
@@ -376,25 +359,21 @@ export function ProductReleaseCard({
               size="md"
               variant="round"
             />
-            <div className="flex flex-col gap-0 flex-1 min-w-0">
-              <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate">
-                {effectiveAuthor.full_name}
-              </p>
-              <p className="text-h6 text-ods-text-secondary">
-                {effectiveAuthor.job_title || 'Author'}
-              </p>
+            <div className="flex min-w-0 flex-1 flex-col gap-0">
+              <p className="truncate tracking-[-0.36px] text-ods-text-primary text-h3">{effectiveAuthor.full_name}</p>
+              <p className="text-ods-text-secondary text-h6">{effectiveAuthor.job_title || 'Author'}</p>
             </div>
           </div>
         </div>
 
         {typeof viewCount === 'number' && viewCount > 0 && (
-          <div className="flex items-center gap-1.5 text-h6 text-ods-text-secondary">
-            <Eye className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-1.5 text-ods-text-secondary text-h6">
+            <Eye className="h-3.5 w-3.5" />
             <span>{viewCount.toLocaleString()} views</span>
           </div>
         )}
       </>
-    )
+    );
 
     // Outer-element three-branch decision tree, matching the existing
     // `default` branch precedence at lines ~200-241. PRECEDENCE:
@@ -404,28 +383,22 @@ export function ProductReleaseCard({
         <a {...anchorProps} className={frameClass} aria-label={`Open ${title}`}>
           {innerLayout}
         </a>
-      )
+      );
     }
     if (onClick) {
       return (
         <InteractiveCard clickable onClick={onClick} className={frameClass}>
           {innerLayout}
         </InteractiveCard>
-      )
+      );
     }
     // Non-interactive fallback — strip the hover lift / accent-border so
     // the cursor doesn't lie about clickability.
     return (
-      <div
-        className={cn(
-          frameClass
-            .replace('hover:border-ods-accent', '')
-            .replace('hover:translate-y-[-2px]', ''),
-        )}
-      >
+      <div className={cn(frameClass.replace('hover:border-ods-accent', '').replace('hover:translate-y-[-2px]', ''))}>
         {innerLayout}
       </div>
-    )
+    );
   }
 
   // ----- COMPACT branch (chat / tight surfaces) ------------------------------
@@ -444,13 +417,13 @@ export function ProductReleaseCard({
   // primary text + 1-line meta + optional summary clamp.
   if (size === 'sm') {
     const handleKey = (e: React.KeyboardEvent<HTMLSpanElement>) => {
-      if (!onClick) return
+      if (!onClick) return;
       if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        onClick()
+        e.preventDefault();
+        onClick();
       }
-    }
-    const isInteractive = !!anchorProps || !!onClick
+    };
+    const isInteractive = !!anchorProps || !!onClick;
     const outerClassName = cn(
       // The base frame (`my-1.5 flex … no-underline`) mirrors the
       // hub's `COMPACT_CARD_OUTER` in `components/shared/compact-
@@ -462,13 +435,13 @@ export function ProductReleaseCard({
       // visible ring. The `<a>` form would normally get focus styling
       // from the browser, but `no-underline` strips the default
       // affordance, so explicit ring styles match the `<span role>` form.
-      'my-1.5 flex items-start gap-3 w-full p-2',
+      'my-1.5 flex w-full items-start gap-3 p-2',
       'rounded-lg border border-ods-border bg-ods-card no-underline',
       isInteractive
-        ? 'transition-colors hover:border-ods-text-secondary/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-1 focus-visible:ring-offset-ods-card'
+        ? 'cursor-pointer transition-colors hover:border-ods-text-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-1 focus-visible:ring-offset-ods-card'
         : 'cursor-default',
       className,
-    )
+    );
     const innerChildren = (
       <>
         {/* 56×56 cover slot. Mirrors BlogCard / ProgramCard / OnboardingGuide
@@ -477,16 +450,9 @@ export function ProductReleaseCard({
             the `Package` icon when no cover is provided. Play overlay
             fires only when `hasVideoCover` is true AND a cover image was
             actually supplied (matches the catalog variant's overlay rule). */}
-        <span className="relative flex h-14 w-14 aspect-square shrink-0 self-start items-center justify-center overflow-hidden rounded-md bg-ods-bg text-ods-accent">
+        <span className="relative flex aspect-square h-14 w-14 shrink-0 items-center justify-center self-start overflow-hidden rounded-md bg-ods-bg text-ods-accent">
           {coverImage ? (
-            <Image
-              src={coverImage}
-              alt={title}
-              fill
-              sizes="56px"
-              className="object-contain"
-              unoptimized
-            />
+            <Image src={coverImage} alt={title} fill sizes="56px" className="object-contain" unoptimized />
           ) : (
             <Package className="h-5 w-5" />
           )}
@@ -504,24 +470,22 @@ export function ProductReleaseCard({
             edit them here too. Per-row heights are fixed (h-5 / h-4 / h-4)
             so a skeleton placeholder occupies the SAME pixel position
             as the loaded text — zero load-to-resolve baseline shift. */}
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5 min-h-14">
-          <span className="flex items-center gap-2 min-w-0 h-5">
-            <span className="truncate text-h6 font-semibold text-ods-text-primary min-w-0" title={title}>
+        <span className="flex min-h-14 min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex h-5 min-w-0 items-center gap-2">
+            <span className="min-w-0 truncate font-semibold text-ods-text-primary text-h6" title={title}>
               {title}
             </span>
             {version ? (
-              <span className="shrink-0 rounded bg-ods-accent/10 px-1.5 py-0.5 text-code text-ods-accent">
+              <span className="shrink-0 rounded bg-ods-accent/10 px-1.5 py-0.5 text-ods-accent text-code">
                 {version}
               </span>
             ) : null}
           </span>
-          <span className="flex items-center min-w-0 h-4">
-            <span className="truncate text-h6 text-ods-text-secondary">
-              {formattedDate || 'Product release'}
-            </span>
+          <span className="flex h-4 min-w-0 items-center">
+            <span className="truncate text-ods-text-secondary text-h6">{formattedDate || 'Product release'}</span>
           </span>
-          <span className="flex items-center min-w-0 h-4">
-            <span className="truncate text-h6 text-ods-text-secondary/80" title={summary || undefined}>
+          <span className="flex h-4 min-w-0 items-center">
+            <span className="truncate text-ods-text-secondary/80 text-h6" title={summary || undefined}>
               {/* The literal between the curly-quote string is U+00A0
                   (NBSP). The hub's `COMPACT_CARD_ROW_FILLER` is also
                   NBSP; ASCII space here would let React collapse the
@@ -532,7 +496,7 @@ export function ProductReleaseCard({
           </span>
         </span>
       </>
-    )
+    );
     // Anchor variant — consumer's `useNavLink` (or equivalent) owns the
     // click decision; the card just spreads the prop bundle and renders
     // a real `<a>` so cmd/ctrl-click new-tab + middle-click work without
@@ -543,7 +507,7 @@ export function ProductReleaseCard({
         <a {...anchorProps} className={outerClassName}>
           {innerChildren}
         </a>
-      )
+      );
     }
     // Legacy fallback — `onClick` (no href). Keeps the public `/releases`
     // page's existing `router.push(...)` flow working unchanged. When
@@ -559,11 +523,11 @@ export function ProductReleaseCard({
       >
         {innerChildren}
       </span>
-    )
+    );
   }
 
   // Unreachable — `size` is typed `'lg' | 'sm'` and both branches return
   // above. Kept as a defensive throw so a future variant addition that
   // forgets to return doesn't silently render `undefined`.
-  throw new Error(`ProductReleaseCard: unsupported size '${size as string}'`)
+  throw new Error(`ProductReleaseCard: unsupported size '${size as string}'`);
 }

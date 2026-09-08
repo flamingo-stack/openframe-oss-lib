@@ -22,14 +22,14 @@
  *   3. Returns `''` for anything else (null, undefined, unknown shape).
  */
 export function flattenAssistantContent(raw: unknown): string {
-  if (typeof raw === 'string') return raw
-  if (!Array.isArray(raw)) return ''
-  const parts: string[] = []
+  if (typeof raw === 'string') return raw;
+  if (!Array.isArray(raw)) return '';
+  const parts: string[] = [];
   for (const seg of raw) {
     if (seg && typeof seg === 'object' && (seg as { type?: string }).type === 'text') {
-      const t = (seg as { text?: unknown }).text
-      if (typeof t === 'string' && t.length > 0) parts.push(t)
+      const t = (seg as { text?: unknown }).text;
+      if (typeof t === 'string' && t.length > 0) parts.push(t);
     }
   }
-  return parts.join('\n\n')
+  return parts.join('\n\n');
 }

@@ -1,40 +1,40 @@
-'use client'
+'use client';
 
-import * as PopoverPrimitive from '@radix-ui/react-popover'
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding'
-import { CheckIcon, PlusIcon, SearchIcon, TrashIcon } from '../icons-v2-generated'
-import { Button } from './button'
-import { Input } from './input'
+import * as PopoverPrimitive from '@radix-ui/react-popover';
+import { useState, useMemo } from 'react';
+import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding';
+import { cn } from '../../utils/cn';
+import { CheckIcon, PlusIcon, SearchIcon, TrashIcon } from '../icons-v2-generated';
+import { Button } from './button';
+import { Input } from './input';
 
 export interface TagSelectOption {
-  id: string
-  label: string
+  id: string;
+  label: string;
 }
 
 export interface TagSelectDropdownProps {
   /** All selectable tags. */
-  options: TagSelectOption[]
+  options: TagSelectOption[];
   /** IDs of the currently selected tags. */
-  selectedIds: string[]
+  selectedIds: string[];
   /** Called with the next full selection whenever a tag is toggled. */
-  onChange: (ids: string[]) => void
+  onChange: (ids: string[]) => void;
   /** Called when the inline "Create" row is chosen. Omit to disable creation. */
-  onCreate?: (name: string) => void
+  onCreate?: (name: string) => void;
   /** Max length for a newly created tag name. Omit for no limit. */
-  maxCreateLength?: number
+  maxCreateLength?: number;
   /** Called when a row's hover trash button is clicked. Omit to hide delete. */
-  onDelete?: (id: string) => void
-  isCreating?: boolean
-  isDeleting?: boolean
+  onDelete?: (id: string) => void;
+  isCreating?: boolean;
+  isDeleting?: boolean;
   /** Trigger button label. */
-  triggerLabel?: string
-  searchPlaceholder?: string
-  disabled?: boolean
-  align?: 'start' | 'center' | 'end'
+  triggerLabel?: string;
+  searchPlaceholder?: string;
+  disabled?: boolean;
+  align?: 'start' | 'center' | 'end';
   /** Forwarded to the trigger button. */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -58,41 +58,43 @@ export function TagSelectDropdown({
   align = 'start',
   className,
 }: TagSelectDropdownProps) {
-  const [isOpen, setIsOpen] = React.useState(false)
-  const [search, setSearch] = React.useState('')
-  const keyboardPadding = useKeyboardCollisionPadding()
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const keyboardPadding = useKeyboardCollisionPadding();
 
-  React.useEffect(() => {
-    if (!isOpen) setSearch('')
-  }, [isOpen])
+  // Clear the query on close, while rendering rather than from an effect: the
+  // popover closes and reopens without unmounting, so an effect left the
+  // previous query in the field for the frame the popover reopened in. Guarded
+  // on `search`, so the extra render pass this schedules takes the early exit.
+  if (!isOpen && search !== '') setSearch('');
 
-  const query = search.trim()
-  const filtered = React.useMemo(() => {
-    const q = query.toLowerCase()
-    if (!q) return options
-    return options.filter(o => o.label.toLowerCase().includes(q))
-  }, [options, query])
+  const query = search.trim();
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase();
+    if (!q) return options;
+    return options.filter(o => o.label.toLowerCase().includes(q));
+  }, [options, query]);
 
   // Selected tags float to the top of the list.
-  const ordered = React.useMemo(() => {
-    const selected = filtered.filter(o => selectedIds.includes(o.id))
-    const rest = filtered.filter(o => !selectedIds.includes(o.id))
-    return [...selected, ...rest]
-  }, [filtered, selectedIds])
+  const ordered = useMemo(() => {
+    const selected = filtered.filter(o => selectedIds.includes(o.id));
+    const rest = filtered.filter(o => !selectedIds.includes(o.id));
+    return [...selected, ...rest];
+  }, [filtered, selectedIds]);
 
-  const showCreate = !!onCreate && !!query && !options.some(o => o.label.toLowerCase() === query.toLowerCase())
-  const isCreateTooLong = maxCreateLength != null && query.length > maxCreateLength
-  const canCreate = showCreate && !isCreateTooLong
+  const showCreate = !!onCreate && !!query && !options.some(o => o.label.toLowerCase() === query.toLowerCase());
+  const isCreateTooLong = maxCreateLength != null && query.length > maxCreateLength;
+  const canCreate = showCreate && !isCreateTooLong;
 
   const toggle = (id: string) => {
-    onChange(selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : [...selectedIds, id])
-  }
+    onChange(selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : [...selectedIds, id]);
+  };
 
   const handleCreate = () => {
-    if (!onCreate || !canCreate) return
-    onCreate(query)
-    setSearch('')
-  }
+    if (!onCreate || !canCreate) return;
+    onCreate(query);
+    setSearch('');
+  };
 
   return (
     <PopoverPrimitive.Root open={isOpen} onOpenChange={setIsOpen} modal={false}>
@@ -116,8 +118,8 @@ export function TagSelectDropdown({
           // opens — see useKeyboardCollisionPadding.
           collisionPadding={{ bottom: keyboardPadding }}
           className={cn(
-            'z-50 w-72 bg-ods-card border border-ods-border rounded-[6px] shadow-lg overflow-hidden',
-            'flex flex-col max-h-[var(--radix-popper-available-height)]',
+            'z-50 w-72 overflow-hidden rounded-[6px] border border-ods-border bg-ods-card shadow-lg',
+            'flex max-h-[var(--radix-popper-available-height)] flex-col',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -131,8 +133,8 @@ export function TagSelectDropdown({
               onChange={e => setSearch(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter' && canCreate) {
-                  e.preventDefault()
-                  handleCreate()
+                  e.preventDefault();
+                  handleCreate();
                 }
               }}
               placeholder={searchPlaceholder}
@@ -140,9 +142,9 @@ export function TagSelectDropdown({
               className="rounded-none border-0"
             />
           </div>
-          <div className="min-h-0 max-h-72 overflow-y-auto py-[var(--spacing-system-xs)]" role="listbox">
+          <div className="max-h-72 min-h-0 overflow-y-auto py-[var(--spacing-system-xs)]" role="listbox">
             {ordered.map(opt => {
-              const isSelected = selectedIds.includes(opt.id)
+              const isSelected = selectedIds.includes(opt.id);
               return (
                 <div
                   key={opt.id}
@@ -152,14 +154,14 @@ export function TagSelectDropdown({
                   onClick={() => toggle(opt.id)}
                   onKeyDown={e => {
                     if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      toggle(opt.id)
+                      e.preventDefault();
+                      toggle(opt.id);
                     }
                   }}
                   className={cn(
-                    'group/item flex items-center gap-[var(--spacing-system-xs)] w-full cursor-pointer text-left',
+                    'group/item flex w-full cursor-pointer items-center gap-[var(--spacing-system-xs)] text-left',
                     'px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)]',
-                    'hover:bg-ods-bg-hover transition-colors',
+                    'transition-colors hover:bg-ods-bg-hover',
                     isSelected && 'bg-ods-bg-hover',
                   )}
                 >
@@ -175,25 +177,25 @@ export function TagSelectDropdown({
                       type="button"
                       aria-label={`Delete tag ${opt.label}`}
                       onClick={e => {
-                        e.stopPropagation()
-                        onDelete(opt.id)
+                        e.stopPropagation();
+                        onDelete(opt.id);
                       }}
                       disabled={isDeleting}
                       className={cn(
-                        'shrink-0 opacity-0 transition-opacity group-hover/item:opacity-100 focus-visible:opacity-100',
-                        'disabled:opacity-50 disabled:pointer-events-none',
+                        'shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/item:opacity-100',
+                        'disabled:pointer-events-none disabled:opacity-50',
                       )}
                     >
                       <TrashIcon className="size-4 text-ods-error" />
                     </button>
                   )}
                 </div>
-              )
+              );
             })}
 
             {showCreate &&
               (isCreateTooLong ? (
-                <div className="flex items-center gap-[var(--spacing-system-xs)] w-full px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-h5 text-ods-error">
+                <div className="flex w-full items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-ods-error text-h5">
                   Maximum {maxCreateLength} characters
                 </div>
               ) : (
@@ -202,19 +204,19 @@ export function TagSelectDropdown({
                   onClick={handleCreate}
                   disabled={isCreating}
                   className={cn(
-                    'flex items-center gap-[var(--spacing-system-xs)] w-full px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-left',
-                    'hover:bg-ods-bg-hover transition-colors disabled:opacity-50 disabled:pointer-events-none',
+                    'flex w-full items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-left',
+                    'transition-colors hover:bg-ods-bg-hover disabled:pointer-events-none disabled:opacity-50',
                   )}
                 >
                   <PlusIcon className="size-4 shrink-0 text-ods-accent" />
-                  <span className="flex-1 truncate text-h4 text-ods-accent" title={`Create "${query}"`}>
+                  <span className="flex-1 truncate text-ods-accent text-h4" title={`Create "${query}"`}>
                     Create &ldquo;{query}&rdquo;
                   </span>
                 </button>
               ))}
 
             {filtered.length === 0 && !showCreate && (
-              <div className="px-[var(--spacing-system-sf)] py-[var(--spacing-system-s)] text-h5 text-ods-text-secondary">
+              <div className="px-[var(--spacing-system-sf)] py-[var(--spacing-system-s)] text-ods-text-secondary text-h5">
                 No tags found
               </div>
             )}
@@ -222,5 +224,5 @@ export function TagSelectDropdown({
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>
     </PopoverPrimitive.Root>
-  )
+  );
 }

@@ -1,11 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import * as React from 'react';
-import { Button } from '../components/ui/button';
-import { BracketCurlyIcon } from '../components/icons-v2-generated/coding/bracket-curly-icon';
-import { MonitorIcon } from '../components/icons-v2-generated/devices/monitor-icon';
-import { AlertTriangleIcon } from '../components/icons-v2-generated/interface/alert-triangle-icon';
-import { BannedIcon } from '../components/icons-v2-generated/security/banned-icon';
-import { UserPlusIcon } from '../components/icons-v2-generated/users/user-plus-icon';
+import { useEffect, useState, useRef } from 'react';
 import {
   ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
   ApprovalRequestNotificationTile,
@@ -19,6 +13,12 @@ import {
   type NotificationVariant,
   type RenderNotificationTile,
 } from '../components/features/notifications';
+import { BracketCurlyIcon } from '../components/icons-v2-generated/coding/bracket-curly-icon';
+import { MonitorIcon } from '../components/icons-v2-generated/devices/monitor-icon';
+import { AlertTriangleIcon } from '../components/icons-v2-generated/interface/alert-triangle-icon';
+import { BannedIcon } from '../components/icons-v2-generated/security/banned-icon';
+import { UserPlusIcon } from '../components/icons-v2-generated/users/user-plus-icon';
+import { Button } from '../components/ui/button';
 import { Toaster } from '../components/ui/toaster';
 
 const meta = {
@@ -156,7 +156,7 @@ const SEED: Notification[] = [
 
 function AutoOpen() {
   const { open } = useNotifications();
-  React.useEffect(() => {
+  useEffect(() => {
     open();
   }, [open]);
   return null;
@@ -322,7 +322,7 @@ export const SeverityIconAndImage: Story = {
  */
 export const LiveTile: Story = {
   render: function LiveTileRender() {
-    const [tick, setTick] = React.useState(0);
+    const [tick, setTick] = useState(0);
     return (
       <div className="flex max-w-md flex-col gap-3">
         <NotificationTile
@@ -339,7 +339,7 @@ export const LiveTile: Story = {
           }}
           onComplete={() => {}}
         />
-        <Button variant="outline" onClick={() => setTick((t) => t + 1)}>
+        <Button variant="outline" onClick={() => setTick(t => t + 1)}>
           Replay live progress
         </Button>
       </div>
@@ -355,7 +355,7 @@ export const DrawerEmpty: Story = {
     <NotificationsProvider>
       <AutoOpen />
       <NotificationDrawer />
-      <p className="text-h6 text-ods-text-secondary">
+      <p className="text-ods-text-secondary text-h6">
         Drawer opens automatically. Close it with Esc or by clicking the overlay.
       </p>
     </NotificationsProvider>
@@ -368,6 +368,25 @@ export const DrawerEmpty: Story = {
  * resolution state: pending (buttons), approved, rejected and cancelled
  * (status tag + resolver name in place of the buttons).
  */
+/**
+ * Renders approval-request notifications with the dedicated
+ * `ApprovalRequestNotificationTile` (collapsible command section + Approve /
+ * Reject), falling back to the default tile for everything else.
+ */
+const renderApprovalTile: RenderNotificationTile = (n, { onComplete, onSettle, liveDurationMs }) => {
+  if (!isApprovalNotification(n)) return undefined;
+  return (
+    <ApprovalRequestNotificationTile
+      notification={n}
+      onApprove={id => alert(`Approved ${id}`)}
+      onReject={id => alert(`Rejected ${id}`)}
+      onComplete={onComplete}
+      onSettle={onSettle}
+      liveDurationMs={liveDurationMs}
+    />
+  );
+};
+
 export const DrawerWithSeedData: Story = {
   render: function DrawerWithSeedDataRender() {
     return (
@@ -375,14 +394,13 @@ export const DrawerWithSeedData: Story = {
         initialNotifications={SEED}
         onHistoryClick={() => alert('Navigate to /notifications')}
         historyHref="/notifications"
-        onShowPopupsChange={(v) => console.log('showPopups →', v)}
+        onShowPopupsChange={v => console.log('showPopups →', v)}
         renderTile={renderApprovalTile}
       >
         <AutoOpen />
         <NotificationDrawer />
-        <p className="text-h6 text-ods-text-secondary">
-          Seeded notifications matching the Figma reference, including approvals
-          in all four resolution states.
+        <p className="text-ods-text-secondary text-h6">
+          Seeded notifications matching the Figma reference, including approvals in all four resolution states.
         </p>
       </NotificationsProvider>
     );
@@ -429,25 +447,6 @@ const LONG_POWERSHELL = [
   'Write-Host "Diagnostic bundle ready at $out.zip"',
 ].join('\n');
 
-/**
- * Renders approval-request notifications with the dedicated
- * `ApprovalRequestNotificationTile` (collapsible command section + Approve /
- * Reject), falling back to the default tile for everything else.
- */
-const renderApprovalTile: RenderNotificationTile = (n, { onComplete, onSettle, liveDurationMs }) => {
-  if (!isApprovalNotification(n)) return undefined;
-  return (
-    <ApprovalRequestNotificationTile
-      notification={n}
-      onApprove={(id) => alert(`Approved ${id}`)}
-      onReject={(id) => alert(`Rejected ${id}`)}
-      onComplete={onComplete}
-      onSettle={onSettle}
-      liveDurationMs={liveDurationMs}
-    />
-  );
-};
-
 export const LivePlayground: Story = {
   render: () => (
     <NotificationsProvider
@@ -464,9 +463,8 @@ export const LivePlayground: Story = {
 };
 
 function PlaygroundControls() {
-  const { addNotification, markAllRead, clear, toggle, notifications, unreadCount, showPopups } =
-    useNotifications();
-  const approvalSeq = React.useRef(0);
+  const { addNotification, markAllRead, clear, toggle, notifications, unreadCount, showPopups } = useNotifications();
+  const approvalSeq = useRef(0);
 
   const fire = (
     variant: NotificationVariant,
@@ -486,11 +484,7 @@ function PlaygroundControls() {
     });
   };
 
-  const fireApproval = (
-    title: string,
-    description: string,
-    toolCalls: Array<Record<string, unknown>>,
-  ) => {
+  const fireApproval = (title: string, description: string, toolCalls: Array<Record<string, unknown>>) => {
     const n = approvalSeq.current++;
     addNotification({
       variant: 'warning',
@@ -567,10 +561,9 @@ function PlaygroundControls() {
   return (
     <div className="flex max-w-2xl flex-col gap-4">
       <div className="rounded-md border border-ods-border bg-ods-card p-3">
-        <p className="text-h3 text-ods-text-primary">Playground</p>
-        <p className="text-h6 text-ods-text-secondary">
-          {notifications.length} total · {unreadCount} unread · pop-ups{' '}
-          {showPopups ? 'on' : 'off'}
+        <p className="text-ods-text-primary text-h3">Playground</p>
+        <p className="text-ods-text-secondary text-h6">
+          {notifications.length} total · {unreadCount} unread · pop-ups {showPopups ? 'on' : 'off'}
         </p>
       </div>
 

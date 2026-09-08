@@ -1,18 +1,14 @@
-"use client";
+'use client';
 
-import React, { ComponentType } from 'react';
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from '../ui/tabs';
+import type React from 'react';
+import type { ComponentType } from 'react';
 import type { VideoTeaser } from '../../types/video-processing';
-import { Video } from './video';
-import { useCaptions } from './use-captions';
-import { VideoBitesStrip, type VideoBiteStripItem } from './video-bites-strip';
-import { DEFAULT_VIDEO_BITES_TITLE, type VideoBiteStripProfile } from './video-bites-shared';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
+import { useCaptions } from './use-captions';
+import { Video } from './video';
+import { DEFAULT_VIDEO_BITES_TITLE, type VideoBiteStripProfile } from './video-bites-shared';
+import { VideoBitesStrip, type VideoBiteStripItem } from './video-bites-strip';
 
 /**
  * <EntityVideoSection> — public detail-page video block.
@@ -121,9 +117,7 @@ export function EntityVideoSection({
   // Caption resolution: explicit URL props win (detail pages gate on their
   // entity's SRT columns); otherwise derive from `captionsEntity` identity —
   // the zero-knowledge path for chat cards.
-  const derivedCaptions = captionsEntity
-    ? captions.forEntityId(captionsEntity.type, captionsEntity.id)
-    : null;
+  const derivedCaptions = captionsEntity ? captions.forEntityId(captionsEntity.type, captionsEntity.id) : null;
   const captionsUrl = captionsUrlProp ?? derivedCaptions?.captionsUrl;
   const highlightCaptionsUrl = highlightCaptionsUrlProp ?? derivedCaptions?.highlightCaptionsUrl;
 
@@ -137,19 +131,25 @@ export function EntityVideoSection({
 
   return (
     <>
+      {/* Branch on the resolved URLs themselves rather than on the derived
+          `hasFullVideo` flag: `fullVideoUrl` is truthy exactly when
+          `hasFullVideo` is, and testing it directly narrows it to a `string`
+          for `<Video url>` without a non-null assertion. `hasHighlight` is a
+          single-reference alias of `highlightVideoUrl`, so it narrows on its
+          own. */}
       {hasVideo &&
-        (hasFullVideo && hasHighlight ? (
+        (fullVideoUrl && hasHighlight ? (
           <Tabs defaultValue="full-video" className="w-full">
-            <TabsList className="inline-flex justify-start rounded-none bg-transparent h-auto p-0 gap-0">
+            <TabsList className="inline-flex h-auto justify-start gap-0 rounded-none bg-transparent p-0">
               <TabsTrigger
                 value="full-video"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 md:px-6 py-3 text-ods-text-secondary data-[state=active]:text-ods-text-primary"
+                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none md:px-6"
               >
                 Full Video
               </TabsTrigger>
               <TabsTrigger
                 value="highlights"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 md:px-6 py-3 text-ods-text-secondary data-[state=active]:text-ods-text-primary"
+                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none md:px-6"
               >
                 Highlights
               </TabsTrigger>
@@ -158,7 +158,7 @@ export function EntityVideoSection({
             <TabsContent value="full-video" className="mt-4">
               <Video
                 kind={fullVideoKind}
-                url={fullVideoUrl!}
+                url={fullVideoUrl}
                 poster={mainVideoPoster}
                 title={title}
                 srtContent={srtContent}
@@ -170,17 +170,17 @@ export function EntityVideoSection({
 
             <TabsContent value="highlights" className="mt-4">
               <Video
-                url={highlightVideoUrl!}
+                url={highlightVideoUrl}
                 poster={highlightVideoThumbnail}
                 captionsUrl={highlightCaptionsUrl}
                 layout="centered"
               />
             </TabsContent>
           </Tabs>
-        ) : hasFullVideo ? (
+        ) : fullVideoUrl ? (
           <Video
             kind={fullVideoKind}
-            url={fullVideoUrl!}
+            url={fullVideoUrl}
             poster={mainVideoPoster}
             title={title}
             srtContent={srtContent}
@@ -188,22 +188,20 @@ export function EntityVideoSection({
             layout="centered"
             priority={priority}
           />
-        ) : (
+        ) : highlightVideoUrl ? (
           <Video
-            url={highlightVideoUrl!}
+            url={highlightVideoUrl}
             poster={highlightVideoThumbnail}
             captionsUrl={highlightCaptionsUrl}
             layout="centered"
             priority={priority}
           />
-        ))}
+        ) : null)}
 
       {videoSummary && MarkdownRenderer && (
-        <div className="flex flex-col gap-6 w-full min-w-0">
-          <h2 className={`${SECTION_HEADING_CLASS} break-words`}>
-            Summary
-          </h2>
-          <div className="text-h4 text-ods-text-primary break-words overflow-hidden">
+        <div className="flex w-full min-w-0 flex-col gap-6">
+          <h2 className={`${SECTION_HEADING_CLASS} break-words`}>Summary</h2>
+          <div className="overflow-hidden break-words text-ods-text-primary text-h4">
             <MarkdownRenderer content={videoSummary} />
           </div>
         </div>

@@ -12,10 +12,7 @@ export {
   type SimpleMarkdownRendererProps,
   type ResolveLinkResult,
 } from './simple-markdown-renderer';
-export {
-  RichMarkdownRenderer,
-  type RichMarkdownRendererProps,
-} from './rich/rich-markdown-renderer';
+export { RichMarkdownRenderer, type RichMarkdownRendererProps } from './rich/rich-markdown-renderer';
 export { processShortcodes } from './rich/shortcodes';
 export {
   SAFE_HTML_TAGS,
@@ -35,13 +32,7 @@ export {
   type TextSizePreset,
 } from './text-size';
 export { MermaidDiagram } from './mermaid-diagram';
-export {
-  buildHeadingIdMap,
-  useHeadingIdMap,
-  extractText,
-  type HeadingSection,
-  type HeadingIdMap,
-} from './heading-ids';
+export { buildHeadingIdMap, useHeadingIdMap, extractText, type HeadingSection, type HeadingIdMap } from './heading-ids';
 // NOT exported: `mermaidStyles` (single-consumer, owned by MermaidDiagram)
 // and `buildStandardLeafRenderers` (an internal SSOT — exporting it invites
 // exactly the renderer-map fork this module exists to prevent; the rich

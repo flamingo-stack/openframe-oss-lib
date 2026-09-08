@@ -11,14 +11,16 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
-import com.openframe.api.service.ScriptTagService;
+import com.openframe.api.service.rmm.script.ScriptTagService;
+import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.api.service.rmm.script.ScriptTimeoutValidator;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
-import com.openframe.data.document.rmm.Script;
-import com.openframe.data.document.rmm.ScriptShell;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.script.ScriptShell;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -724,5 +726,54 @@ class ScriptServiceTest {
 
         verify(scriptRepository, never()).save(any());
         verifyNoInteractions(scriptMapper);
+    }
+
+    @Test
+    @DisplayName("update: system scripts are immutable — rejected before any name check or save")
+    void update_rejectsSystemScript() {
+        Script system = new Script();
+        system.setId(SCRIPT_ID);
+        system.setStatus(ScriptStatus.ACTIVE);
+        system.setSystem(true);
+        updateInput.setName("renamed");
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
+
+        assertThatThrownBy(() -> scriptService.update(updateInput))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("System scripts");
+
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("delete: system scripts cannot be deleted")
+    void delete_rejectsSystemScript() {
+        Script system = new Script();
+        system.setId(SCRIPT_ID);
+        system.setStatus(ScriptStatus.ACTIVE);
+        system.setSystem(true);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
+
+        assertThatThrownBy(() -> scriptService.delete(SCRIPT_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("System scripts");
+
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("archive: system scripts cannot be archived")
+    void archive_rejectsSystemScript() {
+        Script system = new Script();
+        system.setId(SCRIPT_ID);
+        system.setStatus(ScriptStatus.ACTIVE);
+        system.setSystem(true);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
+
+        assertThatThrownBy(() -> scriptService.archive(SCRIPT_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("System scripts");
+
+        verify(scriptRepository, never()).save(any());
     }
 }

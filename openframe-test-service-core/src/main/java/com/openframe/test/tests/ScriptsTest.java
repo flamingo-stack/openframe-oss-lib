@@ -38,7 +38,14 @@ public class ScriptsTest extends BaseTest {
     public void testListScripts() {
         List<Script> scripts = ScriptApi.listScripts();
         assertThat(scripts).as("Expected at least one script").isNotEmpty();
-        assertThat(scripts).withFailMessage("Expected to have mandatory fields").allSatisfy(script -> {
+        // No withFailMessage() here on purpose: it replaces the failure message for the whole block,
+        // including the per-field .as() descriptions below, so a failure would report only "Expected to
+        // have mandatory fields" -- naming neither the field nor the script. That is not diagnosable
+        // from a nightly log, because RequestSpecHelper logs requests but not response bodies.
+        // These three fields are non-null in the schema (id: ID!, name: String!, shell: ScriptShell!),
+        // so a failure here is a contract violation worth reporting precisely, and it has to say which
+        // of possibly many scripts in the list broke it.
+        assertThat(scripts).allSatisfy(script -> {
             assertThat(script.getId()).as("No Id").isNotNull();
             assertThat(script.getName()).as("No Name for " + script.getId()).isNotEmpty();
             assertThat(script.getShell()).as("No Shell for " + script.getName()).isNotEmpty();

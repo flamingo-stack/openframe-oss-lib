@@ -152,6 +152,21 @@ pub struct RmmResult {
     pub schedule_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionAck {
+    pub execution_id: String,
+    pub machine_id: String,
+    pub schedule_id: Option<String>,
+    pub script_ids: Vec<String>,
+}
+
+pub const EXECUTION_ACK_KIND: &str = "execution.acknowledge";
+
+pub fn is_ack_subject(subject: &str) -> bool {
+    subject.ends_with(EXECUTION_ACK_KIND)
+}
+
 pub struct ExecutionRequest<'a> {
     pub execution_id: &'a str,
     pub code: &'a str,

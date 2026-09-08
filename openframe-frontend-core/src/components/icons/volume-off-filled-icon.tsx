@@ -1,7 +1,6 @@
-import type { SVGProps } from "react";
+import type { SVGProps } from 'react';
 
-export interface VolumeOffFilledIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+export interface VolumeOffFilledIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
@@ -14,9 +13,9 @@ export interface VolumeOffFilledIconProps
  * Figma-generated set has only outline volume icons).
  */
 export function VolumeOffFilledIcon({
-  className = "",
+  className = '',
   size = 24,
-  color = "currentColor",
+  color = 'currentColor',
   ...props
 }: VolumeOffFilledIconProps) {
   return (

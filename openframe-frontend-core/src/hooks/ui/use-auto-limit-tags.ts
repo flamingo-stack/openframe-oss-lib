@@ -1,35 +1,36 @@
-"use client"
+'use client';
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 
 export interface UseAutoLimitTagsOptions {
   /** Total number of tags */
-  count: number
+  count: number;
   /** Fixed limit or "auto" for DOM-based measurement. Default "auto" */
-  limitTags?: number | "auto"
+  limitTags?: number | 'auto';
   /** Placeholder text used to reserve input width (only used in "auto" mode) */
-  placeholder?: string
+  placeholder?: string;
   /**
    * Reserve trailing space for a text input (the autocomplete combobox). Set
    * `false` for a pure chip row that has no input — then only the chips and the
    * "+N" / "⋯" overflow badge compete for the available width. Default `true`.
    */
-  reserveInputWidth?: boolean
+  reserveInputWidth?: boolean;
 }
 
 export interface UseAutoLimitTagsReturn {
   /** How many tags to show */
-  visibleCount: number
+  visibleCount: number;
   /** Ref for the zone that contains tags + input (must have overflow-hidden, gap, padding) */
-  middleRef: React.RefObject<HTMLDivElement | null>
+  middleRef: RefObject<HTMLDivElement | null>;
   /** Ref for the off-screen container that holds measurement copies of ALL tags */
-  measureRef: React.RefObject<HTMLDivElement | null>
+  measureRef: RefObject<HTMLDivElement | null>;
   /** Ref for the hidden span that measures placeholder text width */
-  textMeasureRef: React.RefObject<HTMLSpanElement | null>
+  textMeasureRef: RefObject<HTMLSpanElement | null>;
   /** Ref for the "+N" badge element (used to measure its width) */
-  badgeRef: React.RefObject<HTMLButtonElement | null>
+  badgeRef: RefObject<HTMLButtonElement | null>;
   /** Ref for the input element (used to read its min-width) */
-  inputRef: React.RefObject<HTMLInputElement | null>
+  inputRef: RefObject<HTMLInputElement | null>;
 }
 
 /**
@@ -45,102 +46,107 @@ export interface UseAutoLimitTagsReturn {
  */
 export function useAutoLimitTags({
   count,
-  limitTags = "auto",
-  placeholder = "",
+  limitTags = 'auto',
+  placeholder = '',
   reserveInputWidth = true,
 }: UseAutoLimitTagsOptions): UseAutoLimitTagsReturn {
-  const middleRef = useRef<HTMLDivElement>(null)
-  const measureRef = useRef<HTMLDivElement>(null)
-  const textMeasureRef = useRef<HTMLSpanElement>(null)
-  const badgeRef = useRef<HTMLButtonElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [visibleCount, setVisibleCount] = useState(count)
+  const middleRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const textMeasureRef = useRef<HTMLSpanElement>(null);
+  const badgeRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // `null` = never measured (no container rendered, or a fixed `limitTags` that
+  // needs no measurement). Kept distinct from `0` so the "show everything"
+  // fallback below stays derivable during render instead of having to be
+  // written into state from an effect.
+  const [measuredCount, setMeasuredCount] = useState<number | null>(null);
 
   const recalculate = useCallback(() => {
-    // Fixed limit — skip DOM measurement
-    if (limitTags !== "auto") {
-      setVisibleCount(Math.min(limitTags, count))
-      return
-    }
-
-    const middle = middleRef.current
-    const measure = measureRef.current
+    const middle = middleRef.current;
+    const measure = measureRef.current;
     if (!middle || !measure) {
-      setVisibleCount(count)
-      return
+      setMeasuredCount(null);
+      return;
     }
     if (count === 0) {
-      setVisibleCount(0)
-      return
+      setMeasuredCount(0);
+      return;
     }
 
     // Read real CSS metrics from the middle zone
-    const cs = getComputedStyle(middle)
-    const padL = parseFloat(cs.paddingLeft) || 0
-    const padR = parseFloat(cs.paddingRight) || 0
-    const gap = parseFloat(cs.gap) || 0
-    const middleW = middle.clientWidth
+    const cs = getComputedStyle(middle);
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0;
+    const gap = parseFloat(cs.gap) || 0;
+    const middleW = middle.clientWidth;
 
     // Reserve trailing space for the input (autocomplete only). A pure chip row
     // (`reserveInputWidth: false`) has no input, so nothing — and no gap before
     // it — is reserved.
-    let inputReservedW = 0
-    let trailingGap = 0
+    let inputReservedW = 0;
+    let trailingGap = 0;
     if (reserveInputWidth) {
-      const textW = textMeasureRef.current?.offsetWidth ?? 60
-      const inputMinW = inputRef.current
-        ? parseFloat(getComputedStyle(inputRef.current).minWidth) || 60
-        : 60
-      inputReservedW = Math.max(textW + 8, inputMinW)
-      trailingGap = gap
+      const textW = textMeasureRef.current?.offsetWidth ?? 60;
+      const inputMinW = inputRef.current ? parseFloat(getComputedStyle(inputRef.current).minWidth) || 60 : 60;
+      inputReservedW = Math.max(textW + 8, inputMinW);
+      trailingGap = gap;
     }
 
     // Available = middle zone − padding − input reserved − gap before input
-    const available = middleW - padL - padR - inputReservedW - trailingGap
+    const available = middleW - padL - padR - inputReservedW - trailingGap;
 
     // Measure every tag from the off-screen container
-    const tagEls = Array.from(measure.children) as HTMLElement[]
-    const widths = tagEls.map((el) => el.offsetWidth)
+    const tagEls = Array.from(measure.children) as HTMLElement[];
+    const widths = tagEls.map(el => el.offsetWidth);
 
     // Fast check: do ALL tags fit?
-    let total = 0
+    let total = 0;
     for (let i = 0; i < widths.length; i++) {
-      total += widths[i] + (i > 0 ? gap : 0)
+      total += widths[i] + (i > 0 ? gap : 0);
     }
     if (total <= available) {
-      setVisibleCount(count)
-      return
+      setMeasuredCount(count);
+      return;
     }
 
     // Not all fit → reserve space for the "+N" badge
-    const badgeW = badgeRef.current?.offsetWidth ?? 40
-    const spaceWithBadge = available - badgeW - gap
+    const badgeW = badgeRef.current?.offsetWidth ?? 40;
+    const spaceWithBadge = available - badgeW - gap;
 
-    let used = 0
-    let fitCount = 0
+    let used = 0;
+    let fitCount = 0;
     for (let i = 0; i < widths.length; i++) {
-      const need = widths[i] + (i > 0 ? gap : 0)
-      if (used + need > spaceWithBadge) break
-      used += need
-      fitCount++
+      const need = widths[i] + (i > 0 ? gap : 0);
+      if (used + need > spaceWithBadge) break;
+      used += need;
+      fitCount++;
     }
 
-    setVisibleCount(Math.max(0, fitCount))
-  }, [count, limitTags, placeholder, reserveInputWidth])
+    setMeasuredCount(Math.max(0, fitCount));
+  }, [count, placeholder, reserveInputWidth]);
 
-  // Recalculate when inputs change
+  // ONE effect, not two. `ResizeObserver` delivers an initial notification as
+  // soon as it starts observing, so `observe()` IS the mount-time measurement —
+  // the separate `recalculate()` call this replaces was a synchronous setState
+  // in an effect body, i.e. a guaranteed second render pass on every mount and
+  // on every change of `count`. `recalculate`'s identity changes with `count` /
+  // `placeholder` / `reserveInputWidth`, so a re-observe (and therefore a fresh
+  // measurement) still happens for input changes that do not resize the box.
   useEffect(() => {
-    recalculate()
-  }, [recalculate])
+    if (limitTags !== 'auto') return undefined;
+    const el = middleRef.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(recalculate);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [recalculate, limitTags]);
 
-  // Recalculate on container resize
-  useEffect(() => {
-    const el = middleRef.current
-    if (!el) return
-    const ro = new ResizeObserver(recalculate)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [recalculate])
+  // A fixed limit is pure arithmetic on props and never needed the DOM at all.
+  // The `Math.min(…, count)` clamp matters because the measurement lags a
+  // shrinking `count` by one commit: unclamped, callers computing
+  // `count - visibleCount` for the "+N" badge briefly get a NEGATIVE number.
+  const visibleCount =
+    limitTags !== 'auto' ? Math.min(limitTags, count) : measuredCount === null ? count : Math.min(measuredCount, count);
 
-  return { visibleCount, middleRef, measureRef, textMeasureRef, badgeRef, inputRef }
+  return { visibleCount, middleRef, measureRef, textMeasureRef, badgeRef, inputRef };
 }

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * RichMarkdownRenderer — the content composition over the unified
@@ -14,20 +14,46 @@
  * working), the engine is memoized, and the dead light-mode branches are
  * gone.
  */
-import React, { memo, useCallback, useMemo } from 'react';
-import { MarkdownEngine, NO_BROKEN_LINKS, type MarkdownEngineProps } from '../engine';
+import type React from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import type { ResolveLinkResult } from '../../../../types/doc-source';
 import {
   RichMarkdownRuntimeProvider,
   useRichMarkdownRuntime,
   type RichMarkdownRuntime,
 } from '../../../embeds/rich-markdown-runtime';
+import { MarkdownEngine, NO_BROKEN_LINKS, type MarkdownEngineProps } from '../engine';
 import { resolveTextSizeConfig } from '../text-size';
 import { buildRichEmbedOverrides } from './embed-overrides';
 import { processShortcodes } from './shortcodes';
 
 /** Raw-HTML tags authored content needs beyond the chat-safe baseline. */
 const RICH_EXTRA_TAGS = ['video', 'source'];
+
+/**
+ * `/api/docs/resolve-link` is an untrusted wire boundary: `Response.json()`
+ * hands back `any`, and returning it straight through as a `ResolveLinkResult`
+ * meant the renderer's link handler trusted fields the endpoint may never have
+ * sent. Narrow instead — anything that is not an object, or whose fields are
+ * the wrong primitive, degrades to `{ success: false }`, which is the
+ * "leave the link alone" outcome `base-components` already handles.
+ */
+const toResolveLinkResult = (body: unknown): ResolveLinkResult => {
+  if (typeof body !== 'object' || body === null) {
+    return { success: false };
+  }
+  const fields: Record<string, unknown> = { ...body };
+  const readString = (key: string): string | undefined => (typeof fields[key] === 'string' ? fields[key] : undefined);
+
+  return {
+    success: fields.success === true,
+    resolvedPath: readString('resolvedPath'),
+    type: readString('type'),
+    action: readString('action'),
+    error: readString('error'),
+    message: readString('message'),
+  };
+};
 
 /**
  * The engine props this composition OWNS and therefore does not forward:
@@ -51,13 +77,80 @@ type RichOwnedEngineProps =
  * a missed mirror type-checks fine while silently dropping the prop).
  */
 export interface RichMarkdownRendererProps
-  extends Partial<RichMarkdownRuntime>,
-    Omit<MarkdownEngineProps, RichOwnedEngineProps> {
+  extends Partial<RichMarkdownRuntime>, Omit<MarkdownEngineProps, RichOwnedEngineProps> {
   /** Source for resolving internal links (default: 'openframe-docs'). Registry id from DOC_SOURCES. */
   resolveSource?: string;
   /** Path of the internal link-resolver endpoint. Default '/api/docs/resolve-link'. */
   resolveLinkEndpointUrl?: string;
 }
+
+const RichMarkdownInner: React.FC<InnerProps> = ({
+  content,
+  className = '',
+  sectionIds,
+  onInternalLinkClick,
+  brokenLinks,
+  currentPath,
+  resolveSource,
+  resolveLinkEndpointUrl,
+  demoteMarkdownH1ToH2,
+}) => {
+  const { ogScraperUrl } = useRichMarkdownRuntime();
+
+  // The OG link-preview endpoint is `${apiBaseUrl}${ogEndpointPath}` —
+  // split the runtime URL once. Full URLs route through the cross-origin
+  // proxy; path-only values are used as the path with an empty base.
+  const { ogApiBaseUrl, ogEndpointPath } = useMemo(() => {
+    try {
+      const u = new URL(ogScraperUrl);
+      return {
+        ogApiBaseUrl: `${u.protocol}//${u.host}`,
+        ogEndpointPath: u.pathname,
+      };
+    } catch {
+      return { ogApiBaseUrl: '', ogEndpointPath: ogScraperUrl };
+    }
+  }, [ogScraperUrl]);
+
+  // ONE link-resolution code path: the engine's callback seam. This is the
+  // fetch implementation the old Rich renderer had inline in its <a>
+  // handler — the engine's base `a` component now drives it.
+  const onResolveLink = useCallback(
+    async (href: string, path: string): Promise<ResolveLinkResult> => {
+      const response = await fetch(resolveLinkEndpointUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link: href, currentPath: path, source: resolveSource }),
+      });
+      return toResolveLinkResult(await response.json());
+    },
+    [resolveLinkEndpointUrl, resolveSource],
+  );
+
+  const textSizes = useMemo(() => resolveTextSizeConfig('article'), []);
+
+  const componentOverrides = useMemo(
+    () => buildRichEmbedOverrides({ ogApiBaseUrl, ogEndpointPath, textSizes }),
+    [ogApiBaseUrl, ogEndpointPath, textSizes],
+  );
+
+  return (
+    <MarkdownEngine
+      content={content}
+      className={className}
+      sectionIds={sectionIds}
+      demoteMarkdownH1ToH2={demoteMarkdownH1ToH2}
+      brokenLinks={brokenLinks}
+      currentPath={currentPath}
+      onInternalLinkClick={onInternalLinkClick}
+      onResolveLink={onResolveLink}
+      preprocessContent={processShortcodes}
+      componentOverrides={componentOverrides}
+      textSize="article"
+      extraAllowedHtmlTags={RICH_EXTRA_TAGS}
+    />
+  );
+};
 
 const RichMarkdownRendererImpl: React.FC<RichMarkdownRendererProps> = ({
   content,
@@ -104,81 +197,7 @@ const RichMarkdownRendererImpl: React.FC<RichMarkdownRendererProps> = ({
  * is a type error rather than a silent `undefined`.
  */
 type InnerProps = Omit<RichMarkdownRendererProps, keyof RichMarkdownRuntime> &
-  Required<
-    Pick<
-      RichMarkdownRendererProps,
-      'resolveSource' | 'resolveLinkEndpointUrl' | 'demoteMarkdownH1ToH2'
-    >
-  >;
-
-const RichMarkdownInner: React.FC<InnerProps> = ({
-  content,
-  className = '',
-  sectionIds,
-  onInternalLinkClick,
-  brokenLinks,
-  currentPath,
-  resolveSource,
-  resolveLinkEndpointUrl,
-  demoteMarkdownH1ToH2,
-}) => {
-  const { ogScraperUrl } = useRichMarkdownRuntime();
-
-  // The OG link-preview endpoint is `${apiBaseUrl}${ogEndpointPath}` —
-  // split the runtime URL once. Full URLs route through the cross-origin
-  // proxy; path-only values are used as the path with an empty base.
-  const { ogApiBaseUrl, ogEndpointPath } = useMemo(() => {
-    try {
-      const u = new URL(ogScraperUrl);
-      return {
-        ogApiBaseUrl: `${u.protocol}//${u.host}`,
-        ogEndpointPath: u.pathname,
-      };
-    } catch {
-      return { ogApiBaseUrl: '', ogEndpointPath: ogScraperUrl };
-    }
-  }, [ogScraperUrl]);
-
-  // ONE link-resolution code path: the engine's callback seam. This is the
-  // fetch implementation the old Rich renderer had inline in its <a>
-  // handler — the engine's base `a` component now drives it.
-  const onResolveLink = useCallback(
-    async (href: string, path: string): Promise<ResolveLinkResult> => {
-      const response = await fetch(resolveLinkEndpointUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ link: href, currentPath: path, source: resolveSource }),
-      });
-      return response.json();
-    },
-    [resolveLinkEndpointUrl, resolveSource],
-  );
-
-  const textSizes = useMemo(() => resolveTextSizeConfig('article'), []);
-
-  const componentOverrides = useMemo(
-    () => buildRichEmbedOverrides({ ogApiBaseUrl, ogEndpointPath, textSizes }),
-    [ogApiBaseUrl, ogEndpointPath, textSizes],
-  );
-
-  return (
-    <MarkdownEngine
-      content={content}
-      className={className}
-      sectionIds={sectionIds}
-      demoteMarkdownH1ToH2={demoteMarkdownH1ToH2}
-      brokenLinks={brokenLinks}
-      currentPath={currentPath}
-      onInternalLinkClick={onInternalLinkClick}
-      onResolveLink={onResolveLink}
-      preprocessContent={processShortcodes}
-      componentOverrides={componentOverrides}
-      textSize="article"
-      extraAllowedHtmlTags={RICH_EXTRA_TAGS}
-    />
-  );
-};
+  Required<Pick<RichMarkdownRendererProps, 'resolveSource' | 'resolveLinkEndpointUrl' | 'demoteMarkdownH1ToH2'>>;
 
 /** Memoized — see the engine's memo rationale. */
 export const RichMarkdownRenderer = memo(RichMarkdownRendererImpl);
-

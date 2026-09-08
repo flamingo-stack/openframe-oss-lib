@@ -10,22 +10,26 @@
  * duplicate it and instead records the full-output shape.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { processHistoricalMessages, extractErrorMessages, processHistoricalMessagesWithErrors } from '../process-historical-messages'
-import type { HistoricalMessage } from '../../types'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { AskMessageData, HistoricalMessage } from '../../types';
+import {
+  processHistoricalMessages,
+  extractErrorMessages,
+  processHistoricalMessagesWithErrors,
+} from '../process-historical-messages';
 
 // Deterministic Date.now for the `pending-approvals-${Date.now()}` synthetic
 // message id + its `new Date()` timestamp.
-const FIXED_NOW = new Date('2026-07-20T10:00:00.000Z')
+const FIXED_NOW = new Date('2026-07-20T10:00:00.000Z');
 
 beforeEach(() => {
-  vi.useFakeTimers()
-  vi.setSystemTime(FIXED_NOW)
-})
+  vi.useFakeTimers();
+  vi.setSystemTime(FIXED_NOW);
+});
 
 afterEach(() => {
-  vi.useRealTimers()
-})
+  vi.useRealTimers();
+});
 
 /** Recorded corpus — one realistic dialog covering every row shape. */
 const CORPUS: HistoricalMessage[] = [
@@ -45,7 +49,7 @@ const CORPUS: HistoricalMessage[] = [
           { type: 'device', id: 'dev-1' },
           { type: 'bad' }, // missing id → filtered
         ],
-      } as any,
+      },
     ],
   },
   // 2. Assistant: thinking + text (grouped into one bubble).
@@ -187,7 +191,7 @@ const CORPUS: HistoricalMessage[] = [
     createdAt: '2026-07-19T09:03:00Z',
     owner: { type: 'ASSISTANT' },
     lastChunkStreamSeq: 40,
-    messageData: [{ type: 'SYSTEM', text: 'Technician joined the chat' } as any],
+    messageData: [{ type: 'SYSTEM', text: 'Technician joined the chat' }],
   },
   // 8. DIRECT_MESSAGE row. CHARACTERIZATION: DIRECT_MESSAGE is a
   //    realtime-only concept — the history processors have NO branch for
@@ -200,7 +204,7 @@ const CORPUS: HistoricalMessage[] = [
     chatType: 'CLIENT_CHAT',
     createdAt: '2026-07-19T09:03:30Z',
     owner: { type: 'ADMIN', user: { id: 'admin-7', firstName: 'Jane' } },
-    messageData: [{ type: 'DIRECT_MESSAGE', text: 'Human here, taking over' } as any],
+    messageData: [{ type: 'DIRECT_MESSAGE', text: 'Human here, taking over' }],
   },
   // 9. Error row inside an assistant turn.
   {
@@ -213,7 +217,7 @@ const CORPUS: HistoricalMessage[] = [
       { type: 'ERROR', error: 'Agent crashed', details: '{"error":{"message":"boom"}}' },
     ],
   },
-]
+];
 
 describe('processHistoricalMessages — golden corpus', () => {
   it('processes the full recorded dialog (snapshot)', () => {
@@ -221,12 +225,12 @@ describe('processHistoricalMessages — golden corpus', () => {
       assistantName: 'Mingo AI',
       assistantType: 'mingo',
       assistantAvatar: '/avatars/mingo.png',
-    })
+    });
     expect({
       messages: result.messages,
       escalatedApprovals: Array.from(result.escalatedApprovals.entries()),
-    }).toMatchSnapshot()
-  })
+    }).toMatchSnapshot();
+  });
 
   it('unresolved single approval is resurrected as a synthetic pending-approvals bubble', () => {
     const result = processHistoricalMessages([
@@ -243,10 +247,10 @@ describe('processHistoricalMessages — golden corpus', () => {
           },
         ],
       },
-    ])
+    ]);
     // Date.now is frozen → deterministic synthetic id.
-    expect(result.messages).toMatchSnapshot()
-  })
+    expect(result.messages).toMatchSnapshot();
+  });
 
   it('owner-type author resolution: CLIENT vs ADMIN vs ADMIN-without-name display names/avatars', () => {
     const rows: HistoricalMessage[] = [
@@ -271,9 +275,9 @@ describe('processHistoricalMessages — golden corpus', () => {
         owner: { type: 'ADMIN' },
         messageData: [{ type: 'TEXT', text: 'from anonymous admin' }],
       },
-    ]
-    expect(processHistoricalMessages(rows).messages).toMatchSnapshot()
-  })
+    ];
+    expect(processHistoricalMessages(rows).messages).toMatchSnapshot();
+  });
 
   it('chatTypeFilter drops rows of other chat types', () => {
     const rows: HistoricalMessage[] = [
@@ -291,117 +295,38 @@ describe('processHistoricalMessages — golden corpus', () => {
         owner: { type: 'CLIENT' },
         messageData: [{ type: 'TEXT', text: 'filtered out' }],
       },
-    ]
-    expect(
-      processHistoricalMessages(rows, { chatTypeFilter: 'CLIENT_CHAT' }).messages,
-    ).toMatchSnapshot()
-  })
-})
+    ];
+    expect(processHistoricalMessages(rows, { chatTypeFilter: 'CLIENT_CHAT' }).messages).toMatchSnapshot();
+  });
+});
 
 describe('extractErrorMessages / processHistoricalMessagesWithErrors — golden', () => {
   it('extractErrorMessages surfaces ERROR rows as standalone error-role messages', () => {
-    expect(extractErrorMessages(CORPUS, { assistantName: 'Mingo AI', assistantType: 'mingo' })).toMatchSnapshot()
-  })
+    expect(extractErrorMessages(CORPUS, { assistantName: 'Mingo AI', assistantType: 'mingo' })).toMatchSnapshot();
+  });
 
   it('processHistoricalMessagesWithErrors output parity on the same corpus (snapshot)', () => {
     const result = processHistoricalMessagesWithErrors(CORPUS, {
       assistantName: 'Mingo AI',
       assistantType: 'mingo',
       assistantAvatar: '/avatars/mingo.png',
-    })
+    });
     expect({
       messages: result.messages,
       escalatedApprovals: Array.from(result.escalatedApprovals.entries()),
-    }).toMatchSnapshot()
-  })
-})
-
-// ─── GUIDE rows (#1583) ────────────────────────────────────────────────────
-//
-// The realtime path decodes a `GUIDE` chunk into a `guide-delta` event; the
-// history path must decode the persisted `GUIDE` row into the SAME event so a
-// reloaded dialog renders the guide card instead of silently dropping it.
-// Explicit assertions rather than a corpus snapshot — the point is the exact
-// coalescing shape, not the whole-dialog record.
-
-describe('processHistoricalMessages — GUIDE rows', () => {
-  const guideDialog: HistoricalMessage[] = [
-    {
-      id: 'u1',
-      chatType: 'CLIENT_CHAT',
-      createdAt: '2026-07-19T09:00:00Z',
-      owner: { type: 'CLIENT', userId: 'user-42' },
-      messageData: [{ type: 'TEXT', text: 'how do I enroll a device?' }],
-    },
-    {
-      id: 'a1',
-      chatType: 'CLIENT_CHAT',
-      createdAt: '2026-07-19T09:00:05Z',
-      owner: { type: 'ASSISTANT', model: 'claude-sonnet-x' },
-      messageData: [
-        { type: 'GUIDE', text: '## Enroll a device\n' },
-        { type: 'GUIDE', text: '1. Open Settings' },
-      ],
-    },
-  ]
-
-  it('replays consecutive GUIDE rows into ONE coalesced guide segment', () => {
-    const { messages } = processHistoricalMessages(guideDialog, {
-      assistantName: 'Mingo AI',
-      assistantType: 'mingo',
-    })
-    expect(messages).toHaveLength(2)
-    expect(messages[1]).toMatchObject({
-      role: 'assistant',
-      content: [{ type: 'guide', text: '## Enroll a device\n1. Open Settings' }],
-    })
-  })
-
-  it('keeps GUIDE and TEXT as separate segments in wire order', () => {
-    const mixed: HistoricalMessage[] = [
-      {
-        id: 'a1',
-        chatType: 'CLIENT_CHAT',
-        createdAt: '2026-07-19T09:00:05Z',
-        owner: { type: 'ASSISTANT' },
-        messageData: [
-          { type: 'TEXT', text: 'Here is the walkthrough.' },
-          { type: 'GUIDE', text: '## Steps' },
-          { type: 'TEXT', text: 'Anything else?' },
-        ],
-      },
-    ]
-    const { messages } = processHistoricalMessages(mixed)
-    expect(messages[0].content).toEqual([
-      { type: 'text', text: 'Here is the walkthrough.' },
-      { type: 'guide', text: '## Steps' },
-      { type: 'text', text: 'Anything else?' },
-    ])
-  })
-
-  it('a GUIDE row with no text decodes to nothing (no empty card)', () => {
-    const empty: HistoricalMessage[] = [
-      {
-        id: 'a1',
-        chatType: 'CLIENT_CHAT',
-        createdAt: '2026-07-19T09:00:05Z',
-        owner: { type: 'ASSISTANT' },
-        messageData: [{ type: 'GUIDE' } as any],
-      },
-    ]
-    expect(processHistoricalMessages(empty).messages).toEqual([])
-  })
-})
+    }).toMatchSnapshot();
+  });
+});
 
 // ─── ASK rows ──────────────────────────────────────────────────────────────
 //
-// Same contract as GUIDE above: history must replay a persisted `ASK` row into
+// History must replay a persisted `ASK` row into
 // the SAME shape the live `ASK` chunk produces — the intro sentence as answer
 // text, then the card — or a reloaded dialog loses the clarification the user
 // was about to answer.
 
 describe('processHistoricalMessages — ASK rows', () => {
-  const askRow = {
+  const askRow: AskMessageData = {
     type: 'ASK',
     text: 'Do you want the docs, or your own workspace?',
     question: 'What do you want to work on?',
@@ -409,7 +334,7 @@ describe('processHistoricalMessages — ASK rows', () => {
       { label: 'Find documentation', description: 'How scripting works and how to set it up' },
       { label: 'Your scripts', description: 'List, edit or run the scripts in your workspace' },
     ],
-  }
+  };
 
   it('replays an ASK row as intro text followed by the card', () => {
     const dialog: HistoricalMessage[] = [
@@ -418,9 +343,9 @@ describe('processHistoricalMessages — ASK rows', () => {
         chatType: 'CLIENT_CHAT',
         createdAt: '2026-07-19T09:00:05Z',
         owner: { type: 'ASSISTANT' },
-        messageData: [askRow as any],
+        messageData: [askRow],
       },
-    ]
+    ];
     expect(processHistoricalMessages(dialog).messages[0].content).toEqual([
       { type: 'text', text: 'Do you want the docs, or your own workspace?' },
       {
@@ -431,8 +356,8 @@ describe('processHistoricalMessages — ASK rows', () => {
           { label: 'Your scripts', description: 'List, edit or run the scripts in your workspace' },
         ],
       },
-    ])
-  })
+    ]);
+  });
 
   it('keeps consecutive ASK rows as SEPARATE segments (the card pages them)', () => {
     const dialog: HistoricalMessage[] = [
@@ -442,16 +367,16 @@ describe('processHistoricalMessages — ASK rows', () => {
         createdAt: '2026-07-19T09:00:05Z',
         owner: { type: 'ASSISTANT' },
         messageData: [
-          { type: 'ASK', question: 'First?', options: [{ label: 'A' }] } as any,
-          { type: 'ASK', question: 'Second?', options: [{ label: 'B' }] } as any,
+          { type: 'ASK', question: 'First?', options: [{ label: 'A' }] },
+          { type: 'ASK', question: 'Second?', options: [{ label: 'B' }] },
         ],
       },
-    ]
+    ];
     expect(processHistoricalMessages(dialog).messages[0].content).toEqual([
       { type: 'ask', question: 'First?', options: [{ label: 'A', description: undefined }] },
       { type: 'ask', question: 'Second?', options: [{ label: 'B', description: undefined }] },
-    ])
-  })
+    ]);
+  });
 
   it('an ASK row with no answerable options decodes to nothing', () => {
     const dialog: HistoricalMessage[] = [
@@ -460,9 +385,9 @@ describe('processHistoricalMessages — ASK rows', () => {
         chatType: 'CLIENT_CHAT',
         createdAt: '2026-07-19T09:00:05Z',
         owner: { type: 'ASSISTANT' },
-        messageData: [{ type: 'ASK', question: 'Which one?', options: [{ description: 'no label' }] } as any],
+        messageData: [{ type: 'ASK', question: 'Which one?', options: [{ description: 'no label' }] }],
       },
-    ]
-    expect(processHistoricalMessages(dialog).messages).toEqual([])
-  })
-})
+    ];
+    expect(processHistoricalMessages(dialog).messages).toEqual([]);
+  });
+});

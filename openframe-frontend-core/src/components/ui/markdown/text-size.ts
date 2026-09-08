@@ -24,15 +24,12 @@
  */
 
 export type TextSizeElement =
-  | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
-  | 'p' | 'li' | 'blockquote' | 'code' | 'th' | 'td';
+  'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'p' | 'li' | 'blockquote' | 'code' | 'th' | 'td';
 
 export type TextSizeClassMap = Partial<Record<TextSizeElement, string>>;
 export type TextSizePreset = 'default' | 'compact' | 'large' | 'article';
 export type TextSizeConfig =
-  | TextSizePreset
-  | TextSizeClassMap
-  | { preset: TextSizePreset; overrides: TextSizeClassMap };
+  TextSizePreset | TextSizeClassMap | { preset: TextSizePreset; overrides: TextSizeClassMap };
 
 export const TEXT_SIZE_PRESETS: Record<TextSizePreset, Record<TextSizeElement, string>> = {
   default: {

@@ -2,14 +2,25 @@
  * Component prop types
  */
 
-import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
-import type { ApprovalBlockVariant, AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
-import type { ApprovalRequestData, AskSegment, Message, MessageSegment, ToolExecutionData,
+import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import type { ChatRef } from '../chat-ref.types';
+import type { MspOrganizationCardProps } from '../msp-organization-card';
+import type {
+  ApprovalBlockVariant,
+  AssistantType,
+  AuthorType,
+  ChatApprovalStatus,
+  ConnectionStatus,
+} from './chat.types';
+import type { ChatContextItem } from './context-item.types';
+import type {
+  ApprovalRequestData,
+  AskSegment,
+  Message,
+  MessageSegment,
+  ToolExecutionData,
   ApprovalResolutionHandler,
-} from './message.types'
-import type { ChatRef } from '../chat-ref.types'
-import type { ChatContextItem } from './context-item.types'
-import type { MspOrganizationCardProps } from '../msp-organization-card'
+} from './message.types';
 
 /**
  * Anchor component supplied by the host (or the lib's
@@ -21,45 +32,49 @@ import type { MspOrganizationCardProps } from '../msp-organization-card'
  * NavLinkAnchor prop type to know about them.
  */
 export type NavLinkAnchorComponent = ComponentType<{
-  href: string
-  className?: string
-  children?: ReactNode
-}>
+  href: string;
+  className?: string;
+  children?: ReactNode;
+}>;
 
 // ========== Chat Container Props ==========
 
 export interface ChatContainerProps extends HTMLAttributes<HTMLDivElement> {
-  children?: React.ReactNode
+  children?: ReactNode;
 }
 
 // ========== Chat Header Props ==========
 
 export interface ChatHeaderTicketInfo {
-  title: React.ReactNode
-  meta?: React.ReactNode
-  status?: string
+  title: ReactNode;
+  meta?: ReactNode;
+  status?: string;
   /** Lifecycle (custom-status) display name. */
-  statusName?: string
+  statusName?: string;
   /** Lifecycle (custom-status) hex color, used when the kind isn't canonical. */
-  statusColor?: string
+  statusColor?: string;
   /** Lifecycle (custom-status) kind — drives canonical-vs-color styling. */
-  statusKind?: string
+  statusKind?: string;
 }
 
 export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
-  userName?: string
-  userTitle?: string
-  userAvatar?: string
-  userIcon?: React.ReactNode
-  onSettingsClick?: () => void
-  onNewChat?: () => void
-  onClose?: () => void
-  onBack?: () => void
-  showNewChat?: boolean
-  connectionStatus?: ConnectionStatus
-  serverUrl?: string | null
-  headerActions?: React.ReactNode
-  ticketInfo?: ChatHeaderTicketInfo
+  userName?: string;
+  /** Accepted for API compatibility but NOT rendered today — the header shows
+   *  the name and the connection line only. Wiring it in adds a second line to
+   *  every consumer's header, so it is a deliberate design decision, not a
+   *  cleanup. */
+  userTitle?: string;
+  userAvatar?: string;
+  userIcon?: ReactNode;
+  onSettingsClick?: () => void;
+  onNewChat?: () => void;
+  onClose?: () => void;
+  onBack?: () => void;
+  showNewChat?: boolean;
+  connectionStatus?: ConnectionStatus;
+  serverUrl?: string | null;
+  headerActions?: ReactNode;
+  ticketInfo?: ChatHeaderTicketInfo;
   /**
    * Drop the default `max-w-ods-content-narrow` (= 600px) constraint so
    * the header fills the entire parent width. Use for chat dialogs
@@ -71,7 +86,7 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
    * Default `false` — preserves the existing centered-narrow layout
    * for legacy consumers.
    */
-  fullWidth?: boolean
+  fullWidth?: boolean;
   /**
    * Drop the default card chrome (bg, border, shadow, ring, rounded) so
    * the header blends with its container. Use when the host shell is
@@ -80,7 +95,7 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
    *
    * Default `false` — preserves the existing card look.
    */
-  bare?: boolean
+  bare?: boolean;
   /**
    * Render a skeleton placeholder in place of the user identity row
    * (avatar/icon + name + server line) while the host is still
@@ -91,59 +106,59 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
    *
    * Default `false` — renders the resolved identity row.
    */
-  isLoading?: boolean
+  isLoading?: boolean;
   /**
    * MSP organization branding section (logo + "Your IT is managed by {name}"
    * + website link) rendered beneath the identity row, inside the header
    * card. Intended for the home chat screen; `ticketInfo` takes precedence
    * over it — on open-chat screens that slot shows the ticket details row.
    */
-  mspOrganization?: MspOrganizationCardProps
+  mspOrganization?: MspOrganizationCardProps;
   /**
    * Render a skeleton in the MSP organization slot while the host is still
    * resolving tenant info, so the header doesn't shift when the section
    * appears. Like `mspOrganization`, ignored when `ticketInfo` is set.
    */
-  isMspLoading?: boolean
+  isMspLoading?: boolean;
 }
 
 // ========== Connection Indicator Props ==========
 
 export interface ConnectionIndicatorProps {
-  status: ConnectionStatus
+  status: ConnectionStatus;
 }
 
 // ========== Chat Message Enhanced Props ==========
 
 export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivElement>, 'content'> {
-  role: 'user' | 'assistant' | 'error'
-  content: string | MessageSegment[]
-  name?: string
-  assistantType?: AssistantType
-  authorType?: AuthorType
+  role: 'user' | 'assistant' | 'error';
+  content: string | MessageSegment[];
+  name?: string;
+  assistantType?: AssistantType;
+  authorType?: AuthorType;
   /** Viewer variant for approval blocks in this message's segments.
    *  `'admin'` (default) = full command block; `'client'` = end-client
    *  (Fae desktop app) title-only card. Forwarded to
    *  ApprovalRequestMessage / ApprovalBatchMessage. */
-  approvalVariant?: ApprovalBlockVariant
-  assistantIcon?: React.ReactNode
-  avatar?: string | null
-  timestamp?: Date
-  showAvatar?: boolean
-  isTyping?: boolean
-  onApprove?: ApprovalResolutionHandler
-  onReject?: ApprovalResolutionHandler
+  approvalVariant?: ApprovalBlockVariant;
+  assistantIcon?: ReactNode;
+  avatar?: string | null;
+  timestamp?: Date;
+  showAvatar?: boolean;
+  isTyping?: boolean;
+  onApprove?: ApprovalResolutionHandler;
+  onReject?: ApprovalResolutionHandler;
   /**
    * Entity-context items attached to this (user) message. When present the
    * bubble renders a read-only chip strip beneath its text (Figma node
    * 31:28709). Resolved from `UnifiedChatMessage.contextItems` by the host.
    */
-  contextItems?: ChatContextItem[]
+  contextItems?: ChatContextItem[];
   /**
    * Lead-icon resolver for the context chips (maps an item to its entity-type
    * glyph). Optional — chips render label-only when omitted.
    */
-  resolveContextIcon?: (item: ChatContextItem) => ReactNode
+  resolveContextIcon?: (item: ChatContextItem) => ReactNode;
   /**
    * Host renderer that REPLACES the default label-only context chip for an
    * attached item with a self-fetching entity chip — so a user's manually
@@ -154,7 +169,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * function identity stable (module const / `useCallback`) so the message memo
    * holds across streaming chunks.
    */
-  renderContextItem?: (item: ChatContextItem) => ReactNode
+  renderContextItem?: (item: ChatContextItem) => ReactNode;
   /**
    * Host renderer for inline AI mentions `@marker:id` — the ASSISTANT echoing
    * `@device:<machineId>` (etc.) in its reply. DIRECT MIRROR of
@@ -168,7 +183,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * own attachments). Keep the function identity stable (e.g. a module const or
    * `useCallback`) so the message memo holds across streaming chunks.
    */
-  renderMention?: (reference: { marker: string; id: string }) => React.ReactNode
+  renderMention?: (reference: { marker: string; id: string }) => ReactNode;
   /**
    * Host-provided renderer for inline entity cards (v6.1 §B.2.7 — DRY
    * duplications #2). The OSS-lib delegates all entity-specific rendering
@@ -179,7 +194,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * Return `null` for any ref the host can't render — the renderer falls
    * back to plain text title-only.
    */
-  renderEntityCard?: (reference: ChatRef) => React.ReactNode
+  renderEntityCard?: (reference: ChatRef) => ReactNode;
   /**
    * Host-provided anchor component for markdown links. When supplied, the
    * `<a>` override in the markdown renderer delegates to this component
@@ -202,7 +217,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * passes its anchor `rest` props via spread, so undeclared extras
    * simply default to undefined on the receiver.
    */
-  NavLinkAnchor?: NavLinkAnchorComponent
+  NavLinkAnchor?: NavLinkAnchorComponent;
   /**
    * Picks an option on an `ask` (clarification) card in this message. Receives
    * the option's label VERBATIM — the host sends it as the user's next message
@@ -211,24 +226,24 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * Omit to render ask cards read-only. Keep the identity stable
    * (`useCallback` / module const): the message memo compares it by reference.
    */
-  onAskSelect?: (label: string) => void
+  onAskSelect?: (label: string) => void;
 }
 
 // ========== Chat Message List Props ==========
 
 export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
-  messages: Message[]
-  dialogId?: string
-  isLoading?: boolean
-  isTyping?: boolean
-  typingMessage?: string
-  smoothScroll?: boolean
-  autoScroll?: boolean
+  messages: Message[];
+  dialogId?: string;
+  isLoading?: boolean;
+  isTyping?: boolean;
+  typingMessage?: string;
+  smoothScroll?: boolean;
+  autoScroll?: boolean;
   /** `overscroll-behavior: contain` on the scroller (default true) — stops
    *  wheel/touch scroll from chaining to the page at the thread's edges (the
    *  deck / drawer need this). Passive in-page demo chats set `false` so the
    *  page keeps scrolling normally over the non-interactive thread. */
-  overscrollContain?: boolean
+  overscrollContain?: boolean;
   /** Deterministic stick-to-bottom for PASSIVE scripted replays (the in-page
    *  Fae/Mingo demos). Whenever the scroll HEIGHT changes — a streamed token
    *  grows the thread, or a new conversation replaces it — the scroller is
@@ -240,61 +255,61 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  re-render does NOT re-pin, so once the stream settles the viewer can freely
    *  scroll up. Pair with `autoScroll={false}` so the library's spring doesn't
    *  run in parallel. */
-  pinBottom?: boolean
-  showAvatars?: boolean
+  pinBottom?: boolean;
+  showAvatars?: boolean;
   /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
    *  the inner content wrapper's `max-w-ods-content-narrow` so messages
    *  fill the entire scroller width. Preferred over `contentClassName=
    *  "!max-w-none"` for new consumers (clearer intent, no
    *  `!important` specificity wrestling). */
-  fullWidth?: boolean
+  fullWidth?: boolean;
   /** @deprecated Prefer `fullWidth` for the full-panel-width use case.
    *  This prop remains supported for callers that need a NON-binary
    *  override (custom max-w value, etc.). */
-  contentClassName?: string
-  assistantType?: AssistantType
+  contentClassName?: string;
+  assistantType?: AssistantType;
   /** Viewer variant for approval blocks in every rendered message (incl. the
    *  sticky pending-approvals footer). `'admin'` (default) = full command
    *  block; `'client'` = end-client (Fae desktop app) title-only card. Set to
    *  `'client'` ONLY on true end-client surfaces — admin views of a Fae
    *  dialog (tickets dialog client tab) keep the default. */
-  approvalVariant?: ApprovalBlockVariant
-  assistantIcon?: React.ReactNode
-  pendingApprovals?: MessageSegment[]
-  onApprove?: ApprovalResolutionHandler
-  onReject?: ApprovalResolutionHandler
+  approvalVariant?: ApprovalBlockVariant;
+  assistantIcon?: ReactNode;
+  pendingApprovals?: MessageSegment[];
+  onApprove?: ApprovalResolutionHandler;
+  onReject?: ApprovalResolutionHandler;
   // Infinite scroll for loading older messages
-  hasNextPage?: boolean
-  isFetchingNextPage?: boolean
-  onLoadMore?: () => void
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
   /** Lead-icon resolver for per-message context chips (maps a context item to
    *  its entity-type glyph). Forwarded to every message's ChatMessageEnhanced. */
-  resolveContextIcon?: (item: ChatContextItem) => ReactNode
+  resolveContextIcon?: (item: ChatContextItem) => ReactNode;
   /** Host renderer that REPLACES the default context chip with a self-fetching
    *  entity chip (so attached context renders like an inline mention).
    *  Forwarded verbatim to every message's ChatMessageEnhanced. */
-  renderContextItem?: (item: ChatContextItem) => ReactNode
+  renderContextItem?: (item: ChatContextItem) => ReactNode;
   /** Host renderer for inline AI mentions `@marker:id` (mirror of
    *  `renderEntityCard`). Forwarded verbatim to every message's
    *  ChatMessageEnhanced; returns a self-fetching chip per entity type. */
-  renderMention?: (reference: { marker: string; id: string }) => React.ReactNode
+  renderMention?: (reference: { marker: string; id: string }) => ReactNode;
   /** Host-provided renderer for inline entity cards. Forwarded verbatim
    *  to every message's ChatMessageEnhanced. v6.1 §B.2.7. */
-  renderEntityCard?: (reference: ChatRef) => React.ReactNode
+  renderEntityCard?: (reference: ChatRef) => ReactNode;
   /** Host-provided anchor for markdown links. Forwarded verbatim to every
    *  message's ChatMessageEnhanced. Owns the unified click rule
    *  (same-origin soft nav, cross-origin new tab). */
-  NavLinkAnchor?: NavLinkAnchorComponent
+  NavLinkAnchor?: NavLinkAnchorComponent;
   /** Ask-card option pick. Forwarded verbatim to every message's
    *  ChatMessageEnhanced; the host sends the received label as the user's next
    *  message. Omit to render ask cards read-only. */
-  onAskSelect?: (label: string) => void
+  onAskSelect?: (label: string) => void;
 }
 
 export interface ChatMessageListRef {
-  scrollToBottom: (smooth?: boolean) => void
-  getScrollPosition: () => { scrollTop: number; scrollHeight: number; clientHeight: number }
-  setScrollPosition: (position: { scrollTop: number }) => void
+  scrollToBottom: (smooth?: boolean) => void;
+  getScrollPosition: () => { scrollTop: number; scrollHeight: number; clientHeight: number };
+  setScrollPosition: (position: { scrollTop: number }) => void;
 }
 
 // ========== Chat Input Props ==========
@@ -313,59 +328,59 @@ export interface ChatMessageListRef {
  *
  *  Mirrors the server-side `SlashCommandActionId` union; kept as a
  *  string-literal union (not enum) so JSON wire shape is stable. */
-export type SlashCommandActionId = 'browse' | 'search' | 'find' | 'display'
+export type SlashCommandActionId = 'browse' | 'search' | 'find' | 'display';
 
 /** Resolved action affordance — `label` is ALWAYS populated by the
  *  server (override OR default). The OSS-lib renders directly without
  *  label-resolution branching — single source of truth lives in the
  *  hub's `slash-commands-config.ts`. */
 export interface SlashCommandSummaryAction {
-  id: SlashCommandActionId
-  label: string
+  id: SlashCommandActionId;
+  label: string;
 }
 
 export interface SlashCommandSummary {
-  id: string
-  description: string
+  id: string;
+  description: string;
   /** Optional `[arg-name]` hint shown after the command id in autocomplete,
    *  e.g. `/podcasts [title or id]`. Per 2026 best practice (Codex CLI /
    *  Claude Code SDK argument-hint frontmatter). */
-  argumentHint?: string
+  argumentHint?: string;
   /** Opaque source id (e.g. `'podcasts'`, `'clickup-roadmap'`) — resolved
    *  by the consumer-provided `resolveSourceIcon` callback into an icon
    *  so the autocomplete row carries the same visual identity as the
    *  empty-state chip. When the resolver returns undefined OR this
    *  field is missing, the row renders without an icon (fallback). */
-  primarySourceId?: string
+  primarySourceId?: string;
   /** Human-readable command label (e.g. "My Tickets", "Product Releases").
    *  When set, the dropdown row renders this as the bold heading instead
    *  of the raw `primarySourceId` slug. Single source of truth: same
    *  field that backs the empty-state chip's title. Falls back to the
    *  `primarySourceId` slug when undefined. */
-  label?: string
+  label?: string;
   /** Action affordances declared by the server-side registry. The
    *  dropdown row renders one button per entry, in array order. Empty
    *  array = no buttons (degenerate; servers should always declare
    *  ≥1 action). Single source of truth — same array drives the
    *  empty-state chip on the host side via the synchronous registry. */
-  actions: SlashCommandSummaryAction[]
+  actions: SlashCommandSummaryAction[];
   /** Icon-registry key — drives both the empty-state chip glyph AND the
    *  autocomplete dropdown row glyph. Optional; falls back to the
    *  `primarySourceId`-based resolution when missing. */
-  iconName?: string
+  iconName?: string;
   /** Admin-UI bucket id. */
-  category?: string
+  category?: string;
   /** Empty-state chip-grid sort key. Undefined = NOT a chip (utility /
    *  thematic command — autocomplete dropdown only). Lower = earlier. */
-  displayOrder?: number
+  displayOrder?: number;
 }
 
 /** Icon + label pair returned by the consumer's `resolveSourceIcon`. The
  *  Icon is a React component (lucide-react or UI-Kit shape); the label
  *  is the human-readable source name (e.g. "Podcasts", "ClickUp Roadmap"). */
 export interface SlashCommandSourceMeta {
-  Icon: ComponentType<{ className?: string }>
-  label: string
+  Icon: ComponentType<{ className?: string }>;
+  label: string;
 }
 
 export interface SlashCommandsProp {
@@ -374,16 +389,13 @@ export interface SlashCommandsProp {
    *  chat source is resolved server-side from the calling deployment, so
    *  this callback does NOT take a `source` parameter — passing one would
    *  let a tampered client request a different platform's commands. */
-  fetchCommands: (
-    prefix: string,
-    signal?: AbortSignal,
-  ) => Promise<SlashCommandSummary[]>
+  fetchCommands: (prefix: string, signal?: AbortSignal) => Promise<SlashCommandSummary[]>;
   /** Optional: resolve a `primarySourceId` to an icon + label pair so the
    *  autocomplete row carries the same visual identity as the empty-state
    *  chip for that source. The host provides this by looking up the
    *  table's icon name and resolving to a React component. Returns
    *  undefined for unknown ids; the row falls back to no-icon rendering. */
-  resolveSourceIcon?: (sourceId: string) => SlashCommandSourceMeta | undefined
+  resolveSourceIcon?: (sourceId: string) => SlashCommandSourceMeta | undefined;
   /** Generic action handler — fires when the user clicks any of the
    *  command's declared action buttons (Recent / Search / Find / …).
    *  The host owns the mapping from `actionId` to the chat-input-ref
@@ -393,39 +405,39 @@ export interface SlashCommandsProp {
    *    - 'find'   → `chatInputRef.current.setValueAndCursor(...)`
    *  When undefined, no action buttons are rendered (the row is still
    *  clickable for the default select behavior). */
-  onAction?: (cmd: SlashCommandSummary, actionId: SlashCommandActionId) => void
+  onAction?: (cmd: SlashCommandSummary, actionId: SlashCommandActionId) => void;
 }
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
   /** Source-compatible widening: returning `false` (or a Promise resolving to
    *  `false`) tells the input to KEEP the draft (e.g. a failed send). `void` /
    *  `true` clears as before — preserves every existing caller's behavior. */
-  onSend?: (message: string) => void | boolean | Promise<boolean | void>
-  onStop?: () => void | Promise<void>
-  sending?: boolean
-  awaitingResponse?: boolean
+  onSend?: (message: string) => void | boolean | Promise<boolean | void>;
+  onStop?: () => void | Promise<void>;
+  sending?: boolean;
+  awaitingResponse?: boolean;
   /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
    *  the default `max-w-ods-content-narrow` so the input fills the
    *  parent. */
-  fullWidth?: boolean
+  fullWidth?: boolean;
   /**
    * @deprecated The avatar-offset layout was removed; this prop is accepted
    * for back-compat but silently ignored. Safe to drop from call sites.
    */
-  reserveAvatarOffset?: boolean
-  disabled?: boolean
-  maxRows?: number
-  showSendButton?: boolean
-  sendButtonLabel?: string
+  reserveAvatarOffset?: boolean;
+  disabled?: boolean;
+  maxRows?: number;
+  showSendButton?: boolean;
+  sendButtonLabel?: string;
   /** When provided, shows a slash-command autocomplete dropdown when the
    *  user's text starts with `/`. The dropdown uses UI-Kit `<Card>` + button
    *  primitives (no raw HTML elements) and ODS tokens for theming.
    *  Backward compat: omit to disable autocomplete entirely. */
-  slashCommands?: SlashCommandsProp
+  slashCommands?: SlashCommandsProp;
   /** When true, send is allowed with EMPTY text (e.g. an attachments-only
    *  reply); `onSend('')` fires. Default false → today's text-required gate.
    *  Used by the ticket reply composer so a file-only reply can send. */
-  allowEmptySend?: boolean
+  allowEmptySend?: boolean;
   /**
    * Enables the `@`-mention trigger for the context picker. Fires with the
    * query typed after a trailing `@token` (e.g. `@dev` → `'dev'`), or `null`
@@ -433,50 +445,50 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
    * the context picker", seeding its type-list filter with the query.
    * Omit to disable the trigger.
    */
-  onMentionQueryChange?: (query: string | null) => void
+  onMentionQueryChange?: (query: string | null) => void;
   /**
    * Fires on EVERY draft value change (typing + imperative `setValue` /
    * `commitMention`). The composer uses it to keep `@<type>:<id>` mention
    * tokens in sync with the context chips — when the user deletes the token
    * text, the matching context item is dropped. Pure notification.
    */
-  onValueChange?: (value: string) => void
+  onValueChange?: (value: string) => void;
   /** Start adornment rendered inside the textarea's left edge (e.g. the
    *  composer `+` context-menu trigger). Forwarded to `Textarea.startIcon`. */
-  startIcon?: ReactNode
+  startIcon?: ReactNode;
   /** Suppress the textarea's own border/bg/radius — an outer card draws it
    *  instead (composer context-chip layout). Forwarded to `Textarea.hideBorder`. */
-  hideBorder?: boolean
+  hideBorder?: boolean;
   /** Ephemeral, non-destructive preview text shown over the editor — e.g.
    *  previewing a hovered quick-action's full prompt before the user commits it.
    *  Purely declarative: it NEVER touches the editor's real value. While set, it
    *  visually replaces the editor (even an in-progress draft); clearing it
    *  (undefined) restores whatever the user had — empty or typed — verbatim. */
-  previewText?: string
+  previewText?: string;
 }
 
 export interface ChatInputRef {
-  focus: () => void
-  blur: () => void
-  clear: () => void
-  setValue: (value: string) => void
-  getValue: () => string
+  focus: () => void;
+  blur: () => void;
+  clear: () => void;
+  setValue: (value: string) => void;
+  getValue: () => string;
   /** Set the input value AND position the textarea caret at the given
    *  zero-based offset. Used by the empty-state quick-action "Find"
    *  button that pre-fills `/<cmd> ""` and lands the cursor between
    *  the quotes so the user can immediately start typing the title. */
-  setValueAndCursor: (value: string, cursorOffset: number) => void
+  setValueAndCursor: (value: string, cursorOffset: number) => void;
   /** Set the input value and immediately fire `onSend` with the new
    *  value (subject to the same `sending`/`disabled` guards as a
    *  manual click). Used by the empty-state quick-action "Recent"
    *  button to dispatch `/<cmd>` in one click without forcing the
    *  user to press Enter. */
-  submit: (value: string) => void
+  submit: (value: string) => void;
   /** Strip the active trailing `@token` mention from the draft (preserving any
    *  leading whitespace). Called by the composer after the user picks a
    *  context item / closes the picker so the `@query` scaffolding doesn't get
    *  sent as literal text. No-op when no mention token is active. */
-  removeMentionTrigger: () => void
+  removeMentionTrigger: () => void;
   /** Commit a mention: replace the trailing `@query` being typed with the
    *  literal `@<type>:<id>` token (`token` = `"<type>:<id>"`, plus a trailing
    *  space). MULTIPLE mentions coexist — prior committed tokens are left in
@@ -484,95 +496,86 @@ export interface ChatInputRef {
    *  (the contenteditable renders the token as a chip); without it the chip
    *  falls back to the id. Used by the composer's `@`-mention flow so the picked
    *  entity rides out in the context — deleting the chip removes it from context. */
-  commitMention: (token: string, meta?: MentionMeta) => void
+  commitMention: (token: string, meta?: MentionMeta) => void;
 }
 
 /** Display metadata for an inline mention chip rendered inside the composer. */
 export interface MentionMeta {
   /** Resolved entity name shown in the chip (e.g. `'ELK-PROD-07'`). */
-  label: string
+  label: string;
   /** Optional lead icon (entity-type glyph). */
-  icon?: ReactNode
+  icon?: ReactNode;
 }
 
 // ========== Chat Typing Indicator Props ==========
 
 export interface ChatTypingIndicatorProps extends HTMLAttributes<HTMLDivElement> {
-  size?: 'sm' | 'md' | 'lg'
-  showText?: boolean
-  text?: string
-  name?: string
-  dotClassName?: string
+  size?: 'sm' | 'md' | 'lg';
+  showText?: boolean;
+  text?: string;
+  name?: string;
+  dotClassName?: string;
 }
 
 // ========== Tool Execution Display Props ==========
 
 export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  message: ToolExecutionData
+  message: ToolExecutionData;
   /** Chat identity. `'fae'` (client) hides the tool icon; `'mingo'`/undefined
    *  keep the admin layout. */
-  assistantType?: AssistantType
+  assistantType?: AssistantType;
   /** Viewer variant — the consumer-declared render audience (NOT derived from
    *  `assistantType`, which only says which assistant the dialog belongs to).
    *  `'client'` (end-client Fae app) shows the human-readable `toolExplanation`;
    *  `'admin'` (default — every dashboard surface, incl. a ticket's Fae client
    *  tab) shows the concise `toolTitle`. */
-  variant?: ApprovalBlockVariant
+  variant?: ApprovalBlockVariant;
 }
 
 // ========== Approval Request Message Props ==========
 
 export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivElement> {
-  data: ApprovalRequestData
-  onApprove?: ApprovalResolutionHandler
-  onReject?: ApprovalResolutionHandler
-  status?: ChatApprovalStatus
-  disabled?: boolean
+  data: ApprovalRequestData;
+  onApprove?: ApprovalResolutionHandler;
+  onReject?: ApprovalResolutionHandler;
+  status?: ChatApprovalStatus;
+  disabled?: boolean;
   /** Chat identity. Accepted for parity with the batch card; does NOT drive
    *  the styling — use `variant`. */
-  assistantType?: AssistantType
+  assistantType?: AssistantType;
   /** Viewer variant. `'admin'` (default) = full card with the raw command;
    *  `'client'` = end-client (Fae desktop app) card with only the
    *  BE-generated title (`explanation`) + actions/status pill. */
-  variant?: ApprovalBlockVariant
+  variant?: ApprovalBlockVariant;
   /** Render the footer Approve/Reject row (or the resolved-status tag).
    *  Turn off when the viewer cannot resolve this card — matches
    *  `ApprovalBatchMessageProps.showFooterActions`. Default true. */
-  showFooterActions?: boolean
+  showFooterActions?: boolean;
   /** Display name of the user who resolved the request; baked into the
    *  client variant's full-text status pill ("Approved by {name}"). */
-  resolvedByName?: string | null
+  resolvedByName?: string | null;
 }
 
 // ========== Error Message Display Props ==========
 
 export interface ErrorMessageDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  title: string
-  details?: string
+  title: string;
+  details?: string;
   /** Severity — drives the icon tint. Defaults to `error`. */
-  type?: 'error' | 'warning' | 'info'
+  type?: 'error' | 'warning' | 'info';
 }
 
 // ========== Context Compaction Display Props ==========
 
 export interface ContextCompactionDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  status: 'started' | 'completed'
+  status: 'started' | 'completed';
 }
 
 // ========== Thinking Display Props ==========
 
 export interface ThinkingDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  text: string
-  isStreaming?: boolean
-}
-
-// ========== Guide Display Props ==========
-
-export interface GuideDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  /** Rendered guide body. `ChatMessageEnhanced` passes the SAME markdown
-   *  output a text segment gets, so `[card://]` cards and mention chips
-   *  behave identically inside a guide. */
-  children?: ReactNode
+  text: string;
+  isStreaming?: boolean;
 }
 
 // ========== Ask Display Props ==========
@@ -581,23 +584,23 @@ export interface AskDisplayProps extends Omit<HTMLAttributes<HTMLDivElement>, 'o
   /** The clarification cards to show. One entry per `ask` segment; a run of
    *  consecutive segments is passed as ONE card with a pager, so a multi-question
    *  turn reads as a single block instead of a stack of near-identical cards. */
-  cards: AskSegment[]
+  cards: AskSegment[];
   /** Picks an option. Receives the option's `label` VERBATIM — that string is
    *  sent as the user's next message and the backend's classifier resolves it
    *  against the labels it offered, so it must not be reworded. Omit to render
    *  the card read-only (replayed history, observer surfaces). */
-  onSelect?: (label: string) => void
+  onSelect?: (label: string) => void;
 }
 
 // ========== Model Display Props ==========
 
 export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  provider?: string
-  modelName?: string
-  displayName?: string
-  contextWindow?: number
-  usedTokens?: number
-  showIcon?: boolean
+  provider?: string;
+  modelName?: string;
+  displayName?: string;
+  contextWindow?: number;
+  usedTokens?: number;
+  showIcon?: boolean;
   /**
    * Per-call token breakdown for the hover-tooltip (v6.1 §A.3). When
    * provided alongside non-empty fields, the entire ModelDisplay is
@@ -607,22 +610,22 @@ export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
    * summarizer). Absent → renders the bare display unchanged
    * (backward-compatible — every existing caller keeps working).
    */
-  breakdown?: ModelUsageBreakdown
+  breakdown?: ModelUsageBreakdown;
   /**
    * Cache-hit % across the answer call's input + cached + creation
    * tokens. Surfaced in the breakdown tooltip's footer. Drives a
    * "cache savings" summary line.
    */
-  hitRatePct?: number
+  hitRatePct?: number;
   /**
    * Answer call's input tokens — surfaced in the breakdown tooltip's
    * "Answer model" row alongside outputTokens. `usedTokens` (sum) is
    * still the right prop for the inline "X / Y" display; this pair
    * powers the per-row split inside the tooltip.
    */
-  inputTokens?: number
+  inputTokens?: number;
   /** Answer call's output tokens — pairs with `inputTokens`. */
-  outputTokens?: number
+  outputTokens?: number;
 }
 
 /**
@@ -633,50 +636,50 @@ export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
  * the field, and the tooltip just doesn't render that row.
  */
 export interface ModelUsageBreakdown {
-  haikuRewriter?: { input: number; output: number }
-  haikuClassifier?: { input: number; output: number }
-  haikuSummarizer?: { input: number; output: number }
+  haikuRewriter?: { input: number; output: number };
+  haikuClassifier?: { input: number; output: number };
+  haikuSummarizer?: { input: number; output: number };
 }
 
 // ========== Dialog Item Props ==========
 
 export interface DialogItem {
-  id: string
-  title: string
-  lastMessage?: string
-  timestamp?: Date | string
-  isActive?: boolean
-  unreadMessagesCount?: number
+  id: string;
+  title: string;
+  lastMessage?: string;
+  timestamp?: Date | string;
+  isActive?: boolean;
+  unreadMessagesCount?: number;
   /** Dialog owner (creator) — drives the trailing avatar in the chat-history
    *  rows (Figma 113:63224). Omit to render the row without an avatar. */
   owner?: {
     /** Full display name — initials fallback + `title` tooltip. */
-    name?: string | null
+    name?: string | null;
     /** Absolute avatar URL; falls back to initials when absent or failing. */
-    avatarUrl?: string | null
-  }
+    avatarUrl?: string | null;
+  };
 }
 
 // ========== Chat Sidebar Props ==========
 
 export interface ChatSidebarProps extends HTMLAttributes<HTMLDivElement> {
-  onNewChat?: () => void
-  onDialogSelect?: (dialogId: string) => void
-  dialogs?: DialogItem[]
-  activeDialogId?: string
-  isLoading?: boolean
-  isCreatingDialog?: boolean
-  children?: React.ReactNode
+  onNewChat?: () => void;
+  onDialogSelect?: (dialogId: string) => void;
+  dialogs?: DialogItem[];
+  activeDialogId?: string;
+  isLoading?: boolean;
+  isCreatingDialog?: boolean;
+  children?: ReactNode;
   // Infinite scroll props
-  hasNextPage?: boolean
-  isFetchingNextPage?: boolean
-  onLoadMore?: () => void
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
 }
 
 // ========== Dialog List Item Props ==========
 
 export interface DialogListItemProps extends HTMLAttributes<HTMLDivElement> {
-  dialog: DialogItem
-  isActive?: boolean
-  onDialogSelect?: (dialogId: string) => void
+  dialog: DialogItem;
+  isActive?: boolean;
+  onDialogSelect?: (dialogId: string) => void;
 }

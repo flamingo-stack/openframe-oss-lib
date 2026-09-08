@@ -1,25 +1,9 @@
-"use client";
+'use client';
 
-import { useState } from 'react';
-import {
-  LinkedInIcon,
-  GitHubIcon,
-  XLogo,
-  RedditIcon,
-  SlackIcon,
-  WhatsAppIcon
-} from '../icons';
-import {
-  Button,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Label
-} from '../ui';
-import { Trash2, User, Globe, Youtube, Instagram, Facebook, MessageCircle, Send, Music, Mail } from 'lucide-react';
+import { Trash2, User } from 'lucide-react';
+import { normalizeSocialPlatform } from '../../utils/social-platforms';
+import { SOCIAL_ICON_COMPONENTS } from '../social-icon-row';
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
 
 export interface SocialLink {
   platform: string;
@@ -50,29 +34,12 @@ interface SocialLinksManagerProps {
 const defaultPlatforms: SocialPlatform[] = [];
 
 // Icon mapping - dynamically loaded based on database icon_name
-const iconMap = {
-  linkedin: LinkedInIcon,
-  github: GitHubIcon,
-  twitter: XLogo,
-  reddit: RedditIcon,
-  slack: SlackIcon,
-  whatsapp: WhatsAppIcon,
-  website: Globe,
-  youtube: Youtube,
-  instagram: Instagram,
-  facebook: Facebook,
-  discord: MessageCircle,
-  telegram: Send,
-  tiktok: Music,
-  email: Mail,
-  mail: Mail,
-};
 
 export function SocialLinksManager({
   links,
   onChange,
   platforms = defaultPlatforms,
-  className = ''
+  className = '',
 }: SocialLinksManagerProps) {
   const addLink = () => {
     const firstPlatform = platforms[0]?.name || 'website';
@@ -92,8 +59,10 @@ export function SocialLinksManager({
   const getIcon = (link: SocialLink, platform?: SocialPlatform) => {
     // Use database icon_name if available, fallback to platform name
     const iconKey = platform?.icon_name || link.platform;
-    const IconComponent = iconMap[iconKey as keyof typeof iconMap];
-    return IconComponent ? <IconComponent className="w-5 h-5 text-ods-text-secondary" /> : null;
+    const key = normalizeSocialPlatform(iconKey);
+    if (!key) return null;
+    const IconComponent = SOCIAL_ICON_COMPONENTS[key];
+    return <IconComponent className="h-5 w-5 text-ods-text-secondary" />;
   };
 
   return (
@@ -103,36 +72,36 @@ export function SocialLinksManager({
         const Icon = getIcon(link, platform);
 
         return (
-          <div key={index} className="flex items-center gap-3 p-3 bg-ods-bg-surface rounded-lg border border-ods-border">
-            <div className="w-8 h-8 flex items-center justify-center">
-              {Icon}
-            </div>
+          <div
+            key={index}
+            className="flex items-center gap-3 rounded-lg border border-ods-border bg-ods-bg-surface p-3"
+          >
+            <div className="flex h-8 w-8 items-center justify-center">{Icon}</div>
 
-            <div className="flex-1 grid grid-cols-2 gap-3">
+            <div className="grid flex-1 grid-cols-2 gap-3">
               <div>
-                <Select
-                  value={link.platform}
-                  onValueChange={(value) => updateLink(index, 'platform', value)}
-                >
+                <Select value={link.platform} onValueChange={value => updateLink(index, 'platform', value)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {platforms.map(p => (
-                      <SelectItem key={p.name} value={p.name}>{p.display_name}</SelectItem>
+                      <SelectItem key={p.name} value={p.name}>
+                        {p.display_name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <Input
-                placeholder={platform?.placeholder || "Profile URL"}
+                placeholder={platform?.placeholder || 'Profile URL'}
                 value={link.url}
-                onChange={(e) => updateLink(index, 'url', e.target.value)}
-                onKeyDown={(e) => {
+                onChange={e => updateLink(index, 'url', e.target.value)}
+                onKeyDown={e => {
                   if (e.key === 'Enter') {
-                    e.preventDefault()
-                    e.stopPropagation()
+                    e.preventDefault();
+                    e.stopPropagation();
                   }
                 }}
               />
@@ -140,7 +109,7 @@ export function SocialLinksManager({
 
             <Select
               value={link.visibility ?? 'external'}
-              onValueChange={(value) => updateLink(index, 'visibility', value)}
+              onValueChange={value => updateLink(index, 'visibility', value)}
             >
               <SelectTrigger className="w-[120px] shrink-0" aria-label="Social link visibility">
                 <SelectValue />
@@ -156,7 +125,7 @@ export function SocialLinksManager({
               variant="transparent"
               size="icon"
               onClick={() => removeLink(index)}
-              className="text-ods-error hover:text-ods-error-hover hover:bg-ods-error-secondary"
+              className="text-ods-error hover:bg-ods-error-secondary hover:text-ods-error-hover"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -165,7 +134,7 @@ export function SocialLinksManager({
       })}
 
       {links.length === 0 && (
-        <div className="text-center py-8 text-ods-text-secondary">
+        <div className="py-8 text-center text-ods-text-secondary">
           <p className="text-h6">No social links added yet.</p>
         </div>
       )}

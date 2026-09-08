@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * <Video> — single source of truth for every public video surface
@@ -30,13 +30,16 @@
  *   layout="native"   → intrinsic aspect ratio. Bites grid, blog cards.
  */
 
-import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
-import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
+import type React from 'react';
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { useAuthedAssetSrc } from '../../hooks/use-authed-asset-src';
+import { useNearViewport } from '../../hooks/use-near-viewport';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { Button } from '../ui/button';
 import { useIosNativeVideoFullscreen } from './use-ios-native-video-fullscreen';
 import { saveDataEnabled } from './use-video-warmup';
-import { useAuthedAssetSrc } from '../../hooks/use-authed-asset-src';
+import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 
 // =============================================================================
 // Dev-only hover→playing latency instrumentation gate. Always on in dev
@@ -192,7 +195,13 @@ if (typeof window !== 'undefined') {
     w.__VIDEO_ACTIVATION_TRACKED__ = true;
     const markActivated = () => {
       userHasInteracted = true;
-      activationWaiters.forEach(fn => { try { fn(); } catch { /* ignore */ } });
+      activationWaiters.forEach(fn => {
+        try {
+          fn();
+        } catch {
+          /* ignore */
+        }
+      });
       activationWaiters.clear();
       window.removeEventListener('pointerdown', markActivated, true);
       window.removeEventListener('keydown', markActivated, true);
@@ -207,9 +216,12 @@ if (typeof window !== 'undefined') {
 // =============================================================================
 
 const YT_HOSTS = new Set([
-  'youtube.com', 'www.youtube.com', 'm.youtube.com',
+  'youtube.com',
+  'www.youtube.com',
+  'm.youtube.com',
   'youtu.be',
-  'youtube-nocookie.com', 'www.youtube-nocookie.com',
+  'youtube-nocookie.com',
+  'www.youtube-nocookie.com',
 ]);
 
 /** Strict YouTube URL detection — parses the URL and checks the hostname. */
@@ -252,7 +264,11 @@ export function extractYouTubeId(url: string): string | null {
   // Match `isYouTubeUrl`'s relative-safe parsing — a base URL with a
   // placeholder origin lets us handle protocol-relative inputs (`//youtube.com/...`)
   // and protocol-less inputs (`youtube.com/...`) without throwing.
-  try { u = new URL(url, 'http://placeholder.local'); } catch { return null; }
+  try {
+    u = new URL(url, 'http://placeholder.local');
+  } catch {
+    return null;
+  }
   if (!YT_HOSTS.has(u.hostname.toLowerCase())) return null;
   // `youtu.be/<id>` — id is the first non-empty path segment.
   if (u.hostname.toLowerCase().endsWith('youtu.be')) {
@@ -264,6 +280,76 @@ export function extractYouTubeId(url: string): string | null {
   // `youtube.com/(embed|v|shorts)/<id>` — anchored pathname match.
   const m = u.pathname.match(YT_PATH_RE);
   return m ? m[1] : null;
+}
+
+// =============================================================================
+// Playback-failure handling
+// =============================================================================
+//
+// A stalled or errored player leaves the user on an endless spinner with no way
+// out. Every failure surfaces a retry (`VideoErrorOverlay`) and is reported on
+// a `window` CustomEvent the host subscribes to — no vendor analytics global is
+// touched from here; this package ships to consumers that load different (or
+// no) analytics.
+
+export type VideoFailureKind = 'file' | 'youtube';
+/** `stall`: buffering that never cleared while playback was expected. */
+export type VideoFailureReason = 'error' | 'stall';
+
+export interface VideoPlaybackFailureDetail {
+  kind: VideoFailureKind;
+  /** File URL or YouTube video id — enough to group failures by source. */
+  src: string;
+  reason: VideoFailureReason;
+  /** YouTube IFrame API error code, when the embed reported one. */
+  errorCode?: number;
+}
+
+export const VIDEO_PLAYBACK_FAILED_EVENT = 'flamingo:video-playback-failed';
+
+function reportPlaybackFailure(detail: VideoPlaybackFailureDetail): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(VIDEO_PLAYBACK_FAILED_EVENT, { detail }));
+  } catch {
+    // Analytics must never break playback recovery.
+  }
+}
+
+// Buffering longer than this while playback is expected reads as "broken", not
+// "loading" — surface a retry instead of spinning forever. This is what an
+// `error` callback alone misses: a video that played, then stalled mid-way.
+const VIDEO_STALL_TIMEOUT_MS = 15_000;
+
+/** `watchOnYouTubeId` adds the one recovery that survives an embed the owner
+ *  disabled: opening the video on YouTube itself. */
+function VideoErrorOverlay({
+  onRetry,
+  watchOnYouTubeId,
+}: {
+  onRetry: () => void;
+  watchOnYouTubeId?: string;
+}): React.ReactElement {
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-[var(--spacing-system-sf)] bg-ods-overlay p-[var(--spacing-system-lf)] text-center">
+      <p className="text-ods-text-secondary text-h6">This video failed to play.</p>
+      <div className="flex items-center gap-[var(--spacing-system-sf)]">
+        <Button variant="outline" size="small" onClick={onRetry}>
+          Try again
+        </Button>
+        {watchOnYouTubeId ? (
+          <Button
+            variant="transparent"
+            size="small"
+            href={`https://www.youtube.com/watch?v=${watchOnYouTubeId}`}
+            openInNewTab
+          >
+            Watch on YouTube
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 // =============================================================================
@@ -311,6 +397,14 @@ interface VideoCommonProps {
   className?: string;
   /** Accessible label (used as YT facade title; ignored for file branch). */
   title?: string;
+  /**
+   * Mount the player only once its box comes near the viewport (shared
+   * fire-once IntersectionObserver, `NEAR_VIEWPORT_ROOT_MARGIN` lookahead).
+   * Until then the box shows the poster (or nothing) — the caller's container
+   * still owns the size, so nothing shifts when the player mounts. For grids
+   * of players: a library of 20 clips costs 20 posters, not 20 players.
+   */
+  lazy?: boolean;
   /**
    * YouTube-only: hide YT player chrome (controls, info, fullscreen, related
    * videos, keyboard shortcuts). Used for marketing/landing-page embeds that
@@ -374,10 +468,23 @@ interface VideoFilePlaybackProps {
  *  or misspelled key; the assertion below rejects a MISSING one (which would
  *  otherwise compile fine and silently stop forwarding that prop). */
 const VIDEO_FILE_PLAYBACK_KEYS = [
-  'srtContent', 'captionsUrl', 'autoPlay', 'loop', 'chromeless', 'playOnHover',
-  'playWhenHovered', 'preload', 'fit', 'startTime', 'playerHandleRef',
-  'autoPlayUnmuted', 'startMuted', 'mutedIntent', 'hideMutedBadge',
-  'onMutedFallbackChange', 'onEnded',
+  'srtContent',
+  'captionsUrl',
+  'autoPlay',
+  'loop',
+  'chromeless',
+  'playOnHover',
+  'playWhenHovered',
+  'preload',
+  'fit',
+  'startTime',
+  'playerHandleRef',
+  'autoPlayUnmuted',
+  'startMuted',
+  'mutedIntent',
+  'hideMutedBadge',
+  'onMutedFallbackChange',
+  'onEnded',
 ] as const satisfies readonly (keyof VideoFilePlaybackProps)[];
 
 /** Build-time proof that a key list covers EVERY key of its interface — the
@@ -389,10 +496,7 @@ type AllKeysForwarded<TProps, TKeys extends readonly (keyof TProps)[]> =
 
 /** Copy only the declared keys that are actually PRESENT on the union member,
  *  so an absent optional prop stays absent rather than becoming `undefined`. */
-function pickForwardedKeys<TProps>(
-  props: VideoProps,
-  keys: readonly (keyof TProps)[],
-): TProps {
+function pickForwardedKeys<TProps>(props: VideoProps, keys: readonly (keyof TProps)[]): TProps {
   const out: Record<string, unknown> = {};
   for (const k of keys) {
     if ((k as string) in props) out[k as string] = (props as unknown as Record<string, unknown>)[k as string];
@@ -428,7 +532,8 @@ interface VideoYouTubeFacadeProps {
 }
 
 const VIDEO_YOUTUBE_FACADE_KEYS = [
-  'autoActivate', 'suspended',
+  'autoActivate',
+  'suspended',
 ] as const satisfies readonly (keyof VideoYouTubeFacadeProps)[];
 
 const _youTubeForwarded: AllKeysForwarded<VideoYouTubeFacadeProps, typeof VIDEO_YOUTUBE_FACADE_KEYS> = true;
@@ -456,11 +561,30 @@ export type VideoProps = VideoFileProps | VideoYouTubeProps | VideoAutoProps;
 // =============================================================================
 
 export function Video(props: VideoProps): React.ReactElement | null {
+  // Hooks run unconditionally; the gate only applies when `lazy` is set.
+  const { ref: nearRef, isNear } = useNearViewport<HTMLDivElement>();
   const url = props.url;
   if (!url) return null;
 
   const effectiveKind = resolveKind(props, url);
   const layout = props.layout ?? 'native';
+
+  if (props.lazy && !isNear) {
+    // Same box, poster only: the observer target IS the reserved space.
+    return wrapWithLayout(
+      <div
+        ref={nearRef}
+        className={props.className}
+        style={
+          props.poster
+            ? { backgroundImage: `url(${props.poster})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+            : undefined
+        }
+        aria-hidden="true"
+      />,
+      layout,
+    );
+  }
 
   const inner =
     effectiveKind === 'youtube' ? (
@@ -515,10 +639,7 @@ function resolveKind(props: VideoProps, url: string): 'youtube' | 'file' {
   return isYouTubeUrl(url) ? 'youtube' : 'file';
 }
 
-function wrapWithLayout(
-  inner: React.ReactElement,
-  layout: VideoLayout,
-): React.ReactElement {
+function wrapWithLayout(inner: React.ReactElement, layout: VideoLayout): React.ReactElement {
   switch (layout) {
     case 'centered':
       // `aspect-video` (16:9) reserves the box from first paint so MuxPlayer
@@ -533,12 +654,14 @@ function wrapWithLayout(
       // poster → iframe transition); MuxPlayer renders flat and inherits
       // the wrapper's rounded corners via `overflow-hidden` clipping.
       return (
-        <div className="flex justify-center w-full">
-          <div className="w-full max-w-3xl aspect-video rounded-lg overflow-hidden border border-ods-border">{inner}</div>
+        <div className="flex w-full justify-center">
+          <div className="aspect-video w-full max-w-3xl overflow-hidden rounded-lg border border-ods-border">
+            {inner}
+          </div>
         </div>
       );
     case 'fill':
-      return <div className="absolute inset-0 w-full h-full">{inner}</div>;
+      return <div className="absolute inset-0 h-full w-full">{inner}</div>;
     case 'wide':
       // In-flow 16:9 at full width, no max-width cap. The theater surface:
       // the video sizes the box (contributes height, unlike `fill`), and any
@@ -547,9 +670,7 @@ function wrapWithLayout(
       // `bg-ods-bg` (the darkest neutral surface) gives the theater a proper
       // near-black video stage — letterbox bars and the pre-play frame read as
       // a video player, not a gray card. Border dropped: a stage has no chrome.
-      return (
-        <div className="w-full aspect-video rounded-lg overflow-hidden bg-ods-bg">{inner}</div>
-      );
+      return <div className="aspect-video w-full overflow-hidden rounded-lg bg-ods-bg">{inner}</div>;
     case 'native':
     default:
       // `native` callers (blog cards etc.) are
@@ -590,14 +711,7 @@ function FirstFramePreview({
       {/* No explicit `preload` — inherits the SSOT default ('metadata',
           'none' under Save-Data) so posterless facade cards honor the
           Save-Data policy like every other surface. */}
-      <FilePlayer
-        url={`${url}#t=0.1`}
-        poster={poster}
-        fit={fit}
-        muted
-        chromeless
-        className={className}
-      />
+      <FilePlayer url={`${url}#t=0.1`} poster={poster} fit={fit} muted chromeless className={className} />
     </div>
   );
 }
@@ -662,7 +776,11 @@ function FilePlayer({
   // policy blocked sound (no user activation yet). Drives the center unmute
   // control — the industry pattern (muted autoplay + explicit unmute button)
   // instead of silently waiting for a click somewhere.
-  const [hoverMutedFallback, setHoverMutedFallback] = useState(false);
+  // Seeded from `startMuted`: a surface that declares itself muted is muted from
+  // its FIRST paint, so the badge does not have to be announced by the autoplay
+  // kick effect below (a setState in an effect body, and a wasted render pass
+  // that flashed an unmuted-looking control over a video that was always muted).
+  const [hoverMutedFallback, setHoverMutedFallback] = useState<boolean>(() => Boolean(startMuted));
   // playOnHover drives the underlying mux-player element imperatively — the
   // element exposes native play()/pause()/muted/volume; the chrome stays as
   // configured. Sound-first: volume 0.5 unmuted, muted fallback when the
@@ -671,11 +789,13 @@ function FilePlayer({
   const hoverPlayerRef = useRef<{
     play?: () => Promise<void> | void;
     pause?: () => void;
+    load?: () => void;
     muted?: boolean;
     volume?: number;
     currentTime?: number;
     duration?: number;
     paused?: boolean;
+    ended?: boolean;
     addEventListener?: (type: string, listener: () => void) => void;
     removeEventListener?: (type: string, listener: () => void) => void;
   } | null>(null);
@@ -693,7 +813,9 @@ function FilePlayer({
     if (perfListenerRef.current) {
       try {
         hoverPlayerRef.current?.removeEventListener?.('playing', perfListenerRef.current);
-      } catch { /* element already torn down */ }
+      } catch {
+        /* element already torn down */
+      }
       perfListenerRef.current = null;
     }
   }, []);
@@ -719,6 +841,19 @@ function FilePlayer({
     }
   }, []);
   useEffect(() => clearActivationWaiter, [clearActivationWaiter]);
+
+  // Read through a ref, NOT the closure: startHoverPlayback is memoized on
+  // empty-dep callbacks, so it would capture render-0's value forever (that is
+  // why threading the prop through three layers still did nothing). Adding it
+  // to the deps instead would re-run hover playback on every mute toggle and
+  // play() over an explicit pause.
+  // Filled in an unconditional effect rather than in the render body: a render
+  // attempt React discards must not install an intent that never committed,
+  // and the only reader is a hover handler, which cannot fire before a commit.
+  const mutedIntentRef = useRef(mutedIntent);
+  useEffect(() => {
+    mutedIntentRef.current = mutedIntent;
+  });
   const startHoverPlayback = useCallback(() => {
     hoverActiveRef.current = true;
     const generation = ++hoverGenerationRef.current;
@@ -729,11 +864,14 @@ function FilePlayer({
       const startedAt = performance.now();
       const onPlaying = () => {
         clearPerfListener();
-        // eslint-disable-next-line no-console
         console.debug('[Video] hover→playing %dms', Math.round(performance.now() - startedAt));
       };
       perfListenerRef.current = onPlaying;
-      try { el.addEventListener?.('playing', onPlaying); } catch { /* ignore */ }
+      try {
+        el.addEventListener?.('playing', onPlaying);
+      } catch {
+        /* ignore */
+      }
     }
     try {
       el.volume = 0.5;
@@ -748,11 +886,7 @@ function FilePlayer({
         el.muted = mutedIntentRef.current;
         (el.play?.() as Promise<void> | undefined)?.catch?.((err: unknown) => {
           const name = (err as { name?: string } | null)?.name;
-          if (
-            name === 'NotAllowedError' &&
-            hoverActiveRef.current &&
-            generation === hoverGenerationRef.current
-          ) {
+          if (name === 'NotAllowedError' && hoverActiveRef.current && generation === hoverGenerationRef.current) {
             try {
               el.muted = true;
               (el.play?.() as Promise<void> | undefined)?.catch?.(() => {
@@ -765,7 +899,9 @@ function FilePlayer({
                 }
               });
               setHoverMutedFallback(true);
-            } catch { /* give up silently */ }
+            } catch {
+              /* give up silently */
+            }
           }
         });
       } else {
@@ -787,21 +923,32 @@ function FilePlayer({
         const waiter = () => {
           activationWaiterRef.current = null;
           if (hoverActiveRef.current && generation === hoverGenerationRef.current) {
-            try { el.muted = false; el.volume = 0.5; } catch { /* ignore */ }
+            try {
+              el.muted = false;
+              el.volume = 0.5;
+            } catch {
+              /* ignore */
+            }
             setHoverMutedFallback(false);
           }
         };
         activationWaiterRef.current = waiter;
         activationWaiters.add(waiter);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [clearActivationWaiter, clearPerfListener]);
   const stopHoverPlayback = useCallback(() => {
     hoverActiveRef.current = false;
     setHoverMutedFallback(false);
     clearActivationWaiter();
     clearPerfListener();
-    try { hoverPlayerRef.current?.pause?.(); } catch { /* already torn down */ }
+    try {
+      hoverPlayerRef.current?.pause?.();
+    } catch {
+      /* already torn down */
+    }
   }, [clearActivationWaiter, clearPerfListener]);
 
   // Explicit unmute affordance: the click IS the user activation the autoplay
@@ -817,7 +964,9 @@ function FilePlayer({
         el.volume = 0.5;
         (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setHoverMutedFallback(false);
   }, []);
 
@@ -837,15 +986,13 @@ function FilePlayer({
   // Report muted-fallback transitions to hosts that render their own control
   // (hideMutedBadge). Emitted on every change to hoverMutedFallback so the
   // host's card-level unmute/play affordance stays in sync.
-  // Read through a ref, NOT the closure: startHoverPlayback is memoized on
-  // empty-dep callbacks, so it would capture render-0's value forever (that is
-  // why threading the prop through three layers still did nothing). Adding it
-  // to the deps instead would re-run hover playback on every mute toggle and
-  // play() over an explicit pause.
-  const mutedIntentRef = useRef(mutedIntent);
-  mutedIntentRef.current = mutedIntent;
+  // Republished in its own unconditional effect, declared BEFORE the emitter
+  // below so it is refreshed first in the same flush — a render body write
+  // would install a callback from a render attempt React may have discarded.
   const onMutedFallbackChangeRef = useRef(onMutedFallbackChange);
-  onMutedFallbackChangeRef.current = onMutedFallbackChange;
+  useEffect(() => {
+    onMutedFallbackChangeRef.current = onMutedFallbackChange;
+  });
   useEffect(() => {
     onMutedFallbackChangeRef.current?.({
       muted: hoverMutedFallback,
@@ -866,20 +1013,34 @@ function FilePlayer({
       // a paused+muted resume (no autoPlay to carry `muted`) sat unmuted and
       // the first Play press blasted full volume while every label said muted.
       const mutedEl = hoverPlayerRef.current;
-      if (!mutedEl) return;   // latch AFTER the ref read — see the branch below
+      if (!mutedEl) return; // latch AFTER the ref read — see the branch below
       autoPlayKickedRef.current = true;
-      try { mutedEl.muted = true; } catch { /* ignore */ }
-      setMutedFallbackBlocked(false);
-      setHoverMutedFallback(true);
+      try {
+        mutedEl.muted = true;
+      } catch {
+        /* ignore */
+      }
+      // No state to publish here: `hoverMutedFallback` is seeded from
+      // `startMuted` at its declaration, and `mutedFallbackBlocked` starts
+      // false — this branch is latched, so it only ever ran while both already
+      // held those values.
       // When this surface is ALSO autoplaying, MuxPlayer issues its own muted
       // play() whose rejection we never see. Issue a parallel one purely to
       // OBSERVE the outcome: a redundant play on an already-playing element is
       // a no-op, but a rejection is the only signal that the host must render
       // "Play" instead of "Pause" over a video that never started.
       if (autoPlay) {
+        // One handler for both failure shapes: `play()` reports a blocked
+        // autoplay either by rejecting or, on a torn-down element, by throwing
+        // synchronously. Same event, same report — and this is genuinely the
+        // element telling us something, not a value the render could have
+        // derived.
+        const reportBlocked = () => setMutedFallbackBlocked(true);
         try {
-          (mutedEl.play?.() as Promise<void> | undefined)?.catch?.(() => setMutedFallbackBlocked(true));
-        } catch { setMutedFallbackBlocked(true); }
+          (mutedEl.play?.() as Promise<void> | undefined)?.catch?.(reportBlocked);
+        } catch {
+          reportBlocked();
+        }
       }
       return;
     }
@@ -909,7 +1070,9 @@ function FilePlayer({
           setHoverMutedFallback(true);
         }
       });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [autoPlayUnmuted, startMuted, autoPlay]);
 
   // volumechange listener — clears the muted-fallback state when the media is
@@ -917,15 +1080,25 @@ function FilePlayer({
   // control). Without this a stale glyph/state can persist after a chrome unmute.
   useEffect(() => {
     const el = hoverPlayerRef.current;
-    if (!el?.addEventListener) return;
+    if (!el?.addEventListener) return undefined;
     const onVolumeChange = () => {
       if (el.muted === false) {
         setMutedFallbackBlocked(false);
         setHoverMutedFallback(false);
       }
     };
-    try { el.addEventListener('volumechange', onVolumeChange); } catch { /* ignore */ }
-    return () => { try { el.removeEventListener?.('volumechange', onVolumeChange); } catch { /* ignore */ } };
+    try {
+      el.addEventListener('volumechange', onVolumeChange);
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      try {
+        el.removeEventListener?.('volumechange', onVolumeChange);
+      } catch {
+        /* ignore */
+      }
+    };
   }, []);
 
   // `playing` clears the blocked-autoplay flag. Without this, once a muted
@@ -933,21 +1106,46 @@ function FilePlayer({
   // over a playing video forever — the flag was only cleared by an unmute.
   useEffect(() => {
     const el = hoverPlayerRef.current;
-    if (!el?.addEventListener) return;
+    if (!el?.addEventListener) return undefined;
     const onPlaying = () => setMutedFallbackBlocked(false);
-    try { el.addEventListener('playing', onPlaying); } catch { /* ignore */ }
-    return () => { try { el.removeEventListener?.('playing', onPlaying); } catch { /* ignore */ } };
+    try {
+      el.addEventListener('playing', onPlaying);
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      try {
+        el.removeEventListener?.('playing', onPlaying);
+      } catch {
+        /* ignore */
+      }
+    };
   }, []);
 
   // ended listener — host clears its handoff (mini-player continuation).
+  // Republished in an unconditional effect rather than in the render body; the
+  // only reader is the DOM 'ended' listener installed below, which cannot fire
+  // before a commit.
   const onEndedRef = useRef(onEnded);
-  onEndedRef.current = onEnded;
+  useEffect(() => {
+    onEndedRef.current = onEnded;
+  });
   useEffect(() => {
     const el = hoverPlayerRef.current;
-    if (!el?.addEventListener) return;
+    if (!el?.addEventListener) return undefined;
     const handler = () => onEndedRef.current?.();
-    try { el.addEventListener('ended', handler); } catch { /* ignore */ }
-    return () => { try { el.removeEventListener?.('ended', handler); } catch { /* ignore */ } };
+    try {
+      el.addEventListener('ended', handler);
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      try {
+        el.removeEventListener?.('ended', handler);
+      } catch {
+        /* ignore */
+      }
+    };
   }, []);
 
   // In the iOS shell the fullscreen control goes to Apple's video player rather
@@ -955,44 +1153,141 @@ function FilePlayer({
   useIosNativeVideoFullscreen(hoverPlayerRef);
 
   // Imperative handle — snapshot getters + control mutators for handoff.
-  useImperativeHandle(playerHandleRef, (): VideoPlayerHandle => ({
-    getCurrentTime: () => hoverPlayerRef.current?.currentTime ?? 0,
-    getDuration: () => {
-      const d = hoverPlayerRef.current?.duration;
-      return typeof d === 'number' && isFinite(d) ? d : 0;
-    },
-    getPaused: () => hoverPlayerRef.current?.paused ?? true,
-    getMuted: () => hoverPlayerRef.current?.muted ?? false,
-    play: async () => { await hoverPlayerRef.current?.play?.(); },
-    pause: () => { try { hoverPlayerRef.current?.pause?.(); } catch { /* ignore */ } },
-    setMuted: (m: boolean) => {
-      const el = hoverPlayerRef.current;
-      if (!el) return;
-      try {
-        el.muted = m;
-        if (!m) {
-          setMutedFallbackBlocked(false);
-          setHoverMutedFallback(false);
+  useImperativeHandle(
+    playerHandleRef,
+    (): VideoPlayerHandle => ({
+      getCurrentTime: () => hoverPlayerRef.current?.currentTime ?? 0,
+      getDuration: () => {
+        const d = hoverPlayerRef.current?.duration;
+        return typeof d === 'number' && isFinite(d) ? d : 0;
+      },
+      getPaused: () => hoverPlayerRef.current?.paused ?? true,
+      getMuted: () => hoverPlayerRef.current?.muted ?? false,
+      play: async () => {
+        await hoverPlayerRef.current?.play?.();
+      },
+      pause: () => {
+        try {
+          hoverPlayerRef.current?.pause?.();
+        } catch {
+          /* ignore */
         }
-      } catch { /* ignore */ }
-    },
-  }), [playerHandleRef]);
+      },
+      setMuted: (m: boolean) => {
+        const el = hoverPlayerRef.current;
+        if (!el) return;
+        try {
+          el.muted = m;
+          if (!m) {
+            setMutedFallbackBlocked(false);
+            setHoverMutedFallback(false);
+          }
+        } catch {
+          /* ignore */
+        }
+      },
+    }),
+    [],
+  );
   // Raw SRT text is unusable without a custom overlay — and we just deleted
   // the 900-LOC custom-controls layer that owned that overlay. Consumers
   // pass `captionsUrl` (the API-side VTT conversion) alongside `srtContent`
   // anyway. Warn in dev if the deprecated prop is the only one supplied
   // so a single-prop call site doesn't silently lose captions.
   if (process.env.NODE_ENV !== 'production' && srtContent && !captionsUrl) {
-    // eslint-disable-next-line no-console
     console.warn(
       '[Video] srtContent supplied without captionsUrl — captions will not render. ' +
-      'Pass captionsUrl (the VTT URL) instead; raw SRT text overlays are no longer supported.',
+        'Pass captionsUrl (the VTT URL) instead; raw SRT text overlays are no longer supported.',
     );
   }
+
+  // Only chrome-bearing surfaces (a user actively watching) monitor health —
+  // decorative first-frame and hover previews pass `chromeless` and stay silent.
+  const monitorHealth = !chromeless;
+  const [playbackFailed, setPlaybackFailed] = useState(false);
+  const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearStallTimer = useCallback(() => {
+    if (stallTimerRef.current !== null) {
+      clearTimeout(stallTimerRef.current);
+      stallTimerRef.current = null;
+    }
+  }, []);
+  useEffect(() => clearStallTimer, [clearStallTimer]);
+
+  const failPlayback = useCallback(
+    (reason: VideoFailureReason) => {
+      clearStallTimer();
+      setPlaybackFailed(true);
+      reportPlaybackFailure({ kind: 'file', src: url, reason });
+    },
+    [clearStallTimer, url],
+  );
+
+  // A manually paused or finished video is never a stall.
+  const armStallTimer = useCallback(() => {
+    if (!monitorHealth) return;
+    const el = hoverPlayerRef.current;
+    if (!el || el.paused || el.ended) return;
+    if (stallTimerRef.current !== null) return;
+    stallTimerRef.current = setTimeout(() => {
+      stallTimerRef.current = null;
+      failPlayback('stall');
+    }, VIDEO_STALL_TIMEOUT_MS);
+  }, [monitorHealth, failPlayback]);
+
+  // Progress means the player is alive — a stall that self-heals clears its own
+  // overlay.
+  const handlePlaybackProgress = useCallback(() => {
+    clearStallTimer();
+    setPlaybackFailed(false);
+  }, [clearStallTimer]);
+
+  const handleMediaError = useCallback(() => {
+    if (!monitorHealth) return;
+    failPlayback('error');
+  }, [monitorHealth, failPlayback]);
+
+  // `load()` re-inits the HLS pipeline (`play()` alone can't) but rewinds to
+  // zero — stash the position and seek back on `loadedmetadata`, since an
+  // earlier assignment is dropped while the fresh source has no seekable range.
+  const retryPlayback = useCallback(() => {
+    setPlaybackFailed(false);
+    clearStallTimer();
+    const el = hoverPlayerRef.current;
+    if (!el) return;
+    const resumeAt = typeof el.currentTime === 'number' ? el.currentTime : 0;
+    try {
+      el.load?.();
+      if (resumeAt > 0 && el.addEventListener && el.removeEventListener) {
+        const seekBack = () => {
+          el.removeEventListener?.('loadedmetadata', seekBack);
+          try {
+            el.currentTime = resumeAt;
+          } catch {
+            /* source shorter than the stashed position — start from the top */
+          }
+        };
+        el.addEventListener('loadedmetadata', seekBack);
+      }
+      (el.play?.() as Promise<void> | undefined)?.catch?.(() => {
+        /* a re-rejected play surfaces again via the error/stall handlers */
+      });
+    } catch {
+      /* element torn down */
+    }
+  }, [clearStallTimer]);
+
+  const errorOverlay = monitorHealth && playbackFailed ? <VideoErrorOverlay onRetry={retryPlayback} /> : null;
 
   const player = (
     <MuxPlayer
       ref={hoverPlayerRef as React.Ref<never>}
+      onError={handleMediaError}
+      onWaiting={armStallTimer}
+      onStalled={armStallTimer}
+      onPlaying={handlePlaybackProgress}
+      onTimeUpdate={handlePlaybackProgress}
+      onPause={clearStallTimer}
       src={url}
       poster={poster || undefined}
       streamType="on-demand"
@@ -1037,18 +1332,12 @@ function FilePlayer({
       style={{
         width: '100%',
         height: '100%',
-        ...(chromeless ? ({ '--controls': 'none' } as React.CSSProperties) : {}),
-        ...(fit === 'cover' ? ({ '--media-object-fit': 'cover' } as React.CSSProperties) : {}),
+        ...(chromeless ? { '--controls': 'none' } : {}),
+        ...(fit === 'cover' ? { '--media-object-fit': 'cover' } : {}),
       }}
     >
       {resolvedCaptionsUrl ? (
-        <track
-          kind="captions"
-          src={resolvedCaptionsUrl}
-          srcLang="en"
-          label="English"
-          default
-        />
+        <track kind="captions" src={resolvedCaptionsUrl} srcLang="en" label="English" default />
       ) : null}
     </MuxPlayer>
   );
@@ -1059,19 +1348,20 @@ function FilePlayer({
   // Styled to match media-chrome's center controls exactly (the play glyph in
   // the same slot): plain large white glyph, no circle/border/background,
   // slight dim on hover — so unmute reads as just another center control.
-  const unmuteBadge = hoverMutedFallback && !hideMutedBadge ? (
-    <button
-      type="button"
-      aria-label="Unmute"
-      title="Unmute"
-      onClick={unmuteNow}
-      // White at rest, ACCENT while the icon itself is hovered — the same
-      // hover language as every mux control icon (see app-globals.css).
-      className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-colors hover:text-ods-accent"
-    >
-      <VideoUnmuteGlyph />
-    </button>
-  ) : null;
+  const unmuteBadge =
+    hoverMutedFallback && !hideMutedBadge ? (
+      <button
+        type="button"
+        aria-label="Unmute"
+        title="Unmute"
+        onClick={unmuteNow}
+        // White at rest, ACCENT while the icon itself is hovered — the same
+        // hover language as every mux control icon (see app-globals.css).
+        className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-colors hover:text-ods-accent"
+      >
+        <VideoUnmuteGlyph />
+      </button>
+    ) : null;
 
   // MuxPlayerProps has no pointer-event props — the hover-play handlers live
   // on a full-size wrapper instead (only in UNCONTROLLED playOnHover mode;
@@ -1079,33 +1369,21 @@ function FilePlayer({
   // hover-capable mode gets a relative wrapper so the unmute badge can dock.
   if (playOnHover && !hoverControlled) {
     return (
-      <div
-        className="relative w-full h-full"
-        onPointerEnter={handleHoverEnter}
-        onPointerLeave={handleHoverLeave}
-      >
+      <div className="relative h-full w-full" onPointerEnter={handleHoverEnter} onPointerLeave={handleHoverLeave}>
         {player}
         {unmuteBadge}
+        {errorOverlay}
       </div>
     );
   }
-  if (hoverControlled) {
+  // A relative wrapper so the unmute badge and the error overlay can dock. The
+  // bare `player` return is left only for chromeless previews (never monitored).
+  if (hoverControlled || autoPlayUnmuted || startMuted || monitorHealth) {
     return (
-      <div className="relative w-full h-full">
+      <div className="relative h-full w-full">
         {player}
         {unmuteBadge}
-      </div>
-    );
-  }
-  // Handoff surfaces (autoPlayUnmuted / startMuted) need the relative wrapper so
-  // the internal center unmute badge can dock — the bare branch has none. Hosts
-  // that render their OWN control pass hideMutedBadge (unmuteBadge is null then,
-  // but the wrapper is harmless).
-  if (autoPlayUnmuted || startMuted) {
-    return (
-      <div className="relative w-full h-full">
-        {player}
-        {unmuteBadge}
+        {errorOverlay}
       </div>
     );
   }
@@ -1140,7 +1418,16 @@ function YouTubeFacade({
   const videoId = extractYouTubeId(url);
   if (!videoId) return null;
 
-  return <YouTubeFacadeInner videoId={videoId} title={title} priority={priority} className={className} minimalControls={minimalControls} {...facade} />;
+  return (
+    <YouTubeFacadeInner
+      videoId={videoId}
+      title={title}
+      priority={priority}
+      className={className}
+      minimalControls={minimalControls}
+      {...facade}
+    />
+  );
 }
 
 interface YouTubeFacadeInnerProps extends VideoYouTubeFacadeProps {
@@ -1178,6 +1465,30 @@ const YT_PLAYING_BLUR_DELAY_MS = 1000;
 interface YouTubeInfoDeliveryMessage {
   event?: string;
   info?: { playerState?: number };
+  /** `onError` carries its code as a bare number in `info`, not an object:
+   *  `{"event":"onError","info":150}` (101/150 = embedding disabled). */
+  errorCode?: number;
+}
+
+/**
+ * Decode one iframe-API message body.
+ *
+ * `JSON.parse` returns `any`, so the parsed body used to be stored straight
+ * into a `YouTubeInfoDeliveryMessage` — the annotation described the wire
+ * rather than checking it. Returns null for anything that is not an object,
+ * which the caller already treats as "ignore this message".
+ */
+function toYouTubeMessage(parsed: unknown): YouTubeInfoDeliveryMessage | null {
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const event = 'event' in parsed ? parsed.event : undefined;
+  const info = 'info' in parsed ? parsed.info : undefined;
+  const playerState = typeof info === 'object' && info !== null && 'playerState' in info ? info.playerState : undefined;
+
+  return {
+    event: typeof event === 'string' ? event : undefined,
+    info: { playerState: typeof playerState === 'number' ? playerState : undefined },
+    errorCode: typeof info === 'number' ? info : undefined,
+  };
 }
 
 function YouTubeFacadeInner({
@@ -1190,7 +1501,17 @@ function YouTubeFacadeInner({
   suspended,
 }: YouTubeFacadeInnerProps): React.ReactElement {
   const [activated, setActivated] = useState(Boolean(autoActivate));
+  // The embed reported a hard player error (see the `onError` branch below).
+  // Retry remounts the iframe via `reloadNonce` — a fresh element, since there
+  // is no way to re-init a cross-origin player from outside.
+  const [failed, setFailed] = useState(false);
+  const [reloadNonce, setReloadNonce] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  const retry = useCallback(() => {
+    setFailed(false);
+    setReloadNonce(n => n + 1);
+  }, []);
 
   // Embed URL + poster URLs only change when `videoId` or `minimalControls`
   // do — memoize so we don't rebuild URLSearchParams on every render.
@@ -1237,16 +1558,22 @@ function YouTubeFacadeInner({
   // Poster starts at the highest tier and steps down on load error (see
   // `YT_POSTER_TIERS`). Reset to the top tier whenever the video changes so a
   // new id gets a fresh shot at its `maxresdefault`.
+  // Adjusted while rendering — React's documented pattern for a prop-driven
+  // reset — rather than from an effect: `posterJpg`/`posterWebp` are built from
+  // the tier two lines below, so an effect made the new video's first paint
+  // request the PREVIOUS video's degraded tier and only then step back up.
   const [posterTier, setPosterTier] = useState(0);
-  useEffect(() => {
+  const [posterTierFor, setPosterTierFor] = useState(videoId);
+  if (posterTierFor !== videoId) {
+    setPosterTierFor(videoId);
     setPosterTier(0);
-  }, [videoId]);
+  }
   const posterQuality = YT_POSTER_TIERS[posterTier];
   const posterJpg = `https://i.ytimg.com/vi/${videoId}/${posterQuality}.jpg`;
   const posterWebp = `https://i.ytimg.com/vi_webp/${videoId}/${posterQuality}.webp`;
   // On a 404 (e.g. no `maxresdefault`) drop one tier; clamp at the last so a
   // genuinely missing thumbnail can't loop.
-  const handlePosterError = () => setPosterTier((tier) => Math.min(tier + 1, YT_POSTER_TIERS.length - 1));
+  const handlePosterError = () => setPosterTier(tier => Math.min(tier + 1, YT_POSTER_TIERS.length - 1));
 
   // ---------------------------------------------------------------------------
   // YouTube control-fade accelerator (user-locked target: ~1s).
@@ -1278,15 +1605,12 @@ function YouTubeFacadeInner({
   // end-of-video (ENDED).
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!activated) return;
+    if (!activated || failed) return undefined;
     const iframe = iframeRef.current;
-    if (!iframe) return;
+    if (!iframe) return undefined;
 
     function subscribe() {
-      iframe?.contentWindow?.postMessage(
-        '{"event":"listening"}',
-        YT_NOCOOKIE_ORIGIN,
-      );
+      iframe?.contentWindow?.postMessage('{"event":"listening"}', YT_NOCOOKIE_ORIGIN);
     }
 
     iframe.addEventListener('load', subscribe);
@@ -1294,16 +1618,26 @@ function YouTubeFacadeInner({
 
     let blurTimer: ReturnType<typeof setTimeout> | null = null;
 
+    // No "never reached PLAYING within N seconds" watchdog on purpose: an embed
+    // whose unmuted autoplay Safari/iOS blocked, or one whose jsapi channel is
+    // dead, is healthy and silent — a timeout would tear those down, and retry
+    // would re-arm it. Only an explicit `onError` is a definitive failure.
     function handleMessage(event: MessageEvent) {
       if (event.origin !== YT_NOCOOKIE_ORIGIN) return;
       if (typeof event.data !== 'string') return;
       let payload: YouTubeInfoDeliveryMessage | null = null;
       try {
-        payload = JSON.parse(event.data);
+        payload = toYouTubeMessage(JSON.parse(event.data));
       } catch {
         return;
       }
-      if (!payload || payload.event !== 'infoDelivery') return;
+      if (!payload) return;
+      if (payload.event === 'onError') {
+        setFailed(true);
+        reportPlaybackFailure({ kind: 'youtube', src: videoId, reason: 'error', errorCode: payload.errorCode });
+        return;
+      }
+      if (payload.event !== 'infoDelivery') return;
       const state = payload.info?.playerState;
       if (typeof state !== 'number') return;
 
@@ -1326,7 +1660,7 @@ function YouTubeFacadeInner({
       window.removeEventListener('message', handleMessage);
       if (blurTimer !== null) clearTimeout(blurTimer);
     };
-  }, [activated]);
+  }, [activated, failed, reloadNonce, videoId]);
 
   // Close-side pause: a closing dialog flips `suspended` false→true. Post the
   // pauseVideo command over the same enablejsapi channel so the iframe stops
@@ -1349,10 +1683,19 @@ function YouTubeFacadeInner({
   const wrapperClass = `relative w-full ${className ?? ''}`;
   const wrapperStyle = { paddingBottom: '56.25%' as const };
 
+  if (activated && failed) {
+    return (
+      <div className={wrapperClass} style={wrapperStyle}>
+        <VideoErrorOverlay onRetry={retry} watchOnYouTubeId={videoId} />
+      </div>
+    );
+  }
+
   if (activated) {
     return (
       <div className={wrapperClass} style={wrapperStyle}>
         <iframe
+          key={reloadNonce}
           ref={iframeRef}
           src={embedUrl}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -1366,7 +1709,7 @@ function YouTubeFacadeInner({
           // sent and embedding is authorized.
           referrerPolicy="strict-origin-when-cross-origin"
           title={title}
-          className="absolute inset-0 w-full h-full border-0 rounded-lg"
+          className="absolute inset-0 h-full w-full rounded-lg border-0"
         />
       </div>
     );
@@ -1378,7 +1721,7 @@ function YouTubeFacadeInner({
         type="button"
         aria-label={`Play: ${title}`}
         onClick={() => setActivated(true)}
-        className="group absolute inset-0 p-0 m-0 border border-ods-border rounded-lg overflow-hidden bg-ods-card cursor-pointer"
+        className="group absolute inset-0 m-0 cursor-pointer overflow-hidden rounded-lg border border-ods-border bg-ods-card p-0"
       >
         <picture>
           <source type="image/webp" srcSet={posterWebp} />
@@ -1393,14 +1736,17 @@ function YouTubeFacadeInner({
             // render the DOM attribute cleanly with no console warnings.
             {...fetchPriorityProp(priority)}
             decoding={priority ? 'sync' : 'async'}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         </picture>
         <div className="absolute inset-0 flex items-center justify-center bg-ods-bg bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
           {/* THE shared center play badge (video-center-badge.tsx) — same disc
               as strip cards / carousel thumbs / unmute chip; hero size + the
               facade's hover-scale affordance. */}
-          <VideoPlayBadge size="lg" className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent" />
+          <VideoPlayBadge
+            size="lg"
+            className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent"
+          />
         </div>
       </button>
     </div>

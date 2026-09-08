@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Shared link-attribute resolver for every entity card.
@@ -23,31 +23,26 @@
  * (same-tab) — matches the documented embed-shim fallback.
  */
 
-import { useMemo } from 'react'
-import { useChatRuntime } from '../../../contexts/chat-runtime-context'
-import { computeIsNewTab } from '../utils/nav-anchor-props'
+import { useMemo } from 'react';
+import { useChatRuntime } from '../../../contexts/chat-runtime-context';
+import { computeIsNewTab } from '../utils/nav-anchor-props';
 
 export interface UseEntityCardLinkArgs {
-  href: string
-  targetPlatform?: string | null
+  href: string;
+  targetPlatform?: string | null;
   /** Explicit override. When set, runtime decision is skipped. */
-  target?: '_blank'
+  target?: '_blank';
   /** Explicit override. When set, runtime decision is skipped. */
-  rel?: 'noopener noreferrer'
+  rel?: 'noopener noreferrer';
 }
 
 export interface EntityCardLinkProps {
-  target: '_blank' | undefined
-  rel: 'noopener noreferrer' | undefined
+  target: '_blank' | undefined;
+  rel: 'noopener noreferrer' | undefined;
 }
 
-export function useEntityCardLink({
-  href,
-  targetPlatform,
-  target,
-  rel,
-}: UseEntityCardLinkArgs): EntityCardLinkProps {
-  const runtime = useChatRuntime()
+export function useEntityCardLink({ href, targetPlatform, target, rel }: UseEntityCardLinkArgs): EntityCardLinkProps {
+  const runtime = useChatRuntime();
   return useMemo(() => {
     // Explicit prop wins — preserves the chat-dispatcher path that
     // pre-computes attrs from `computeIsNewTab`. When `target='_blank'`
@@ -55,9 +50,8 @@ export function useEntityCardLink({
     // to close the tabnabbing vector (window.opener access from the
     // new tab back to the parent).
     if (target !== undefined || rel !== undefined) {
-      const safeRel =
-        rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined)
-      return { target, rel: safeRel }
+      const safeRel = rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined);
+      return { target, rel: safeRel };
     }
     // Use the UNIFIED new-tab decision so the rendered anchor's target/rel ALWAYS
     // agrees with the click handler (executeNavigation also calls computeIsNewTab) —
@@ -66,9 +60,9 @@ export function useEntityCardLink({
     // when decideNewTab was unwired (embed mode rendered a same-tab anchor that
     // clicked into a new tab). Hub behavior is unchanged: it wires decideNewTab,
     // which computeIsNewTab consumes identically.
-    const newTab = runtime ? computeIsNewTab(runtime, href, targetPlatform ?? null) : false
+    const newTab = runtime ? computeIsNewTab(runtime, href, targetPlatform ?? null) : false;
     return newTab
       ? { target: '_blank' as const, rel: 'noopener noreferrer' as const }
-      : { target: undefined, rel: undefined }
-  }, [target, rel, href, targetPlatform, runtime])
+      : { target: undefined, rel: undefined };
+  }, [target, rel, href, targetPlatform, runtime]);
 }

@@ -1,42 +1,35 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { ChatFooter } from './chat-container'
-import { ChatInput } from './chat-input'
-import { ChatAttachmentAddButton } from './chat-attachment-bar'
-import { ChatContextMemoryBar } from './chat-context-memory-bar'
-import {
-  ChatComposerPlusMenu,
-  ChatContextChipStrip,
-  ChatContextPicker,
-} from './chat-context-picker'
-import { ModelDisplay } from './model-display'
-import { BoxArchiveIcon } from '../icons-v2-generated'
-import { cn } from '../../utils/cn'
-import type { ChatInputRef, ModelDisplayProps } from './types/component.types'
-import type {
-  ChatContextItem,
-  ChatContextPickerConfig,
-} from './types/context-item.types'
+import { type ComponentProps, type ReactNode, type Ref, useCallback, useMemo } from 'react';
+import { cn } from '../../utils/cn';
+import { BoxArchiveIcon } from '../icons-v2-generated';
+import { ChatAttachmentAddButton } from './chat-attachment-bar';
+import { ChatFooter } from './chat-container';
+import { ChatContextMemoryBar } from './chat-context-memory-bar';
+import { ChatComposerPlusMenu, ChatContextChipStrip, ChatContextPicker } from './chat-context-picker';
+import { ChatInput } from './chat-input';
+import { ModelDisplay } from './model-display';
+import type { ChatInputRef, ModelDisplayProps } from './types/component.types';
+import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 
 export interface ChatComposerProps {
   /** Read-only archived chat → render the unarchive placeholder instead of the
    *  input (Figma node 7361:426949). */
-  archived?: boolean
-  inputRef: React.Ref<ChatInputRef>
-  onSend: (text: string) => void
-  onStop: () => void
-  sending: boolean
-  placeholder: string
-  autoFocus?: boolean
-  slashCommands?: React.ComponentProps<typeof ChatInput>['slashCommands']
+  archived?: boolean;
+  inputRef: Ref<ChatInputRef>;
+  onSend: (text: string) => void;
+  onStop: () => void;
+  sending: boolean;
+  placeholder: string;
+  autoFocus?: boolean;
+  slashCommands?: ComponentProps<typeof ChatInput>['slashCommands'];
   /** Show the (Guide-only) attachment add button to the left of the model row. */
-  showAttachmentButton?: boolean
-  attachmentsCount?: number
-  onAddFiles?: (files: FileList | File[]) => void
-  attachmentsDisabled?: boolean
+  showAttachmentButton?: boolean;
+  attachmentsCount?: number;
+  onAddFiles?: (files: FileList | File[]) => void;
+  attachmentsDisabled?: boolean;
   /** Model + usage row props, forwarded to `<ModelDisplay>`. */
-  model: ModelDisplayProps
+  model: ModelDisplayProps;
 
   // ─── Entity-context picker (Figma 31:28708 / 1:5699) ──────────────────────
   // When `contextPicker` is set the composer renders the `+` "Assign Item"
@@ -44,36 +37,36 @@ export interface ChatComposerProps {
   // chip strip. All selection STATE is owned by the parent (EmbeddableChat) and
   // flows through these props; this component is presentational.
   /** Host config (entity types + search resolver). Picker is inert when unset. */
-  contextPicker?: ChatContextPickerConfig
+  contextPicker?: ChatContextPickerConfig;
   /** Currently-selected context items (chips + ✓ state). */
-  selectedContextItems?: ChatContextItem[]
+  selectedContextItems?: ChatContextItem[];
   /** Toggle an item in/out of the selection (picker rows). */
-  onToggleContextItem?: (item: ChatContextItem) => void
+  onToggleContextItem?: (item: ChatContextItem) => void;
   /** Remove an item (chip ×). */
-  onRemoveContextItem?: (item: ChatContextItem) => void
+  onRemoveContextItem?: (item: ChatContextItem) => void;
   /** Ambient CONTEXT MEMORY (Figma 271:38656) — the entities the host collected
    *  from the user's navigation history and sends with every message. Rendered
    *  as a summary strip at the top of the composer card, above the assigned-item
    *  chips. Empty/omitted → no strip. */
-  contextMemoryItems?: ChatContextItem[]
+  contextMemoryItems?: ChatContextItem[];
   /** Drop one entity from the context memory (dropdown row ×). */
-  onRemoveContextMemoryItem?: (item: ChatContextItem) => void
+  onRemoveContextMemoryItem?: (item: ChatContextItem) => void;
   /** Controlled picker open state. */
-  contextPickerOpen?: boolean
+  contextPickerOpen?: boolean;
   /** Open the picker (the `+` menu's "Assign Item"). */
-  onOpenContextPicker?: () => void
+  onOpenContextPicker?: () => void;
   /** Close the picker (Escape / outside-click / pick-complete). */
-  onCloseContextPicker?: () => void
+  onCloseContextPicker?: () => void;
   /** Active `@`-mention query (filters the type list); null when inactive. */
-  mentionQuery?: string | null
+  mentionQuery?: string | null;
   /** `@`-trigger callback forwarded to the input. */
-  onMentionQueryChange?: (query: string | null) => void
+  onMentionQueryChange?: (query: string | null) => void;
   /** Fires on every draft value change — threaded to `ChatInput.onValueChange`
    *  so the host can keep `@type:id` mention tokens in sync with context chips. */
-  onValueChange?: (value: string) => void
+  onValueChange?: (value: string) => void;
   /** Non-destructive ghost preview shown in the empty composer (e.g. a hovered
    *  quick-action's full prompt). Forwarded to `ChatInput.previewText`. */
-  previewText?: string
+  previewText?: string;
 }
 
 /**
@@ -113,24 +106,21 @@ export function ChatComposer({
   onValueChange,
   previewText,
 }: ChatComposerProps) {
-  const contextEnabled = !!contextPicker && !archived
-  const selected = selectedContextItems ?? []
-  const memory = contextMemoryItems ?? []
+  const contextEnabled = !!contextPicker && !archived;
+  const selected = selectedContextItems ?? [];
+  const memory = contextMemoryItems ?? [];
 
   // type → icon lookup so the chips (composer + bubble) lead with their
   // entity-type glyph without the parent threading an extra resolver. Keyed on
   // `entityTypes` (not the whole `contextPicker`) so an inline host config
   // doesn't rebuild the map — and the derived `resolveContextIcon` — every render.
-  const entityTypes = contextPicker?.entityTypes
-  const iconByType = React.useMemo(() => {
-    const map = new Map<string, React.ReactNode>()
-    for (const t of entityTypes ?? []) map.set(t.type, t.icon)
-    return map
-  }, [entityTypes])
-  const resolveContextIcon = React.useCallback(
-    (item: ChatContextItem) => iconByType.get(item.type),
-    [iconByType],
-  )
+  const entityTypes = contextPicker?.entityTypes;
+  const iconByType = useMemo(() => {
+    const map = new Map<string, ReactNode>();
+    for (const t of entityTypes ?? []) map.set(t.type, t.icon);
+    return map;
+  }, [entityTypes]);
+  const resolveContextIcon = useCallback((item: ChatContextItem) => iconByType.get(item.type), [iconByType]);
 
   // The input is identical in both layouts; only `hideBorder` (context mode
   // lets the outer card own the chrome) and the `+` adornment differ.
@@ -165,7 +155,7 @@ export function ChatComposer({
                   open={contextPickerOpen}
                   config={contextPicker}
                   selectedItems={selected}
-                  onToggleItem={(item) => onToggleContextItem?.(item)}
+                  onToggleItem={item => onToggleContextItem?.(item)}
                   onClose={() => onCloseContextPicker?.()}
                   mentionQuery={mentionQuery}
                 />
@@ -175,11 +165,11 @@ export function ChatComposer({
         ) : undefined
       }
     />
-  )
+  );
 
   return (
     <div
-      className="flex-shrink-0 px-[var(--spacing-system-m)] pb-[var(--spacing-system-xxs)] flex flex-col gap-[var(--spacing-system-xxs)]"
+      className="flex flex-shrink-0 flex-col gap-[var(--spacing-system-xxs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-xxs)]"
       // Tight `xxs` bottom padding (the model/usage row already sits just below
       // the input); `max(…, safe-area-inset)` still clears the iOS home bar.
       style={{
@@ -191,9 +181,7 @@ export function ChatComposer({
           {archived ? (
             <div className="flex w-full items-center justify-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]">
               <BoxArchiveIcon size={24} className="shrink-0 text-ods-text-secondary" />
-              <p className="truncate text-h4 text-ods-text-secondary">
-                Unarchive the chat to continue
-              </p>
+              <p className="truncate text-ods-text-secondary text-h4">Unarchive the chat to continue</p>
             </div>
           ) : contextEnabled ? (
             // Unified card (Figma 1:6073 / 271:38656): the context-memory
@@ -240,7 +228,7 @@ export function ChatComposer({
         </ChatFooter>
       </div>
 
-      <div className="flex items-center gap-2 w-full">
+      <div className="flex w-full items-center gap-2">
         {/* Legacy (Guide-mode, no context picker) inline attachment `+`. With the
             context picker on, uploads live in the in-input `+` menu instead. */}
         {!contextEnabled && showAttachmentButton && onAddFiles && (
@@ -251,10 +239,10 @@ export function ChatComposer({
             disabled={attachmentsDisabled}
           />
         )}
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <ModelDisplay {...model} />
         </div>
       </div>
     </div>
-  )
+  );
 }

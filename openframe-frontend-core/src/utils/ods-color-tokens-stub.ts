@@ -7,9 +7,9 @@ export const colorTokens = {
   text: {
     primary: '#161616',
     secondary: '#666666',
-    inverse: '#FFFFFF'
+    inverse: '#FFFFFF',
   },
-  border: '#E5E5E5'
+  border: '#E5E5E5',
 } as const;
 
 export function getColorValue(tokenPath: string): string {

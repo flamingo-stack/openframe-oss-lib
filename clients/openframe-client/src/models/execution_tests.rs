@@ -148,3 +148,32 @@ fn shell_maps_to_param() {
     assert_eq!(ScriptShell::Cmd.as_param(), "cmd");
     assert_eq!(ScriptShell::Shell.as_param(), "sh");
 }
+
+#[test]
+fn execution_ack_serializes_camel_case() {
+    let ack = ExecutionAck {
+        execution_id: "ex".into(),
+        machine_id: "m".into(),
+        schedule_id: Some("sch".into()),
+        script_ids: vec!["s1".into(), "s2".into()],
+    };
+    let v = serde_json::to_value(&ack).unwrap();
+    assert_eq!(v["executionId"], "ex");
+    assert_eq!(v["machineId"], "m");
+    assert_eq!(v["scheduleId"], "sch");
+    assert_eq!(v["scriptIds"], serde_json::json!(["s1", "s2"]));
+}
+
+#[test]
+fn execution_ack_command_shape() {
+    // ad-hoc command: no schedule, no scripts.
+    let ack = ExecutionAck {
+        execution_id: "ex".into(),
+        machine_id: "m".into(),
+        schedule_id: None,
+        script_ids: vec![],
+    };
+    let v = serde_json::to_value(&ack).unwrap();
+    assert!(v["scheduleId"].is_null(), "scheduleId serializes as null");
+    assert_eq!(v["scriptIds"], serde_json::json!([]));
+}

@@ -677,6 +677,7 @@ impl ToolRunManager {
         let running_tools = self.running_tools.clone();
         let installed_tools_service = self.installed_tools_service.clone();
         let mut installation = tool.installation.clone();
+        let mut run_command_args = tool.run_command_args.clone();
 
         tokio::spawn(async move {
             let mut launch_backoff = FailureLogBackoff::new();
@@ -687,24 +688,21 @@ impl ToolRunManager {
                     break;
                 }
 
-                let mut was_updating = false;
                 while updating_tools
                     .read()
                     .await
                     .contains_key(&tool.tool_agent_id)
                 {
-                    was_updating = true;
                     info!(tool_id = %tool.tool_agent_id, "Tool is being updated, waiting...");
                     sleep(Duration::from_secs(1)).await;
                 }
 
-                if was_updating {
-                    if let Ok(Some(fresh)) = installed_tools_service
-                        .get_by_tool_agent_id(&tool.tool_agent_id)
-                        .await
-                    {
-                        installation = fresh.installation;
-                    }
+                if let Ok(Some(fresh)) = installed_tools_service
+                    .get_by_tool_agent_id(&tool.tool_agent_id)
+                    .await
+                {
+                    installation = fresh.installation;
+                    run_command_args = fresh.run_command_args;
                 }
 
                 if !running_tools.read().await.contains(&tool.tool_agent_id) {
@@ -714,24 +712,23 @@ impl ToolRunManager {
 
                 let log_attempt = launch_backoff.should_log();
 
-                let processed_args = match params_processor
-                    .process(&tool.tool_agent_id, tool.run_command_args.clone())
-                {
-                    Ok(args) => args,
-                    Err(e) => {
-                        let failures = launch_backoff.record_failure(log_attempt);
-                        if log_attempt {
-                            error!(
-                                failed_attempts = failures,
-                                "Failed to resolve tool {} run command args: {:#}",
-                                tool.tool_agent_id,
-                                e
-                            );
+                let processed_args =
+                    match params_processor.process(&tool.tool_agent_id, run_command_args.clone()) {
+                        Ok(args) => args,
+                        Err(e) => {
+                            let failures = launch_backoff.record_failure(log_attempt);
+                            if log_attempt {
+                                error!(
+                                    failed_attempts = failures,
+                                    "Failed to resolve tool {} run command args: {:#}",
+                                    tool.tool_agent_id,
+                                    e
+                                );
+                            }
+                            sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+                            continue;
                         }
-                        sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
-                        continue;
-                    }
-                };
+                    };
 
                 debug!(
                     "Running tool {} with args: {:?}",

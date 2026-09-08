@@ -1,5 +1,6 @@
-"use client";
+'use client';
 
+import type { MermaidConfig } from 'mermaid';
 /**
  * Single MermaidDiagram for the unified markdown engine (dark theme only —
  * the old RichMarkdownRenderer's light-theme branch was dead code behind a
@@ -8,8 +9,9 @@
  * `mermaid` stays a dynamic import so neither chat nor content bundles pay
  * for it unless a diagram is actually rendered.
  */
-import React, { useEffect, useState } from 'react';
-import type { MermaidConfig } from 'mermaid';
+import type React from 'react';
+import { useEffect, useState } from 'react';
+import { useIsHydrated } from '../../../hooks/ui/use-is-hydrated';
 import { AlertCircleIcon } from '../../icons-v2-generated';
 
 /**
@@ -178,9 +180,10 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => { setMounted(true); }, []);
+  // `useSyncExternalStore` hydration gate rather than the `useState(false)` +
+  // `useEffect(setMounted)` idiom — same one extra render, no setState inside
+  // an effect body.
+  const mounted = useIsHydrated();
 
   useEffect(() => {
     // This effect re-runs on every `chart` change, and during STREAMING the
@@ -218,9 +221,15 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
             mainBkg: 'transparent',
             secondBkg: 'transparent',
             tertiaryBkg: 'transparent',
-            cScale0: '#FFC008', cScale1: '#4ECDC4', cScale2: '#45B7D1',
-            cScale3: '#96CEB4', cScale4: '#FFEAA7', cScale5: '#DDA0DD',
-            cScale6: '#98D8C8', cScale7: '#F7DC6F', cScale8: '#BB8FCE',
+            cScale0: '#FFC008',
+            cScale1: '#4ECDC4',
+            cScale2: '#45B7D1',
+            cScale3: '#96CEB4',
+            cScale4: '#FFEAA7',
+            cScale5: '#DDA0DD',
+            cScale6: '#98D8C8',
+            cScale7: '#F7DC6F',
+            cScale8: '#BB8FCE',
             cScale9: '#85C1E9',
             taskTextColor: '#FAFAFA',
             taskTextOutsideColor: '#FAFAFA',
@@ -260,7 +269,10 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
       }
     };
 
-    if (mounted) { renderMermaid(); }
+    if (mounted) {
+      // Never rejects — try/catch, every write gated on `cancelled`.
+      void renderMermaid();
+    }
     return () => {
       cancelled = true;
       // An abandoned render (superseded chart, or one wedged past the timeout)
@@ -275,14 +287,12 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
 
   if (error) {
     return (
-      <div className="error-state bg-ods-card border border-ods-border rounded-lg p-6 my-6">
-        <div className="error-icon flex justify-center mb-4">
-          <AlertCircleIcon className="w-12 h-12 text-ods-error" />
+      <div className="error-state my-6 rounded-lg border border-ods-border bg-ods-card p-6">
+        <div className="error-icon mb-4 flex justify-center">
+          <AlertCircleIcon className="h-12 w-12 text-ods-error" />
         </div>
-        <div className="error-title text-center font-sans font-semibold text-lg text-ods-error mb-2">
-          Diagram Error
-        </div>
-        <div className="error-description text-center font-sans text-sm text-ods-text-secondary mb-4 break-words overflow-hidden max-w-full">
+        <div className="error-title mb-2 text-center font-sans text-lg font-semibold text-ods-error">Diagram Error</div>
+        <div className="error-description mb-4 max-w-full overflow-hidden break-words text-center font-sans text-sm text-ods-text-secondary">
           <div className="overflow-x-auto">
             <pre className="whitespace-pre-wrap break-words text-xs">{error}</pre>
           </div>
@@ -293,8 +303,8 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
 
   if (isLoading || !svg) {
     return (
-      <div className="skeleton-code bg-ods-card border border-ods-border rounded-lg p-6 min-h-[120px] flex items-center justify-center">
-        <div className="animate-pulse text-ods-text-tertiary font-sans">
+      <div className="skeleton-code flex min-h-[120px] items-center justify-center rounded-lg border border-ods-border bg-ods-card p-6">
+        <div className="animate-pulse font-sans text-ods-text-tertiary">
           {isLoading ? 'Loading diagram renderer...' : 'Rendering diagram...'}
         </div>
       </div>
@@ -302,18 +312,22 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
   }
 
   return (
-    <div className="mermaid-container rounded-lg p-4 md:p-6 lg:p-8 my-6 overflow-x-auto bg-ods-card border border-ods-border">
+    <div className="mermaid-container my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card p-4 md:p-6 lg:p-8">
       {/* Scoped to `.mermaid-svg-container`, so it only needs to exist when a
           diagram is actually mounted. The engine used to emit this once per
           instance — i.e. once per chat segment, almost never with a diagram. */}
       <style dangerouslySetInnerHTML={{ __html: mermaidStyles }} />
-      <div className="flex justify-center items-center w-full min-h-[200px] md:min-h-[250px] lg:min-h-[300px]">
+      <div className="flex min-h-[200px] w-full items-center justify-center md:min-h-[250px] lg:min-h-[300px]">
         <div
-          className="mermaid-svg-container w-full flex justify-center max-w-full"
+          className="mermaid-svg-container flex w-full max-w-full justify-center"
+          // The class is a styling hook for the injected SVG (see the <style>
+          // block above); the test id is the stable handle for "which SVG is
+          // mounted right now", which the stale-render guard has to assert on.
+          data-testid="mermaid-svg-container"
           style={{ fontSize: '14px' }}
           dangerouslySetInnerHTML={{
-            __html: svg.replace(/<svg[^>]*>/, (match) =>
-              match.replace(/width="[^"]*"/, 'width="100%"').replace(/height="[^"]*"/, 'height="auto"')
+            __html: svg.replace(/<svg[^>]*>/, match =>
+              match.replace(/width="[^"]*"/, 'width="100%"').replace(/height="[^"]*"/, 'height="auto"'),
             ),
           }}
         />

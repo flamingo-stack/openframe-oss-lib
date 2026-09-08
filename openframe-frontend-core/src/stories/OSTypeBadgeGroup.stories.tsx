@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { OSTypeBadgeGroup } from '../components/features/os-type-badge-group'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { OSTypeBadgeGroup } from '../components/features/os-type-badge-group';
 
 const meta = {
   title: 'Features/OSTypeBadgeGroup',
@@ -8,7 +8,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Displays multiple OS type badges in a horizontal group. Used for showing supported platforms in scripts and other multi-OS contexts.',
+        component:
+          'Displays multiple OS type badges in a horizontal group. Used for showing supported platforms in scripts and other multi-OS contexts.',
       },
     },
   },
@@ -31,10 +32,10 @@ const meta = {
       description: 'Additional CSS classes',
     },
   },
-} satisfies Meta<typeof OSTypeBadgeGroup>
+} satisfies Meta<typeof OSTypeBadgeGroup>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Default with all three OS types.
@@ -43,7 +44,7 @@ export const Default: Story = {
   args: {
     osTypes: ['windows', 'darwin', 'linux'],
   },
-}
+};
 
 /**
  * Windows and macOS only.
@@ -52,7 +53,7 @@ export const WindowsAndMac: Story = {
   args: {
     osTypes: ['windows', 'macos'],
   },
-}
+};
 
 /**
  * Single OS type.
@@ -61,7 +62,7 @@ export const SingleOS: Story = {
   args: {
     osTypes: ['linux'],
   },
-}
+};
 
 /**
  * Using OS aliases - they normalize to the correct icons.
@@ -70,7 +71,7 @@ export const WithAliases: Story = {
   args: {
     osTypes: ['Darwin', 'Ubuntu', 'win32'],
   },
-}
+};
 
 /**
  * With maxDisplay limit showing "+N more".
@@ -80,7 +81,7 @@ export const WithMaxDisplay: Story = {
     osTypes: ['windows', 'darwin', 'linux'],
     maxDisplay: 2,
   },
-}
+};
 
 /**
  * Many OS types with maxDisplay.
@@ -90,7 +91,7 @@ export const ManyOSWithLimit: Story = {
     osTypes: ['windows', 'darwin', 'linux', 'ubuntu', 'fedora'],
     maxDisplay: 3,
   },
-}
+};
 
 /**
  * Smaller icons.
@@ -100,7 +101,7 @@ export const SmallIcons: Story = {
     osTypes: ['windows', 'darwin', 'linux'],
     iconSize: 'w-4 h-4',
   },
-}
+};
 
 /**
  * Larger icons.
@@ -110,7 +111,7 @@ export const LargeIcons: Story = {
     osTypes: ['windows', 'darwin', 'linux'],
     iconSize: 'w-6 h-6',
   },
-}
+};
 
 /**
  * Empty array - renders nothing.
@@ -119,7 +120,7 @@ export const Empty: Story = {
   args: {
     osTypes: [],
   },
-}
+};
 
 /**
  * Comparison of different configurations.
@@ -148,4 +149,4 @@ export const Comparison: Story = {
       </div>
     </div>
   ),
-}
+};

@@ -30,14 +30,14 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from '../../../embed-shims';
-import type { DeliveryResponse } from '../../../types/delivery';
-import { DeliveryTable } from './delivery-table';
+import { useScrollToHash } from '../../../hooks/use-scroll-to-hash';
+import type { DeliveryItem, DeliveryResponse } from '../../../types/delivery';
+import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
+import { contentFetch } from '../../../utils/embed-content-fetch';
+import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
 import { EmptyState } from '../../empty-state';
 import { LoadError } from '../../ui/error-state';
-import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
-import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
-import { contentFetch } from '../../../utils/embed-content-fetch';
-import { useScrollToHash } from '../../../hooks/use-scroll-to-hash';
+import { DeliveryTable } from './delivery-table';
 
 const DEFAULT_COMPLETED_ENDPOINT = '/api/delivery/completed';
 const DEFAULT_IN_PROGRESS_ENDPOINT = '/api/delivery/in-progress';
@@ -45,6 +45,16 @@ const DEFAULT_IN_PROGRESS_ENDPOINT = '/api/delivery/in-progress';
 // chrome's written `?key=` and this view's read.
 const DEFAULT_SEARCH_PARAM_KEY = DEV_SECTION_PARAM_KEYS.search;
 const DEFAULT_TASK_TYPE_PARAM_KEY = DEV_SECTION_PARAM_KEYS.deliveryTaskType;
+
+/**
+ * Wire shape of ONE bucket endpoint — `{ items, count, pagination }`. Only
+ * `items` is read here; `items` stays optional because an embedder's proxy is
+ * free to answer with an empty envelope, and the render treats "no items" and
+ * "empty items" identically.
+ */
+interface DeliveryBucketResponse {
+  items?: DeliveryItem[];
+}
 
 export interface DeliveryListsProps {
   /** GET endpoint for the "Recently Completed" bucket. Default
@@ -80,6 +90,12 @@ export function DeliveryLists({
   const taskTypeFilter = searchParams.get(taskTypeParamKey) || 'all';
 
   useEffect(() => {
+    // `searchQuery`/`taskTypeFilter` come from the URL, so every keystroke that
+    // rewrites the query string re-runs this effect while the previous pair of
+    // requests is still open. Without this guard a slower EARLIER response can
+    // resolve last and paint results for a query the user already moved past.
+    let cancelled = false;
+
     async function fetchDeliveryData() {
       try {
         setIsLoading(true);
@@ -109,23 +125,30 @@ export function DeliveryLists({
         }
 
         const [completedResult, inProgressResult] = await Promise.all([
-          completedResponse.json(),
-          inProgressResponse.json(),
+          completedResponse.json() as Promise<DeliveryBucketResponse>,
+          inProgressResponse.json() as Promise<DeliveryBucketResponse>,
         ]);
 
+        if (cancelled) return;
         setData({
-          completed: completedResult.items || [],
-          inProgress: inProgressResult.items || [],
+          completed: completedResult.items ?? [],
+          inProgress: inProgressResult.items ?? [],
         });
       } catch (err) {
+        if (cancelled) return;
         console.error('Error fetching delivery items:', err);
         setError('Failed to load delivery items. Please try again later.');
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
 
-    fetchDeliveryData();
+    // Never rejects — try/catch/finally, every write gated on `cancelled`.
+    void fetchDeliveryData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [searchQuery, taskTypeFilter, completedApiEndpoint, inProgressApiEndpoint, searchParamKey, taskTypeParamKey]);
 
   const filteredCompleted = data?.completed || [];
@@ -142,7 +165,8 @@ export function DeliveryLists({
   const showInProgress = true;
 
   const hasActiveFilters = searchQuery !== '' || taskTypeFilter !== 'all';
-  const hasResults = (showCompleted && filteredCompleted.length > 0) || (showInProgress && filteredInProgress.length > 0);
+  const hasResults =
+    (showCompleted && filteredCompleted.length > 0) || (showInProgress && filteredInProgress.length > 0);
 
   // Error state — consume lib's canonical LoadError so ODS tokens +
   // retry affordance stay in lockstep with every other surface.
@@ -155,10 +179,11 @@ export function DeliveryLists({
   }
 
   return (
-    <div className="w-full flex flex-col gap-[40px]">
+    <div className="flex w-full flex-col gap-[40px]">
       {/* Empty state if no results after filtering */}
-      {!isLoading && !hasResults && (
-        hasActiveFilters ? (
+      {!isLoading &&
+        !hasResults &&
+        (hasActiveFilters ? (
           <EmptyState
             type="search"
             title="No tasks found"
@@ -179,32 +204,25 @@ export function DeliveryLists({
             description="Check back soon for upcoming tasks!"
             showCTA={false}
           />
-        )
-      )}
+        ))}
 
       {/* Completed Tasks Table */}
       {showCompleted && (hasResults || isLoading) && (
         <div className="w-full">
-          <h3 className="text-h2 text-ods-text-primary tracking-[-0.48px] md:tracking-[-0.56px] lg:tracking-[-0.64px] mb-4">
+          <h3 className="mb-4 tracking-[-0.48px] text-ods-text-primary text-h2 md:tracking-[-0.56px] lg:tracking-[-0.64px]">
             Recently Completed<span className="text-ods-accent">:</span>
           </h3>
-          <DeliveryTable
-            items={filteredCompleted}
-            isLoading={isLoading}
-          />
+          <DeliveryTable items={filteredCompleted} isLoading={isLoading} />
         </div>
       )}
 
       {/* In Progress Tasks Table */}
       {showInProgress && (hasResults || isLoading) && (
         <div className="w-full">
-          <h3 className="text-h2 text-ods-text-primary tracking-[-0.48px] md:tracking-[-0.56px] lg:tracking-[-0.64px] mb-4">
+          <h3 className="mb-4 tracking-[-0.48px] text-ods-text-primary text-h2 md:tracking-[-0.56px] lg:tracking-[-0.64px]">
             Active Tasks<span className="text-ods-accent">:</span>
           </h3>
-          <DeliveryTable
-            items={filteredInProgress}
-            isLoading={isLoading}
-          />
+          <DeliveryTable items={filteredInProgress} isLoading={isLoading} />
         </div>
       )}
     </div>

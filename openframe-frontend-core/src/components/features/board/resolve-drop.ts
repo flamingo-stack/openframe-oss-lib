@@ -1,12 +1,12 @@
-import { aimFromTarget, aimToChange } from './aim'
-import type { BoardChange, BoardColumnDef } from './types'
+import { aimFromTarget, aimToChange } from './aim';
+import type { BoardChange, BoardColumnDef } from './types';
 
 /** What a drop carries: the card that moved, and what it was dropped onto. */
 interface DropInput {
   /** `getInitialData` from the dragged card. */
-  source: Record<string | symbol, unknown>
+  source: Record<string | symbol, unknown>;
   /** The innermost drop target under the pointer — a card, or a lane. */
-  target: Record<string | symbol, unknown> | undefined
+  target: Record<string | symbol, unknown> | undefined;
 }
 
 /**
@@ -21,8 +21,8 @@ export function resolveBoardDrop(
   columns: readonly BoardColumnDef[],
   { source, target }: DropInput,
 ): BoardChange | null {
-  if (!target) return null
-  const ticketId = String(source.ticketId)
-  const aim = aimFromTarget(columns, ticketId, target)
-  return aim && aimToChange(columns, ticketId, aim)
+  if (!target) return null;
+  const ticketId = String(source.ticketId);
+  const aim = aimFromTarget(columns, ticketId, target);
+  return aim && aimToChange(columns, ticketId, aim);
 }

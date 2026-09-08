@@ -36,13 +36,13 @@ export const GENERIC_EMAIL_DOMAINS = [
   '126.com',
   'web.de',
   't-online.de',
-] as const
+] as const;
 
-export type GenericEmailDomain = (typeof GENERIC_EMAIL_DOMAINS)[number]
+export type GenericEmailDomain = (typeof GENERIC_EMAIL_DOMAINS)[number];
 
 export function extractDomainFromEmail(email: string): string | null {
-  if (!email || !email.includes('@')) return null
-  return email.split('@')[1]?.toLowerCase() || null
+  if (!email || !email.includes('@')) return null;
+  return email.split('@')[1]?.toLowerCase() || null;
 }
 
 export function normalizeDomain(domain: string): string {
@@ -53,19 +53,19 @@ export function normalizeDomain(domain: string): string {
       .replace(/^www\./, '')
       .split('/')[0]
       .trim() || ''
-  )
+  );
 }
 
 export function isGenericDomain(domain: string): boolean {
-  const normalized = normalizeDomain(domain)
-  return GENERIC_EMAIL_DOMAINS.includes(normalized as GenericEmailDomain)
+  const normalized = normalizeDomain(domain);
+  return GENERIC_EMAIL_DOMAINS.includes(normalized as GenericEmailDomain);
 }
 
 export function hasGenericEmailDomain(email: string): boolean {
-  const domain = extractDomainFromEmail(email)
-  return domain ? isGenericDomain(domain) : false
+  const domain = extractDomainFromEmail(email);
+  return domain ? isGenericDomain(domain) : false;
 }
 
 export function isGenericWebsiteDomain(website: string): boolean {
-  return isGenericDomain(normalizeDomain(website))
+  return isGenericDomain(normalizeDomain(website));
 }

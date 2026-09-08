@@ -22,7 +22,7 @@ const meta = {
     showHeader: { control: 'boolean' },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ minHeight: '400px', background: '#111' }}>
         <Story />
       </div>
@@ -34,7 +34,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const PlaceholderContent = () => (
-  <div className="bg-ods-card border border-ods-border rounded-lg p-6">
+  <div className="rounded-lg border border-ods-border bg-ods-card p-6">
     <p className="text-ods-text-secondary">Page content goes here</p>
   </div>
 );
@@ -84,9 +84,7 @@ export const ListPage: Story = {
     variant: 'list',
     title: 'Devices',
     subtitle: '24 devices found',
-    actions: [
-      { label: 'Add Device', onClick: () => {}, icon: <Plus className="w-5 h-5" />, variant: 'accent' },
-    ],
+    actions: [{ label: 'Add Device', onClick: () => {}, icon: <Plus className="h-5 w-5" />, variant: 'accent' }],
     children: <PlaceholderContent />,
   },
 };
@@ -100,8 +98,8 @@ export const ListPageMultipleActions: Story = {
     title: 'Scripts',
     subtitle: 'Manage your scripts',
     actions: [
-      { label: 'Edit', onClick: () => {}, icon: <Edit className="w-5 h-5" />, variant: 'outline' },
-      { label: 'Create Script', onClick: () => {}, icon: <Plus className="w-5 h-5" />, variant: 'accent' },
+      { label: 'Edit', onClick: () => {}, icon: <Edit className="h-5 w-5" />, variant: 'outline' },
+      { label: 'Create Script', onClick: () => {}, icon: <Plus className="h-5 w-5" />, variant: 'accent' },
     ],
     children: <PlaceholderContent />,
   },
@@ -132,7 +130,7 @@ export const DetailPageWithActions: Story = {
     subtitle: 'Last run: 2 hours ago',
     backButton: { onClick: () => {} },
     actions: [
-      { label: 'Delete', onClick: () => {}, icon: <Trash2 className="w-5 h-5" />, variant: 'outline' },
+      { label: 'Delete', onClick: () => {}, icon: <Trash2 className="h-5 w-5" />, variant: 'outline' },
       { label: 'Run Script', onClick: () => {}, variant: 'accent' },
     ],
     children: <PlaceholderContent />,
@@ -155,10 +153,10 @@ export const FormPage: Story = {
     ],
     children: (
       <div className="flex flex-col gap-6">
-        <div className="bg-ods-card border border-ods-border rounded-lg p-6">
+        <div className="rounded-lg border border-ods-border bg-ods-card p-6">
           <p className="text-ods-text-secondary">Form fields go here</p>
         </div>
-        <div className="bg-ods-card border border-ods-border rounded-lg p-6">
+        <div className="rounded-lg border border-ods-border bg-ods-card p-6">
           <p className="text-ods-text-secondary">More form fields</p>
         </div>
       </div>
@@ -188,9 +186,11 @@ export const CustomHeaderContent: Story = {
   args: {
     variant: 'list',
     headerContent: (
-      <div className="flex items-center justify-between w-full">
+      <div className="flex w-full items-center justify-between">
         <h1 className="text-2xl font-bold text-ods-text-primary">Custom Header</h1>
-        <Button variant="accent" size="small-legacy">Action</Button>
+        <Button variant="accent" size="small-legacy">
+          Action
+        </Button>
       </div>
     ),
     children: <PlaceholderContent />,
@@ -205,11 +205,11 @@ export const WithHeaderActions: Story = {
     variant: 'list',
     title: 'Devices',
     headerActions: (
-      <Button variant="outline" size="small-legacy">Export</Button>
+      <Button variant="outline" size="small-legacy">
+        Export
+      </Button>
     ),
-    actions: [
-      { label: 'Add Device', onClick: () => {}, icon: <Plus className="w-5 h-5" />, variant: 'accent' },
-    ],
+    actions: [{ label: 'Add Device', onClick: () => {}, icon: <Plus className="h-5 w-5" />, variant: 'accent' }],
     children: <PlaceholderContent />,
   },
 };

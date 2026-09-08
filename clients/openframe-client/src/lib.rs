@@ -41,6 +41,7 @@ use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
 use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::execution_listener::ExecutionListener;
+use crate::listener::machine_timezone_request_listener::MachineTimezoneRequestListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
 use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
@@ -88,6 +89,7 @@ use crate::services::{
     InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
     UpdateStateService,
 };
+use crate::services::{MachineIdService, MACHINE_ID_HEADER};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -170,6 +172,7 @@ pub struct Client {
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
     hostname_report_publisher: HostnameReportPublisher,
+    machine_timezone_request_listener: MachineTimezoneRequestListener,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
     update_handler_service: UpdateHandlerService,
@@ -210,8 +213,21 @@ impl Client {
         let config_service = AgentConfigurationService::new(directory_manager.clone())
             .context("Failed to initialize device configuration service")?;
 
+        let machine_id_service = MachineIdService::new(&directory_manager);
+        let machine_id = machine_id_service
+            .get_or_create()
+            .context("Failed to get or create machine ID")?;
+
+        let mut default_headers = reqwest::header::HeaderMap::new();
+        default_headers.insert(
+            MACHINE_ID_HEADER,
+            reqwest::header::HeaderValue::from_str(&machine_id)
+                .context("Invalid machine ID for header")?,
+        );
+
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(HTTP_CLIENT_TIMEOUT_SECS))
+            .default_headers(default_headers.clone())
             // disable TLS verification for dev mode only
             .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
             .no_proxy()
@@ -222,6 +238,7 @@ impl Client {
 
         let download_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(DOWNLOAD_CLIENT_TIMEOUT_SECS))
+            .default_headers(default_headers)
             .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
             .no_proxy()
             .pool_max_idle_per_host(0)
@@ -280,11 +297,8 @@ impl Client {
 
         // Initialize proactive token refresh run manager (keeps shared_token.enc valid
         // independent of NATS reconnects)
-        let token_refresh_run_manager = TokenRefreshRunManager::new(
-            auth_service.clone(),
-            config_service.clone(),
-            deactivation_service.clone(),
-        );
+        let token_refresh_run_manager =
+            TokenRefreshRunManager::new(auth_service.clone(), deactivation_service.clone());
 
         // Initialize NATS connection manager
         let ws_url = format!("wss://{}", initial_configuration_service.get_server_url()?);
@@ -297,6 +311,7 @@ impl Client {
             auth_service.clone(),
             tls_config_provider,
             deactivation_service.clone(),
+            machine_id_service.clone(),
         );
 
         // Initialize tool agent file client
@@ -371,6 +386,7 @@ impl Client {
             config_service.clone(),
             tool_run_manager.clone(),
             deactivation_service.clone(),
+            http_client.clone(),
         );
 
         // Initialize tool connection service
@@ -547,6 +563,13 @@ impl Client {
             device_data_fetcher.clone(),
         );
 
+        let machine_timezone_request_listener = MachineTimezoneRequestListener::new(
+            nats_connection_manager.clone(),
+            nats_message_publisher.clone(),
+            config_service.clone(),
+            device_data_fetcher.clone(),
+        );
+
         // Initialize update handler service
         let update_handler_service = UpdateHandlerService::new(
             update_state_service.clone(),
@@ -578,6 +601,7 @@ impl Client {
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
             hostname_report_publisher,
+            machine_timezone_request_listener,
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
             update_handler_service,
@@ -640,6 +664,8 @@ impl Client {
         // Connect to NATS
         self.nats_connection_manager.connect().await?;
 
+        self.nats_connection_manager.start_connection_watchdog();
+
         // Handle any pending update from previous run (after NATS is connected)
         if let Err(e) = self.update_handler_service.handle_pending_update().await {
             error!("Failed to handle pending update: {:#}", e);
@@ -651,6 +677,9 @@ impl Client {
 
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
+
+        self.machine_timezone_request_listener.start().await?;
+        self.machine_timezone_request_listener.report_once().await;
 
         //Start tool installation message listener in background
         self.tool_installation_message_listener.start().await?;

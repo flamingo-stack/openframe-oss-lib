@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from 'react';
-import { LinkedInContainer } from './embed-container';
-import { LinkedinIcon } from '../icons-v2-generated/brand-logos/linkedin-icon';
 import { ExternalLink } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { LinkedinIcon } from '../icons-v2-generated/brand-logos/linkedin-icon';
+import { LinkedInContainer } from './embed-container';
 
 /**
  * Derive LinkedIn's official embed URL from any post URL or URN.
@@ -38,17 +38,17 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
     return (
       <LinkedInContainer>
         <div className="p-6">
-          <div className="flex items-center space-x-3 text-ods-text-secondary mb-4">
-            <LinkedinIcon className="w-5 h-5 shrink-0" />
+          <div className="mb-4 flex items-center space-x-3 text-ods-text-secondary">
+            <LinkedinIcon className="h-5 w-5 shrink-0" />
             <span>LinkedIn post</span>
           </div>
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center space-x-2 px-4 py-2 bg-ods-card border border-ods-border text-ods-text-primary rounded-md text-h6 hover:bg-ods-bg-hover transition-colors"
+            className="inline-flex items-center space-x-2 rounded-md border border-ods-border bg-ods-card px-4 py-2 text-ods-text-primary transition-colors text-h6 hover:bg-ods-bg-hover"
           >
-            <LinkedinIcon className="w-4 h-4" />
+            <LinkedinIcon className="h-4 w-4" />
             <span>View on LinkedIn</span>
           </a>
         </div>
@@ -60,38 +60,38 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
     <LinkedInContainer>
       <div className="relative w-full" style={{ height }}>
         {!loaded && (
-          <div className="absolute inset-0 p-6 animate-pulse">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-ods-border rounded-full" />
+          <div className="absolute inset-0 animate-pulse p-6">
+            <div className="mb-4 flex items-center space-x-3">
+              <div className="h-12 w-12 rounded-full bg-ods-border" />
               <div>
-                <div className="h-4 bg-ods-border rounded w-32 mb-2" />
-                <div className="h-3 bg-ods-border rounded w-24" />
+                <div className="mb-2 h-4 w-32 rounded bg-ods-border" />
+                <div className="h-3 w-24 rounded bg-ods-border" />
               </div>
             </div>
             <div className="space-y-2">
-              <div className="h-4 bg-ods-border rounded w-full" />
-              <div className="h-4 bg-ods-border rounded w-3/4" />
+              <div className="h-4 w-full rounded bg-ods-border" />
+              <div className="h-4 w-3/4 rounded bg-ods-border" />
             </div>
           </div>
         )}
         <iframe
           src={embedUrl}
           title="Embedded LinkedIn post"
-          className="w-full h-full"
+          className="h-full w-full"
           style={{ border: 0 }}
           loading="lazy"
           allowFullScreen
           onLoad={() => setLoaded(true)}
         />
       </div>
-      <div className="px-4 py-3 bg-ods-bg-surface border-t border-ods-border">
+      <div className="border-t border-ods-border bg-ods-bg-surface px-4 py-3">
         <a
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center space-x-2 text-ods-accent hover:text-ods-accent/80 transition-colors text-h6"
+          className="inline-flex items-center space-x-2 text-ods-accent transition-colors text-h6 hover:text-ods-accent/80"
         >
-          <ExternalLink className="w-4 h-4" />
+          <ExternalLink className="h-4 w-4" />
           <span>View on LinkedIn</span>
         </a>
       </div>

@@ -1,9 +1,9 @@
-'use client'
+'use client';
 
-import { useMemo } from 'react'
+import { useMemo } from 'react';
 
-import { useChatRuntime } from '../contexts/chat-runtime-context'
-import { buildOgPlaceholderUrl } from '../utils/og-placeholder'
+import { useChatRuntime } from '../contexts/chat-runtime-context';
+import { buildOgPlaceholderUrl } from '../utils/og-placeholder';
 
 /**
  * Resolve a branded og-placeholder image URL for a title, driven entirely by
@@ -21,14 +21,14 @@ import { buildOgPlaceholderUrl } from '../utils/og-placeholder'
  */
 export interface UseOgPlaceholderUrlArgs {
   /** Text to display on the placeholder. */
-  title: string | undefined | null
+  title: string | undefined | null;
   /** Site name shown below the title (optional). */
-  siteName?: string
+  siteName?: string;
   /** `'wide'` (1200×630 social-card; default) or `'square'` (1024×1024 — for
    *  compact chat-inline slots so `object-cover` doesn't crop the title off). */
-  aspect?: 'wide' | 'square'
+  aspect?: 'wide' | 'square';
   /** When `false`, returns `null` instead of a URL. */
-  enabled?: boolean
+  enabled?: boolean;
 }
 
 export function useOgPlaceholderUrl({
@@ -37,10 +37,10 @@ export function useOgPlaceholderUrl({
   aspect = 'wide',
   enabled = true,
 }: UseOgPlaceholderUrlArgs): string | null {
-  const endpoints = useChatRuntime()?.endpoints
+  const endpoints = useChatRuntime()?.endpoints;
 
   return useMemo(() => {
-    if (!enabled || !title) return null
-    return buildOgPlaceholderUrl(endpoints, title, { site: siteName || undefined, aspect })
-  }, [endpoints, title, siteName, aspect, enabled])
+    if (!enabled || !title) return null;
+    return buildOgPlaceholderUrl(endpoints, title, { site: siteName || undefined, aspect });
+  }, [endpoints, title, siteName, aspect, enabled]);
 }

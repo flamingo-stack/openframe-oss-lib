@@ -56,3 +56,104 @@ describe('processShortcodes script stripping', () => {
     expect(output).toContain('<script>');
   });
 });
+
+/**
+ * Steps 3.5-5 restore the code-block / markdown-link / table-row placeholders.
+ * They used to restore with a plain string replacement, which re-interprets
+ * `$&`, `` $` ``, `$'` and `$$` IN THE REPLACEMENT — so a fenced shell snippet
+ * containing `$$` or `$'…'` was silently rewritten.
+ */
+describe('processShortcodes placeholder restore', () => {
+  it('restores a fenced block containing `$$` verbatim', () => {
+    const output = processShortcodes('```bash\ntmp=/tmp/x.$$\n```\n\nTrailing prose.');
+    expect(output).toContain('tmp=/tmp/x.$$');
+  });
+
+  it("does not splice the rest of the document into a fence containing `$'`", () => {
+    const output = processShortcodes("```bash\nsep=$'\\n'\n```\n\nTrailing prose.");
+    expect(output).toContain("sep=$'\\n'");
+    // `$'` used to expand to everything AFTER the placeholder, duplicating it.
+    expect(output.match(/Trailing prose\./g)).toHaveLength(1);
+  });
+
+  it('restores inline code containing `$&` verbatim', () => {
+    const output = processShortcodes('Use `perl -pe "s/x/[$&]/"` for that.');
+    expect(output).toContain('s/x/[$&]/');
+  });
+});
+
+/**
+ * Every `embed-overrides.tsx` div branch requires its `data-*` payload; a
+ * blank one renders as an empty div (previously: a permanently broken
+ * player). A whitespace-only shortcode payload must therefore stay literal
+ * text rather than expanding into a payload-less embed div.
+ */
+describe('processShortcodes blank shortcode payloads', () => {
+  it.each([
+    ['{{youtube:   }}', 'youtube-embed'],
+    ['{{figma:   }}', 'figma-embed'],
+    ['{{linkedin:   }}', 'linkedin-embed'],
+    ['{{link:   }}', 'link-preview'],
+    ['{{reddit:   }}', 'reddit-embed'],
+    ['{{tweet:   }}', 'tweet-embed'],
+  ])('leaves %s as literal text instead of emitting a payload-less %s', (input, className) => {
+    const output = processShortcodes(input);
+    expect(output).not.toContain(className);
+    expect(output).toContain(input);
+  });
+
+  it('still expands a well-formed shortcode', () => {
+    expect(processShortcodes('{{youtube: dQw4w9WgXcQ }}')).toContain(
+      '<div class="youtube-embed" data-video-id="dQw4w9WgXcQ"></div>',
+    );
+  });
+});
+
+/**
+ * Design-doc embeds (R11): the spec's `{{figma:FILE_KEY[:NODE_ID]}}` grammar is
+ * rewritten onto the canonical `{{figma:URL}}` rule, and Claude artifacts get
+ * the SAME treatment — a shortcode → a block the renderer maps to `ClaudeEmbed`.
+ * Both are markdown blocks, so they render identically in a spec body, a
+ * comment, or a links rail, and no surface hand-assembles its own card.
+ */
+describe('processShortcodes design-doc embeds', () => {
+  it('rewrites {{figma:KEY:NODE}} to the canonical design URL and renders the figma embed', () => {
+    const output = processShortcodes('{{figma:aB3xK9:12-405}}');
+    expect(output).toContain('class="figma-embed"');
+    expect(output).toContain('data-figma-url="https://www.figma.com/design/aB3xK9?node-id=12-405"');
+  });
+
+  it('accepts a colon-separated node id and a bare key', () => {
+    expect(processShortcodes('{{figma:aB3xK9:12:405}}')).toContain('node-id=12-405');
+    expect(processShortcodes('{{figma:aB3xK9}}')).toContain('data-figma-url="https://www.figma.com/design/aB3xK9"');
+  });
+
+  it('leaves the existing {{figma:URL}} grammar untouched', () => {
+    const output = processShortcodes('{{figma:https://www.figma.com/proto/aB3xK9/Flows?node-id=1-2}}');
+    expect(output).toContain('data-figma-url="https://www.figma.com/proto/aB3xK9/Flows?node-id=1-2"');
+  });
+
+  it('renders a Claude artifact / Claude Design link as an embed block, like figma', () => {
+    const artifact = processShortcodes('{{claude-artifact:https://claude.ai/public/artifacts/abc-123}}');
+    expect(artifact).toContain('class="claude-embed"');
+    expect(artifact).toContain('data-url="https://claude.ai/public/artifacts/abc-123"');
+    expect(artifact).toContain('data-kind="artifact"');
+
+    const design = processShortcodes('{{claude-design:https://claude.ai/design/xyz}}');
+    expect(design).toContain('data-kind="design"');
+  });
+
+  it('threads the optional pipe title into data-title', () => {
+    const titled = processShortcodes('{{claude-artifact:https://claude.ai/a|Brief doc}}');
+    expect(titled).toContain('data-title="Brief doc"');
+
+    const untitled = processShortcodes('{{claude-artifact:https://claude.ai/a}}');
+    expect(untitled).not.toContain('data-title');
+  });
+
+  it('escapes the url attribute so a crafted link cannot break out of the block', () => {
+    const output = processShortcodes('{{claude-artifact:https://claude.ai/a"><script>alert(1)</script>}}');
+    expect(output).not.toContain('<script>');
+    expect(output).toContain('&quot;');
+  });
+});

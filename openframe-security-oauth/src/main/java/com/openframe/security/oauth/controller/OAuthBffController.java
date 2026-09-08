@@ -2,9 +2,11 @@ package com.openframe.security.oauth.controller;
 
 import com.openframe.security.cookie.CookieService;
 import com.openframe.security.oauth.dto.TokenResponse;
+import com.openframe.security.oauth.exception.AppleNativeRegistrationRequiredException;
 import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
 import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
+import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +19,7 @@ import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 import static com.openframe.security.oauth.SecurityConstants.*;
 import static org.springframework.http.HttpHeaders.LOCATION;
@@ -33,6 +36,7 @@ public class OAuthBffController {
     private final OAuthBffService oauthBffService;
     private final OAuthDevTicketStore devTicketStore;
     private final CookieService cookieService;
+    private final RedirectTargetResolver redirectTargetResolver;
 
     @Value("${openframe.gateway.oauth.state-cookie-ttl-seconds:180}")
     private int stateCookieTtlSeconds;
@@ -42,6 +46,9 @@ public class OAuthBffController {
     private boolean mobileAuthEnabled;
     @Value("${openframe.auth.error-url}")
     private String authErrorUrl;
+    /** Web continuation page a non-allow-listed signup handoff falls back to. */
+    @Value("${openframe.gateway.oauth.signup-continue-page:/auth/sso-continue}")
+    private String signupContinuePage;
 
     @GetMapping("/login")
     public Mono<ResponseEntity<Void>> login(@RequestParam String tenantId,
@@ -131,6 +138,13 @@ public class OAuthBffController {
                 });
     }
 
+
+    /** Widens a typed response for endpoints whose success and error bodies differ in shape. */
+    @SuppressWarnings("unchecked")
+    private static ResponseEntity<Object> asObjectResponse(ResponseEntity<?> response) {
+        return (ResponseEntity<Object>) response;
+    }
+
     private ResponseEntity<Void> unauthorized() {
         return ResponseEntity.status(401).build();
     }
@@ -154,21 +168,122 @@ public class OAuthBffController {
      * auth cookies) — so the app's existing token-storage path is reused unchanged.
      */
     @PostMapping("/apple/native-exchange")
-    public Mono<ResponseEntity<Void>> appleNativeExchange(@RequestBody AppleNativeExchangeRequest body,
-                                                          ServerHttpRequest request) {
+    public Mono<ResponseEntity<Object>> appleNativeExchange(@RequestBody AppleNativeExchangeRequest body,
+                                                            ServerHttpRequest request) {
         if (!mobileAuthEnabled) {
             return Mono.just(ResponseEntity.status(404).build());
         }
-        if (!hasText(body.tenantId()) || !hasText(body.identityToken()) || !hasText(body.authorizationCode())) {
+        if (!hasText(body.identityToken()) || !hasText(body.authorizationCode())) {
             return Mono.just(ResponseEntity.badRequest().build());
         }
-        return oauthBffService.appleNativeExchange(
-                        body.tenantId(), body.identityToken(), body.authorizationCode(),
-                        body.nonce(), body.firstName(), body.lastName(), request)
-                .map(tokens -> buildNoContentWithCookies(tokens, true))
+        // tenantId is optional: without it the tenant is resolved from the VERIFIED identity
+        // token on the authorization server — the only option for Hide My Email users, who
+        // don't know their relay address and so can't go through email discovery. An identity
+        // with no account answers 409 {"error": "registration_required"} so the app can branch
+        // into signup instead of showing a failed sign-in.
+        Mono<String> tenantId = hasText(body.tenantId())
+                ? Mono.just(body.tenantId())
+                : oauthBffService.appleNativeDiscoverTenant(body.identityToken(), body.nonce(), request);
+        return tenantId
+                .flatMap(tid -> oauthBffService.appleNativeExchange(
+                                tid, body.identityToken(), body.authorizationCode(),
+                                body.nonce(), body.firstName(), body.lastName(), request)
+                        .map(tokens -> asObjectResponse(buildNoContentWithCookies(tokens, true))))
+                .onErrorResume(AppleNativeRegistrationRequiredException.class, e ->
+                        Mono.just(ResponseEntity.status(409).body(Map.of("error", "registration_required"))))
                 .onErrorResume(e -> {
                     log.warn("Apple native exchange failed: {}", e.getMessage());
-                    return Mono.just(ResponseEntity.status(401).<Void>build());
+                    return Mono.just(ResponseEntity.status(401).build());
+                });
+    }
+
+    /**
+     * Fully native Apple signup: for an identity the exchange answered
+     * {@code registration_required} to, this creates the tenant (identity from the verified
+     * token, org name + domain from the app) and immediately runs the regular exchange with the
+     * SAME authorization code — discovery never spent it, so replay protection still holds and
+     * the app is signed up and signed in with one request. Errors carry the actual reason
+     * (domain taken, account exists) as 400 {"error": …}.
+     */
+    @PostMapping("/apple/native-register")
+    public Mono<ResponseEntity<Object>> appleNativeRegister(@RequestBody AppleNativeRegisterRequest body,
+                                                            ServerHttpRequest request) {
+        if (!mobileAuthEnabled) {
+            return Mono.just(ResponseEntity.status(404).build());
+        }
+        if (!hasText(body.identityToken()) || !hasText(body.authorizationCode())
+                || !hasText(body.tenantName()) || !hasText(body.tenantDomain())) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+        return oauthBffService.appleNativeRegisterTenant(
+                        body.identityToken(), body.nonce(), body.tenantName(), body.tenantDomain(),
+                        body.firstName(), body.lastName(), request)
+                .flatMap(tenantId -> oauthBffService.appleNativeExchange(
+                                tenantId, body.identityToken(), body.authorizationCode(),
+                                body.nonce(), body.firstName(), body.lastName(), request)
+                        .map(tokens -> asObjectResponse(buildNoContentWithCookies(tokens, true))))
+                .onErrorResume(IllegalArgumentException.class, e ->
+                        Mono.just(ResponseEntity.badRequest().body(Map.of("error", e.getMessage()))))
+                .onErrorResume(e -> {
+                    log.warn("Apple native registration failed: {}", e.getMessage());
+                    return Mono.just(ResponseEntity.status(401).build());
+                });
+    }
+
+    public record AppleNativeRegisterRequest(String identityToken,
+                                             String authorizationCode,
+                                             String nonce,
+                                             String firstName,
+                                             String lastName,
+                                             String tenantName,
+                                             String tenantDomain) {
+    }
+
+    /**
+     * Allow-list hop for the mobile signup handoff: the auth server parks the pending identity
+     * behind an opaque ticket and sends the sheet here; this endpoint — owner of redirect policy,
+     * same list the login devTicket uses — decides whether the client-supplied target may receive
+     * it. Not allow-listed falls back to the web continuation page, the browser flow's behaviour.
+     */
+    @GetMapping("/signup-continue")
+    public Mono<ResponseEntity<Void>> signupContinue(@RequestParam("signupTicket") String signupTicket,
+                                                     @RequestParam("redirectTo") String redirectTo) {
+        String target = redirectTargetResolver.isAllowedRedirectUri(redirectTo)
+                ? redirectTo + (redirectTo.contains("?") ? "&" : "?") + "signupTicket="
+                        + URLEncoder.encode(signupTicket, StandardCharsets.UTF_8)
+                : signupContinuePage;
+        return Mono.just(ResponseEntity.status(FOUND).header(LOCATION, target).build());
+    }
+
+    public record SignupTicketCompleteRequest(String ticket,
+                                              String tenantName,
+                                              String tenantDomain,
+                                              Map<String, Object> attribution) {
+    }
+
+    /**
+     * Mobile signup completion: registers the tenant for the ticket's server-side identity and
+     * answers a devTicket — the shell finishes through the same /oauth/dev-exchange path it
+     * already uses for login, so no tokens sit in a response the WebView has to hold.
+     */
+    @PostMapping("/login/sso/complete")
+    public Mono<ResponseEntity<Object>> completeSignup(@RequestBody SignupTicketCompleteRequest body,
+                                                       ServerHttpRequest request) {
+        if (!mobileAuthEnabled) {
+            return Mono.just(ResponseEntity.status(404).build());
+        }
+        if (!hasText(body.ticket()) || !hasText(body.tenantName()) || !hasText(body.tenantDomain())) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+        return oauthBffService.completeSignupTicket(
+                        body.ticket(), body.tenantName(), body.tenantDomain(), body.attribution(), request)
+                .flatMap(tokens -> devTicketStore.createTicket(tokens)
+                        .map(devTicket -> asObjectResponse(ResponseEntity.ok(Map.of("devTicket", devTicket)))))
+                .onErrorResume(IllegalArgumentException.class, e ->
+                        Mono.just(asObjectResponse(ResponseEntity.badRequest().body(Map.of("error", e.getMessage())))))
+                .onErrorResume(e -> {
+                    log.warn("Mobile signup completion failed: {}", e.getMessage());
+                    return Mono.just(ResponseEntity.status(401).<Object>build());
                 });
     }
 

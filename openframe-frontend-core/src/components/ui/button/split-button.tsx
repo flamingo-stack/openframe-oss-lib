@@ -1,23 +1,22 @@
-"use client"
+'use client';
 
-import { cva, type VariantProps } from "class-variance-authority"
-import Link from "../../../embed-shims/next-link"
-import React from "react"
-
-import { cn } from "../../../utils/cn"
-import { buttonSurfaceClasses, splitDividerColorClasses, splitGlyphSizeClasses } from "./button-styles"
+import { cva, type VariantProps } from 'class-variance-authority';
+import React from 'react';
+import Link from '../../../embed-shims/next-link';
+import { cn } from '../../../utils/cn';
+import { buttonSurfaceClasses, splitDividerColorClasses, splitGlyphSizeClasses } from './button-styles';
 
 // Two independent interactive halves: each a `<button>` or `<a>`. The seam is
 // a 1px border on the left edge of the icon half, colored per variant. For a
 // single-target variant (decorative trailing icon), use `<Button splitIcon>`.
 
 const splitHalfBase = [
-  "relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)]",
-  "whitespace-nowrap transition-colors duration-200",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus focus-visible:z-10",
-  "disabled:pointer-events-none",
-  "[&_svg]:pointer-events-none [&_svg]:shrink-0",
-]
+  'relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)]',
+  'whitespace-nowrap transition-colors duration-200',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus focus-visible:z-10',
+  'disabled:pointer-events-none',
+  '[&_svg]:pointer-events-none [&_svg]:shrink-0',
+];
 
 const splitHalfVariants = cva(splitHalfBase, {
   variants: {
@@ -29,146 +28,166 @@ const splitHalfVariants = cva(splitHalfBase, {
       warning: buttonSurfaceClasses.warning,
     },
     size: {
-      default: `h-10 md:h-12 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 ${splitGlyphSizeClasses}`,
-      small: "h-6 md:h-8 px-[var(--spacing-system-xs)] text-h5 [&_svg]:h-3 [&_svg]:w-3 md:[&_svg]:h-4 md:[&_svg]:w-4",
+      default: `h-10 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 md:h-12 ${splitGlyphSizeClasses}`,
+      small: 'h-6 px-[var(--spacing-system-xs)] text-h5 md:h-8 [&_svg]:h-3 [&_svg]:w-3 md:[&_svg]:h-4 md:[&_svg]:w-4',
     },
-    side: { main: "", icon: "" },
-    soloOnMobile: { true: "", false: "" },
+    side: { main: '', icon: '' },
+    soloOnMobile: { true: '', false: '' },
   },
   compoundVariants: [
     // Rounded corners + per-variant seam. The icon-side's left border is the divider.
-    { variant: "accent", side: "main", class: "rounded-l-md" },
-    { variant: "accent", side: "icon", class: cn(
-      "rounded-r-md border-l",
-      splitDividerColorClasses.accent,
-      "disabled:border-ods-disabled aria-disabled:border-ods-disabled",
-    ) },
-    { variant: "destructive", side: "main", class: "rounded-l-md" },
-    { variant: "destructive", side: "icon", class: cn(
-      "rounded-r-md border-l",
-      splitDividerColorClasses.destructive,
-      "disabled:border-ods-disabled aria-disabled:border-ods-disabled",
-    ) },
-    { variant: "warning", side: "main", class: "rounded-l-md" },
-    { variant: "warning", side: "icon", class: cn(
-      "rounded-r-md border-l",
-      splitDividerColorClasses.warning,
-      "disabled:border-ods-disabled aria-disabled:border-ods-disabled",
-    ) },
-    { variant: "outline", side: "main", class: "rounded-l-md border-y border-l border-ods-border" },
-    { variant: "outline", side: "icon", class: "rounded-r-md border border-ods-border" },
-    { variant: "transparent", side: "main", class: "rounded-md" },
-    { variant: "transparent", side: "icon", class: cn("rounded-md", splitDividerColorClasses.transparent) },
+    { variant: 'accent', side: 'main', class: 'rounded-l-md' },
+    {
+      variant: 'accent',
+      side: 'icon',
+      class: cn(
+        'rounded-r-md border-l',
+        splitDividerColorClasses.accent,
+        'disabled:border-ods-disabled aria-disabled:border-ods-disabled',
+      ),
+    },
+    { variant: 'destructive', side: 'main', class: 'rounded-l-md' },
+    {
+      variant: 'destructive',
+      side: 'icon',
+      class: cn(
+        'rounded-r-md border-l',
+        splitDividerColorClasses.destructive,
+        'disabled:border-ods-disabled aria-disabled:border-ods-disabled',
+      ),
+    },
+    { variant: 'warning', side: 'main', class: 'rounded-l-md' },
+    {
+      variant: 'warning',
+      side: 'icon',
+      class: cn(
+        'rounded-r-md border-l',
+        splitDividerColorClasses.warning,
+        'disabled:border-ods-disabled aria-disabled:border-ods-disabled',
+      ),
+    },
+    { variant: 'outline', side: 'main', class: 'rounded-l-md border-y border-l border-ods-border' },
+    { variant: 'outline', side: 'icon', class: 'rounded-r-md border border-ods-border' },
+    { variant: 'transparent', side: 'main', class: 'rounded-md' },
+    { variant: 'transparent', side: 'icon', class: cn('rounded-md', splitDividerColorClasses.transparent) },
 
     // Icon half: per Figma, narrower than main height (default: 40×48; small: 32×32).
-    { side: "icon", size: "default", class: "w-10 px-0" },
-    { side: "icon", size: "small", class: "w-6 md:w-8 px-0" },
+    { side: 'icon', size: 'default', class: 'w-10 px-0' },
+    { side: 'icon', size: 'small', class: 'w-6 px-0 md:w-8' },
 
-    { side: "icon", soloOnMobile: true, class: "max-md:hidden" },
-    { side: "main", soloOnMobile: true, class: "max-md:rounded-r-md" },
-    { variant: "outline", side: "main", soloOnMobile: true, class: "max-md:border-r" },
+    { side: 'icon', soloOnMobile: true, class: 'max-md:hidden' },
+    { side: 'main', soloOnMobile: true, class: 'max-md:rounded-r-md' },
+    { variant: 'outline', side: 'main', soloOnMobile: true, class: 'max-md:border-r' },
   ],
-  defaultVariants: { variant: "accent", size: "default", side: "main", soloOnMobile: false },
-})
+  defaultVariants: { variant: 'accent', size: 'default', side: 'main', soloOnMobile: false },
+});
 
-type SplitButtonVariant = NonNullable<VariantProps<typeof splitHalfVariants>["variant"]>
-type SplitButtonSize = NonNullable<VariantProps<typeof splitHalfVariants>["size"]>
+type SplitButtonVariant = NonNullable<VariantProps<typeof splitHalfVariants>['variant']>;
+type SplitButtonSize = NonNullable<VariantProps<typeof splitHalfVariants>['size']>;
 
 interface SplitButtonIconAction {
-  icon: React.ReactNode
+  icon: React.ReactNode;
   /** The icon half is interactive but has no visible text — needs an accessible name. */
-  "aria-label": string
-  onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>
-  href?: string
+  'aria-label': string;
+  onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>;
+  href?: string;
   /**
    * Opens `href` with `target="_blank"`. Also marks the half as a new-tab
    * affordance, which hides it below `md` (set it for `onClick` handlers that
    * open a new tab/window themselves).
    */
-  openInNewTab?: boolean
-  prefetch?: boolean
-  disabled?: boolean
+  openInNewTab?: boolean;
+  prefetch?: boolean;
+  disabled?: boolean;
 }
 
 interface SplitButtonProps {
-  variant?: SplitButtonVariant
-  size?: SplitButtonSize
-  fullWidth?: boolean
-  className?: string
+  variant?: SplitButtonVariant;
+  size?: SplitButtonSize;
+  fullWidth?: boolean;
+  className?: string;
 
-  children: React.ReactNode
-  onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>
-  href?: string
-  openInNewTab?: boolean
-  prefetch?: boolean
-  leftIcon?: React.ReactNode
-  rightIcon?: React.ReactNode
+  children: React.ReactNode;
+  onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>;
+  href?: string;
+  openInNewTab?: boolean;
+  prefetch?: boolean;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
   /** Disables both halves. Equivalent to `mainDisabled && iconAction.disabled`. */
-  disabled?: boolean
+  disabled?: boolean;
   /** Disables only the main half. Combine with `iconAction.disabled` for finer control. */
-  mainDisabled?: boolean
-  type?: "button" | "submit" | "reset"
-  "aria-label"?: string
-  groupAriaLabel?: string
+  mainDisabled?: boolean;
+  type?: 'button' | 'submit' | 'reset';
+  'aria-label'?: string;
+  groupAriaLabel?: string;
 
-  iconAction: SplitButtonIconAction
+  iconAction: SplitButtonIconAction;
 }
 
 interface HalfOptions {
-  variant: SplitButtonVariant
-  size: SplitButtonSize
-  side: "main" | "icon"
-  soloOnMobile?: boolean
-  href?: string
-  openInNewTab?: boolean
-  prefetch?: boolean
-  onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>
-  disabled?: boolean
+  variant: SplitButtonVariant;
+  size: SplitButtonSize;
+  side: 'main' | 'icon';
+  soloOnMobile?: boolean;
+  href?: string;
+  openInNewTab?: boolean;
+  prefetch?: boolean;
+  onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>;
+  disabled?: boolean;
   /** Stretch this half to fill the group's free space (the icon half stays fixed-width). */
-  grow?: boolean
-  type?: "button" | "submit" | "reset"
-  ariaLabel?: string
-  children: React.ReactNode
+  grow?: boolean;
+  type?: 'button' | 'submit' | 'reset';
+  ariaLabel?: string;
+  children: React.ReactNode;
 }
 
-function Half({ variant, size, side, soloOnMobile, href, openInNewTab, prefetch, onClick, disabled, grow, type = "button", ariaLabel, children }: HalfOptions) {
-  const classes = cn(splitHalfVariants({ variant, size, side, soloOnMobile }), grow && "flex-1")
+function Half({
+  variant,
+  size,
+  side,
+  soloOnMobile,
+  href,
+  openInNewTab,
+  prefetch,
+  onClick,
+  disabled,
+  grow,
+  type = 'button',
+  ariaLabel,
+  children,
+}: HalfOptions) {
+  const classes = cn(splitHalfVariants({ variant, size, side, soloOnMobile }), grow && 'flex-1');
 
   if (href) {
     return (
       <Link
         href={href}
         prefetch={prefetch}
-        target={openInNewTab ? "_blank" : undefined}
-        rel={openInNewTab ? "noopener noreferrer" : undefined}
+        target={openInNewTab ? '_blank' : undefined}
+        rel={openInNewTab ? 'noopener noreferrer' : undefined}
         aria-disabled={disabled || undefined}
         tabIndex={disabled ? -1 : undefined}
         aria-label={ariaLabel}
-        className={cn(classes, disabled && "pointer-events-none")}
-        onClick={onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined}
+        className={cn(classes, disabled && 'pointer-events-none')}
+        onClick={onClick}
       >
         {children}
       </Link>
-    )
+    );
   }
 
   return (
-    <button
-      type={type}
-      className={classes}
-      disabled={disabled}
-      aria-label={ariaLabel}
-      onClick={onClick as React.MouseEventHandler<HTMLButtonElement>}
-    >
+    <button type={type} className={classes} disabled={disabled} aria-label={ariaLabel} onClick={onClick}>
       {children}
     </button>
-  )
+  );
 }
 
-const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function SplitButton(
+const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function SplitButtonImpl(
   {
-    variant = "accent",
-    size = "default",
+    variant = 'accent',
+    size = 'default',
     fullWidth = false,
     className,
     children,
@@ -182,19 +201,19 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
     mainDisabled,
     type,
     iconAction,
-    "aria-label": ariaLabel,
+    'aria-label': ariaLabel,
     groupAriaLabel,
   },
   ref,
 ) {
-  const soloOnMobile = !!iconAction.openInNewTab
+  const soloOnMobile = !!iconAction.openInNewTab;
 
   return (
     <div
       ref={ref}
       role="group"
       aria-label={groupAriaLabel}
-      className={cn("inline-flex items-stretch", fullWidth && "w-full", className)}
+      className={cn('inline-flex items-stretch', fullWidth && 'w-full', className)}
     >
       <Half
         variant={variant}
@@ -224,12 +243,13 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
         prefetch={iconAction.prefetch}
         onClick={iconAction.onClick}
         disabled={disabled || iconAction.disabled}
-        ariaLabel={iconAction["aria-label"]}
+        ariaLabel={iconAction['aria-label']}
       >
         <span className="inline-flex items-center">{iconAction.icon}</span>
       </Half>
     </div>
-  )
-})
+  );
+});
+SplitButton.displayName = 'SplitButton';
 
-export { SplitButton, type SplitButtonProps, type SplitButtonIconAction }
+export { SplitButton, type SplitButtonProps, type SplitButtonIconAction };

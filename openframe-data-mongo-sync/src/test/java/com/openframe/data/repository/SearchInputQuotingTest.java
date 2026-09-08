@@ -4,7 +4,6 @@ import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.filter.UserQueryFilter;
-import com.openframe.data.repository.event.impl.CustomEventRepositoryImpl;
 import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
 import com.openframe.data.repository.organization.CustomOrganizationRepositoryImpl;
 import com.openframe.data.repository.tool.CustomIntegratedToolRepositoryImpl;
@@ -92,15 +91,6 @@ class SearchInputQuotingTest {
         assertThat(pattern.pattern()).isEqualTo("^" + QUOTED + "$");
     }
 
-    @Test
-    @DisplayName("event search: type and data clauses quote the input")
-    void eventSearchIsQuoted() {
-        CustomEventRepositoryImpl repo = new CustomEventRepositoryImpl(mock(MongoTemplate.class));
-
-        Document q = repo.buildEventQuery(null, HOSTILE).getQueryObject();
-
-        assertQuoted(q, "type", "data");
-    }
 
     @Test
     @DisplayName("integrated tool search: name and description clauses quote the input")

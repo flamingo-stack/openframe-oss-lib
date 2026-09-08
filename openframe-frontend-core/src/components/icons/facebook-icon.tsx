@@ -1,14 +1,10 @@
-import React from 'react';
-
 interface FacebookIconProps {
   color?: string;
   className?: string;
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function FacebookIcon({ className ,
-  color = 'white'
-}:  FacebookIconProps) {
+export function FacebookIcon({ className, color = 'white' }: FacebookIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

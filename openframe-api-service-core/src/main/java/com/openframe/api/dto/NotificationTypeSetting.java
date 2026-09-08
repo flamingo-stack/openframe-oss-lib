@@ -10,5 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class NotificationTypeSetting {
     private NotificationSettingGroup group;
+    private String label;
     private boolean enabled;
 }
