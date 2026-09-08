@@ -22,16 +22,13 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
     private final MachineIdCacheService machineIdCacheService;
     private final ClusterTenantIdResolver clusterTenantIdResolver;
     private final TenantIdProvider tenantIdProvider;
-    private final MachineDisplayNameResolver machineDisplayNameResolver;
 
     public IntegratedToolDataEnrichmentService(MachineIdCacheService machineIdCacheService,
                                                @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver,
-                                               TenantIdProvider tenantIdProvider,
-                                               MachineDisplayNameResolver machineDisplayNameResolver) {
+                                               TenantIdProvider tenantIdProvider) {
         this.machineIdCacheService = machineIdCacheService;
         this.clusterTenantIdResolver = clusterTenantIdResolver;
         this.tenantIdProvider = tenantIdProvider;
-        this.machineDisplayNameResolver = machineDisplayNameResolver;
     }
 
     @Override
@@ -56,9 +53,9 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
             log.warn("Machine ID not found for agent: {}", agentId);
             return;
         }
-        String displayName = machineDisplayNameResolver.resolveDisplayName(machine);
         enriched.setMachineId(machine.getMachineId());
-        enriched.setHostname(displayName);
+        enriched.setHostname(machine.getHostname());
+        enriched.setNickname(machine.getNickname());
 
         CachedOrganizationInfo organization = machineIdCacheService.getOrganization(machine.getOrganizationId());
         log.debug("Found machine ID {} for agent {} (organization {})",

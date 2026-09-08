@@ -35,6 +35,9 @@ public class UnifiedLogEvent {
     @Column("hostname")
     private String hostname;
 
+    @Column("nickname")
+    private String nickname;
+
     /**
      * Organization ID associated with the event.
      */

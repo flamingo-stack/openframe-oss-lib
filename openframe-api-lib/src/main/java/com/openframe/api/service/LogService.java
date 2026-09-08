@@ -203,6 +203,7 @@ public class LogService {
                 .userId(log.userId)
                 .deviceId(log.deviceId)
                 .hostname(log.hostname)
+                .nickname(log.nickname)
                 .organizationId(log.organizationId)
                 .organizationName(log.organizationName)
                 .build();
@@ -222,6 +223,7 @@ public class LogService {
                 .userId(logEvent.getUserId())
                 .deviceId(logEvent.getDeviceId())
                 .hostname(logEvent.getHostname())
+                .nickname(logEvent.getNickname())
                 .organizationId(logEvent.getOrganizationId())
                 .organizationName(logEvent.getOrganizationName())
                 .summary(logEvent.getMessage())

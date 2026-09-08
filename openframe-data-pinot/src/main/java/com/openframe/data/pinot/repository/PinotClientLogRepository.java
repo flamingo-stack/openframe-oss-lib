@@ -45,7 +45,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                                         List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit,
                                         String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
-                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
@@ -66,7 +66,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                                           List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit,
                                           String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
-                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
@@ -191,6 +191,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 projection.userId = resultSet.getString(rowIndex, columnIndexMap.get("userId"));
                 projection.deviceId = resultSet.getString(rowIndex, columnIndexMap.get("deviceId"));
                 projection.hostname = resultSet.getString(rowIndex, columnIndexMap.get("hostname"));
+                projection.nickname = resultSet.getString(rowIndex, columnIndexMap.get("nickname"));
                 projection.organizationId = resultSet.getString(rowIndex, columnIndexMap.get("organizationId"));
                 projection.organizationName = resultSet.getString(rowIndex, columnIndexMap.get("organizationName"));
                 projection.summary = resultSet.getString(rowIndex, columnIndexMap.get("summary"));

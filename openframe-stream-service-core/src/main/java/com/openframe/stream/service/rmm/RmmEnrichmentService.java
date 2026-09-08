@@ -10,7 +10,6 @@ import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import com.openframe.stream.service.ClusterTenantIdResolver;
 import com.openframe.stream.service.DataEnrichmentService;
 import com.openframe.stream.service.IntegratedToolDataEnrichmentService;
-import com.openframe.stream.service.MachineDisplayNameResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -35,16 +34,13 @@ public class RmmEnrichmentService implements DataEnrichmentService<DeserializedD
     private final MachineIdCacheService machineIdCacheService;
     private final ClusterTenantIdResolver clusterTenantIdResolver;
     private final TenantIdProvider tenantIdProvider;
-    private final MachineDisplayNameResolver machineDisplayNameResolver;
 
     public RmmEnrichmentService(MachineIdCacheService machineIdCacheService,
                                 @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver,
-                                TenantIdProvider tenantIdProvider,
-                                MachineDisplayNameResolver machineDisplayNameResolver) {
+                                TenantIdProvider tenantIdProvider) {
         this.machineIdCacheService = machineIdCacheService;
         this.clusterTenantIdResolver = clusterTenantIdResolver;
         this.tenantIdProvider = tenantIdProvider;
-        this.machineDisplayNameResolver = machineDisplayNameResolver;
     }
 
     @Override
@@ -69,9 +65,9 @@ public class RmmEnrichmentService implements DataEnrichmentService<DeserializedD
             log.warn("Native RMM event references unknown machineId: {}", machineId);
             return;
         }
-        String displayName = machineDisplayNameResolver.resolveDisplayName(machine);
         enriched.setMachineId(machine.getMachineId());
-        enriched.setHostname(displayName);
+        enriched.setHostname(machine.getHostname());
+        enriched.setNickname(machine.getNickname());
 
         CachedOrganizationInfo organization = machineIdCacheService.getOrganization(machine.getOrganizationId());
         if (organization != null) {

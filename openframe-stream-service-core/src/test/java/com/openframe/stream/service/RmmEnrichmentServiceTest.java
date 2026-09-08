@@ -40,8 +40,7 @@ class RmmEnrichmentServiceTest {
     void setUp() {
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // Tenant cluster mode — no ClusterTenantIdResolver bean.
-        service = new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider,
-                new MachineDisplayNameResolver());
+        service = new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider);
     }
 
     @Test
@@ -68,8 +67,8 @@ class RmmEnrichmentServiceTest {
     }
 
     @Test
-    @DisplayName("getExtraParams: nickname wins over hostname — the stamped hostname is what the log surfaces show")
-    void getExtraParams_nicknameTakesPriorityOverHostname() {
+    @DisplayName("getExtraParams: nickname is carried alongside hostname, not instead of it — the log surfaces show both")
+    void getExtraParams_carriesNicknameAlongsideHostname() {
         when(machineIdCacheService.getMachineByMachineId(MACHINE_ID))
                 .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, NICKNAME, ORG_ID));
         when(machineIdCacheService.getOrganization(ORG_ID))
@@ -77,7 +76,22 @@ class RmmEnrichmentServiceTest {
 
         IntegratedToolEnrichedData enriched = service.getExtraParams(message(MACHINE_ID));
 
-        assertThat(enriched.getHostname()).isEqualTo(NICKNAME);
+        assertThat(enriched.getHostname()).isEqualTo(HOSTNAME);
+        assertThat(enriched.getNickname()).isEqualTo(NICKNAME);
+    }
+
+    @Test
+    @DisplayName("getExtraParams: machine without a nickname leaves nickname null and still stamps the hostname")
+    void getExtraParams_noNickname_leavesNicknameNull() {
+        when(machineIdCacheService.getMachineByMachineId(MACHINE_ID))
+                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, null, ORG_ID));
+        when(machineIdCacheService.getOrganization(ORG_ID))
+                .thenReturn(new CachedOrganizationInfo(ORG_ID, "Default"));
+
+        IntegratedToolEnrichedData enriched = service.getExtraParams(message(MACHINE_ID));
+
+        assertThat(enriched.getHostname()).isEqualTo(HOSTNAME);
+        assertThat(enriched.getNickname()).isNull();
     }
 
     @Test

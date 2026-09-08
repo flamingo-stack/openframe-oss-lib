@@ -175,12 +175,12 @@ class PinotClientLogRepositoryTest {
         @Test
         @DisplayName("findLogs maps ResultSet rows to LogProjection objects")
         void mapsLogProjection() {
-            // 12 columns as declared in findLogs: toolEventId, ingestDay, toolType, eventType,
-            // severity, userId, deviceId, hostname, organizationId, organizationName, summary, eventTimestamp
+            // 13 columns as declared in findLogs: toolEventId, ingestDay, toolType, eventType, severity,
+            // userId, deviceId, hostname, nickname, organizationId, organizationName, summary, eventTimestamp
             when(pinotConnection.execute(anyString())).thenReturn(resultSetGroup);
             when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
             when(resultSet.getRowCount()).thenReturn(1);
-            when(resultSet.getColumnCount()).thenReturn(12);
+            when(resultSet.getColumnCount()).thenReturn(13);
             when(resultSet.getColumnName(0)).thenReturn("toolEventId");
             when(resultSet.getColumnName(1)).thenReturn("ingestDay");
             when(resultSet.getColumnName(2)).thenReturn("toolType");
@@ -189,10 +189,11 @@ class PinotClientLogRepositoryTest {
             when(resultSet.getColumnName(5)).thenReturn("userId");
             when(resultSet.getColumnName(6)).thenReturn("deviceId");
             when(resultSet.getColumnName(7)).thenReturn("hostname");
-            when(resultSet.getColumnName(8)).thenReturn("organizationId");
-            when(resultSet.getColumnName(9)).thenReturn("organizationName");
-            when(resultSet.getColumnName(10)).thenReturn("summary");
-            when(resultSet.getColumnName(11)).thenReturn("eventTimestamp");
+            when(resultSet.getColumnName(8)).thenReturn("nickname");
+            when(resultSet.getColumnName(9)).thenReturn("organizationId");
+            when(resultSet.getColumnName(10)).thenReturn("organizationName");
+            when(resultSet.getColumnName(11)).thenReturn("summary");
+            when(resultSet.getColumnName(12)).thenReturn("eventTimestamp");
 
             when(resultSet.getString(0, 0)).thenReturn("evt-1");
             when(resultSet.getString(0, 1)).thenReturn("2026-01-15");
@@ -202,10 +203,11 @@ class PinotClientLogRepositoryTest {
             when(resultSet.getString(0, 5)).thenReturn("user-1");
             when(resultSet.getString(0, 6)).thenReturn("dev-1");
             when(resultSet.getString(0, 7)).thenReturn("host-1");
-            when(resultSet.getString(0, 8)).thenReturn("org-1");
-            when(resultSet.getString(0, 9)).thenReturn("Org One");
-            when(resultSet.getString(0, 10)).thenReturn("Device came online");
-            when(resultSet.getLong(0, 11)).thenReturn(1700000000000L);
+            when(resultSet.getString(0, 8)).thenReturn("Reception iMac");
+            when(resultSet.getString(0, 9)).thenReturn("org-1");
+            when(resultSet.getString(0, 10)).thenReturn("Org One");
+            when(resultSet.getString(0, 11)).thenReturn("Device came online");
+            when(resultSet.getLong(0, 12)).thenReturn(1700000000000L);
 
             List<LogProjection> result = repository.findLogs(TENANT_ID, START, END, null, null, List.of(), List.of(),
                     List.of(), List.of(), null, null, 100, "eventTimestamp", "DESC");
@@ -215,6 +217,8 @@ class PinotClientLogRepositoryTest {
             assertEquals("evt-1", p.toolEventId);
             assertEquals("FLEET_MDM", p.toolType);
             assertEquals("INFO", p.severity);
+            assertEquals("host-1", p.hostname);
+            assertEquals("Reception iMac", p.nickname);
             assertEquals("Org One", p.organizationName);
             assertNotNull(p.eventTimestamp);
         }

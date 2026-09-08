@@ -9,6 +9,7 @@ public class IntegratedToolEvent implements KafkaMessage {
     private String userId;
     private String deviceId;
     private String hostname;
+    private String nickname;
     private String organizationId;
     private String organizationName;
     private String ingestDay;
