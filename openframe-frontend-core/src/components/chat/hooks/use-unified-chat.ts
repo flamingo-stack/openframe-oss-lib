@@ -19,9 +19,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { UnifiedChatState } from '../types/unified-chat-state.types';
+import { EMPTY_DIALOG_CAPABILITIES } from '../types/unified-chat-state.types';
+import type { ChatDialogCapabilities, UnifiedChatState } from '../types/unified-chat-state.types';
 import { useNatsChatAdapter, type UseNatsChatAdapterConfig } from './use-nats-chat-adapter';
 import { useSseChatAdapter, type UseSseChatAdapterOptions } from './use-sse-chat-adapter';
+import { useStableShallow } from './use-stable-shallow';
 
 // =============================================================================
 // Modes
@@ -70,6 +72,18 @@ export interface UseUnifiedChatOptions {
    * hook's local React state. Guide mode is unaffected.
    */
   mingoStateOverride?: UnifiedChatState;
+
+  /**
+   * Conversation-list capabilities for a `mingoStateOverride`. A host that
+   * builds the whole state in its own store has no adapter to report them, so
+   * it declares them alongside the state it injects.
+   *
+   * Supplying the override AT ALL declares that its panel owns a conversation
+   * list — an override with no capabilities still resolves to an empty object,
+   * never `undefined`, so such a host keeps its list surface exactly as before.
+   * Ignored unless the override is the active state.
+   */
+  injectedDialogCapabilities?: ChatDialogCapabilities;
 }
 
 // =============================================================================
@@ -96,7 +110,7 @@ function createDisabledNatsConfig(): UseNatsChatAdapterConfig {
 // =============================================================================
 
 export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState {
-  const { modes, activeMode, mingoStateOverride } = options;
+  const { modes, activeMode, mingoStateOverride, injectedDialogCapabilities } = options;
 
   // The mingo config object identity matters — `useNatsChatAdapter`
   // wires its `dialogId`/url/publish into deps. Stabilise the disabled
@@ -121,6 +135,18 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
   // still runs (rules of hooks) but is idle (no `modes.mingo` → not active),
   // and we hand the host's store-backed state straight through as active.
   const activeState = activeMode === 'guide' ? sseState : (mingoStateOverride ?? natsState);
+  // The ONE place the injected state's capabilities are defaulted, because this
+  // is the ONE place that decides which state won. `EmbeddableChat` therefore
+  // reads a single resolved `dialogCapabilities` and never re-derives it from
+  // the mode.
+  const activeStateIsInjected = activeState === mingoStateOverride;
+  // Latched: hosts write the companion prop inline, and a fresh object each
+  // render would invalidate the state memo below (and every memo a consumer
+  // hangs off its identity) forever.
+  const stableInjected = useStableShallow(injectedDialogCapabilities);
+  const dialogCapabilities = activeStateIsInjected
+    ? (activeState.dialogCapabilities ?? stableInjected ?? EMPTY_DIALOG_CAPABILITIES)
+    : activeState.dialogCapabilities;
 
   // Live ref to the active state. The injected `mingoState` (and the SSE/NATS
   // adapters) hand back a NEW state object on EVERY streaming chunk
@@ -220,6 +246,8 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       setDialogScope,
       hasMoreMessages: activeState.hasMoreMessages,
       loadMoreMessages,
+      // THE conversation-list signal — resolved once, above.
+      dialogCapabilities,
       // Approvals
       approveRequest,
       rejectRequest,
@@ -229,6 +257,7 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
     }),
     [
       activeState,
+      dialogCapabilities,
       sendMessage,
       stopMessage,
       clearMessages,

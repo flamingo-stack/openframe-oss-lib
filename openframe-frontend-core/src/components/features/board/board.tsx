@@ -5,8 +5,10 @@ import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/ad
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/utils/prevent-unhandled';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { DRAG_AND_DROP_MEDIA_QUERY } from '../../../hooks/ui/use-drag-and-drop-enabled';
 import { useHorizontalScrollbar } from '../../../hooks/ui/use-horizontal-scrollbar';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
+import { useMediaQuery } from '../../../hooks/ui/use-media-query';
 import { autoScrollBothWays } from '../../../utils/auto-scroll-ancestors';
 import { cn } from '../../../utils/cn';
 import { nearestScrollableAncestor } from '../../../utils/scroll-parent';
@@ -26,6 +28,7 @@ import { cardById, DROP_LINE_ATTRIBUTE } from './lane-geometry';
 import { applyPendingMove, hasMoveSettled, LandingCardContext, type PendingMove } from './pending-move';
 import { resolveBoardDrop } from './resolve-drop';
 import { DRAG_PREVIEW_OPACITY, TicketCardView } from './ticket-card';
+import { TouchBoard } from './touch-board';
 import type { BoardChange, BoardColumnDef, BoardTicket } from './types';
 import { useBoardCollapse } from './use-board-collapse';
 
@@ -39,9 +42,15 @@ const PENDING_MOVE_TIMEOUT_MS = 2000;
 const DROP_MS = 160;
 const DROP_EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 
-/** Above the header, modals and drawers, below toasts — a card being carried
- *  has to clear everything it is being carried over. */
-const DRAG_PREVIEW_Z = 1400;
+/** Above the header, the in-layout drawers and the header menus (z-[104]),
+ *  BELOW modals (`ModalV2` overlay z-[1300]). The carried card itself is the
+ *  browser's drag image and needs no z-index at all; this stacks only the
+ *  160ms landing glide, which never leaves the lanes - a release anywhere
+ *  else cancels, and no modal or drawer is open while a card is in the air.
+ *  The one modal the glide can meet is the one the drop itself opens (Take
+ *  Over / Reopen, mounted in the same commit as the glide), and that modal has
+ *  to cover the glide, not be flown over by it. */
+const DRAG_PREVIEW_Z = 1200;
 
 const ARROW_KEYS: ArrowKey[] = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
@@ -79,6 +88,35 @@ export interface BoardProps {
 }
 
 /**
+ * Picks which board exists for this input mode, and that is all it does.
+ *
+ * - **Drag board** — pointer devices from the `md` breakpoint up: the full
+ *   drag-and-drop implementation below.
+ * - **Touch board** (`touch-board.tsx`) — everything else: a swipeable
+ *   scroll-snap pager of full-height lanes, registering no DnD at all. The
+ *   HTML5 drag events Pragmatic builds on never fire under touch, so on those
+ *   devices a drag board is dead affordances stapled to 400px lanes.
+ *
+ * The rule is `DRAG_AND_DROP_MEDIA_QUERY` (pointer AND hover AND width — see
+ * `use-drag-and-drop-enabled.ts` for why neither alone survives an iPad or a
+ * touchscreen laptop), read live: attaching a mouse or crossing the breakpoint
+ * swaps the subtree without a reload.
+ *
+ * While the answer is unknown (SSR and the hydration render) neither subtree
+ * exists — mounting one is a guess that runs the loser's effects and, for the
+ * drag board, registers DnD on a device that may be a phone. The empty shell
+ * keeps the container's footprint; `useMediaQuery` resolves in a pre-paint
+ * layout effect, so on the client the shell is never actually painted.
+ */
+export function Board(props: BoardProps) {
+  const dragAndDropEnabled = useMediaQuery(DRAG_AND_DROP_MEDIA_QUERY);
+  if (dragAndDropEnabled === undefined) {
+    return <div aria-hidden className={cn('flex h-full min-h-0 flex-col', props.className)} />;
+  }
+  return dragAndDropEnabled ? <DragBoard {...props} /> : <TouchBoard {...props} />;
+}
+
+/**
  * The board renders `columns` and nothing else — there is no local mirror of
  * them, and a drag in progress changes no state here at all.
  *
@@ -89,7 +127,7 @@ export interface BoardProps {
  * module on. Here the preview is a line drawn by the card being hovered, the
  * data moves once, on drop, and the cascade has nothing to feed on.
  */
-export function Board({
+function DragBoard({
   columns,
   onChange,
   onLoadMore,

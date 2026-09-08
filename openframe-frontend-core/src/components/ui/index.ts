@@ -128,7 +128,6 @@ export * from './content-loader';
 
 // Table components
 export {
-  COMPACT_ROW_MIN_HEIGHT_PX,
   Table,
   TableCardSkeleton,
   TableCell,
@@ -218,3 +217,9 @@ export * from './ticket-notes-section';
 export * from './marquee-wall';
 export * from './markdown';
 export * from './filter-pill-row';
+
+// Viewport-gated mounting for heavy previews (players, large images)
+export { LazyMount, type LazyMountProps } from './lazy-mount';
+export { RequiredMark } from './required-mark';
+export { IconTile } from './icon-tile';
+export { PolicyLink } from './policy-link';

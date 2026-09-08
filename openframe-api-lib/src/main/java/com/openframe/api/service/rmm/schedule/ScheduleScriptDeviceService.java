@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm.schedule;
 
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
@@ -204,11 +205,13 @@ public class ScheduleScriptDeviceService {
 
         Map<String, List<String>> result = new HashMap<>();
         if (!specificIds.isEmpty()) {
-            for (ScheduleScriptMachineAssigned row :
-                    assignedRepository.findByTenantIdAndScriptScheduleIdIn(tenantId, specificIds)) {
+            List<ScheduleScriptMachineAssigned> rows = assignedRepository
+                    .findByTenantIdAndScriptScheduleIdIn(tenantId, specificIds);
+            Set<String> validMids = validAssignedMachineIds(tenantId, rows);
+            for (ScheduleScriptMachineAssigned row : rows) {
                 String sid = row.getScriptScheduleId();
                 String mid = row.getMachineId();
-                if (sid == null || mid == null) {
+                if (sid == null || mid == null || !validMids.contains(mid)) {
                     continue;
                 }
                 result.computeIfAbsent(sid, k -> new java.util.ArrayList<>()).add(mid);
@@ -239,10 +242,13 @@ public class ScheduleScriptDeviceService {
 
         Map<String, Integer> result = new HashMap<>();
         if (!specificIds.isEmpty()) {
+            List<ScheduleScriptMachineAssigned> rows = assignedRepository
+                    .findByTenantIdAndScriptScheduleIdIn(tenantId, specificIds);
+            Set<String> validMids = validAssignedMachineIds(tenantId, rows);
             Map<String, Integer> counts = new HashMap<>();
-            for (ScheduleScriptMachineAssigned row :
-                    assignedRepository.findByTenantIdAndScriptScheduleIdIn(tenantId, specificIds)) {
-                if (row.getScriptScheduleId() != null && row.getMachineId() != null) {
+            for (ScheduleScriptMachineAssigned row : rows) {
+                if (row.getScriptScheduleId() != null && row.getMachineId() != null
+                        && validMids.contains(row.getMachineId())) {
                     counts.merge(row.getScriptScheduleId(), 1, Integer::sum);
                 }
             }
@@ -339,6 +345,15 @@ public class ScheduleScriptDeviceService {
                     "Unknown or inaccessible device(s) for this tenant: " + unknown);
         }
 
+        List<String> nonDispatchable = machines.stream()
+                .filter(m -> !DeviceStatus.DISPATCH_ELIGIBLE.contains(m.getStatus()))
+                .map(m -> m.getHostname() != null ? m.getHostname() : m.getMachineId())
+                .toList();
+        if (!nonDispatchable.isEmpty()) {
+            throw new BadRequestException(
+                    "Device(s) are not in a dispatchable state (must be ONLINE or OFFLINE): " + nonDispatchable);
+        }
+
         if (schedulePlatforms == null || schedulePlatforms.isEmpty()) {
             return;
         }
@@ -362,5 +377,19 @@ public class ScheduleScriptDeviceService {
         return scheduleRepository.findByTenantIdAndId(tenantId, scheduleId)
                 .filter(schedule -> schedule.getStatus() != ScriptStatus.DELETED)
                 .orElseThrow(() -> new NotFoundException("Script schedule not found: " + scheduleId));
+    }
+
+    private Set<String> validAssignedMachineIds(String tenantId, List<ScheduleScriptMachineAssigned> rows) {
+        Set<String> ids = rows.stream()
+                .map(ScheduleScriptMachineAssigned::getMachineId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        return machineRepository.findByTenantIdAndMachineIdIn(tenantId, ids).stream()
+                .filter(m -> DeviceStatus.DISPATCH_ELIGIBLE.contains(m.getStatus()))
+                .map(Machine::getMachineId)
+                .collect(java.util.stream.Collectors.toSet());
     }
 }

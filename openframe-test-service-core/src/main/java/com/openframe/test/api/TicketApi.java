@@ -69,7 +69,7 @@ public class TicketApi {
 
     public static TicketConnection findColumnWithAtLeastTwoTickets() {
         for (TicketStatusDefinition status : getTicketStatuses()) {
-            TicketConnection column = getTickets(TicketGenerator.ticketsWithStatusId(status.getId()), limit(20));
+            TicketConnection column = getTickets(TicketGenerator.activeTicketsWithStatusId(status.getId()), limit(20));
             if (column.getEdges() != null && column.getEdges().size() >= 2) {
                 return column;
             }

@@ -16,12 +16,7 @@ export {
 
 // Where an approval card renders — one rule for both live kernels, the history
 // replay, and hosts that sort cards between their own footer and the flow.
-export {
-  isGuideApproval,
-  guideApprovalOrigin,
-  approvalDisplaysInline,
-  isGuideApprovalSegment,
-} from './approval-display';
+export { approvalDisplaysInline } from './approval-display';
 
 // Historical message processing
 export {
@@ -45,6 +40,13 @@ export {
   type HistoryMergeInput,
   type HistoryPrependResult,
 } from './history-merge';
+
+// Conversation-list wire client (`ChatRuntime.endpoints.chatConversationsUrl`)
+export {
+  createChatConversationsApi,
+  type ChatConversationsApi,
+  type ChatConversationStatus,
+} from './chat-conversations-api';
 
 // Tool call helpers
 export { getCommandText } from './tool-call-helpers';

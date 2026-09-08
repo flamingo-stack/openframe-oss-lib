@@ -16,7 +16,6 @@ import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
-import { GuideDisplay } from './guide-display';
 import { remarkCardLinks } from './remark-card-links';
 import { remarkMentionChips } from './remark-mention-chips';
 import { remarkStripCitations } from './remark-strip-citations';
@@ -226,12 +225,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       // duplicates so two siblings never collide on the same React key.
       const emittedBlockKeys = new Set<string>();
       segments.forEach((segment, segIdx) => {
-        // Both markdown-bearing segment types take part: a `guide` body is
-        // authored by the same LLM and carries the same `[card://]` markers,
-        // so skipping it here left its markers with no `inlineByKey` entry and
-        // no hoisted card — the `<a card://>` override silently degraded them
-        // to a bare title / id.
-        if (segment.type !== 'text' && segment.type !== 'guide') return;
+        if (segment.type !== 'text') return;
         const text = segment.text;
         const parts: SegmentPart[] = [];
         let cursor = 0;
@@ -607,12 +601,6 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     >
                       {renderSegmentBody(index, segment.text, segmentIsStreaming)}
                     </div>
-                  );
-                } else if (segment.type === 'guide') {
-                  return (
-                    <GuideDisplay key={index}>
-                      {renderSegmentBody(index, segment.text, segmentIsStreaming)}
-                    </GuideDisplay>
                   );
                 } else if (segment.type === 'ask') {
                   // Only the run's head draws — the tail segments are pages of

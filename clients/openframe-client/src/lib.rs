@@ -41,6 +41,7 @@ use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
 use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::execution_listener::ExecutionListener;
+use crate::listener::machine_timezone_request_listener::MachineTimezoneRequestListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
 use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
@@ -171,6 +172,7 @@ pub struct Client {
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
     hostname_report_publisher: HostnameReportPublisher,
+    machine_timezone_request_listener: MachineTimezoneRequestListener,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
     update_handler_service: UpdateHandlerService,
@@ -295,11 +297,8 @@ impl Client {
 
         // Initialize proactive token refresh run manager (keeps shared_token.enc valid
         // independent of NATS reconnects)
-        let token_refresh_run_manager = TokenRefreshRunManager::new(
-            auth_service.clone(),
-            config_service.clone(),
-            deactivation_service.clone(),
-        );
+        let token_refresh_run_manager =
+            TokenRefreshRunManager::new(auth_service.clone(), deactivation_service.clone());
 
         // Initialize NATS connection manager
         let ws_url = format!("wss://{}", initial_configuration_service.get_server_url()?);
@@ -387,6 +386,7 @@ impl Client {
             config_service.clone(),
             tool_run_manager.clone(),
             deactivation_service.clone(),
+            http_client.clone(),
         );
 
         // Initialize tool connection service
@@ -421,6 +421,16 @@ impl Client {
         let last_known_good_service = LastKnownGoodService::new(directory_manager.clone())
             .context("Failed to initialize last-known-good service")?;
 
+        // Initialize update handler service (boot-time and in-process failure handling)
+        let update_handler_service = UpdateHandlerService::new(
+            update_state_service.clone(),
+            openframe_client_info_service.clone(),
+            update_cleanup_service.clone(),
+            last_known_good_service.clone(),
+            installed_agent_message_publisher.clone(),
+            config_service.clone(),
+        );
+
         // Initialize tool installation service
         let tool_installation_service = ToolInstallationService::new(
             github_download_service.clone(),
@@ -444,6 +454,7 @@ impl Client {
             update_state_service.clone(),
             last_known_good_service.clone(),
             tool_run_manager.clone(),
+            update_handler_service.clone(),
         );
 
         // Initialize tool agent update service
@@ -563,14 +574,11 @@ impl Client {
             device_data_fetcher.clone(),
         );
 
-        // Initialize update handler service
-        let update_handler_service = UpdateHandlerService::new(
-            update_state_service.clone(),
-            openframe_client_info_service.clone(),
-            update_cleanup_service.clone(),
-            last_known_good_service.clone(),
-            installed_agent_message_publisher.clone(),
+        let machine_timezone_request_listener = MachineTimezoneRequestListener::new(
+            nats_connection_manager.clone(),
+            nats_message_publisher.clone(),
             config_service.clone(),
+            device_data_fetcher.clone(),
         );
 
         Ok(Self {
@@ -594,6 +602,7 @@ impl Client {
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
             hostname_report_publisher,
+            machine_timezone_request_listener,
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
             update_handler_service,
@@ -656,6 +665,8 @@ impl Client {
         // Connect to NATS
         self.nats_connection_manager.connect().await?;
 
+        self.nats_connection_manager.start_connection_watchdog();
+
         // Handle any pending update from previous run (after NATS is connected)
         if let Err(e) = self.update_handler_service.handle_pending_update().await {
             error!("Failed to handle pending update: {:#}", e);
@@ -667,6 +678,9 @@ impl Client {
 
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
+
+        self.machine_timezone_request_listener.start().await?;
+        self.machine_timezone_request_listener.report_once().await;
 
         //Start tool installation message listener in background
         self.tool_installation_message_listener.start().await?;

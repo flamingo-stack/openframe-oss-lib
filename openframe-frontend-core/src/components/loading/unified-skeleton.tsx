@@ -60,6 +60,10 @@ export function UnifiedSkeleton({
 
   const animationClasses = animate ? 'animate-pulse motion-reduce:animate-none' : '';
 
+  // An `aspect-*` utility sizes the box itself; a default height would win
+  // over it (explicit height beats aspect-ratio) and collapse the box to 16px.
+  const sizedByAspect = /(?:^|\s)aspect-/.test(className ?? '');
+
   const style: React.CSSProperties = {
     width: width,
     height: height,
@@ -70,7 +74,7 @@ export function UnifiedSkeleton({
       className={cn(
         baseClasses,
         variantClasses[variant],
-        !height && !style.height && defaultHeights[variant],
+        !height && !style.height && !sizedByAspect && defaultHeights[variant],
         !width && !style.width && variant !== 'circular' && 'w-full',
         animationClasses,
         className,

@@ -28,6 +28,7 @@
 import { useState, type ChangeEvent } from 'react';
 import { ContactForm } from '../contact';
 import { Input, Label } from '../ui';
+import { RequiredMark } from '../ui/required-mark';
 import type { UseTicketActionsReturn } from './hooks/use-ticket-actions';
 
 const SUBJECT_MAX_CHARS = 200;
@@ -175,7 +176,8 @@ export function HelpCenterCreateForm({
   const subjectField = (
     <div className="flex flex-col">
       <Label htmlFor="help-center-subject">
-        Subject<span className="text-ods-accent">*</span>
+        Subject
+        <RequiredMark />
       </Label>
       <Input
         id="help-center-subject"
@@ -188,6 +190,7 @@ export function HelpCenterCreateForm({
         placeholder="Briefly describe what's going on"
         maxLength={SUBJECT_MAX_CHARS}
         aria-invalid={!!subjectError}
+        aria-required
         aria-describedby={subjectError ? 'help-center-subject-error' : undefined}
         disabled={supportSystemDown}
         className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"

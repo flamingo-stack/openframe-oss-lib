@@ -1,6 +1,6 @@
 /**
  * createDeltaBatcher — framework-free, append-only batching of the
- * `text-delta` / `thinking-delta` / `guide-delta` events.
+ * `text-delta` / `thinking-delta` events.
  *
  * WHY THIS IS SHARED (and not a hook-private detail): every host that drives a
  * `ChatStreamReducer` from a raw transport needs the SAME batching, and a
@@ -23,19 +23,14 @@
  *     deltas never land on the wrong dialog/side.
  */
 
-import type {
-  ChatStreamEvent,
-  GuideDeltaEvent,
-  TextDeltaEvent,
-  ThinkingDeltaEvent,
-} from '../../../chat-protocol/events';
+import type { ChatStreamEvent, TextDeltaEvent, ThinkingDeltaEvent } from '../../../chat-protocol/events';
 
 export const DELTA_FLUSH_FALLBACK_MS = 50;
 
-export type DeltaEvent = TextDeltaEvent | ThinkingDeltaEvent | GuideDeltaEvent;
+export type DeltaEvent = TextDeltaEvent | ThinkingDeltaEvent;
 
 export function isDeltaEvent(event: ChatStreamEvent): event is DeltaEvent {
-  return event.type === 'text-delta' || event.type === 'thinking-delta' || event.type === 'guide-delta';
+  return event.type === 'text-delta' || event.type === 'thinking-delta';
 }
 
 export interface CreateDeltaBatcherOptions<K> {

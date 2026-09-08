@@ -578,15 +578,6 @@ export interface ThinkingDisplayProps extends HTMLAttributes<HTMLDivElement> {
   isStreaming?: boolean;
 }
 
-// ========== Guide Display Props ==========
-
-export interface GuideDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  /** Rendered guide body. `ChatMessageEnhanced` passes the SAME markdown
-   *  output a text segment gets, so `[card://]` cards and mention chips
-   *  behave identically inside a guide. */
-  children?: ReactNode;
-}
-
 // ========== Ask Display Props ==========
 
 export interface AskDisplayProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onSelect'> {

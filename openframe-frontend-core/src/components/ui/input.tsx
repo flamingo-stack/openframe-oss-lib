@@ -14,6 +14,8 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   endAdornment?: ReactNode;
   /** Label text displayed above the input */
   label?: string;
+  /** Label scale forwarded to FieldWrapper ('large' = text-h4 for designs with body-scale field titles) */
+  labelVariant?: 'default' | 'large';
   /** Status message displayed below the input */
   error?: string;
   /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey).
@@ -37,6 +39,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       startAdornment,
       endAdornment,
       label,
+      labelVariant,
       error,
       errorVariant = 'error',
       loading = false,
@@ -75,7 +78,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         />
       );
       return label ? (
-        <FieldWrapper label={label} error={error} errorVariant={errorVariant}>
+        <FieldWrapper label={label} labelVariant={labelVariant} error={error} errorVariant={errorVariant}>
           {rangeInput}
         </FieldWrapper>
       ) : (
@@ -149,7 +152,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     );
 
     return (
-      <FieldWrapper label={label} error={error} errorVariant={errorVariant}>
+      <FieldWrapper label={label} labelVariant={labelVariant} error={error} errorVariant={errorVariant}>
         {content}
       </FieldWrapper>
     );

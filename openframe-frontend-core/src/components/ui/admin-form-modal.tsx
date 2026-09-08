@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, type ReactNode } from 'react';
+import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
 import { Button } from './button';
 import { UnsavedChangesChip, useGuardedClose } from './modal-guarded-close';
 import {
@@ -146,6 +147,7 @@ export function AdminFormModal({
           admin modal routed through this shell. */}
       <form
         id={formId}
+        {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}
         // Inherit the ModalV2 flex chain — an unstyled form between the shell
         // and ModalV2Content made flex-1/min-h-0 inert, so tall modals pushed
         // the Cancel/Save footer past 90vh.

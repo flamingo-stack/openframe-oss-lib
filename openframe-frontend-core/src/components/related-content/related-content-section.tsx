@@ -60,6 +60,7 @@ import {
 } from '../../utils/content-ref-groups';
 import { extractItems, extractItemId } from '../../utils/extract-items';
 import { buildListUrl as libBuildListUrl, canonicalContentRefType } from '../../utils/list-url';
+import { pageCount } from '../../utils/search-params';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
 // Type-only — erased at build, no runtime dependency on the dispatch module.
 import type { ChatCardDispatchExtras } from '../chat/entity-cards/dispatch';
@@ -344,7 +345,7 @@ function ContentGroup({
       setPage(1);
     }
   }, [refsKey]);
-  const totalGroupPages = Math.max(1, Math.ceil(refs.length / GROUP_PAGE_SIZE));
+  const totalGroupPages = pageCount(refs.length, GROUP_PAGE_SIZE);
   const safePage = Math.min(page, totalGroupPages);
   const visibleGroupRefs =
     refs.length > GROUP_PAGE_SIZE ? refs.slice((safePage - 1) * GROUP_PAGE_SIZE, safePage * GROUP_PAGE_SIZE) : refs;

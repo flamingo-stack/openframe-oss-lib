@@ -32,9 +32,14 @@ export const SCHEDULING_SLUG_SHAPE = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/;
 /** Upper bound for availability month paging (widget nav, route 400, DAL clamp). */
 export const MAX_MONTH_OFFSET = 11;
 
+/** The one spelling of slug normalisation — every map key and lookup goes through it. */
+export function normalizeSchedulingSlug(slug: string): string {
+  return slug.trim().toLowerCase();
+}
+
 /** Full-slug shape validity (path-resolution safety only — never semantics). */
 export function isValidSchedulingSlug(slug: string): boolean {
-  return SCHEDULING_SLUG_SHAPE.test(slug.trim().toLowerCase());
+  return SCHEDULING_SLUG_SHAPE.test(normalizeSchedulingSlug(slug));
 }
 
 export interface ParsedSchedulingLinkName {
@@ -66,9 +71,11 @@ export function parseSchedulingLinkName(name: string): ParsedSchedulingLinkName 
   };
 }
 
-/** Whether a link name opts into the directory (has an Audience segment). */
+/** Whether a link name opts into the directory: its Audience segment slugifies
+ *  to a non-empty key — the SAME rule the directory groups by, so "listed" and
+ *  "has a group" can never disagree. */
 export function isListedSchedulingName(name: string): boolean {
-  return parseSchedulingLinkName(name).audienceLabel !== null;
+  return schedulingAudienceKey(parseSchedulingLinkName(name).audienceLabel ?? '') !== null;
 }
 
 /**

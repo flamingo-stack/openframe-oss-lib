@@ -1,6 +1,7 @@
 'use client';
 
-import { useLayoutEffect, useState } from 'react';
+import { useState } from 'react';
+import { useIsomorphicLayoutEffect } from './use-isomorphic-layout-effect';
 
 /**
  * Hook to check if a media query matches
@@ -10,7 +11,7 @@ import { useLayoutEffect, useState } from 'react';
 export function useMediaQuery(query: string): boolean | undefined {
   const [matches, setMatches] = useState<boolean | undefined>(undefined);
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const matchMedia = window.matchMedia(query);
 
     const handleChange = () => {

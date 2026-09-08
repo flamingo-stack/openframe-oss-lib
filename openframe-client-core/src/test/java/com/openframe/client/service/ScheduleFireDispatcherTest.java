@@ -42,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -84,6 +85,8 @@ class ScheduleFireDispatcherTest {
         Instant now = Instant.now();
         ScheduleScript schedule = schedule(List.of("script-a", "script-b"));
         when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m1", "m2"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE), machine("m2", DeviceStatus.ONLINE)));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(script("script-a", ScriptShell.BASH), script("script-b", ScriptShell.POWERSHELL)));
 
@@ -148,6 +151,8 @@ class ScheduleFireDispatcherTest {
     @DisplayName("dispatch: all referenced scripts missing/inactive → resolved but nothing dispatched")
     void dispatch_noRunnableScripts_isNoOp() {
         when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
+        lenient().when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE)));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of());   // none resolve
 
         dispatcher.dispatch(schedule(List.of("gone")), Instant.now());
@@ -161,6 +166,8 @@ class ScheduleFireDispatcherTest {
     @DisplayName("dispatch: a combined '-Name value' defaultArg is tokenized into separate argv tokens on the wire")
     void dispatch_tokenizesCombinedArgs() {
         when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
+        lenient().when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE)));
         Script withArgs = Script.builder()
                 .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.POWERSHELL)
                 .privilegeLevel(PrivilegeLevel.USER).scriptBody("param($Bucket)")
@@ -197,6 +204,8 @@ class ScheduleFireDispatcherTest {
     @DisplayName("dispatch: per-script custom params override args + env for that script only; others keep their defaults")
     void dispatch_customParamsOverrideArgsAndEnv() {
         when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
+        lenient().when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE)));
         Script scriptA = Script.builder()
                 .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.BASH)
                 .privilegeLevel(PrivilegeLevel.USER).scriptBody("echo a")
@@ -234,6 +243,8 @@ class ScheduleFireDispatcherTest {
     @DisplayName("dispatch: a custom-params entry with null args/env inherits the script's defaults for that dimension")
     void dispatch_customParamsNullFieldsInheritDefaults() {
         when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
+        lenient().when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE)));
         Script scriptA = Script.builder()
                 .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.BASH)
                 .privilegeLevel(PrivilegeLevel.USER).scriptBody("echo a")
@@ -339,18 +350,21 @@ class ScheduleFireDispatcherTest {
 
     @Test
     @DisplayName("dispatch RETRY_ON_RECONNECT: a non-OFFLINE status (e.g. no Machine record) is dispatched, not held")
-    void dispatch_retryOnReconnect_nonOfflineDispatched() {
+    void dispatch_retryOnReconnect_notOnlineIsArmedNotDispatched() {
         Instant now = Instant.now();
         ScheduleScript schedule = retrySchedule(List.of("script-a"), 3600L);
         when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-unknown"));
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of());  // no record
-        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(script("script-a", ScriptShell.BASH)));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of());
+        when(dispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT, "m-unknown", SCHEDULE_ID))
+                .thenReturn(Optional.empty());
 
         dispatcher.dispatch(schedule, now);
 
-        verify(dispatchRepository, never()).save(any());                  // nothing armed
-        verify(scriptScheduleNatsPublisher).publish(eq("m-unknown"), any());   // dispatched as-is
+        // Only ONLINE devices run; a not-found (non-ONLINE) target is armed for reconnect, NOT dispatched.
+        ArgumentCaptor<DeviceFirstOnlineDispatch> sentinelCaptor = ArgumentCaptor.forClass(DeviceFirstOnlineDispatch.class);
+        verify(dispatchRepository).save(sentinelCaptor.capture());
+        assertThat(sentinelCaptor.getValue().getMachineId()).isEqualTo("m-unknown");
+        verify(scriptScheduleNatsPublisher, never()).publish(any(), any());
     }
 
     private static ScheduleScript schedule(List<String> scriptIds) {
