@@ -28,6 +28,7 @@ public class ScheduleLocalMachineTimeDispatch implements TenantScoped {
 
     private String machineId;
 
+    private Instant lastOccurrenceAt;
     private Instant firedAt;
 
     private ScheduleDeviceLocalTimeDispatchStatus status;
