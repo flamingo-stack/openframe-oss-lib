@@ -396,7 +396,7 @@ export function buildBaseComponents({
     th: ({ children }: MdRenderProps<'th'>) => (
       <th
         className={cn(
-          'break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-accent last:border-r-0 md:px-4',
+          'break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-text-primary last:border-r-0 md:px-4',
           textSizes.th,
         )}
       >
