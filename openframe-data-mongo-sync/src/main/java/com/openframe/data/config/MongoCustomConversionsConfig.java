@@ -11,7 +11,6 @@ import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
  * <p>
  * Always pins the UTC {@link LocalDateUtcMongoConverters}. To add more converters, publish a
  * {@link MongoConversionsContributor} bean rather than another conversions bean; they are all applied here.
- * See {@code NotificationContextMongoConfig} for an example.
  */
 @Configuration
 public class MongoCustomConversionsConfig {

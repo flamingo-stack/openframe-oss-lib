@@ -10,8 +10,6 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
-import com.openframe.data.document.notification.NotificationContext;
-import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -21,8 +19,6 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class GraphQLNotificationMapper {
-
-    private final NotificationContextDescriptorRegistry descriptorRegistry;
 
     public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
         return CursorPaginationCriteria.fromConnectionArgs(args);
@@ -35,8 +31,7 @@ public class GraphQLNotificationMapper {
     }
 
     public NotificationView toView(Notification notification, boolean read) {
-        NotificationContext context = notification.getContext();
-        NotificationCategory category = categoryOf(notification);
+        NotificationCategory category = notification.getCategory();
         return NotificationView.builder()
                 .id(notification.getId())
                 .severity(notification.getSeverity())
@@ -44,19 +39,10 @@ public class GraphQLNotificationMapper {
                 .description(notification.getDescription())
                 .createdAt(notification.getCreatedAt())
                 .category(category)
-                .context(context)
                 .type(notification.getType())
                 .attributes(notification.getAttributes())
                 .read(read)
                 .build();
-    }
-
-    private NotificationCategory categoryOf(Notification notification) {
-        NotificationCategory stored = notification.getCategory();
-        if (stored != null) {
-            return stored;
-        }
-        return descriptorRegistry.categoryOf(notification.getContext());
     }
 
     public GenericConnection<GenericEdge<NotificationView>> toConnection(GenericQueryResult<NotificationView> result) {

@@ -1,7 +1,6 @@
 package com.openframe.data.nats.integration.publisher;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationSeverity;
@@ -50,7 +49,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given a subscriber on user.<userId>.notification, when publishToUser is called, then the message is delivered through the Spring Cloud Stream io.nats binder with the full payload (id, severity, title, context)")
+    @DisplayName("Given a subscriber on user.<userId>.notification, when publishToUser is called, then the message is delivered through the Spring Cloud Stream io.nats binder with the full payload (id, severity, title, type, attributes)")
     void publish_to_user_delivers_payload() throws Exception {
         Subscription sub = subscriber.subscribe("user.alice.notification");
         subscriber.flush(Duration.ofSeconds(2));
@@ -58,7 +57,8 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         Notification saved = persisted(Notification.builder()
                 .title("Welcome aboard")
                 .createdAt(Instant.now())
-                .context(GenericContext.builder().type("welcome").payload("{\"k\":\"v\"}").build()));
+                .type("welcome")
+                .attributes(java.util.Map.of("k", "v")));
 
         publisher.publishToUser("alice", saved, NotificationCategory.TICKETS);
 
@@ -69,9 +69,8 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         assertThat(decoded.getTitle()).isEqualTo("Welcome aboard");
         assertThat(decoded.getSeverity()).isEqualTo(NotificationSeverity.INFO);
         assertThat(decoded.getCategory()).isEqualTo(NotificationCategory.TICKETS);
-        assertThat(decoded.getContext()).isInstanceOf(GenericContext.class);
-        assertThat(decoded.getContext().getType()).isEqualTo("welcome");
-        assertThat(((GenericContext) decoded.getContext()).getPayload()).isEqualTo("{\"k\":\"v\"}");
+        assertThat(decoded.getType()).isEqualTo("welcome");
+        assertThat(decoded.getAttributes()).containsEntry("k", "v");
     }
 
     @Test
@@ -82,7 +81,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
 
         Notification savedForBob = persisted(Notification.builder()
                 .title("for bob")
-                .context(GenericContext.builder().type("evt").payload("{}").build()));
+                .type("evt"));
 
         publisher.publishToUser("bob", savedForBob, NotificationCategory.GENERIC);
 
@@ -98,7 +97,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
 
         Notification saved = persisted(Notification.builder()
                 .title("Machine event")
-                .context(GenericContext.builder().type("event").payload("{}").build()));
+                .type("event"));
 
         publisher.publishToMachine("m1", saved, NotificationCategory.DEVICES);
 
@@ -111,7 +110,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
     void unsaved_notification_throws() {
         Notification noId = Notification.builder()
                 .title("not yet persisted")
-                .context(GenericContext.builder().type("evt").payload("{}").build())
+                .type("evt")
                 .build();
         assertThatThrownBy(() -> publisher.publishToUser("alice", noId, NotificationCategory.GENERIC))
                 .isInstanceOf(IllegalArgumentException.class);

@@ -32,7 +32,6 @@ public class Notification implements TenantScoped {
 
     private String description;
 
-    // Null on legacy-path and pre-migration documents; context stays authoritative until readers switch.
     private String type;
 
     private Map<String, String> attributes;
@@ -42,8 +41,6 @@ public class Notification implements TenantScoped {
     @CreatedDate
     @Indexed(expireAfterSeconds = NotificationRetention.HISTORY_TTL_SECONDS) // 30-day notifications-history retention
     private Instant createdAt;
-
-    private NotificationContext context;
 
     /**
      * Optional source-event correlation key (e.g. an approval-request id) used to locate and

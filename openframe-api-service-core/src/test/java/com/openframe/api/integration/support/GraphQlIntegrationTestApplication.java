@@ -4,13 +4,8 @@ import com.openframe.api.config.DateScalarConfig;
 import com.openframe.api.config.InstantScalarConfig;
 import com.openframe.api.config.LongScalarConfig;
 import com.openframe.api.datafetcher.NotificationDataFetcher;
-import com.openframe.api.datafetcher.notification.NotificationContextGraphQlTypeResolver;
-import com.openframe.api.integration.datafetcher.notification.TestApprovalContextDescriptor;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
-import com.openframe.data.config.NotificationContextJacksonConfig;
-import com.openframe.data.config.NotificationContextMongoConfig;
-import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.impl.CustomNotificationReadStateRepositoryImpl;
@@ -55,15 +50,10 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
         CustomNotificationRepositoryImpl.class,
         CustomNotificationReadStateRepositoryImpl.class,
         NotificationBroadcaster.class,
-        NotificationContextDescriptorRegistry.class,
         NotificationReadStateService.class,
         NotificationService.class,
         GraphQLNotificationMapper.class,
         NotificationDataFetcher.class,
-        NotificationContextGraphQlTypeResolver.class,
-        TestApprovalContextDescriptor.class,
-        NotificationContextMongoConfig.class,
-        NotificationContextJacksonConfig.class,
         InstantScalarConfig.class,
         DateScalarConfig.class,
         LongScalarConfig.class

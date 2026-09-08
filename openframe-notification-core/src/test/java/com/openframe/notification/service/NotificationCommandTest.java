@@ -1,15 +1,20 @@
 package com.openframe.notification.service;
 
-import com.openframe.data.document.notification.GenericContext;
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.notification.spec.Audience;
+import com.openframe.notification.spec.NotificationType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class NotificationCommandTest {
+
+    private enum TestType implements NotificationType { APPROVAL }
 
     @Test
     @DisplayName("Given all required fields, when build() runs, then the Command carries the supplied values verbatim")
@@ -19,14 +24,18 @@ class NotificationCommandTest {
                 .title("Approval required")
                 .description("desc")
                 .severity(NotificationSeverity.INFO)
-                .context(genericContext("APPROVAL"))
+                .type(TestType.APPROVAL)
+                .category(NotificationCategory.MINGO)
+                .attributes(Map.of("approvalRequestId", "req-1"))
                 .audience(audience)
                 .build();
 
         assertThat(cmd.getTitle()).isEqualTo("Approval required");
         assertThat(cmd.getDescription()).isEqualTo("desc");
         assertThat(cmd.getSeverity()).isEqualTo(NotificationSeverity.INFO);
-        assertThat(cmd.getContext().getType()).isEqualTo("APPROVAL");
+        assertThat(cmd.getType()).isEqualTo(TestType.APPROVAL);
+        assertThat(cmd.getCategory()).isEqualTo(NotificationCategory.MINGO);
+        assertThat(cmd.getAttributes()).containsEntry("approvalRequestId", "req-1");
         assertThat(cmd.getAudience()).isSameAs(audience);
     }
 
@@ -49,19 +58,24 @@ class NotificationCommandTest {
     }
 
     @Test
-    void null_context_rejected() {
-        assertThatThrownBy(() -> baseBuilder().context(null).build())
+    void null_type_rejected() {
+        assertThatThrownBy(() -> baseBuilder().type(null).build())
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("context");
+                .hasMessageContaining("type");
     }
 
     @Test
-    @DisplayName("Given a context whose type is blank, when build() runs, then IllegalArgumentException — type drives polymorphic dispatch")
-    void blank_context_type_rejected() {
-        GenericContext ctxWithBlankType = GenericContext.builder().type("   ").payload("{}").build();
-        assertThatThrownBy(() -> baseBuilder().context(ctxWithBlankType).build())
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("context.type");
+    void null_attributes_rejected() {
+        assertThatThrownBy(() -> baseBuilder().attributes(null).build())
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("attributes");
+    }
+
+    @Test
+    void null_category_rejected() {
+        assertThatThrownBy(() -> baseBuilder().category(null).build())
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("category");
     }
 
     @Test
@@ -76,11 +90,9 @@ class NotificationCommandTest {
         return NotificationCommand.builder()
                 .title("Default title")
                 .severity(NotificationSeverity.INFO)
-                .context(genericContext("X"))
+                .type(TestType.APPROVAL)
+                .category(NotificationCategory.GENERIC)
+                .attributes(Map.of())
                 .audience(Audience.users("admin-1"));
-    }
-
-    private static GenericContext genericContext(String type) {
-        return GenericContext.builder().type(type).payload("{}").build();
     }
 }

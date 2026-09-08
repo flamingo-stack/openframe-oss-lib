@@ -1,7 +1,6 @@
 package com.openframe.notification.spec;
 
 import com.openframe.data.document.notification.NotificationCategory;
-import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSeverity;
 
@@ -33,7 +32,4 @@ public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     // iOS action-button set, delivered as aps.category; empty = plain banner.
     Optional<String> getApplePushCategory();
-
-    // Transitional — deleted together with the legacy context classes; do not build on it.
-    NotificationContext buildLegacyContext(S seed);
 }
