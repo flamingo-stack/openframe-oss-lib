@@ -7,7 +7,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -31,12 +30,13 @@ class PackageSearchServiceTest {
         chocoClient = clientFor(PackageManagerType.CHOCO);
         wingetClient = clientFor(PackageManagerType.WINGET);
         packageManagerProperties = new PackageManagerProperties();
+        packageManagerProperties.setChocoEnabled(true);
         service = new PackageSearchService(List.of(brewClient, chocoClient, wingetClient), packageManagerProperties);
     }
 
     @Test
     void rejectsSearchForDisabledManager() {
-        packageManagerProperties.setDisabled(Set.of(PackageManagerType.CHOCO));
+        packageManagerProperties.setChocoEnabled(false);
 
         assertThrows(IllegalArgumentException.class,
                 () -> service.search(new PackageSearchInput(PackageManagerType.CHOCO, "slack", null, null)));

@@ -163,10 +163,8 @@ class PackageManagerBootstrapServiceTest {
     }
 
     @Test
-    @DisplayName("disabled manager: report is ignored before any machine lookup")
+    @DisplayName("choco is disabled by default: report is ignored before any machine lookup")
     void ignoresDisabledManager() {
-        packageManagerProperties.setDisabled(java.util.Set.of(PackageManagerType.CHOCO));
-
         service.dispatchInstall(MACHINE_ID, PackageManagerType.CHOCO);
 
         verify(machineRepository, never()).findByMachineId(anyString());

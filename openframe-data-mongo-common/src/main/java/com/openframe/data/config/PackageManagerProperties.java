@@ -6,18 +6,15 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import java.util.HashSet;
-import java.util.Set;
-
 @Getter
 @Setter
 @Component
 @ConfigurationProperties(prefix = "openframe.package-managers")
 public class PackageManagerProperties {
 
-    private Set<PackageManagerType> disabled = new HashSet<>();
+    private boolean chocoEnabled = false;
 
     public boolean isDisabled(PackageManagerType type) {
-        return disabled.contains(type);
+        return type == PackageManagerType.CHOCO && !chocoEnabled;
     }
 }
