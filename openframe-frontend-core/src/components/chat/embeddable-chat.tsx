@@ -1799,12 +1799,17 @@ function EmbeddableChatInner({
    * is no longer a Guide-mode-only affordance either.
    */
   const renderMessageSources = useCallback(
-    (message: Message) => {
+    (message: Message, index: number) => {
       if (message.role !== 'assistant') return null;
-      // Suppressed while the turn is still streaming: the citation markers the
-      // order is derived from arrive WITH the text, so a strip rendered mid-turn
-      // reshuffles under the reader as more sentences land.
-      if (chatLoading) return null;
+      // Suppressed only on the answer still being written: the citation markers
+      // the order is derived from arrive WITH the text, so a strip rendered
+      // mid-turn reshuffles under the reader as more sentences land.
+      //
+      // Scoped to the trailing row on purpose. `chatLoading` is a property of
+      // the THREAD, so testing it alone pulls the strips off every earlier
+      // answer too — a reader scrolled up watches finished citations blink out
+      // for the duration of an unrelated turn.
+      if (chatLoading && index === messages.length - 1) return null;
       const { cited, uncited } = splitCitedSources(message.sources, flattenAssistantContent(message.content));
       if (cited.length === 0 && uncited.length === 0) return null;
       return (
@@ -1820,7 +1825,7 @@ function EmbeddableChatInner({
         </div>
       );
     },
-    [chatLoading, resolvedBaseRoute, chipBasePlatform, handleNavigationClose, discussRef],
+    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, handleNavigationClose, discussRef],
   );
 
   // Host node for in-panel Radix portals (see the body wrapper below).

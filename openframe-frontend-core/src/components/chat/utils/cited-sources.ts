@@ -14,6 +14,24 @@ export interface CitedSources {
 /** `[1]`, `[12]` — a citation marker in the answer body. */
 const CITATION = /\[(\d+)\]/g;
 
+/** Fenced blocks and inline code spans. */
+const CODE = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g;
+
+/**
+ * Blank out code before looking for citations.
+ *
+ * `$items[1]`, `argv[1]`, `matrix[0][1]` — array indexing is not a citation,
+ * and this assistant answers with scripts constantly. Left in, a snippet marks
+ * a source as cited that the prose never mentions, and worse, seeds the reading
+ * order from a position inside a code block.
+ *
+ * Replaced with spaces rather than removed so nothing outside the block shifts
+ * — only whether a marker is inside one is being decided here.
+ */
+function withoutCode(content: string): string {
+  return content.replace(CODE, block => ' '.repeat(block.length));
+}
+
 /**
  * Split an answer's sources into the ones it cited and the ones it did not.
  *
@@ -30,7 +48,7 @@ export function splitCitedSources(sources: ChatSource[] | undefined, content: st
   if (!sources || sources.length === 0) return { cited: [], uncited: [] };
 
   const firstMentionAt = new Map<number, number>();
-  for (const match of content.matchAll(CITATION)) {
+  for (const match of withoutCode(content).matchAll(CITATION)) {
     const index = Number.parseInt(match[1], 10);
     if (!firstMentionAt.has(index)) firstMentionAt.set(index, firstMentionAt.size);
   }

@@ -51,3 +51,30 @@ describe('splitCitedSources', () => {
     expect(splitCitedSources([], '[1]')).toEqual({ cited: [], uncited: [] });
   });
 });
+
+describe('splitCitedSources — code is not prose', () => {
+  const retrieved = [
+    { index: 1, name: 'Install the agent', path: '', documentType: '' },
+    { index: 2, name: 'Configure the tenant', path: '', documentType: '' },
+  ];
+
+  it('ignores array indexing inside a fenced block', () => {
+    // This assistant answers with scripts, so `$hosts[1]` is common — and a
+    // source marked cited by a snippet is a citation the prose never made.
+    const answer = ['Run the script below.', '```powershell', '$hosts[1] | Restart-Service', '```'].join('\n');
+    const { cited, uncited } = splitCitedSources(retrieved, answer);
+
+    expect(cited).toEqual([]);
+    expect(uncited).toHaveLength(2);
+  });
+
+  it('ignores an index inside an inline code span', () => {
+    expect(splitCitedSources(retrieved, 'Read `argv[1]` first.').cited).toEqual([]);
+  });
+
+  it('still reads a citation that sits beside code', () => {
+    const { cited } = splitCitedSources(retrieved, 'Per the guide [1], run `argv[2]`.');
+
+    expect(cited.map(row => row.index)).toEqual([1]);
+  });
+});

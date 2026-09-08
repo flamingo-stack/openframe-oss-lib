@@ -37,12 +37,6 @@ import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedPro
  *  `scheduledScript`); id is the mention-token charset. */
 const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-zA-Z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g;
 
-/**
- * Same regex shape as `remarkCardLinks` — kept in lockstep so the
- * pre-scan and the remark plugin see the SAME set of markers. If the
- * grammar widens (today: snake_case OR kebab-case; closer `]` OR `)`),
- * both files must update.
- */
 /** Scanner for `[card://type:id]` in answer text. Built from the shared
  *  grammar so the body renderer and the metadata decoder cannot disagree on
  *  what a marker is — see `chat-protocol/card-marker.ts`. */
