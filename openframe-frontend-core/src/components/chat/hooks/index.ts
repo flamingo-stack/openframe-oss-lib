@@ -27,6 +27,10 @@ export * from './use-sse';
 // access is needed. `useEmbeddedChat` is the legacy SSE alias.
 export * from './use-sse-chat-adapter';
 export * from './use-nats-chat-adapter';
+// Shared dialog-list state machine behind both adapters' managed modes.
+export * from './use-managed-dialog-list';
+// Reference latch for host-supplied inline objects used as memo dependencies.
+export * from './use-stable-shallow';
 export * from './use-unified-chat';
 export * from './use-embedded-chat';
 

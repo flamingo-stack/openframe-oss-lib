@@ -1,15 +1,19 @@
 package com.openframe.authz.security;
 
+import com.openframe.authz.config.oidc.MicrosoftSSOProperties;
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.sso.SSOConfigService;
+import com.openframe.authz.service.sso.SsoIdentityService;
+import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
+
+import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
 
 /**
  * Verified-email gate for the TENANT-SCOPED web login — the same nOAuth defense the email-less
@@ -27,16 +31,27 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MicrosoftLoginEmailGate {
 
-    private static final String MICROSOFT = "microsoft";
-
+    private final MicrosoftSSOProperties microsoftProps;
     private final SSOConfigService ssoConfigService;
+    private final EmailTrustPolicy emailTrustPolicy;
+    private final SsoIdentityService ssoIdentityService;
+    private final UserService userService;
 
-    @Value("${openframe.sso.microsoft.require-verified-email:false}")
-    private boolean requireVerifiedEmail;
+    private boolean isLinkedToClaimedEmail(String tenantId, OidcUser user) {
+        String email = OidcUserUtils.resolveEmail(user);
+        if (email == null || tenantId == null) {
+            return false;
+        }
+        return ssoIdentityService.findLink(MICROSOFT, user.getClaims())
+                .flatMap(link -> userService.findActiveById(link.getUserId()))
+                .filter(u -> tenantId.equals(u.getTenantId()))
+                .filter(u -> email.equalsIgnoreCase(u.getEmail()))
+                .isPresent();
+    }
 
     /** @throws IllegalStateException when the login must not proceed */
     public void require(Authentication authentication) {
-        if (!requireVerifiedEmail
+        if (!microsoftProps.isRequireVerifiedEmail()
                 || !(authentication instanceof OAuth2AuthenticationToken token)
                 || !MICROSOFT.equals(token.getAuthorizedClientRegistrationId())
                 || !(token.getPrincipal() instanceof OidcUser user)) {
@@ -47,9 +62,14 @@ public class MicrosoftLoginEmailGate {
         if (tenantId != null && ssoConfigService.getSSOConfig(tenantId, MICROSOFT).isPresent()) {
             return;
         }
-        if (!OidcUserUtils.emailTrustedForRouting(MICROSOFT, user.getClaims())) {
-            log.warn("event=sso-login-unverified-email provider=microsoft tenant={} sub={}",
-                    tenantId, user.getSubject());
+        // A previously bound identity link is proof enough: the subject cannot be forged, and it
+        // must point at the user this login's email resolves to in this tenant.
+        if (isLinkedToClaimedEmail(tenantId, user)) {
+            return;
+        }
+        if (!emailTrustPolicy.emailTrustedForRouting(MICROSOFT, user.getClaims())) {
+            log.warn("event=sso-login-unverified-email provider=microsoft tenant={} sub={} {}",
+                    tenantId, user.getSubject(), OidcUserUtils.describeEmailTrustSignals(user.getClaims()));
             throw new IllegalStateException(
                     "This account's email is not verified by the provider. Please contact your administrator.");
         }

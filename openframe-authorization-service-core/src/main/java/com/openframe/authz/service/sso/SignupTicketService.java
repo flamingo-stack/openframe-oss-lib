@@ -37,6 +37,7 @@ public class SignupTicketService {
                                       String lastName,
                                       String provider,
                                       boolean emailVerified,
+                                      String subject,
                                       String userId,
                                       String tenantId) {
 
@@ -45,11 +46,12 @@ public class SignupTicketService {
         }
     }
 
-    public String create(String email, String firstName, String lastName, String provider, boolean emailVerified) {
+    public String create(String email, String firstName, String lastName, String provider,
+                         boolean emailVerified, String subject) {
         byte[] raw = new byte[32];
         RANDOM.nextBytes(raw);
         String ticket = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
-        write(ticket, new SignupTicketPayload(email, firstName, lastName, provider, emailVerified, null, null), TTL);
+        write(ticket, new SignupTicketPayload(email, firstName, lastName, provider, emailVerified, subject, null, null), TTL);
         return ticket;
     }
 
@@ -69,7 +71,7 @@ public class SignupTicketService {
         Long remaining = redisTemplate.getExpire(k);
         Duration ttl = remaining != null && remaining > 0 ? Duration.ofSeconds(remaining) : TTL;
         write(ticket, new SignupTicketPayload(p.email(), p.firstName(), p.lastName(), p.provider(),
-                p.emailVerified(), userId, tenantId), ttl);
+                p.emailVerified(), p.subject(), userId, tenantId), ttl);
     }
 
     /** Atomic single use — the token mint, and only it, calls this. */
