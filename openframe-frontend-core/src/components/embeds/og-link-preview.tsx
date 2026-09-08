@@ -95,14 +95,15 @@ export interface OGLinkPreviewProps {
    *  (the card then degrades to a favicon+title chip when no scraped image
    *  is available). The hub injects its `buildOgPlaceholderUrl` here. */
   buildPlaceholderUrl?: BuildPlaceholderUrl;
-  /** Override the scraped title (used by publication cards that already know
-   *  the title locally — e.g. a CMS-managed press link). */
-  fallbackTitle?: string;
-  /** Override the scraped description. */
-  fallbackDescription?: string;
-  /** Override the scraped image — useful when the scrape returns no image but
-   *  the embedder has a CMS-stored hero image to fall back to. */
-  fallbackImage?: string;
+  /** CURATED title — our own copy for this link (e.g. a CMS-managed press
+   *  row). Wins over the scrape; see the precedence rule on the component. */
+  curatedTitle?: string;
+  /** CURATED description. Wins over the scrape. */
+  curatedDescription?: string;
+  /** CURATED cover image. Wins over the scrape — an outlet's og:image is a
+   *  fallback for links we have no cover for, never an override of one we
+   *  deliberately chose. */
+  curatedImage?: string;
   /** Publication / source name shown alongside the favicon (e.g. "TechCrunch"). */
   publicationName?: string;
   /** Publication logo URL shown alongside the title (defaults to favicon). */
@@ -173,23 +174,35 @@ const Favicon = ({ src, size = 'w-6 h-6' }: { src: string; size?: string }) => (
  *     RFC1918 ranges — those render as plain `<a>` tags).
  *  2. `GET ogEndpointPath?url=<encoded>` — embedder serves the shape declared
  *     in `OGData`.
- *  3. Resolve image: scraped og:image → `originalImage` fallback → `fallbackImage`
- *     prop → `buildPlaceholderUrl(title, siteName)`. Each step has its own
- *     error toggle so a 404 / CORS-tainted image gracefully degrades.
+ *  3. Resolve the image by the PRECEDENCE rule below.
  *  4. Extract a letterbox background color from the resolved image via
  *     `useImageEdgeColor`. Same-origin proxy is REQUIRED for cross-origin
  *     images so the `<canvas>` extraction doesn't taint.
  *  5. Render compact (h-[120px] horizontal) or default (vertical w/ aspect-video
  *     hero) variant, with image-less degraded variants for each.
+ *
+ * PRECEDENCE — curated over scraped, for EVERY field alike. A `curated*` prop
+ * is a value we chose ourselves; the scrape only fills what curation left
+ * empty:
+ *
+ *     curatedImage → scraped og:image → scraped originalImage → placeholder
+ *
+ * The image chain used to invert this — any outlet og:image beat an uploaded
+ * cover — so a deliberate editorial choice was silently overridden wherever
+ * the outlet happened to publish one, while title and description read
+ * curated-first 200 lines down. The chain is now expressed ONCE, as
+ * `imageCandidates`, and `handleImageError` retires the candidate currently on
+ * screen instead of restating the order: a positional error handler is how the
+ * two halves drift apart.
  */
 export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   url,
   apiBaseUrl,
   ogEndpointPath = '/api/og-scraper',
   buildPlaceholderUrl,
-  fallbackTitle,
-  fallbackDescription,
-  fallbackImage,
+  curatedTitle,
+  curatedDescription,
+  curatedImage,
   publicationName,
   publicationLogo,
   variant = 'default',
@@ -198,9 +211,9 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   const [ogData, setOgData] = useState<OGData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const [originalImageError, setOriginalImageError] = useState(false);
-  const [fallbackImageError, setFallbackImageError] = useState(false);
+  /** URLs that failed to load. Keyed by url, so the candidate order below is
+   *  the single owner of precedence. */
+  const [failedImages, setFailedImages] = useState<ReadonlySet<string>>(new Set());
 
   let isValidUrl = true;
   let isLocalhost = false;
@@ -291,8 +304,8 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
     ogData ??
     (error
       ? {
-          title: fallbackTitle || domainToTitle(domain),
-          description: fallbackDescription || domain,
+          title: curatedTitle || domainToTitle(domain),
+          description: curatedDescription || domain,
           image: '',
           url,
           siteName: publicationName || domain,
@@ -308,18 +321,13 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
       ? buildPlaceholderUrl(effectiveData.title, effectiveData.siteName || domain)
       : null;
 
-  const resolvedImageUrl =
-    effectiveData?.image && !imageError
-      ? effectiveData.image
-      : effectiveData?.originalImage && !originalImageError
-        ? effectiveData.originalImage
-        : fallbackImage && !fallbackImageError
-          ? fallbackImage
-          : placeholderImageUrl;
+  // THE precedence rule, in one place (see the component doc).
+  const imageCandidates = [curatedImage, effectiveData?.image, effectiveData?.originalImage, placeholderImageUrl];
+  const resolvedImageUrl = imageCandidates.find(u => !!u && !failedImages.has(u)) ?? null;
 
   const hasImage = !!resolvedImageUrl;
-  const isFallbackImage = resolvedImageUrl === fallbackImage;
-  const isPlaceholder = resolvedImageUrl === placeholderImageUrl && !isFallbackImage;
+  const isCuratedImage = !!resolvedImageUrl && resolvedImageUrl === curatedImage;
+  const isPlaceholder = !!resolvedImageUrl && resolvedImageUrl === placeholderImageUrl && !isCuratedImage;
   const bgColor = useImageEdgeColor(resolvedImageUrl ?? null, 'var(--color-bg-surface)');
 
   const renderSkeleton = () =>
@@ -389,19 +397,21 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   if (loading) return renderSkeleton();
   if (!effectiveData) return renderSkeleton();
 
-  const title = fallbackTitle || effectiveData.title;
+  const title = curatedTitle || effectiveData.title;
   // Empty string when the scrape returned nothing — descriptions render
   // conditionally below. Avoids the legacy `'No description available'` filler
   // that signaled "broken card" to users.
-  const description = fallbackDescription || effectiveData.description || '';
+  const description = curatedDescription || effectiveData.description || '';
   const ogDomain = getDomain(effectiveData.url);
   const faviconSrc = effectiveData.favicon || `https://www.google.com/s2/favicons?domain=${ogDomain}&sz=32`;
   const logoSrc = publicationLogo || faviconSrc;
 
+  // Retire whichever candidate is on screen; the next one down the chain
+  // takes over on the re-render. Never restate the order here.
   const handleImageError = () => {
-    if (effectiveData.image && !imageError) setImageError(true);
-    else if (effectiveData.originalImage && !originalImageError) setOriginalImageError(true);
-    else setFallbackImageError(true);
+    const failed = resolvedImageUrl;
+    if (!failed) return;
+    setFailedImages(prev => (prev.has(failed) ? prev : new Set(prev).add(failed)));
   };
 
   const renderImage = () => {
@@ -411,7 +421,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
         <Image src={resolvedImageUrl} alt={title} className="rounded-md object-cover" fill sizes="100vw" unoptimized />
       );
     }
-    if (isFallbackImage) {
+    if (isCuratedImage) {
       return (
         <Image
           src={resolvedImageUrl}
