@@ -11,6 +11,7 @@ pub enum UpdatePhase {
     Completed,
     Verifying,
     RolledBack,
+    Failed,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +26,9 @@ pub struct UpdateState {
 
     #[serde(default)]
     pub started_at: Option<String>,
+    /// Failure reason stamped by the updater script
+    #[serde(default)]
+    pub last_error: Option<String>,
 }
 
 impl UpdateState {
@@ -34,6 +38,7 @@ impl UpdateState {
             phase: UpdatePhase::Validating,
             boot_attempts: 0,
             started_at: Some(chrono::Utc::now().to_rfc3339()),
+            last_error: None,
         }
     }
 
@@ -41,3 +46,7 @@ impl UpdateState {
         self.phase = phase;
     }
 }
+
+#[cfg(test)]
+#[path = "update_state_tests.rs"]
+mod tests;

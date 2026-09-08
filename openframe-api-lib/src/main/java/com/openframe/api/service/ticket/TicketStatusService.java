@@ -59,7 +59,6 @@ public class TicketStatusService {
                 .name(input.getName())
                 .color(input.getColor())
                 .position(nextCustomPosition())
-                .staleAfterMinutes(input.getStaleAfterMinutes())
                 .build();
 
         TicketStatusDefinition saved = statusRepository.save(definition);
@@ -74,7 +73,6 @@ public class TicketStatusService {
 
         applyName(status, input.getName());
         applyColor(status, input.getColor());
-        applyStaleAfterMinutes(status, input.getStaleAfterMinutes());
 
         return statusRepository.save(status);
     }
@@ -203,12 +201,6 @@ public class TicketStatusService {
         }
         ensureCustomStatus(status, CHANGE_COLOR);
         status.setColor(color);
-    }
-
-    private void applyStaleAfterMinutes(TicketStatusDefinition status, Integer staleAfterMinutes) {
-        if (staleAfterMinutes != null) {
-            status.setStaleAfterMinutes(staleAfterMinutes);
-        }
     }
 
     private void ensureCustomStatus(TicketStatusDefinition status, TicketStatusOperation operation) {
