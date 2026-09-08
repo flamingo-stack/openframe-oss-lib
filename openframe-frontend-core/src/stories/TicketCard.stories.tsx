@@ -1,11 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { PendingToolCallData } from '../components/chat/types';
-import {
-  TicketCard,
-  type TicketCardProps,
-  type BoardTicket,
-  type BoardTicketActivityKind,
-} from '../components/features/board';
+import { TicketCard, type TicketCardProps, type BoardTicket } from '../components/features/board';
 
 // =============================================================================
 // Harness — the card registers its own drag behaviour against the DOM and needs

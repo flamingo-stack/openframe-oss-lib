@@ -61,8 +61,6 @@ export interface BoardTicket {
    * technician should pick it up.
    */
   escalatedByUser?: boolean;
-  /** Single live-activity indicator rendered as the card's footer row. */
-  activity?: BoardTicketActivity;
 }
 
 export interface BoardColumnDef {
