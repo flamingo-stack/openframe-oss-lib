@@ -2,16 +2,16 @@ package com.openframe.test.tests;
 
 import com.openframe.test.api.DeviceApi;
 import com.openframe.test.data.dto.device.DeviceFilters;
+import com.openframe.test.data.dto.device.DeviceStatus;
+import com.openframe.test.data.dto.device.ForceClientUninstallItem;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.device.ToolConnection;
 import com.openframe.test.data.dto.device.fleet.FleetHost;
 import com.openframe.test.data.dto.device.mesh.MeshDevice;
+import com.openframe.test.helpers.FleetWait;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 
 import java.util.List;
 
@@ -19,13 +19,18 @@ import static com.openframe.test.data.generator.DeviceGenerator.*;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
 @DisplayName("Devices")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class DevicesTest extends BaseTest {
 
     /** The tag seeded on {@link #TAGGED_DEVICE}, rendered as the chip "purpose:auto_test" in the UI. */
     private static final String TAG_KEY = "purpose";
     private static final String TAG_VALUE = "auto_test";
     private static final String TAGGED_DEVICE = "vm115982";
+
+    /**
+     * How long the client gets to uninstall itself and deregister after a dashboard-style delete. A
+     * healthy client is done in well under a minute; the ceiling only bounds a dead one.
+     */
+    private static final int DELETE_TIMEOUT_SECONDS = 300;
 
     @Tag("feature")
     @Tag("saas")
@@ -203,35 +208,44 @@ public class DevicesTest extends BaseTest {
     }
 
     @Tag("archive")
-    @Order(1)
     @Test
-    @DisplayName("Archive device")
-    public void testArchiveDevice() {
-        List<Machine> devices = DeviceApi.getDevices(pipelineScoped(offlineDevicesFilter()));
+    @DisplayName("Delete device from dashboard")
+    public void testDeleteDeviceFromDashboard() {
+        // The dashboard's Delete is POST api/force/client/uninstall: the platform marks the device
+        // PENDING_DELETION and tells the client to uninstall itself; the client deregisters on its way
+        // out and the platform sets DELETED. The device is never OFFLINE in between, which is why this
+        // replaced the old archive-an-OFFLINE-device / delete-an-ARCHIVED-device pair: with a client
+        // that deregisters, neither of those states ever appears.
+        List<Machine> devices = DeviceApi.getDevices(
+                pipelineScoped(statusDevicesFilter(DeviceStatus.ONLINE, DeviceStatus.OFFLINE)));
         assertThat(devices)
-                .as("Expected at least one OFFLINE device to archive%s", orgSuffix())
+                .as("Expected at least one enrolled device to delete%s", orgSuffix())
                 .isNotEmpty();
-        Machine device = devices.getLast();
-        DeviceApi.archiveDevice(device);
-        List<String> ids = DeviceApi.getDeviceIds(listedStatusesDevicesFilter());
-        assertThat(ids).as("Archived device should not be in listed devices").doesNotContain(device.getMachineId());
-    }
+        String machineId = devices.getLast().getMachineId();
 
-    @Tag("archive")
-    @Order(2)
-    @Test
-    @DisplayName("Delete device")
-    public void testDeleteDevice() {
-        // Archive (@Order(1)) moves this pipeline's enrolled device to ARCHIVED, so it no longer appears
-        // in the OFFLINE listing. Delete operates on that archived device.
-        List<Machine> devices = DeviceApi.getDevices(pipelineScoped(archivedDevicesFilter()));
-        assertThat(devices)
-                .as("Expected at least one ARCHIVED device to delete%s", orgSuffix())
-                .isNotEmpty();
-        Machine device = devices.getLast();
-        DeviceApi.deleteDevice(device);
+        List<ForceClientUninstallItem> items = DeviceApi.forceClientUninstall(List.of(machineId));
+        assertThat(items)
+                .as("Force uninstall response should name the device")
+                .extracting(ForceClientUninstallItem::getMachineId)
+                .contains(machineId);
+        assertThat(DeviceApi.getDevice(machineId).getStatus())
+                .as("Device %s should be PENDING_DELETION as soon as the uninstall is requested", machineId)
+                .isIn(DeviceStatus.PENDING_DELETION, DeviceStatus.DELETED);
+
+        // FleetWait is a generic poller despite its name: a failed read counts as "not yet", and it
+        // hands back the last value it read so the assertion below can say what state the device was
+        // left in if the client never finished.
+        Machine deleted = FleetWait.until("device " + machineId + " to become DELETED",
+                () -> DeviceApi.getDevice(machineId),
+                device -> device == null || device.getStatus() == DeviceStatus.DELETED,
+                DELETE_TIMEOUT_SECONDS);
+        if (deleted != null) {
+            assertThat(deleted.getStatus())
+                    .as("Device %s should be DELETED once the client has uninstalled itself", machineId)
+                    .isEqualTo(DeviceStatus.DELETED);
+        }
         List<String> ids = DeviceApi.getDeviceIds(listedStatusesDevicesFilter());
-        assertThat(ids).as("Deleted device should not be in listed devices").doesNotContain(device.getMachineId());
+        assertThat(ids).as("Deleted device should not be in listed devices").doesNotContain(machineId);
     }
 
 }
