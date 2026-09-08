@@ -1,5 +1,3 @@
-import React from 'react'
-
 /**
  * Text-style skeleton — matches a rendered markdown article layout.
  * Used by `<DocsHubPage>` as the default for `markdown` (and unknown
@@ -7,56 +5,56 @@ import React from 'react'
  */
 export function MarkdownSkeleton() {
   return (
-    <div className="space-y-7 mt-6">
+    <div className="mt-6 space-y-7">
       <div className="space-y-[14px]">
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-3/4 animate-pulse" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-3/4 animate-pulse rounded bg-ods-border" />
       </div>
       <div className="space-y-[14px]">
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-5/6 animate-pulse" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-5/6 animate-pulse rounded bg-ods-border" />
       </div>
       <div className="space-y-[14px]">
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-2/3 animate-pulse" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-2/3 animate-pulse rounded bg-ods-border" />
       </div>
-      <div className="h-[88px] bg-ods-card border border-ods-border rounded-lg animate-pulse" />
-      <div className="h-7 bg-ods-border rounded w-1/3 animate-pulse" />
+      <div className="h-[88px] animate-pulse rounded-lg border border-ods-border bg-ods-card" />
+      <div className="h-7 w-1/3 animate-pulse rounded bg-ods-border" />
       <div className="space-y-[14px]">
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-[72%] animate-pulse" />
-      </div>
-      <div className="space-y-[14px]">
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-[58%] animate-pulse" />
-      </div>
-      <div className="h-7 bg-ods-border rounded w-2/5 animate-pulse" />
-      <div className="space-y-[14px]">
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-[90%] animate-pulse" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-[72%] animate-pulse rounded bg-ods-border" />
       </div>
       <div className="space-y-[14px]">
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-full animate-pulse" />
-        <div className="h-[16px] bg-ods-border rounded w-[70%] animate-pulse" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-[58%] animate-pulse rounded bg-ods-border" />
       </div>
-      <div className="h-[88px] bg-ods-card border border-ods-border rounded-lg animate-pulse" />
+      <div className="h-7 w-2/5 animate-pulse rounded bg-ods-border" />
+      <div className="space-y-[14px]">
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-[90%] animate-pulse rounded bg-ods-border" />
+      </div>
+      <div className="space-y-[14px]">
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-full animate-pulse rounded bg-ods-border" />
+        <div className="h-[16px] w-[70%] animate-pulse rounded bg-ods-border" />
+      </div>
+      <div className="h-[88px] animate-pulse rounded-lg border border-ods-border bg-ods-card" />
     </div>
-  )
+  );
 }
 
 /**
@@ -80,7 +78,7 @@ export function MarkdownSkeleton() {
 export interface EmbedSkeletonProps {
   /** When provided, the header layout matches the eventual viewer's
    *  button count + arrangement, so the layout doesn't shift on load. */
-  documentType?: 'pdf' | 'google_sheet' | 'figma' | 'file' | string
+  documentType?: 'pdf' | 'google_sheet' | 'figma' | 'file' | string;
 }
 
 export function EmbedSkeleton({ documentType }: EmbedSkeletonProps = {}) {
@@ -90,21 +88,21 @@ export function EmbedSkeleton({ documentType }: EmbedSkeletonProps = {}) {
   if (documentType === 'file') {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <div className="bg-ods-card border border-ods-border rounded-xl p-8 max-w-md w-full text-center space-y-4">
-          <div className="w-16 h-16 rounded mx-auto bg-ods-border animate-pulse" />
+        <div className="w-full max-w-md space-y-4 rounded-xl border border-ods-border bg-ods-card p-8 text-center">
+          <div className="mx-auto h-16 w-16 animate-pulse rounded bg-ods-border" />
           <div className="space-y-2">
-            <div className="h-5 w-2/3 mx-auto rounded bg-ods-border animate-pulse" />
-            <div className="h-4 w-1/2 mx-auto rounded bg-ods-border animate-pulse" />
+            <div className="mx-auto h-5 w-2/3 animate-pulse rounded bg-ods-border" />
+            <div className="mx-auto h-4 w-1/2 animate-pulse rounded bg-ods-border" />
           </div>
-          <div className="h-10 w-full rounded bg-ods-border animate-pulse" />
+          <div className="h-10 w-full animate-pulse rounded bg-ods-border" />
         </div>
       </div>
-    )
+    );
   }
 
   // PDF viewer has TWO buttons (Preview + Download); Sheets / Figma
   // render ONE (Open / view-toggle). Default to one for unknown types.
-  const buttonCount = documentType === 'pdf' ? 2 : 1
+  const buttonCount = documentType === 'pdf' ? 2 : 1;
 
   return (
     <div className="space-y-4">
@@ -113,26 +111,23 @@ export function EmbedSkeleton({ documentType }: EmbedSkeletonProps = {}) {
        *  (mobile-stacked, desktop-row). */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Left: icon + title */}
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="w-5 h-5 shrink-0 rounded bg-ods-border animate-pulse" />
-          <div className="h-6 w-2/3 rounded bg-ods-border animate-pulse" />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="h-5 w-5 shrink-0 animate-pulse rounded bg-ods-border" />
+          <div className="h-6 w-2/3 animate-pulse rounded bg-ods-border" />
         </div>
         {/* Right: 1 or 2 buttons. Mobile = full-width; desktop = auto. */}
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           {Array.from({ length: buttonCount }).map((_, i) => (
-            <div
-              key={i}
-              className="h-10 w-full sm:w-32 rounded bg-ods-border animate-pulse flex-1 sm:flex-initial"
-            />
+            <div key={i} className="h-10 w-full flex-1 animate-pulse rounded bg-ods-border sm:w-32 sm:flex-initial" />
           ))}
         </div>
       </div>
       {/* Body — clean iframe-sized rectangle, no fake inner placeholder
        *  cruft. Matches the viewer's default `calc(100vh - 250px)` height. */}
       <div
-        className="w-full rounded-lg border border-ods-border bg-ods-card animate-pulse"
+        className="w-full animate-pulse rounded-lg border border-ods-border bg-ods-card"
         style={{ height: 'calc(100vh - 250px)' }}
       />
     </div>
-  )
+  );
 }

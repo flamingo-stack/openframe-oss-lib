@@ -16,6 +16,10 @@
     <dependencies>
         <dependency>
             <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-mongo-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-core</artifactId>
         </dependency>
         <dependency>

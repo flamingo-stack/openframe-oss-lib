@@ -1,11 +1,8 @@
-"use client";
+'use client';
 
-import React from 'react';
-import { Sparkles } from 'lucide-react';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import { Badge } from '../ui/badge';
 import { ConfidenceBadge } from './ai-enrich/ConfidenceBadge';
 
 export interface EntitySummaryEditorProps {
@@ -54,31 +51,24 @@ export function EntitySummaryEditor({
       <div className="mb-2">
         <div className="flex items-center gap-2">
           <Label htmlFor="entity-summary">{label}</Label>
-          {isAIGenerated && (
-            <AIGeneratedBadge />
-          )}
+          {isAIGenerated && <AIGeneratedBadge />}
           {summaryConfidence !== undefined && summaryConfidence !== null && (
-            <ConfidenceBadge
-              confidence={summaryConfidence}
-              showLabel={true}
-              showPercentage={true}
-              size="sm"
-            />
+            <ConfidenceBadge confidence={summaryConfidence} showLabel={true} showPercentage={true} size="sm" />
           )}
         </div>
-        <p className="text-h6 text-ods-text-secondary mt-1">{helperText}</p>
+        <p className="mt-1 text-ods-text-secondary text-h6">{helperText}</p>
       </div>
       <div
-        className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
+        className="overflow-hidden rounded-lg border border-ods-border bg-ods-card"
         style={{ minHeight: `${minHeight}px` }}
       >
         <Textarea
           id="entity-summary"
           value={summary}
-          onChange={(e) => onSummaryChange(e.target.value)}
+          onChange={e => onSummaryChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
+          className="h-full w-full resize-none border-0 bg-transparent p-4 text-ods-text-primary text-code placeholder:text-ods-text-secondary/50 focus:outline-none focus:ring-0"
           style={{ minHeight: `${minHeight}px`, lineHeight: '1.6' }}
         />
       </div>

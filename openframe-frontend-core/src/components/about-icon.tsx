@@ -1,16 +1,10 @@
-import React from 'react';
-
 interface AboutIconProps {
   width?: number;
   height?: number;
   className?: string;
 }
 
-export function AboutIcon({ 
-  width = 24, 
-  height = 24, 
-  className = "" 
-}: AboutIconProps) {
+export function AboutIcon({ width = 24, height = 24, className = '' }: AboutIconProps) {
   return (
     <svg
       width={width}
@@ -26,4 +20,4 @@ export function AboutIcon({
       />
     </svg>
   );
-} 
+}

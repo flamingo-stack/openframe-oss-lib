@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { CardsStrip } from '../components/features/cards-strip'
-import { BlogCard, CaseStudyCard, CustomerInterviewCard } from '../components/chat/entity-cards'
-import { blogPostSummary, caseStudy, customerInterview } from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { BlogCard, CaseStudyCard, CustomerInterviewCard } from '../components/chat/entity-cards';
+import { CardsStrip } from '../components/features/cards-strip';
+import { blogPostSummary, caseStudy, customerInterview } from './__fixtures__/chat-cards';
 
 // All stories exercise the ORGANIC children mode: real entity cards passed as
 // plain JSX children with zero strip-side registration. The render-prop mode
@@ -16,7 +16,7 @@ const caseStudies = Array.from({ length: 7 }, (_, i) => ({
   id: i + 1,
   slug: `${caseStudy.slug}-${i}`,
   title: `${caseStudy.title} (${i + 1})`,
-}))
+}));
 
 const meta: Meta<typeof CardsStrip> = {
   title: 'Features/CardsStrip',
@@ -24,15 +24,15 @@ const meta: Meta<typeof CardsStrip> = {
   parameters: { layout: 'fullscreen' },
   decorators: [
     Story => (
-      <div className="bg-ods-bg p-8 min-h-[560px]">
+      <div className="min-h-[560px] bg-ods-bg p-8">
         <Story />
       </div>
     ),
   ],
-}
-export default meta
+};
+export default meta;
 
-type Story = StoryObj<typeof CardsStrip>
+type Story = StoryObj<typeof CardsStrip>;
 
 /** Figma 3905:77388: chevron-nav strip of uniform 400px case-study cards —
  *  `autoScroll={false}`, chevrons appear only when content overflows. */
@@ -44,7 +44,7 @@ export const CaseStudiesChevrons: Story = {
       ))}
     </CardsStrip>
   ),
-}
+};
 
 /** Any card type coexists with zero strip config — the managed cell's
  *  stretch keeps mixed card types row-aligned (verify heights match). */
@@ -62,7 +62,7 @@ export const MixedCardTypes: Story = {
       <BlogCard key="blog2" post={blogPostSummary} href={`/blog/${blogPostSummary.slug}-2`} />
     </CardsStrip>
   ),
-}
+};
 
 /** Marquee opt-in (engine default). Accepted clone behaviors: the clone
  *  copy's inner cell is `aria-hidden` + focus-suppressed (every focusable
@@ -78,7 +78,7 @@ export const MarqueeOptIn: Story = {
       ))}
     </CardsStrip>
   ),
-}
+};
 
 /** Two cards — no overflow, so no clones, no marquee, no chevrons. */
 export const TwoItemsNoOverflow: Story = {
@@ -89,7 +89,7 @@ export const TwoItemsNoOverflow: Story = {
       ))}
     </CardsStrip>
   ),
-}
+};
 
 /** Narrow cells via cardWidthDesktop/Mobile overrides. */
 export const CustomCellWidth: Story = {
@@ -100,4 +100,4 @@ export const CustomCellWidth: Story = {
       ))}
     </CardsStrip>
   ),
-}
+};

@@ -1,39 +1,39 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import * as TooltipPrimitive from "@radix-ui/react-tooltip"
-import { cn } from "../../utils/cn"
-import { usePortalContainer } from "./portal-container"
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
+import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from 'react';
+import { cn } from '../../utils/cn';
+import { usePortalContainer } from './portal-container';
 
-const TooltipProvider = TooltipPrimitive.Provider
+const TooltipProvider = TooltipPrimitive.Provider;
 
-const Tooltip = TooltipPrimitive.Root
+const Tooltip = TooltipPrimitive.Root;
 
-const TooltipTrigger = TooltipPrimitive.Trigger
+const TooltipTrigger = TooltipPrimitive.Trigger;
 
-const TooltipContent = React.forwardRef<
-  React.ElementRef<typeof TooltipPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
+const TooltipContent = forwardRef<
+  ElementRef<typeof TooltipPrimitive.Content>,
+  ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
 >(({ className, sideOffset = 4, ...props }, ref) => {
   // Portal into the active container (e.g. a drawer) so the tooltip inherits
   // its stacking context; falls back to `document.body` when none is provided.
-  const container = usePortalContainer()
+  const container = usePortalContainer();
   return (
-  <TooltipPrimitive.Portal container={container ?? undefined}>
-    <TooltipPrimitive.Content
-      ref={ref}
-      sideOffset={sideOffset}
-      className={cn(
-        // `max-h` uses Radix's available-height var so tall content scrolls inside
-        // the tooltip instead of overflowing off-screen (only engages on overflow).
-        "z-[1400] max-h-[var(--radix-popper-available-height)] overflow-y-auto rounded-md bg-ods-card border border-ods-border px-3 py-2 text-h6 text-ods-text-primary shadow-lg animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-        className
-      )}
-      {...props}
-    />
-  </TooltipPrimitive.Portal>
-  )
-})
-TooltipContent.displayName = TooltipPrimitive.Content.displayName
+    <TooltipPrimitive.Portal container={container ?? undefined}>
+      <TooltipPrimitive.Content
+        ref={ref}
+        sideOffset={sideOffset}
+        className={cn(
+          // `max-h` uses Radix's available-height var so tall content scrolls inside
+          // the tooltip instead of overflowing off-screen (only engages on overflow).
+          'z-[1400] max-h-[var(--radix-popper-available-height)] overflow-y-auto rounded-md border border-ods-border bg-ods-card px-3 py-2 text-ods-text-primary shadow-lg animate-in fade-in-0 zoom-in-95 text-h6 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+          className,
+        )}
+        {...props}
+      />
+    </TooltipPrimitive.Portal>
+  );
+});
+TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };

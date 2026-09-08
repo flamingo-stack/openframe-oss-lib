@@ -1,40 +1,31 @@
-import * as React from "react"
-import { Button } from "./ui/button"
-import { cn } from "../utils/cn"
+import { type ButtonHTMLAttributes, forwardRef } from 'react';
+import { cn } from '../utils/cn';
+import { Button } from './ui/button';
 
-interface ProviderButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ProviderButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   provider: 'google' | 'microsoft' | 'slack' | 'github' | 'apple';
   variant?: 'accent' | 'outline';
   size?: 'default' | 'small-legacy';
   loading?: boolean;
 }
 
-const ProviderButton = React.forwardRef<HTMLButtonElement, ProviderButtonProps>(
+const ProviderButton = forwardRef<HTMLButtonElement, ProviderButtonProps>(
   ({ className, provider, variant = 'outline', size = 'default', children, ...props }, ref) => {
     const providerNames = {
       google: 'Google',
       microsoft: 'Microsoft',
       slack: 'Slack',
       github: 'GitHub',
-      apple: 'Apple'
+      apple: 'Apple',
     };
 
     return (
-      <Button
-        className={cn(
-          "w-full",
-          className
-        )}
-        variant={variant}
-        size={size}
-        ref={ref}
-        {...props}
-      >
+      <Button className={cn('w-full', className)} variant={variant} size={size} ref={ref} {...props}>
         {children || `Sign in with ${providerNames[provider]}`}
       </Button>
-    )
-  }
-)
-ProviderButton.displayName = "ProviderButton"
+    );
+  },
+);
+ProviderButton.displayName = 'ProviderButton';
 
-export { ProviderButton }
+export { ProviderButton };

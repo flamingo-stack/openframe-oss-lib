@@ -26,13 +26,13 @@
  */
 
 /** HLS playback (`/{playback_id}.m3u8` + segments + per-asset MP4 renditions). */
-export const MUX_STREAM_ORIGIN = 'https://stream.mux.com'
+export const MUX_STREAM_ORIGIN = 'https://stream.mux.com';
 
 /** Server-generated thumbnails (`/{playback_id}/thumbnail.jpg`). */
-export const MUX_IMAGE_ORIGIN = 'https://image.mux.com'
+export const MUX_IMAGE_ORIGIN = 'https://image.mux.com';
 
 /** Valid values for Mux's `max_resolution` playback modifier (720p is the floor). */
-export type MuxMaxResolution = '720p' | '1080p' | '1440p' | '2160p'
+export type MuxMaxResolution = '720p' | '1080p' | '1440p' | '2160p';
 
 /**
  * Cap the renditions offered by a public Mux HLS manifest for small
@@ -51,15 +51,15 @@ export type MuxMaxResolution = '720p' | '1080p' | '1440p' | '2160p'
  * live in the JWT), and unparseable strings.
  */
 export function toMuxPreviewUrl(url: string, maxResolution: MuxMaxResolution = '720p'): string {
-  let parsed: URL
+  let parsed: URL;
   try {
-    parsed = new URL(url)
+    parsed = new URL(url);
   } catch {
-    return url
+    return url;
   }
-  if (parsed.origin !== MUX_STREAM_ORIGIN) return url
-  if (!parsed.pathname.endsWith('.m3u8')) return url
-  if (parsed.searchParams.has('token')) return url
-  parsed.searchParams.set('max_resolution', maxResolution)
-  return parsed.toString()
+  if (parsed.origin !== MUX_STREAM_ORIGIN) return url;
+  if (!parsed.pathname.endsWith('.m3u8')) return url;
+  if (parsed.searchParams.has('token')) return url;
+  parsed.searchParams.set('max_resolution', maxResolution);
+  return parsed.toString();
 }

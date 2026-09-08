@@ -32,7 +32,7 @@ export const Default: Story = {
   },
   render: args => (
     <div className="flex min-h-40 items-center justify-center">
-      <span className="inline-flex items-center gap-1.5 text-h6 text-ods-text-primary">
+      <span className="inline-flex items-center gap-1.5 text-ods-text-primary text-h6">
         Judged rules
         <InfoHint {...args} />
       </span>
@@ -50,11 +50,11 @@ export const InALabelRow: Story = {
   },
   render: () => (
     <div className="flex min-h-40 flex-col items-start justify-center gap-[var(--spacing-system-sf)]">
-      <span className="inline-flex items-center gap-1.5 text-h6 text-ods-text-primary">
+      <span className="inline-flex items-center gap-1.5 text-ods-text-primary text-h6">
         Observe
         <InfoHint label="Observe">Runs the rule and records the outcome without blocking the PR.</InfoHint>
       </span>
-      <span className="inline-flex items-center gap-1.5 text-h6 text-ods-text-primary">
+      <span className="inline-flex items-center gap-1.5 text-ods-text-primary text-h6">
         Error
         <InfoHint label="Error" side="right">
           A failing rule blocks the merge until the finding is resolved or waived.

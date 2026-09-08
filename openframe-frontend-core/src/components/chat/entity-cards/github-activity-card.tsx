@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * GitHub Activity Card — unified visual for commits, PRs, and PR reviews.
@@ -16,9 +16,11 @@
  * (commit / PR / review).
  */
 
-import React from 'react'
-import { GitHubIcon } from '../../icons/github-icon'
-import { GitPullRequest, Eye, ExternalLink } from 'lucide-react'
+import { GitPullRequest, Eye, ExternalLink } from 'lucide-react';
+import React from 'react';
+import { formatDateUTC as formatDate } from '../../../utils/format';
+import { GitHubIcon } from '../../icons/github-icon';
+import type { GitHubActivityItem, GitHubActivityKind, PrReviewState } from '../types/entities/github-activity';
 import {
   COMPACT_CARD_ICON_SLOT,
   COMPACT_CARD_META_ROW,
@@ -33,58 +35,58 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
   safeHref,
-} from '../utils/compact-card-classes'
-import { formatDateUTC as formatDate } from '../../../utils/format'
-import type {
-  GitHubActivityItem,
-  GitHubActivityKind,
-  PrReviewState,
-} from '../types/entities/github-activity'
+} from '../utils/compact-card-classes';
 
 /** Extract owner/repo from a GitHub URL. */
 function parseRepoFromUrl(url: string | null | undefined): string | null {
-  if (!url) return null
+  if (!url) return null;
   try {
-    const u = new URL(url)
-    if (u.host !== 'github.com') return null
-    const parts = u.pathname.split('/').filter(Boolean)
-    if (parts.length >= 2) return `${parts[0]}/${parts[1]}`
+    const u = new URL(url);
+    if (u.host !== 'github.com') return null;
+    const parts = u.pathname.split('/').filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
   } catch {
     /* malformed URL */
   }
-  return null
+  return null;
 }
 
 function kindIcon(kind: GitHubActivityKind, className = 'h-4 w-4') {
   switch (kind) {
     case 'pull_request':
-      return <GitPullRequest className={`${className} shrink-0`} />
+      return <GitPullRequest className={`${className} shrink-0`} />;
     case 'pr_review':
-      return <Eye className={`${className} shrink-0`} />
+      return <Eye className={`${className} shrink-0`} />;
     case 'commit':
     default:
-      return <GitHubIcon className={`${className} shrink-0`} />
+      return <GitHubIcon className={`${className} shrink-0`} />;
   }
 }
 
 export function kindLabel(kind: GitHubActivityKind): string {
   switch (kind) {
-    case 'pull_request': return 'PR'
-    case 'pr_review': return 'Review'
+    case 'pull_request':
+      return 'PR';
+    case 'pr_review':
+      return 'Review';
     case 'commit':
-    default: return 'Commit'
+    default:
+      return 'Commit';
   }
 }
 
 export function formatActivityId(id: string, kind: GitHubActivityKind): string {
-  if (!id) return ''
-  if (kind === 'pull_request' || kind === 'pr_review') return `#${id}`
-  if (/^[0-9a-f]{40}$/i.test(id)) return id.slice(0, 7)
-  return id.length > 12 ? id.slice(0, 12) : id
+  if (!id) return '';
+  if (kind === 'pull_request' || kind === 'pr_review') return `#${id}`;
+  if (/^[0-9a-f]{40}$/i.test(id)) return id.slice(0, 7);
+  return id.length > 12 ? id.slice(0, 12) : id;
 }
 
-export function parseGithubTitle(title: string, kind: GitHubActivityKind): { display: string; reviewState: PrReviewState | null } {
-  if (!title) return { display: '', reviewState: null }
+export function parseGithubTitle(
+  title: string,
+  kind: GitHubActivityKind,
+): { display: string; reviewState: PrReviewState | null } {
+  if (!title) return { display: '', reviewState: null };
 
   // Split prefix-tag from rest by hand instead of one giant regex.
   // Avoids polynomial-redos on chained `\s*` quantifiers (`\[\s*X\s*\]`),
@@ -94,37 +96,39 @@ export function parseGithubTitle(title: string, kind: GitHubActivityKind): { dis
   // Algorithm: trim; if it starts with `[`, locate the matching `]`,
   // then content[0:closing] is the tag, content[closing+1:] is the
   // remainder. Linear scan — no regex backtracking possible.
-  const trimmed = title.trim()
-  let tag: string | null = null
-  let rest: string = trimmed
+  const trimmed = title.trim();
+  let tag: string | null = null;
+  let rest: string = trimmed;
   if (trimmed.startsWith('[')) {
-    const close = trimmed.indexOf(']')
+    const close = trimmed.indexOf(']');
     if (close > 0) {
-      tag = trimmed.slice(1, close).trim().toLowerCase()
-      rest = trimmed.slice(close + 1).trim()
+      tag = trimmed.slice(1, close).trim().toLowerCase();
+      rest = trimmed.slice(close + 1).trim();
     }
   }
 
   if (kind === 'pr_review' && tag && tag.startsWith('review:')) {
-    const stateRaw = tag.slice('review:'.length).trim().toUpperCase()
-    const reviewState = (['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'DISMISSED', 'PENDING'] as PrReviewState[]).includes(stateRaw as PrReviewState)
+    const stateRaw = tag.slice('review:'.length).trim().toUpperCase();
+    const reviewState = (
+      ['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'DISMISSED', 'PENDING'] as PrReviewState[]
+    ).includes(stateRaw as PrReviewState)
       ? (stateRaw as PrReviewState)
-      : null
-    return { display: rest || 'Review', reviewState }
+      : null;
+    return { display: rest || 'Review', reviewState };
   }
   if (kind === 'pull_request' && tag && tag.startsWith('pr')) {
     // Accept `[PR #123]`, `[PR#123]`, `[ pr # 123 ]` etc. — anything
     // matching `pr` followed by `#?\s*\d+`. Validate the suffix is
     // a numeric PR id, not arbitrary text.
-    const after = tag.slice(2).trim().replace(/^#\s*/, '')
+    const after = tag.slice(2).trim().replace(/^#\s*/, '');
     if (after.length > 0 && /^\d+$/.test(after)) {
-      return { display: rest || title, reviewState: null }
+      return { display: rest || title, reviewState: null };
     }
   }
   if (kind === 'commit' && tag === 'commit') {
-    return { display: rest || title, reviewState: null }
+    return { display: rest || title, reviewState: null };
   }
-  return { display: title.trim(), reviewState: null }
+  return { display: title.trim(), reviewState: null };
 }
 
 const REVIEW_STATE_STYLE: Record<PrReviewState, { label: string; className: string }> = {
@@ -148,86 +152,95 @@ const REVIEW_STATE_STYLE: Record<PrReviewState, { label: string; className: stri
     label: 'Pending',
     className: 'bg-ods-warning-secondary text-ods-warning',
   },
-}
+};
 
 /** Short review-state label ("APPROVED" → "Approved") shared with the
  *  MingoInfoCard dispatch mapping so both surfaces read identically. */
 export function reviewStateLabel(state: PrReviewState): string {
-  return (REVIEW_STATE_STYLE[state] ?? REVIEW_STATE_STYLE.COMMENTED).label
+  return (REVIEW_STATE_STYLE[state] ?? REVIEW_STATE_STYLE.COMMENTED).label;
 }
 
 function ReviewStateBadge({ state, className = '' }: { state: PrReviewState; className?: string }) {
-  const { label, className: paint } = REVIEW_STATE_STYLE[state] ?? REVIEW_STATE_STYLE.COMMENTED
+  const { label, className: paint } = REVIEW_STATE_STYLE[state] ?? REVIEW_STATE_STYLE.COMMENTED;
   return (
-    <span
-      className={`inline-flex items-center rounded px-1.5 py-0.5 text-h5 shrink-0 ${paint} ${className}`}
-    >
+    <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-h5 ${paint} ${className}`}>
       {label}
     </span>
-  )
+  );
 }
 
 export interface GitHubActivityCardAnchorProps {
-  href: string
-  target?: '_blank'
-  rel?: 'noopener noreferrer'
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+  href: string;
+  target?: '_blank';
+  rel?: 'noopener noreferrer';
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
 export interface GitHubActivityCardProps {
-  item: GitHubActivityItem
-  variant?: 'row' | 'compact'
-  className?: string
+  item: GitHubActivityItem;
+  variant?: 'row' | 'compact';
+  className?: string;
   /** Pre-composed `<a>` prop bundle (typically from a `useNavLink` hook in
    *  the consumer). When provided, the outer renders as a real `<a>`. */
-  anchorProps?: GitHubActivityCardAnchorProps
+  anchorProps?: GitHubActivityCardAnchorProps;
 }
 
 export function GitHubActivityCard({ item, variant = 'compact', className, anchorProps }: GitHubActivityCardProps) {
-  const kind = item.kind ?? 'commit'
-  const repo = item.repo ?? parseRepoFromUrl(item.url) ?? ''
-  const dateText = formatDate(item.dateUpdated, { fallback: '', timezone: 'local' })
-  const idLabel = formatActivityId(item.id, kind)
-  const { display: title, reviewState } = parseGithubTitle(item.title, kind)
-  const primaryText = kind === 'pr_review'
-    ? (title.replace(/^by\s+/i, '').trim() || 'Reviewer')
-    : title
+  const kind = item.kind ?? 'commit';
+  const repo = item.repo ?? parseRepoFromUrl(item.url) ?? '';
+  const dateText = formatDate(item.dateUpdated, { fallback: '', timezone: 'local' });
+  const idLabel = formatActivityId(item.id, kind);
+  const { display: title, reviewState } = parseGithubTitle(item.title, kind);
+  const primaryText = kind === 'pr_review' ? title.replace(/^by\s+/i, '').trim() || 'Reviewer' : title;
 
   if (variant === 'row') {
     return (
-      <div className={`flex items-center gap-3 min-w-0 ${className ?? ''}`}>
-        <span className="flex items-center gap-2 w-28 shrink-0">
+      <div className={`flex min-w-0 items-center gap-3 ${className ?? ''}`}>
+        <span className="flex w-28 shrink-0 items-center gap-2">
           {kindIcon(kind, 'h-3.5 w-3.5')}
-          <code className="text-ods-text-secondary text-code truncate">{idLabel}</code>
+          <code className="truncate text-ods-text-secondary text-code">{idLabel}</code>
         </span>
-        <span className="flex items-center gap-2 text-ods-text-primary text-h6 flex-1 min-w-0">
+        <span className="flex min-w-0 flex-1 items-center gap-2 text-ods-text-primary text-h6">
           {reviewState ? <ReviewStateBadge state={reviewState} /> : null}
           <span className="truncate">{primaryText}</span>
         </span>
         {repo ? (
-          <span className="text-code text-ods-text-secondary truncate max-w-[240px] shrink-0">{repo}</span>
+          <span className="max-w-[240px] shrink-0 truncate text-ods-text-secondary text-code">{repo}</span>
         ) : null}
-        {dateText ? (
-          <span className="text-ods-text-secondary text-h6 w-24 shrink-0 text-right">{dateText}</span>
-        ) : null}
+        {dateText ? <span className="w-24 shrink-0 text-right text-ods-text-secondary text-h6">{dateText}</span> : null}
       </div>
-    )
+    );
   }
 
-  const metaParts: React.ReactNode[] = []
+  const metaParts: React.ReactNode[] = [];
   metaParts.push(
-    <span key="kind" className="text-h6 uppercase">{kindLabel(kind)}</span>,
-  )
-  if (idLabel) metaParts.push(<code key="id" className="font-mono">{idLabel}</code>)
-  if (repo) metaParts.push(<span key="repo" className="font-mono truncate">{repo}</span>)
-  if (dateText) metaParts.push(<span key="date" className="whitespace-nowrap">{dateText}</span>)
+    <span key="kind" className="uppercase text-h6">
+      {kindLabel(kind)}
+    </span>,
+  );
+  if (idLabel)
+    metaParts.push(
+      <code key="id" className="font-mono">
+        {idLabel}
+      </code>,
+    );
+  if (repo)
+    metaParts.push(
+      <span key="repo" className="truncate font-mono">
+        {repo}
+      </span>,
+    );
+  if (dateText)
+    metaParts.push(
+      <span key="date" className="whitespace-nowrap">
+        {dateText}
+      </span>,
+    );
 
-  const href = safeHref(item.url)
+  const href = safeHref(item.url);
   const body = (
     <>
-      <span className={COMPACT_CARD_ICON_SLOT}>
-        {kindIcon(kind, 'h-5 w-5')}
-      </span>
+      <span className={COMPACT_CARD_ICON_SLOT}>{kindIcon(kind, 'h-5 w-5')}</span>
       <span className={COMPACT_CARD_TEXT_COL}>
         <span className={`${COMPACT_CARD_TITLE_ROW} flex-nowrap gap-1.5`}>
           {reviewState ? <ReviewStateBadge state={reviewState} /> : null}
@@ -237,7 +250,7 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
           <span className={COMPACT_CARD_META_ROW}>
             {metaParts.map((part, i) => (
               <React.Fragment key={i}>
-                {i > 0 ? <span className="text-ods-text-secondary/40 shrink-0">·</span> : null}
+                {i > 0 ? <span className="shrink-0 text-ods-text-secondary/40">·</span> : null}
                 <span className="min-w-0 truncate">{part}</span>
               </React.Fragment>
             ))}
@@ -248,46 +261,49 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
         </span>
       </span>
       {href ? (
-        <span className="flex shrink-0 items-center self-start h-5 text-ods-text-secondary">
-          <ExternalLink className="w-3.5 h-3.5" />
+        <span className="flex h-5 shrink-0 items-center self-start text-ods-text-secondary">
+          <ExternalLink className="h-3.5 w-3.5" />
         </span>
       ) : null}
     </>
-  )
+  );
   if (anchorProps) {
     return (
       <a {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {body}
       </a>
-    )
+    );
   }
   return href ? (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}
-    >
+    <a href={href} target="_blank" rel="noopener noreferrer" className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
       {body}
     </a>
   ) : (
-    <span className={`${COMPACT_CARD_OUTER_STATIC} ${className ?? ''}`} aria-label="No link available">{body}</span>
-  )
+    <span className={`${COMPACT_CARD_OUTER_STATIC} ${className ?? ''}`} aria-label="No link available">
+      {body}
+    </span>
+  );
 }
 
-export function GitHubActivityCardSkeleton({ variant = 'compact', className }: { variant?: 'row' | 'compact'; className?: string }) {
+export function GitHubActivityCardSkeleton({
+  variant = 'compact',
+  className,
+}: {
+  variant?: 'row' | 'compact';
+  className?: string;
+}) {
   if (variant === 'row') {
     return (
-      <div className={`flex items-center gap-3 min-w-0 animate-pulse ${className ?? ''}`}>
-        <div className="flex items-center gap-2 w-28 shrink-0">
+      <div className={`flex min-w-0 animate-pulse items-center gap-3 ${className ?? ''}`}>
+        <div className="flex w-28 shrink-0 items-center gap-2">
           <div className="h-3.5 w-3.5 rounded bg-ods-bg" />
-          <div className="h-3 w-16 bg-ods-bg rounded" />
+          <div className="h-3 w-16 rounded bg-ods-bg" />
         </div>
-        <div className="h-3 w-2/3 bg-ods-bg rounded flex-1" />
-        <div className="h-3 w-40 bg-ods-bg/60 rounded shrink-0" />
-        <div className="h-3 w-20 bg-ods-bg/60 rounded shrink-0" />
+        <div className="h-3 w-2/3 flex-1 rounded bg-ods-bg" />
+        <div className="h-3 w-40 shrink-0 rounded bg-ods-bg/60" />
+        <div className="h-3 w-20 shrink-0 rounded bg-ods-bg/60" />
       </div>
-    )
+    );
   }
   return (
     <span className={`${COMPACT_CARD_SKELETON_OUTER} ${className ?? ''}`}>
@@ -303,9 +319,9 @@ export function GitHubActivityCardSkeleton({ variant = 'compact', className }: {
           <span className={COMPACT_CARD_SUMMARY}>{COMPACT_CARD_ROW_FILLER}</span>
         </span>
       </span>
-      <span className="flex shrink-0 items-center self-start h-5">
+      <span className="flex h-5 shrink-0 items-center self-start">
         <span className="h-3.5 w-3.5 rounded bg-ods-bg" />
       </span>
     </span>
-  )
+  );
 }

@@ -1,52 +1,62 @@
-"use client"
+'use client';
 
-import * as PopoverPrimitive from "@radix-ui/react-popover"
-import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
-import * as React from "react"
-import { cn } from "../../utils/cn"
-import { useDebounce } from "../../hooks/ui/use-debounce"
-import { useAutoLimitTags } from "../../hooks/ui/use-auto-limit-tags"
-import { useKeyboardCollisionPadding } from "../../hooks/ui/use-keyboard-collision-padding"
-import { SearchIcon } from "../icons-v2-generated"
-import { XmarkCircleIcon } from "../icons-v2-generated/signs-and-symbols/xmark-circle-icon"
-import { Tag } from "./tag"
-import { HiddenTagsPopup } from "./hidden-tags-popup"
+import * as PopoverPrimitive from '@radix-ui/react-popover';
+import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
+import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useAutoLimitTags } from '../../hooks/ui/use-auto-limit-tags';
+import { useDebounce } from '../../hooks/ui/use-debounce';
+import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
+import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding';
+import { cn } from '../../utils/cn';
+import { SearchIcon } from '../icons-v2-generated';
+import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { HiddenTagsPopup } from './hidden-tags-popup';
+import { Tag } from './tag';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface SearchResult {
-  id: string
-  title: string
-  description?: string
-  path?: string
-  type?: string
-  icon?: React.ReactNode
-  metadata?: Record<string, unknown>
+  id: string;
+  title: string;
+  description?: string;
+  path?: string;
+  type?: string;
+  icon?: ReactNode;
+  metadata?: Record<string, unknown>;
 }
 
 export interface FilterChipData {
-  id: string
-  label: string
-  variant?: "selected" | "category" | "subcategory" | "tag"
+  id: string;
+  label: string;
+  variant?: 'selected' | 'category' | 'subcategory' | 'tag';
 }
 
 export interface SearchInputProps {
   /** Placeholder text shown in the input */
-  placeholder?: string
+  placeholder?: string;
   /** Controlled value */
-  value?: string
+  value?: string;
   /** Default value for uncontrolled mode */
-  defaultValue?: string
+  defaultValue?: string;
   /** Called when input value changes (raw, not debounced) */
-  onChange?: (value: string) => void
+  onChange?: (value: string) => void;
   /** Called when user presses Enter */
-  onSubmit?: (value: string) => void
+  onSubmit?: (value: string) => void;
   /** Search results to display in the dropdown */
-  results?: SearchResult[]
+  results?: SearchResult[];
   /** Whether results are loading */
-  isLoading?: boolean
+  isLoading?: boolean;
   /** Called when a result row is selected.
    *
    *  `modifiers` carries the click event's modifier-key state when the
@@ -58,35 +68,35 @@ export interface SearchInputProps {
   onResultSelect?: (
     result: SearchResult,
     modifiers?: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean; button?: number },
-  ) => void
+  ) => void;
   /** Debounce delay in ms. 0 disables debounce. Default 300 */
-  debounceMs?: number
+  debounceMs?: number;
   /** Custom renderer for a single result row */
-  renderResult?: (result: SearchResult, isHighlighted: boolean) => React.ReactNode
+  renderResult?: (result: SearchResult, isHighlighted: boolean) => ReactNode;
   /** Group results by a key derived from each result */
-  groupBy?: (result: SearchResult) => string
+  groupBy?: (result: SearchResult) => string;
   /** Text shown when query meets minQueryLength but no results */
-  emptyResultsText?: string
+  emptyResultsText?: string;
   /** Force-control dropdown visibility. Default: auto */
-  showDropdown?: boolean
+  showDropdown?: boolean;
   /** Filter chips rendered inline before the input */
-  filterChips?: FilterChipData[]
+  filterChips?: FilterChipData[];
   /** Called when a filter chip is removed */
-  onFilterRemove?: (id: string) => void
+  onFilterRemove?: (id: string) => void;
   /** Element rendered before the input. Default: SearchIcon */
-  startAdornment?: React.ReactNode
+  startAdornment?: ReactNode;
   /** Element rendered after the input */
-  endAdornment?: React.ReactNode
+  endAdornment?: ReactNode;
   /** Extra class names for the outer container */
-  className?: string
+  className?: string;
   /** Extra class names for the dropdown */
-  dropdownClassName?: string
+  dropdownClassName?: string;
   /** Minimum characters before showing results. Default 2 */
-  minQueryLength?: number
+  minQueryLength?: number;
   /** Maximum visible filter chips. "auto" measures available width. Default "auto" */
-  limitTags?: number | "auto"
+  limitTags?: number | 'auto';
   /** Custom render for the "+N" overflow text */
-  getLimitTagsText?: (more: number) => React.ReactNode
+  getLimitTagsText?: (more: number) => ReactNode;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,39 +105,39 @@ export interface SearchInputProps {
 
 const containerStyles = cn(
   // Layout & spacing — matches lib Input component
-  "flex items-center gap-2 rounded-[6px] border px-3 h-11 md:h-12 cursor-text",
-  "has-[:focus-visible]:outline-none",
-  "group",
-  "transition-colors duration-200",
+  'flex h-11 cursor-text items-center gap-2 rounded-[6px] border px-3 md:h-12',
+  'has-[:focus-visible]:outline-none',
+  'group',
+  'transition-colors duration-200',
   // Theme palette — matches lib Input component
-  "bg-ods-card border-ods-border has-[:focus]:border-ods-accent"
-)
+  'border-ods-border bg-ods-card has-[:focus]:border-ods-accent',
+);
 
 const innerInputStyles = cn(
-  "flex-1 min-w-[60px] bg-transparent border-none outline-none",
-  "text-h4",
-  "text-ods-text-primary placeholder:text-ods-text-secondary",
+  'min-w-[60px] flex-1 border-none bg-transparent outline-none',
+  'text-h4',
+  'text-ods-text-primary placeholder:text-ods-text-secondary',
   // Disabled - match Input exactly (value greys out, placeholder dims further)
-  "disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border",
-  "touch-manipulation"
-)
+  'disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border',
+  'touch-manipulation',
+);
 
 // ---------------------------------------------------------------------------
 // Helper: chip variant → Tag variant mapping
 // ---------------------------------------------------------------------------
 
-function chipVariantToTagVariant(variant?: FilterChipData["variant"]): "primary" | "outline" | "badge" {
+function chipVariantToTagVariant(variant?: FilterChipData['variant']): 'primary' | 'outline' | 'badge' {
   switch (variant) {
-    case "selected":
-      return "primary"
+    case 'selected':
+      return 'primary';
     // Content tags render with the unified badge skin (ods-card + ods-border,
     // mono uppercase) — identical to the public EntityTagBadges display.
-    case "tag":
-      return "badge"
-    case "category":
-    case "subcategory":
+    case 'tag':
+      return 'badge';
+    case 'category':
+    case 'subcategory':
     default:
-      return "outline"
+      return 'outline';
   }
 }
 
@@ -136,9 +146,9 @@ function chipVariantToTagVariant(variant?: FilterChipData["variant"]): "primary"
 // ---------------------------------------------------------------------------
 
 export function SearchInput({
-  placeholder = "Search...",
+  placeholder = 'Search...',
   value,
-  defaultValue = "",
+  defaultValue = '',
   onChange,
   onSubmit,
   results = [],
@@ -147,7 +157,7 @@ export function SearchInput({
   debounceMs = 300,
   renderResult,
   groupBy,
-  emptyResultsText = "No results found",
+  emptyResultsText = 'No results found',
   showDropdown: showDropdownProp,
   filterChips = [],
   onFilterRemove,
@@ -156,115 +166,139 @@ export function SearchInput({
   className,
   dropdownClassName,
   minQueryLength = 2,
-  limitTags = "auto",
+  limitTags = 'auto',
   getLimitTagsText = (more: number) => `+${more}`,
 }: SearchInputProps) {
   // ---- Controlled / uncontrolled ----
-  const [internalValue, setInternalValue] = React.useState(defaultValue)
-  const currentValue = onChange ? (value ?? "") : internalValue
+  const [internalValue, setInternalValue] = useState(defaultValue);
+  const currentValue = onChange ? (value ?? '') : internalValue;
 
   // ---- Debounce ----
-  const debouncedValue = useDebounce(currentValue, debounceMs)
+  const debouncedValue = useDebounce(currentValue, debounceMs);
 
   // ---- Popover state ----
-  const [isOpen, setIsOpen] = React.useState(false)
-  const [highlightedIndex, setHighlightedIndex] = React.useState(-1)
-  const keyboardPadding = useKeyboardCollisionPadding()
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const keyboardPadding = useKeyboardCollisionPadding();
 
-  const containerRef = React.useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // ---- Auto-limit tags ----
-  const currentPlaceholder = filterChips.length > 0 ? "Add filter..." : placeholder
+  const currentPlaceholder = filterChips.length > 0 ? 'Add filter...' : placeholder;
 
   const {
-    visibleCount: rawVisibleCount, middleRef, measureRef, textMeasureRef, badgeRef, inputRef,
+    visibleCount: rawVisibleCount,
+    middleRef,
+    measureRef,
+    textMeasureRef,
+    badgeRef,
+    inputRef,
   } = useAutoLimitTags({
     count: filterChips.length,
     limitTags,
     // When chips exist, pass empty placeholder so the hook only reserves input minWidth,
     // not the full placeholder text width — gives more room for chips on narrow screens
-    placeholder: filterChips.length > 0 ? "" : placeholder,
-  })
+    placeholder: filterChips.length > 0 ? '' : placeholder,
+  });
 
   // Always show at least 1 chip when chips exist (industry standard: Gmail, MUI, Ant Design)
-  const visibleCount = filterChips.length > 0 ? Math.max(1, rawVisibleCount) : rawVisibleCount
+  const visibleCount = filterChips.length > 0 ? Math.max(1, rawVisibleCount) : rawVisibleCount;
 
   // ---- Hidden tags popup ----
-  const hiddenTagsRef = React.useRef<HTMLDivElement>(null)
-  const hiddenTagsPopupRef = React.useRef<HTMLDivElement>(null)
-  const [showHiddenTags, setShowHiddenTags] = React.useState(false)
+  const hiddenTagsRef = useRef<HTMLDivElement>(null);
+  const hiddenTagsPopupRef = useRef<HTMLDivElement>(null);
+  const [showHiddenTags, setShowHiddenTags] = useState(false);
 
-  React.useEffect(() => {
-    if (!showHiddenTags) return
+  useEffect(() => {
+    if (!showHiddenTags) return undefined;
     const handleClick = (e: MouseEvent) => {
-      const target = e.target as Node
+      const target = e.target as Node;
       if (!hiddenTagsRef.current?.contains(target) && !hiddenTagsPopupRef.current?.contains(target)) {
-        setShowHiddenTags(false)
+        setShowHiddenTags(false);
       }
-    }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
-  }, [showHiddenTags])
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showHiddenTags]);
+
+  // The popup is rendered OUTSIDE the overflow-hidden chip row, so it has to be
+  // pushed across to sit under the `+N` badge. Measured in a layout effect
+  // rather than during render: `getBoundingClientRect()` is a value React does
+  // not track, so a render-time read pinned the popup to wherever the badge
+  // happened to be at that one render and never followed it afterwards —
+  // removing a chip from the popup shifts the badge left, and the popup stayed
+  // behind. Unconditional so every commit re-measures; it runs before paint,
+  // so there is no visible jump.
+  useIsomorphicLayoutEffect(() => {
+    const popup = hiddenTagsPopupRef.current;
+    const badge = badgeRef.current;
+    if (!popup || !badge) return;
+    const originLeft = containerRef.current?.getBoundingClientRect().left ?? 0;
+    popup.style.left = `${badge.getBoundingClientRect().left - originLeft}px`;
+  });
 
   // ---- Derived chip slicing ----
-  const hiddenCount = filterChips.length - visibleCount
-  const visibleChips = filterChips.slice(0, visibleCount)
-  const hiddenChips = filterChips.slice(visibleCount)
+  const hiddenCount = filterChips.length - visibleCount;
+  const visibleChips = filterChips.slice(0, visibleCount);
+  const hiddenChips = filterChips.slice(visibleCount);
 
   // ---- Derive flat list (possibly grouped) ----
-  const { flatResults, groups } = React.useMemo(() => {
-    if (!groupBy) return { flatResults: results, groups: null }
+  const { flatResults, groups } = useMemo(() => {
+    if (!groupBy) return { flatResults: results, groups: null };
 
-    const grouped = new Map<string, SearchResult[]>()
+    const grouped = new Map<string, SearchResult[]>();
     for (const r of results) {
-      const key = groupBy(r)
-      const arr = grouped.get(key)
+      const key = groupBy(r);
+      const arr = grouped.get(key);
       if (arr) {
-        arr.push(r)
+        arr.push(r);
       } else {
-        grouped.set(key, [r])
+        grouped.set(key, [r]);
       }
     }
-    return { flatResults: results, groups: grouped }
-  }, [results, groupBy])
+    return { flatResults: results, groups: grouped };
+  }, [results, groupBy]);
 
   // ---- Auto-show logic ----
-  const meetsMinQuery = debouncedValue.length >= minQueryLength
-  const autoShow = meetsMinQuery
-  const dropdownVisible = showDropdownProp ?? (isOpen && autoShow)
+  const meetsMinQuery = debouncedValue.length >= minQueryLength;
+  const autoShow = meetsMinQuery;
+  const dropdownVisible = showDropdownProp ?? (isOpen && autoShow);
 
   // ---- Reset highlight when results change ----
-  React.useEffect(() => {
-    setHighlightedIndex(-1)
-  }, [flatResults.length])
+  // Adjusted while rendering, not from an effect: the highlight is drawn from
+  // this value in THIS render, so an effect commits one frame highlighting
+  // whatever result now happens to sit at the old index — and Enter pressed in
+  // that frame navigates to it.
+  const [highlightedFor, setHighlightedFor] = useState(flatResults.length);
+  if (highlightedFor !== flatResults.length) {
+    setHighlightedFor(flatResults.length);
+    setHighlightedIndex(-1);
+  }
 
   // ---- Handlers ----
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVal = e.target.value
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const newVal = e.target.value;
     if (onChange) {
-      onChange(newVal)
+      onChange(newVal);
     } else {
-      setInternalValue(newVal)
+      setInternalValue(newVal);
     }
-    if (!isOpen) setIsOpen(true)
-    setHighlightedIndex(-1)
-  }
+    if (!isOpen) setIsOpen(true);
+    setHighlightedIndex(-1);
+  };
 
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
+  const handleClear = (e: ReactMouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
     if (onChange) {
-      onChange("")
+      onChange('');
     } else {
-      setInternalValue("")
+      setInternalValue('');
     }
-    inputRef.current?.focus()
-  }
+    inputRef.current?.focus();
+  };
 
-  const handleResultClick = (
-    result: SearchResult,
-    e?: React.MouseEvent,
-  ) => {
+  const handleResultClick = (result: SearchResult, e?: ReactMouseEvent) => {
     onResultSelect?.(
       result,
       e
@@ -276,151 +310,131 @@ export function SearchInput({
             button: e.button,
           }
         : undefined,
-    )
-    setIsOpen(false)
-  }
+    );
+    setIsOpen(false);
+  };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent) => {
     switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault()
-        if (!isOpen) setIsOpen(true)
-        setHighlightedIndex((prev) =>
-          prev < flatResults.length - 1 ? prev + 1 : 0
-        )
-        break
-      case "ArrowUp":
-        e.preventDefault()
-        setHighlightedIndex((prev) =>
-          prev > 0 ? prev - 1 : flatResults.length - 1
-        )
-        break
-      case "Enter":
-        e.preventDefault()
+      case 'ArrowDown':
+        e.preventDefault();
+        if (!isOpen) setIsOpen(true);
+        setHighlightedIndex(prev => (prev < flatResults.length - 1 ? prev + 1 : 0));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightedIndex(prev => (prev > 0 ? prev - 1 : flatResults.length - 1));
+        break;
+      case 'Enter':
+        e.preventDefault();
         if (highlightedIndex >= 0 && flatResults[highlightedIndex]) {
-          handleResultClick(flatResults[highlightedIndex])
+          handleResultClick(flatResults[highlightedIndex]);
         } else {
-          onSubmit?.(currentValue)
+          onSubmit?.(currentValue);
         }
-        break
-      case "Escape":
-        setIsOpen(false)
-        setHighlightedIndex(-1)
-        break
-      case "Backspace":
+        break;
+      case 'Escape':
+        setIsOpen(false);
+        setHighlightedIndex(-1);
+        break;
+      case 'Backspace':
         if (!currentValue && filterChips.length > 0 && onFilterRemove) {
-          onFilterRemove(filterChips[filterChips.length - 1].id)
+          onFilterRemove(filterChips[filterChips.length - 1].id);
         }
-        break
+        break;
     }
-  }
+  };
 
   const handleOpenChange = (open: boolean) => {
-    setIsOpen(open)
-  }
+    setIsOpen(open);
+  };
 
   // ---- Default result renderer ----
   const defaultRenderResult = (result: SearchResult, isHighlighted: boolean) => (
-    <div className="flex items-center gap-3 w-full min-w-0">
-      {result.icon && (
-        <span className="flex-shrink-0 text-ods-text-secondary [&_svg]:size-4">
-          {result.icon}
-        </span>
-      )}
+    <div className="flex w-full min-w-0 items-center gap-3">
+      {result.icon && <span className="flex-shrink-0 text-ods-text-secondary [&_svg]:size-4">{result.icon}</span>}
       <div className="min-w-0 flex-1">
-        <div className={cn(
-          "text-h6 truncate",
-          isHighlighted ? "text-ods-accent" : "text-ods-text-primary"
-        )} title={result.title}>
+        <div
+          className={cn('truncate text-h6', isHighlighted ? 'text-ods-accent' : 'text-ods-text-primary')}
+          title={result.title}
+        >
           {result.title}
         </div>
         {result.description && (
-          <div className="text-h6 text-ods-text-secondary truncate mt-0.5" title={result.description}>
+          <div className="mt-0.5 truncate text-ods-text-secondary text-h6" title={result.description}>
             {result.description}
           </div>
         )}
       </div>
-      {result.type && (
-        <span className="flex-shrink-0 text-h6 text-ods-text-muted uppercase">
-          {result.type}
-        </span>
-      )}
+      {result.type && <span className="flex-shrink-0 uppercase text-ods-text-muted text-h6">{result.type}</span>}
     </div>
-  )
+  );
 
   // ---- Render a result row ----
   const renderRow = (result: SearchResult, index: number) => {
-    const isHighlighted = index === highlightedIndex
+    const isHighlighted = index === highlightedIndex;
     return (
       <div
         key={result.id}
         role="option"
         aria-selected={isHighlighted}
         className={cn(
-          "flex items-center min-h-10 px-3 cursor-pointer transition-colors border-b border-ods-border last:border-b-0",
-          isHighlighted && "bg-ods-bg-hover",
-          !isHighlighted && "hover:bg-ods-bg-hover"
+          'flex min-h-10 cursor-pointer items-center border-b border-ods-border px-3 transition-colors last:border-b-0',
+          isHighlighted && 'bg-ods-bg-hover',
+          !isHighlighted && 'hover:bg-ods-bg-hover',
         )}
-        onClick={(e) => handleResultClick(result, e)}
+        onClick={e => handleResultClick(result, e)}
         onMouseEnter={() => setHighlightedIndex(index)}
       >
         {renderResult ? renderResult(result, isHighlighted) : defaultRenderResult(result, isHighlighted)}
       </div>
-    )
-  }
+    );
+  };
 
   // ---- Dropdown content ----
   const renderDropdownContent = () => {
     if (isLoading) {
-      return (
-        <div className="px-4 py-3 text-ods-text-secondary text-h6">
-          Loading...
-        </div>
-      )
+      return <div className="px-4 py-3 text-ods-text-secondary text-h6">Loading...</div>;
     }
 
     if (flatResults.length === 0) {
-      return (
-        <div className="px-4 py-3 text-ods-text-secondary text-h6">
-          {emptyResultsText}
-        </div>
-      )
+      return <div className="px-4 py-3 text-ods-text-secondary text-h6">{emptyResultsText}</div>;
     }
 
     if (groups) {
-      let globalIndex = 0
+      let globalIndex = 0;
       return Array.from(groups.entries()).map(([groupLabel, groupResults]) => (
         <div key={groupLabel}>
-          <div className="px-4 py-2 text-h6 font-semibold text-ods-text-secondary uppercase bg-ods-bg">
+          <div className="bg-ods-bg px-4 py-2 font-semibold uppercase text-ods-text-secondary text-h6">
             {groupLabel}
           </div>
-          {groupResults.map((result) => {
-            const idx = globalIndex++
-            return renderRow(result, idx)
+          {groupResults.map(result => {
+            const idx = globalIndex++;
+            return renderRow(result, idx);
           })}
         </div>
-      ))
+      ));
     }
 
-    return flatResults.map((result, index) => renderRow(result, index))
-  }
+    return flatResults.map((result, index) => renderRow(result, index));
+  };
 
   // ---- Determine if we have a value worth clearing ----
-  const hasValue = currentValue.length > 0
+  const hasValue = currentValue.length > 0;
 
   return (
-    <div className={cn("relative", className)} ref={containerRef}>
+    <div className={cn('relative', className)} ref={containerRef}>
       <PopoverPrimitive.Root open={dropdownVisible} onOpenChange={handleOpenChange} modal={false}>
         <PopoverPrimitive.Anchor asChild>
           <div
             className={cn(
               containerStyles,
-              "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
-              dropdownVisible && "!border-ods-accent"
+              'hover:border-ods-border-hover hover:bg-ods-bg-hover active:border-ods-border-active active:bg-ods-bg-active',
+              dropdownVisible && '!border-ods-accent',
             )}
             onClick={() => {
-              inputRef.current?.focus()
-              setIsOpen(true)
+              inputRef.current?.focus();
+              setIsOpen(true);
             }}
           >
             {/* Start Adornment — pinned left, shrink-0 */}
@@ -429,14 +443,14 @@ export function SearchInput({
             </span>
 
             {/* Middle zone: chips + input — overflow hidden, single line */}
-            <div ref={middleRef} className="flex-1 flex items-center gap-2 min-w-0 overflow-hidden">
+            <div ref={middleRef} className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
               {/* Visible filter chips */}
-              {visibleChips.map((chip) => (
+              {visibleChips.map(chip => (
                 <Tag
                   key={chip.id}
                   variant={chipVariantToTagVariant(chip.variant)}
                   label={chip.label}
-                  labelClassName="truncate max-w-[120px]"
+                  labelClassName="max-w-[120px] truncate"
                   onClose={onFilterRemove ? () => onFilterRemove(chip.id) : undefined}
                 />
               ))}
@@ -447,15 +461,15 @@ export function SearchInput({
                   <button
                     ref={badgeRef}
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowHiddenTags((prev) => !prev)
+                    onClick={e => {
+                      e.stopPropagation();
+                      setShowHiddenTags(prev => !prev);
                     }}
                     className={cn(
-                      "flex items-center h-8 px-2",
-                      "bg-ods-card border border-ods-border rounded-[6px]",
-                      "text-h5 text-ods-text-secondary",
-                      "hover:bg-ods-bg-hover transition-colors cursor-pointer",
+                      'flex h-8 items-center px-2',
+                      'rounded-[6px] border border-ods-border bg-ods-card',
+                      'text-ods-text-secondary text-h5',
+                      'cursor-pointer transition-colors hover:bg-ods-bg-hover',
                     )}
                     aria-label={`${hiddenCount} more selected filters`}
                   >
@@ -472,8 +486,8 @@ export function SearchInput({
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
                 onFocus={() => {
-                  setIsOpen(true)
-                  setShowHiddenTags(false)
+                  setIsOpen(true);
+                  setShowHiddenTags(false);
                 }}
                 placeholder={currentPlaceholder}
                 className={innerInputStyles}
@@ -481,12 +495,12 @@ export function SearchInput({
             </div>
 
             {/* End adornment / Clear — pinned right, shrink-0 */}
-            <div className="flex items-center gap-1 shrink-0 ml-auto">
+            <div className="ml-auto flex shrink-0 items-center gap-1">
               {hasValue && (
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="flex items-center justify-center hover:opacity-70 transition-opacity"
+                  className="flex items-center justify-center transition-opacity hover:opacity-70"
                   aria-label="Clear search"
                 >
                   <XmarkCircleIcon className="text-ods-text-secondary" size={24} />
@@ -499,14 +513,14 @@ export function SearchInput({
 
         <PopoverPrimitive.Content
           className={cn(
-            "z-50 w-[var(--radix-popover-trigger-width)] mt-1",
-            "bg-ods-card border border-ods-border rounded-[6px] overflow-hidden shadow-lg",
-            "flex flex-col max-h-[var(--radix-popper-available-height)]",
-            "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-            "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-            "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
-            dropdownClassName
+            'z-50 mt-1 w-[var(--radix-popover-trigger-width)]',
+            'overflow-hidden rounded-[6px] border border-ods-border bg-ods-card shadow-lg',
+            'flex max-h-[var(--radix-popper-available-height)] flex-col',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+            'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+            'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
+            dropdownClassName,
           )}
           sideOffset={4}
           align="start"
@@ -514,21 +528,19 @@ export function SearchInput({
           // so these suggestions are always positioned with the keyboard up —
           // see useKeyboardCollisionPadding.
           collisionPadding={{ bottom: keyboardPadding }}
-          onOpenAutoFocus={(e) => {
-            e.preventDefault()
-            inputRef.current?.focus()
+          onOpenAutoFocus={e => {
+            e.preventDefault();
+            inputRef.current?.focus();
           }}
-          onInteractOutside={(e) => {
+          onInteractOutside={e => {
             if (containerRef.current?.contains(e.target as Node)) {
-              e.preventDefault()
+              e.preventDefault();
             }
           }}
         >
           <ScrollAreaPrimitive.Root className="flex min-h-0 flex-col overflow-hidden">
-            <ScrollAreaPrimitive.Viewport className="min-h-0 max-h-[320px] w-full">
-              <div role="listbox">
-                {renderDropdownContent()}
-              </div>
+            <ScrollAreaPrimitive.Viewport className="max-h-[320px] min-h-0 w-full">
+              <div role="listbox">{renderDropdownContent()}</div>
             </ScrollAreaPrimitive.Viewport>
             <ScrollAreaPrimitive.Scrollbar className="hidden" orientation="vertical">
               <ScrollAreaPrimitive.Thumb />
@@ -542,15 +554,9 @@ export function SearchInput({
         <HiddenTagsPopup
           ref={hiddenTagsPopupRef}
           items={hiddenChips.map(chip => ({ label: chip.label, value: chip.id }))}
-          style={{
-            left: badgeRef.current
-              ? badgeRef.current.getBoundingClientRect().left -
-                (containerRef.current?.getBoundingClientRect().left ?? 0)
-              : 0,
-          }}
-          onRemove={(value) => {
-            onFilterRemove?.(value as string)
-            if (hiddenCount <= 1) setShowHiddenTags(false)
+          onRemove={removedTag => {
+            onFilterRemove?.(removedTag as string);
+            if (hiddenCount <= 1) setShowHiddenTags(false);
           }}
         />
       )}
@@ -559,29 +565,25 @@ export function SearchInput({
       <span
         ref={textMeasureRef}
         aria-hidden="true"
-        className="fixed -left-[9999px] top-0 pointer-events-none whitespace-nowrap text-ods-text-primary"
+        className="pointer-events-none fixed -left-[9999px] top-0 whitespace-nowrap text-ods-text-primary"
       >
         {currentPlaceholder}
       </span>
 
       {/* Off-screen measurement: all chip widths */}
-      <div
-        ref={measureRef}
-        aria-hidden="true"
-        className="fixed -left-[9999px] top-0 flex gap-2 pointer-events-none"
-      >
-        {filterChips.map((chip) => (
+      <div ref={measureRef} aria-hidden="true" className="pointer-events-none fixed -left-[9999px] top-0 flex gap-2">
+        {filterChips.map(chip => (
           <Tag
             key={`m-${chip.id}`}
             variant={chipVariantToTagVariant(chip.variant)}
             label={chip.label}
-            labelClassName="truncate max-w-[120px]"
+            labelClassName="max-w-[120px] truncate"
             onClose={() => {}}
           />
         ))}
       </div>
     </div>
-  )
+  );
 }
 
-export default SearchInput
+export default SearchInput;

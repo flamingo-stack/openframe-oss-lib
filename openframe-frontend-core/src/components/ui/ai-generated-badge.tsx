@@ -1,5 +1,5 @@
-import { Badge } from './badge';
 import { Sparkles } from 'lucide-react';
+import { Badge } from './badge';
 
 /**
  * Canonical "AI Generated" chip (Sparkles + label). Single source of truth for

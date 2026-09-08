@@ -2,6 +2,7 @@ package com.openframe.stream.service;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.IntegratedToolId;
+import com.openframe.data.document.tool.ToolCredentials;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.FleetTenantHeader;
@@ -214,7 +215,7 @@ public class FleetMdmCacheService {
     // deployed. validateTenantConfig has already guaranteed a non-blank baseUrl on that path.
     private FleetMdmClient getFleetMdmClient() {
         if (fleetMdmClient == null) {
-            String apiKey = resolveApiKey();
+            String apiKey = resolveDeploymentApiKey();
             if (apiKey == null) {
                 return null;
             }
@@ -227,7 +228,8 @@ public class FleetMdmCacheService {
     /**
      * Client for the given event tenant. Blank/null tenant (per-tenant clusters, or an event
      * whose tenant could not be resolved) falls back to the deployment client. Per-tenant
-     * clients share the tool credential and base URL and differ only in the X-Tenant-Id header.
+     * clients carry the tenant's own base URL, its own API key (each tenant registers its own
+     * fleetmdm-server tool doc on the shared plane), and the X-Tenant-Id header.
      */
     private FleetMdmClient clientFor(String eventTenantId) {
         if (isBlank(eventTenantId)) {
@@ -250,7 +252,7 @@ public class FleetMdmCacheService {
             log.debug("No Fleet base URL for tenant {} — skipping Fleet API lookup", tenant);
             return null;
         }
-        String apiKey = resolveApiKey();
+        String apiKey = resolveTenantApiKey(tenant);
         if (apiKey == null) {
             return null;
         }
@@ -273,22 +275,39 @@ public class FleetMdmCacheService {
         return null;
     }
 
-    private String resolveApiKey() {
+    private String resolveDeploymentApiKey() {
         if (cachedApiKey != null) {
             return cachedApiKey;
         }
-        Optional<IntegratedTool> optionalFleetInfo = integratedToolService.getToolByKey(IntegratedToolId.FLEET_SERVER_ID.getValue());
-        if (optionalFleetInfo.isEmpty()) {
-            log.warn("Fleet integration not found by ID '{}'. Query/policy name resolution will be unavailable.",
-                    IntegratedToolId.FLEET_SERVER_ID.getValue());
-            return null;
-        }
-        IntegratedTool tool = optionalFleetInfo.get();
-        if (tool.getCredentials() == null || tool.getCredentials().getApiKey() == null) {
-            log.warn("Fleet integration found but credentials/API key is missing. Query/policy name resolution will be unavailable.");
-            return null;
-        }
-        cachedApiKey = tool.getCredentials().getApiKey().getKey();
+        String fleetToolKey = IntegratedToolId.FLEET_SERVER_ID.getValue();
+        cachedApiKey = integratedToolService.getToolByKey(fleetToolKey)
+                .map(tool -> apiKeyOf(tool, tenantId))
+                .orElseGet(() -> warnMissingFleetTool(tenantId));
         return cachedApiKey;
+    }
+
+    private String resolveTenantApiKey(String tenant) {
+        String fleetToolKey = IntegratedToolId.FLEET_SERVER_ID.getValue();
+        return integratedToolService.getToolByTenantAndKey(tenant, fleetToolKey)
+                .map(tool -> apiKeyOf(tool, tenant))
+                .orElseGet(() -> warnMissingFleetTool(tenant));
+    }
+
+    private String apiKeyOf(IntegratedTool fleetTool, String tenant) {
+        if (!hasApiKey(fleetTool)) {
+            log.warn("Fleet integration for tenant {} has no API key — query and policy names will not be resolved", tenant);
+            return null;
+        }
+        return fleetTool.getCredentials().getApiKey().getKey();
+    }
+
+    private boolean hasApiKey(IntegratedTool fleetTool) {
+        ToolCredentials credentials = fleetTool.getCredentials();
+        return credentials != null && credentials.getApiKey() != null;
+    }
+
+    private String warnMissingFleetTool(String tenant) {
+        log.warn("Fleet integration not found for tenant {} — query and policy names will not be resolved", tenant);
+        return null;
     }
 }

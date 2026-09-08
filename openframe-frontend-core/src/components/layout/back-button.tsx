@@ -1,13 +1,12 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon'
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 
-export interface BackButtonProps
-  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
-  label?: string
-  onClick?: React.MouseEventHandler<HTMLButtonElement>
+export interface BackButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+  label?: string;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
 }
 
 export function BackButton({ label = 'Back', className, type = 'button', ...props }: BackButtonProps) {
@@ -27,7 +26,7 @@ export function BackButton({ label = 'Back', className, type = 'button', ...prop
       <Chevron02LeftIcon className="size-6 shrink-0" />
       <span className="text-h4">{label}</span>
     </button>
-  )
+  );
 }
 
-export default BackButton
+export default BackButton;

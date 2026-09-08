@@ -6,14 +6,13 @@ import com.openframe.authz.exception.UserActiveInAnotherTenantException;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.processor.UserDeactivationProcessor;
+import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.validation.InvitationValidator;
 import com.openframe.data.document.auth.AuthInvitation;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.repository.auth.AuthInvitationRepository;
-import com.openframe.data.repository.tenant.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import static com.openframe.data.document.user.InvitationStatus.ACCEPTED;
@@ -26,17 +25,14 @@ public class InvitationRegistrationService {
 
     private final UserService userService;
     private final AuthInvitationRepository invitationRepository;
-    private final TenantRepository tenantRepository;
     private final RegistrationProcessor registrationProcessor;
     private final UserDeactivationProcessor userDeactivationProcessor;
     private final InvitationValidator invitationValidator;
-
-    @Value("${openframe.tenancy.local-tenant:false}")
-    private boolean localTenant;
+    private final SsoIdentityService ssoIdentityService;
 
     public AuthUser registerByInvitation(InvitationRegistrationRequest request) {
         AuthInvitation invitation = invitationValidator.loadAndEnsureAcceptable(request.getInvitationId());
-        String targetTenantId = resolveTargetTenantId(invitation);
+        String targetTenantId = invitation.getTenantId();
 
         var existing = userService.findActiveByEmail(invitation.getEmail());
         if (existing.isPresent()) {
@@ -51,13 +47,6 @@ public class InvitationRegistrationService {
         AuthUser user = createUserForInvitation(targetTenantId, invitation, request);
         acceptInvitation(invitation, user, request);
         return user;
-    }
-
-    private String resolveTargetTenantId(AuthInvitation invitation) {
-        if (localTenant) {
-            return tenantRepository.findAll().getFirst().getId();
-        }
-        return invitation.getTenantId();
     }
 
     /**
@@ -78,6 +67,13 @@ public class InvitationRegistrationService {
                 throw new OwnerCannotSwitchTenantException(invitation.getEmail());
             }
             userService.deactivateUser(user);
+            // Tenant switch is an explicit lifecycle action — the one context where touching links
+            // is allowed. Drop the departing (now-deactivated) user's links so the identity binds
+            // cleanly to the new tenant's account on first login instead of dead-ending on a
+            // deactivated user and logging a conflict every time. Intentionally NOT best-effort
+            // (unlike account-deletion's link cleanup): a failure here must abort the switch rather
+            // than leave a stale link that would silently route the invitee back to the old tenant.
+            ssoIdentityService.removeUserLinks(user.getId());
             userDeactivationProcessor.postProcessDeactivation(user);
             return null;
         }

@@ -5,6 +5,7 @@ use std::time::Duration;
 use super::{CheckCategory, CheckResult};
 use crate::installation_initial_config_service::InstallConfigParams;
 use crate::platform::permissions::PermissionUtils;
+use crate::services::MACHINE_ID_HEADER;
 
 pub fn check_required_args(params: &InstallConfigParams) -> CheckResult {
     let mut missing = Vec::new();
@@ -208,7 +209,18 @@ pub fn check_tcp_connect(server_url: &str) -> CheckResult {
     }
 }
 
-pub async fn check_tls_handshake(server_url: &str) -> CheckResult {
+/// The platform firewall drops client requests without it, so probes must carry it to reach the gateway.
+fn with_machine_id(
+    request: reqwest::RequestBuilder,
+    machine_id: Option<&str>,
+) -> reqwest::RequestBuilder {
+    match machine_id {
+        Some(id) => request.header(MACHINE_ID_HEADER, id),
+        None => request,
+    }
+}
+
+pub async fn check_tls_handshake(server_url: &str, machine_id: Option<&str>) -> CheckResult {
     let url = ensure_https(server_url);
 
     let client = match reqwest::Client::builder()
@@ -225,7 +237,7 @@ pub async fn check_tls_handshake(server_url: &str) -> CheckResult {
         }
     };
 
-    match client.get(&url).send().await {
+    match with_machine_id(client.get(&url), machine_id).send().await {
         Ok(_) => CheckResult::pass(CheckCategory::Network, "Network: TLS handshake ok"),
         Err(e) if e.is_connect() => CheckResult::warn(
             CheckCategory::Network,
@@ -249,7 +261,7 @@ pub async fn check_tls_handshake(server_url: &str) -> CheckResult {
 /// We send a WebSocket upgrade request to /ws/nats without auth.
 /// Any HTTP response (even 401/403) means the path is reachable.
 /// A connection error means a proxy or firewall is blocking WebSocket.
-pub async fn check_websocket_upgrade(server_url: &str) -> CheckResult {
+pub async fn check_websocket_upgrade(server_url: &str, machine_id: Option<&str>) -> CheckResult {
     let base = ensure_https(server_url);
     let ws_url = format!("{}/ws/nats", base.trim_end_matches('/'));
 
@@ -267,8 +279,7 @@ pub async fn check_websocket_upgrade(server_url: &str) -> CheckResult {
         }
     };
 
-    match client
-        .get(&ws_url)
+    match with_machine_id(client.get(&ws_url), machine_id)
         .header("Upgrade", "websocket")
         .header("Connection", "Upgrade")
         .header("Sec-WebSocket-Version", "13")

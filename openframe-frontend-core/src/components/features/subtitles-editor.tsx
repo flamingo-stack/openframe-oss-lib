@@ -1,10 +1,9 @@
-"use client";
+'use client';
 
-import React from 'react';
+import { StandardCcIcon } from '../icons-v2-generated';
+import { Badge } from '../ui/badge';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import { Badge } from '../ui/badge';
-import { StandardCcIcon } from '../icons-v2-generated';
 
 export interface SubtitlesEditorProps {
   /** SRT subtitle content */
@@ -64,19 +63,19 @@ export function SubtitlesEditor({
             </Badge>
           )}
         </div>
-        <p className="text-h6 text-ods-text-secondary mt-1">{helperText}</p>
+        <p className="mt-1 text-ods-text-secondary text-h6">{helperText}</p>
       </div>
       <div
-        className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
+        className="overflow-hidden rounded-lg border border-ods-border bg-ods-card"
         style={{ minHeight: `${minHeight}px` }}
       >
         <Textarea
           id={id}
           value={subtitles || ''}
-          onChange={(e) => onSubtitlesChange?.(e.target.value)}
+          onChange={e => onSubtitlesChange?.(e.target.value)}
           placeholder={placeholder}
           disabled={disabled || !onSubtitlesChange}
-          className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
+          className="h-full w-full resize-none border-0 bg-transparent p-4 text-ods-text-primary text-code placeholder:text-ods-text-secondary/50 focus:outline-none focus:ring-0"
           style={{ minHeight: `${minHeight}px`, lineHeight: '1.6' }}
         />
       </div>

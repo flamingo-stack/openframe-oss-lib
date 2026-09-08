@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Client-side hook + helper for the slash-command autocomplete.
@@ -13,24 +13,16 @@
  * dropdown and the chat-side runtime share one source of truth.
  */
 
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { embedAuthedFetch } from "../../../utils/embed-authed-fetch";
-import type {
-  SlashCommandActionId,
-  SlashCommandSummaryAction,
-  SlashCommandSummary,
-} from "../types/component.types";
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import type { SlashCommandActionId, SlashCommandSummaryAction, SlashCommandSummary } from '../types/component.types';
 
 // Re-export so callers can `import { SlashCommandSummary } from
 // '@flamingo-stack/openframe-frontend-core/components/chat/hooks'`
 // without reaching into types. The component.types module is the
 // canonical declaration.
-export type {
-  SlashCommandActionId,
-  SlashCommandSummaryAction,
-  SlashCommandSummary,
-};
+export type { SlashCommandActionId, SlashCommandSummaryAction, SlashCommandSummary };
 
 /**
  * Fetch slash-command suggestions for the CURRENT deployment platform,
@@ -64,7 +56,7 @@ export async function fetchSlashCommands(
 ): Promise<SlashCommandSummary[]> {
   try {
     const url = new URL(commandsUrl, window.location.origin);
-    if (prefix) url.searchParams.set("q", prefix);
+    if (prefix) url.searchParams.set('q', prefix);
     // `headers: {}` opts out of the default `Content-Type: application/json`
     // — this is a bare GET with no body, so no content-type is needed.
     const res = await embedAuthedFetch(url.toString(), { signal, headers: {} });
@@ -77,8 +69,8 @@ export async function fetchSlashCommands(
     // (network down, proxy reject, non-JSON body) degrades to "no commands" so
     // a flaky commands endpoint can NEVER break the chat — the autocomplete /
     // onboarding list just renders empty.
-    if ((err as Error)?.name === "AbortError") throw err;
-    console.warn("[chat] slash-commands fetch failed, showing none:", err);
+    if ((err as Error)?.name === 'AbortError') throw err;
+    console.warn('[chat] slash-commands fetch failed, showing none:', err);
     return [];
   }
 }
@@ -88,33 +80,51 @@ export async function fetchSlashCommands(
  *
  * `commandsUrl` is required — pass `useChatRuntime().endpoints.commandsUrl`.
  */
+/** One shared empty list, so "no commands" keeps a stable identity. */
+const NO_COMMANDS: SlashCommandSummary[] = [];
+
 export function useSlashCommands(
   prefix: string | null,
   commandsUrl: string,
 ): { commands: SlashCommandSummary[]; loading: boolean } {
-  const [commands, setCommands] = useState<SlashCommandSummary[]>([]);
-  const [loading, setLoading] = useState(false);
+  // The result carries the prefix it answers. That tag is what makes BOTH
+  // outputs derivable: "no prefix" and "a prefix whose answer has not landed
+  // yet" are the empty list and the loading flag respectively, so the effect no
+  // longer writes either of them synchronously — it used to clear the list AND
+  // raise the loading flag from its own body, two render passes per keystroke
+  // on a dropdown that is already re-rendering for the keystroke.
+  const [answered, setAnswered] = useState<{ prefix: string; commands: SlashCommandSummary[] } | null>(null);
+  const commands = prefix != null && answered?.prefix === prefix ? answered.commands : NO_COMMANDS;
+  const loading = prefix != null && answered?.prefix !== prefix;
 
   useEffect(() => {
-    if (prefix == null) {
-      setCommands([]);
-      return;
-    }
+    if (prefix == null) return undefined;
     let cancelled = false;
     const ctrl = new AbortController();
-    setLoading(true);
-    const handle = setTimeout(async () => {
+    // Named async function rather than an async timer callback: `setTimeout`
+    // throws away what its callback returns, so a rejection would escape as an
+    // unhandled one. The body below already catches its own failures; the
+    // handler on the call site is the net for anything else (a throwing state
+    // setter), which must not leave `loading` stuck true.
+    const runFetch = async () => {
       try {
         const next = await fetchSlashCommands(prefix, ctrl.signal, commandsUrl);
-        if (!cancelled) setCommands(next);
+        if (!cancelled) setAnswered({ prefix, commands: next });
       } catch (err) {
         // AbortError on dep-change / unmount is expected; log others.
-        if (!cancelled && (err as Error)?.name !== "AbortError") {
-          console.warn("[use-slash-commands] fetch failed:", err);
+        if (!cancelled && (err as Error)?.name !== 'AbortError') {
+          console.warn('[use-slash-commands] fetch failed:', err);
+          // Answer the prefix with an empty list anyway: `loading` is derived
+          // from "this prefix has no answer yet", so leaving it unanswered
+          // would spin forever instead of degrading to "no commands".
+          setAnswered({ prefix, commands: NO_COMMANDS });
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
+    };
+    const handle = setTimeout(() => {
+      runFetch().catch((err: unknown) => {
+        console.warn('[use-slash-commands] unexpected failure:', err);
+      });
     }, 150);
     return () => {
       cancelled = true;
@@ -150,8 +160,8 @@ export function useSlashCommandRegistry(
   options?: { enabled?: boolean },
 ): { commands: SlashCommandSummary[]; loading: boolean; loaded: boolean } {
   const query = useQuery({
-    queryKey: ["chat-slash-commands", commandsUrl],
-    queryFn: ({ signal }) => fetchSlashCommands("", signal, commandsUrl),
+    queryKey: ['chat-slash-commands', commandsUrl],
+    queryFn: ({ signal }) => fetchSlashCommands('', signal, commandsUrl),
     enabled: options?.enabled ?? true,
     staleTime: Infinity,
     gcTime: Infinity,

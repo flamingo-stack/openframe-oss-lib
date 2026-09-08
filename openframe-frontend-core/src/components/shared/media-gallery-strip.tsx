@@ -1,6 +1,7 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
+import Image from '../../embed-shims/next-image';
 import { Video } from '../features/video';
 import { ImageGalleryModal } from '../ui/image-gallery-modal';
 
@@ -38,14 +39,14 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
 
   if (!items || items.length === 0) return null;
 
-  const galleryImages = items.filter((m) => isGalleryImage(m.media_type)).map((m) => m.media_url);
+  const galleryImages = items.filter(m => isGalleryImage(m.media_type)).map(m => m.media_url);
 
   const tileClass =
     'shrink-0 w-[240px] h-[200px] rounded-md overflow-hidden border border-ods-border bg-black transition-opacity';
 
   return (
     <>
-      <div className={`flex gap-6 overflow-x-auto w-full ${className ?? ''}`}>
+      <div className={`flex w-full gap-6 overflow-x-auto ${className ?? ''}`}>
         {items.map((mediaItem, index) => {
           // Image tiles open the lightbox, so they're real <button>s — keyboard
           // focusable + Enter/Space activatable. Clips render in <Video>, which
@@ -59,11 +60,18 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
                 aria-label={`Open ${mediaItem.title || `media ${index + 1}`} in gallery`}
                 onClick={() => {
                   // Lightbox position = rank among image-only items (clips skipped).
-                  setGalleryIndex(items.slice(0, index).filter((m) => isGalleryImage(m.media_type)).length);
+                  setGalleryIndex(items.slice(0, index).filter(m => isGalleryImage(m.media_type)).length);
                   setGalleryOpen(true);
                 }}
               >
-                <img src={mediaItem.media_url} alt={mediaItem.title || `Media ${index + 1}`} className="w-full h-full object-cover" />
+                <Image
+                  src={mediaItem.media_url}
+                  alt={mediaItem.title || `Media ${index + 1}`}
+                  className="h-full w-full object-cover"
+                  width={240}
+                  height={200}
+                  unoptimized
+                />
               </button>
             );
           }

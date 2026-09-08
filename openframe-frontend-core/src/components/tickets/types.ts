@@ -15,46 +15,46 @@
  * surfaces, which the ticket center doesn't render.
  */
 export interface TicketData {
-  id: string
+  id: string;
   /** HubSpot ticket id (display number, e.g. "1234"). */
-  external_id: string
-  subject: string | null
+  external_id: string;
+  subject: string | null;
   /** Short (≤400 char) HTML-stripped preview of the ticket body —
    *  used for the list-card subtitle when needed. */
-  preview: string | null
+  preview: string | null;
   /** Longer (≤4k char) sanitized body. INCLUDES every appended
    *  `content_addendum` comment because the `update_ticket` executor
    *  reads + re-writes the `content` property server-side with a
    *  `---` separator. Render this in the drawer's description block
    *  and the user sees both the original message + every comment they
    *  (or staff) added. */
-  body: string | null
+  body: string | null;
   /** Canonical OPEN | CLOSED (HubSpot pipeline derived). */
-  status: string | null
+  status: string | null;
   /** Human label like "New" / "Working on it" / "Waiting on contact" /
    *  "Closed". Drives the badge text; canonical status drives color. */
-  pipeline_stage_label: string | null
-  clickup_task_id: string | null
+  pipeline_stage_label: string | null;
+  clickup_task_id: string | null;
   /** Snapshot of the linked ClickUp delivery task — populated server-side
    *  via the `clickup_tasks` mirror when `clickup_task_id` is set. Drives
    *  the "Linked delivery" card surface on the ticket drawer (status
    *  badge + ClickUp deep link). `null` when no link OR the ClickUp row
    *  was deleted / not yet synced. */
-  clickup: TicketClickupSummary | null
-  priority: string | null
-  customer_emails: string[]
-  customer_company: string | null
+  clickup: TicketClickupSummary | null;
+  priority: string | null;
+  customer_emails: string[];
+  customer_company: string | null;
   /** HubSpot contact's display name. Drives the customer attribution
    *  on the drawer when the viewer is NOT the customer themselves
    *  (admin browsing / multi-contact second viewer). Conversations
    *  API messages don't carry per-message sender info on Custom
    *  Channels, so this is the only reliable source for "what's the
    *  customer's name." */
-  customer_name: string | null
+  customer_name: string | null;
   /** HubSpot owner id of the agent assigned to this ticket. Carried as
    *  raw id for debugging; rendering goes through `assignedOwner`. Null
    *  when unassigned. */
-  assigned_to: string | null
+  assigned_to: string | null;
   /** Resolved assigned-owner profile — name + email + avatar. Populated
    *  server-side via `attachOwnerProfiles` which joins through the
    *  `hubspot_owners` mirror to `profiles` by email. Drives the
@@ -62,17 +62,17 @@ export interface TicketData {
    *  unassigned OR the owner couldn't be resolved (rare — only when
    *  the agent was deleted from HubSpot between the ticket update and
    *  the next owners reconcile). */
-  assignedOwner: TicketAssignedOwner | null
-  hubspot_updated_at: string
+  assignedOwner: TicketAssignedOwner | null;
+  hubspot_updated_at: string;
 }
 
 /** Resolved profile of a ticket's assigned agent — surfaced in the
  *  drawer header. Subset of the server's `MirroredOwnerProfile`
  *  trimmed to just the rendering fields. */
 export interface TicketAssignedOwner {
-  name: string | null
-  email: string | null
-  avatarUrl: string | null
+  name: string | null;
+  email: string | null;
+  avatarUrl: string | null;
 }
 
 /** Compact projection of a linked ClickUp task — matches the server's
@@ -83,43 +83,43 @@ export interface TicketClickupSummary {
   /** ClickUp task external_id (e.g. "86ad4e022"). Used as the
    *  `?focus=<id>` URL param to scroll the public delivery page to
    *  this row. */
-  external_id: string
-  title: string | null
-  description: string | null
+  external_id: string;
+  title: string | null;
+  description: string | null;
   /** ClickUp status name — e.g. "complete" / "working" / "design approved"
    *  / "waiting for release". Used as the badge label. */
-  status: string | null
+  status: string | null;
   /** ClickUp's per-status hex color (e.g. "#008844"). Forwarded to the
    *  badge so colors match the ClickUp board exactly. */
-  status_color: string | null
+  status_color: string | null;
   /** Bucket — `'backlog' | 'working' | 'complete' | 'unknown'`. Used as
    *  a fallback when status_color is missing. */
-  status_category: string | null
+  status_category: string | null;
   /** ClickUp custom item label (`'Bug'` / `'Request'`) — drives the
    *  type badge ("BUG-FIX" / "ENHANCEMENT"). */
-  task_type: string | null
-  custom_item_id: number | null
+  task_type: string | null;
+  custom_item_id: number | null;
   /** Every ClickUp list the task is associated with. UI joins with ", ". */
-  list_names: string[]
+  list_names: string[];
   /** Unix-ms timestamps so the row's "ACTIVE X ago" subtitle uses the
    *  shared `getRelativeTime()` helper. */
-  date_opened: number | null
-  date_updated: number | null
-  date_closed: number | null
+  date_opened: number | null;
+  date_updated: number | null;
+  date_closed: number | null;
   /** Direct https://app.clickup.com/t/<id> deep link. Kept on the wire
    *  for admin surfaces; the customer-facing linked card navigates
    *  internally instead. */
-  clickup_url: string | null
+  clickup_url: string | null;
   /** Composed server-side via the SAME `buildDevSectionUrl` helper the
    *  chat-inline delivery card uses. Carries `?search=<id>` so the
    *  delivery list filters to that single task on landing. */
-  delivery_href: string
+  delivery_href: string;
   /** Target platform name for the host's `useNavLink` to decide
    *  same-tab vs new-tab on cross-platform links. */
-  delivery_target_platform: string
+  delivery_target_platform: string;
   /** Release version label set by the delivery team, e.g. "0.9" / "1.0".
    *  Shown beside the status when present. */
-  target_version: string | null
+  target_version: string | null;
 }
 
 /**
@@ -130,13 +130,13 @@ export interface TicketClickupSummary {
  * prop.
  */
 export interface OptimisticTicket extends TicketData {
-  _optimistic: true
+  _optimistic: true;
 }
 
-export type AnyTicket = TicketData | OptimisticTicket
+export type AnyTicket = TicketData | OptimisticTicket;
 
 export function isOptimistic(t: AnyTicket): t is OptimisticTicket {
-  return (t as OptimisticTicket)._optimistic === true
+  return (t as OptimisticTicket)._optimistic === true;
 }
 
 /**
@@ -153,13 +153,13 @@ export function isOptimistic(t: AnyTicket): t is OptimisticTicket {
  * `tickets` explicitly.
  */
 export interface TicketsCacheSlot {
-  tickets?: TicketData[]
-  count?: number
-  totalCount?: number
-  page?: number
-  pageSize?: number
-  totalPages?: number
-  scope?: 'self' | 'all'
+  tickets?: TicketData[];
+  count?: number;
+  totalCount?: number;
+  page?: number;
+  pageSize?: number;
+  totalPages?: number;
+  scope?: 'self' | 'all';
 }
 
 /**
@@ -185,21 +185,21 @@ export type TicketActionErrorCode =
   | 'HUBSPOT_400_VALIDATION'
   | 'HUBSPOT_404_THREAD'
   | 'HUBSPOT_REPLY_UNKNOWN'
-  | 'UNKNOWN'
+  | 'UNKNOWN';
 
 export interface MappedTicketActionError {
-  code: TicketActionErrorCode
+  code: TicketActionErrorCode;
   /** Human-readable copy safe to show in a toast. */
-  message: string
+  message: string;
   /** When true, the form should disable submit + show the
    *  support-down banner. Set only for HUBSPOT_DISCONNECTED. */
-  supportSystemDown: boolean
+  supportSystemDown: boolean;
   /** When true, the helper should remove the affected row optimistically
    *  (TICKET_NOT_FOUND). */
-  removeRowFromCache: boolean
+  removeRowFromCache: boolean;
   /** Retry hint surfaced from a 429 response. Caller decides whether
    *  to mention it in the toast. */
-  retryAfterSeconds?: number
+  retryAfterSeconds?: number;
 }
 
 /**
@@ -209,7 +209,7 @@ export interface MappedTicketActionError {
  * Both the open-ticket form and the per-row comment textarea import
  * this so a future server-side hardening only touches one place.
  */
-export const TICKET_TEXT_MAX_CHARS = 5000
+export const TICKET_TEXT_MAX_CHARS = 5000;
 
 /**
  * Wire contract of the ticket live stream (`GET /api/chat/agent/
@@ -242,44 +242,40 @@ export const TICKET_TEXT_MAX_CHARS = 5000
  * `reconnect_failed`) from the shared SSE utility — clients derive
  * `connected` from those, NOT from the HTTP stream being open.
  */
-export type TicketStreamEventType =
-  | 'ticket-message'
-  | 'ticket-status'
-  | 'ticket-summary'
-  | 'ticket-resync'
+export type TicketStreamEventType = 'ticket-message' | 'ticket-status' | 'ticket-summary' | 'ticket-resync';
 
 /** Metadata payload of a `ticket-message` frame. */
 export type TicketMessageStreamData = {
-  ticket_external_id: string
+  ticket_external_id: string;
   /** Mirror row's HubSpot message id. */
-  message_id: string
+  message_id: string;
   /** Server-stamped via the same direction predicate the wire mapper
    *  uses. Clients never re-derive author classification. */
-  authorRole: 'customer' | 'support'
+  authorRole: 'customer' | 'support';
   /** Server-stamped via the visibility+direction unread predicate
    *  (`countsAsUnread` in the hub's conversations DAL). ONLY frames
    *  with `true` may bump client-side unread state. */
-  countsAsUnread: boolean
-  hubspot_created_at: string | null
-}
+  countsAsUnread: boolean;
+  hubspot_created_at: string | null;
+};
 
 /** Metadata payload of a `ticket-status` frame. */
 export type TicketStatusStreamData = {
-  ticket_external_id: string
+  ticket_external_id: string;
   /** Canonical OPEN | CLOSED after the change. */
-  status: string | null
-  pipeline_stage_label: string | null
-  closed_at: string | null
-}
+  status: string | null;
+  pipeline_stage_label: string | null;
+  closed_at: string | null;
+};
 
 export interface TicketStreamEvent {
-  eventType: TicketStreamEventType
+  eventType: TicketStreamEventType;
   /** Human-readable label (SSE envelope compat) — clients ignore it. */
-  message: string
+  message: string;
   /** `ticket-message` → TicketMessageStreamData; `ticket-status` →
    *  TicketStatusStreamData; `ticket-summary` → TicketUnreadSummary;
    *  absent on `ticket-resync`. */
-  data?: TicketMessageStreamData | TicketStatusStreamData | TicketUnreadSummary
+  data?: TicketMessageStreamData | TicketStatusStreamData | TicketUnreadSummary;
 }
 
 /**
@@ -290,13 +286,13 @@ export interface TicketStreamEvent {
  * `TicketLiveProvider` map; missing keys mean 0.
  */
 export type TicketUnreadSummary = {
-  totalUnread: number
-  tickets: Record<string, number>
+  totalUnread: number;
+  tickets: Record<string, number>;
   /** ISO timestamp of the NEWEST unread message per ticket (same keys as
    *  `tickets`). Drives "route to the most recent update" on the header
    *  cell: the ticket with the max value here is `nextUnreadTicketId`. */
-  latestUnreadAt: Record<string, string>
-}
+  latestUnreadAt: Record<string, string>;
+};
 
 /**
  * Trailing debounce for `markRead` while the drawer is open and new
@@ -304,7 +300,7 @@ export type TicketUnreadSummary = {
  * still persists the receipt. Named beside its sibling cadences so
  * every timing knob lives in one file.
  */
-export const TICKET_MARK_READ_DEBOUNCE_MS = 2000
+export const TICKET_MARK_READ_DEBOUNCE_MS = 2000;
 
 /**
  * Ticket deep-link SSOT — DEFINED in the server-safe param-keys module
@@ -313,10 +309,7 @@ export const TICKET_MARK_READ_DEBOUNCE_MS = 2000
  * SERVER-side chat-ref builder and the client header cell. Re-exported
  * here so ticket-surface consumers keep one import home.
  */
-export {
-  TICKET_OPEN_PARAM,
-  buildTicketOpenHref,
-} from '../../utils/dev-sections/dev-section-param-keys'
+export { TICKET_OPEN_PARAM, buildTicketOpenHref } from '../../utils/dev-sections/dev-section-param-keys';
 
 /**
  * Centralized toast copy. Keep all wording here so QA / localization
@@ -330,4 +323,4 @@ export const TOAST_COPY = {
   comment_success: { title: 'Comment added' },
   attach_success: { title: 'Files attached' },
   // Failure variants are constructed dynamically from MappedTicketActionError.
-} as const
+} as const;

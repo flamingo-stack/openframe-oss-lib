@@ -1,13 +1,13 @@
-'use client'
+'use client';
 
-import type * as React from 'react'
-import { cn } from '../../../utils/cn'
-import { OpenFrameWordmark, PoweredByFlamingo } from './auth-branding'
+import type { ReactNode } from 'react';
+import { cn } from '../../../utils/cn';
+import { OpenFrameWordmark, PoweredByFlamingo } from './auth-branding';
 
 export interface SsoAuthShellProps {
   /** Centered card content (OpenFrame SSO login / sign-up form). */
-  children: React.ReactNode
-  className?: string
+  children: ReactNode;
+  className?: string;
 }
 
 /**
@@ -26,5 +26,5 @@ export function SsoAuthShell({ children, className }: SsoAuthShellProps) {
       <div className="flex w-full max-w-[600px] flex-col items-center">{children}</div>
       <PoweredByFlamingo compact />
     </div>
-  )
+  );
 }

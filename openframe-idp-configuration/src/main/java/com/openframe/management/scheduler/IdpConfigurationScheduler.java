@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Component
@@ -39,6 +40,8 @@ public class IdpConfigurationScheduler {
 
     /** Grant used by the native Sign in with Apple exchange (see AppleNativeGrantAuthenticationToken). */
     private static final String APPLE_NATIVE_GRANT = "urn:openframe:params:oauth:grant-type:apple-native";
+    /** Grant that redeems a bound mobile signup ticket (see SignupTicketGrantAuthenticationToken). */
+    private static final String SIGNUP_TICKET_GRANT = "urn:openframe:params:oauth:grant-type:signup-ticket";
 
     @Scheduled(fixedDelay = Long.MAX_VALUE, initialDelay = 5000)
     @SchedulerLock(name = "IdpConfigurationScheduler_initializeDefaultIdp", lockAtMostFor = "10m", lockAtLeastFor = "1m")
@@ -49,13 +52,12 @@ public class IdpConfigurationScheduler {
                 // Existing deployments predate the apple-native grant — upsert it, or the token
                 // endpoint rejects the exchange with unauthorized_client.
                 MongoRegisteredClient client = existing.get();
-                if (client.getGrantTypes() == null || !client.getGrantTypes().contains(APPLE_NATIVE_GRANT)) {
-                    java.util.Set<String> grants = new java.util.HashSet<>(
-                            client.getGrantTypes() != null ? client.getGrantTypes() : Set.of());
-                    grants.add(APPLE_NATIVE_GRANT);
+                Set<String> grants = new HashSet<>(
+                        client.getGrantTypes() != null ? client.getGrantTypes() : Set.of());
+                if (grants.addAll(Set.of(APPLE_NATIVE_GRANT, SIGNUP_TICKET_GRANT))) {
                     client.setGrantTypes(grants);
                     registeredClientMongoRepository.save(client);
-                    log.info("Added '{}' grant to existing RegisteredClient: {}", APPLE_NATIVE_GRANT, gatewayClientId);
+                    log.info("Upserted custom grants on existing RegisteredClient: {}", gatewayClientId);
                 } else {
                     log.info("Registered OAuth client already exists: {}", gatewayClientId);
                 }
@@ -68,7 +70,7 @@ public class IdpConfigurationScheduler {
                 .clientId(gatewayClientId)
                 .clientSecret(encodedSecret)
                 .authenticationMethods(Set.of("none", "client_secret_basic"))
-                .grantTypes(Set.of("authorization_code", "refresh_token", APPLE_NATIVE_GRANT))
+                .grantTypes(Set.of("authorization_code", "refresh_token", APPLE_NATIVE_GRANT, SIGNUP_TICKET_GRANT))
                 .redirectUris(Set.of(gatewayRedirectUri))
                 .scopes(Set.of("openid", "profile", "email", "offline_access"))
                 .requireProofKey(true)

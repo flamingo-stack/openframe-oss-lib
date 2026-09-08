@@ -3,7 +3,7 @@ package com.openframe.api.datafetcher;
 import com.netflix.graphql.dgs.*;
 import graphql.relay.Relay;
 import com.openframe.api.dto.device.DeviceFilterOption;
-import com.openframe.api.service.ScriptTagService;
+import com.openframe.api.service.rmm.script.ScriptTagService;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagEntityType;

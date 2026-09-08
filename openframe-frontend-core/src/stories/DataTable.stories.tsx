@@ -7,8 +7,12 @@
  * individual stories below for how each feature lights up.
  */
 
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Chevron02RightIcon } from '../components/icons-v2-generated';
+import { ActionsMenuDropdown } from '../components/ui/actions-menu';
+import { Button } from '../components/ui/button';
+import { Checkbox } from '../components/ui/checkbox';
 import {
   DataTable,
   multiSelectFilterFn,
@@ -17,29 +21,25 @@ import {
   type ColumnFiltersState,
   type DataTableSortState,
   type RowSelectionState,
-} from '../components/ui/data-table'
-import { Button } from '../components/ui/button'
-import { Checkbox } from '../components/ui/checkbox'
-import { Tag } from '../components/ui/tag'
-import { ActionsMenuDropdown } from '../components/ui/actions-menu'
-import { Chevron02RightIcon } from '../components/icons-v2-generated'
+} from '../components/ui/data-table';
+import { Tag } from '../components/ui/tag';
 
 /* ──────────────────────────────── sample data ───────────────────────────────── */
 
-type DeviceStatus = 'online' | 'offline' | 'pending'
-type DeviceOS = 'macOS' | 'Windows' | 'Linux'
+type DeviceStatus = 'online' | 'offline' | 'pending';
+type DeviceOS = 'macOS' | 'Windows' | 'Linux';
 
 interface Device {
-  id: string
-  hostname: string
-  ipAddress: string
-  os: DeviceOS
-  status: DeviceStatus
-  owner: { name: string; email: string }
-  tags: string[]
-  cpuLoad: number
-  memoryGB: number
-  lastSeen: string
+  id: string;
+  hostname: string;
+  ipAddress: string;
+  os: DeviceOS;
+  status: DeviceStatus;
+  owner: { name: string; email: string };
+  tags: string[];
+  cpuLoad: number;
+  memoryGB: number;
+  lastSeen: string;
 }
 
 const OWNERS = [
@@ -48,29 +48,35 @@ const OWNERS = [
   { name: 'Grace Hopper', email: 'grace@example.com' },
   { name: 'Linus Torvalds', email: 'linus@example.com' },
   { name: 'Margaret Hamilton', email: 'margaret@example.com' },
-]
+];
 
-const TAG_POOL = ['production', 'staging', 'dev', 'dmz', 'pci', 'edge', 'core', 'gpu', 'critical']
+const TAG_POOL = ['production', 'staging', 'dev', 'dmz', 'pci', 'edge', 'core', 'gpu', 'critical'];
 
 function pick<T>(arr: T[], seed: number): T {
-  return arr[seed % arr.length]!
+  // `seed % arr.length` is always in range for a non-empty array, but
+  // `noUncheckedIndexedAccess` cannot see that. Name the real precondition
+  // instead of asserting it away — an empty pool would otherwise surface as
+  // `undefined` leaking into a fixture row.
+  const value = arr[seed % arr.length];
+  if (value === undefined) throw new Error('pick() needs a non-empty array');
+  return value;
 }
 
 function randTags(seed: number): string[] {
-  const n = (seed % 3) + 1
-  const result: string[] = []
+  const n = (seed % 3) + 1;
+  const result: string[] = [];
   for (let i = 0; i < n; i++) {
-    const tag = TAG_POOL[(seed + i * 3) % TAG_POOL.length]!
-    if (!result.includes(tag)) result.push(tag)
+    const tag = pick(TAG_POOL, seed + i * 3);
+    if (!result.includes(tag)) result.push(tag);
   }
-  return result
+  return result;
 }
 
 function makeDevices(count: number, startId = 1): Device[] {
-  const statuses: DeviceStatus[] = ['online', 'offline', 'pending']
-  const oss: DeviceOS[] = ['macOS', 'Windows', 'Linux']
+  const statuses: DeviceStatus[] = ['online', 'offline', 'pending'];
+  const oss: DeviceOS[] = ['macOS', 'Windows', 'Linux'];
   return Array.from({ length: count }, (_, i) => {
-    const seed = startId + i
+    const seed = startId + i;
     return {
       id: String(seed),
       hostname: `host-${String(seed).padStart(4, '0')}`,
@@ -80,32 +86,29 @@ function makeDevices(count: number, startId = 1): Device[] {
       owner: pick(OWNERS, seed * 3),
       tags: randTags(seed),
       cpuLoad: (seed * 13) % 100,
-      memoryGB: [4, 8, 16, 32, 64][seed % 5]!,
+      memoryGB: pick([4, 8, 16, 32, 64], seed),
       lastSeen: new Date(Date.now() - seed * 1000 * 60 * 17).toISOString(),
-    }
-  })
+    };
+  });
 }
 
-const DEVICES = makeDevices(24)
-const DEVICES_6 = DEVICES.slice(0, 6)
-const DEVICES_8 = DEVICES.slice(0, 8)
-const DEVICES_10 = DEVICES.slice(0, 10)
-const DEVICES_12 = DEVICES.slice(0, 12)
-const DEVICES_30 = makeDevices(30)
-const DEVICES_50 = makeDevices(50)
+const DEVICES = makeDevices(24);
+const DEVICES_6 = DEVICES.slice(0, 6);
+const DEVICES_8 = DEVICES.slice(0, 8);
+const DEVICES_10 = DEVICES.slice(0, 10);
+const DEVICES_12 = DEVICES.slice(0, 12);
+const DEVICES_30 = makeDevices(30);
+const DEVICES_50 = makeDevices(50);
 
 /* ─────────────────────────── shared cell renderers ──────────────────────────── */
 
 function StatusTag({ status }: { status: DeviceStatus }) {
-  const variant =
-    status === 'online' ? 'success' : status === 'offline' ? 'error' : 'warning'
-  return <Tag label={status} variant={variant} />
+  const variant = status === 'online' ? 'success' : status === 'offline' ? 'error' : 'warning';
+  return <Tag label={status} variant={variant} />;
 }
 
 function OSBadge({ os }: { os: DeviceOS }) {
-  return (
-    <span className="text-h5 text-ods-text-primary">{os}</span>
-  )
+  return <span className="text-ods-text-primary text-h5">{os}</span>;
 }
 
 function OwnerCell({ owner }: { owner: Device['owner'] }) {
@@ -113,18 +116,18 @@ function OwnerCell({ owner }: { owner: Device['owner'] }) {
     .split(' ')
     .map(s => s[0])
     .slice(0, 2)
-    .join('')
+    .join('');
   return (
-    <div className="flex items-center gap-2 min-w-0">
-      <div className="w-8 h-8 rounded-full bg-ods-bg-active flex items-center justify-center shrink-0 text-h5 text-ods-text-secondary">
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ods-bg-active text-ods-text-secondary text-h5">
         {initials}
       </div>
-      <div className="flex flex-col min-w-0">
-        <span className="text-h4 text-ods-text-primary truncate">{owner.name}</span>
-        <span className="text-h6 text-ods-text-secondary truncate">{owner.email}</span>
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-ods-text-primary text-h4">{owner.name}</span>
+        <span className="truncate text-ods-text-secondary text-h6">{owner.email}</span>
       </div>
     </div>
-  )
+  );
 }
 
 function TagsCell({ tags }: { tags: string[] }) {
@@ -134,23 +137,27 @@ function TagsCell({ tags }: { tags: string[] }) {
         <Tag key={t} label={t} variant="grey" />
       ))}
     </div>
-  )
+  );
 }
 
 function LoadCell({ value, unit = '%' }: { value: number; unit?: string }) {
-  const intent =
-    value >= 85 ? 'text-ods-error' : value >= 60 ? 'text-ods-warning' : 'text-ods-text-primary'
-  return <span className={`text-h4 ${intent}`}>{value}{unit}</span>
+  const intent = value >= 85 ? 'text-ods-error' : value >= 60 ? 'text-ods-warning' : 'text-ods-text-primary';
+  return (
+    <span className={`text-h4 ${intent}`}>
+      {value}
+      {unit}
+    </span>
+  );
 }
 
 function LastSeenCell({ iso }: { iso: string }) {
-  const d = new Date(iso)
+  const d = new Date(iso);
   return (
     <div className="flex flex-col">
-      <span className="text-h4 text-ods-text-primary">{d.toLocaleDateString()}</span>
-      <span className="text-h6 text-ods-text-secondary">{d.toLocaleTimeString()}</span>
+      <span className="text-ods-text-primary text-h4">{d.toLocaleDateString()}</span>
+      <span className="text-ods-text-secondary text-h6">{d.toLocaleTimeString()}</span>
     </div>
-  )
+  );
 }
 
 /* ───────────────────────── reusable column factories ────────────────────────── */
@@ -235,7 +242,7 @@ function baseColumns(): ColumnDef<Device>[] {
       cell: ({ row }) => <LastSeenCell iso={row.original.lastSeen} />,
       meta: { width: 'w-[160px] shrink-0', hideAt: ['md', 'lg', 'xl'] },
     },
-  ]
+  ];
 }
 
 /* ───────────────────────────────── meta ─────────────────────────────────────── */
@@ -264,10 +271,10 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-} satisfies Meta
+} satisfies Meta;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /* ─────────────────────────────────── stories ──────────────────────────────────── */
 
@@ -293,18 +300,18 @@ export const Basic: Story = {
         { accessorKey: 'os', header: 'OS', meta: { width: 'flex-1 min-w-0' } },
       ],
       [],
-    )
+    );
 
-    const table = useDataTable<Device>({ data: DEVICES_6, columns })
+    const table = useDataTable<Device>({ data: DEVICES_6, columns });
 
     return (
       <DataTable table={table}>
         <DataTable.Header />
         <DataTable.Body emptyMessage="No devices" />
       </DataTable>
-    )
+    );
   },
-}
+};
 
 /**
  * **Sorting** — the header is purely presentational: it renders the direction
@@ -314,27 +321,27 @@ export const Basic: Story = {
  */
 export const WithSorting: Story = {
   render: () => {
-    const [sort, setSort] = useState<DataTableSortState | null>({ id: 'hostname', desc: false })
+    const [sort, setSort] = useState<DataTableSortState | null>({ id: 'hostname', desc: false });
 
     const handleSortChange = useCallback((columnId: string) => {
       setSort(prev => {
-        if (prev?.id !== columnId) return { id: columnId, desc: false }
-        if (!prev.desc) return { id: columnId, desc: true }
-        return null
-      })
-    }, [])
+        if (prev?.id !== columnId) return { id: columnId, desc: false };
+        if (!prev.desc) return { id: columnId, desc: true };
+        return null;
+      });
+    }, []);
 
     const sortedData = useMemo(() => {
-      if (!sort) return DEVICES_10
-      const dir = sort.desc ? -1 : 1
+      if (!sort) return DEVICES_10;
+      const dir = sort.desc ? -1 : 1;
       return [...DEVICES_10].sort((a, b) => {
-        const av = a[sort.id as keyof Device] as string | number
-        const bv = b[sort.id as keyof Device] as string | number
-        if (av < bv) return -1 * dir
-        if (av > bv) return 1 * dir
-        return 0
-      })
-    }, [sort])
+        const av = a[sort.id as keyof Device] as string | number;
+        const bv = b[sort.id as keyof Device] as string | number;
+        if (av < bv) return -1 * dir;
+        if (av > bv) return 1 * dir;
+        return 0;
+      });
+    }, [sort]);
 
     const columns = useMemo<ColumnDef<Device>[]>(
       () => [
@@ -360,13 +367,13 @@ export const WithSorting: Story = {
         },
       ],
       [],
-    )
+    );
 
-    const table = useDataTable<Device>({ data: sortedData, columns })
+    const table = useDataTable<Device>({ data: sortedData, columns });
 
     return (
       <div className="space-y-4">
-        <div className="text-h5 text-ods-text-secondary">
+        <div className="text-ods-text-secondary text-h5">
           Current sort: <code>{JSON.stringify(sort)}</code>
         </div>
         <DataTable table={table}>
@@ -374,9 +381,9 @@ export const WithSorting: Story = {
           <DataTable.Body />
         </DataTable>
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * **Client-side filtering** — columns declare `meta.filter.options` and the
@@ -388,7 +395,7 @@ export const WithSorting: Story = {
  */
 export const WithFilters: Story = {
   render: () => {
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
     const columns = useMemo<ColumnDef<Device>[]>(
       () => [
@@ -427,7 +434,7 @@ export const WithFilters: Story = {
         },
       ],
       [],
-    )
+    );
 
     const table = useDataTable<Device>({
       data: DEVICES,
@@ -435,11 +442,11 @@ export const WithFilters: Story = {
       clientSideFiltering: true,
       state: { columnFilters },
       onColumnFiltersChange: setColumnFilters,
-    })
+    });
 
     return (
       <div className="space-y-4">
-        <div className="text-h5 text-ods-text-secondary">
+        <div className="text-ods-text-secondary text-h5">
           Active filters: <code>{JSON.stringify(columnFilters)}</code>
         </div>
         <DataTable table={table}>
@@ -447,9 +454,9 @@ export const WithFilters: Story = {
           <DataTable.Body />
         </DataTable>
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * **Row selection** — add a checkbox column wired to TanStack's selection API
@@ -462,7 +469,7 @@ export const WithFilters: Story = {
  */
 export const WithRowSelection: Story = {
   render: () => {
-    const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
     const columns = useMemo<ColumnDef<Device>[]>(
       () => [
@@ -471,13 +478,7 @@ export const WithRowSelection: Story = {
           header: ({ table }) => (
             <div data-no-row-click>
               <Checkbox
-                checked={
-                  table.getIsAllRowsSelected()
-                    ? true
-                    : table.getIsSomeRowsSelected()
-                      ? 'indeterminate'
-                      : false
-                }
+                checked={table.getIsAllRowsSelected() ? true : table.getIsSomeRowsSelected() ? 'indeterminate' : false}
                 onCheckedChange={v => table.toggleAllRowsSelected(Boolean(v))}
                 className="border-ods-border"
               />
@@ -507,7 +508,7 @@ export const WithRowSelection: Story = {
         { accessorKey: 'os', header: 'OS', meta: { width: 'flex-1 min-w-0' } },
       ],
       [],
-    )
+    );
 
     const table = useDataTable<Device>({
       data: DEVICES_8,
@@ -518,25 +519,23 @@ export const WithRowSelection: Story = {
       getRowId: row => row.id,
       state: { rowSelection },
       onRowSelectionChange: setRowSelection,
-    })
+    });
 
-    const selected = table.getSelectedRowModel().rows
-    const selectedCount = selected.length
+    const selected = table.getSelectedRowModel().rows;
+    const selectedCount = selected.length;
 
     return (
       <div className="space-y-2">
         {selectedCount > 0 && (
-          <div className="flex items-center justify-between bg-ods-card border border-ods-border rounded-[6px] p-3">
-            <span className="text-ods-text-secondary text-sm">
+          <div className="flex items-center justify-between rounded-[6px] border border-ods-border bg-ods-card p-3">
+            <span className="text-sm text-ods-text-secondary">
               {selectedCount} device{selectedCount !== 1 ? 's' : ''} selected
             </span>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => table.resetRowSelection()}>
                 Clear
               </Button>
-              <Button
-                onClick={() => alert(`Would restart: ${selected.map(r => r.original.hostname).join(', ')}`)}
-              >
+              <Button onClick={() => alert(`Would restart: ${selected.map(r => r.original.hostname).join(', ')}`)}>
                 Restart selected
               </Button>
             </div>
@@ -548,9 +547,9 @@ export const WithRowSelection: Story = {
           <DataTable.Body />
         </DataTable>
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * **Actions column** — just a regular column. Wrap interactive content in a
@@ -574,41 +573,45 @@ export const WithActionsColumn: Story = {
         {
           id: 'actions',
           cell: ({ row }) => {
-            const device = row.original
+            const device = row.original;
             return (
-              <div
-                data-no-row-click
-                className="flex gap-2 items-center justify-end pointer-events-auto"
-              >
+              <div data-no-row-click className="pointer-events-auto flex items-center justify-end gap-2">
                 <ActionsMenuDropdown
-                  groups={[{
-                    items: [
-                      { id: 'ping', label: 'Ping', onClick: () => alert(`Ping ${device.hostname}`) },
-                      { id: 'restart', label: 'Restart', onClick: () => alert(`Restart ${device.hostname}`) },
-                      { id: 'remove', label: 'Remove', onClick: () => alert(`Remove ${device.hostname}`), danger: true },
-                    ],
-                  }]}
+                  groups={[
+                    {
+                      items: [
+                        { id: 'ping', label: 'Ping', onClick: () => alert(`Ping ${device.hostname}`) },
+                        { id: 'restart', label: 'Restart', onClick: () => alert(`Restart ${device.hostname}`) },
+                        {
+                          id: 'remove',
+                          label: 'Remove',
+                          onClick: () => alert(`Remove ${device.hostname}`),
+                          danger: true,
+                        },
+                      ],
+                    },
+                  ]}
                 />
               </div>
-            )
+            );
           },
           enableSorting: false,
           meta: { width: 'w-[60px] shrink-0 flex-none', align: 'right' },
         },
       ],
       [],
-    )
+    );
 
-    const table = useDataTable<Device>({ data: DEVICES_8, columns })
+    const table = useDataTable<Device>({ data: DEVICES_8, columns });
 
     return (
       <DataTable table={table}>
         <DataTable.Header />
         <DataTable.Body onRowClick={d => console.log('Row clicked:', d.hostname)} />
       </DataTable>
-    )
+    );
   },
-}
+};
 
 /**
  * **Chevron link column** — pair `<DataTable.Body rowHref={...}>` (which
@@ -636,16 +639,13 @@ export const WithChevronLink: Story = {
         {
           id: 'open',
           cell: ({ row }) => (
-            <div
-              data-no-row-click
-              className="flex items-center justify-end pointer-events-auto"
-            >
+            <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
               <Button
                 href={`#/devices/${row.original.id}`}
                 prefetch={false}
                 variant="outline"
                 size="icon"
-                leftIcon={<Chevron02RightIcon className="w-5 h-5" />}
+                leftIcon={<Chevron02RightIcon className="h-5 w-5" />}
                 aria-label="View details"
                 className="bg-ods-card"
               />
@@ -656,18 +656,18 @@ export const WithChevronLink: Story = {
         },
       ],
       [],
-    )
+    );
 
-    const table = useDataTable<Device>({ data: DEVICES_8, columns })
+    const table = useDataTable<Device>({ data: DEVICES_8, columns });
 
     return (
       <DataTable table={table}>
         <DataTable.Header />
         <DataTable.Body rowHref={d => `#/devices/${d.id}`} />
       </DataTable>
-    )
+    );
   },
-}
+};
 
 /**
  * **Row click** — pass `onRowClick` on `<DataTable.Body>` to handle whole-row
@@ -676,7 +676,7 @@ export const WithChevronLink: Story = {
  */
 export const WithRowClick: Story = {
   render: () => {
-    const [selected, setSelected] = useState<Device | null>(null)
+    const [selected, setSelected] = useState<Device | null>(null);
 
     const columns = useMemo<ColumnDef<Device>[]>(
       () => [
@@ -690,23 +690,21 @@ export const WithRowClick: Story = {
         { accessorKey: 'os', header: 'OS', meta: { width: 'flex-1 min-w-0' } },
       ],
       [],
-    )
+    );
 
-    const table = useDataTable<Device>({ data: DEVICES_6, columns })
+    const table = useDataTable<Device>({ data: DEVICES_6, columns });
 
     return (
       <div className="space-y-4">
-        <div className="text-h5 text-ods-text-secondary">
-          Selected: {selected ? selected.hostname : '—'}
-        </div>
+        <div className="text-ods-text-secondary text-h5">Selected: {selected ? selected.hostname : '—'}</div>
         <DataTable table={table}>
           <DataTable.Header />
           <DataTable.Body onRowClick={setSelected} />
         </DataTable>
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * **Loading state** — pass `loading` on `<DataTable.Body>`. While `loading`
@@ -715,18 +713,18 @@ export const WithRowClick: Story = {
  */
 export const Loading: Story = {
   render: () => {
-    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns(), [])
+    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns(), []);
 
-    const table = useDataTable<Device>({ data: [], columns })
+    const table = useDataTable<Device>({ data: [], columns });
 
     return (
       <DataTable table={table}>
         <DataTable.Header />
         <DataTable.Body loading skeletonRows={6} />
       </DataTable>
-    )
+    );
   },
-}
+};
 
 /**
  * **Empty state** — when there are no rows and `loading` is falsy, the body
@@ -735,17 +733,17 @@ export const Loading: Story = {
  */
 export const EmptyState: Story = {
   render: () => {
-    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns().slice(0, 4), [])
-    const table = useDataTable<Device>({ data: [], columns })
+    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns().slice(0, 4), []);
+    const table = useDataTable<Device>({ data: [], columns });
 
     return (
       <DataTable table={table}>
         <DataTable.Header />
         <DataTable.Body />
       </DataTable>
-    )
+    );
   },
-}
+};
 
 /**
  * **Empty state — custom** — override any field via the `emptyState` prop,
@@ -753,8 +751,8 @@ export const EmptyState: Story = {
  */
 export const EmptyStateCustom: Story = {
   render: () => {
-    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns().slice(0, 4), [])
-    const table = useDataTable<Device>({ data: [], columns })
+    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns().slice(0, 4), []);
+    const table = useDataTable<Device>({ data: [], columns });
 
     return (
       <DataTable table={table}>
@@ -766,9 +764,9 @@ export const EmptyStateCustom: Story = {
           }}
         />
       </DataTable>
-    )
+    );
   },
-}
+};
 
 /**
  * **Sticky header** — set `stickyHeader` on `<DataTable.Header>` and provide a
@@ -798,13 +796,13 @@ export const StickyHeader: Story = {
         },
       ],
       [],
-    )
+    );
 
-    const table = useDataTable<Device>({ data: DEVICES_30, columns })
+    const table = useDataTable<Device>({ data: DEVICES_30, columns });
 
     return (
       <div className="h-[600px] overflow-auto p-4">
-        <div className="h-[80px] bg-ods-card border border-ods-border rounded-[6px] flex items-center justify-center mb-4">
+        <div className="mb-4 flex h-[80px] items-center justify-center rounded-[6px] border border-ods-border bg-ods-card">
           <span className="text-ods-text-secondary">Fake page header above</span>
         </div>
         <DataTable table={table}>
@@ -812,9 +810,9 @@ export const StickyHeader: Story = {
           <DataTable.Body />
         </DataTable>
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * **Responsive columns** — `meta.hideAt` accepts a Tailwind breakpoint or a
@@ -827,23 +825,23 @@ export const StickyHeader: Story = {
  */
 export const ResponsiveColumns: Story = {
   render: () => {
-    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns(), [])
-    const table = useDataTable<Device>({ data: DEVICES_8, columns })
+    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns(), []);
+    const table = useDataTable<Device>({ data: DEVICES_8, columns });
 
     return (
       <div className="space-y-2">
-        <div className="text-h5 text-ods-text-secondary">
-          IP hides below <code>md</code>, Tags/CPU hide below <code>lg</code>,
-          Memory/Last seen hide below <code>xl</code>.
+        <div className="text-ods-text-secondary text-h5">
+          IP hides below <code>md</code>, Tags/CPU hide below <code>lg</code>, Memory/Last seen hide below{' '}
+          <code>xl</code>.
         </div>
         <DataTable table={table}>
           <DataTable.Header />
           <DataTable.Body />
         </DataTable>
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * **Infinite scroll** — place `<DataTable.InfiniteFooter>` after the body.
@@ -856,10 +854,10 @@ export const ResponsiveColumns: Story = {
  */
 export const InfiniteScroll: Story = {
   render: () => {
-    const [rows, setRows] = useState<Device[]>(() => makeDevices(20))
-    const [isFetching, setIsFetching] = useState(false)
-    const [hasNext, setHasNext] = useState(true)
-    const pageRef = useRef(1)
+    const [rows, setRows] = useState<Device[]>(() => makeDevices(20));
+    const [isFetching, setIsFetching] = useState(false);
+    const [hasNext, setHasNext] = useState(true);
+    const pageRef = useRef(1);
 
     const columns = useMemo<ColumnDef<Device>[]>(
       () => [
@@ -874,40 +872,36 @@ export const InfiniteScroll: Story = {
         { accessorKey: 'os', header: 'OS', meta: { width: 'flex-1 min-w-0' } },
       ],
       [],
-    )
+    );
 
-    const table = useDataTable<Device>({ data: rows, columns })
+    const table = useDataTable<Device>({ data: rows, columns });
 
     const loadMore = useCallback(() => {
-      if (isFetching || !hasNext) return
-      setIsFetching(true)
+      if (isFetching || !hasNext) return;
+      setIsFetching(true);
       window.setTimeout(() => {
-        pageRef.current += 1
-        setRows(prev => [...prev, ...makeDevices(20, prev.length + 1)])
-        setIsFetching(false)
-        if (pageRef.current >= 4) setHasNext(false)
-      }, 700)
-    }, [isFetching, hasNext])
+        pageRef.current += 1;
+        setRows(prev => [...prev, ...makeDevices(20, prev.length + 1)]);
+        setIsFetching(false);
+        if (pageRef.current >= 4) setHasNext(false);
+      }, 700);
+    }, [isFetching, hasNext]);
 
     return (
       <div className="space-y-2">
-        <div className="text-h5 text-ods-text-secondary">
+        <div className="text-ods-text-secondary text-h5">
           Loaded {rows.length} rows · page {pageRef.current}
           {!hasNext && ' · end of list'}
         </div>
         <DataTable table={table}>
           <DataTable.Header stickyHeader stickyHeaderOffset="top-0" />
           <DataTable.Body />
-          <DataTable.InfiniteFooter
-            hasNextPage={hasNext}
-            isFetchingNextPage={isFetching}
-            onLoadMore={loadMore}
-          />
+          <DataTable.InfiniteFooter hasNextPage={hasNext} isFetchingNextPage={isFetching} onLoadMore={loadMore} />
         </DataTable>
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * **Cursor pagination** — use `<DataTable.CursorFooter>` for a prev/next
@@ -916,13 +910,10 @@ export const InfiniteScroll: Story = {
  */
 export const CursorPagination: Story = {
   render: () => {
-    const PAGE_SIZE = 8
-    const [page, setPage] = useState(1)
-    const maxPage = Math.ceil(DEVICES_50.length / PAGE_SIZE)
-    const rows = useMemo(
-      () => DEVICES_50.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-      [page],
-    )
+    const PAGE_SIZE = 8;
+    const [page, setPage] = useState(1);
+    const maxPage = Math.ceil(DEVICES_50.length / PAGE_SIZE);
+    const rows = useMemo(() => DEVICES_50.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [page]);
 
     const columns = useMemo<ColumnDef<Device>[]>(
       () => [
@@ -937,9 +928,9 @@ export const CursorPagination: Story = {
         { accessorKey: 'os', header: 'OS', meta: { width: 'flex-1 min-w-0' } },
       ],
       [],
-    )
+    );
 
-    const table = useDataTable<Device>({ data: rows, columns })
+    const table = useDataTable<Device>({ data: rows, columns });
 
     return (
       <DataTable table={table}>
@@ -956,9 +947,9 @@ export const CursorPagination: Story = {
           onReset={() => setPage(1)}
         />
       </DataTable>
-    )
+    );
   },
-}
+};
 
 /**
  * **Compact mode** — pass `compact` on `<DataTable.Body>` for a denser row
@@ -980,17 +971,17 @@ export const CompactMode: Story = {
         { accessorKey: 'os', header: 'OS', meta: { width: 'flex-1 min-w-0' } },
       ],
       [],
-    )
-    const table = useDataTable<Device>({ data: DEVICES_12, columns })
+    );
+    const table = useDataTable<Device>({ data: DEVICES_12, columns });
 
     return (
       <DataTable table={table}>
         <DataTable.Header />
         <DataTable.Body compact />
       </DataTable>
-    )
+    );
   },
-}
+};
 
 /**
  * **Rich cells** — cells are just React nodes. Use whatever UI-kit primitives
@@ -998,17 +989,17 @@ export const CompactMode: Story = {
  */
 export const RichCells: Story = {
   render: () => {
-    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns(), [])
-    const table = useDataTable<Device>({ data: DEVICES_8, columns })
+    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns(), []);
+    const table = useDataTable<Device>({ data: DEVICES_8, columns });
 
     return (
       <DataTable table={table}>
         <DataTable.Header />
         <DataTable.Body />
       </DataTable>
-    )
+    );
   },
-}
+};
 
 /**
  * **Column visibility** — every column has `column.getIsVisible()` /
@@ -1017,19 +1008,17 @@ export const RichCells: Story = {
  */
 export const ColumnVisibility: Story = {
   render: () => {
-    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns(), [])
-    const table = useDataTable<Device>({ data: DEVICES_10, columns })
+    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns(), []);
+    const table = useDataTable<Device>({ data: DEVICES_10, columns });
 
-    const allColumns = table
-      .getAllLeafColumns()
-      .filter(c => !c.id.startsWith('__')) // hide synthetic columns from the picker
+    const allColumns = table.getAllLeafColumns().filter(c => !c.id.startsWith('__')); // hide synthetic columns from the picker
 
     return (
       <div className="space-y-3">
-        <div className="flex flex-wrap gap-3 p-3 bg-ods-card border border-ods-border rounded-[6px]">
-          <span className="text-h5 text-ods-text-secondary self-center">Columns:</span>
+        <div className="flex flex-wrap gap-3 rounded-[6px] border border-ods-border bg-ods-card p-3">
+          <span className="self-center text-ods-text-secondary text-h5">Columns:</span>
           {allColumns.map(col => (
-            <label key={col.id} className="flex items-center gap-2 text-h5 text-ods-text-primary">
+            <label key={col.id} className="flex items-center gap-2 text-ods-text-primary text-h5">
               <input
                 type="checkbox"
                 checked={col.getIsVisible()}
@@ -1044,9 +1033,9 @@ export const ColumnVisibility: Story = {
           <DataTable.Body />
         </DataTable>
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * **Custom header label** — when you need something richer than a plain
@@ -1060,7 +1049,7 @@ export const CustomHeader: Story = {
         {
           accessorKey: 'hostname',
           header: () => (
-            <span className="text-h5 text-ods-accent uppercase whitespace-nowrap flex items-center gap-1">
+            <span className="flex items-center gap-1 whitespace-nowrap uppercase text-ods-accent text-h5">
               📡 Hostname
             </span>
           ),
@@ -1076,18 +1065,18 @@ export const CustomHeader: Story = {
         { accessorKey: 'os', header: 'OS', meta: { width: 'flex-1 min-w-0' } },
       ],
       [],
-    )
+    );
 
-    const table = useDataTable<Device>({ data: DEVICES_6, columns })
+    const table = useDataTable<Device>({ data: DEVICES_6, columns });
 
     return (
       <DataTable table={table}>
         <DataTable.Header />
         <DataTable.Body />
       </DataTable>
-    )
+    );
   },
-}
+};
 
 /**
  * **Pre-fetch delay** — simulates the initial load. For ~700ms the body shows
@@ -1095,28 +1084,28 @@ export const CustomHeader: Story = {
  */
 export const SimulatedInitialLoad: Story = {
   render: () => {
-    const [loading, setLoading] = useState(true)
-    const [rows, setRows] = useState<Device[]>([])
+    const [loading, setLoading] = useState(true);
+    const [rows, setRows] = useState<Device[]>([]);
 
     useEffect(() => {
       const id = window.setTimeout(() => {
-        setRows(DEVICES_10)
-        setLoading(false)
-      }, 900)
-      return () => window.clearTimeout(id)
-    }, [])
+        setRows(DEVICES_10);
+        setLoading(false);
+      }, 900);
+      return () => window.clearTimeout(id);
+    }, []);
 
-    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns(), [])
-    const table = useDataTable<Device>({ data: rows, columns })
+    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns(), []);
+    const table = useDataTable<Device>({ data: rows, columns });
 
     return (
       <DataTable table={table}>
         <DataTable.Header />
         <DataTable.Body loading={loading} skeletonRows={10} />
       </DataTable>
-    )
+    );
   },
-}
+};
 
 /**
  * **Row count** — `<DataTable.RowCount itemName="device" />` reads the row
@@ -1146,14 +1135,14 @@ export const WithRowCount: Story = {
         { accessorKey: 'os', header: 'OS', meta: { width: 'flex-1 min-w-0' } },
       ],
       [],
-    )
+    );
 
-    const table = useDataTable<Device>({ data: DEVICES_8, columns })
+    const table = useDataTable<Device>({ data: DEVICES_8, columns });
 
     return (
       <div className="space-y-6">
         <div className="space-y-1">
-          <h3 className="text-h5 text-ods-text-secondary">In header right slot</h3>
+          <h3 className="text-ods-text-secondary text-h5">In header right slot</h3>
           <DataTable table={table}>
             <DataTable.Header rightSlot={<DataTable.RowCount itemName="device" />} />
             <DataTable.Body />
@@ -1161,9 +1150,9 @@ export const WithRowCount: Story = {
         </div>
 
         <div className="space-y-1">
-          <h3 className="text-h5 text-ods-text-secondary">In a toolbar above the table</h3>
+          <h3 className="text-ods-text-secondary text-h5">In a toolbar above the table</h3>
           <DataTable table={table}>
-            <div className="flex items-center justify-between mb-1">
+            <div className="mb-1 flex items-center justify-between">
               <DataTable.RowCount itemName="device" />
               <Button variant="outline">Add device</Button>
             </div>
@@ -1172,38 +1161,38 @@ export const WithRowCount: Story = {
           </DataTable>
         </div>
       </div>
-    )
+    );
   },
-}
+};
 
 export const URLBackedFilters: Story = {
   render: () => {
     // Simulated URL state: `status` is a comma-separated list.
     const [urlParams, setUrlParams] = useState<Record<string, string>>({
       status: 'online',
-    })
+    });
 
     // Irrelevant state that forces re-renders — mimics how URL-backed apps
     // re-run this component frequently (navigation, searchParams changes).
-    const [tick, setTick] = useState(0)
+    const [tick, setTick] = useState(0);
 
     // Rebuild ColumnFiltersState from "URL" on every render — a NEW array ref
     // every time. This is the pattern that used to thrash; now it's safe.
     const columnFilters: ColumnFiltersState = Object.entries(urlParams)
       .filter(([, v]) => v)
-      .map(([id, v]) => ({ id, value: v.split(',').filter(Boolean) }))
+      .map(([id, v]) => ({ id, value: v.split(',').filter(Boolean) }));
 
     const handleFiltersChange = useCallback(
       (updater: ColumnFiltersState | ((old: ColumnFiltersState) => ColumnFiltersState)) => {
-        const next = typeof updater === 'function' ? updater(columnFilters) : updater
-        const params: Record<string, string> = {}
+        const next = typeof updater === 'function' ? updater(columnFilters) : updater;
+        const params: Record<string, string> = {};
         next.forEach(f => {
-          params[f.id] = (f.value as string[]).join(',')
-        })
-        setUrlParams(params)
+          params[f.id] = (f.value as string[]).join(',');
+        });
+        setUrlParams(params);
       },
       [columnFilters],
-    )
+    );
 
     const columns = useMemo<ColumnDef<Device>[]>(
       () => [
@@ -1242,7 +1231,7 @@ export const URLBackedFilters: Story = {
         { accessorKey: 'ipAddress', header: 'IP', meta: { width: 'flex-1 min-w-0' } },
       ],
       [],
-    )
+    );
 
     const table = useDataTable<Device>({
       data: DEVICES,
@@ -1250,16 +1239,14 @@ export const URLBackedFilters: Story = {
       clientSideFiltering: true,
       state: { columnFilters },
       onColumnFiltersChange: handleFiltersChange,
-    })
+    });
 
     return (
       <div className="space-y-3">
-        <div className="flex flex-wrap gap-3 items-center p-3 bg-ods-card border border-ods-border rounded-[6px]">
-          <div className="text-h5 text-ods-text-secondary">
+        <div className="flex flex-wrap items-center gap-3 rounded-[6px] border border-ods-border bg-ods-card p-3">
+          <div className="text-ods-text-secondary text-h5">
             Simulated URL state:{' '}
-            <code className="text-ods-text-primary">
-              ?{new URLSearchParams(urlParams).toString() || '(empty)'}
-            </code>
+            <code className="text-ods-text-primary">?{new URLSearchParams(urlParams).toString() || '(empty)'}</code>
           </div>
           <Button variant="outline" onClick={() => setTick(t => t + 1)}>
             Force re-render ({tick})
@@ -1270,9 +1257,9 @@ export const URLBackedFilters: Story = {
           <DataTable.Body />
         </DataTable>
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * **Kitchen sink** — everything enabled at once: client-side sort, client-side
@@ -1282,29 +1269,29 @@ export const URLBackedFilters: Story = {
 export const KitchenSink: Story = {
   parameters: { layout: 'fullscreen' },
   render: () => {
-    const [sort, setSort] = useState<DataTableSortState | null>(null)
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-    const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+    const [sort, setSort] = useState<DataTableSortState | null>(null);
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
     const handleSortChange = useCallback((columnId: string) => {
       setSort(prev => {
-        if (prev?.id !== columnId) return { id: columnId, desc: false }
-        if (!prev.desc) return { id: columnId, desc: true }
-        return null
-      })
-    }, [])
+        if (prev?.id !== columnId) return { id: columnId, desc: false };
+        if (!prev.desc) return { id: columnId, desc: true };
+        return null;
+      });
+    }, []);
 
     const sortedDevices = useMemo(() => {
-      if (!sort) return DEVICES
-      const dir = sort.desc ? -1 : 1
+      if (!sort) return DEVICES;
+      const dir = sort.desc ? -1 : 1;
       return [...DEVICES].sort((a, b) => {
-        const av = a[sort.id as keyof Device] as unknown as string | number
-        const bv = b[sort.id as keyof Device] as unknown as string | number
-        if (av < bv) return -1 * dir
-        if (av > bv) return 1 * dir
-        return 0
-      })
-    }, [sort])
+        const av = a[sort.id as keyof Device] as unknown as string | number;
+        const bv = b[sort.id as keyof Device] as unknown as string | number;
+        if (av < bv) return -1 * dir;
+        if (av > bv) return 1 * dir;
+        return 0;
+      });
+    }, [sort]);
 
     const columns = useMemo<ColumnDef<Device>[]>(
       () => [
@@ -1314,13 +1301,7 @@ export const KitchenSink: Story = {
           header: ({ table }) => (
             <div data-no-row-click>
               <Checkbox
-                checked={
-                  table.getIsAllRowsSelected()
-                    ? true
-                    : table.getIsSomeRowsSelected()
-                      ? 'indeterminate'
-                      : false
-                }
+                checked={table.getIsAllRowsSelected() ? true : table.getIsSomeRowsSelected() ? 'indeterminate' : false}
                 onCheckedChange={v => table.toggleAllRowsSelected(Boolean(v))}
                 className="border-ods-border"
               />
@@ -1348,23 +1329,27 @@ export const KitchenSink: Story = {
         {
           id: 'actions',
           cell: ({ row }) => {
-            const device = row.original
+            const device = row.original;
             return (
-              <div
-                data-no-row-click
-                className="flex gap-2 items-center justify-end pointer-events-auto"
-              >
+              <div data-no-row-click className="pointer-events-auto flex items-center justify-end gap-2">
                 <ActionsMenuDropdown
-                  groups={[{
-                    items: [
-                      { id: 'ping', label: 'Ping', onClick: () => alert(`Ping ${device.hostname}`) },
-                      { id: 'restart', label: 'Restart', onClick: () => alert(`Restart ${device.hostname}`) },
-                      { id: 'remove', label: 'Remove', onClick: () => alert(`Remove ${device.hostname}`), danger: true },
-                    ],
-                  }]}
+                  groups={[
+                    {
+                      items: [
+                        { id: 'ping', label: 'Ping', onClick: () => alert(`Ping ${device.hostname}`) },
+                        { id: 'restart', label: 'Restart', onClick: () => alert(`Restart ${device.hostname}`) },
+                        {
+                          id: 'remove',
+                          label: 'Remove',
+                          onClick: () => alert(`Remove ${device.hostname}`),
+                          danger: true,
+                        },
+                      ],
+                    },
+                  ]}
                 />
               </div>
-            )
+            );
           },
           enableSorting: false,
           meta: { width: 'w-[60px] shrink-0 flex-none', align: 'right' },
@@ -1373,16 +1358,13 @@ export const KitchenSink: Story = {
         {
           id: 'open',
           cell: ({ row }) => (
-            <div
-              data-no-row-click
-              className="flex items-center justify-end pointer-events-auto"
-            >
+            <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
               <Button
                 href={`#/devices/${row.original.id}`}
                 prefetch={false}
                 variant="outline"
                 size="icon"
-                leftIcon={<Chevron02RightIcon className="w-5 h-5" />}
+                leftIcon={<Chevron02RightIcon className="h-5 w-5" />}
                 aria-label="View details"
                 className="bg-ods-card"
               />
@@ -1393,7 +1375,7 @@ export const KitchenSink: Story = {
         },
       ],
       [],
-    )
+    );
 
     const table = useDataTable<Device>({
       data: sortedDevices,
@@ -1404,26 +1386,22 @@ export const KitchenSink: Story = {
       state: { columnFilters, rowSelection },
       onColumnFiltersChange: setColumnFilters,
       onRowSelectionChange: setRowSelection,
-    })
+    });
 
-    const selected = table.getSelectedRowModel().rows
+    const selected = table.getSelectedRowModel().rows;
 
     return (
-      <div className="h-[700px] overflow-auto p-4 space-y-2">
+      <div className="h-[700px] space-y-2 overflow-auto p-4">
         {selected.length > 0 && (
-          <div className="sticky top-0 z-20 flex items-center justify-between bg-ods-card border border-ods-border rounded-[6px] p-3">
-            <span className="text-ods-text-secondary text-sm">
+          <div className="sticky top-0 z-20 flex items-center justify-between rounded-[6px] border border-ods-border bg-ods-card p-3">
+            <span className="text-sm text-ods-text-secondary">
               {selected.length} device{selected.length !== 1 ? 's' : ''} selected
             </span>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => table.resetRowSelection()}>
                 Clear
               </Button>
-              <Button
-                onClick={() =>
-                  alert(`Would restart: ${selected.map(r => r.original.hostname).join(', ')}`)
-                }
-              >
+              <Button onClick={() => alert(`Would restart: ${selected.map(r => r.original.hostname).join(', ')}`)}>
                 Restart selected
               </Button>
             </div>
@@ -1440,6 +1418,6 @@ export const KitchenSink: Story = {
           <DataTable.Body />
         </DataTable>
       </div>
-    )
+    );
   },
-}
+};

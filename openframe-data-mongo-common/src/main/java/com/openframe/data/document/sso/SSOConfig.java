@@ -14,6 +14,23 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @AllArgsConstructor
 @Document(collection = "sso_configs")
 public class SSOConfig implements TenantScoped {
+
+    /**
+     * Pseudo-provider id for the built-in OpenFrame (password) login. Not an OIDC provider: a
+     * config with this id carries no client credentials and only its {@code enabled} flag matters —
+     * no document means enabled. Kept in this collection so the standard per-provider toggle API
+     * covers it; every consumer that builds OAuth clients must skip it.
+     * <p>
+     * The id is {@code openframe-sso} for backward compatibility: deployed frontends match this
+     * exact string in the {@code /tenant/discover} provider list to decide whether to render the
+     * password form.
+     * <p>
+     * TODO: switch this to "openframe" once the new mobile app version (which accepts the
+     * "openframe" id) is released and old versions are out of circulation — and drop the
+     * "openframe" alias handling in the api-side SSOConfigService at the same time.
+     */
+    public static final String OPENFRAME_PROVIDER = "openframe-sso";
+
     @Id
     private String id;
     @Indexed private String tenantId;

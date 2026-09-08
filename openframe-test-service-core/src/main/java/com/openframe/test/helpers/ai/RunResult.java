@@ -125,6 +125,13 @@ public class RunResult {
                             .append(" approvalType=").append(d.getApprovalType());
                     if (d.getError() != null) sb.append("error=").append(trim(d.getError()))
                             .append(" details=").append(trim(d.getDetails()));
+                    if (d.getQuestion() != null) {
+                        sb.append("question=").append(trim(d.getQuestion()));
+                        if (d.getOptions() != null) {
+                            d.getOptions().forEach(o -> sb.append("\n        option: ").append(o.getLabel())
+                                    .append(" — ").append(trim(o.getDescription())));
+                        }
+                    }
                     sb.append('\n');
                 }
             }

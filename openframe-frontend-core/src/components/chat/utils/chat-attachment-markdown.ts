@@ -40,20 +40,15 @@
 /** Hub-default prefix for the view-proxy URL. Embedders override via the
  *  runtime. The server-side strip regex always uses THIS value (server
  *  runs on the hub). */
-export const CHAT_ATTACHMENT_VIEW_URL_PREFIX = '/api/storage/view/chat-attachments/'
+export const CHAT_ATTACHMENT_VIEW_URL_PREFIX = '/api/storage/view/chat-attachments/';
 
 /** Query parameter name for the HMAC view token. */
-export const CHAT_ATTACHMENT_VIEW_TOKEN_QUERY_PARAM = 't'
+export const CHAT_ATTACHMENT_VIEW_TOKEN_QUERY_PARAM = 't';
 
 /** Subset Anthropic's image content-block API supports. HEIC / video
  *  attachments fall through to the text-marker form so the LLM still sees
  *  a reference even when it can't visually parse the file. */
-export const ANTHROPIC_SUPPORTED_IMAGE_MIME = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-] as const
+export const ANTHROPIC_SUPPORTED_IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 
 /**
  * Wire shape for a single chat attachment.
@@ -63,11 +58,11 @@ export const ANTHROPIC_SUPPORTED_IMAGE_MIME = [
  * route returns it alongside the storage path.
  */
 export interface ChatAttachment {
-  storagePath: string
-  viewToken: string
-  contentType: string
-  fileName: string
-  size: number
+  storagePath: string;
+  viewToken: string;
+  contentType: string;
+  fileName: string;
+  size: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,12 +81,8 @@ export interface ChatAttachment {
  * Server-side callers (the strip regex source) should pass
  * `CHAT_ATTACHMENT_VIEW_URL_PREFIX` directly.
  */
-export function buildChatAttachmentViewUrl(
-  viewUrlPrefix: string,
-  storagePath: string,
-  viewToken: string,
-): string {
-  return `${viewUrlPrefix}${storagePath}?${CHAT_ATTACHMENT_VIEW_TOKEN_QUERY_PARAM}=${encodeURIComponent(viewToken)}`
+export function buildChatAttachmentViewUrl(viewUrlPrefix: string, storagePath: string, viewToken: string): string {
+  return `${viewUrlPrefix}${storagePath}?${CHAT_ATTACHMENT_VIEW_TOKEN_QUERY_PARAM}=${encodeURIComponent(viewToken)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,16 +99,16 @@ export function buildChatAttachmentViewUrl(
  * Escapes: `[`, `]`, `(`, `)`, `\`, `\n`, `\r`, `<`, `>`, `"`.
  */
 export function escapeMarkdownInline(text: string): string {
-  return text.replace(/[[\]()\\\n\r<>"]/g, (ch) => {
+  return text.replace(/[[\]()\\\n\r<>"]/g, ch => {
     switch (ch) {
       case '\n':
-        return ' '
+        return ' ';
       case '\r':
-        return ''
+        return '';
       default:
-        return `\\${ch}`
+        return `\\${ch}`;
     }
-  })
+  });
 }
 
 /**
@@ -129,14 +120,11 @@ export function escapeMarkdownInline(text: string): string {
  * else (HEIC, video, audio) emits the `[Attached: ...]` link form so the
  * bubble shows a clickable file pill instead of a broken-image icon.
  */
-export function formatChatAttachmentMarkdownForBubble(
-  att: ChatAttachment,
-  viewUrlPrefix: string,
-): string {
-  const safeName = escapeMarkdownInline(att.fileName)
-  const url = buildChatAttachmentViewUrl(viewUrlPrefix, att.storagePath, att.viewToken)
-  const isImage = (ANTHROPIC_SUPPORTED_IMAGE_MIME as readonly string[]).includes(att.contentType)
-  return isImage ? `\n\n![${safeName}](${url})` : `\n\n[Attached: ${safeName}](${url})`
+export function formatChatAttachmentMarkdownForBubble(att: ChatAttachment, viewUrlPrefix: string): string {
+  const safeName = escapeMarkdownInline(att.fileName);
+  const url = buildChatAttachmentViewUrl(viewUrlPrefix, att.storagePath, att.viewToken);
+  const isImage = (ANTHROPIC_SUPPORTED_IMAGE_MIME as readonly string[]).includes(att.contentType);
+  return isImage ? `\n\n![${safeName}](${url})` : `\n\n[Attached: ${safeName}](${url})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,8 +137,10 @@ export function formatChatAttachmentMarkdownForBubble(
  * regex sources. Computed ONCE at module load. Exported so other
  * regex-building call sites can share the same source of truth.
  */
-export const CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED =
-  CHAT_ATTACHMENT_VIEW_URL_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+export const CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED = CHAT_ATTACHMENT_VIEW_URL_PREFIX.replace(
+  /[.*+?^${}()|[\]\\]/g,
+  '\\$&',
+);
 
 /**
  * Single anchored regex matching both the image (`![]()`) and link
@@ -163,7 +153,7 @@ export const CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED =
 export const CHAT_ATTACHMENT_MARKDOWN_PATTERN = new RegExp(
   `^\\s*!?\\[[^\\]]*\\]\\(${CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED}[^)]+\\)\\s*$`,
   'gm',
-)
+);
 
 /**
  * Strip pre-embedded chat-attachment markdown lines from `text`.
@@ -171,20 +161,18 @@ export const CHAT_ATTACHMENT_MARKDOWN_PATTERN = new RegExp(
  * matched URLs.
  */
 export function stripChatAttachmentMarkdown(text: string): {
-  stripped: string
-  storagePaths: string[]
+  stripped: string;
+  storagePaths: string[];
 } {
-  const storagePaths: string[] = []
-  const pathExtract = new RegExp(
-    `\\(${CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED}([^?)]+)`,
-  )
-  const stripped = text.replace(CHAT_ATTACHMENT_MARKDOWN_PATTERN, (match) => {
-    const m = match.match(pathExtract)
-    if (m && m[1]) storagePaths.push(m[1])
-    return ''
-  })
+  const storagePaths: string[] = [];
+  const pathExtract = new RegExp(`\\(${CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED}([^?)]+)`);
+  const stripped = text.replace(CHAT_ATTACHMENT_MARKDOWN_PATTERN, match => {
+    const m = match.match(pathExtract);
+    if (m && m[1]) storagePaths.push(m[1]);
+    return '';
+  });
   return {
     stripped: stripped.replace(/\n{3,}/g, '\n\n').trim(),
     storagePaths,
-  }
+  };
 }

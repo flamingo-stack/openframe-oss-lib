@@ -1,16 +1,16 @@
-'use client'
+'use client';
 
-import { useEffect, useRef } from 'react'
-import { DataTableSkeleton } from './data-table-skeleton'
+import { useEffect, useRef } from 'react';
+import { DataTableSkeleton } from './data-table-skeleton';
 
 export interface DataTableInfiniteFooterProps {
-  hasNextPage: boolean
-  isFetchingNextPage: boolean
-  onLoadMore: () => void
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  onLoadMore: () => void;
   /** Skeleton rows shown while fetching. Default `3`. */
-  skeletonRows?: number
+  skeletonRows?: number;
   /** `IntersectionObserver` rootMargin. Default `'200px'`. */
-  rootMargin?: string
+  rootMargin?: string;
 }
 
 /**
@@ -24,30 +24,33 @@ export function DataTableInfiniteFooter({
   skeletonRows = 3,
   rootMargin = '200px',
 }: DataTableInfiniteFooterProps) {
-  const sentinelRef = useRef<HTMLDivElement>(null)
-  const onLoadMoreRef = useRef(onLoadMore)
-  onLoadMoreRef.current = onLoadMore
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  // Refreshed after every commit, declared before the observer effect so it
+  // wins the same flush. Not in the render body: the reader is the
+  // IntersectionObserver callback, which cannot fire before a commit.
+  const onLoadMoreRef = useRef(onLoadMore);
+  useEffect(() => {
+    onLoadMoreRef.current = onLoadMore;
+  });
 
   useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage) return
-    const sentinel = sentinelRef.current
-    if (!sentinel) return
+    if (!hasNextPage || isFetchingNextPage) return undefined;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return undefined;
     const observer = new IntersectionObserver(
       entries => {
-        if (entries[0]?.isIntersecting) onLoadMoreRef.current()
+        if (entries[0]?.isIntersecting) onLoadMoreRef.current();
       },
       { rootMargin },
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [hasNextPage, isFetchingNextPage, rootMargin])
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, rootMargin]);
 
   return (
     <>
       {isFetchingNextPage && <DataTableSkeleton rows={skeletonRows} />}
-      {hasNextPage && (
-        <div ref={sentinelRef} className="h-1" aria-hidden="true" />
-      )}
+      {hasNextPage && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
     </>
-  )
+  );
 }

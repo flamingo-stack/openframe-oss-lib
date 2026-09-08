@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Shared building blocks for the entity-context picker's ITEMS level
@@ -11,24 +11,23 @@
  * 16px→24px responsive icon, h4 label, border-b, hover surface.
  */
 
-import * as React from 'react'
-import { CheckFillIcon } from '../icons-v2-generated/signs-and-symbols/check-fill-icon'
-import { Skeleton } from '../ui/skeleton'
-import { cn } from '../../utils/cn'
-import type { ChatContextItem } from './types/context-item.types'
+import { Component, type ReactNode, type UIEvent, useCallback } from 'react';
+import { cn } from '../../utils/cn';
+import { CheckFillIcon } from '../icons-v2-generated/signs-and-symbols/check-fill-icon';
+import { Skeleton } from '../ui/skeleton';
+import type { ChatContextItem } from './types/context-item.types';
 
-const itemKey = (i: { type: string; id: string }) => `${i.type}:${i.id}`
+const itemKey = (i: { type: string; id: string }) => `${i.type}:${i.id}`;
 
 // Shared row classes — used by the picker (root / types) and the item rows so
 // every level is visually identical and there's one source of truth.
 export const CONTEXT_ROW_CLASS =
-  'flex w-full items-center gap-2 border-b border-ods-border bg-ods-bg py-3 pl-4 pr-2 text-left outline-none transition-colors last:border-b-0 hover:bg-ods-bg-hover focus-visible:bg-ods-bg-hover [&_svg]:size-4 md:[&_svg]:size-6'
-export const CONTEXT_ICON_CLASS =
-  'flex size-4 shrink-0 items-center justify-center text-ods-text-secondary md:size-6'
-export const CONTEXT_LABEL_CLASS = 'flex-1 truncate text-h4 font-medium leading-6 text-ods-text-primary'
+  'flex w-full items-center gap-2 border-b border-ods-border bg-ods-bg py-3 pl-4 pr-2 text-left outline-none transition-colors last:border-b-0 hover:bg-ods-bg-hover focus-visible:bg-ods-bg-hover [&_svg]:size-4 md:[&_svg]:size-6';
+export const CONTEXT_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center text-ods-text-secondary md:size-6';
+export const CONTEXT_LABEL_CLASS = 'flex-1 truncate text-h4 font-medium leading-6 text-ods-text-primary';
 export const CONTEXT_BACK_CLASS =
-  'flex shrink-0 items-center gap-2 border-b border-ods-border bg-ods-bg px-2 py-3 text-left text-h4 font-medium leading-6 text-ods-text-secondary outline-none transition-colors hover:text-ods-text-primary [&_svg]:size-4 md:[&_svg]:size-6'
-export const CONTEXT_STATE_CLASS = 'bg-ods-bg px-4 py-3 text-h4 text-ods-text-secondary'
+  'flex shrink-0 items-center gap-2 border-b border-ods-border bg-ods-bg px-2 py-3 text-left text-h4 font-medium leading-6 text-ods-text-secondary outline-none transition-colors hover:text-ods-text-primary [&_svg]:size-4 md:[&_svg]:size-6';
+export const CONTEXT_STATE_CLASS = 'bg-ods-bg px-4 py-3 text-h4 text-ods-text-secondary';
 
 // ===========================================================================
 // ROW — one menu row (icon + label + optional trailing). Shared primitive.
@@ -36,16 +35,16 @@ export const CONTEXT_STATE_CLASS = 'bg-ods-bg px-4 py-3 text-h4 text-ods-text-se
 
 export interface ContextMenuRowProps {
   /** Lead glyph (entity-type icon). Omit for item rows (label only). */
-  icon?: React.ReactNode
-  label: React.ReactNode
+  icon?: ReactNode;
+  label: ReactNode;
   /** Trailing slot (e.g. the selected ✓). */
-  trailing?: React.ReactNode
-  onClick?: () => void
-  disabled?: boolean
+  trailing?: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
   /** Selected state for `role="option"` rows (aria + caller styling). */
-  selected?: boolean
-  role?: 'menuitem' | 'option'
-  title?: string
+  selected?: boolean;
+  role?: 'menuitem' | 'option';
+  title?: string;
 }
 
 export function ContextMenuRow({
@@ -72,7 +71,7 @@ export function ContextMenuRow({
       <span className={CONTEXT_LABEL_CLASS}>{label}</span>
       {trailing}
     </button>
-  )
+  );
 }
 
 // ===========================================================================
@@ -91,7 +90,7 @@ export function ContextItemsSkeleton({ count }: { count: number }) {
         </div>
       ))}
     </>
-  )
+  );
 }
 
 // ===========================================================================
@@ -100,20 +99,20 @@ export function ContextItemsSkeleton({ count }: { count: number }) {
 // ===========================================================================
 
 export interface ContextItemsListProps {
-  items: ChatContextItem[]
+  items: ChatContextItem[];
   /** Selected keys (`${type}:${id}`) for the ✓ state. */
-  selectedKeys: Set<string>
-  onToggle: (item: ChatContextItem) => void
+  selectedKeys: Set<string>;
+  onToggle: (item: ChatContextItem) => void;
   /** Selection cap reached → non-selected rows disabled. */
-  atLimit: boolean
+  atLimit: boolean;
   /** Another page is available. */
-  hasMore?: boolean
+  hasMore?: boolean;
   /** Load the next page (called when the user nears the bottom). */
-  onLoadMore?: () => void
+  onLoadMore?: () => void;
   /** A page is currently loading (shows inline skeleton rows). */
-  loadingMore?: boolean
-  emptyLabel?: string
-  className?: string
+  loadingMore?: boolean;
+  emptyLabel?: string;
+  className?: string;
 }
 
 export function ContextItemsList({
@@ -127,17 +126,17 @@ export function ContextItemsList({
   emptyLabel = 'No results',
   className,
 }: ContextItemsListProps) {
-  const onScroll = React.useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      if (!hasMore || loadingMore || !onLoadMore) return
-      const el = e.currentTarget
-      if (el.scrollHeight - el.scrollTop - el.clientHeight <= 48) onLoadMore()
+  const onScroll = useCallback(
+    (e: UIEvent<HTMLDivElement>) => {
+      if (!hasMore || loadingMore || !onLoadMore) return;
+      const el = e.currentTarget;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight <= 48) onLoadMore();
     },
     [hasMore, loadingMore, onLoadMore],
-  )
+  );
 
   if (items.length === 0 && !loadingMore) {
-    return <div className={CONTEXT_STATE_CLASS}>{emptyLabel}</div>
+    return <div className={CONTEXT_STATE_CLASS}>{emptyLabel}</div>;
   }
 
   return (
@@ -151,7 +150,7 @@ export function ContextItemsList({
       className={cn('max-h-[min(340px,45vh)] overflow-y-auto overscroll-contain', className)}
     >
       {items.map(item => {
-        const selected = selectedKeys.has(itemKey(item))
+        const selected = selectedKeys.has(itemKey(item));
         return (
           <ContextMenuRow
             key={itemKey(item)}
@@ -163,11 +162,11 @@ export function ContextItemsList({
             title={!selected && atLimit ? 'Selection limit reached' : undefined}
             trailing={selected ? <CheckFillIcon className="size-4 shrink-0 text-ods-accent md:size-6" /> : undefined}
           />
-        )
+        );
       })}
       {loadingMore && <ContextItemsSkeleton count={3} />}
     </div>
-  )
+  );
 }
 
 // ===========================================================================
@@ -177,33 +176,33 @@ export function ContextItemsList({
 
 export interface ContextErrorBoundaryProps {
   /** Change this (e.g. `type:query`) to clear a previous error and retry. */
-  resetKey: string
+  resetKey: string;
   /** Error UI. As a render-prop it receives a `retry` callback that clears the
    *  boundary so the children re-mount (pair it with react-query's `reset()` so
    *  the cached suspense error is dropped and the fetch actually re-runs). */
-  fallback: React.ReactNode | ((retry: () => void) => React.ReactNode)
-  children: React.ReactNode
+  fallback: ReactNode | ((retry: () => void) => ReactNode);
+  children: ReactNode;
 }
 
-export class ContextErrorBoundary extends React.Component<ContextErrorBoundaryProps, { errored: boolean }> {
-  state = { errored: false }
+export class ContextErrorBoundary extends Component<ContextErrorBoundaryProps, { errored: boolean }> {
+  state = { errored: false };
 
   static getDerivedStateFromError() {
-    return { errored: true }
+    return { errored: true };
   }
 
   componentDidUpdate(prev: ContextErrorBoundaryProps) {
     if (prev.resetKey !== this.props.resetKey && this.state.errored) {
-      this.setState({ errored: false })
+      this.setState({ errored: false });
     }
   }
 
   private retry = () => {
-    if (this.state.errored) this.setState({ errored: false })
-  }
+    if (this.state.errored) this.setState({ errored: false });
+  };
 
   render() {
-    if (!this.state.errored) return this.props.children
-    return typeof this.props.fallback === 'function' ? this.props.fallback(this.retry) : this.props.fallback
+    if (!this.state.errored) return this.props.children;
+    return typeof this.props.fallback === 'function' ? this.props.fallback(this.retry) : this.props.fallback;
   }
 }

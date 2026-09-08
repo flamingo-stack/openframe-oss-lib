@@ -132,5 +132,6 @@ export function buildEndpointsRuntime(): EndpointsRuntime {
     announcementsUrl: EP.announcements,
     accessCode: { validateUrl: EP.accessValidate, consumeUrl: EP.accessConsume },
     contactUrl: EP.contact,
+    storageViewBaseUrl: EP.storageView,
   }
 }

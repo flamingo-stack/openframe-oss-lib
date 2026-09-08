@@ -1,44 +1,44 @@
-'use client'
+'use client';
 
-import { type ReactNode } from 'react'
-import { useIsTruncated } from '../../hooks/ui/use-is-truncated'
-import { cn } from '../../utils/cn'
-import { FloatingTooltip } from './floating-tooltip'
+import type { ReactNode } from 'react';
+import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
+import { cn } from '../../utils/cn';
+import { FloatingTooltip } from './floating-tooltip';
 
 /** ODS typography variants. Maps to the `.text-h1`…`.text-h6` utilities. */
-export type TruncateTextVariant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
+export type TruncateTextVariant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 
 /** ODS text tone. Maps to the `text-ods-text-*` colour utilities. */
-export type TruncateTextTone = 'primary' | 'secondary'
+export type TruncateTextTone = 'primary' | 'secondary';
 
 export interface TruncateTextProps {
-  children: string
+  children: string;
   /** Tooltip content; defaults to `children`. */
-  tooltip?: ReactNode
+  tooltip?: ReactNode;
   /** Extra classes merged after the variant/tone defaults. */
-  className?: string
-  side?: 'top' | 'right' | 'bottom' | 'left'
+  className?: string;
+  side?: 'top' | 'right' | 'bottom' | 'left';
   /** Max visible lines. `1` uses `truncate` (single-line ellipsis); higher values use `line-clamp-N`. */
-  lines?: 1 | 2 | 3 | 4 | 5 | 6
+  lines?: 1 | 2 | 3 | 4 | 5 | 6;
   /** ODS typography token. Default: `'h4'` (body). */
-  variant?: TruncateTextVariant
+  variant?: TruncateTextVariant;
   /** ODS text tone. Default: `'primary'`. */
-  tone?: TruncateTextTone
+  tone?: TruncateTextTone;
   /** Force the monospace (heading) font family — preserves the variant's size while swapping family. */
-  mono?: boolean
+  mono?: boolean;
   /**
    * Extra classes for the tooltip trigger wrapper — the element that becomes the
    * flex/grid item in the caller's layout (e.g. `flex-1`). Merged after the
    * built-in `min-w-0 max-w-full`, which is what lets the trigger shrink inside
    * flex rows so the text ellipsizes instead of clipping.
    */
-  triggerClassName?: string
+  triggerClassName?: string;
   /**
    * Trigger wrapper element. Default `'div'`. Use `'span'` where a block element
    * is invalid HTML — inside a `<p>`, a heading, or another `<span>`; the span
    * trigger is `inline-block` so the inner truncation still measures.
    */
-  as?: 'div' | 'span'
+  as?: 'div' | 'span';
 }
 
 const VARIANT_CLASS: Record<TruncateTextVariant, string> = {
@@ -48,12 +48,12 @@ const VARIANT_CLASS: Record<TruncateTextVariant, string> = {
   h4: 'text-h4',
   h5: 'text-h5',
   h6: 'text-h6',
-}
+};
 
 const TONE_CLASS: Record<TruncateTextTone, string> = {
   primary: 'text-ods-text-primary',
   secondary: 'text-ods-text-secondary',
-}
+};
 
 const LINE_CLAMP_CLASS: Record<2 | 3 | 4 | 5 | 6, string> = {
   2: 'line-clamp-2',
@@ -61,7 +61,7 @@ const LINE_CLAMP_CLASS: Record<2 | 3 | 4 | 5 | 6, string> = {
   4: 'line-clamp-4',
   5: 'line-clamp-5',
   6: 'line-clamp-6',
-}
+};
 
 /**
  * Truncated text bound to the ODS typography system. Shows a `FloatingTooltip`
@@ -85,12 +85,10 @@ export function TruncateText({
   triggerClassName,
   as = 'div',
 }: TruncateTextProps) {
-  const isMultiLine = lines > 1
-  const { ref, isTruncated } = useIsTruncated<HTMLSpanElement>(children, { multiline: isMultiLine })
+  const isMultiLine = lines > 1;
+  const { ref, isTruncated } = useIsTruncated<HTMLSpanElement>(children, { multiline: isMultiLine });
 
-  const clampClass = isMultiLine
-    ? LINE_CLAMP_CLASS[lines as Exclude<typeof lines, 1>]
-    : 'truncate block'
+  const clampClass = isMultiLine ? LINE_CLAMP_CLASS[lines as Exclude<typeof lines, 1>] : 'truncate block';
 
   return (
     <FloatingTooltip
@@ -117,5 +115,5 @@ export function TruncateText({
         {children}
       </span>
     </FloatingTooltip>
-  )
+  );
 }

@@ -1,19 +1,19 @@
-"use client"
+'use client';
 
-import { forwardRef, type HTMLAttributes } from "react"
-import { InfoCircleIcon } from "../icons-v2-generated"
-import { AiAssistantInfo } from "./ai-assistant-info"
-import type { TicketEscalatedSegment } from "./types/message.types"
+import { forwardRef, type HTMLAttributes } from 'react';
+import { InfoCircleIcon } from '../icons-v2-generated';
+import { AiAssistantInfo } from './ai-assistant-info';
+import type { TicketEscalatedSegment } from './types/message.types';
 
-const TITLE = "Handed Off to a Technician"
+const TITLE = 'Handed Off to a Technician';
 
 /** Shown when the wire omits `text` (the field is nullable). */
-const DEFAULT_BODY = "A technician will reply when available."
+const DEFAULT_BODY = 'A technician will reply when available.';
 
 export interface TicketEscalatedMessageProps extends HTMLAttributes<HTMLDivElement> {
-  data: TicketEscalatedSegment['data']
+  data: TicketEscalatedSegment['data'];
   /** Timestamp of the message row this block came in on. */
-  timestamp?: Date
+  timestamp?: Date;
 }
 
 /**
@@ -27,7 +27,7 @@ export interface TicketEscalatedMessageProps extends HTMLAttributes<HTMLDivEleme
  */
 const TicketEscalatedMessage = forwardRef<HTMLDivElement, TicketEscalatedMessageProps>(
   ({ data, timestamp, ...props }, ref) => {
-    const body = data.text?.trim() || DEFAULT_BODY
+    const body = data.text?.trim() || DEFAULT_BODY;
     return (
       <AiAssistantInfo
         ref={ref}
@@ -37,10 +37,10 @@ const TicketEscalatedMessage = forwardRef<HTMLDivElement, TicketEscalatedMessage
         timestamp={timestamp}
         {...props}
       />
-    )
+    );
   },
-)
+);
 
-TicketEscalatedMessage.displayName = "TicketEscalatedMessage"
+TicketEscalatedMessage.displayName = 'TicketEscalatedMessage';
 
-export { TicketEscalatedMessage }
+export { TicketEscalatedMessage };

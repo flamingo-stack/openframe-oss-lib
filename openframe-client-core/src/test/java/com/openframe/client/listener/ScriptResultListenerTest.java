@@ -1,7 +1,8 @@
 package com.openframe.client.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.client.service.RmmResultService;
+import com.openframe.client.listener.rmm.ScriptResultListener;
+import com.openframe.client.service.rmm.RmmResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.data.nats.rmm.model.RmmResultParser;
 import com.openframe.data.nats.rmm.model.ScriptResultMessage;

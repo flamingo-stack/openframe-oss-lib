@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<OnboardingGuidesCatalogPage>` — the full `/onboarding-guides` catalog page:
@@ -8,33 +8,33 @@
  * (`guidesEndpoint`/`sectionsEndpoint`) modes — forwarded to the view verbatim.
  */
 
-import type { ReactNode } from 'react'
-import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide'
-import { DevSectionPage } from '../shared/dev-section'
-import { OnboardingGuidesCatalogView } from '../onboarding-guides'
+import type { ReactNode } from 'react';
+import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
+import { OnboardingGuidesCatalogView } from '../onboarding-guides';
+import { DevSectionPage } from '../shared/dev-section';
 
-type SectionSummary = { section: string; section_order: number; count: number }
+type SectionSummary = { section: string; section_order: number; count: number };
 
 export interface OnboardingGuidesCatalogPageProps {
   /** Self-fetch: GET list endpoint (the api route). Appends `?section=`. */
-  guidesEndpoint?: string
+  guidesEndpoint?: string;
   /** Self-fetch: GET section-summary endpoint (the api route). */
-  sectionsEndpoint?: string
+  sectionsEndpoint?: string;
   /** Controlled / SSR: server-fetched guides + sections + active section. */
-  initialGuides?: OnboardingGuide[]
-  initialSections?: SectionSummary[]
-  initialSection?: string
+  initialGuides?: OnboardingGuide[];
+  initialSections?: SectionSummary[];
+  initialSection?: string;
   /** Base path the catalog is mounted under (card href prefix + `?section=` push). */
-  basePath?: string
+  basePath?: string;
   /** Back-button config. Pass `false` to hide. Default `{ href: '/' }`. */
-  backButton?: { label?: string; href?: string } | false
-  title?: string
-  subtitle?: string
+  backButton?: { label?: string; href?: string } | false;
+  title?: string;
+  subtitle?: string;
   /** Optional slot rendered below the catalog, inside the page chrome. */
-  belowContent?: ReactNode
+  belowContent?: ReactNode;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container (forwarded to `DevSectionPage`). */
-  shell?: boolean
+  shell?: boolean;
 }
 
 export function OnboardingGuidesCatalogPage({
@@ -62,5 +62,5 @@ export function OnboardingGuidesCatalogPage({
       />
       {belowContent}
     </DevSectionPage>
-  )
+  );
 }

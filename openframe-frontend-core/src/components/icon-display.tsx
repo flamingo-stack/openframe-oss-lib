@@ -1,21 +1,22 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { AgentMark, type AgentName } from './agent-mark'
-import { resolveIcon } from './chat/utils/icon-library'
+import type { ReactElement } from 'react';
+import Image from '../embed-shims/next-image';
+import { AgentMark, type AgentName } from './agent-mark';
+import { resolveIcon } from './chat/utils/icon-library';
 
 /** Unified icon value used across the app (announcement bar, chat quick actions,
  *  AI-agent identity). Exactly one of `name`/`url` is typically set. */
 export interface EntityIconValue {
   /** Library glyph name resolved via {@link resolveIcon} (icons-v2 + curated aliases). */
-  name?: string | null
+  name?: string | null;
   /** Uploaded image URL — wins over `name`. */
-  url?: string | null
+  url?: string | null;
   /** Props spread onto the resolved glyph (e.g. `{ color }`). */
-  props?: Record<string, unknown> | null
+  props?: Record<string, unknown> | null;
 }
 
-const BRAND_MARK_NAMES = new Set<string>(['fae', 'mingo'])
+const BRAND_MARK_NAMES = new Set<string>(['fae', 'mingo']);
 
 /**
  * THE single icon-display path for the whole app. Resolution order:
@@ -32,22 +33,22 @@ export function EntityIcon({
   size = 20,
   className,
 }: {
-  icon?: EntityIconValue | null
-  size?: number
-  className?: string
-}): React.ReactElement {
+  icon?: EntityIconValue | null;
+  size?: number;
+  className?: string;
+}): ReactElement {
   if (icon?.url) {
-    // eslint-disable-next-line @next/next/no-img-element
     return (
-      <img
+      <Image
         src={icon.url}
         alt=""
         width={size}
         height={size}
         className={className}
         style={{ objectFit: 'contain' }}
+        unoptimized
       />
-    )
+    );
   }
   if (icon?.name && BRAND_MARK_NAMES.has(icon.name)) {
     // Size via `className` when provided (so responsive Tailwind sizing like
@@ -58,10 +59,10 @@ export function EntityIcon({
         className={`inline-flex${className ? ` ${className}` : ''}`}
         style={className ? undefined : { width: size, height: size }}
       >
-        <AgentMark agent={icon.name as AgentName} className="w-full h-full" />
+        <AgentMark agent={icon.name as AgentName} className="h-full w-full" />
       </span>
-    )
+    );
   }
-  const Glyph = resolveIcon(icon?.name ?? undefined)
-  return <Glyph size={size} className={className} {...(icon?.props ?? {})} />
+  const Glyph = resolveIcon(icon?.name ?? undefined);
+  return <Glyph size={size} className={className} {...(icon?.props ?? {})} />;
 }

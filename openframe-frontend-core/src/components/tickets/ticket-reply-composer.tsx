@@ -1,8 +1,9 @@
-'use client'
+'use client';
 
-import { useCallback, useState } from 'react'
-import { Button } from './../ui/button'
-import { Textarea } from './../ui/textarea'
+import { useCallback, useState } from 'react';
+import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from './../chat/chat-attachment-bar';
+import { ChatInput } from './../chat/chat-input';
+import { useChatAttachments } from './../chat/hooks/use-chat-attachments';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,23 +13,19 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from './../ui/alert-dialog'
-import { ChatInput } from './../chat/chat-input'
-import {
-  ChatAttachmentAddButton,
-  ChatAttachmentChipStrip,
-} from './../chat/chat-attachment-bar'
-import { useChatAttachments } from './../chat/hooks/use-chat-attachments'
-import type { AnyTicket } from './types'
-import { TICKET_TEXT_MAX_CHARS } from './types'
-import type { TicketDetailDrawerProps, TicketRef } from './ticket-detail-drawer'
+} from './../ui/alert-dialog';
+import { Button } from './../ui/button';
+import { Textarea } from './../ui/textarea';
+import type { TicketDetailDrawerProps, TicketRef } from './ticket-detail-drawer';
+import type { AnyTicket } from './types';
+import { TICKET_TEXT_MAX_CHARS } from './types';
 
 export interface TicketReplyComposerProps {
-  ticket: AnyTicket
-  busy: boolean
-  supportSystemDown: boolean
-  onSendMessage: TicketDetailDrawerProps['onSendMessage']
-  onClose: TicketDetailDrawerProps['onClose']
+  ticket: AnyTicket;
+  busy: boolean;
+  supportSystemDown: boolean;
+  onSendMessage: TicketDetailDrawerProps['onSendMessage'];
+  onClose: TicketDetailDrawerProps['onClose'];
 }
 
 /**
@@ -60,42 +57,39 @@ export function TicketReplyComposer({
   onSendMessage,
   onClose,
 }: TicketReplyComposerProps) {
-  const [resolution, setResolution] = useState('')
-  const [closeDialogOpen, setCloseDialogOpen] = useState(false)
-  const attachments = useChatAttachments()
+  const [resolution, setResolution] = useState('');
+  const [closeDialogOpen, setCloseDialogOpen] = useState(false);
+  const attachments = useChatAttachments();
+  // Pulled out of the bag ONCE: `useChatAttachments` returns a fresh object
+  // every render, so depending on it would rebuild `handleSend` every render.
+  // Both of these are `useMemo`/`useCallback` results, so they are the stable
+  // half and no receiver is lost by destructuring.
+  const { readyAttachments, clear: clearAttachments } = attachments;
 
-  const ticketRef: TicketRef = { id: ticket.id, external_id: ticket.external_id }
-  const hasReadyFiles = attachments.readyAttachments.length > 0
+  const ticketRef: TicketRef = { id: ticket.id, external_id: ticket.external_id };
+  const hasReadyFiles = readyAttachments.length > 0;
 
   const handleSend = useCallback(
     async (text: string): Promise<boolean> => {
-      const ref: TicketRef = { id: ticket.id, external_id: ticket.external_id }
-      const ok = await onSendMessage(ref, text.trim(), attachments.readyAttachments)
-      if (ok) attachments.clear()
-      return ok
+      const ref: TicketRef = { id: ticket.id, external_id: ticket.external_id };
+      const ok = await onSendMessage(ref, text.trim(), readyAttachments);
+      if (ok) clearAttachments();
+      return ok;
     },
-    // Depend on the reactive projections, not the whole bag (a fresh object each
-    // render). `readyAttachments` is memo-stable; `clear` is callback-stable.
-    [
-      onSendMessage,
-      ticket.id,
-      ticket.external_id,
-      attachments.readyAttachments,
-      attachments.clear,
-    ],
-  )
+    [onSendMessage, ticket.id, ticket.external_id, readyAttachments, clearAttachments],
+  );
 
   const confirmClose = async () => {
-    setCloseDialogOpen(false)
-    await onClose(ticketRef, resolution.trim() || undefined)
-    setResolution('')
+    setCloseDialogOpen(false);
+    await onClose(ticketRef, resolution.trim() || undefined);
+    setResolution('');
     // Intentionally NO `onActionCollapsed()` — collapsing the drawer after a
     // close dismisses the ticket the user is working on (PR #1053). The
     // optimistic in-place status update keeps the row mounted with the new
     // badge; that is the only feedback needed.
-  }
+  };
 
-  const disabled = busy || supportSystemDown
+  const disabled = busy || supportSystemDown;
 
   return (
     <div className="flex flex-col gap-2">
@@ -128,7 +122,7 @@ export function TicketReplyComposer({
         maxLength={TICKET_TEXT_MAX_CHARS}
         onSend={handleSend}
       />
-      <div className="flex items-center gap-2 w-full">
+      <div className="flex w-full items-center gap-2">
         {!supportSystemDown && (
           <ChatAttachmentAddButton
             attachmentsEnabled
@@ -138,7 +132,7 @@ export function TicketReplyComposer({
             size="compact"
           />
         )}
-        <div className="flex-1 min-w-0" />
+        <div className="min-w-0 flex-1" />
         <Button
           type="button"
           variant="transparent"
@@ -155,19 +149,16 @@ export function TicketReplyComposer({
           REVERSIBLE, so the confirm action is the standard accent primary, NOT
           a red destructive button. */}
       <AlertDialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
-        <AlertDialogContent className="bg-ods-card border-ods-border">
+        <AlertDialogContent className="border-ods-border bg-ods-card">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-ods-text-primary">
-              Close this ticket?
-            </AlertDialogTitle>
+            <AlertDialogTitle className="text-ods-text-primary">Close this ticket?</AlertDialogTitle>
             <AlertDialogDescription className="text-ods-text-secondary">
-              Add an optional resolution note below. You can reopen the ticket
-              later if needed.
+              Add an optional resolution note below. You can reopen the ticket later if needed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Textarea
             value={resolution}
-            onChange={(e) => setResolution(e.target.value)}
+            onChange={e => setResolution(e.target.value)}
             placeholder="Resolution (optional)"
             rows={3}
             maxLength={TICKET_TEXT_MAX_CHARS}
@@ -176,7 +167,7 @@ export function TicketReplyComposer({
           <AlertDialogFooter>
             <AlertDialogCancel
               disabled={busy}
-              className="bg-transparent border-ods-border text-ods-text-primary hover:bg-ods-border"
+              className="border-ods-border bg-transparent text-ods-text-primary hover:bg-ods-border"
             >
               Cancel
             </AlertDialogCancel>
@@ -191,5 +182,5 @@ export function TicketReplyComposer({
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }

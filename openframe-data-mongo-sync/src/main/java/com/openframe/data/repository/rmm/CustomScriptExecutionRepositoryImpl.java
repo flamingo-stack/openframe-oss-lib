@@ -1,7 +1,7 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
@@ -19,6 +19,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.Optional;
 import java.util.LinkedHashMap;
@@ -58,6 +59,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_STATUS = "status";
+    private static final String FIELD_SOURCE = "source";
     private static final String FIELD_INITIATED_BY = "initiatedBy";
     private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_EXECUTION_ID = "executionId";
@@ -141,13 +143,26 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     }
 
     @Override
+    public List<ScriptExecution> findByMachineIdAndExecutionIdAndScriptIdIn(String machineId, String executionId, Collection<String> scriptIds) {
+        if (scriptIds == null || scriptIds.isEmpty()) {
+            return List.of();
+        }
+        Query query = new Query(Criteria.where(FIELD_MACHINE_ID).is(machineId)
+                .and(FIELD_EXECUTION_ID).is(executionId)
+                .and(FIELD_SCRIPT_ID).in(scriptIds))
+                .withReadPreference(ReadPreference.primary());
+        return mongoTemplate.find(query, ScriptExecution.class);
+    }
+
+    @Override
     public LeafStatusCounts countLeavesByStatus(String tenantId, String executionId) {
         if (tenantId == null || executionId == null) {
             return new LeafStatusCounts(0, 0);
         }
-        long running = countLeavesInStatus(tenantId, executionId, ExecutionStatus.RUNNING);
+        long inProgress = countLeavesInStatus(tenantId, executionId, ExecutionStatus.QUEUED)
+                + countLeavesInStatus(tenantId, executionId, ExecutionStatus.RUNNING);
         long failed = countLeavesInStatus(tenantId, executionId, ExecutionStatus.FAILED);
-        return new LeafStatusCounts(running, failed);
+        return new LeafStatusCounts(inProgress, failed);
     }
 
     private long countLeavesInStatus(String tenantId, String executionId, ExecutionStatus status) {
@@ -171,6 +186,11 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                 .and(OWNER_FIELDS.get(owner.type())).is(owner.id());
         if (filter == null) {
             return criteria;
+        }
+        // never dropped by facets: source is not a facet field, and the service-level
+        // exclusion must hold in every counted bucket
+        if (filter.getExcludedSources() != null && !filter.getExcludedSources().isEmpty()) {
+            criteria.and(FIELD_SOURCE).nin(filter.getExcludedSources());
         }
         if (!FIELD_STATUS.equals(excludedField)
                 && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {

@@ -16,6 +16,7 @@ import com.openframe.sdk.fleetmdm.model.CreatePolicyRequest;
 import com.openframe.sdk.fleetmdm.model.UpdatePolicyRequest;
 import com.openframe.sdk.fleetmdm.model.CreateScheduledQueryRequest;
 import com.openframe.sdk.fleetmdm.model.UpdateScheduledQueryRequest;
+import com.openframe.sdk.fleetmdm.model.VulnerabilitiesResponse;
 
 import java.io.IOException;
 import java.net.URI;
@@ -40,6 +41,7 @@ public class FleetMdmClient {
     private static final String GET_ENROLL_SECRET_URL = "/api/latest/fleet/spec/enroll_secret";
     private static final String LIVE_QUERY_RUN_URL = "/api/v1/fleet/queries/run";
     private static final String POLICIES_DELETE_URL = "/api/latest/fleet/policies/delete";
+    private static final String VULNERABILITIES_URL = "/api/latest/fleet/vulnerabilities";
 
     static final String TENANT_ID_HEADER = "X-Tenant-Id";
 
@@ -400,6 +402,21 @@ public class FleetMdmClient {
             throw e;
         } catch (Exception e) {
             throw new FleetMdmException("Failed to create Fleet policy", e);
+        }
+    }
+
+    /**
+     * List vulnerabilities with pagination.
+     */
+    public VulnerabilitiesResponse listVulnerabilities(int page, int perPage) {
+        try {
+            HttpResponse<String> response = sendRequest(VULNERABILITIES_URL + "?page=" + page + "&per_page=" + perPage, "GET", null);
+            checkResponse(response, "list Fleet vulnerabilities");
+            return MAPPER.readValue(response.body(), VulnerabilitiesResponse.class);
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to list Fleet vulnerabilities", e);
         }
     }
 

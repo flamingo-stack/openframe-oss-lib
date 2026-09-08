@@ -1,16 +1,19 @@
 package com.openframe.authz.security.flow;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.util.OidcUserUtils;
-import com.openframe.authz.security.SsoRegistrationConstants;
 import com.openframe.authz.security.SsoTenantRegCookiePayload;
+import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +22,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
+import static org.springframework.util.StringUtils.hasText;
 
 
 @Component
@@ -27,10 +31,11 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
 
     private final SsoCookieCodec ssoCookieCodec;
     private final TenantRegistrationService registrationService;
+    private final SsoIdentityService ssoIdentityService;
 
     @Override
     public String cookieName() {
-        return SsoRegistrationConstants.COOKIE_SSO_REG;
+        return SsoFlowCookieNames.OF_SSO_REG;
     }
 
     @Override
@@ -47,6 +52,14 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
         SsoTenantRegCookiePayload payload = ssoCookieCodec.decodeTenant(cookie.getValue())
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
+        requireEmailMatchesForm(payload.email(), email);
+        // Provider from the authenticated token, falling back to the flow cookie — never null, so
+        // the invariant guard fails CLOSED rather than passing a null provider that matches nothing.
+        String provider = authentication instanceof OAuth2AuthenticationToken token
+                ? token.getAuthorizedClientRegistrationId()
+                : payload.provider();
+        ssoIdentityService.ensureNotAlreadyLinked(provider, user.getClaims());
+
         String[] names = resolveNames(request, authentication, user);
         String givenName = names[0];
         String familyName = names[1];
@@ -57,7 +70,6 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
 
         TenantRegistrationRequest reg = TenantRegistrationRequest.builder()
                 .email(email)
-                .accessCode(payload.accessCode())
                 .firstName(givenName != null ? givenName : "")
                 .lastName(familyName != null ? familyName : "")
                 .password(UUID.randomUUID().toString())
@@ -71,6 +83,23 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
         var tenant = registrationService.registerTenant(reg);
 
         clearFlowCookieAndRedirect(response, cookie, tenant.getId(), payload.redirectTo(), payload.authMobile());
+    }
+
+    /**
+     * The tenant is created with the email the identity provider asserts, but every pre-flight
+     * check (disposable-domain, access code, attribution) ran against the email typed into the
+     * sign-up form — so a different SSO account must not slip through. Missing form email means a
+     * cookie minted before this field existed; the flow cookie lives 10 minutes, so just let it pass.
+     */
+    private void requireEmailMatchesForm(String formEmail, String ssoEmail) {
+        if (!hasText(formEmail)) {
+            return;
+        }
+        if (!formEmail.trim().equalsIgnoreCase(ssoEmail)) {
+            throw new IllegalStateException(
+                    "This account's email (" + ssoEmail + ") doesn't match the email you entered ("
+                            + formEmail.trim() + "). Please sign up with the account that matches the form email.");
+        }
     }
 
 }

@@ -1,11 +1,9 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import {
-  ThemeProvider as NextThemesProvider,
-  useTheme as useNextTheme,
-} from "next-themes";
-import type { ThemeProviderProps as NextThemesProviderProps } from "next-themes/dist/types";
+import { ThemeProvider as NextThemesProvider, useTheme as useNextTheme } from 'next-themes';
+import type { ThemeProviderProps as NextThemesProviderProps } from 'next-themes/dist/types';
+import { useCallback } from 'react';
+import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 
 /**
  * ODS theme system — thin wrapper over `next-themes`.
@@ -30,11 +28,11 @@ import type { ThemeProviderProps as NextThemesProviderProps } from "next-themes/
  *                         existing `<Button>`).
  */
 
-export type Theme = "light" | "dark";
+export type Theme = 'light' | 'dark';
 
-export const THEME_STORAGE_KEY = "ods-theme";
-export const THEME_ATTRIBUTE = "data-theme";
-export const DEFAULT_THEME: Theme = "dark";
+export const THEME_STORAGE_KEY = 'ods-theme';
+export const THEME_ATTRIBUTE = 'data-theme';
+export const DEFAULT_THEME: Theme = 'dark';
 
 export type ThemeProviderProps = Partial<NextThemesProviderProps>;
 
@@ -52,7 +50,7 @@ export function ThemeProvider({ children, ...overrides }: ThemeProviderProps) {
       attribute={THEME_ATTRIBUTE}
       defaultTheme={DEFAULT_THEME}
       enableSystem={false}
-      themes={["light", "dark"]}
+      themes={['light', 'dark']}
       storageKey={THEME_STORAGE_KEY}
       disableTransitionOnChange={false}
       {...overrides}
@@ -100,30 +98,19 @@ export interface UseThemeToggleResult {
  */
 export function useThemeToggle(): UseThemeToggleResult {
   const { resolvedTheme, theme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
+  const mounted = useIsHydrated();
 
-  const active: Theme = mounted
-    ? resolvedTheme === "light" || theme === "light"
-      ? "light"
-      : "dark"
-    : DEFAULT_THEME;
+  const active: Theme = mounted ? (resolvedTheme === 'light' || theme === 'light' ? 'light' : 'dark') : DEFAULT_THEME;
 
-  const setOdsTheme = React.useCallback(
-    (next: Theme) => setTheme(next),
-    [setTheme],
-  );
+  const setOdsTheme = useCallback((next: Theme) => setTheme(next), [setTheme]);
 
-  const toggle = React.useCallback(
-    () => setTheme(active === "dark" ? "light" : "dark"),
-    [active, setTheme],
-  );
+  const toggle = useCallback(() => setTheme(active === 'dark' ? 'light' : 'dark'), [active, setTheme]);
 
   return {
     mounted,
     theme: active,
-    isDark: active === "dark",
-    isLight: active === "light",
+    isDark: active === 'dark',
+    isLight: active === 'light',
     toggle,
     setTheme: setOdsTheme,
   };

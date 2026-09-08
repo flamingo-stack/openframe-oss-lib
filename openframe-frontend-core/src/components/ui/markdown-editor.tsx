@@ -1,13 +1,15 @@
-"use client"
+'use client';
 
-import React, { useRef, useCallback, useState, useEffect } from "react"
-import dynamic from "../../embed-shims/next-dynamic"
-import { Loader2, Upload } from "lucide-react"
-import { cn } from "../../utils/cn"
+import type { ICommand } from '@uiw/react-md-editor';
+import { Loader2, Upload } from 'lucide-react';
+import type React from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
+import dynamic from '../../embed-shims/next-dynamic';
+import { cn } from '../../utils/cn';
 
-const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false })
+const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false });
 
-const MARKDOWN_EDITOR_STYLE_ID = "ods-markdown-editor-styles"
+const MARKDOWN_EDITOR_STYLE_ID = 'ods-markdown-editor-styles';
 
 const mdEditorCSS = `
 :root { --md-editor-text-color: var(--color-text-primary) !important; }
@@ -32,52 +34,52 @@ body .w-md-editor .w-md-editor-bar { width: 24px !important; height: 12px !impor
 body .w-md-editor .w-md-editor-bar svg { display: none !important; }
 body .w-md-editor .w-md-editor-bar::after { content: '' !important; display: block !important; width: 24px !important; height: 4px !important; border-top: 2px solid var(--color-border-default) !important; border-bottom: 2px solid var(--color-border-default) !important; margin-top: 2px !important; border-radius: 1px !important; }
 body .w-md-editor .w-md-editor-bar:hover::after { border-color: var(--color-text-secondary) !important; }
-`
+`;
 
 function MarkdownEditorStyles() {
   useEffect(() => {
-    if (document.getElementById(MARKDOWN_EDITOR_STYLE_ID)) return
-    const style = document.createElement("style")
-    style.id = MARKDOWN_EDITOR_STYLE_ID
-    style.textContent = mdEditorCSS
-    document.head.appendChild(style)
+    if (document.getElementById(MARKDOWN_EDITOR_STYLE_ID)) return undefined;
+    const style = document.createElement('style');
+    style.id = MARKDOWN_EDITOR_STYLE_ID;
+    style.textContent = mdEditorCSS;
+    document.head.appendChild(style);
     return () => {
-      style.remove()
-    }
-  }, [])
-  return null
+      style.remove();
+    };
+  }, []);
+  return null;
 }
 
 export interface MarkdownEditorProps {
   /** Markdown string content */
-  value: string
+  value: string;
   /** Callback with updated markdown string */
-  onChange: (markdown: string) => void
+  onChange: (markdown: string) => void;
   /** Placeholder text shown when editor is empty */
-  placeholder?: string
+  placeholder?: string;
   /** Whether the editor is disabled */
-  disabled?: boolean
+  disabled?: boolean;
   /** Initial editor height in pixels (default: 600). User can resize via drag handle. */
-  height?: number
+  height?: number;
   /** Minimum editor height in pixels (default: 100) */
-  minHeight?: number
+  minHeight?: number;
   /** Additional className for the wrapper */
-  className?: string
+  className?: string;
   /**
    * File upload handler. Return the public URL of the uploaded file.
    * If not provided, the upload button is hidden.
    */
-  onUploadFile?: (file: File) => Promise<string>
+  onUploadFile?: (file: File) => Promise<string>;
   /** Called after a file is successfully uploaded and inserted */
-  onFileUploaded?: (url: string, filename: string) => void
+  onFileUploaded?: (url: string, filename: string) => void;
   /** Custom preview renderer. Receives the markdown source string. */
-  renderPreview?: (source: string) => React.ReactNode
+  renderPreview?: (source: string) => React.ReactNode;
 }
 
 export function MarkdownEditor({
   value,
   onChange,
-  placeholder = "",
+  placeholder = '',
   disabled = false,
   height = 600,
   minHeight = 100,
@@ -86,206 +88,203 @@ export function MarkdownEditor({
   onFileUploaded,
   renderPreview,
 }: MarkdownEditorProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState("")
-  const [defaultExtraCommands, setDefaultExtraCommands] = useState<any[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [defaultExtraCommands, setDefaultExtraCommands] = useState<ICommand[]>([]);
 
   useEffect(() => {
-    import("@uiw/react-md-editor").then((mod) => {
-      if (mod.commands?.getExtraCommands) {
-        setDefaultExtraCommands(mod.commands.getExtraCommands())
+    let cancelled = false;
+    void (async () => {
+      try {
+        const mod = await import('@uiw/react-md-editor');
+        if (cancelled) return;
+        if (mod.commands?.getExtraCommands) {
+          setDefaultExtraCommands(mod.commands.getExtraCommands());
+        }
+      } catch (error) {
+        // Chunk load failure — the editor still works, it just renders without
+        // the vendor's extra toolbar commands.
+        console.error('Failed to load markdown editor toolbar commands:', error);
       }
-    })
-  }, [])
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleChange = (val?: string) => {
-    onChange(val || "")
-  }
+    onChange(val || '');
+  };
 
   const insertTextAtCursor = useCallback(
     (text: string) => {
-      const textarea = document.querySelector(
-        ".w-md-editor-text-textarea"
-      ) as HTMLTextAreaElement
+      const textarea = document.querySelector('.w-md-editor-text-textarea') as HTMLTextAreaElement;
       if (textarea) {
-        const start = textarea.selectionStart
-        const end = textarea.selectionEnd
-        const newValue = value.slice(0, start) + text + value.slice(end)
-        onChange(newValue)
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const newValue = value.slice(0, start) + text + value.slice(end);
+        onChange(newValue);
       } else {
-        onChange(value + "\n" + text)
+        onChange(value + '\n' + text);
       }
     },
-    [value, onChange]
-  )
+    [value, onChange],
+  );
 
   const handleFileUpload = useCallback(
     async (file: File) => {
-      if (!onUploadFile) return
+      if (!onUploadFile) return;
 
-      setIsUploading(true)
-      setUploadProgress(`Uploading ${file.name}...`)
+      setIsUploading(true);
+      setUploadProgress(`Uploading ${file.name}...`);
 
       try {
-        const url = await onUploadFile(file)
-        const isImage = file.type.startsWith("image/")
-        const markdown = isImage
-          ? `![${file.name}](${url})`
-          : `[${file.name}](${url})`
-        insertTextAtCursor(markdown)
-        onFileUploaded?.(url, file.name)
+        const url = await onUploadFile(file);
+        const isImage = file.type.startsWith('image/');
+        const markdown = isImage ? `![${file.name}](${url})` : `[${file.name}](${url})`;
+        insertTextAtCursor(markdown);
+        onFileUploaded?.(url, file.name);
       } catch (error) {
-        console.error("File upload failed:", error)
-        setUploadProgress("Upload failed. Please try again.")
+        console.error('File upload failed:', error);
+        setUploadProgress('Upload failed. Please try again.');
       } finally {
-        setIsUploading(false)
-        setTimeout(() => setUploadProgress(""), 3000)
+        setIsUploading(false);
+        setTimeout(() => setUploadProgress(''), 3000);
       }
     },
-    [onUploadFile, insertTextAtCursor, onFileUploaded]
-  )
+    [onUploadFile, insertTextAtCursor, onFileUploaded],
+  );
 
   const handleFileInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
+      const input = e.target;
+      const file = input.files?.[0];
       if (file) {
-        handleFileUpload(file)
-        e.target.value = ""
+        // Never rejects — reports failure through `uploadProgress`.
+        void handleFileUpload(file);
+        input.value = '';
       }
     },
-    [handleFileUpload]
-  )
+    [handleFileUpload],
+  );
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
-      if (!onUploadFile) return
-      const items = e.clipboardData?.items
-      if (!items) return
+      if (!onUploadFile) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
 
       for (const item of items) {
-        if (item.type.startsWith("image/")) {
-          e.preventDefault()
-          const file = item.getAsFile()
-          if (file) handleFileUpload(file)
-          return
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          // Never rejects — reports failure through `uploadProgress`.
+          if (file) void handleFileUpload(file);
+          return;
         }
       }
     },
-    [onUploadFile, handleFileUpload]
-  )
+    [onUploadFile, handleFileUpload],
+  );
 
   const CustomPreview = ({ source }: { source: string }) => {
     if (renderPreview) {
-      return (
-        <div style={{ padding: "16px", height: "100%", overflow: "auto" }}>
-          {renderPreview(source)}
-        </div>
-      )
+      return <div style={{ padding: '16px', height: '100%', overflow: 'auto' }}>{renderPreview(source)}</div>;
     }
-    return null
-  }
+    return null;
+  };
 
   const uploadCommand = onUploadFile
     ? {
-        name: "upload",
-        keyCommand: "upload",
-        buttonProps: { "aria-label": "Upload file", title: "Upload file" },
-        icon: isUploading ? (
-          <Loader2 className="w-3 h-3 animate-spin" />
-        ) : (
-          <Upload className="w-3 h-3" />
-        ),
+        name: 'upload',
+        keyCommand: 'upload',
+        buttonProps: { 'aria-label': 'Upload file', title: 'Upload file' },
+        icon: isUploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />,
         execute: () => {
-          fileInputRef.current?.click()
+          fileInputRef.current?.click();
         },
       }
-    : null
+    : null;
 
-  const extraCommands = uploadCommand
-    ? [...defaultExtraCommands, uploadCommand]
-    : defaultExtraCommands
+  const extraCommands = uploadCommand ? [...defaultExtraCommands, uploadCommand] : defaultExtraCommands;
 
-  const wrapperRef = useRef<HTMLDivElement>(null)
-  const isDraggingRef = useRef(false)
-  const mouseYRef = useRef(0)
-  const rafRef = useRef<number>(0)
-  const scrollParentRef = useRef<HTMLElement | Window>(window)
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const mouseYRef = useRef(0);
+  const rafRef = useRef<number>(0);
+  const scrollParentRef = useRef<HTMLElement | Window>(window);
 
-  const EDGE_ZONE = 60
-  const MAX_SCROLL_SPEED = 15
+  const EDGE_ZONE = 60;
+  const MAX_SCROLL_SPEED = 15;
 
   const findScrollParent = useCallback((el: HTMLElement | null): HTMLElement | Window => {
-    let node = el?.parentElement
+    let node = el?.parentElement;
     while (node && node !== document.documentElement) {
-      const { overflowY } = window.getComputedStyle(node)
-      if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) {
-        return node
+      const { overflowY } = window.getComputedStyle(node);
+      if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+        return node;
       }
-      node = node.parentElement
+      node = node.parentElement;
     }
-    return window
-  }, [])
+    return window;
+  }, []);
 
-  const scrollLoop = useCallback(() => {
-    if (!isDraggingRef.current) return
-    const parent = scrollParentRef.current
-    const isWindow = parent === window
-    const viewportBottom = isWindow
-      ? window.innerHeight
-      : (parent as HTMLElement).getBoundingClientRect().bottom
-    const distFromBottom = viewportBottom - mouseYRef.current
+  const scrollLoop = useCallback(function step() {
+    if (!isDraggingRef.current) return;
+    const parent = scrollParentRef.current;
+    const isWindow = parent === window;
+    const viewportBottom = isWindow ? window.innerHeight : (parent as HTMLElement).getBoundingClientRect().bottom;
+    const distFromBottom = viewportBottom - mouseYRef.current;
     if (distFromBottom < EDGE_ZONE) {
-      const speed = Math.ceil(MAX_SCROLL_SPEED * (1 - distFromBottom / EDGE_ZONE))
+      const speed = Math.ceil(MAX_SCROLL_SPEED * (1 - distFromBottom / EDGE_ZONE));
       if (isWindow) {
-        window.scrollBy(0, speed)
+        window.scrollBy(0, speed);
       } else {
-        (parent as HTMLElement).scrollTop += speed
+        (parent as HTMLElement).scrollTop += speed;
       }
     }
-    rafRef.current = requestAnimationFrame(scrollLoop)
-  }, [])
+    rafRef.current = requestAnimationFrame(step);
+  }, []);
 
   useEffect(() => {
-    const wrapper = wrapperRef.current
-    if (!wrapper) return
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return undefined;
 
-    const onMouseMove = (e: MouseEvent) => { mouseYRef.current = e.clientY }
+    const onMouseMove = (e: MouseEvent) => {
+      mouseYRef.current = e.clientY;
+    };
 
     const onMouseDown = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest(".w-md-editor-bar")) {
-        isDraggingRef.current = true
-        mouseYRef.current = e.clientY
-        scrollParentRef.current = findScrollParent(wrapper)
-        window.addEventListener("mousemove", onMouseMove)
-        rafRef.current = requestAnimationFrame(scrollLoop)
+      if ((e.target as HTMLElement).closest('.w-md-editor-bar')) {
+        isDraggingRef.current = true;
+        mouseYRef.current = e.clientY;
+        scrollParentRef.current = findScrollParent(wrapper);
+        window.addEventListener('mousemove', onMouseMove);
+        rafRef.current = requestAnimationFrame(scrollLoop);
       }
-    }
+    };
 
     const onMouseUp = () => {
       if (isDraggingRef.current) {
-        isDraggingRef.current = false
-        window.removeEventListener("mousemove", onMouseMove)
-        cancelAnimationFrame(rafRef.current)
+        isDraggingRef.current = false;
+        window.removeEventListener('mousemove', onMouseMove);
+        cancelAnimationFrame(rafRef.current);
       }
-    }
+    };
 
-    wrapper.addEventListener("mousedown", onMouseDown)
-    window.addEventListener("mouseup", onMouseUp)
+    wrapper.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mouseup', onMouseUp);
     return () => {
-      wrapper.removeEventListener("mousedown", onMouseDown)
-      window.removeEventListener("mouseup", onMouseUp)
-      window.removeEventListener("mousemove", onMouseMove)
-      cancelAnimationFrame(rafRef.current)
-    }
-  }, [scrollLoop, findScrollParent])
+      wrapper.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('mousemove', onMouseMove);
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [scrollLoop, findScrollParent]);
 
   return (
-    <div
-      ref={wrapperRef}
-      className={cn("advanced-blog-editor", className)}
-      onPaste={handlePaste}
-    >
+    <div ref={wrapperRef} className={cn('advanced-blog-editor', className)} onPaste={handlePaste}>
       {onUploadFile && (
         <input
           ref={fileInputRef}
@@ -297,7 +296,7 @@ export function MarkdownEditor({
       )}
 
       {!MDEditor && (
-        <div className="flex items-center justify-center h-64">
+        <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       )}
@@ -313,16 +312,16 @@ export function MarkdownEditor({
           extraCommands={extraCommands}
           style={
             {
-              "--md-editor-text-color": "var(--color-text-primary)",
-              "--md-editor-bg-color": "var(--color-bg-card)",
-              "--md-editor-border-color": "var(--color-border)"
-            } as any
+              '--md-editor-text-color': 'var(--color-text-primary)',
+              '--md-editor-bg-color': 'var(--color-bg-card)',
+              '--md-editor-border-color': 'var(--color-border)',
+            } as React.CSSProperties
           }
           components={
             renderPreview
               ? {
-                  preview: (source) => {
-                    return <CustomPreview source={source} />
+                  preview: source => {
+                    return <CustomPreview source={source} />;
                   },
                 }
               : undefined
@@ -332,22 +331,20 @@ export function MarkdownEditor({
             disabled,
             style: {
               fontFamily: 'var(--font-family-body)',
-              fontSize: "18px",
+              fontSize: '18px',
               fontWeight: 500,
-              lineHeight: "24px",
-              color: "var(--color-text-primary)",
-              backgroundColor: disabled ? "var(--color-bg)" : "var(--color-bg-card)",
+              lineHeight: '24px',
+              color: 'var(--color-text-primary)',
+              backgroundColor: disabled ? 'var(--color-bg)' : 'var(--color-bg-card)',
             },
           }}
           data-color-mode="dark"
         />
       )}
 
-      {uploadProgress && (
-        <p className="text-h6 text-ods-text-secondary mt-1">{uploadProgress}</p>
-      )}
+      {uploadProgress && <p className="mt-1 text-ods-text-secondary text-h6">{uploadProgress}</p>}
 
       <MarkdownEditorStyles />
     </div>
-  )
+  );
 }

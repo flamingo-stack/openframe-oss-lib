@@ -1,19 +1,19 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../../utils/cn'
-import { SparklesIcon } from '../../icons/sparkles-icon'
-import { AIEnrichButton } from './AIEnrichButton'
-import { AIWarningsSection } from './AIWarningsSection'
-import { Button } from '../../ui/button'
-import { Badge } from '../../ui/badge'
-import { Textarea } from '../../ui/textarea'
-import { CheckCircle, AlertCircle, Loader2, X } from 'lucide-react'
+import { CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
+import type React from 'react';
+import { cn } from '../../../utils/cn';
+import { SparklesIcon } from '../../icons/sparkles-icon';
+import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
+import { Textarea } from '../../ui/textarea';
+import { AIEnrichButton } from './AIEnrichButton';
+import { AIWarningsSection } from './AIWarningsSection';
 
 export interface ConfidenceField {
-  label: string
-  key: string
-  confidence?: number
+  label: string;
+  key: string;
+  confidence?: number;
 }
 
 /**
@@ -22,36 +22,36 @@ export interface ConfidenceField {
  */
 export interface AIRequiredField {
   /** Form field key (e.g., 'version', 'email') */
-  key: string
+  key: string;
   /** Display label (e.g., 'Version', 'Email') */
-  label: string
+  label: string;
   /** Current state - is field filled? */
-  isFilled: boolean
+  isFilled: boolean;
 }
 
 export interface AIEnrichSectionProps {
   // Button state
-  onEnrich: () => void
-  loading?: boolean
-  disabled?: boolean
-  canEnrich?: boolean
+  onEnrich: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  canEnrich?: boolean;
 
   // Status
-  status?: 'idle' | 'loading' | 'success' | 'error'
-  statusMessage?: string
-  overallConfidence?: number
+  status?: 'idle' | 'loading' | 'success' | 'error';
+  statusMessage?: string;
+  overallConfidence?: number;
 
   // Warnings
-  warnings?: string[]
+  warnings?: string[];
 
   // Confidence fields to display (optional - shown as simple list)
-  confidenceFields?: ConfidenceField[]
+  confidenceFields?: ConfidenceField[];
 
   // Required fields for AI enrichment - displays missing fields when disabled
-  requiredFields?: AIRequiredField[]
+  requiredFields?: AIRequiredField[];
 
   // Custom content (like created tags info)
-  children?: React.ReactNode
+  children?: React.ReactNode;
   /**
    * Settings panel rendered INSIDE the card, between the header and the action
    * button (same slot the custom-instructions block occupies). Combined
@@ -59,39 +59,39 @@ export interface AIEnrichSectionProps {
    * title that names it — rendered ABOVE the card, a config panel reads as
    * belonging to whatever section happens to precede it.
    */
-  configSlot?: React.ReactNode
+  configSlot?: React.ReactNode;
 
   // Actions
-  onClear?: () => void
-  showClearButton?: boolean
-  onCancel?: () => void
-  showCancel?: boolean
-  isCancelling?: boolean
+  onClear?: () => void;
+  showClearButton?: boolean;
+  onCancel?: () => void;
+  showCancel?: boolean;
+  isCancelling?: boolean;
 
   // Labels
-  title?: string
-  description?: string
-  buttonLabel?: string
-  loadingLabel?: string
-  disabledMessage?: string
+  title?: string;
+  description?: string;
+  buttonLabel?: string;
+  loadingLabel?: string;
+  disabledMessage?: string;
 
   // Styling
-  variant?: 'default' | 'compact'
-  className?: string
-  icon?: React.ReactNode
+  variant?: 'default' | 'compact';
+  className?: string;
+  icon?: React.ReactNode;
 
   // Editor-provided custom instructions textarea (opt-in).
   // When showCustomInstructions is true, a controlled <Textarea> is rendered
   // above the action button. The parent owns the string — purely controlled.
   // The same value is sent to the backend and injected into the Claude prompt
   // via lib/utils/ai-instructions.ts → buildEditorFocusBlock().
-  showCustomInstructions?: boolean
-  customInstructions?: string
-  onCustomInstructionsChange?: (value: string) => void
-  customInstructionsLabel?: string
-  customInstructionsPlaceholder?: string
-  customInstructionsHelperText?: string
-  customInstructionsMaxLength?: number
+  showCustomInstructions?: boolean;
+  customInstructions?: string;
+  onCustomInstructionsChange?: (value: string) => void;
+  customInstructionsLabel?: string;
+  customInstructionsPlaceholder?: string;
+  customInstructionsHelperText?: string;
+  customInstructionsMaxLength?: number;
 }
 
 export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
@@ -103,7 +103,6 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
   statusMessage,
   overallConfidence,
   warnings,
-  confidenceFields,
   requiredFields,
   children,
   configSlot,
@@ -128,32 +127,26 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
   customInstructionsHelperText,
   customInstructionsMaxLength = 5000,
 }) => {
-  const hasResults = status === 'success' || status === 'error'
-  const shouldDisable = disabled || !canEnrich
+  const hasResults = status === 'success' || status === 'error';
+  const shouldDisable = disabled || !canEnrich;
 
   // Get list of unfilled required fields for display
-  const unfilledFields = requiredFields?.filter(f => !f.isFilled) || []
+  const unfilledFields = requiredFields?.filter(f => !f.isFilled) || [];
 
   return (
     <div
       className={cn(
-        'rounded-lg bg-ods-card border border-ods-border',
-        variant === 'default' ? 'p-6 space-y-4' : 'p-4 space-y-3',
-        className
+        'rounded-lg border border-ods-border bg-ods-card',
+        variant === 'default' ? 'space-y-4 p-6' : 'space-y-3 p-4',
+        className,
       )}
     >
       {/* Row 1: Icon + Title + Description */}
       <div className="flex items-center gap-3">
         {icon || <SparklesIcon size={20} className="text-ods-text-secondary" />}
         <div className="flex-1">
-          <h3 className="text-h5 text-ods-text-primary">
-            {title}
-          </h3>
-          {description && (
-            <p className="text-ods-text-secondary text-h6 mt-1">
-              {description}
-            </p>
-          )}
+          <h3 className="text-ods-text-primary text-h5">{title}</h3>
+          {description && <p className="mt-1 text-ods-text-secondary text-h6">{description}</p>}
         </div>
       </div>
 
@@ -164,14 +157,11 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
       {showCustomInstructions && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label
-              htmlFor="ai-enrich-custom-instructions"
-              className="text-h6 text-ods-text-primary"
-            >
+            <label htmlFor="ai-enrich-custom-instructions" className="text-ods-text-primary text-h6">
               {customInstructionsLabel}
             </label>
             {customInstructionsMaxLength !== undefined && (
-              <span className="text-h6 text-ods-text-secondary">
+              <span className="text-ods-text-secondary text-h6">
                 {(customInstructions ?? '').length}/{customInstructionsMaxLength}
               </span>
             )}
@@ -179,7 +169,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
           <Textarea
             id="ai-enrich-custom-instructions"
             value={customInstructions ?? ''}
-            onChange={(e) => onCustomInstructionsChange?.(e.target.value)}
+            onChange={e => onCustomInstructionsChange?.(e.target.value)}
             placeholder={customInstructionsPlaceholder}
             disabled={loading}
             maxLength={customInstructionsMaxLength}
@@ -187,9 +177,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
             className="resize-y"
           />
           {customInstructionsHelperText && (
-            <p className="text-h6 text-ods-text-secondary">
-              {customInstructionsHelperText}
-            </p>
+            <p className="text-ods-text-secondary text-h6">{customInstructionsHelperText}</p>
           )}
         </div>
       )}
@@ -229,17 +217,15 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
       {/* Disabled message with unfilled fields */}
       {shouldDisable && !loading && (
         <div className="space-y-2">
-          <p className="text-ods-text-secondary text-h6">
-            {disabledMessage}
-          </p>
+          <p className="text-ods-text-secondary text-h6">{disabledMessage}</p>
           {unfilledFields.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {unfilledFields.map(field => (
                 <span
                   key={field.key}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 text-h6 rounded-full bg-ods-flamingo-cyan/10 text-ods-flamingo-cyan/70"
+                  className="inline-flex items-center gap-1 rounded-full bg-ods-flamingo-cyan/10 px-2 py-0.5 text-ods-flamingo-cyan/70 text-h6"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-ods-flamingo-cyan/50" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-ods-flamingo-cyan/50" />
                   {field.label}
                 </span>
               ))}
@@ -250,11 +236,9 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
 
       {/* Loading state with status message */}
       {loading && statusMessage && (
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-ods-bg-surface">
-          <Loader2 className="h-5 w-5 text-ods-accent animate-spin" />
-          <span className="text-h6 text-ods-text-primary">
-            {statusMessage}
-          </span>
+        <div className="flex items-center gap-3 rounded-lg bg-ods-bg-surface p-3">
+          <Loader2 className="h-5 w-5 animate-spin text-ods-accent" />
+          <span className="text-ods-text-primary text-h6">{statusMessage}</span>
         </div>
       )}
 
@@ -262,19 +246,18 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
       {hasResults && (
         <div className="space-y-4">
           {/* Status indicator - simple and clean */}
-          <div className={cn(
-            'flex items-center gap-3 p-3 rounded-lg',
-            status === 'success' ? 'bg-ods-success/10' : 'bg-ods-error/10'
-          )}>
+          <div
+            className={cn(
+              'flex items-center gap-3 rounded-lg p-3',
+              status === 'success' ? 'bg-ods-success/10' : 'bg-ods-error/10',
+            )}
+          >
             {status === 'success' ? (
               <CheckCircle className="h-5 w-5 text-ods-success" />
             ) : (
               <AlertCircle className="h-5 w-5 text-ods-error" />
             )}
-            <span className={cn(
-              'text-h6',
-              status === 'success' ? 'text-ods-success' : 'text-ods-error'
-            )}>
+            <span className={cn('text-h6', status === 'success' ? 'text-ods-success' : 'text-ods-error')}>
               {statusMessage || (status === 'success' ? 'Enrichment complete' : 'Enrichment failed')}
             </span>
             {overallConfidence !== undefined && status === 'success' && (
@@ -285,26 +268,19 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
           </div>
 
           {/* Warnings */}
-          {warnings && warnings.length > 0 && (
-            <AIWarningsSection warnings={warnings} />
-          )}
+          {warnings && warnings.length > 0 && <AIWarningsSection warnings={warnings} />}
 
           {/* Custom children content (like created tags info) */}
           {children}
 
           {/* Clear button */}
           {showClearButton && onClear && (
-            <Button
-              type="button"
-              variant="outline"
-              size="small-legacy"
-              onClick={onClear}
-            >
+            <Button type="button" variant="outline" size="small-legacy" onClick={onClear}>
               Clear Results
             </Button>
           )}
         </div>
       )}
     </div>
-  )
-}
+  );
+};

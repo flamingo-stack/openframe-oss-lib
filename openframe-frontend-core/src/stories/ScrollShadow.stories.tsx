@@ -30,19 +30,22 @@ const COLUMNS = ['HOSTNAME', 'PID', 'NAME', 'PATH', 'STATE', 'UID', 'RESIDENT', 
 
 const WideTable = () => (
   <div className="w-max min-w-full">
-    <div className="flex px-[var(--spacing-system-mf)] gap-[var(--spacing-system-mf)]">
+    <div className="flex gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]">
       {COLUMNS.map(col => (
         <div key={col} className="flex h-12 w-[160px] shrink-0 items-center">
-          <span className="text-h5 text-ods-text-secondary uppercase">{col}</span>
+          <span className="uppercase text-ods-text-secondary text-h5">{col}</span>
         </div>
       ))}
     </div>
     {[1, 2, 3].map(row => (
-      <div key={row} className="rounded-md bg-ods-card border border-ods-border overflow-hidden mb-[var(--spacing-system-xsf)]">
-        <div className="flex h-[78px] items-center px-[var(--spacing-system-mf)] gap-[var(--spacing-system-mf)]">
+      <div
+        key={row}
+        className="mb-[var(--spacing-system-xsf)] overflow-hidden rounded-md border border-ods-border bg-ods-card"
+      >
+        <div className="flex h-[78px] items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]">
           {COLUMNS.map(col => (
             <div key={col} className="w-[160px] shrink-0">
-              <span className="text-h4 text-ods-text-primary truncate">
+              <span className="truncate text-ods-text-primary text-h4">
                 {col.toLowerCase()}-{row}
               </span>
             </div>
@@ -69,8 +72,8 @@ export const HorizontalTable: Story = {
 const LongList = () => (
   <div className="flex flex-col gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-mf)]">
     {Array.from({ length: 20 }).map((_, i) => (
-      <div key={i} className="rounded-md bg-ods-card border border-ods-border p-[var(--spacing-system-mf)]">
-        <span className="text-h4 text-ods-text-primary">Message {i + 1}</span>
+      <div key={i} className="rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]">
+        <span className="text-ods-text-primary text-h4">Message {i + 1}</span>
       </div>
     ))}
   </div>
@@ -111,7 +114,7 @@ export const LightSurface: Story = {
     scrollClassName: 'h-[320px]',
   },
   render: args => (
-    <div className="max-w-[480px] bg-white rounded-md">
+    <div className="max-w-[480px] rounded-md bg-white">
       <ScrollShadow {...args} />
     </div>
   ),

@@ -40,7 +40,7 @@ class CustomPushDeviceRepositoryImplTest {
         when(mongoTemplate.upsert(any(Query.class), any(Update.class), eq(PushDevice.class)))
                 .thenReturn(inserted);
 
-        assertThat(repository.registerToken("alice", "tok-1", PushPlatform.ANDROID)).isTrue();
+        assertThat(repository.registerToken("alice", "tok-1", PushPlatform.ANDROID, "1.4.0")).isTrue();
 
         ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
         verify(mongoTemplate).upsert(query.capture(), any(Update.class), eq(PushDevice.class));
@@ -54,12 +54,12 @@ class CustomPushDeviceRepositoryImplTest {
         when(mongoTemplate.upsert(any(Query.class), any(Update.class), eq(PushDevice.class)))
                 .thenReturn(updated);
 
-        assertThat(repository.registerToken("bob", "tok-1", PushPlatform.ANDROID)).isFalse();
+        assertThat(repository.registerToken("bob", "tok-1", PushPlatform.ANDROID, "1.4.0")).isFalse();
 
         ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
         verify(mongoTemplate).upsert(any(Query.class), update.capture(), eq(PushDevice.class));
         String set = update.getValue().getUpdateObject().get("$set").toString();
-        assertThat(set).contains("userId=bob");
+        assertThat(set).contains("userId=bob").contains("appVersion=1.4.0");
     }
 
     @Test
@@ -71,7 +71,7 @@ class CustomPushDeviceRepositoryImplTest {
         when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(PushDevice.class)))
                 .thenReturn(claimed);
 
-        assertThat(repository.registerToken("alice", "tok-1", PushPlatform.IOS)).isFalse();
+        assertThat(repository.registerToken("alice", "tok-1", PushPlatform.IOS, null)).isFalse();
 
         verify(mongoTemplate, times(1)).upsert(any(Query.class), any(Update.class), eq(PushDevice.class));
         verify(mongoTemplate).updateFirst(any(Query.class), any(Update.class), eq(PushDevice.class));
@@ -88,7 +88,7 @@ class CustomPushDeviceRepositoryImplTest {
         when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(PushDevice.class)))
                 .thenReturn(nothingMatched);
 
-        assertThat(repository.registerToken("alice", "tok-1", PushPlatform.IOS)).isTrue();
+        assertThat(repository.registerToken("alice", "tok-1", PushPlatform.IOS, null)).isTrue();
 
         verify(mongoTemplate, times(2)).upsert(any(Query.class), any(Update.class), eq(PushDevice.class));
     }

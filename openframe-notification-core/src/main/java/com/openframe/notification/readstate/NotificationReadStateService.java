@@ -1,11 +1,14 @@
 package com.openframe.notification.readstate;
 
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.CategoryCount;
+import com.openframe.data.repository.notification.EntityCount;
 import com.openframe.data.repository.notification.NotificationReadStateRepository;
+import com.openframe.notification.spec.NotificationEntityRef;
 import com.openframe.data.service.TenantIdProvider;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -18,6 +21,7 @@ import org.springframework.validation.annotation.Validated;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +40,17 @@ public class NotificationReadStateService {
                                   String title,
                                   @NotNull RecipientType recipientType,
                                   @NotEmpty Collection<String> recipientIds) {
+        createForAudience(notificationId, category, title, null, recipientType, recipientIds);
+    }
+
+    public void createForAudience(@NotBlank String notificationId,
+                                  @NotNull NotificationCategory category,
+                                  String title,
+                                  NotificationEntityRef entity,
+                                  @NotNull RecipientType recipientType,
+                                  @NotEmpty Collection<String> recipientIds) {
+        NotificationEntityType entityType = entity == null ? null : entity.getType();
+        String entityId = entity == null ? null : entity.getId();
         List<NotificationReadState> rows = new ArrayList<>(recipientIds.size());
         for (String recipientId : recipientIds) {
             rows.add(NotificationReadState.builder()
@@ -44,6 +59,8 @@ public class NotificationReadStateService {
                     .notificationId(notificationId)
                     .status(ReadStatus.UNREAD)
                     .category(category)
+                    .entityType(entityType)
+                    .entityId(entityId)
                     .title(title)
                     .build());
         }
@@ -70,12 +87,15 @@ public class NotificationReadStateService {
     }
 
     public long markAllAsRead(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
-        // Snapshot BEFORE the flip: under concurrency the ids can drift from what the flip matches,
-        // in both directions. Deliberate — events are best-effort (a throwing listener already loses
-        // one) and listeners must be idempotent; exactness would need a transaction.
         List<String> unreadIds = notificationIds(
                 repository.findByRecipientIdAndRecipientTypeAndStatus(recipientId, recipientType, ReadStatus.UNREAD));
-        long flipped = repository.markAllAsRead(recipientId, recipientType);
+        if (unreadIds.isEmpty()) {
+            return 0L;
+        }
+        // Flip the snapshot, not "everything unread": one arriving in between would turn read with
+        // nobody retracting its push. What turns read here is exactly what gets published.
+        String tenantId = tenantIdProvider.getTenantId();
+        long flipped = repository.markAsReadByIds(tenantId, recipientId, recipientType, unreadIds);
         publish(recipientId, recipientType, unreadIds, NotificationReadEvent.Transition.READ);
         return flipped;
     }
@@ -113,7 +133,11 @@ public class NotificationReadStateService {
     public long deleteAllRead(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
         List<String> readIds = notificationIds(
                 repository.findByRecipientIdAndRecipientTypeAndStatus(recipientId, recipientType, ReadStatus.READ));
-        long deleted = repository.softDeleteAllRead(recipientId, recipientType);
+        if (readIds.isEmpty()) {
+            return 0L;
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        long deleted = repository.softDeleteByIds(tenantId, recipientId, recipientType, readIds);
         publish(recipientId, recipientType, readIds, NotificationReadEvent.Transition.DELETED);
         return deleted;
     }
@@ -128,6 +152,56 @@ public class NotificationReadStateService {
             }
         }
         return counts;
+    }
+
+    public Map<String, Long> unreadCountsByEntity(@NotBlank String recipientId,
+                                                  @NotNull RecipientType recipientType,
+                                                  @NotNull NotificationEntityType entityType) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<EntityCount> rows = repository.unreadCountsByEntity(recipientId, recipientType, entityType, tenantId);
+        return countsById(rows);
+    }
+
+    public Map<String, Long> unreadCountsByEntity(@NotBlank String recipientId,
+                                                  @NotNull RecipientType recipientType,
+                                                  @NotNull NotificationEntityType entityType,
+                                                  @NotNull Collection<String> entityIds) {
+        if (entityIds.isEmpty()) {
+            return Map.of();
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        List<EntityCount> rows = repository.unreadCountsByEntityIds(
+                recipientId, recipientType, entityType, entityIds, tenantId);
+        return countsById(rows);
+    }
+
+    private Map<String, Long> countsById(List<EntityCount> rows) {
+        Map<String, Long> counts = new HashMap<>(rows.size());
+        for (EntityCount row : rows) {
+            String entityId = row.entityId();
+            if (entityId != null) {
+                counts.put(entityId, row.count());
+            }
+        }
+        return counts;
+    }
+
+    public long markEntityAsRead(@NotBlank String recipientId,
+                                 @NotNull RecipientType recipientType,
+                                 @NotNull NotificationEntityType entityType,
+                                 @NotBlank String entityId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<NotificationReadState> unreadRows = repository.findByRecipientIdAndRecipientTypeAndEntity(
+                recipientId, recipientType, entityType, entityId, ReadStatus.UNREAD, tenantId);
+        List<String> unreadIds = notificationIds(unreadRows);
+        if (unreadIds.isEmpty()) {
+            return 0L;
+        }
+        // Flip the snapshot, not the entity: whatever turns read here is exactly what gets published,
+        // so no notification can end up read with its push banner still on someone's phone.
+        long flipped = repository.markAsReadByIds(tenantId, recipientId, recipientType, unreadIds);
+        publish(recipientId, recipientType, unreadIds, NotificationReadEvent.Transition.READ);
+        return flipped;
     }
 
     private void publish(String recipientId, RecipientType recipientType,

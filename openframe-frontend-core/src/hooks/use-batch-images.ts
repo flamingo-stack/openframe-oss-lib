@@ -1,22 +1,22 @@
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react';
 
 /**
  * Configuration for batch image fetching
  */
 export interface BatchImageFetchConfig {
   /** Base URL for tenant-specific API calls (e.g., 'https://tenant.openframe.dev' or '') */
-  tenantHostUrl?: string
+  tenantHostUrl?: string;
   /** Enable dev mode with Bearer token from localStorage */
-  enableDevMode?: boolean
+  enableDevMode?: boolean;
   /** localStorage key for access token (default: 'of_access_token') */
-  accessTokenKey?: string
+  accessTokenKey?: string;
 }
 
 /**
  * Global configuration for batch image fetching
  * Can be set once at app initialization
  */
-let globalBatchImageConfig: BatchImageFetchConfig = {}
+let globalBatchImageConfig: BatchImageFetchConfig = {};
 
 /**
  * Configure global settings for batch image fetching
@@ -32,7 +32,7 @@ let globalBatchImageConfig: BatchImageFetchConfig = {}
  * ```
  */
 export function configureBatchImageFetch(config: BatchImageFetchConfig): void {
-  globalBatchImageConfig = { ...globalBatchImageConfig, ...config }
+  globalBatchImageConfig = { ...globalBatchImageConfig, ...config };
 }
 
 /**
@@ -42,8 +42,8 @@ function getBatchImageConfig(): Required<BatchImageFetchConfig> {
   return {
     tenantHostUrl: globalBatchImageConfig.tenantHostUrl || '',
     enableDevMode: globalBatchImageConfig.enableDevMode ?? false,
-    accessTokenKey: globalBatchImageConfig.accessTokenKey || 'of_access_token'
-  }
+    accessTokenKey: globalBatchImageConfig.accessTokenKey || 'of_access_token',
+  };
 }
 
 /**
@@ -65,52 +65,52 @@ function getBatchImageConfig(): Required<BatchImageFetchConfig> {
  */
 export async function batchFetchAuthenticatedImages(
   imageUrls: string[],
-  config?: BatchImageFetchConfig
+  config?: BatchImageFetchConfig,
 ): Promise<Record<string, string | undefined>> {
-  const results: Record<string, string | undefined> = {}
+  const results: Record<string, string | undefined> = {};
 
   if (imageUrls.length === 0) {
-    return results
+    return results;
   }
 
   const { tenantHostUrl, enableDevMode, accessTokenKey } = {
     ...getBatchImageConfig(),
-    ...config
-  }
+    ...config,
+  };
 
-  const fetchPromises = imageUrls.map(async (imageUrl) => {
+  const fetchPromises = imageUrls.map(async imageUrl => {
     try {
       // Construct full image URL
-      let fullImageUrl: string
+      let fullImageUrl: string;
       if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-        fullImageUrl = imageUrl
+        fullImageUrl = imageUrl;
       } else if (imageUrl.startsWith('/api/')) {
-        fullImageUrl = `${tenantHostUrl}${imageUrl}`
+        fullImageUrl = `${tenantHostUrl}${imageUrl}`;
       } else if (imageUrl.startsWith('/')) {
-        fullImageUrl = `${tenantHostUrl}/api${imageUrl}`
+        fullImageUrl = `${tenantHostUrl}/api${imageUrl}`;
       } else {
-        fullImageUrl = `${tenantHostUrl}/api/${imageUrl}`
+        fullImageUrl = `${tenantHostUrl}/api/${imageUrl}`;
       }
 
       // Add cache buster
-      const cacheBuster = `?t=${Date.now()}`
-      fullImageUrl = fullImageUrl + cacheBuster
+      const cacheBuster = `?t=${Date.now()}`;
+      fullImageUrl = fullImageUrl + cacheBuster;
 
       // Prepare headers
       const headers: Record<string, string> = {
-        'Accept': 'image/*',
+        Accept: 'image/*',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      }
+        Pragma: 'no-cache',
+      };
 
       // Add Bearer token in dev mode
       if (enableDevMode) {
         try {
-          const accessToken = localStorage.getItem(accessTokenKey)
+          const accessToken = localStorage.getItem(accessTokenKey);
           if (accessToken) {
-            headers['Authorization'] = `Bearer ${accessToken}`
+            headers.Authorization = `Bearer ${accessToken}`;
           }
-        } catch (error) {
+        } catch {
           // Silently continue without token
         }
       }
@@ -119,31 +119,31 @@ export async function batchFetchAuthenticatedImages(
       const response = await fetch(fullImageUrl, {
         method: 'GET',
         credentials: 'include', // Include cookies for authentication
-        headers
-      })
+        headers,
+      });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.status}`)
+        throw new Error(`Failed to fetch image: ${response.status}`);
       }
 
       // Convert to blob URL
-      const blob = await response.blob()
-      const objectUrl = URL.createObjectURL(blob)
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
 
-      return { imageUrl, fetchedUrl: objectUrl }
+      return { imageUrl, fetchedUrl: objectUrl };
     } catch (error) {
-      console.warn(`Failed to fetch image ${imageUrl}:`, error)
-      return { imageUrl, fetchedUrl: undefined }
+      console.warn(`Failed to fetch image ${imageUrl}:`, error);
+      return { imageUrl, fetchedUrl: undefined };
     }
-  })
+  });
 
-  const fetchResults = await Promise.all(fetchPromises)
+  const fetchResults = await Promise.all(fetchPromises);
 
   fetchResults.forEach(({ imageUrl, fetchedUrl }) => {
-    results[imageUrl] = fetchedUrl
-  })
+    results[imageUrl] = fetchedUrl;
+  });
 
-  return results
+  return results;
 }
 
 /**
@@ -174,58 +174,74 @@ export async function batchFetchAuthenticatedImages(
  */
 export function useBatchImages(
   imageUrls: (string | null | undefined)[],
-  config?: BatchImageFetchConfig
+  config?: BatchImageFetchConfig,
 ): Record<string, string | undefined> {
-  const [fetchedImages, setFetchedImages] = useState<Record<string, string | undefined>>({})
-  const [loading, setLoading] = useState(false)
+  const [fetchedImages, setFetchedImages] = useState<Record<string, string | undefined>>({});
 
   // Deduplicate and filter out null/undefined
-  const uniqueUrls = useMemo(() =>
-    Array.from(new Set(imageUrls.filter((url): url is string => Boolean(url)))),
-    [imageUrls]
-  )
+  const uniqueUrls = useMemo(
+    () => Array.from(new Set(imageUrls.filter((url): url is string => Boolean(url)))),
+    [imageUrls],
+  );
 
   // Track URLs we've already requested to avoid duplicate fetches
-  const requestedUrls = useRef<Set<string>>(new Set())
+  const requestedUrls = useRef<Set<string>>(new Set());
+
+  // Revoke on UNMOUNT only, reading the latest map through a ref.
+  //
+  // This used to be the cleanup of the fetch effect below, closing over
+  // `fetchedImages` from the render the effect happened to run in. Two bugs
+  // fell out of that: URLs fetched after that render were never revoked
+  // (a leak), and a change to `imageUrls`/`config` revoked the whole captured
+  // set while state still pointed at those blobs — every image on screen broke.
+  const fetchedImagesRef = useRef(fetchedImages);
+  useEffect(() => {
+    fetchedImagesRef.current = fetchedImages;
+  }, [fetchedImages]);
+  useEffect(
+    () => () => {
+      Object.values(fetchedImagesRef.current).forEach(blobUrl => {
+        if (blobUrl && blobUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(blobUrl);
+        }
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (uniqueUrls.length === 0) {
-      setFetchedImages({})
-      return
-    }
+    // An empty `imageUrls` used to wipe `fetchedImages` back to `{}` here. That
+    // was wrong three ways, and removing it fixes all three:
+    //  * `requestedUrls` was NOT cleared alongside it, so once a url came back
+    //    it was filtered out as "already requested" and never re-fetched — the
+    //    image stayed permanently blank;
+    //  * the wiped blob URLs were dropped from the map the unmount cleanup
+    //    revokes from, so they leaked;
+    //  * it was a synchronous setState in an effect body, i.e. a second render
+    //    pass for a map nobody is indexing into (there are no urls to look up).
+    // The map is a url-keyed cache: stale entries are unreachable, not stale
+    // data, and it is bounded by the same url set `requestedUrls` already holds.
 
     // Find URLs we haven't fetched yet
-    const urlsToFetch = uniqueUrls.filter(url => !requestedUrls.current.has(url))
+    const urlsToFetch = uniqueUrls.filter(url => !requestedUrls.current.has(url));
 
     if (urlsToFetch.length === 0) {
-      return // All URLs already requested
+      return; // All URLs already requested
     }
 
     // Mark these URLs as requested
-    urlsToFetch.forEach(url => requestedUrls.current.add(url))
-
-    setLoading(true)
+    urlsToFetch.forEach(url => {
+      requestedUrls.current.add(url);
+    });
 
     batchFetchAuthenticatedImages(urlsToFetch, config)
       .then(newResults => {
-        setFetchedImages(prev => ({ ...prev, ...newResults }))
+        setFetchedImages(prev => ({ ...prev, ...newResults }));
       })
-      .catch(error => {
-        console.error('Failed to batch fetch images:', error)
-      })
-      .finally(() => {
-        setLoading(false)
-      })
+      .catch((error: unknown) => {
+        console.error('Failed to batch fetch images:', error);
+      });
+  }, [uniqueUrls, config]);
 
-    // Cleanup blob URLs on unmount
-    return () => {
-      Object.values(fetchedImages).forEach(blobUrl => {
-        if (blobUrl && blobUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(blobUrl)
-        }
-      })
-    }
-  }, [uniqueUrls, config])
-
-  return fetchedImages
+  return fetchedImages;
 }

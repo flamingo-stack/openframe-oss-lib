@@ -7,7 +7,7 @@ import com.openframe.api.dto.command.BatchRunCommandInput;
 import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
-import com.openframe.api.service.rmm.CommandDispatchService;
+import com.openframe.api.service.rmm.command.CommandDispatchService;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

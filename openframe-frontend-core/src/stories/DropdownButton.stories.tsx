@@ -26,7 +26,7 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div className="flex min-h-80 items-start justify-center p-8">
         <Story />
       </div>

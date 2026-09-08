@@ -1,7 +1,6 @@
-import type { SVGProps } from "react";
+import type { SVGProps } from 'react';
 
-export interface PlayFilledIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
+export interface PlayFilledIconProps extends Omit<SVGProps<SVGSVGElement>, 'width' | 'height'> {
   className?: string;
   size?: number;
   color?: string;
@@ -14,12 +13,7 @@ export interface PlayFilledIconProps
  * Hand-maintained (not in the Figma-generated set, which has only the
  * outline `PlayIcon`).
  */
-export function PlayFilledIcon({
-  className = "",
-  size = 24,
-  color = "currentColor",
-  ...props
-}: PlayFilledIconProps) {
+export function PlayFilledIcon({ className = '', size = 24, color = 'currentColor', ...props }: PlayFilledIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

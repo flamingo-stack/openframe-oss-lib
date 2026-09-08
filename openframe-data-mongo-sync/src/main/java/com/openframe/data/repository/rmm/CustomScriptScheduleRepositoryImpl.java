@@ -1,9 +1,9 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptMachineAssigned;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,7 +57,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static final String FIELD_SCRIPT_SCHEDULE_ID = "scriptScheduleId";
     private static final String FIELD_TRIGGER = "trigger";
     private static final String FIELD_TRIGGER_BUCKET = "_triggerBucket";
-    private static final ScriptScheduleTrigger TRIGGER_LAST = ScriptScheduleTrigger.DEVICE_ONLINE;
+    private static final ScheduleScriptTrigger TRIGGER_LAST = ScheduleScriptTrigger.DEVICE_ONLINE;
     private static final String ASSIGNMENTS_COLLECTION = "script_schedules_machines_assigned";
     private static final String LOOKUP_ALIAS = "assignments";
     private static final String CURSOR_SEPARATOR = "|";
@@ -68,7 +68,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private final MongoTemplate mongoTemplate;
 
     @Override
-    public List<ScriptSchedule> findPageForTenant(String tenantId,
+    public List<ScheduleScript> findPageForTenant(String tenantId,
                                                   ScriptScheduleQueryFilter filter,
                                                   String search,
                                                   String sortField,
@@ -92,10 +92,10 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
                 .with(sortWithIdTiebreaker(effectiveDir, sortField))
                 .limit(limit);
 
-        return mongoTemplate.find(query, ScriptSchedule.class);
+        return mongoTemplate.find(query, ScheduleScript.class);
     }
 
-    private List<ScriptSchedule> findPageAggregatedByDeviceCount(String tenantId,
+    private List<ScheduleScript> findPageAggregatedByDeviceCount(String tenantId,
                                                                  ScriptScheduleQueryFilter filter,
                                                                  String search,
                                                                  Sort.Direction effectiveDir,
@@ -160,7 +160,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         ops.add(ctx -> new Document("$match", orExpr));
     }
 
-    private List<ScriptSchedule> findPageAggregatedByStartAtTriggerLast(String tenantId,
+    private List<ScheduleScript> findPageAggregatedByStartAtTriggerLast(String tenantId,
                                                                         ScriptScheduleQueryFilter filter,
                                                                         String search,
                                                                         Sort.Direction effectiveDir,
@@ -240,20 +240,20 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         ops.add(ctx -> new Document("$match", new Document("$or", arms)));
     }
 
-    private ScriptSchedule toSchedule(Document doc) {
-        return mongoTemplate.getConverter().read(ScriptSchedule.class, doc);
+    private ScheduleScript toSchedule(Document doc) {
+        return mongoTemplate.getConverter().read(ScheduleScript.class, doc);
     }
 
-    private int computeDeviceCount(ScriptSchedule schedule) {
+    private int computeDeviceCount(ScheduleScript schedule) {
         Query q = new Query(Criteria.where(FIELD_TENANT_ID).is(schedule.getTenantId())
                 .and(FIELD_SCRIPT_SCHEDULE_ID).is(schedule.getId()));
-        return Math.toIntExact(mongoTemplate.count(q, ScriptScheduleMachineAssigned.class));
+        return Math.toIntExact(mongoTemplate.count(q, ScheduleScriptMachineAssigned.class));
     }
 
     @Override
     public long countForTenant(String tenantId, ScriptScheduleQueryFilter filter, String search) {
         Query query = new Query(buildBaseCriteria(tenantId, filter, search));
-        return mongoTemplate.count(query, ScriptSchedule.class);
+        return mongoTemplate.count(query, ScheduleScript.class);
     }
 
     /**
@@ -307,7 +307,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         }
         ops.add(Aggregation.group(groupField).count().as(FIELD_COUNT));
         AggregationResults<Document> results =
-                mongoTemplate.aggregate(Aggregation.newAggregation(ops), ScriptSchedule.class, Document.class);
+                mongoTemplate.aggregate(Aggregation.newAggregation(ops), ScheduleScript.class, Document.class);
 
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (Document doc : results.getMappedResults()) {
@@ -493,7 +493,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     }
 
     @Override
-    public String encodeCursor(ScriptSchedule schedule, String sortField) {
+    public String encodeCursor(ScheduleScript schedule, String sortField) {
         if (schedule == null) {
             return null;
         }
@@ -509,7 +509,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         return encodeSortValue(schedule, sortField) + CURSOR_SEPARATOR + schedule.getId();
     }
 
-    private static int triggerBucket(ScriptSchedule schedule) {
+    private static int triggerBucket(ScheduleScript schedule) {
         return schedule.getTrigger() == TRIGGER_LAST ? 1 : 0;
     }
 
@@ -518,7 +518,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
      * separator is located from the right, so a value containing it (a schedule name) is
      * still split correctly against the fixed-length ObjectId.
      */
-    private String encodeSortValue(ScriptSchedule schedule, String sortField) {
+    private String encodeSortValue(ScheduleScript schedule, String sortField) {
         Object value = switch (sortField) {
             case FIELD_NAME -> schedule.getName();
             case FIELD_REPEAT -> schedule.getRepeat();

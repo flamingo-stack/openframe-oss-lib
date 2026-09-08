@@ -1,13 +1,13 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import React from 'react';
 import {
   Chevron01DownIcon as ChevronDown,
   Ellipsis02Icon as MoreVertical,
   ExternalLinkIcon as ExternalLink,
   FloppyDiscIcon as Save,
   TrashIcon as Trash2,
-} from '../components/icons-v2-generated'
-import React from 'react'
-import { SplitButton } from '../components/ui/button'
+} from '../components/icons-v2-generated';
+import { SplitButton } from '../components/ui/button';
 
 const meta = {
   title: 'UI/SplitButton',
@@ -24,23 +24,23 @@ const meta = {
     fullWidth: { control: 'boolean' },
     disabled: { control: 'boolean' },
   },
-} satisfies Meta<typeof SplitButton>
+} satisfies Meta<typeof SplitButton>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 const newTabAction = {
   icon: <ExternalLink />,
   'aria-label': 'Open in new tab',
   href: 'https://example.com',
   openInNewTab: true,
-}
+};
 
 const dropdownAction = {
   icon: <ChevronDown />,
   'aria-label': 'More options',
   onClick: () => alert('Open menu'),
-}
+};
 
 export const Accent: Story = {
   args: {
@@ -49,7 +49,7 @@ export const Accent: Story = {
     onClick: () => alert('Main click'),
     iconAction: newTabAction,
   },
-}
+};
 
 export const Outline: Story = {
   args: {
@@ -58,7 +58,7 @@ export const Outline: Story = {
     onClick: () => alert('Main click'),
     iconAction: newTabAction,
   },
-}
+};
 
 export const Transparent: Story = {
   args: {
@@ -67,7 +67,7 @@ export const Transparent: Story = {
     onClick: () => alert('Main click'),
     iconAction: newTabAction,
   },
-}
+};
 
 export const Destructive: Story = {
   args: {
@@ -81,7 +81,7 @@ export const Destructive: Story = {
       onClick: () => alert('Menu'),
     },
   },
-}
+};
 
 export const Warning: Story = {
   args: {
@@ -94,7 +94,7 @@ export const Warning: Story = {
       onClick: () => alert('Menu'),
     },
   },
-}
+};
 
 export const SizeSmall: Story = {
   args: {
@@ -103,7 +103,7 @@ export const SizeSmall: Story = {
     onClick: () => alert('Main click'),
     iconAction: newTabAction,
   },
-}
+};
 
 export const AsLink: Story = {
   args: {
@@ -112,7 +112,7 @@ export const AsLink: Story = {
     href: '/docs',
     iconAction: newTabAction,
   },
-}
+};
 
 export const WithLeftIcon: Story = {
   args: {
@@ -121,7 +121,7 @@ export const WithLeftIcon: Story = {
     onClick: () => alert('Save'),
     iconAction: dropdownAction,
   },
-}
+};
 
 export const Disabled: Story = {
   args: {
@@ -130,7 +130,7 @@ export const Disabled: Story = {
     onClick: () => alert('Main'),
     iconAction: newTabAction,
   },
-}
+};
 
 export const IconActionDisabled: Story = {
   args: {
@@ -138,15 +138,23 @@ export const IconActionDisabled: Story = {
     onClick: () => alert('Main'),
     iconAction: { ...dropdownAction, disabled: true },
   },
-}
+};
 
 export const AllVariants: Story = {
   args: { children: 'Button', iconAction: newTabAction },
   render: () => {
-    const variants = ['accent', 'outline', 'transparent', 'destructive', 'warning'] as const
+    const variants = ['accent', 'outline', 'transparent', 'destructive', 'warning'] as const;
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto auto', gap: '1rem', alignItems: 'center', justifyItems: 'start' }}>
-        {variants.map((variant) => (
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto auto auto auto',
+          gap: '1rem',
+          alignItems: 'center',
+          justifyItems: 'start',
+        }}
+      >
+        {variants.map(variant => (
           <React.Fragment key={variant}>
             <SplitButton variant={variant} onClick={() => {}} iconAction={newTabAction}>
               {variant}
@@ -163,9 +171,9 @@ export const AllVariants: Story = {
           </React.Fragment>
         ))}
       </div>
-    )
+    );
   },
-}
+};
 
 export const TwoActions: Story = {
   args: { children: 'Two actions', iconAction: newTabAction },
@@ -197,4 +205,4 @@ export const TwoActions: Story = {
       </SplitButton>
     </div>
   ),
-}
+};

@@ -1,14 +1,10 @@
-import React from 'react';
-
 interface TelegramIconProps {
   color?: string;
   className?: string;
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function TelegramIcon({ className ,
-  color = 'white'
-}:  TelegramIconProps) {
+export function TelegramIcon({ className, color = 'white' }: TelegramIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

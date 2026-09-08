@@ -1,24 +1,24 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { useDebounce } from '../../hooks/ui/use-debounce'
-import { SearchIcon } from '../icons-v2-generated'
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useDebounce } from '../../hooks/ui/use-debounce';
+import { cn } from '../../utils/cn';
+import { SearchIcon } from '../icons-v2-generated';
 
 export interface ChatHeaderSearchFieldProps {
   /** Seeds the field on mount (the current server-side search term). */
-  initialValue?: string
+  initialValue?: string;
   /** Emits the DEBOUNCED term. The host owns the query and refetches the
    *  dialog list server-side — the field never filters locally. */
-  onSearchChange: (query: string) => void
+  onSearchChange: (query: string) => void;
   /** Collapse the field back to the title. Fired on Escape and on blur while
    *  the field is empty (an accidental open closes itself). */
-  onCollapse?: () => void
+  onCollapse?: () => void;
   /** Focus the input on mount (default true — the field only mounts when the
    *  user opens search, so we drop them straight into typing). */
-  autoFocus?: boolean
+  autoFocus?: boolean;
   /** Appended to the root element (e.g. to tweak the open animation). */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -35,62 +35,62 @@ export function ChatHeaderSearchField({
   autoFocus = true,
   className,
 }: ChatHeaderSearchFieldProps) {
-  const [value, setValue] = React.useState(initialValue ?? '')
-  const debounced = useDebounce(value, 300)
-  const lastEmitted = React.useRef(initialValue ?? '')
+  const [value, setValue] = useState(initialValue ?? '');
+  const debounced = useDebounce(value, 300);
+  const lastEmitted = useRef(initialValue ?? '');
 
   // Exit animation: collapsing plays `animate-out` (slide/fade back toward the
   // right) BEFORE the parent unmounts us. We stay mounted through the leave —
   // the parent only drops the field once we call `onCollapse`, which we defer
   // to the animation's end.
-  const [exiting, setExiting] = React.useState(false)
-  const collapsedRef = React.useRef(false)
+  const [exiting, setExiting] = useState(false);
+  const collapsedRef = useRef(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Once the collapse starts, no further emits: Escape already flushed the
     // cleared term synchronously, and a still-pending debounce of the typed
     // text ("abc" → Escape before 300ms) must not resurrect a stale query
     // while the field animates out.
-    if (exiting) return
-    if (debounced === lastEmitted.current) return
-    lastEmitted.current = debounced
-    onSearchChange(debounced)
-  }, [debounced, exiting, onSearchChange])
+    if (exiting) return;
+    if (debounced === lastEmitted.current) return;
+    lastEmitted.current = debounced;
+    onSearchChange(debounced);
+  }, [debounced, exiting, onSearchChange]);
 
-  const finishCollapse = React.useCallback(() => {
-    if (collapsedRef.current) return
-    collapsedRef.current = true
-    onCollapse?.()
-  }, [onCollapse])
+  const finishCollapse = useCallback(() => {
+    if (collapsedRef.current) return;
+    collapsedRef.current = true;
+    onCollapse?.();
+  }, [onCollapse]);
 
-  const beginCollapse = React.useCallback(() => {
-    setExiting(true)
-  }, [])
+  const beginCollapse = useCallback(() => {
+    setExiting(true);
+  }, []);
 
   // Fallback for when `animationend` never fires (reduced motion, or the
   // animation utilities are disabled) — otherwise the field would hang open.
-  React.useEffect(() => {
-    if (!exiting) return
-    const t = setTimeout(finishCollapse, 240)
-    return () => clearTimeout(t)
-  }, [exiting, finishCollapse])
+  useEffect(() => {
+    if (!exiting) return undefined;
+    const t = setTimeout(finishCollapse, 240);
+    return () => clearTimeout(t);
+  }, [exiting, finishCollapse]);
 
   return (
     <div
-      onAnimationEnd={(e) => {
+      onAnimationEnd={e => {
         // Only the root's OWN leave animation collapses — ignore the child
         // icon's animations bubbling up, and the enter animation.
-        if (e.target === e.currentTarget && exiting) finishCollapse()
+        if (e.target === e.currentTarget && exiting) finishCollapse();
       }}
       className={cn(
         'flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)]',
         exiting
           ? // Elegant leave: sweep back out to the right + fade, holding the end
             // frame (`fill-mode-forwards`) so it stays hidden until unmount.
-            'animate-out fade-out-0 slide-out-to-right-4 duration-200 ease-in fill-mode-forwards pointer-events-none'
+            'pointer-events-none duration-200 ease-in animate-out fade-out-0 slide-out-to-right-4 fill-mode-forwards'
           : // Elegant open: sweep in from the right (where the magnifier toggle
             // sat) and fade up as it takes over the title area.
-            'animate-in fade-in-0 slide-in-from-right-4 duration-200 ease-out',
+            'duration-200 ease-out animate-in fade-in-0 slide-in-from-right-4',
         className,
       )}
     >
@@ -98,26 +98,26 @@ export function ChatHeaderSearchField({
           "growing" into the field rather than hard-cutting in. */}
       <SearchIcon
         size={24}
-        className="shrink-0 text-ods-text-secondary animate-in fade-in-0 zoom-in-75 duration-300 ease-out"
+        className="shrink-0 text-ods-text-secondary duration-300 ease-out animate-in fade-in-0 zoom-in-75"
       />
-      {/* biome-ignore lint/a11y/noAutofocus: the field only mounts on an
-          explicit search toggle, so focusing it is the intended behaviour. */}
+      {/* `autoFocus` on purpose: the field only mounts on an explicit search
+          toggle, so focusing it is what the user just asked for. */}
       <input
         autoFocus={autoFocus}
         type="text"
         value={value}
         disabled={exiting}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => {
           if (e.key === 'Escape') {
-            e.preventDefault()
-            setValue('')
+            e.preventDefault();
+            setValue('');
             // Emit the cleared term immediately AND record it as the last emit,
             // so the 300ms debounce effect doesn't fire a second, redundant
             // `onSearchChange('')` (extra server round-trip) before we unmount.
-            lastEmitted.current = ''
-            onSearchChange('')
-            beginCollapse()
+            lastEmitted.current = '';
+            onSearchChange('');
+            beginCollapse();
           }
         }}
         onBlur={() => {
@@ -129,16 +129,16 @@ export function ChatHeaderSearchField({
             // query ("abc" → "" → immediate blur) must emit its reset here or
             // the host would keep filtering by the stale term.
             if (lastEmitted.current !== '') {
-              lastEmitted.current = ''
-              onSearchChange('')
+              lastEmitted.current = '';
+              onSearchChange('');
             }
-            beginCollapse()
+            beginCollapse();
           }
         }}
         placeholder="Search for Chats"
         aria-label="Search chats"
-        className="min-w-0 flex-1 bg-transparent text-h4 text-ods-text-primary placeholder:text-ods-text-secondary focus:outline-none"
+        className="min-w-0 flex-1 bg-transparent text-ods-text-primary text-h4 placeholder:text-ods-text-secondary focus:outline-none"
       />
     </div>
-  )
+  );
 }

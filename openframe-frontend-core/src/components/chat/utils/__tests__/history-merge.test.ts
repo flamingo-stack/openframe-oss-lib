@@ -1,41 +1,46 @@
-import { describe, expect, it } from 'vitest'
-import type { MessageSegment } from '../../types'
+import { describe, expect, it } from 'vitest';
+import type { MessageSegment } from '../../types';
 import {
   computeHistoryPrepend,
   flattenMessagePagesChronological,
   maxPersistedStreamSeq,
   type MergeableChatMessage,
   mergeHistoryWithRealtime,
-} from '../history-merge'
+} from '../history-merge';
 
 interface TestMessage extends MergeableChatMessage {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant';
 }
 
-const txt = (s: string): MessageSegment[] => [{ type: 'text', text: s }]
-const t = (ms: number) => new Date(ms)
-const ids = (msgs: TestMessage[]) => msgs.map((m) => m.id)
+const txt = (s: string): MessageSegment[] => [{ type: 'text', text: s }];
+const t = (ms: number) => new Date(ms);
+const ids = (msgs: TestMessage[]) => msgs.map(m => m.id);
 const batchSeg = {
   type: 'approval_batch',
   data: { approvalRequestId: 'req-9', toolCalls: [] },
-} as unknown as MessageSegment
+} as unknown as MessageSegment;
 const tool = (id: string, state: 'EXECUTING_TOOL' | 'EXECUTED_TOOL'): MessageSegment =>
   ({
     type: 'tool_execution',
     data: { type: state, integratedToolType: 'sqlite', toolFunction: 'query', toolExecutionRequestId: id },
-  }) as unknown as MessageSegment
+  }) as unknown as MessageSegment;
 
 // Persisted history (Mongo ids), first fetched at t=1000
-const U0: TestMessage = { id: 'aaaa0001', role: 'user', content: 'first question', timestamp: t(500) }
-const A0: TestMessage = { id: 'aaaa0002', role: 'assistant', content: txt('first answer'), timestamp: t(600) }
+const U0: TestMessage = { id: 'aaaa0001', role: 'user', content: 'first question', timestamp: t(500) };
+const A0: TestMessage = { id: 'aaaa0002', role: 'assistant', content: txt('first answer'), timestamp: t(600) };
 
 // A later turn that happened via realtime (optimistic user + streamed reply)
-const OPT1: TestMessage = { id: 'optimistic-2000-x', role: 'user', content: 'second question', timestamp: t(2000) }
-const SYN1: TestMessage = { id: 'assistant-2100-x', role: 'assistant', content: txt('second answer'), timestamp: t(2100) }
+const OPT1: TestMessage = { id: 'optimistic-2000-x', role: 'user', content: 'second question', timestamp: t(2000) };
+const SYN1: TestMessage = {
+  id: 'assistant-2100-x',
+  role: 'assistant',
+  content: txt('second answer'),
+  timestamp: t(2100),
+};
 
 // Persisted counterparts of that turn (what a FRESH fetch returns)
-const U1: TestMessage = { id: 'aaaa0003', role: 'user', content: 'second question', timestamp: t(2000) }
-const A1: TestMessage = { id: 'aaaa0004', role: 'assistant', content: txt('second answer'), timestamp: t(2100) }
+const U1: TestMessage = { id: 'aaaa0003', role: 'user', content: 'second question', timestamp: t(2000) };
+const A1: TestMessage = { id: 'aaaa0004', role: 'assistant', content: txt('second answer'), timestamp: t(2100) };
 
 describe('mergeHistoryWithRealtime', () => {
   it('keeps realtime messages newer than a STALE history snapshot (no data loss)', () => {
@@ -47,9 +52,9 @@ describe('mergeHistoryWithRealtime', () => {
       existingMessages: [U0, A0, OPT1, SYN1],
       streamingMessageId: null,
       historyFetchedAt: 1000,
-    })
-    expect(ids(merged)).toEqual([U0.id, A0.id, OPT1.id, SYN1.id])
-  })
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, OPT1.id, SYN1.id]);
+  });
 
   it('replaces optimistic + synthetic messages with their persisted twins on a FRESH snapshot', () => {
     const merged = mergeHistoryWithRealtime({
@@ -57,9 +62,9 @@ describe('mergeHistoryWithRealtime', () => {
       existingMessages: [U0, A0, OPT1, SYN1],
       streamingMessageId: null,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id])
-  })
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id]);
+  });
 
   it('never drops the in-flight streaming synthetic', () => {
     const merged = mergeHistoryWithRealtime({
@@ -67,43 +72,48 @@ describe('mergeHistoryWithRealtime', () => {
       existingMessages: [U0, A0, OPT1, SYN1],
       streamingMessageId: SYN1.id,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toContain(SYN1.id)
-  })
+    });
+    expect(ids(merged)).toContain(SYN1.id);
+  });
 
   it('dedupes mid-list synthetics against fresh history (no duplicated turns)', () => {
-    const OPT2: TestMessage = { id: 'optimistic-3000-x', role: 'user', content: 'third question', timestamp: t(3000) }
-    const SYN2: TestMessage = { id: 'assistant-3100-x', role: 'assistant', content: txt('third answer'), timestamp: t(3100) }
-    const U2: TestMessage = { id: 'aaaa0006', role: 'user', content: 'third question', timestamp: t(3000) }
-    const A2: TestMessage = { id: 'aaaa0007', role: 'assistant', content: txt('third answer'), timestamp: t(3100) }
+    const OPT2: TestMessage = { id: 'optimistic-3000-x', role: 'user', content: 'third question', timestamp: t(3000) };
+    const SYN2: TestMessage = {
+      id: 'assistant-3100-x',
+      role: 'assistant',
+      content: txt('third answer'),
+      timestamp: t(3100),
+    };
+    const U2: TestMessage = { id: 'aaaa0006', role: 'user', content: 'third question', timestamp: t(3000) };
+    const A2: TestMessage = { id: 'aaaa0007', role: 'assistant', content: txt('third answer'), timestamp: t(3100) };
 
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, U1, A1, U2, A2],
       existingMessages: [U0, A0, OPT1, SYN1, OPT2, SYN2],
       streamingMessageId: null,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id, U2.id, A2.id])
-  })
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id, U2.id, A2.id]);
+  });
 
   it('pins the more-complete synthetic over a partial history assistant (approval persistence race)', () => {
-    const partialHistA: TestMessage = { id: 'aaaa0005', role: 'assistant', content: [batchSeg], timestamp: t(2100) }
+    const partialHistA: TestMessage = { id: 'aaaa0005', role: 'assistant', content: [batchSeg], timestamp: t(2100) };
     const fullSyn: TestMessage = {
       id: 'assistant-2100-y',
       role: 'assistant',
       content: [...txt('second answer'), batchSeg],
       timestamp: t(2100), // OLDER than the snapshot — pin must beat the freshness rule
-    }
+    };
 
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, U1, partialHistA],
       existingMessages: [U0, A0, OPT1, fullSyn],
       streamingMessageId: null,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toContain(fullSyn.id)
-    expect(ids(merged)).not.toContain(partialHistA.id)
-  })
+    });
+    expect(ids(merged)).toContain(fullSyn.id);
+    expect(ids(merged)).not.toContain(partialHistA.id);
+  });
 
   it('drops the synthetic when history is at least as complete for the same approval batch', () => {
     const fullHistA: TestMessage = {
@@ -111,23 +121,23 @@ describe('mergeHistoryWithRealtime', () => {
       role: 'assistant',
       content: [...txt('second answer'), batchSeg],
       timestamp: t(2100),
-    }
+    };
     const lesserSyn: TestMessage = {
       id: 'assistant-2100-y',
       role: 'assistant',
       content: [batchSeg],
       timestamp: t(9000), // even NEWER than the snapshot — explicit drop wins
-    }
+    };
 
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, U1, fullHistA],
       existingMessages: [U0, A0, OPT1, lesserSyn],
       streamingMessageId: null,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toContain(fullHistA.id)
-    expect(ids(merged)).not.toContain(lesserSyn.id)
-  })
+    });
+    expect(ids(merged)).toContain(fullHistA.id);
+    expect(ids(merged)).not.toContain(lesserSyn.id);
+  });
 
   it('drops a replay-minted synthetic with a FRESH timestamp when seq coverage proves history contains it', () => {
     // Chunk replay re-materializes an old turn into a synthetic stamped with
@@ -140,7 +150,7 @@ describe('mergeHistoryWithRealtime', () => {
       role: 'assistant',
       content: txt('second answer'),
       timestamp: t(9999), // newer than historyFetchedAt
-    }
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, U1, A1],
       existingMessages: [U0, A0, replayedSyn],
@@ -148,9 +158,9 @@ describe('mergeHistoryWithRealtime', () => {
       historyFetchedAt: 5000,
       historyMaxStreamSeq: 80,
       realtimeSeenStreamSeq: 80,
-    })
-    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id])
-  })
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id]);
+  });
 
   it('keeps an old-looking synthetic when seq coverage proves history is BEHIND (persistence lag)', () => {
     // Client consumed through seq 90 but history only persisted through 80 —
@@ -163,9 +173,9 @@ describe('mergeHistoryWithRealtime', () => {
       historyFetchedAt: 5000,
       historyMaxStreamSeq: 80,
       realtimeSeenStreamSeq: 90,
-    })
-    expect(ids(merged)).toContain(SYN1.id)
-  })
+    });
+    expect(ids(merged)).toContain(SYN1.id);
+  });
 
   it('falls back to the wall-clock rule when seq signals are unavailable', () => {
     const merged = mergeHistoryWithRealtime({
@@ -175,35 +185,50 @@ describe('mergeHistoryWithRealtime', () => {
       historyFetchedAt: 5000,
       historyMaxStreamSeq: 0,
       realtimeSeenStreamSeq: 0,
-    })
-    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id])
-  })
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id]);
+  });
 
   it('keeps a just-sent optimistic message whose text repeats an older turn (stale snapshot)', () => {
     // The user re-sends "first question" and the merge runs against a STALE
     // snapshot (e.g. triggered by stream start). Content-dedup must not match
     // it against the OLD persisted turn with the same text.
-    const repeat: TestMessage = { id: 'optimistic-9000-x', role: 'user', content: 'first question', timestamp: t(9000) }
+    const repeat: TestMessage = {
+      id: 'optimistic-9000-x',
+      role: 'user',
+      content: 'first question',
+      timestamp: t(9000),
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0],
       existingMessages: [U0, A0, repeat],
       streamingMessageId: null,
       historyFetchedAt: 1000,
-    })
-    expect(ids(merged)).toContain(repeat.id)
-  })
+    });
+    expect(ids(merged)).toContain(repeat.id);
+  });
 
   it('drops an optimistic repeat once the snapshot is fresh enough to contain its twin', () => {
-    const repeatPersisted: TestMessage = { id: 'bbbb0001', role: 'user', content: 'first question', timestamp: t(9000) }
-    const repeat: TestMessage = { id: 'optimistic-9000-x', role: 'user', content: 'first question', timestamp: t(9000) }
+    const repeatPersisted: TestMessage = {
+      id: 'bbbb0001',
+      role: 'user',
+      content: 'first question',
+      timestamp: t(9000),
+    };
+    const repeat: TestMessage = {
+      id: 'optimistic-9000-x',
+      role: 'user',
+      content: 'first question',
+      timestamp: t(9000),
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, repeatPersisted],
       existingMessages: [U0, A0, repeat],
       streamingMessageId: null,
       historyFetchedAt: 10_000,
-    })
-    expect(ids(merged)).toEqual([U0.id, A0.id, repeatPersisted.id])
-  })
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, repeatPersisted.id]);
+  });
 
   it('returns existing messages untouched when the history snapshot is empty', () => {
     const merged = mergeHistoryWithRealtime({
@@ -211,15 +236,20 @@ describe('mergeHistoryWithRealtime', () => {
       existingMessages: [OPT1, SYN1],
       streamingMessageId: null,
       historyFetchedAt: 10_000,
-    })
-    expect(merged).toEqual([OPT1, SYN1])
-  })
+    });
+    expect(merged).toEqual([OPT1, SYN1]);
+  });
 
   it('keeps a just-sent optimistic repeat even when seq coverage reports covered', () => {
     // Optimistic messages are minted on send, not by chunks — seq coverage
     // says nothing about them. Sent AFTER the snapshot → must survive even
     // though its text matches an old persisted turn.
-    const repeat: TestMessage = { id: 'optimistic-9000-x', role: 'user', content: 'first question', timestamp: t(9000) }
+    const repeat: TestMessage = {
+      id: 'optimistic-9000-x',
+      role: 'user',
+      content: 'first question',
+      timestamp: t(9000),
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0],
       existingMessages: [U0, A0, repeat],
@@ -227,9 +257,9 @@ describe('mergeHistoryWithRealtime', () => {
       historyFetchedAt: 5000,
       historyMaxStreamSeq: 80,
       realtimeSeenStreamSeq: 80,
-    })
-    expect(ids(merged)).toContain(repeat.id)
-  })
+    });
+    expect(ids(merged)).toContain(repeat.id);
+  });
 
   it('drops a replayed `user-` synthetic against a COMPLETED persisted turn (missing user seq)', () => {
     // Repro of the tickets client→viewer duplicate: the backend persists the
@@ -239,16 +269,26 @@ describe('mergeHistoryWithRealtime', () => {
     // followed by the assistant turn (A1) — a completed turn — so the replay
     // is recognised by content and dropped. The assistant replay is collapsed
     // by the assistant content-fallback, matching "user twice, Fae once".
-    const userSynthetic: TestMessage = { id: 'user-9000-x', role: 'user', content: 'second question', timestamp: t(9000) }
-    const asstSynthetic: TestMessage = { id: 'assistant-9100-x', role: 'assistant', content: txt('second answer'), timestamp: t(9100) }
+    const userSynthetic: TestMessage = {
+      id: 'user-9000-x',
+      role: 'user',
+      content: 'second question',
+      timestamp: t(9000),
+    };
+    const asstSynthetic: TestMessage = {
+      id: 'assistant-9100-x',
+      role: 'assistant',
+      content: txt('second answer'),
+      timestamp: t(9100),
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, U1, A1],
       existingMessages: [U0, A0, U1, A1, userSynthetic, asstSynthetic],
       streamingMessageId: null,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id])
-  })
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id]);
+  });
 
   it('dedupes a `user-` synthetic against its persisted twin even when that twin is the TRAILING row', () => {
     // Client→viewer duplicate at the START of a conversation: the user row is
@@ -256,16 +296,21 @@ describe('mergeHistoryWithRealtime', () => {
     // yet) and the same MESSAGE_REQUEST is replayed as a `user-` synthetic. The
     // persisted row renders the message, so the synthetic must be dropped —
     // keeping it (the old trailing-twin carve-out) IS the reported duplicate.
-    const replay: TestMessage = { id: 'user-9000-x', role: 'user', content: 'third question', timestamp: t(9000) }
-    const trailingPersisted: TestMessage = { id: 'aaaa0006', role: 'user', content: 'third question', timestamp: t(3000) }
+    const replay: TestMessage = { id: 'user-9000-x', role: 'user', content: 'third question', timestamp: t(9000) };
+    const trailingPersisted: TestMessage = {
+      id: 'aaaa0006',
+      role: 'user',
+      content: 'third question',
+      timestamp: t(3000),
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, U1, A1, trailingPersisted],
       existingMessages: [U0, A0, U1, A1, trailingPersisted, replay],
       streamingMessageId: null,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id, trailingPersisted.id])
-  })
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id, trailingPersisted.id]);
+  });
 
   it('keeps a LATER same-text `user-` synthetic whose own row is not persisted yet (positional match)', () => {
     // Two identical "continue" turns: the first is persisted, the second was
@@ -273,19 +318,19 @@ describe('mergeHistoryWithRealtime', () => {
     // the first synthetic with the one persisted row and KEEPS the second — the
     // old first-match dedup matched the second against the first's row and
     // dropped it, losing the message (the reported "user message lost" repro).
-    const persistedFirst: TestMessage = { id: 'aaaa0006', role: 'user', content: 'continue', timestamp: t(3000) }
-    const asstFirst: TestMessage = { id: 'aaaa0007', role: 'assistant', content: txt('ok one'), timestamp: t(3100) }
-    const synFirst: TestMessage = { id: 'user-4000-a', role: 'user', content: 'continue', timestamp: t(4000) }
-    const synSecond: TestMessage = { id: 'user-5000-b', role: 'user', content: 'continue', timestamp: t(5000) }
+    const persistedFirst: TestMessage = { id: 'aaaa0006', role: 'user', content: 'continue', timestamp: t(3000) };
+    const asstFirst: TestMessage = { id: 'aaaa0007', role: 'assistant', content: txt('ok one'), timestamp: t(3100) };
+    const synFirst: TestMessage = { id: 'user-4000-a', role: 'user', content: 'continue', timestamp: t(4000) };
+    const synSecond: TestMessage = { id: 'user-5000-b', role: 'user', content: 'continue', timestamp: t(5000) };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, persistedFirst, asstFirst],
       existingMessages: [U0, A0, persistedFirst, asstFirst, synFirst, synSecond],
       streamingMessageId: null,
       historyFetchedAt: 6000,
-    })
+    });
     // Only one persisted "continue" → synFirst covered/dropped, synSecond kept.
-    expect(ids(merged)).toEqual([U0.id, A0.id, persistedFirst.id, asstFirst.id, synSecond.id])
-  })
+    expect(ids(merged)).toEqual([U0.id, A0.id, persistedFirst.id, asstFirst.id, synSecond.id]);
+  });
 
   it('KEEPS a `user-` synthetic when a seq-stamped ASSISTANT row raised the global max but the user turn is not persisted', () => {
     // The reload+stop loss: history has a seq-stamped assistant row (so
@@ -294,8 +339,20 @@ describe('mergeHistoryWithRealtime', () => {
     // hasn't yet. The assistant's seq must NOT cover it — content dedup finds no
     // twin, so it survives. (On the pre-fix code the `user-` role max was 0 and
     // the merge fell back to the global coverage, dropping it.)
-    const histAsst: TestMessage = { id: 'aaaa0501', role: 'assistant', content: txt('older answer'), timestamp: t(2100), streamSeq: 200 }
-    const liveUser: TestMessage = { id: 'user-9000-x', role: 'user', content: 'continue', timestamp: t(9000), streamSeq: 150 }
+    const histAsst: TestMessage = {
+      id: 'aaaa0501',
+      role: 'assistant',
+      content: txt('older answer'),
+      timestamp: t(2100),
+      streamSeq: 200,
+    };
+    const liveUser: TestMessage = {
+      id: 'user-9000-x',
+      role: 'user',
+      content: 'continue',
+      timestamp: t(9000),
+      streamSeq: 150,
+    };
     const merged = mergeHistoryWithRealtime<TestMessage>({
       processedHistory: [U0, histAsst],
       existingMessages: [U0, histAsst, liveUser],
@@ -303,20 +360,20 @@ describe('mergeHistoryWithRealtime', () => {
       historyFetchedAt: 5000,
       historyMaxStreamSeq: 200,
       realtimeSeenStreamSeq: 200,
-    })
-    expect(ids(merged)).toContain(liveUser.id)
-  })
+    });
+    expect(ids(merged)).toContain(liveUser.id);
+  });
 
   it('keeps a `user-` synthetic when no persisted twin exists yet (persistence lag)', () => {
-    const pending: TestMessage = { id: 'user-9000-x', role: 'user', content: 'brand new question', timestamp: t(9000) }
+    const pending: TestMessage = { id: 'user-9000-x', role: 'user', content: 'brand new question', timestamp: t(9000) };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0],
       existingMessages: [U0, A0, pending],
       streamingMessageId: null,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toContain(pending.id)
-  })
+    });
+    expect(ids(merged)).toContain(pending.id);
+  });
 
   it('KEEPS a repeated `user-` message whose streamSeq is ahead of history (new send after a long tool turn)', () => {
     // The "many tools + reload, message from the client chat disappears" repro:
@@ -325,9 +382,21 @@ describe('mergeHistoryWithRealtime', () => {
     // synthetic's streamSeq (250) is ahead of everything persisted → it is a NEW
     // message, not a replay of the old turn. Positional content match alone
     // would drop it against the old "continue"; the seq watermark keeps it.
-    const oldUser: TestMessage = { id: 'aaaa0801', role: 'user', content: 'continue', timestamp: t(2000) }
-    const oldAsst: TestMessage = { id: 'aaaa0802', role: 'assistant', content: txt('ok one'), timestamp: t(2100), streamSeq: 200 }
-    const newSend: TestMessage = { id: 'user-9000-x', role: 'user', content: 'continue', timestamp: t(9000), streamSeq: 250 }
+    const oldUser: TestMessage = { id: 'aaaa0801', role: 'user', content: 'continue', timestamp: t(2000) };
+    const oldAsst: TestMessage = {
+      id: 'aaaa0802',
+      role: 'assistant',
+      content: txt('ok one'),
+      timestamp: t(2100),
+      streamSeq: 200,
+    };
+    const newSend: TestMessage = {
+      id: 'user-9000-x',
+      role: 'user',
+      content: 'continue',
+      timestamp: t(9000),
+      streamSeq: 250,
+    };
     const merged = mergeHistoryWithRealtime<TestMessage>({
       processedHistory: [oldUser, oldAsst],
       existingMessages: [oldUser, oldAsst, newSend],
@@ -335,16 +404,28 @@ describe('mergeHistoryWithRealtime', () => {
       historyFetchedAt: 5000,
       historyMaxStreamSeq: 200,
       realtimeSeenStreamSeq: 250,
-    })
-    expect(ids(merged)).toContain(newSend.id)
-  })
+    });
+    expect(ids(merged)).toContain(newSend.id);
+  });
 
   it('DROPS a replayed `user-` message whose streamSeq history already passed', () => {
     // A replay of the OLD "continue" (streamSeq 150) after history persisted the
     // turn past it (200): its own row is in the snapshot → drop the duplicate.
-    const oldUser: TestMessage = { id: 'aaaa0811', role: 'user', content: 'continue', timestamp: t(2000) }
-    const oldAsst: TestMessage = { id: 'aaaa0812', role: 'assistant', content: txt('ok one'), timestamp: t(2100), streamSeq: 200 }
-    const replay: TestMessage = { id: 'user-9000-x', role: 'user', content: 'continue', timestamp: t(9000), streamSeq: 150 }
+    const oldUser: TestMessage = { id: 'aaaa0811', role: 'user', content: 'continue', timestamp: t(2000) };
+    const oldAsst: TestMessage = {
+      id: 'aaaa0812',
+      role: 'assistant',
+      content: txt('ok one'),
+      timestamp: t(2100),
+      streamSeq: 200,
+    };
+    const replay: TestMessage = {
+      id: 'user-9000-x',
+      role: 'user',
+      content: 'continue',
+      timestamp: t(9000),
+      streamSeq: 150,
+    };
     const merged = mergeHistoryWithRealtime<TestMessage>({
       processedHistory: [oldUser, oldAsst],
       existingMessages: [oldUser, oldAsst, replay],
@@ -352,16 +433,16 @@ describe('mergeHistoryWithRealtime', () => {
       historyFetchedAt: 5000,
       historyMaxStreamSeq: 200,
       realtimeSeenStreamSeq: 200,
-    })
-    expect(ids(merged)).toEqual([oldUser.id, oldAsst.id])
-  })
+    });
+    expect(ids(merged)).toEqual([oldUser.id, oldAsst.id]);
+  });
 
   it('DROPS a `user-` echo of a just-sent TRAILING message even when history is behind its seq', () => {
     // Start of a turn: the just-sent "hello" is the trailing history row (no
     // reply yet, so historyMaxStreamSeq is behind its seq). Its own row is right
     // there → drop the echo, don't render "hello" twice.
-    const justSent: TestMessage = { id: 'aaaa0821', role: 'user', content: 'hello', timestamp: t(3000) }
-    const echo: TestMessage = { id: 'user-9000-x', role: 'user', content: 'hello', timestamp: t(9000), streamSeq: 300 }
+    const justSent: TestMessage = { id: 'aaaa0821', role: 'user', content: 'hello', timestamp: t(3000) };
+    const echo: TestMessage = { id: 'user-9000-x', role: 'user', content: 'hello', timestamp: t(9000), streamSeq: 300 };
     const merged = mergeHistoryWithRealtime<TestMessage>({
       processedHistory: [U0, A0, justSent],
       existingMessages: [U0, A0, justSent, echo],
@@ -369,25 +450,25 @@ describe('mergeHistoryWithRealtime', () => {
       historyFetchedAt: 5000,
       historyMaxStreamSeq: 100,
       realtimeSeenStreamSeq: 300,
-    })
-    expect(ids(merged)).toEqual([U0.id, A0.id, justSent.id])
-  })
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, justSent.id]);
+  });
 
   it('pins the streaming twin even when it carries a persisted history id (adoption path)', () => {
     // Chunk processors ADOPT an in-progress trailing assistant after a prior
     // merge, so the streaming twin can have the SAME Mongo id as history's
     // trailing message. The pin must beat the processed/raw id dedup or the
     // turn vanishes from both lists.
-    const adopted: TestMessage = { id: 'aaaa0005', role: 'assistant', content: [batchSeg], timestamp: t(2100) }
+    const adopted: TestMessage = { id: 'aaaa0005', role: 'assistant', content: [batchSeg], timestamp: t(2100) };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, U1, adopted],
       rawHistoryIds: new Set([U0.id, A0.id, U1.id, adopted.id]),
       existingMessages: [U0, A0, adopted],
       streamingMessageId: adopted.id,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, adopted.id])
-  })
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, adopted.id]);
+  });
 
   it('never drops the streaming twin in the approval-batch resolution (pins it instead)', () => {
     // History's trailing assistant fully persisted the approval turn, but the
@@ -399,48 +480,58 @@ describe('mergeHistoryWithRealtime', () => {
       role: 'assistant',
       content: [...txt('second answer'), batchSeg],
       timestamp: t(2100),
-    }
-    const liveTwin: TestMessage = { id: 'assistant-2100-y', role: 'assistant', content: [batchSeg], timestamp: t(2100) }
+    };
+    const liveTwin: TestMessage = {
+      id: 'assistant-2100-y',
+      role: 'assistant',
+      content: [batchSeg],
+      timestamp: t(2100),
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, U1, fullHistA],
       existingMessages: [U0, A0, OPT1, liveTwin],
       streamingMessageId: liveTwin.id,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toContain(liveTwin.id)
-    expect(ids(merged)).not.toContain(fullHistA.id)
-  })
+    });
+    expect(ids(merged)).toContain(liveTwin.id);
+    expect(ids(merged)).not.toContain(fullHistA.id);
+  });
 
   it('resolves the approval batch against the most recent twin when several share the batch id', () => {
-    const partialHistA: TestMessage = { id: 'aaaa0005', role: 'assistant', content: [batchSeg], timestamp: t(2100) }
-    const staleTwin: TestMessage = { id: 'assistant-1000-old', role: 'assistant', content: [batchSeg], timestamp: t(1000) }
+    const partialHistA: TestMessage = { id: 'aaaa0005', role: 'assistant', content: [batchSeg], timestamp: t(2100) };
+    const staleTwin: TestMessage = {
+      id: 'assistant-1000-old',
+      role: 'assistant',
+      content: [batchSeg],
+      timestamp: t(1000),
+    };
     const fullTwin: TestMessage = {
       id: 'assistant-2100-y',
       role: 'assistant',
       content: [...txt('second answer'), batchSeg],
       timestamp: t(2100),
-    }
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, U1, partialHistA],
       existingMessages: [U0, A0, staleTwin, fullTwin],
       streamingMessageId: null,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toContain(fullTwin.id)
-    expect(ids(merged)).not.toContain(partialHistA.id)
-    expect(ids(merged)).not.toContain(staleTwin.id)
-  })
+    });
+    expect(ids(merged)).toContain(fullTwin.id);
+    expect(ids(merged)).not.toContain(partialHistA.id);
+    expect(ids(merged)).not.toContain(staleTwin.id);
+  });
 
   it('keeps welcome bubbles (never persisted server-side)', () => {
-    const welcome: TestMessage = { id: 'welcome-d1', role: 'assistant', content: 'Hi!', timestamp: t(100) }
+    const welcome: TestMessage = { id: 'welcome-d1', role: 'assistant', content: 'Hi!', timestamp: t(100) };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0],
       existingMessages: [welcome],
       streamingMessageId: null,
       historyFetchedAt: 5000,
-    })
-    expect(ids(merged)).toContain(welcome.id)
-  })
+    });
+    expect(ids(merged)).toContain(welcome.id);
+  });
 
   // Production reality: the client consumes the non-persisted MESSAGE_END /
   // final TOKEN_USAGE chunks, so `realtimeSeenStreamSeq` always ends up ABOVE
@@ -450,12 +541,24 @@ describe('mergeHistoryWithRealtime', () => {
   // reported duplication). The per-message `streamSeq` makes the decision
   // exact and turn-local.
   describe('per-message streamSeq coverage', () => {
-    const U2b: TestMessage = { id: 'aaaa0006', role: 'user', content: 'third question', timestamp: t(3000) }
-    const A2b: TestMessage = { id: 'aaaa0007', role: 'assistant', content: txt('history three'), timestamp: t(3100) }
+    const U2b: TestMessage = { id: 'aaaa0006', role: 'user', content: 'third question', timestamp: t(3000) };
+    const A2b: TestMessage = { id: 'aaaa0007', role: 'assistant', content: txt('history three'), timestamp: t(3100) };
 
     it('drops an earlier finished synthetic by its own seq even though the global seq reads not-covered', () => {
-      const synEarly: TestMessage = { id: 'assistant-2100-x', role: 'assistant', content: txt('second answer'), timestamp: t(2100), streamSeq: 40 }
-      const synLate: TestMessage = { id: 'assistant-3100-x', role: 'assistant', content: txt('realtime three'), timestamp: t(3100), streamSeq: 80 }
+      const synEarly: TestMessage = {
+        id: 'assistant-2100-x',
+        role: 'assistant',
+        content: txt('second answer'),
+        timestamp: t(2100),
+        streamSeq: 40,
+      };
+      const synLate: TestMessage = {
+        id: 'assistant-3100-x',
+        role: 'assistant',
+        content: txt('realtime three'),
+        timestamp: t(3100),
+        streamSeq: 80,
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [U0, A0, U1, A1, U2b, A2b],
         rawHistoryIds: new Set([U0.id, A0.id, U1.id, A1.id, U2b.id, A2b.id]),
@@ -464,13 +567,19 @@ describe('mergeHistoryWithRealtime', () => {
         historyFetchedAt: 9000,
         historyMaxStreamSeq: 80, // both turns fully persisted
         realtimeSeenStreamSeq: 82, // biased past 80 by the consumed MESSAGE_END
-      })
+      });
       // Global seq (80 >= 82) is false, but per-message seqs (40, 80) are both <= 80.
-      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id, U2b.id, A2b.id])
-    })
+      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id, U2b.id, A2b.id]);
+    });
 
     it('drops a partial mid-stream synthetic in favour of the full persisted turn', () => {
-      const partial: TestMessage = { id: 'assistant-2100-x', role: 'assistant', content: txt('second ans'), timestamp: t(2100), streamSeq: 50 }
+      const partial: TestMessage = {
+        id: 'assistant-2100-x',
+        role: 'assistant',
+        content: txt('second ans'),
+        timestamp: t(2100),
+        streamSeq: 50,
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [U0, A0, U1, A1],
         rawHistoryIds: new Set([U0.id, A0.id, U1.id, A1.id]),
@@ -479,13 +588,25 @@ describe('mergeHistoryWithRealtime', () => {
         historyFetchedAt: 9000,
         historyMaxStreamSeq: 80,
         realtimeSeenStreamSeq: 82,
-      })
-      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id])
-    })
+      });
+      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id]);
+    });
 
     it('keeps a still-streaming later turn while dropping an earlier finished one', () => {
-      const synEarly: TestMessage = { id: 'assistant-2100-x', role: 'assistant', content: txt('second answer'), timestamp: t(2100), streamSeq: 40 }
-      const synLive: TestMessage = { id: 'assistant-3100-x', role: 'assistant', content: txt('third in progress'), timestamp: t(3100), streamSeq: 70 }
+      const synEarly: TestMessage = {
+        id: 'assistant-2100-x',
+        role: 'assistant',
+        content: txt('second answer'),
+        timestamp: t(2100),
+        streamSeq: 40,
+      };
+      const synLive: TestMessage = {
+        id: 'assistant-3100-x',
+        role: 'assistant',
+        content: txt('third in progress'),
+        timestamp: t(3100),
+        streamSeq: 70,
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [U0, A0, U1, A1], // only turn 1 persisted so far
         rawHistoryIds: new Set([U0.id, A0.id, U1.id, A1.id]),
@@ -494,10 +615,10 @@ describe('mergeHistoryWithRealtime', () => {
         historyFetchedAt: 9000,
         historyMaxStreamSeq: 40, // turn 2 not persisted yet
         realtimeSeenStreamSeq: 70,
-      })
+      });
       // synEarly (40 <= 40) is covered and dropped; synLive (70 > 40) survives.
-      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id, synLive.id])
-    })
+      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id, synLive.id]);
+    });
 
     it('falls back to the global seq for an unstamped synthetic (legacy NATS)', () => {
       const merged = mergeHistoryWithRealtime<TestMessage>({
@@ -507,23 +628,23 @@ describe('mergeHistoryWithRealtime', () => {
         historyFetchedAt: 5000,
         historyMaxStreamSeq: 80,
         realtimeSeenStreamSeq: 80,
-      })
-      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id])
-    })
+      });
+      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id]);
+    });
 
     // The reported reconnect bug: a replayed direct/system message re-mints a
     // synthetic with a FRESH timestamp (wall-clock can't catch it), so dedup
     // must be by seq. Direct/system are role 'user' rows persisted with a
     // lastChunkStreamSeq equal to the realtime chunk's streamSeq.
     it('drops a replayed direct-message synthetic once history persisted it', () => {
-      const histDirect: TestMessage = { id: 'aaaa0009', role: 'user', content: 'ping from tech', timestamp: t(2100) }
+      const histDirect: TestMessage = { id: 'aaaa0009', role: 'user', content: 'ping from tech', timestamp: t(2100) };
       const replayedDirect: TestMessage = {
         id: 'direct-9999-r',
         role: 'user',
         content: 'ping from tech',
         timestamp: t(9999), // re-minted on reconnect replay — newer than the snapshot
         streamSeq: 80,
-      }
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [U0, A0, histDirect],
         rawHistoryIds: new Set([U0.id, A0.id, histDirect.id]),
@@ -531,9 +652,9 @@ describe('mergeHistoryWithRealtime', () => {
         streamingMessageId: null,
         historyFetchedAt: 5000,
         historyMaxStreamSeq: 80,
-      })
-      expect(ids(merged)).toEqual([U0.id, A0.id, histDirect.id])
-    })
+      });
+      expect(ids(merged)).toEqual([U0.id, A0.id, histDirect.id]);
+    });
 
     it('keeps a live direct message history has not persisted yet (no loss)', () => {
       const liveDirect: TestMessage = {
@@ -542,26 +663,26 @@ describe('mergeHistoryWithRealtime', () => {
         content: 'new tech msg',
         timestamp: t(3000),
         streamSeq: 90,
-      }
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [U0, A0],
         existingMessages: [U0, A0, liveDirect],
         streamingMessageId: null,
         historyFetchedAt: 5000,
         historyMaxStreamSeq: 80, // history hasn't reached seq 90 yet
-      })
-      expect(ids(merged)).toContain(liveDirect.id)
-    })
+      });
+      expect(ids(merged)).toContain(liveDirect.id);
+    });
 
     it('dedups a system-message synthetic by seq coverage', () => {
-      const histSystem: TestMessage = { id: 'aaaa0010', role: 'user', content: 'User joined', timestamp: t(2100) }
+      const histSystem: TestMessage = { id: 'aaaa0010', role: 'user', content: 'User joined', timestamp: t(2100) };
       const synSystem: TestMessage = {
         id: 'system-9999-r',
         role: 'user',
         content: 'User joined',
         timestamp: t(9999),
         streamSeq: 70,
-      }
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [U0, A0, histSystem],
         rawHistoryIds: new Set([U0.id, A0.id, histSystem.id]),
@@ -569,10 +690,10 @@ describe('mergeHistoryWithRealtime', () => {
         streamingMessageId: null,
         historyFetchedAt: 5000,
         historyMaxStreamSeq: 80,
-      })
-      expect(ids(merged)).toEqual([U0.id, A0.id, histSystem.id])
-    })
-  })
+      });
+      expect(ids(merged)).toEqual([U0.id, A0.id, histSystem.id]);
+    });
+  });
 
   // Per-ROLE coverage: when history rows carry their own streamSeq, a synthetic
   // is covered only by a persisted row of the SAME role reaching its seq. This
@@ -586,37 +707,85 @@ describe('mergeHistoryWithRealtime', () => {
       // the assistant turn itself was never persisted. A stop/new-message
       // recompute must NOT drop the assistant synthetic just because some row's
       // seq >= 100 — only a persisted ASSISTANT row reaching 100 may.
-      const histUser: TestMessage = { id: 'aaaa0100', role: 'user', content: 'do a health check', timestamp: t(2000), streamSeq: 90 }
-      const histAsst: TestMessage = { id: 'aaaa0101', role: 'assistant', content: txt('older answer'), timestamp: t(2100), streamSeq: 50 }
-      const interrupted: TestMessage = { id: 'assistant-9000-x', role: 'assistant', content: txt('running tools…'), timestamp: t(9000), streamSeq: 100 }
+      const histUser: TestMessage = {
+        id: 'aaaa0100',
+        role: 'user',
+        content: 'do a health check',
+        timestamp: t(2000),
+        streamSeq: 90,
+      };
+      const histAsst: TestMessage = {
+        id: 'aaaa0101',
+        role: 'assistant',
+        content: txt('older answer'),
+        timestamp: t(2100),
+        streamSeq: 50,
+      };
+      const interrupted: TestMessage = {
+        id: 'assistant-9000-x',
+        role: 'assistant',
+        content: txt('running tools…'),
+        timestamp: t(9000),
+        streamSeq: 100,
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [histUser, histAsst],
         existingMessages: [histUser, histAsst, interrupted],
         streamingMessageId: null, // exemption already lost (stop / new turn)
         historyFetchedAt: 5000,
         historyMaxStreamSeq: 90, // global max — advanced past 100? no, but a bigger user row would
-      })
-      expect(ids(merged)).toContain(interrupted.id)
-    })
+      });
+      expect(ids(merged)).toContain(interrupted.id);
+    });
 
     it('KEEPS an assistant synthetic newer than the same-role persisted max', () => {
-      const histAsst: TestMessage = { id: 'aaaa0201', role: 'assistant', content: txt('answer one'), timestamp: t(2100), streamSeq: 50 }
-      const laterUser: TestMessage = { id: 'aaaa0202', role: 'user', content: 'and again', timestamp: t(2200), streamSeq: 120 }
-      const liveAsst: TestMessage = { id: 'assistant-9000-y', role: 'assistant', content: txt('second answer growing'), timestamp: t(9000), streamSeq: 100 }
+      const histAsst: TestMessage = {
+        id: 'aaaa0201',
+        role: 'assistant',
+        content: txt('answer one'),
+        timestamp: t(2100),
+        streamSeq: 50,
+      };
+      const laterUser: TestMessage = {
+        id: 'aaaa0202',
+        role: 'user',
+        content: 'and again',
+        timestamp: t(2200),
+        streamSeq: 120,
+      };
+      const liveAsst: TestMessage = {
+        id: 'assistant-9000-y',
+        role: 'assistant',
+        content: txt('second answer growing'),
+        timestamp: t(9000),
+        streamSeq: 100,
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [histAsst, laterUser],
         existingMessages: [histAsst, laterUser, liveAsst],
         streamingMessageId: null,
         historyFetchedAt: 5000,
         historyMaxStreamSeq: 120, // global would cover 100 and wrongly drop it
-      })
+      });
       // assistant same-role max is 50 < 100 → kept.
-      expect(ids(merged)).toContain(liveAsst.id)
-    })
+      expect(ids(merged)).toContain(liveAsst.id);
+    });
 
     it('DROPS an assistant synthetic once a same-role persisted row reaches its seq', () => {
-      const histAsst: TestMessage = { id: 'aaaa0301', role: 'assistant', content: txt('final answer'), timestamp: t(2100), streamSeq: 100 }
-      const synAsst: TestMessage = { id: 'assistant-9000-z', role: 'assistant', content: txt('final answer'), timestamp: t(9000), streamSeq: 100 }
+      const histAsst: TestMessage = {
+        id: 'aaaa0301',
+        role: 'assistant',
+        content: txt('final answer'),
+        timestamp: t(2100),
+        streamSeq: 100,
+      };
+      const synAsst: TestMessage = {
+        id: 'assistant-9000-z',
+        role: 'assistant',
+        content: txt('final answer'),
+        timestamp: t(9000),
+        streamSeq: 100,
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [U0, histAsst],
         rawHistoryIds: new Set([U0.id, histAsst.id]),
@@ -624,16 +793,28 @@ describe('mergeHistoryWithRealtime', () => {
         streamingMessageId: null,
         historyFetchedAt: 5000,
         historyMaxStreamSeq: 100,
-      })
+      });
       // same-role assistant max is 100 >= 100 → the replay is deduped.
-      expect(ids(merged)).toEqual([U0.id, histAsst.id])
-    })
+      expect(ids(merged)).toEqual([U0.id, histAsst.id]);
+    });
 
     it('DROPS a partial assistant synthetic against the same-role full persisted turn', () => {
       // Partial realtime text differs from the full persisted text — coverage
       // is by seq, not content, and the same-role max proves the turn landed.
-      const histAsst: TestMessage = { id: 'aaaa0401', role: 'assistant', content: txt('the full answer'), timestamp: t(2100), streamSeq: 80 }
-      const partial: TestMessage = { id: 'assistant-9000-p', role: 'assistant', content: txt('the full ans'), timestamp: t(9000), streamSeq: 60 }
+      const histAsst: TestMessage = {
+        id: 'aaaa0401',
+        role: 'assistant',
+        content: txt('the full answer'),
+        timestamp: t(2100),
+        streamSeq: 80,
+      };
+      const partial: TestMessage = {
+        id: 'assistant-9000-p',
+        role: 'assistant',
+        content: txt('the full ans'),
+        timestamp: t(9000),
+        streamSeq: 60,
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [U0, histAsst],
         rawHistoryIds: new Set([U0.id, histAsst.id]),
@@ -641,10 +822,10 @@ describe('mergeHistoryWithRealtime', () => {
         streamingMessageId: null,
         historyFetchedAt: 5000,
         historyMaxStreamSeq: 80,
-      })
-      expect(ids(merged)).toEqual([U0.id, histAsst.id])
-    })
-  })
+      });
+      expect(ids(merged)).toEqual([U0.id, histAsst.id]);
+    });
+  });
 
   // Adoption path for plain TOOL turns (no approval batch). After a mid-stream
   // reload the trailing assistant is a persisted Mongo-id row; the chunk
@@ -654,17 +835,21 @@ describe('mergeHistoryWithRealtime', () => {
   // (the "3 tools collapse to 2, one stuck pending" after reload + stop bug).
   describe('adopted trailing assistant (post-reload tool turns)', () => {
     it('pins the same-id realtime copy when it has MORE tool segments than history', () => {
-      const id = 'aaaa0700'
+      const id = 'aaaa0700';
       const persistedTrailing: TestMessage = {
-        id, role: 'assistant',
+        id,
+        role: 'assistant',
         content: [tool('t1', 'EXECUTED_TOOL'), tool('t2', 'EXECUTING_TOOL')],
-        timestamp: t(2100), streamSeq: 60,
-      }
+        timestamp: t(2100),
+        streamSeq: 60,
+      };
       const adoptedRicher: TestMessage = {
-        id, role: 'assistant',
+        id,
+        role: 'assistant',
         content: [tool('t1', 'EXECUTED_TOOL'), tool('t2', 'EXECUTED_TOOL'), tool('t3', 'EXECUTED_TOOL')],
-        timestamp: t(2100), streamSeq: 80,
-      }
+        timestamp: t(2100),
+        streamSeq: 80,
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [U0, persistedTrailing],
         rawHistoryIds: new Set([U0.id, id]),
@@ -673,25 +858,29 @@ describe('mergeHistoryWithRealtime', () => {
         historyFetchedAt: 5000,
         historyMaxStreamSeq: 60,
         realtimeSeenStreamSeq: 80,
-      })
-      const trailing = merged[merged.length - 1]
-      expect(trailing).toBe(adoptedRicher)
-      expect(Array.isArray(trailing.content) ? trailing.content.length : 0).toBe(3)
-      expect(merged.filter((m) => m.id === id)).toHaveLength(1) // no duplicate turn
-    })
+      });
+      const trailing = merged[merged.length - 1];
+      expect(trailing).toBe(adoptedRicher);
+      expect(Array.isArray(trailing.content) ? trailing.content.length : 0).toBe(3);
+      expect(merged.filter(m => m.id === id)).toHaveLength(1); // no duplicate turn
+    });
 
     it('pins the same-id realtime copy when counts tie but its consumed seq is higher', () => {
-      const id = 'aaaa0701'
+      const id = 'aaaa0701';
       const persistedTrailing: TestMessage = {
-        id, role: 'assistant',
+        id,
+        role: 'assistant',
         content: [tool('t1', 'EXECUTED_TOOL'), tool('t2', 'EXECUTING_TOOL')],
-        timestamp: t(2100), streamSeq: 60,
-      }
+        timestamp: t(2100),
+        streamSeq: 60,
+      };
       const adoptedResolved: TestMessage = {
-        id, role: 'assistant',
+        id,
+        role: 'assistant',
         content: [tool('t1', 'EXECUTED_TOOL'), tool('t2', 'EXECUTED_TOOL')], // t2 resolved, same count
-        timestamp: t(2100), streamSeq: 85,
-      }
+        timestamp: t(2100),
+        streamSeq: 85,
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [U0, persistedTrailing],
         existingMessages: [U0, adoptedResolved],
@@ -699,22 +888,26 @@ describe('mergeHistoryWithRealtime', () => {
         historyFetchedAt: 5000,
         historyMaxStreamSeq: 60,
         realtimeSeenStreamSeq: 85,
-      })
-      expect(merged[merged.length - 1]).toBe(adoptedResolved)
-    })
+      });
+      expect(merged[merged.length - 1]).toBe(adoptedResolved);
+    });
 
     it('keeps the persisted trailing when the same-id realtime copy is NOT richer', () => {
-      const id = 'aaaa0702'
+      const id = 'aaaa0702';
       const persistedTrailing: TestMessage = {
-        id, role: 'assistant',
+        id,
+        role: 'assistant',
         content: [tool('t1', 'EXECUTED_TOOL'), tool('t2', 'EXECUTED_TOOL')],
-        timestamp: t(2100), streamSeq: 80,
-      }
+        timestamp: t(2100),
+        streamSeq: 80,
+      };
       const staleSameId: TestMessage = {
-        id, role: 'assistant',
+        id,
+        role: 'assistant',
         content: [tool('t1', 'EXECUTED_TOOL')], // fewer segments, lower seq
-        timestamp: t(2100), streamSeq: 50,
-      }
+        timestamp: t(2100),
+        streamSeq: 50,
+      };
       const merged = mergeHistoryWithRealtime<TestMessage>({
         processedHistory: [U0, persistedTrailing],
         existingMessages: [U0, staleSameId],
@@ -722,54 +915,61 @@ describe('mergeHistoryWithRealtime', () => {
         historyFetchedAt: 5000,
         historyMaxStreamSeq: 80,
         realtimeSeenStreamSeq: 80,
-      })
-      expect(merged[merged.length - 1]).toBe(persistedTrailing)
-      expect(merged.filter((m) => m.id === id)).toHaveLength(1)
-    })
-  })
-})
+      });
+      expect(merged[merged.length - 1]).toBe(persistedTrailing);
+      expect(merged.filter(m => m.id === id)).toHaveLength(1);
+    });
+  });
+});
 
 describe('computeHistoryPrepend', () => {
   it('collects only messages above the first known id', () => {
-    const older: TestMessage = { id: 'aaaa0000', role: 'user', content: 'zeroth', timestamp: t(100) }
-    const result = computeHistoryPrepend([older, U0, A0], [U0, A0, SYN1])
-    expect(result).not.toBeNull()
-    expect(ids(result!.newMessages)).toEqual([older.id])
-    expect(result!.boundaryUpdates).toBeUndefined()
-  })
+    const older: TestMessage = { id: 'aaaa0000', role: 'user', content: 'zeroth', timestamp: t(100) };
+    const result = computeHistoryPrepend([older, U0, A0], [U0, A0, SYN1]);
+    // Throw instead of `expect(...).not.toBeNull()` so the assertions below
+    // see a narrowed `result` and a null return fails by name.
+    if (!result) throw new Error('computeHistoryPrepend returned null for a page with an older message');
+    expect(ids(result.newMessages)).toEqual([older.id]);
+    expect(result.boundaryUpdates).toBeUndefined();
+  });
 
   it('reports a boundary content refresh when the known boundary message changed', () => {
-    const updatedU0: TestMessage = { ...U0, content: 'first question (edited)' }
-    const result = computeHistoryPrepend([updatedU0, A0], [U0, A0])
-    expect(result).not.toBeNull()
-    expect(result!.newMessages).toEqual([])
-    expect(result!.boundaryMessageId).toBe(U0.id)
-    expect(result!.boundaryUpdates).toEqual({ content: 'first question (edited)' })
-  })
+    const updatedU0: TestMessage = { ...U0, content: 'first question (edited)' };
+    const result = computeHistoryPrepend([updatedU0, A0], [U0, A0]);
+    if (!result) throw new Error('computeHistoryPrepend returned null for a changed boundary message');
+    expect(result.newMessages).toEqual([]);
+    expect(result.boundaryMessageId).toBe(U0.id);
+    expect(result.boundaryUpdates).toEqual({ content: 'first question (edited)' });
+  });
 
   it('returns null when there is nothing to apply', () => {
-    expect(computeHistoryPrepend([U0, A0], [U0, A0])).toBeNull()
-  })
-})
+    expect(computeHistoryPrepend([U0, A0], [U0, A0])).toBeNull();
+  });
+});
 
 describe('page helpers', () => {
   // Pages arrive DESC (newest page first, newest message first within a page).
   const pages: { messages: { id: string; lastChunkStreamSeq?: number | null }[] }[] = [
-    { messages: [{ id: 'd', lastChunkStreamSeq: 40 }, { id: 'c', lastChunkStreamSeq: null }] },
+    {
+      messages: [
+        { id: 'd', lastChunkStreamSeq: 40 },
+        { id: 'c', lastChunkStreamSeq: null },
+      ],
+    },
     { messages: [{ id: 'b', lastChunkStreamSeq: 20 }, { id: 'a' }] },
-  ]
+  ];
 
   it('flattenMessagePagesChronological reverses pages and messages into chronological order', () => {
-    expect(flattenMessagePagesChronological(pages).map((m) => m.id)).toEqual(['a', 'b', 'c', 'd'])
-    expect(flattenMessagePagesChronological(undefined)).toEqual([])
-  })
+    expect(flattenMessagePagesChronological(pages).map(m => m.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(flattenMessagePagesChronological(undefined)).toEqual([]);
+  });
 
   it('maxPersistedStreamSeq returns the highest stamped seq, 0 when absent', () => {
-    expect(maxPersistedStreamSeq(pages)).toBe(40)
-    expect(maxPersistedStreamSeq([{ messages: [{}] }])).toBe(0)
-    expect(maxPersistedStreamSeq(undefined)).toBe(0)
-  })
-})
+    expect(maxPersistedStreamSeq(pages)).toBe(40);
+    expect(maxPersistedStreamSeq([{ messages: [{}] }])).toBe(0);
+    expect(maxPersistedStreamSeq(undefined)).toBe(0);
+  });
+});
 
 /**
  * The scenario the reducer's `streamSeq` stamp exists for: a history refetch
@@ -786,17 +986,17 @@ describe('mid-stream refetch (live turn not yet persisted)', () => {
     content: txt('let me check that'),
     timestamp: t(3000),
     streamSeq: 41,
-  }
+  };
   const LIVE_B: TestMessage = {
     id: 'assistant-3100-b',
     role: 'assistant',
     content: [tool('exec-7', 'EXECUTING_TOOL')],
     timestamp: t(3100),
     streamSeq: 42,
-  }
+  };
   // What history returns mid-turn: the user row only. It carries no
   // `lastChunkStreamSeq` (the backend does not stamp user rows).
-  const U_LIVE: TestMessage = { id: 'aaaa0009', role: 'user', content: 'check the disk', timestamp: t(2900) }
+  const U_LIVE: TestMessage = { id: 'aaaa0009', role: 'user', content: 'check the disk', timestamp: t(2900) };
 
   it('keeps every live bubble, not just the streaming one', () => {
     const merged = mergeHistoryWithRealtime({
@@ -810,10 +1010,10 @@ describe('mid-stream refetch (live turn not yet persisted)', () => {
       historyFetchedAt: 3500,
       historyMaxStreamSeq: 0,
       realtimeSeenStreamSeq: 42,
-    })
+    });
 
-    expect(ids(merged)).toEqual([U0.id, A0.id, U_LIVE.id, LIVE_A.id, LIVE_B.id])
-  })
+    expect(ids(merged)).toEqual([U0.id, A0.id, U_LIVE.id, LIVE_A.id, LIVE_B.id]);
+  });
 
   it('drops a live bubble once a persisted row of its role reaches its seq', () => {
     // Self-healing side of the same rule: when the turn IS persisted, the
@@ -824,7 +1024,7 @@ describe('mid-stream refetch (live turn not yet persisted)', () => {
       content: txt('let me check that'),
       timestamp: t(3000),
       streamSeq: 41,
-    }
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, U_LIVE, persisted],
       existingMessages: [U0, A0, U_LIVE, LIVE_A],
@@ -832,11 +1032,11 @@ describe('mid-stream refetch (live turn not yet persisted)', () => {
       historyFetchedAt: 3500,
       historyMaxStreamSeq: 41,
       realtimeSeenStreamSeq: 41,
-    })
+    });
 
-    expect(ids(merged)).toEqual([U0.id, A0.id, U_LIVE.id, persisted.id])
-  })
-})
+    expect(ids(merged)).toEqual([U0.id, A0.id, U_LIVE.id, persisted.id]);
+  });
+});
 
 /**
  * The other half of the mid-stream refetch: history has begun persisting the
@@ -852,7 +1052,7 @@ describe('mid-stream refetch (turn partially persisted)', () => {
     content: [tool('exec-1', 'EXECUTED_TOOL'), tool('exec-2', 'EXECUTED_TOOL'), tool('exec-3', 'EXECUTING_TOOL')],
     timestamp: t(4000),
     streamSeq: 90,
-  }
+  };
   // History's snapshot of the SAME turn, under its Mongo id, two chunks behind.
   const PERSISTED_PARTIAL: TestMessage = {
     id: 'aaaa0020',
@@ -860,7 +1060,7 @@ describe('mid-stream refetch (turn partially persisted)', () => {
     content: [tool('exec-1', 'EXECUTED_TOOL'), tool('exec-2', 'EXECUTING_TOOL')],
     timestamp: t(3900),
     streamSeq: 70,
-  }
+  };
 
   it('keeps ONE copy — the live one — when the turn is still streaming', () => {
     const merged = mergeHistoryWithRealtime({
@@ -870,10 +1070,10 @@ describe('mid-stream refetch (turn partially persisted)', () => {
       historyFetchedAt: 4200,
       historyMaxStreamSeq: 70,
       realtimeSeenStreamSeq: 90,
-    })
+    });
 
-    expect(ids(merged)).toEqual([U0.id, A0.id, LIVE.id])
-  })
+    expect(ids(merged)).toEqual([U0.id, A0.id, LIVE.id]);
+  });
 
   it('keeps the live copy when it is richer even after the stream ends', () => {
     // No `streamingMessageId` any more, but the turn's own request ids still
@@ -885,17 +1085,17 @@ describe('mid-stream refetch (turn partially persisted)', () => {
       historyFetchedAt: 4200,
       historyMaxStreamSeq: 70,
       realtimeSeenStreamSeq: 90,
-    })
+    });
 
-    expect(ids(merged)).toEqual([U0.id, A0.id, LIVE.id])
-  })
+    expect(ids(merged)).toEqual([U0.id, A0.id, LIVE.id]);
+  });
 
   it('lets the persisted copy win once it has caught up (self-heals)', () => {
     const persistedFull: TestMessage = {
       ...PERSISTED_PARTIAL,
       content: [tool('exec-1', 'EXECUTED_TOOL'), tool('exec-2', 'EXECUTED_TOOL'), tool('exec-3', 'EXECUTED_TOOL')],
       streamSeq: 95,
-    }
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, persistedFull],
       existingMessages: [U0, A0, LIVE],
@@ -903,10 +1103,10 @@ describe('mid-stream refetch (turn partially persisted)', () => {
       historyFetchedAt: 4500,
       historyMaxStreamSeq: 95,
       realtimeSeenStreamSeq: 90,
-    })
+    });
 
-    expect(ids(merged)).toEqual([U0.id, A0.id, persistedFull.id])
-  })
+    expect(ids(merged)).toEqual([U0.id, A0.id, persistedFull.id]);
+  });
 
   it('does not pair unrelated turns that merely sit next to each other', () => {
     // No shared request id → no turn identity → both stand. Guards the widened
@@ -917,7 +1117,7 @@ describe('mid-stream refetch (turn partially persisted)', () => {
       content: [tool('exec-77', 'EXECUTING_TOOL')],
       timestamp: t(4100),
       streamSeq: 91,
-    }
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [U0, A0, PERSISTED_PARTIAL],
       existingMessages: [U0, A0, unrelatedLive],
@@ -925,11 +1125,11 @@ describe('mid-stream refetch (turn partially persisted)', () => {
       historyFetchedAt: 4200,
       historyMaxStreamSeq: 70,
       realtimeSeenStreamSeq: 91,
-    })
+    });
 
-    expect(ids(merged)).toEqual([U0.id, A0.id, PERSISTED_PARTIAL.id, unrelatedLive.id])
-  })
-})
+    expect(ids(merged)).toEqual([U0.id, A0.id, PERSISTED_PARTIAL.id, unrelatedLive.id]);
+  });
+});
 
 describe('ordering of surviving realtime messages', () => {
   // The merge concatenates: all persisted history, then every realtime message
@@ -937,8 +1137,8 @@ describe('ordering of surviving realtime messages', () => {
   // contract, which nothing asserted before — the suite tested only WHICH
   // messages survive, never where they land — and which an attempt to
   // chronologically interleave the two sides repeatedly broke.
-  const H_U0: TestMessage = { ...U0, streamSeq: 5 }
-  const H_A0: TestMessage = { ...A0, streamSeq: 10 }
+  const H_U0: TestMessage = { ...U0, streamSeq: 5 };
+  const H_A0: TestMessage = { ...A0, streamSeq: 10 };
   /**
    * Sent from a notification while the window was away, and persisted. NO
    * `streamSeq`: the backend does not stamp user MESSAGE_REQUEST rows, which is
@@ -949,7 +1149,7 @@ describe('ordering of surviving realtime messages', () => {
     role: 'user',
     content: 'replied from a notification',
     timestamp: t(3000),
-  }
+  };
   /** Mingo's answer to it. Assistant rows DO carry a sequence. */
   const AWAY_A: TestMessage = {
     id: 'bbbb0002',
@@ -957,7 +1157,7 @@ describe('ordering of surviving realtime messages', () => {
     content: txt('answered while the window was away'),
     timestamp: t(3100),
     streamSeq: 80,
-  }
+  };
 
   it('appends surviving realtime messages after all persisted history', () => {
     // A technician direct message the snapshot has not caught up with. Its own
@@ -968,7 +1168,7 @@ describe('ordering of surviving realtime messages', () => {
       content: 'a direct message history has not persisted yet',
       timestamp: t(1500),
       streamSeq: 40,
-    }
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [H_U0, H_A0, AWAY_U, AWAY_A],
       existingMessages: [H_U0, H_A0, unpersistedDirect],
@@ -976,10 +1176,10 @@ describe('ordering of surviving realtime messages', () => {
       historyFetchedAt: 9000,
       historyMaxStreamSeq: 80,
       realtimeSeenStreamSeq: 40,
-    })
+    });
 
-    expect(ids(merged)).toEqual([H_U0.id, H_A0.id, AWAY_U.id, AWAY_A.id, unpersistedDirect.id])
-  })
+    expect(ids(merged)).toEqual([H_U0.id, H_A0.id, AWAY_U.id, AWAY_A.id, unpersistedDirect.id]);
+  });
 
   it('keeps survivors in store order, sequence or no sequence', () => {
     // The guard against reordering the two kinds against each other: an
@@ -991,14 +1191,14 @@ describe('ordering of surviving realtime messages', () => {
       role: 'user',
       content: 'just typed, no seq of its own',
       timestamp: t(9400),
-    }
+    };
     const laterDirect: TestMessage = {
       id: 'direct-9500-x',
       role: 'user',
       content: 'and a direct message after it',
       timestamp: t(9500),
       streamSeq: 40,
-    }
+    };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [H_U0, H_A0, AWAY_U, AWAY_A],
       existingMessages: [H_U0, H_A0, optimistic, laterDirect],
@@ -1007,16 +1207,16 @@ describe('ordering of surviving realtime messages', () => {
       historyFetchedAt: 9000,
       historyMaxStreamSeq: 80,
       realtimeSeenStreamSeq: 40,
-    })
+    });
 
-    expect(ids(merged)).toEqual([H_U0.id, H_A0.id, AWAY_U.id, AWAY_A.id, optimistic.id, laterDirect.id])
-  })
+    expect(ids(merged)).toEqual([H_U0.id, H_A0.id, AWAY_U.id, AWAY_A.id, optimistic.id, laterDirect.id]);
+  });
 
   it('keeps history in snapshot order even when its sequences do not climb', () => {
     // The snapshot is the server's account of the conversation; the merge is
     // not entitled to second-guess it from a `streamSeq` that looks out of
     // order, which is what any sort of the two sides together would do.
-    const outOfOrder: TestMessage = { ...H_A0, id: 'aaaa0009', streamSeq: 3 }
+    const outOfOrder: TestMessage = { ...H_A0, id: 'aaaa0009', streamSeq: 3 };
     const merged = mergeHistoryWithRealtime({
       processedHistory: [H_U0, outOfOrder, AWAY_U, AWAY_A],
       existingMessages: [H_U0],
@@ -1024,8 +1224,8 @@ describe('ordering of surviving realtime messages', () => {
       historyFetchedAt: 9000,
       historyMaxStreamSeq: 80,
       realtimeSeenStreamSeq: 0,
-    })
+    });
 
-    expect(ids(merged)).toEqual([H_U0.id, outOfOrder.id, AWAY_U.id, AWAY_A.id])
-  })
-})
+    expect(ids(merged)).toEqual([H_U0.id, outOfOrder.id, AWAY_U.id, AWAY_A.id]);
+  });
+});

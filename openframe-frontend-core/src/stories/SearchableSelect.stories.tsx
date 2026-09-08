@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
+import { MonitorIcon, UserPlusIcon } from '../components/icons-v2-generated';
 import { SearchableSelect, type SearchableSelectProps } from '../components/ui/searchable-select';
 import { SquareAvatar } from '../components/ui/square-avatar';
-import { MonitorIcon, UserPlusIcon } from '../components/icons-v2-generated';
 
 const meta = {
   title: 'UI/SearchableSelect',
@@ -109,7 +109,7 @@ export const CustomTrigger: Story = {
       <button
         type="button"
         aria-label="Assign user"
-        className="size-8 rounded-full border border-ods-border flex items-center justify-center shrink-0 text-ods-text-secondary hover:text-ods-accent hover:border-ods-accent transition-colors"
+        className="flex size-8 shrink-0 items-center justify-center rounded-full border border-ods-border text-ods-text-secondary transition-colors hover:border-ods-accent hover:text-ods-accent"
       >
         <UserPlusIcon className="size-4" />
       </button>

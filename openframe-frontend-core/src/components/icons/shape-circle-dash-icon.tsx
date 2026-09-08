@@ -1,10 +1,8 @@
-import React from 'react'
-
 interface ShapeCircleDashIconProps {
-  className?: string
-  size?: number
-  color?: string
-  full?: boolean
+  className?: string;
+  size?: number;
+  color?: string;
+  full?: boolean;
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
@@ -12,7 +10,7 @@ export function ShapeCircleDashIcon({
   className = '',
   size = 24,
   color = 'white',
-  full = false
+  full = false,
 }: ShapeCircleDashIconProps) {
   return (
     <svg
@@ -34,5 +32,5 @@ export function ShapeCircleDashIcon({
         fill={full ? color : 'none'}
       />
     </svg>
-  )
+  );
 }

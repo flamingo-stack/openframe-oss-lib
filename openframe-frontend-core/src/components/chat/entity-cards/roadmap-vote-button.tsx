@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * RoadmapVoteButton — small thumbs-up / thumbs-down vote button used by
@@ -6,21 +6,20 @@
  * comes from the parent (typically a `useRoadmapVoting` hook).
  */
 
-import React from 'react'
-import { ThumbsUpIcon } from '../../icons/thumbs-up-icon'
-import { ThumbsDownIcon } from '../../icons/thumbs-down-icon'
-import { Button } from '../../ui/button/button'
-import { cn } from '../../../utils/cn'
+import { cn } from '../../../utils/cn';
+import { ThumbsDownIcon } from '../../icons/thumbs-down-icon';
+import { ThumbsUpIcon } from '../../icons/thumbs-up-icon';
+import { Button } from '../../ui/button/button';
 
 export interface RoadmapVoteButtonProps {
-  voteType: 'up' | 'down'
-  count: number
-  isActive: boolean
-  onClick: () => void
-  disabled?: boolean
-  showCount?: boolean
-  color?: string
-  className?: string
+  voteType: 'up' | 'down';
+  count: number;
+  isActive: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  showCount?: boolean;
+  color?: string;
+  className?: string;
 }
 
 export function RoadmapVoteButton({
@@ -33,22 +32,22 @@ export function RoadmapVoteButton({
   color,
   className,
 }: RoadmapVoteButtonProps) {
-  const Icon = voteType === 'up' ? ThumbsUpIcon : ThumbsDownIcon
+  const Icon = voteType === 'up' ? ThumbsUpIcon : ThumbsDownIcon;
   return (
     <Button
       variant="outline"
       onClick={onClick}
       disabled={disabled}
-      leftIcon={<Icon className="w-5 h-5" color={color} />}
+      leftIcon={<Icon className="h-5 w-5" color={color} />}
       className={cn(
         className,
-        'bg-ods-bg border-0 border-ods-border flex gap-[2px] items-center justify-center p-[12px] h-full',
+        'flex h-full items-center justify-center gap-[2px] border-0 border-ods-border bg-ods-bg p-[12px]',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        'hover:bg-ods-border transition-all',
+        'transition-all hover:bg-ods-border',
         isActive && 'bg-ods-border',
       )}
     >
       {showCount && <span className="text-h6">{count}</span>}
     </Button>
-  )
+  );
 }

@@ -16,6 +16,9 @@ public interface AuthUserRepository extends MongoRepository<AuthUser, String> {
      */
     Optional<AuthUser> findByEmailAndStatus(String email, UserStatus status);
 
+    /** All accounts for an email in a given status, across tenants — used to detect duplicates. */
+    List<AuthUser> findAllByEmailAndStatus(String email, UserStatus status);
+
     /**
      * Find single ACTIVE user by email within a specific tenant
      */

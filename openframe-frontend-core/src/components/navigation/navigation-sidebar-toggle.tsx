@@ -1,35 +1,30 @@
-"use client"
+'use client';
 
-import { cn } from '../../utils'
-import { Chevrons03LeftIcon } from '../icons-v2-generated'
+import { cn } from '../../utils';
+import { Chevrons03LeftIcon } from '../icons-v2-generated';
 
 export interface NavigationSidebarToggleProps {
-  minimized: boolean
-  showLabel: boolean
-  onToggle: () => void
+  minimized: boolean;
+  showLabel: boolean;
+  onToggle: () => void;
 }
 
-export function NavigationSidebarToggle({
-  minimized,
-  showLabel,
-  onToggle,
-}: NavigationSidebarToggleProps) {
- 
+export function NavigationSidebarToggle({ minimized, showLabel, onToggle }: NavigationSidebarToggleProps) {
   return (
     <div className="border-t border-ods-border">
       <button
         onClick={onToggle}
         className={cn(
-          "w-full flex items-center justify-start relative",
-          "h-14 p-[var(--spacing-system-m)]",
-          "transition-colors duration-300",
-          "[&_svg]:transition-colors [&_svg]:duration-300",
-          "hover:bg-ods-bg-hover text-ods-text-primary",
+          'relative flex w-full items-center justify-start',
+          'h-14 p-[var(--spacing-system-m)]',
+          'transition-colors duration-300',
+          '[&_svg]:transition-colors [&_svg]:duration-300',
+          'text-ods-text-primary hover:bg-ods-bg-hover',
         )}
-        title={minimized ? "Hide Menu" : undefined}
-        aria-label={"Hide Menu"}
+        title={minimized ? 'Hide Menu' : undefined}
+        aria-label={'Hide Menu'}
       >
-        <div className="flex items-center justify-center flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center justify-center">
           {/* Direction follows the rail's measured width (the `of-nav-sidebar`
               container declared in `navigation-sidebar.tsx`), not `minimized`:
               before hydration that prop can only carry the server's answer, and
@@ -39,13 +34,13 @@ export function NavigationSidebarToggle({
               Collapsed is the default because container queries are min-width —
               the rail is narrower than every threshold, so it needs no query of
               its own. */}
-          <Chevrons03LeftIcon className="rotate-180 @[140px]/of-nav-sidebar:rotate-0 text-ods-text-secondary w-6 h-6 transition-transform duration-300" />
+          <Chevrons03LeftIcon className="h-6 w-6 rotate-180 text-ods-text-secondary transition-transform duration-300 @[140px]/of-nav-sidebar:rotate-0" />
         </div>
 
         <span
           className={cn(
-            "text-h4 flex-1 text-left truncate transition-[opacity,margin-left] duration-300",
-            showLabel ? "opacity-100 ml-[var(--spacing-system-xs)]" : "opacity-0 ml-0",
+            'flex-1 truncate text-left transition-[opacity,margin-left] duration-300 text-h4',
+            showLabel ? 'ml-[var(--spacing-system-xs)] opacity-100' : 'ml-0 opacity-0',
           )}
           aria-hidden={!showLabel}
         >
@@ -53,5 +48,5 @@ export function NavigationSidebarToggle({
         </span>
       </button>
     </div>
-  )
+  );
 }

@@ -1,8 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import {
-  QuickActionChipButton,
-  type QuickActionIconSpec,
-} from '../components/chat/quick-action-chip'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { QuickActionChipButton, type QuickActionIconSpec } from '../components/chat/quick-action-chip';
 
 const meta: Meta<typeof QuickActionChipButton> = {
   title: 'Chat/QuickActionChip',
@@ -12,7 +9,7 @@ const meta: Meta<typeof QuickActionChipButton> = {
     docs: {
       description: {
         component:
-          'The unified quick-action chip (`QuickActionChipButton`) used by every chat empty state (guide / mingo / ai-agent), the marketing marquee strips, and the ROI table task cells. Icon resolution is owned entirely by `<EntityIcon>` in two `QuickActionIconSpec` formats: the **agent format** (`{ name: \'fae\' | \'mingo\' }`) renders the packaged agent mark, and the **config format** (`{ name, url, props, accent }`) renders an admin-configured glyph tinted via `accent` (`pink` → flamingo-pink, `cyan` → flamingo-cyan, or any CSS color). An explicit `props.color` wins over `accent`.',
+          "The unified quick-action chip (`QuickActionChipButton`) used by every chat empty state (guide / mingo / ai-agent), the marketing marquee strips, and the ROI table task cells. Icon resolution is owned entirely by `<EntityIcon>` in two `QuickActionIconSpec` formats: the **agent format** (`{ name: 'fae' | 'mingo' }`) renders the packaged agent mark, and the **config format** (`{ name, url, props, accent }`) renders an admin-configured glyph tinted via `accent` (`pink` → flamingo-pink, `cyan` → flamingo-cyan, or any CSS color). An explicit `props.color` wins over `accent`.",
       },
     },
   },
@@ -26,21 +23,21 @@ const meta: Meta<typeof QuickActionChipButton> = {
     onHoverEnd: { control: false },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div className="flex items-center justify-center bg-ods-bg p-8">
         <Story />
       </div>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof QuickActionChipButton>
+export default meta;
+type Story = StoryObj<typeof QuickActionChipButton>;
 
 // Config-format icon specs — resolved by <EntityIcon> against the icons-v2
 // library, tinted by `accent`.
-const SEARCH_ICON: QuickActionIconSpec = { name: 'search', accent: 'pink' }
-const BUG_ICON: QuickActionIconSpec = { name: 'bug', accent: 'cyan' }
+const SEARCH_ICON: QuickActionIconSpec = { name: 'search', accent: 'pink' };
+const BUG_ICON: QuickActionIconSpec = { name: 'bug', accent: 'cyan' };
 
 /** Default bordered (`outline`) chip with a config glyph tinted flamingo-pink. */
 export const Default: Story = {
@@ -50,7 +47,7 @@ export const Default: Story = {
     variant: 'outline',
     onSelect: () => console.log('select'),
   },
-}
+};
 
 /** Accent (`primary`, yellow) chip variant. */
 export const Primary: Story = {
@@ -60,7 +57,7 @@ export const Primary: Story = {
     variant: 'primary',
     onSelect: () => console.log('select'),
   },
-}
+};
 
 /** Config glyphs tinted via `accent` — `pink` and `cyan` brand tokens. */
 export const AccentTints: Story = {
@@ -68,14 +65,10 @@ export const AccentTints: Story = {
     <div className="flex flex-wrap items-center gap-2">
       <QuickActionChipButton label="Search docs" icon={SEARCH_ICON} onSelect={() => {}} />
       <QuickActionChipButton label="Report a bug" icon={BUG_ICON} onSelect={() => {}} />
-      <QuickActionChipButton
-        label="Custom color"
-        icon={{ name: 'compass', accent: '#8b5cf6' }}
-        onSelect={() => {}}
-      />
+      <QuickActionChipButton label="Custom color" icon={{ name: 'compass', accent: '#8b5cf6' }} onSelect={() => {}} />
     </div>
   ),
-}
+};
 
 /**
  * Agent-format icons — `{ name: 'fae' }` / `{ name: 'mingo' }` render the
@@ -88,7 +81,7 @@ export const AgentMarks: Story = {
       <QuickActionChipButton label="Ask mingo" icon={{ name: 'mingo' }} onSelect={() => {}} />
     </div>
   ),
-}
+};
 
 /** No icon — label only. */
 export const NoIcon: Story = {
@@ -96,7 +89,7 @@ export const NoIcon: Story = {
     label: 'Find device',
     onSelect: () => console.log('select'),
   },
-}
+};
 
 /**
  * `interactive={false}` renders a plain, non-focusable `<Tag>` (decorative use:
@@ -108,7 +101,7 @@ export const NonInteractive: Story = {
     icon: SEARCH_ICON,
     interactive: false,
   },
-}
+};
 
 /**
  * `onHoverStart` / `onHoverEnd` fire on pointer AND keyboard focus — used to
@@ -123,7 +116,7 @@ export const HoverCallbacks: Story = {
     onHoverStart: () => console.log('hover start → preview prompt'),
     onHoverEnd: () => console.log('hover end → restore composer'),
   },
-}
+};
 
 /** All variants side by side. */
 export const Gallery: Story = {
@@ -131,12 +124,7 @@ export const Gallery: Story = {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <QuickActionChipButton label="Outline" icon={SEARCH_ICON} onSelect={() => {}} />
-        <QuickActionChipButton
-          label="Primary"
-          icon={{ name: 'rocket' }}
-          variant="primary"
-          onSelect={() => {}}
-        />
+        <QuickActionChipButton label="Primary" icon={{ name: 'rocket' }} variant="primary" onSelect={() => {}} />
         <QuickActionChipButton label="No icon" onSelect={() => {}} />
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -146,4 +134,4 @@ export const Gallery: Story = {
       </div>
     </div>
   ),
-}
+};
