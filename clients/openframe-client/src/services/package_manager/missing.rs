@@ -37,7 +37,7 @@ impl PackageManagerMissingPublisher {
         let subject = format!("machine.{}.package-manager-missing", machine_id);
 
         for id in ManagerId::for_current_platform() {
-            if id.presence() != Presence::Absent {
+            if id.presence().await != Presence::Absent {
                 continue;
             }
             self.nats_publisher

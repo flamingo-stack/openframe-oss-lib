@@ -47,7 +47,7 @@ impl ManagerId {
         }
     }
 
-    pub fn presence(self) -> Presence {
+    pub async fn presence(self) -> Presence {
         match self {
             ManagerId::Brew => {
                 if Path::new("/opt/homebrew/bin/brew").exists()
@@ -58,10 +58,77 @@ impl ManagerId {
                     Presence::Absent
                 }
             }
-            // TODO(windows): real choco/winget detection; Unknown until Windows work.
-            ManagerId::Choco | ManagerId::Winget => Presence::Unknown,
+            ManagerId::Choco => choco_presence(),
+            ManagerId::Winget => winget_presence().await,
         }
     }
+}
+
+#[cfg(target_os = "windows")]
+fn choco_presence() -> Presence {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+
+    const ENVIRONMENT: &str = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
+
+    let root = RegKey::predef(HKEY_LOCAL_MACHINE)
+        .open_subkey(ENVIRONMENT)
+        .ok()
+        .and_then(|key| key.get_value::<String, _>("ChocolateyInstall").ok())
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| {
+            let program_data =
+                std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".to_string());
+            format!(r"{}\chocolatey", program_data)
+        });
+
+    if Path::new(&root).join("bin").join("choco.exe").exists() {
+        Presence::Present
+    } else {
+        Presence::Absent
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn choco_presence() -> Presence {
+    Presence::Unknown
+}
+
+#[cfg(target_os = "windows")]
+const WINGET_PRESENCE_SCRIPT: &str = r#"$p = (Get-AppxPackage -Name Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue).InstallLocation
+if ($p -and (Test-Path "$p\winget.exe")) { exit 0 }
+exit 1
+"#;
+
+#[cfg(target_os = "windows")]
+const PRESENCE_TIMEOUT_SECS: u32 = 60;
+
+#[cfg(target_os = "windows")]
+async fn winget_presence() -> Presence {
+    let result = execute_script(ScriptParams {
+        code: WINGET_PRESENCE_SCRIPT,
+        shell: "powershell",
+        args: &[],
+        timeout_secs: PRESENCE_TIMEOUT_SECS,
+        privilege: Privilege::User,
+        env_vars: &[],
+    })
+    .await;
+
+    if result.timed_out || result.retcode == SETUP_FAILURE_RETCODE {
+        return Presence::Unknown;
+    }
+
+    match result.retcode {
+        0 => Presence::Present,
+        1 => Presence::Absent,
+        _ => Presence::Unknown,
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+async fn winget_presence() -> Presence {
+    Presence::Unknown
 }
 
 #[derive(Debug)]
