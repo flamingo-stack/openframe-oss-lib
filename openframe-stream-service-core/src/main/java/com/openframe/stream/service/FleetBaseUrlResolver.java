@@ -1,13 +1,13 @@
 package com.openframe.stream.service;
 
 /**
- * Resolves the Fleet MDM base URL for a specific tenant.
+ * Finds the Fleet URL for a given tenant.
  *
- * <p>In per-tenant clusters the stream service and Fleet share a cluster, so the static
- * {@code fleet.mdm.base-url} (an in-cluster ClusterIP URL) is always correct and no
- * implementation of this interface is deployed — the dependency is optional and the static
- * configuration is used. Only the shared cluster contributes a bean, which resolves a real
- * per-tenant URL.
+ * <p>This repo has no implementation on purpose. On a tenant cluster Fleet is in the same cluster,
+ * so the fixed {@code fleet.mdm.base-url} from config is always right and there is nothing to look
+ * up — the dependency is optional and stays null. The only implementation is in
+ * openframe-saas-shared, where one service talks to many tenants' Fleets and has to pick the URL
+ * per tenant.
  */
 public interface FleetBaseUrlResolver {
 
@@ -18,4 +18,3 @@ public interface FleetBaseUrlResolver {
      */
     String resolveBaseUrl(String tenantId);
 }
-
