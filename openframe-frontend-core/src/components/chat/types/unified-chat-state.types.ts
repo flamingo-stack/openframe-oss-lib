@@ -17,12 +17,72 @@
  */
 
 import type { ChatRef } from '../chat-ref.types';
-import type { ChatSource } from '../hooks/use-sse-chat-adapter';
 import type { ChatAttachment } from '../utils/chat-attachment-markdown';
 import type { AuthorType } from './chat.types';
 import type { DialogItem } from './component.types';
 import type { ChatContextItem } from './context-item.types';
-import type { MessageSegment, ScrollAnchor } from './message.types';
+import type { ChatSource, MessageSegment, ScrollAnchor } from './message.types';
+
+// ─── Dialog-list host contract (shared by the NATS + SSE adapters) ───────────
+
+/** Page-fetch parameters passed to a host `fetchDialogs` callback. The
+ *  adapter owns the cursor — the host only resolves it against the backend.
+ *  `search` is present ONLY when the adapter runs a server-side list search
+ *  (never spread as an `undefined` key). */
+export interface FetchDialogsParams {
+  cursor?: string;
+  limit?: number;
+  search?: string;
+}
+
+/** Successful `fetchDialogs` response. `nextCursor: null` means "no more
+ *  pages" — used to terminate the infinite-scroll observer in the list. */
+export interface FetchDialogsResult {
+  dialogs: DialogItem[];
+  nextCursor: string | null;
+}
+
+/**
+ * Dialog-management capabilities a transport exposes to `EmbeddableChat`.
+ * Structurally identical to the host-injected `mingoDialogCapabilities`
+ * prop — one shape, whether the list is host-owned (openframe `mingoState`)
+ * or adapter-owned (`UnifiedChatState.dialogCapabilities`).
+ */
+export interface ChatDialogCapabilities {
+  /** Show "Rename chat" in the row ⋯ menu and the conversation header. */
+  canRename?: boolean;
+  /** Show "Archive chat" in the row ⋯ menu and the conversation header. */
+  canArchive?: boolean;
+  /** Pages archived dialogs — presence gates the archive page + header button. */
+  fetchArchivedDialogs?: (params: FetchDialogsParams) => Promise<FetchDialogsResult>;
+  /** Restores an archived dialog — presence gates the restore button. */
+  unarchiveDialog?: (id: string) => Promise<void>;
+  /** Current list-search term (host/adapter owned; the list never filters). */
+  searchQuery?: string;
+  /** Presence wires the header magnifier + the rail's search field. */
+  onSearchChange?: (query: string) => void;
+  /** "Copy chat link" — the owner of the URL shape + clipboard write. */
+  onCopyLink?: (dialog: DialogItem) => void;
+  /**
+   * When the list has settled EMPTY and is unsearched, land on the composer
+   * instead of an empty "Current Chats" screen.
+   *
+   * A policy, not a transport detail: a public marketing panel must not make a
+   * first-time visitor tap through an empty list to ask a question, while a
+   * signed-in workspace panel wants the list (with its "Start New Chat"
+   * affordance) as the landing surface. Omit to keep the list.
+   */
+  emptyListSkipsToCompose?: boolean;
+}
+
+/**
+ * "This panel owns a conversation list, and no optional affordance on it."
+ *
+ * A frozen module singleton so it is referentially stable across renders —
+ * it is read inside memo dependency lists, where a fresh `{}` would
+ * invalidate them on every pass.
+ */
+export const EMPTY_DIALOG_CAPABILITIES: ChatDialogCapabilities = Object.freeze({});
 
 // ─── Per-dialog token usage (Mingo backend telemetry) ────────────────────────
 
@@ -169,8 +229,18 @@ export interface UnifiedChatMessage {
    */
   timestamp?: Date | string | number;
 
-  /** Guide/SSE-only: document citations. Undefined in Mingo mode. */
+  /**
+   * Documents this answer cited, rendered as chips beneath it. Produced by
+   * BOTH transports now — SSE reads them off the per-turn metadata frame, NATS
+   * decodes them out of a `GUIDE`/`SOURCES` chunk.
+   */
   sources?: ChatSource[];
+  /**
+   * Entity references this answer's metadata described — videos and cards.
+   * Data for the `[card://type:id]` markers in the body, not a render list:
+   * only markers actually present in the text are rendered.
+   */
+  refs?: ChatRef[];
 
   /**
    * Per-message viewport-positioning hint. Common to both modes; the
@@ -357,17 +427,28 @@ export interface UnifiedChatState {
    *  adapter doesn't support creation, resolves to `null`. */
   startNewDialog: () => Promise<string | null>;
 
-  /** Delete a dialog from history. No-op when the adapter doesn't
-   *  expose `deleteDialog` (Guide localStorage always supports it;
-   *  Mingo gates on the host-provided callback). */
+  /** Delete a dialog from history. No-op (resolves) when the adapter doesn't
+   *  expose `deleteDialog`.
+   *
+   *  REJECTS when the backend call fails — the row is kept and the error is
+   *  re-thrown so a confirmation modal can stay open for a retry instead of
+   *  closing over a write that never landed. Callers must `await`/`.catch()`;
+   *  a bare `void state.deleteDialog(id)` produces an unhandled rejection. */
   deleteDialog: (id: string) => Promise<void>;
 
   /** Rename a dialog. Optimistically updates the title in the local list.
-   *  No-op when the adapter doesn't expose a rename callback. */
+   *  No-op (resolves) when the adapter doesn't expose a rename callback.
+   *
+   *  ALWAYS RESOLVES — unlike `deleteDialog` / `archiveDialog`. A failure rolls
+   *  the optimistic title back and is logged, never re-thrown, because
+   *  `useChatDialogManager` fires rename as `void renameDialog(...)` and closes
+   *  its modal immediately; rejecting here would only produce an unhandled
+   *  rejection. The rollback is the user-visible signal. */
   renameDialog: (id: string, title: string) => Promise<void>;
 
-  /** Archive a dialog (removes it from the active list). No-op when the
-   *  adapter doesn't expose an archive callback. */
+  /** Archive a dialog (removes it from the active list). No-op (resolves) when
+   *  the adapter doesn't expose an archive callback.
+   *  REJECTS on failure, keeping the row — see `deleteDialog`. */
   archiveDialog: (id: string) => Promise<void>;
 
   /** True while the dialog list is being fetched for the first time. */
@@ -404,6 +485,21 @@ export interface UnifiedChatState {
 
   /** Fetch the next page of historical messages for the active dialog. */
   loadMoreMessages: () => Promise<void>;
+
+  /**
+   * THE conversation-list signal. Present iff this state owns a conversation
+   * list; absent = a single-thread panel. `EmbeddableChat` gates the whole
+   * history surface — rail, stacked list, archive page, rename/archive menus,
+   * header search — on its presence alone, so the panel never asks WHICH
+   * transport it is talking to. Each field inside it then gates one
+   * affordance, on the same rule the rest of this file uses: the presence of
+   * a callback IS the capability.
+   *
+   * Deliberately ONE field, not a `dialogsManaged` boolean beside an object:
+   * two signals derived from the same predicate can disagree, and every
+   * producer would have to remember to set both.
+   */
+  dialogCapabilities?: ChatDialogCapabilities;
 
   // ─── Approval mutations (Mingo agent tool-call workflow) ──────────────────
 

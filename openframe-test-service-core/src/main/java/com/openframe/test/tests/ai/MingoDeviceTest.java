@@ -177,7 +177,11 @@ public class MingoDeviceTest extends MingoBaseTest {
     public void testHostnameQuery() {
         String actualHostname = ssh.hostname();
 
-        RunResult result = prompt("What is the hostname of the machine " + host + "?");
+        // "the online machine": the tenant can hold several device records for this hostname, one
+        // per enroll/uninstall cycle, and the assistant is entitled to stop and ask which is meant.
+        // Both these cases assert against values read over SSH from the live box, so the online
+        // record is the only one whose answer can match. See MingoMdmTest.testPolicyAssignHost.
+        RunResult result = prompt("What is the hostname of the online machine " + host + "?");
 
         assertThat(result.finalText())
                 .as("Reply should contain the real hostname %s.\n%s", actualHostname, result)
@@ -208,7 +212,7 @@ public class MingoDeviceTest extends MingoBaseTest {
     public void testOsVersion() {
         String build = ssh.osBuild();
 
-        RunResult result = prompt("What Windows version and build number is the machine " + host + " running?");
+        RunResult result = prompt("What Windows version and build number is the online machine " + host + " running?");
 
         assertThat(result.finalText())
                 .as("Reply should include the real OS build %s.\n%s", build, result)

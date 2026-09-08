@@ -6,7 +6,7 @@ import type { NoDataProps } from '../no-data';
 import { useDataTableContext } from './data-table';
 import { DataTableEmpty } from './data-table-empty';
 import { DataTableRow } from './data-table-row';
-import { DataTableSkeleton, ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, ROW_SHELL_CLASSES } from './data-table-skeleton';
+import { DataTableSkeleton, PlaceholderRows, ReservedEmptyState } from './data-table-skeleton';
 
 export interface DataTableBodyProps<T = unknown> {
   /** Show skeleton rows while `loading` is true and data is empty. */
@@ -30,6 +30,23 @@ export interface DataTableBodyProps<T = unknown> {
    * the row instead of clipping. Default keeps the fixed height.
    */
   autoHeight?: boolean;
+  /**
+   * REPLACES the design row height for THIS table's rows, its pad rows and its
+   * skeleton alike — one number, so they cannot disagree.
+   *
+   * Why a prop and not a className: `minRows` promises a stable table height,
+   * but its pad rows and the skeleton were hard-coded to the design height
+   * while a row passing `autoHeight` renders as tall as its content. A table
+   * with 112px rows padded a short page with 78px placeholders and came up
+   * 34px per missing row too short — on a 15-row page with 5 results, 340px of
+   * jump against every other page. Appending a height through `rowClassName`
+   * cannot fix it either: tailwind-merge drops the plain `h-[66px]` but keeps
+   * the `md:h-[78px]` beside it, so the override holds on a phone and loses on
+   * a desktop. Pass it here and every row slot in the table agrees.
+   *
+   * Responsive values belong in the string itself, e.g. `'h-[200px] md:h-[112px]'`.
+   */
+  rowHeightClassName?: string;
   /**
    * Click anywhere on a row (except elements with `data-no-row-click`). Prefer
    * `useCallback` to avoid breaking `React.memo` on rows.
@@ -68,6 +85,7 @@ export function DataTableBody<T = unknown>({
   rowClassName,
   compact,
   autoHeight,
+  rowHeightClassName,
   onRowClick,
   rowHref,
   minRows,
@@ -79,7 +97,7 @@ export function DataTableBody<T = unknown>({
   if (loading && rows.length === 0) {
     return (
       <div className={cn('flex w-full flex-col gap-[var(--spacing-system-xsf)]', className)}>
-        <DataTableSkeleton rows={skeletonRows} />
+        <DataTableSkeleton rows={skeletonRows} rowHeightClassName={rowHeightClassName} />
       </div>
     );
   }
@@ -99,10 +117,13 @@ export function DataTableBody<T = unknown>({
     // slots here and center the empty state over them.
     if (minRows) {
       return (
-        <div className={cn('relative flex w-full flex-col gap-[var(--spacing-system-xsf)]', className)}>
-          <PlaceholderRows count={minRows} />
-          <div className="absolute inset-0 flex items-center justify-center">{empty}</div>
-        </div>
+        <ReservedEmptyState
+          count={minRows}
+          gapClassName={cn('gap-[var(--spacing-system-xsf)]', className)}
+          rowHeightClassName={rowHeightClassName}
+        >
+          {empty}
+        </ReservedEmptyState>
       );
     }
 
@@ -125,36 +146,13 @@ export function DataTableBody<T = unknown>({
             href={href}
             compact={compact}
             autoHeight={autoHeight}
+            rowHeightClassName={rowHeightClassName}
             className={cls}
             subRow={renderSubRow?.(item)}
           />
         );
       })}
-      {padCount > 0 && <PlaceholderRows count={padCount} />}
+      {padCount > 0 && <PlaceholderRows count={padCount} rowHeightClassName={rowHeightClassName} />}
     </div>
-  );
-}
-
-/**
- * Invisible rows that occupy exactly one row slot each.
- *
- * THE height reservation for a table whose page is short or empty — both call
- * sites use it, so a padded page and an empty one are the same height by
- * construction rather than by two matching guesses.
- */
-function PlaceholderRows({ count }: { count: number }) {
-  return (
-    <>
-      {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={`placeholder-${i}`}
-          className="pointer-events-none relative overflow-hidden rounded-md"
-          aria-hidden="true"
-        >
-          <div className={cn('hidden py-0 md:flex', ROW_SHELL_CLASSES, ROW_HEIGHT_DESKTOP)} />
-          <div className={cn('flex justify-start py-0 md:hidden', ROW_SHELL_CLASSES, ROW_HEIGHT_MOBILE)} />
-        </div>
-      ))}
-    </>
   );
 }

@@ -802,7 +802,7 @@ describe('useApiParams', () => {
         result.current.setParam('page', 1);
       });
 
-      const written = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+      const written = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0];
       expect(written).not.toContain('page=1');
     });
 

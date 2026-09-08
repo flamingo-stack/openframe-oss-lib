@@ -39,11 +39,11 @@ export function positiveInt<TFallback = number>(
   // sentinel back untouched instead of `Math.min(null, max)`.
   const capped = (v: number) => (max == null ? v : Math.min(v, max));
   if (raw === null || raw === undefined || raw === '') {
-    return typeof fallback === 'number' ? (capped(fallback) as number | TFallback) : fallback;
+    return typeof fallback === 'number' ? capped(fallback) : fallback;
   }
   const n = Math.trunc(Number(raw));
   if (!Number.isFinite(n) || n < min) {
-    return typeof fallback === 'number' ? (capped(fallback) as number | TFallback) : fallback;
+    return typeof fallback === 'number' ? capped(fallback) : fallback;
   }
   return capped(n);
 }
@@ -160,7 +160,7 @@ function coerceScalar(raw: string | undefined, config: ParamConfig): unknown {
   if (raw === undefined || raw === '') return undefined;
   switch (config.type) {
     case 'int': {
-      const int = config as IntParamConfig;
+      const int = config;
       // ONE integer grammar, default or not. Without a declared default the
       // fallback is `undefined` (an unparseable value is absent), which
       // `positiveInt` returns untouched — the branch used to open-code the
@@ -201,7 +201,7 @@ export function parseSchemaParams<TSchema extends ParamSchema, Opts extends Pars
   for (const [key, config] of Object.entries(schema)) {
     if (config.type === 'array') {
       const values = allParamValues(input, key);
-      out[key] = values.length > 0 ? values : ((config.default as string[] | undefined) ?? []);
+      out[key] = values.length > 0 ? values : (config.default ?? []);
       continue;
     }
     const coerced = coerceScalar(firstParamValue(input, key), config);

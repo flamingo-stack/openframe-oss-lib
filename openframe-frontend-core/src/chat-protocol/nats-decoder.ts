@@ -20,15 +20,12 @@ import { MESSAGE_TYPE } from '../components/chat/types/message.types';
 import type { AskOptionData } from '../components/chat/types/message.types';
 import { ESCALATION_STATE, escalationResolvedStatus } from './events';
 import type { ApprovalToolCall, ChatStreamEvent } from './events';
+import { sourceMetadataEvent } from './source-metadata';
+import { isRecord } from './wire-narrow';
 
 /** Minimal structural view of a NATS chunk (see `ChunkData` in
  *  `src/components/chat/types/network.types.ts`). */
 type NatsChunk = Record<string, unknown>;
-
-/** Narrow an unknown wire value to something with string-keyed properties. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 /** Wire string field, or `undefined` when the backend sent anything else. */
 function str(value: unknown): string | undefined {
@@ -124,6 +121,17 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         return { type: 'thinking-delta', text: data.text, ...seq };
       }
       return null;
+
+    // Two chunk names, one payload and one decoder. `SOURCES` is the contract
+    // the backend is moving to; `GUIDE` is the v2 envelope it ships in during
+    // the rollout (see `MESSAGE_TYPE.GUIDE`). The chunk arrives BEFORE or
+    // between the answer's text deltas, so the reducer — not this decoder —
+    // owns attaching it to the right turn.
+    case MESSAGE_TYPE.GUIDE:
+    case MESSAGE_TYPE.SOURCES: {
+      const event = sourceMetadataEvent(data.payload);
+      return event ? { ...event, ...seq } : null;
+    }
 
     // An ask card is only an ask card with something to pick: a question and at
     // least one option. Anything less is dropped rather than rendered as an
