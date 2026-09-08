@@ -8,7 +8,7 @@ import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
-import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
+import com.openframe.data.nats.rmm.publisher.ScriptBootstrapNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -43,7 +43,7 @@ public class PackageManagerBootstrapService {
     private final MachineRepository machineRepository;
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
-    private final ScriptNatsPublisher scriptNatsPublisher;
+    private final ScriptBootstrapNatsPublisher scriptBootstrapNatsPublisher;
 
     @Value("${openframe.rmm.package-manager-bootstrap.cooldown-seconds:1800}")
     private long cooldownSeconds;
@@ -117,7 +117,7 @@ public class PackageManagerBootstrapService {
                 .statusChangedAt(now)
                 .build());
 
-        scriptNatsPublisher.publishScript(machineId, ScriptMessage.builder()
+        scriptBootstrapNatsPublisher.publishBootstrapScript(machineId, ScriptMessage.builder()
                 .executionId(executionId)
                 .scriptId(script.getId())
                 .machineId(machineId)

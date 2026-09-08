@@ -11,7 +11,7 @@ import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
-import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
+import com.openframe.data.nats.rmm.publisher.ScriptBootstrapNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -42,7 +42,7 @@ class PackageManagerBootstrapServiceTest {
     private MachineRepository machineRepository;
     private ScriptRepository scriptRepository;
     private ScriptExecutionRepository scriptExecutionRepository;
-    private ScriptNatsPublisher scriptNatsPublisher;
+    private ScriptBootstrapNatsPublisher scriptBootstrapNatsPublisher;
     private PackageManagerBootstrapService service;
 
     @BeforeEach
@@ -50,9 +50,9 @@ class PackageManagerBootstrapServiceTest {
         machineRepository = mock(MachineRepository.class);
         scriptRepository = mock(ScriptRepository.class);
         scriptExecutionRepository = mock(ScriptExecutionRepository.class);
-        scriptNatsPublisher = mock(ScriptNatsPublisher.class);
+        scriptBootstrapNatsPublisher = mock(ScriptBootstrapNatsPublisher.class);
         service = new PackageManagerBootstrapService(
-                machineRepository, scriptRepository, scriptExecutionRepository, scriptNatsPublisher);
+                machineRepository, scriptRepository, scriptExecutionRepository, scriptBootstrapNatsPublisher);
         ReflectionTestUtils.setField(service, "cooldownSeconds", COOLDOWN_SECONDS);
     }
 
@@ -113,7 +113,7 @@ class PackageManagerBootstrapServiceTest {
         assertThat(row.getValue().getTimeoutSeconds()).isEqualTo(1800);
 
         ArgumentCaptor<ScriptMessage> message = ArgumentCaptor.forClass(ScriptMessage.class);
-        verify(scriptNatsPublisher).publishScript(anyString(), message.capture());
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(anyString(), message.capture());
         assertThat(message.getValue().getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(message.getValue().getCode()).isEqualTo("winget bootstrap body");
         assertThat(message.getValue().getShell()).isEqualTo(ScriptShell.POWERSHELL);
@@ -130,7 +130,7 @@ class PackageManagerBootstrapServiceTest {
 
         service.installIfAbsent(MACHINE_ID, PackageManagerType.WINGET);
 
-        verify(scriptNatsPublisher, never()).publishScript(anyString(), any());
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
         verify(scriptExecutionRepository, never()).save(any());
     }
 
@@ -143,7 +143,7 @@ class PackageManagerBootstrapServiceTest {
 
         service.installIfAbsent(MACHINE_ID, PackageManagerType.WINGET);
 
-        verify(scriptNatsPublisher, never()).publishScript(anyString(), any());
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
     }
 
     @Test
@@ -155,7 +155,7 @@ class PackageManagerBootstrapServiceTest {
 
         service.installIfAbsent(MACHINE_ID, PackageManagerType.WINGET);
 
-        verify(scriptNatsPublisher).publishScript(anyString(), any(ScriptMessage.class));
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(anyString(), any(ScriptMessage.class));
     }
 
     @Test
@@ -165,7 +165,7 @@ class PackageManagerBootstrapServiceTest {
 
         service.installIfAbsent(MACHINE_ID, PackageManagerType.BREW);
 
-        verify(scriptNatsPublisher, never()).publishScript(anyString(), any());
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
     }
 
     @Test
@@ -175,7 +175,7 @@ class PackageManagerBootstrapServiceTest {
 
         service.installIfAbsent(MACHINE_ID, PackageManagerType.BREW);
 
-        verify(scriptNatsPublisher, never()).publishScript(anyString(), any());
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
     }
 
     @Test
@@ -185,7 +185,7 @@ class PackageManagerBootstrapServiceTest {
 
         service.installIfAbsent(MACHINE_ID, PackageManagerType.BREW);
 
-        verify(scriptNatsPublisher, never()).publishScript(anyString(), any());
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
     }
 
     @Test
@@ -197,7 +197,7 @@ class PackageManagerBootstrapServiceTest {
 
         service.installIfAbsent(MACHINE_ID, PackageManagerType.BREW);
 
-        verify(scriptNatsPublisher, never()).publishScript(anyString(), any());
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
         verify(scriptExecutionRepository, never()).save(any());
     }
 }
