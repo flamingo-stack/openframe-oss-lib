@@ -6,10 +6,10 @@ import { useDebounce } from '../../hooks/ui/use-debounce';
 import { cn } from '../../utils/cn';
 import { Filter02Icon, SearchIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
+import type { TableFilters } from '../ui/data-table/types';
 import { PageError } from '../ui/error-state';
 import { FilterModal, type FilterGroup, type SortConfig, type SortDirection } from '../ui/filter-modal';
 import { Input } from '../ui/input';
-import type { TableFilters } from '../ui/table/types';
 import { ListPageContainer, type PageActionButton } from './page-container';
 
 export interface ListPageLayoutProps {

@@ -2,7 +2,7 @@
 
 import { flexRender, type Row } from '@tanstack/react-table';
 import type React from 'react';
-import { memo, useCallback, useRef, type ReactNode } from 'react';
+import { memo, useCallback, useRef, type ElementType, type ReactNode } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { ROW_HEIGHT_DESKTOP, ROW_SHELL_CLASSES } from './data-table-skeleton';
@@ -35,6 +35,15 @@ export interface DataTableRowProps<T> {
   className?: string;
   /** Expandable content rendered below the cells, inside the same card. */
   subRow?: ReactNode;
+  /** Opt-in FLIP reorder — see `DataTableBodyProps.animateRowReorder`. Forwarded by `DataTable.Body`. */
+  animateRowReorder?: boolean;
+  /**
+   * Internal: the lazily-resolved framer-motion `motion.div`, injected by
+   * `DataTable.Body` so framer-motion stays out of the default bundle. Typed as
+   * a bare `ElementType` so this module never statically references
+   * framer-motion. Plain `<div>` is used until it's set.
+   */
+  motionDiv?: ElementType;
 }
 
 /**
@@ -83,6 +92,8 @@ function DataTableRowImpl<T>({
   rowHeightClassName,
   className,
   subRow,
+  animateRowReorder,
+  motionDiv,
 }: DataTableRowProps<T>) {
   const hasSubRow = subRow != null && subRow !== false;
   // A sub-row carries its own interactive controls, so it must not live inside the
@@ -90,6 +101,17 @@ function DataTableRowImpl<T>({
   const isLinkMode = Boolean(href) && !onClick;
   const isWholeCardLink = isLinkMode && !hasSubRow;
   const containerRef = useRef<HTMLElement | null>(null);
+
+  // Opt-in FLIP: the card becomes a `motion.div` that animates only its
+  // position (`layout="position"`), so a reorder slides the row without
+  // distorting the cell content inside it. Plain `<div>` when off, or until
+  // framer-motion has resolved — zero cost on the default path. A whole-card
+  // link row IS its `<Link>` and stays a plain link.
+  const animate = Boolean(animateRowReorder && motionDiv);
+  const Card: ElementType = animate && motionDiv ? motionDiv : 'div';
+  const motionProps = animate
+    ? { layout: 'position' as const, transition: { layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const } } }
+    : {};
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -171,10 +193,11 @@ function DataTableRowImpl<T>({
   }
 
   return (
-    <div
+    <Card
       ref={containerRef as React.RefObject<HTMLDivElement>}
       className={containerClassName}
       onClick={onClick ? handleClick : undefined}
+      {...motionProps}
     >
       {isLinkMode && href ? (
         <Link
@@ -192,7 +215,7 @@ function DataTableRowImpl<T>({
         cells
       )}
       {hasSubRow && subRow}
-    </div>
+    </Card>
   );
 }
 

@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
 import { Button } from '../components/ui/button';
+import type { TableFilters } from '../components/ui/data-table';
 import { FilterModal, type FilterGroup, type SortConfig, type TagKeyConfig } from '../components/ui/filter-modal';
-import type { TableFilters } from '../components/ui/table/types';
 
 const meta = {
   title: 'UI/FilterModal',

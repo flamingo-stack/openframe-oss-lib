@@ -21,6 +21,16 @@ export interface DataTableFilterOption {
   count?: number;
 }
 
+/**
+ * Per-column multi-select filter state: selected option ids keyed by column id,
+ * the shape `FiltersDropdown` / `FilterModal` emit and `ListPageLayout` passes
+ * back for its mobile filter. Lives here (not in the legacy `table/`) so the
+ * filter UI outlives that module.
+ */
+export interface TableFilters {
+  [columnKey: string]: string[];
+}
+
 declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> {
     /** Tailwind width class, e.g. `'w-40'`, `'flex-1 min-w-0'`. */

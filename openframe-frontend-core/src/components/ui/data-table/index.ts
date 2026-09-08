@@ -52,7 +52,7 @@ export { useDataTable } from './use-data-table';
 export { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, ROW_SHELL_CLASSES } from './data-table-skeleton';
 export { alignJustify, getHideClasses, multiSelectFilterFn } from './utils';
 
-export type { DataTableFilterOption, TailwindBreakpoint } from './types';
+export type { DataTableFilterOption, TableFilters, TailwindBreakpoint } from './types';
 export type { DataTableProps } from './data-table';
 export { DATA_TABLE_HEADER_LABEL_CLASS } from './data-table-header';
 export type { DataTableHeaderProps, DataTableSortState } from './data-table-header';
