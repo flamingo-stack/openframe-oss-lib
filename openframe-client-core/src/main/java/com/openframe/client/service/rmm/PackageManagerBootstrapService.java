@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -42,11 +43,17 @@ public class PackageManagerBootstrapService {
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptBootstrapNatsPublisher scriptBootstrapNatsPublisher;
+    private final PackageManagerProperties packageManagerProperties;
 
     @Value("${openframe.rmm.package-manager-bootstrap.cooldown-seconds}")
     private long cooldownSeconds;
 
     public void dispatchInstall(String machineId, PackageManagerType packageManager) {
+        if (packageManagerProperties.isDisabled(packageManager)) {
+            log.debug("Package manager {} is disabled, ignoring report from machineId={}", packageManager, machineId);
+            return;
+        }
+
         Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
         if (foundMachine.isEmpty()) {
             log.warn("Package-manager report for unknown machine {}, ignoring", machineId);

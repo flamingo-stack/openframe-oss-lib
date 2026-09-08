@@ -1,11 +1,13 @@
 package com.openframe.api.service.packagesearch;
 
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.api.dto.packagesearch.PackageSearchInput;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -20,6 +22,7 @@ class PackageSearchServiceTest {
     private PackageManagerClient brewClient;
     private PackageManagerClient chocoClient;
     private PackageManagerClient wingetClient;
+    private PackageManagerProperties packageManagerProperties;
     private PackageSearchService service;
 
     @BeforeEach
@@ -27,7 +30,17 @@ class PackageSearchServiceTest {
         brewClient = clientFor(PackageManagerType.BREW);
         chocoClient = clientFor(PackageManagerType.CHOCO);
         wingetClient = clientFor(PackageManagerType.WINGET);
-        service = new PackageSearchService(List.of(brewClient, chocoClient, wingetClient));
+        packageManagerProperties = new PackageManagerProperties();
+        service = new PackageSearchService(List.of(brewClient, chocoClient, wingetClient), packageManagerProperties);
+    }
+
+    @Test
+    void rejectsSearchForDisabledManager() {
+        packageManagerProperties.setDisabled(Set.of(PackageManagerType.CHOCO));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.search(new PackageSearchInput(PackageManagerType.CHOCO, "slack", null, null)));
+        verify(chocoClient, never()).search(anyString(), anyInt(), anyInt());
     }
 
     @Test

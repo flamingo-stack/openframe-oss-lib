@@ -2,6 +2,7 @@ package com.openframe.api.service.packagesearch;
 
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.api.dto.packagesearch.PackageDetails;
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.api.dto.packagesearch.PackageSearchInput;
 import com.openframe.api.dto.packagesearch.PackageSearchResult;
@@ -24,10 +25,13 @@ public class PackageSearchService {
     private static final int MIN_QUERY_LENGTH = 2;
 
     private final Map<PackageManagerType, PackageManagerClient> clients;
+    private final PackageManagerProperties packageManagerProperties;
 
-    public PackageSearchService(List<PackageManagerClient> clientList) {
+    public PackageSearchService(List<PackageManagerClient> clientList,
+                                PackageManagerProperties packageManagerProperties) {
         this.clients = clientList.stream()
                 .collect(toUnmodifiableMap(PackageManagerClient::getPackageManagerType, identity()));
+        this.packageManagerProperties = packageManagerProperties;
     }
 
     public PackageSearchResult search(PackageSearchInput input) {
@@ -55,6 +59,9 @@ public class PackageSearchService {
     }
 
     private PackageManagerClient clientFor(PackageManagerType packageManager) {
+        if (packageManagerProperties.isDisabled(packageManager)) {
+            throw new IllegalArgumentException("package manager " + packageManager + " is currently disabled");
+        }
         PackageManagerClient client = clients.get(packageManager);
         if (client == null) {
             throw new IllegalStateException("no package manager client registered for " + packageManager);
