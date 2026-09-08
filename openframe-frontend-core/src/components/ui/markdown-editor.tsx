@@ -22,13 +22,17 @@ body .w-md-editor-text-pre .token.title, body .w-md-editor-text-pre .token.bold,
 body .w-md-editor-text-textarea, body .w-md-editor-text-input, body .w-md-editor-text-pre { color: var(--color-text-primary) !important; -webkit-text-fill-color: var(--color-text-primary) !important; text-shadow: none !important; filter: brightness(1) contrast(1) !important; }
 body .w-md-editor { color: var(--color-text-primary) !important; }
 body .w-md-editor *:not(.w-md-editor-toolbar *, .w-md-editor-preview *, .custom-preview-wrapper *) { color: var(--color-text-primary) !important; -webkit-text-fill-color: var(--color-text-primary) !important; }
-.w-md-editor-toolbar { background-color: var(--color-bg) !important; border-bottom: 1px solid var(--color-border-default) !important; padding: 12px 16px !important; }
+/* The toolbar's top corners follow the frame's own 6px radius. Rounding the toolbar
+   rather than clipping the whole editor with overflow:hidden on purpose: the toolbar's
+   dropdown commands render inside .w-md-editor and clipping would cut them off. */
+.w-md-editor-toolbar { background-color: var(--color-bg) !important; border-bottom: 1px solid var(--color-border-default) !important; border-radius: 6px 6px 0 0 !important; padding: 12px 16px !important; }
 .w-md-editor-toolbar ul li button { background: transparent !important; border: none !important; color: var(--color-text-primary) !important; padding: 8px 12px !important; border-radius: 6px !important; transition: all 0.2s ease !important; min-height: 36px !important; min-width: 36px !important; }
 .w-md-editor-toolbar ul li button:hover { background-color: var(--color-border-default) !important; color: var(--ods-accent) !important; }
 .w-md-editor-toolbar ul li button.active, .w-md-editor-toolbar ul li button[aria-pressed="true"] { background-color: var(--ods-accent) !important; color: var(--color-text-on-accent) !important; }
 .w-md-editor-toolbar-divider { display: none !important; }
 .w-md-editor-preview { background-color: var(--color-bg) !important; color: var(--color-text-primary) !important; border-left: 1px solid var(--color-border-default) !important; --color-border-default: var(--ods-system-greys-soft-grey) !important; --color-border-muted: var(--ods-system-greys-soft-grey) !important; --color-fg-muted: var(--ods-system-greys-grey) !important; }
-.w-md-editor-text { border-top: 1px solid var(--color-border-default) !important; }
+/* No border-top on .w-md-editor-text: the toolbar above already draws its own
+   border-bottom in the same colour, and the two sat adjacent as one 2px line. */
 .w-md-editor-focus { border-color: var(--ods-accent) !important; }
 body .w-md-editor .w-md-editor-bar { width: 24px !important; height: 12px !important; margin-left: auto !important; margin-right: 8px !important; cursor: ns-resize !important; }
 body .w-md-editor .w-md-editor-bar svg { display: none !important; }
