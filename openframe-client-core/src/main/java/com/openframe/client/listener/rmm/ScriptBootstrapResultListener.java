@@ -16,16 +16,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
-/**
- * Subscribes to results of package-manager bootstrap scripts, published by the
- * agent over <b>core NATS</b> on {@code machine.*.script-bootstrap-execution.result}
- * — the dedicated auto-install channel, separate from user/scheduled script runs.
- *
- * <p>The payload is a {@link ScriptResultMessage}, structurally identical to a
- * regular script result, so it is relayed through the same {@link RmmResultService}
- * ({@code MessageType.SCRIPT_EXECUTED}) and updates the same {@code script_executions}
- * row by {@code executionId}. Only the subject differs from {@link ScriptResultListener}.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j

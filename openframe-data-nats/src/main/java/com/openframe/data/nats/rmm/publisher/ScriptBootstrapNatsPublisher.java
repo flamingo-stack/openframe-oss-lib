@@ -9,13 +9,6 @@ import org.springframework.stereotype.Component;
 
 import static java.lang.String.format;
 
-/**
- * Publishes package-manager bootstrap script executions to an agent over core
- * NATS on a channel dedicated to auto-install, separate from user/scheduled
- * script runs. Same {@link ScriptMessage} wire shape as
- * {@link ScriptNatsPublisher}; the agent replies on
- * {@code machine.{machineId}.script-bootstrap-execution.result}.
- */
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty("spring.cloud.stream.enabled")
