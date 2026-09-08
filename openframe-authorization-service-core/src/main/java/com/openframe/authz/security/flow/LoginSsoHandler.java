@@ -1,10 +1,14 @@
 package com.openframe.authz.security.flow;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
+import com.openframe.authz.security.EmailTrustPolicy;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
-import com.openframe.authz.security.SsoRegistrationConstants;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.sso.SignupTicketService;
+import com.openframe.authz.service.sso.SsoIdentityService;
+import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
@@ -42,6 +46,9 @@ public class LoginSsoHandler implements SsoFlowHandler {
 
     private final SsoCookieCodec ssoCookieCodec;
     private final SignupTicketService signupTicketService;
+    private final SsoIdentityService ssoIdentityService;
+    private final SsoOidcUserService ssoOidcUserService;
+    private final EmailTrustPolicy emailTrustPolicy;
     private final UserService userService;
     private final TenantService tenantService;
     private final SSOConfigService ssoConfigService;
@@ -55,7 +62,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
 
     @Override
     public String cookieName() {
-        return SsoRegistrationConstants.COOKIE_SSO_LOGIN;
+        return SsoFlowCookieNames.OF_SSO_LOGIN;
     }
 
     @Override
@@ -73,12 +80,26 @@ public class LoginSsoHandler implements SsoFlowHandler {
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
         String provider = registrationId(authentication, payload);
-        requireEmailTrustedForRouting(provider, user);
 
-        AuthUser authUser = userService.findActiveByEmail(email).orElse(null);
+        // Link-first: a previously bound subject outranks the email claim entirely — it cannot be
+        // forged by a hostile directory and needs no verified-email signal. Email-based routing
+        // (gated) is the first-association bootstrap only.
+        AuthUser authUser = ssoIdentityService.findLink(provider, user.getClaims())
+                .flatMap(link -> userService.findActiveById(link.getUserId()))
+                .orElse(null);
+
         if (authUser == null) {
-            continueIntoRegistration(request, response, authentication, payload, provider, user, email);
-            return;
+            requireEmailTrustedForRouting(provider, user);
+            authUser = userService.findActiveByEmail(email)
+                    // Shared-domain tenants (global domain policy, no custom app) auto-provision the
+                    // user on first login — same as the email-discovery path — instead of dropping
+                    // to the registration screen. Email is already trusted (gate above).
+                    .or(() -> ssoOidcUserService.autoProvisionByGlobalDomain(provider, user))
+                    .orElse(null);
+            if (authUser == null) {
+                continueIntoRegistration(request, response, authentication, payload, provider, user, email);
+                return;
+            }
         }
 
         String tenantId = authUser.getTenantId();
@@ -87,6 +108,11 @@ public class LoginSsoHandler implements SsoFlowHandler {
         tenantService.findById(tenantId)
                 .filter(Tenant::isActive)
                 .orElseThrow(() -> new IllegalStateException("Your account is not active. Please contact your administrator."));
+
+        // Only now — the login is fully allowed (trusted routing, provider permitted, tenant
+        // active). A link written before these checks would outlive a REJECTED login and later
+        // count as proof of trust.
+        ssoIdentityService.link(provider, user.getClaims(), authUser);
 
         clearFlowCookieAndRedirect(response, cookie, tenantId, payload.redirectTo(), payload.authMobile());
     }
@@ -106,10 +132,11 @@ public class LoginSsoHandler implements SsoFlowHandler {
      * (an optional claim that must be enabled on the generic app registration).
      */
     private void requireEmailTrustedForRouting(String provider, OidcUser user) {
-        if (!OidcUserUtils.emailTrustedForRouting(provider, user.getClaims())) {
-            log.warn("event=sso-login-unverified-email provider={} sub={}", provider, user.getSubject());
+        if (!emailTrustPolicy.emailTrustedForRouting(provider, user.getClaims())) {
+            log.warn("event=sso-login-unverified-email provider={} sub={} {}",
+                    provider, user.getSubject(), OidcUserUtils.describeEmailTrustSignals(user.getClaims()));
             throw new IllegalStateException(
-                    "This account's email is not verified by the provider. Enter your email on the login page instead.");
+                    "This account's email is not verified by the provider. Please try a different sign-in method, or contact your administrator.");
         }
     }
 
@@ -148,7 +175,8 @@ public class LoginSsoHandler implements SsoFlowHandler {
             // existing allow-list — this handler makes no redirect-policy decision.
             String[] names = resolveNames(request, authentication, user);
             String ticket = signupTicketService.create(email, names[0], names[1], provider,
-                    OidcUserUtils.emailVerifiedClaimAllows(user));
+                    OidcUserUtils.emailVerifiedClaimAllows(user),
+                    ssoIdentityService.subjectOf(provider, user.getClaims()).orElse(null));
             log.info("event=sso-login-continue-registration-mobile provider={}", provider);
             foundAtRoot(response, "/oauth/signup-continue?signupTicket=" + urlEncode(ticket)
                     + "&redirectTo=" + urlEncode(payload.redirectTo()));

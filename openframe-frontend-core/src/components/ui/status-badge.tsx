@@ -21,9 +21,9 @@ const statusBadgeVariants = cva('inline-flex items-center justify-center rounded
         'px-2 py-0.5 font-[family-name:var(--font-h5-family)] font-[number:var(--font-h5-weight)] uppercase tracking-[-0.02em] text-badge',
     },
     colorScheme: {
-      cyan: 'bg-[var(--ods-flamingo-cyan-base)] text-ods-text-on-accent',
-      pink: 'bg-[var(--ods-flamingo-pink-base)] text-ods-text-on-accent',
-      yellow: 'border border-[var(--ods-system-greys-black)] bg-ods-accent text-ods-text-on-accent',
+      cyan: 'bg-ods-flamingo-cyan text-ods-text-on-accent',
+      pink: 'bg-ods-flamingo-pink text-ods-text-on-accent',
+      yellow: 'border border-ods-border bg-ods-accent text-ods-text-on-accent',
       green: 'bg-ods-success text-ods-text-on-accent',
       purple: 'bg-ods-flamingo-pink text-ods-text-on-accent',
       success: 'bg-ods-success-secondary text-ods-success',
