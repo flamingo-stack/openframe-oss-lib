@@ -5,6 +5,8 @@ import com.openframe.data.document.tool.IntegratedToolId;
 import com.openframe.data.document.tool.ToolCredentials;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
 import com.openframe.sdk.fleetmdm.FleetTenantHeader;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.Policy;
@@ -17,7 +19,6 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -115,11 +116,11 @@ public class FleetMdmCacheService {
             FleetMdmClient client = clientFor(eventTenantId);
             Host host = client != null ? client.getHostById(hostId.longValue()) : null;
             return host != null ? host.getUuid() : null;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("Interrupted while fetching agent ID for host: {}", hostId, e);
-            return null;
-        } catch (IOException e) {
+        } catch (FleetMdmApiException e) {
+            // A Fleet API status (401, 5xx, ...) is not a missing entity: keep surfacing it to the
+            // caller exactly as before this client stopped throwing checked exceptions.
+            throw e;
+        } catch (FleetMdmException e) {
             log.error("Error fetching agent ID for host: {}", hostId, e);
             return null;
         }
@@ -155,11 +156,11 @@ public class FleetMdmCacheService {
                 log.warn("Fleet MDM API returned null for query_id: {} (query may have been deleted)", queryId);
             }
             return query;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("Interrupted while fetching query_id: {}. Cause: {}", queryId, e.getMessage(), e);
-            return null;
-        } catch (IOException e) {
+        } catch (FleetMdmApiException e) {
+            // A Fleet API status (401, 5xx, ...) is not a missing entity: keep surfacing it to the
+            // caller exactly as before this client stopped throwing checked exceptions.
+            throw e;
+        } catch (FleetMdmException e) {
             log.error("Fleet MDM API call failed for query_id: {}. Cause: {}", queryId, e.getMessage(), e);
             return null;
         }
@@ -213,11 +214,11 @@ public class FleetMdmCacheService {
                     () -> log.warn("Fleet MDM API returned null for policy_id: {} (policy may have been deleted)", policyId)
             );
             return policy;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("Interrupted while fetching policy_id: {}. Cause: {}", policyId, e.getMessage(), e);
-            return Optional.empty();
-        } catch (IOException e) {
+        } catch (FleetMdmApiException e) {
+            // A Fleet API status (401, 5xx, ...) is not a missing entity: keep surfacing it to the
+            // caller exactly as before this client stopped throwing checked exceptions.
+            throw e;
+        } catch (FleetMdmException e) {
             log.error("Fleet MDM API call failed for policy_id: {}. Cause: {}", policyId, e.getMessage(), e);
             return Optional.empty();
         }
