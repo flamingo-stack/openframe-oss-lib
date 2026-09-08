@@ -62,7 +62,7 @@ import { createChatDialogStore } from '../stream/chat-dialog-store';
 import type { ChatDialogStore } from '../stream/chat-dialog-store';
 import type { ChatStreamReducerOptions } from '../stream/chat-stream-reducer';
 import { useChatStreamReducer } from '../stream/use-chat-stream-reducer';
-import type { Message, MessageSegment } from '../types/message.types';
+import type { ChatSource, Message, MessageSegment } from '../types/message.types';
 import type {
   ChatDialogCapabilities,
   FetchDialogsParams,
@@ -121,33 +121,10 @@ const noopBumpMetaTick = (): void => {};
  *  hub-side platform-utils, not in lib). */
 export type DocSource = string;
 
-export interface ChatSource {
-  index: number;
-  name: string;
-  path: string;
-  documentType: string;
-  externalUrl?: string;
-  /** Platform that owns the destination at `externalUrl`. */
-  targetPlatform?: string | null;
-  /** Primary-key value for single-row chips. */
-  id?: string;
-  /** Per-row items for grouped chips. */
-  items?: Array<{
-    id: string;
-    documentType: string;
-    name: string;
-    externalUrl?: string;
-    targetPlatform?: string | null;
-    /** In-app doc-tree path for markdown / data-room-doc rows so the
-     *  grouped chip's anchor can trigger an in-page doc-tree swap via
-     *  `handleChatNavClick` (parity with single-row chips + cards). */
-    path?: string | null;
-  }>;
-  /** RagTableConfig.id for this source. */
-  sourceRepo?: string;
-  /** Optional display label override returned by the chat API. */
-  label?: string;
-}
+/** Re-export: `ChatSource` moved to `message.types` when the NATS transport
+ *  started producing it too. Kept so existing `use-sse-chat-adapter` imports
+ *  keep resolving. */
+export type { ChatSource };
 
 export interface DocChatMessage {
   id: string;

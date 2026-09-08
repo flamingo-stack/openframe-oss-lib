@@ -170,8 +170,8 @@ class DeviceLocalScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("RETRY + offline still inside the reconnect window: wait — not missed, not fired")
-    void retryOffline_withinWindow_waits() {
+    @DisplayName("RETRY + offline still inside the reconnect window: armed for reconnect (not fired, not missed)")
+    void retryOffline_withinWindow_armsReconnect() {
         Instant now = Instant.parse("2026-09-15T06:05:00Z");   // 5 min past the 06:00Z occurrence, window 30 min
         stubSchedule(retry(null, RECONNECT_WINDOW), List.of("m-off"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
@@ -179,8 +179,12 @@ class DeviceLocalScheduleServiceTest {
 
         service.runDueDeviceLocalSchedules(now);
 
-        verifyNoInteractions(fireDispatcher);
-        verify(dispatchRepository, never()).save(any());
+        // Handed off to the reconnect-retry dispatcher until fireAt (06:00Z) + window (30 min) = 06:30Z.
+        verify(fireDispatcher).armReconnectRetry(any(ScheduleScript.class), eq("m-off"), eq(now),
+                eq(Instant.parse("2026-09-15T06:30:00Z")));
+        verify(fireDispatcher, never()).dispatch(any(ScheduleScript.class), any(), any());
+        assertThat(capturedSave().getStatus())
+                .isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.ARMED_FOR_RECONNECT);
     }
 
     @Test
