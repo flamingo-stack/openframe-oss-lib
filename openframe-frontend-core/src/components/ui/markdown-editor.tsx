@@ -13,20 +13,21 @@ const MARKDOWN_EDITOR_STYLE_ID = 'ods-markdown-editor-styles';
 
 const mdEditorCSS = `
 :root { --md-editor-text-color: var(--color-text-primary) !important; }
-/* NAME COLLISION, and the reason the toolbar seam was drawn in a colour ODS does not own.
-   --color-border-default is an ODS semantic alias (:root -> --ods-system-greys-soft-grey,
-   #3a3a3a) AND a GitHub Primer variable that @uiw/react-md-editor redeclares as #30363d on
-   .wmde-markdown / .wmde-markdown-var — and the editor root carries .wmde-markdown-var.
-   The nearer declaration wins, so every rule below that reads the alias inside the editor got
-   the vendor's blue-tinted grey, while the frame's own border, which reads the palette var
-   directly, stayed neutral. .w-md-editor-preview already worked around this for itself;
-   restoring the alias on the container covers the toolbar seam and the resize grip too.
-   SCOPE: custom properties inherit downwards only, and no element outside the editor carries
-   either vendor class (verified in Storybook), so nothing else can be reached — including the
-   two components that also read this alias, smooth-accordion and tab-navigation. The
-   .wmde-markdown half covers the vendor's own preview renderer, which a consumer that does
-   not pass renderPreview still gets. */
-body .w-md-editor, body .w-md-editor .wmde-markdown { --color-border-default: var(--ods-system-greys-soft-grey) !important; }
+/* NAME COLLISION. --color-border-default is an ODS semantic alias AND a GitHub Primer
+   variable that @uiw/react-md-editor redeclares as #30363d on .wmde-markdown /
+   .wmde-markdown-var — and the editor root carries .wmde-markdown-var. The nearer
+   declaration wins, so every rule below that reads the alias inside the editor got the
+   vendor's blue-tinted grey, which is why the toolbar seam was drawn in a colour ODS
+   does not own.
+   inherit rather than a value: it makes the property take whatever the theme above
+   resolved, so the vendor's redeclaration is neutralised WITHOUT this file asserting a
+   colour of its own. That matters because ODS owns this name in more than one scope —
+   :root maps it to --ods-system-greys-soft-grey, and .theme-high-contrast to #ffffff.
+   Pinning the grey here would have quietly disabled the accessibility theme inside the
+   editor, which is the one place a hardcoded value cannot be checked against.
+   The .wmde-markdown half covers the vendor's own preview renderer, which a consumer
+   that does not pass renderPreview still gets. */
+body .w-md-editor, body .w-md-editor .wmde-markdown { --color-border-default: inherit !important; }
 /* padding-bottom is a vendor default (1px) and it is INSIDE the border box, so both
    panes stop 1px short of the frame's inner edge and the frame's own background shows
    through as a hairline across the entire bottom -- a shade lighter than the preview,
@@ -54,7 +55,9 @@ body .w-md-editor *:not(.w-md-editor-toolbar *, .w-md-editor-preview *, .custom-
 .w-md-editor-toolbar ul li button:hover { background-color: var(--color-border-default) !important; color: var(--ods-accent) !important; }
 .w-md-editor-toolbar ul li button.active, .w-md-editor-toolbar ul li button[aria-pressed="true"] { background-color: var(--ods-accent) !important; color: var(--color-text-on-accent) !important; }
 .w-md-editor-toolbar-divider { display: none !important; }
-.w-md-editor-preview { background-color: var(--color-bg) !important; color: var(--color-text-primary) !important; border-left: 1px solid var(--color-border-default) !important; --color-border-default: var(--ods-system-greys-soft-grey) !important; --color-border-muted: var(--ods-system-greys-soft-grey) !important; --color-fg-muted: var(--ods-system-greys-grey) !important; }
+/* --color-border-muted / --color-fg-muted keep a literal ODS value on purpose: those are
+   Primer-only names with no ODS counterpart, so there is nothing above to inherit. */
+.w-md-editor-preview { background-color: var(--color-bg) !important; color: var(--color-text-primary) !important; border-left: 1px solid var(--color-border-default) !important; --color-border-default: inherit !important; --color-border-muted: var(--ods-system-greys-soft-grey) !important; --color-fg-muted: var(--ods-system-greys-grey) !important; }
 /* The seam under the toolbar. Two vendor defaults broke it, both visible as one artefact:
    .w-md-editor-text drew its own border-top in the same colour as the toolbar's
    border-bottom, so the two sat adjacent as a 2px line (no border-top here any more), and
