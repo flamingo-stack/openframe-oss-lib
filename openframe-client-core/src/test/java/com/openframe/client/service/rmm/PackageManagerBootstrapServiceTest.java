@@ -1,6 +1,5 @@
 package com.openframe.client.service.rmm;
 
-import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -44,7 +43,6 @@ class PackageManagerBootstrapServiceTest {
     private ScriptRepository scriptRepository;
     private ScriptExecutionRepository scriptExecutionRepository;
     private ScriptBootstrapNatsPublisher scriptBootstrapNatsPublisher;
-    private PackageManagerProperties packageManagerProperties;
     private PackageManagerBootstrapService service;
 
     @BeforeEach
@@ -53,10 +51,9 @@ class PackageManagerBootstrapServiceTest {
         scriptRepository = mock(ScriptRepository.class);
         scriptExecutionRepository = mock(ScriptExecutionRepository.class);
         scriptBootstrapNatsPublisher = mock(ScriptBootstrapNatsPublisher.class);
-        packageManagerProperties = new PackageManagerProperties();
         service = new PackageManagerBootstrapService(
                 machineRepository, scriptRepository, scriptExecutionRepository,
-                scriptBootstrapNatsPublisher, packageManagerProperties);
+                scriptBootstrapNatsPublisher);
         ReflectionTestUtils.setField(service, "cooldownSeconds", COOLDOWN_SECONDS);
     }
 
@@ -160,15 +157,6 @@ class PackageManagerBootstrapServiceTest {
         service.dispatchInstall(MACHINE_ID, PackageManagerType.WINGET);
 
         verify(scriptBootstrapNatsPublisher).publishBootstrapScript(anyString(), any(ScriptMessage.class));
-    }
-
-    @Test
-    @DisplayName("choco is disabled by default: report is ignored before any machine lookup")
-    void ignoresDisabledManager() {
-        service.dispatchInstall(MACHINE_ID, PackageManagerType.CHOCO);
-
-        verify(machineRepository, never()).findByMachineId(anyString());
-        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
     }
 
     @Test

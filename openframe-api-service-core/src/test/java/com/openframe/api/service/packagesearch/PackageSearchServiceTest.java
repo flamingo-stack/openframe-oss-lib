@@ -1,6 +1,5 @@
 package com.openframe.api.service.packagesearch;
 
-import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.api.dto.packagesearch.PackageSearchInput;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,7 +20,6 @@ class PackageSearchServiceTest {
     private PackageManagerClient brewClient;
     private PackageManagerClient chocoClient;
     private PackageManagerClient wingetClient;
-    private PackageManagerProperties packageManagerProperties;
     private PackageSearchService service;
 
     @BeforeEach
@@ -29,18 +27,7 @@ class PackageSearchServiceTest {
         brewClient = clientFor(PackageManagerType.BREW);
         chocoClient = clientFor(PackageManagerType.CHOCO);
         wingetClient = clientFor(PackageManagerType.WINGET);
-        packageManagerProperties = new PackageManagerProperties();
-        packageManagerProperties.setChocoEnabled(true);
-        service = new PackageSearchService(List.of(brewClient, chocoClient, wingetClient), packageManagerProperties);
-    }
-
-    @Test
-    void rejectsSearchForDisabledManager() {
-        packageManagerProperties.setChocoEnabled(false);
-
-        assertThrows(IllegalArgumentException.class,
-                () -> service.search(new PackageSearchInput(PackageManagerType.CHOCO, "slack", null, null)));
-        verify(chocoClient, never()).search(anyString(), anyInt(), anyInt());
+        service = new PackageSearchService(List.of(brewClient, chocoClient, wingetClient));
     }
 
     @Test
