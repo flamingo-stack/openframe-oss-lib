@@ -260,7 +260,7 @@ interface ToggleRowProps {
 
 function ShowNotificationsToggleRow({ checked, onChange }: ToggleRowProps) {
   return (
-    <div className="flex items-center gap-[var(--spacing-system-s)] border-b border-ods-border p-[var(--spacing-system-sf)]">
+    <div className="flex items-center gap-[var(--spacing-system-s)] border-b border-ods-border p-[var(--spacing-system-sf)] last:border-b-0">
       <Switch checked={checked} onCheckedChange={onChange} aria-label="Show pop-up notifications" />
       <div className="min-w-0 flex-1">
         <p className="text-ods-text-primary text-h4">Show Notifications</p>
@@ -286,7 +286,7 @@ function DesktopNotificationsToggleRow({ checked, onChange }: ToggleRowProps) {
   };
 
   return (
-    <div className="flex items-center gap-[var(--spacing-system-s)] border-b border-ods-border p-[var(--spacing-system-sf)]">
+    <div className="flex items-center gap-[var(--spacing-system-s)] border-b border-ods-border p-[var(--spacing-system-sf)] last:border-b-0">
       <Switch
         checked={checked && permission === 'granted'}
         disabled={blocked}
