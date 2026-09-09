@@ -3,8 +3,14 @@ extend type Query {
     Search packages in a public package-manager repository (Homebrew, Chocolatey, winget).
     Homebrew and winget results are ranked by match quality with popularity/canonical-id
     tiebreaks; Chocolatey results come in the repository's own relevance order.
+    Forward cursor pagination only: pass `pageInfo.endCursor` back as `after`.
     """
-    searchPackages(input: PackageSearchInput!): PackageSearchResult!
+    searchPackages(
+        packageManager: PackageManagerType!,
+        query: String!,
+        first: Int,
+        after: String
+    ): PackageSearchConnection!
     """
     Package details by identifier, including available versions (newest first).
     Errors with NOT_FOUND when the id is unknown to the package manager.
@@ -24,21 +30,16 @@ enum BrewPackageType {
     CASK
 }
 
-input PackageSearchInput {
-    packageManager: PackageManagerType!
-    "At least 2 characters after trimming."
-    query: String!
-    "Defaults to 25; values above 39 are clamped, not rejected (Chocolatey's server page cap of 40 minus the row used to compute hasMore)."
-    limit: Int
-    offset: Int
+type PackageSearchConnection {
+    edges: [PackageSearchEdge!]!
+    pageInfo: PageInfo!
+    "Total matches for the query (same field name as every other connection)."
+    filteredCount: Int!
 }
 
-type PackageSearchResult {
-    items: [PackageSearchItem!]!
-    "Null when the source cannot report a total without an extra request (Chocolatey)."
-    total: Int
-    "Exact for every source — drive pagination off this field, not off total."
-    hasMore: Boolean!
+type PackageSearchEdge {
+    node: PackageSearchItem!
+    cursor: String!
 }
 
 type PackageSearchItem {

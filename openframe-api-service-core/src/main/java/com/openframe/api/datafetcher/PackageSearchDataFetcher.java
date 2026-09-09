@@ -6,8 +6,7 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.api.dto.packagesearch.PackageDetails;
 import com.openframe.data.document.packagesearch.PackageManagerType;
-import com.openframe.api.dto.packagesearch.PackageSearchInput;
-import com.openframe.api.dto.packagesearch.PackageSearchResult;
+import com.openframe.api.dto.packagesearch.PackageSearchConnection;
 import com.openframe.api.service.packagesearch.PackageSearchService;
 import lombok.RequiredArgsConstructor;
 
@@ -18,8 +17,11 @@ public class PackageSearchDataFetcher {
     private final PackageSearchService packageSearchService;
 
     @DgsQuery
-    public PackageSearchResult searchPackages(@InputArgument PackageSearchInput input) {
-        return packageSearchService.search(input);
+    public PackageSearchConnection searchPackages(@InputArgument PackageManagerType packageManager,
+                                                  @InputArgument String query,
+                                                  @InputArgument Integer first,
+                                                  @InputArgument String after) {
+        return packageSearchService.search(packageManager, query, first, after);
     }
 
     @DgsQuery
