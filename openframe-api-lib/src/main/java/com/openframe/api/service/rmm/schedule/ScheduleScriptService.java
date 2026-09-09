@@ -24,6 +24,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -60,6 +61,7 @@ public class ScheduleScriptService {
     private final ScriptService scriptService;
     private final TenantIdProvider tenantIdProvider;
     private final ScheduleDeviceLocalDispatchRepository deviceLocalDispatchRepository;
+    private final DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
 
     /**
      * Create a new schedule in the current tenant.
@@ -75,8 +77,8 @@ public class ScheduleScriptService {
 
         ScheduleScriptTrigger trigger = defaultTrigger(input.getTrigger());
         ScheduleTimeReference timeReference = defaultTimeReference(input.getTimeReference());
-        validateTiming(trigger, timeReference, input.getStartAt(), input.getRepeat());
-        validateOfflineBehavior(trigger, timeReference, input.getOfflineBehavior(),
+        validateTiming(trigger, input.getStartAt(), input.getRepeat());
+        validateOfflineBehavior(trigger, input.getOfflineBehavior(),
                 input.getReconnectWindowSeconds(), input.getRepeat());
         validateOsTypes(input.getSupportedPlatforms(), input.getScriptIds());
         validateCustomParams(input.getScriptIds(), input.getScriptCustomParams());
@@ -199,22 +201,25 @@ public class ScheduleScriptService {
 
         ScheduleScriptTrigger trigger = defaultTrigger(input.getTrigger());
         ScheduleTimeReference timeReference = defaultTimeReference(input.getTimeReference());
-        validateTiming(trigger, timeReference, input.getStartAt(), input.getRepeat());
-        validateOfflineBehavior(trigger, timeReference, input.getOfflineBehavior(),
+        validateTiming(trigger, input.getStartAt(), input.getRepeat());
+        validateOfflineBehavior(trigger, input.getOfflineBehavior(),
                 input.getReconnectWindowSeconds(), input.getRepeat());
         validateOsTypes(input.getSupportedPlatforms(), input.getScriptIds());
         validateCustomParams(input.getScriptIds(), input.getScriptCustomParams());
 
         Instant priorStartAt = existing.getStartAt();
+        Long priorRepeat = existing.getRepeat();
         scheduleMapper.updateEntity(existing, input);
-        rescheduleAfterUpdate(existing, trigger, timeReference, priorStartAt, tenantId);
+        rescheduleAfterUpdate(existing, trigger, timeReference, priorStartAt, priorRepeat, tenantId);
 
         ScheduleScript saved = scheduleRepository.save(existing);
         log.info("Updated script schedule id={} tenantId={}", saved.getId(), tenantId);
         return scheduleMapper.toResponse(saved);
     }
 
-    private void rescheduleAfterUpdate(ScheduleScript schedule, ScheduleScriptTrigger trigger, ScheduleTimeReference timeReference, Instant priorStartAt, String tenantId) {
+    private void rescheduleAfterUpdate(ScheduleScript schedule, ScheduleScriptTrigger trigger,
+                                       ScheduleTimeReference timeReference, Instant priorStartAt, Long priorRepeat,
+                                       String tenantId) {
         boolean startAtChanged = !Objects.equals(priorStartAt, schedule.getStartAt());
 
         if (trigger == ScheduleScriptTrigger.DATE_TIME && timeReference == ScheduleTimeReference.SERVER) {
@@ -225,7 +230,8 @@ public class ScheduleScriptService {
         }
 
         schedule.setNextRunAt(null);
-        if (trigger == ScheduleScriptTrigger.DATE_TIME && timeReference == ScheduleTimeReference.DEVICE_LOCAL && startAtChanged) {
+        boolean timingChanged = startAtChanged || !Objects.equals(priorRepeat, schedule.getRepeat());
+        if (trigger == ScheduleScriptTrigger.DATE_TIME && timeReference == ScheduleTimeReference.DEVICE_LOCAL && timingChanged) {
             clearDeviceLocalFires(schedule.getId(), tenantId);
         }
     }
@@ -233,7 +239,11 @@ public class ScheduleScriptService {
     private void clearDeviceLocalFires(String scheduleId, String tenantId) {
         long cleared = deviceLocalDispatchRepository.deleteByScheduleId(scheduleId);
         if (cleared > 0) {
-            log.info("Cleared {} device-local fire record(s) after startAt change scheduleId={} tenantId={}", cleared, scheduleId, tenantId);
+            log.info("Cleared {} device-local fire record(s) after timing change scheduleId={} tenantId={}", cleared, scheduleId, tenantId);
+        }
+        long clearedReconnect = onlineDeviceDispatchRepository.deleteByTenantIdAndScheduleId(tenantId, scheduleId);
+        if (clearedReconnect > 0) {
+            log.info("Cleared {} reconnect-retry sentinel(s) after timing change scheduleId={} tenantId={}", clearedReconnect, scheduleId, tenantId);
         }
     }
 
@@ -301,8 +311,7 @@ public class ScheduleScriptService {
         return startAt;
     }
 
-    private static void validateTiming(ScheduleScriptTrigger trigger, ScheduleTimeReference timeReference,
-                                       Instant startAt, Long repeatSeconds) {
+    private static void validateTiming(ScheduleScriptTrigger trigger, Instant startAt, Long repeatSeconds) {
         if (trigger == ScheduleScriptTrigger.DEVICE_ONLINE) {
             if (startAt != null || repeatSeconds != null) {
                 throw new BadRequestException("A DEVICE_ONLINE schedule is event-triggered and must not set startAt or repeat");
@@ -313,9 +322,6 @@ public class ScheduleScriptService {
             throw new BadRequestException("A scheduled (DATE_TIME) schedule requires a run date and time (startAt)");
         }
         validateGrid(startAt, repeatSeconds);
-        if (timeReference == ScheduleTimeReference.DEVICE_LOCAL && repeatSeconds != null) {
-            throw new BadRequestException("A DEVICE_LOCAL schedule does not support repeat yet (one-shot only)");
-        }
     }
 
     private static void validateGrid(Instant startAt, Long repeatSeconds) {
@@ -334,7 +340,7 @@ public class ScheduleScriptService {
         return instant.getNano() == 0 && Math.floorMod(instant.getEpochSecond(), SLOT_SECONDS) == 0;
     }
 
-    private static void validateOfflineBehavior(ScheduleScriptTrigger trigger, ScheduleTimeReference timeReference,
+    private static void validateOfflineBehavior(ScheduleScriptTrigger trigger,
                                                 ScheduleOfflineBehavior offlineBehavior,
                                                 Long reconnectWindowSeconds, Long repeatSeconds) {
         if (offlineBehavior != ScheduleOfflineBehavior.RETRY_ON_RECONNECT) {
@@ -342,9 +348,6 @@ public class ScheduleScriptService {
         }
         if (trigger != ScheduleScriptTrigger.DATE_TIME) {
             throw new BadRequestException("RETRY_ON_RECONNECT is only valid for a DATE_TIME schedule");
-        }
-        if (timeReference == ScheduleTimeReference.DEVICE_LOCAL) {
-            throw new BadRequestException("RETRY_ON_RECONNECT is not supported for a DEVICE_LOCAL schedule");
         }
         if (reconnectWindowSeconds == null || reconnectWindowSeconds <= 0) {
             throw new BadRequestException(

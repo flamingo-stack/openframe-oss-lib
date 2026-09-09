@@ -3,6 +3,7 @@
  * Contains all message structures, segments, and content types
  */
 
+import type { ChatRef } from '../chat-ref.types';
 import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from './chat.types';
 
 // ========== Message Type Definitions ==========
@@ -11,6 +12,15 @@ export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
   THINKING: 'THINKING',
   ASK: 'ASK',
+  /** Per-answer source metadata (documents, videos, entity cards).
+   *
+   *  TWO names for ONE payload, on purpose. `SOURCES` is the contract the
+   *  backend is moving to; `GUIDE` is the envelope it ships in today, reused
+   *  from Guide Mode v2 so a released frontend keeps working during the v2→v3
+   *  rollout. Both decode through the same path, so dropping `GUIDE` later is a
+   *  deletion here and nothing else. */
+  GUIDE: 'GUIDE',
+  SOURCES: 'SOURCES',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
   APPROVAL_REQUEST: 'APPROVAL_REQUEST',
@@ -391,6 +401,55 @@ export interface ThinkingMessageData extends MessageDataBase {
   text?: string;
 }
 
+/**
+ * A document cited by an assistant answer, rendered as a chip under it.
+ *
+ * Lives here, beside `Message`, because BOTH transports produce it now: the SSE
+ * adapter reads it off the per-turn metadata frame, and the NATS path decodes it
+ * out of a `GUIDE`/`SOURCES` chunk. It used to be declared inside
+ * `use-sse-chat-adapter`, which made "a Guide answer's citations" structurally a
+ * property of one transport — `use-sse-chat-adapter` still re-exports the name
+ * so existing imports keep working.
+ */
+export interface ChatSource {
+  /** 1-based citation number. `[1]` in the answer text refers to this. */
+  index: number;
+  name: string;
+  path: string;
+  documentType: string;
+  externalUrl?: string;
+  /** Platform that owns the destination at `externalUrl`. */
+  targetPlatform?: string | null;
+  /** Primary-key value for single-row chips. */
+  id?: string;
+  /** Per-row items for grouped chips. */
+  items?: Array<{
+    id: string;
+    documentType: string;
+    name: string;
+    externalUrl?: string;
+    targetPlatform?: string | null;
+    /** In-app doc-tree path for markdown / data-room-doc rows so the
+     *  grouped chip's anchor can trigger an in-page doc-tree swap via
+     *  `handleChatNavClick` (parity with single-row chips + cards). */
+    path?: string | null;
+  }>;
+  /** RagTableConfig.id for this source. */
+  sourceRepo?: string;
+  /** Optional display label override returned by the chat API. */
+  label?: string;
+}
+
+/** Persisted source-metadata row. `payload` is the SAME object the live chunk
+ *  carries, so history and realtime share one decoder (`sourceMetadataEvent`)
+ *  and cannot drift apart. Left as an open record here rather than typed
+ *  structurally: it is unvalidated wire data, and the decoder is what turns it
+ *  into `ChatSource[]` / `ChatRef[]`. */
+export interface SourceMetadataMessageData extends MessageDataBase {
+  type: 'GUIDE' | 'SOURCES';
+  payload?: unknown;
+}
+
 /** Persisted `ASK` row (GraphQL `AskData`). `text` is the intro sentence, which
  *  history replays as a text segment ahead of the card — same split the live
  *  `ASK` chunk carries. */
@@ -533,6 +592,7 @@ export type MessageData =
   | TextMessageData
   | ThinkingMessageData
   | AskMessageData
+  | SourceMetadataMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData
   | ApprovalRequestMessageData
@@ -582,6 +642,12 @@ export interface ProcessedMessage {
    *  `streamSeq` so the history/realtime merge can do per-role seq coverage.
    *  Absent when the source row(s) carried no seq. */
   streamSeq?: number;
+  /** Documents this answer cited — see `Message.sources`, the same field.
+   *  Replayed from the turn's persisted `GUIDE`/`SOURCES` row, so a reloaded
+   *  answer carries the citations the live one did. */
+  sources?: ChatSource[];
+  /** Entity references this answer's metadata described — see `Message.refs`. */
+  refs?: ChatRef[];
 }
 
 // ========== Base Message Interface ==========
@@ -633,4 +699,21 @@ export interface Message {
    *  bubble like "(continue per protocol)" between the approval card
    *  and the AI's follow-up. */
   hidden?: boolean;
+  /**
+   * Documents this answer cited, rendered as chips beneath it.
+   *
+   * Per MESSAGE, not per conversation: an answer's citations belong to the
+   * answer, and a thread can hold several answers that each cited something
+   * different. Ordering is a rendering concern — see `splitCitedSources`.
+   */
+  sources?: ChatSource[];
+  /**
+   * Entity references this answer's metadata described — videos and cards.
+   *
+   * Presence here does NOT mean "render it": only the `[card://type:id]`
+   * markers actually written into the answer text are rendered, and these
+   * supply the data those markers expand with. The metadata frame routinely
+   * describes more than the model chose to cite.
+   */
+  refs?: ChatRef[];
 }
