@@ -58,6 +58,10 @@ public class InviteSsoHandler implements SsoFlowHandler {
         // (re-accepting) and unconfigured environments proceed straight through.
         if (org.springframework.util.StringUtils.hasText(joinConfirmUrl)
                 && invitationRegistrationService.isNewMemberJoin(payload.invitationId())) {
+            // Bind this session to the invitation so only it can finalize (see SsoJoinController).
+            request.getSession(true).setAttribute(
+                    com.openframe.authz.security.SsoRegistrationConstants.SESSION_ATTR_JOIN_INVITE_ID,
+                    payload.invitationId());
             try {
                 response.sendRedirect(joinConfirmUrl);
             } catch (java.io.IOException e) {

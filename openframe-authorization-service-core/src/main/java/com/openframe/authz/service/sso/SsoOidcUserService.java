@@ -138,6 +138,17 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
      * rule), and provisioning it via the generic button would create a user the very next check
      * rejects. Callers must have already established that the email is trusted for routing.
      */
+    public Optional<AuthUser> autoProvisionByGlobalDomain(String provider, OidcUser user) {
+        String email = resolveEmail(user);
+        if (!hasText(email)) {
+            return Optional.empty();
+        }
+        String normalizedEmail = email.toLowerCase(ROOT);
+        String domain = normalizedEmail.substring(normalizedEmail.lastIndexOf('@') + 1);
+        return globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
+                .map(tenantId -> provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, resolvePictureUrl(user)));
+    }
+
     /**
      * The tenant a shared-domain email would be auto-provisioned into, WITHOUT creating anything —
      * lets the caller decide (e.g. show a consent step) before the create in
@@ -149,17 +160,6 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
         }
         String domain = email.toLowerCase(ROOT).substring(email.lastIndexOf('@') + 1);
         return globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain);
-    }
-
-    public Optional<AuthUser> autoProvisionByGlobalDomain(String provider, OidcUser user) {
-        String email = resolveEmail(user);
-        if (!hasText(email)) {
-            return Optional.empty();
-        }
-        String normalizedEmail = email.toLowerCase(ROOT);
-        String domain = normalizedEmail.substring(normalizedEmail.lastIndexOf('@') + 1);
-        return globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
-                .map(tenantId -> provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, resolvePictureUrl(user)));
     }
 
     /**

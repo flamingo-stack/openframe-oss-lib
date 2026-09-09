@@ -36,6 +36,7 @@ import java.util.UUID;
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
 import static com.openframe.authz.web.AuthStateUtils.clearCookie;
 import static com.openframe.authz.web.Redirects.foundAtRoot;
+import static com.openframe.authz.security.SsoRegistrationConstants.SESSION_ATTR_JOIN_INVITE_ID;
 import static com.openframe.core.constants.SsoFlowCookieNames.OF_SSO_INVITE;
 import static com.openframe.core.constants.SsoFlowCookieNames.OF_SSO_LOGIN;
 import static java.util.Locale.ROOT;
@@ -77,6 +78,7 @@ public class SsoJoinController {
         if (invite != null) {
             SsoInviteCookiePayload payload = ssoCookieCodec.decodeInvite(invite.getValue())
                     .orElseThrow(this::expired);
+            requireInviteBoundToSession(request, payload.invitationId());
             AuthInvitation inv = invitationValidator.loadAndEnsureAcceptable(payload.invitationId());
             return new JoinPendingResponse(email, names[0], names[1], payload.provider(),
                     tenantName(inv.getTenantId()), roleNames(inv.getRoles()));
@@ -116,6 +118,7 @@ public class SsoJoinController {
         if (invite != null) {
             SsoInviteCookiePayload payload = ssoCookieCodec.decodeInvite(invite.getValue())
                     .orElseThrow(this::expired);
+            requireInviteBoundToSession(request, payload.invitationId());
             InvitationRegistrationRequest req = InvitationRegistrationRequest.builder()
                     .invitationId(payload.invitationId())
                     .firstName(names[0] != null ? names[0] : "")
@@ -145,6 +148,21 @@ public class SsoJoinController {
 
     private void continueInto(HttpServletResponse response, String tenantId, String redirectTo, boolean authMobile) {
         foundAtRoot(response, com.openframe.authz.web.Redirects.oauthContinuePath(tenantId, redirectTo, authMobile));
+    }
+
+    /**
+     * Binds the invite cookie to THIS session: the invitation id in the cookie must equal the one
+     * stamped on the session when {@code InviteSsoHandler} deferred to the consent page. Stops a
+     * session from completing a different invitation's stolen/stale cookie. Relay-safe (no email
+     * dependence).
+     */
+    private void requireInviteBoundToSession(HttpServletRequest request, String invitationId) {
+        Object stamped = request.getSession(false) == null ? null
+                : request.getSession(false).getAttribute(SESSION_ATTR_JOIN_INVITE_ID);
+        if (!invitationId.equals(stamped)) {
+            log.warn("event=sso-join-invite-session-mismatch invitationId={}", invitationId);
+            throw expired();
+        }
     }
 
     private String tenantName(String tenantId) {
