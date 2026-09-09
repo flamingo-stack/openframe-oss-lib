@@ -93,6 +93,14 @@ export interface SearchInputProps {
   dropdownClassName?: string;
   /** Minimum characters before showing results. Default 2 */
   minQueryLength?: number;
+  /**
+   * Read-only mode. The input is natively `disabled` (the greyed value +
+   * dimmed placeholder styles are already in `innerInputStyles`), the dropdown
+   * cannot be opened, chips lose their remove affordance and the clear button
+   * is hidden — so a bar used as a multi-select FIELD can be shown read-only
+   * without the host having to grey it out from the outside.
+   */
+  disabled?: boolean;
   /** Maximum visible filter chips. "auto" measures available width. Default "auto" */
   limitTags?: number | 'auto';
   /** Custom render for the "+N" overflow text */
@@ -166,6 +174,7 @@ export function SearchInput({
   className,
   dropdownClassName,
   minQueryLength = 2,
+  disabled = false,
   limitTags = 'auto',
   getLimitTagsText = (more: number) => `+${more}`,
 }: SearchInputProps) {
@@ -262,7 +271,7 @@ export function SearchInput({
   // ---- Auto-show logic ----
   const meetsMinQuery = debouncedValue.length >= minQueryLength;
   const autoShow = meetsMinQuery;
-  const dropdownVisible = showDropdownProp ?? (isOpen && autoShow);
+  const dropdownVisible = !disabled && (showDropdownProp ?? (isOpen && autoShow));
 
   // ---- Reset highlight when results change ----
   // Adjusted while rendering, not from an effect: the highlight is drawn from
@@ -429,10 +438,13 @@ export function SearchInput({
           <div
             className={cn(
               containerStyles,
-              'hover:border-ods-border-hover hover:bg-ods-bg-hover active:border-ods-border-active active:bg-ods-bg-active',
+              disabled
+                ? 'cursor-not-allowed opacity-60'
+                : 'hover:border-ods-border-hover hover:bg-ods-bg-hover active:border-ods-border-active active:bg-ods-bg-active',
               dropdownVisible && '!border-ods-accent',
             )}
             onClick={() => {
+              if (disabled) return;
               inputRef.current?.focus();
               setIsOpen(true);
             }}
@@ -451,7 +463,7 @@ export function SearchInput({
                   variant={chipVariantToTagVariant(chip.variant)}
                   label={chip.label}
                   labelClassName="max-w-[120px] truncate"
-                  onClose={onFilterRemove ? () => onFilterRemove(chip.id) : undefined}
+                  onClose={onFilterRemove && !disabled ? () => onFilterRemove(chip.id) : undefined}
                 />
               ))}
 
@@ -485,7 +497,9 @@ export function SearchInput({
                 value={currentValue}
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
+                disabled={disabled}
                 onFocus={() => {
+                  if (disabled) return;
                   setIsOpen(true);
                   setShowHiddenTags(false);
                 }}
@@ -496,7 +510,7 @@ export function SearchInput({
 
             {/* End adornment / Clear — pinned right, shrink-0 */}
             <div className="ml-auto flex shrink-0 items-center gap-1">
-              {hasValue && (
+              {hasValue && !disabled && (
                 <button
                   type="button"
                   onClick={handleClear}
