@@ -60,15 +60,12 @@ public class SsoJoinController {
     private final SsoOidcUserService ssoOidcUserService;
     private final TenantService tenantService;
 
-    public enum JoinMode { INVITATION, AUTO_PROVISION }
-
     public record JoinPendingResponse(String email,
                                       String firstName,
                                       String lastName,
                                       String provider,
                                       String tenantName,
-                                      List<String> roles,
-                                      JoinMode mode) {}
+                                      List<String> roles) {}
 
     @GetMapping("/pending")
     public JoinPendingResponse pending(Authentication authentication, HttpServletRequest request) {
@@ -82,7 +79,7 @@ public class SsoJoinController {
                     .orElseThrow(this::expired);
             AuthInvitation inv = invitationValidator.loadAndEnsureAcceptable(payload.invitationId());
             return new JoinPendingResponse(email, names[0], names[1], payload.provider(),
-                    tenantName(inv.getTenantId()), roleNames(inv.getRoles()), JoinMode.INVITATION);
+                    tenantName(inv.getTenantId()), roleNames(inv.getRoles()));
         }
 
         Cookie login = WebUtils.getCookie(request, OF_SSO_LOGIN);
@@ -92,7 +89,7 @@ public class SsoJoinController {
             String tenantId = ssoOidcUserService.autoProvisionTenantForDomain(email)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "no_auto_provision_tenant"));
             return new JoinPendingResponse(email, names[0], names[1], payload.provider(),
-                    tenantName(tenantId), List.of("ADMIN"), JoinMode.AUTO_PROVISION);
+                    tenantName(tenantId), List.of("ADMIN"));
         }
         throw expired();
     }
