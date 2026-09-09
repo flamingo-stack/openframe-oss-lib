@@ -1,9 +1,12 @@
 package com.openframe.api.service.packagesearch;
 
-import com.openframe.api.dto.packagesearch.PackageSearchConnection;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.packagesearch.PackageSearchItem;
 import com.openframe.api.dto.packagesearch.PackageSearchResult;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +43,16 @@ class PackageSearchServiceTest {
         service = new PackageSearchService(List.of(brewClient, chocoClient, wingetClient), packageManagerProperties);
     }
 
+    private static CursorPaginationCriteria forward(Integer first, String after) {
+        return CursorPaginationCriteria.fromConnectionArgs(
+                ConnectionArgs.builder().first(first).after(after).build());
+    }
+
+    private static CursorPaginationCriteria backward(Integer last, String before) {
+        return CursorPaginationCriteria.fromConnectionArgs(
+                ConnectionArgs.builder().last(last).before(before).build());
+    }
+
     private static PackageSearchResult resultOf(int count, boolean hasMore, int total) {
         List<PackageSearchItem> items = IntStream.range(0, count)
                 .mapToObj(i -> PackageSearchItem.builder().id("pkg-" + i).name("pkg-" + i).build())
@@ -50,7 +63,7 @@ class PackageSearchServiceTest {
     @Test
     void rejectsShortQuery() {
         assertThrows(IllegalArgumentException.class,
-                () -> service.search(PackageManagerType.BREW, " a ", null, null, null, null));
+                () -> service.search(PackageManagerType.BREW, " a ", forward(null, null)));
         verify(brewClient, never()).search(anyString(), anyInt(), anyInt());
     }
 
@@ -58,7 +71,7 @@ class PackageSearchServiceTest {
     void appliesDefaultsAndRoutesToBrew() {
         when(brewClient.search(eq("slack"), anyInt(), anyInt())).thenReturn(resultOf(2, false, 2));
 
-        service.search(PackageManagerType.BREW, " slack ", null, null, null, null);
+        service.search(PackageManagerType.BREW, " slack ", forward(null, null));
 
         verify(brewClient).search("slack", 25, 0);
     }
@@ -67,7 +80,7 @@ class PackageSearchServiceTest {
     void clampsFirstToMax() {
         when(wingetClient.search(eq("slack"), anyInt(), anyInt())).thenReturn(resultOf(1, false, 1));
 
-        service.search(PackageManagerType.WINGET, "slack", 500, null, null, null);
+        service.search(PackageManagerType.WINGET, "slack", forward(500, null));
 
         verify(wingetClient).search("slack", 39, 0);
     }
@@ -76,7 +89,8 @@ class PackageSearchServiceTest {
     void mapsFirstPageToConnectionAndCursors() {
         when(brewClient.search(eq("slack"), anyInt(), anyInt())).thenReturn(resultOf(3, true, 42));
 
-        PackageSearchConnection connection = service.search(PackageManagerType.BREW, "slack", 3, null, null, null);
+        CountedGenericConnection<GenericEdge<PackageSearchItem>> connection =
+                service.search(PackageManagerType.BREW, "slack", forward(3, null));
 
         assertThat(connection.getEdges()).hasSize(3);
         assertThat(connection.getFilteredCount()).isEqualTo(42);
@@ -92,7 +106,8 @@ class PackageSearchServiceTest {
         String after = CursorCodec.encode("2");
         when(brewClient.search(eq("slack"), anyInt(), anyInt())).thenReturn(resultOf(2, false, 5));
 
-        PackageSearchConnection connection = service.search(PackageManagerType.BREW, "slack", 3, after, null, null);
+        CountedGenericConnection<GenericEdge<PackageSearchItem>> connection =
+                service.search(PackageManagerType.BREW, "slack", forward(3, after));
 
         verify(brewClient).search("slack", 3, 3);
         assertThat(connection.getPageInfo().isHasPreviousPage()).isTrue();
@@ -104,7 +119,8 @@ class PackageSearchServiceTest {
         String before = CursorCodec.encode("5");
         when(brewClient.search(eq("slack"), anyInt(), anyInt())).thenReturn(resultOf(3, false, 20));
 
-        PackageSearchConnection connection = service.search(PackageManagerType.BREW, "slack", null, null, 3, before);
+        CountedGenericConnection<GenericEdge<PackageSearchItem>> connection =
+                service.search(PackageManagerType.BREW, "slack", backward(3, before));
 
         // last 3 items ending just before index 5 -> window [2, 5)
         verify(brewClient).search("slack", 3, 2);
@@ -118,7 +134,7 @@ class PackageSearchServiceTest {
         packageManagerProperties.setChocoEnabled(false);
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.search(PackageManagerType.CHOCO, "slack", null, null, null, null));
+                () -> service.search(PackageManagerType.CHOCO, "slack", forward(null, null)));
         verify(chocoClient, never()).search(anyString(), anyInt(), anyInt());
     }
 

@@ -1,12 +1,13 @@
 package com.openframe.api.service.packagesearch;
 
 import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.packagesearch.PackageDetails;
-import com.openframe.api.dto.packagesearch.PackageSearchConnection;
 import com.openframe.api.dto.packagesearch.PackageSearchItem;
 import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -41,13 +42,13 @@ public class PackageSearchService {
         this.packageManagerProperties = packageManagerProperties;
     }
 
-    public PackageSearchConnection search(PackageManagerType packageManager, String rawQuery,
-                                          Integer first, String after, Integer last, String before) {
+    public CountedGenericConnection<GenericEdge<PackageSearchItem>> search(
+            PackageManagerType packageManager, String rawQuery, CursorPaginationCriteria pagination) {
         String query = rawQuery == null ? "" : rawQuery.trim();
         if (query.length() < MIN_QUERY_LENGTH) {
             throw new IllegalArgumentException("query must be at least " + MIN_QUERY_LENGTH + " characters long");
         }
-        Page page = resolvePage(first, after, last, before);
+        Page page = resolvePage(pagination);
 
         PackageManagerClient client = clientFor(packageManager);
         PackageSearchResult result = client.search(query, page.getLimit(), page.getStartIndex());
@@ -63,20 +64,21 @@ public class PackageSearchService {
         return client.findPackage(id, packageType);
     }
 
-    private Page resolvePage(Integer first, String after, Integer last, String before) {
-        if (isBackward(last, before)) {
-            int size = clamp(last);
-            int beforeIndex = indexFrom(before);
-            int startIndex = Math.max(0, beforeIndex - size);
-            return new Page(startIndex, beforeIndex - startIndex, true);
+    // offset math is source-specific (brew/winget rank in-memory, choco is external $skip), so it stays
+    // here; direction and cursor decoding are the shared CursorPaginationCriteria.
+    private Page resolvePage(CursorPaginationCriteria pagination) {
+        int cursorIndex = indexOf(pagination.getCursor());
+        if (pagination.isBackward()) {
+            int size = clamp(pagination.getLimit());
+            int startIndex = Math.max(0, cursorIndex - size);
+            return new Page(startIndex, cursorIndex - startIndex, true);
         }
-        int startIndex = after == null ? 0 : indexFrom(after) + 1;
-        return new Page(startIndex, clamp(first), false);
+        int startIndex = pagination.hasCursor() ? cursorIndex + 1 : 0;
+        return new Page(startIndex, clamp(pagination.getLimit()), false);
     }
 
-    private PackageSearchConnection toConnection(PackageSearchResult result, Page page) {
-        List<PackageSearchItem> items = result.getItems();
-        List<GenericEdge<PackageSearchItem>> edges = buildEdges(items, page.getStartIndex());
+    private CountedGenericConnection<GenericEdge<PackageSearchItem>> toConnection(PackageSearchResult result, Page page) {
+        List<GenericEdge<PackageSearchItem>> edges = buildEdges(result.getItems(), page.getStartIndex());
         String startCursor = edges.isEmpty() ? null : edges.getFirst().getCursor();
         String endCursor = edges.isEmpty() ? null : edges.getLast().getCursor();
         PageInfo pageInfo = PageInfo.builder()
@@ -85,7 +87,7 @@ public class PackageSearchService {
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
-        return PackageSearchConnection.builder()
+        return CountedGenericConnection.<GenericEdge<PackageSearchItem>>builder()
                 .edges(edges)
                 .pageInfo(pageInfo)
                 .filteredCount(result.getTotal())
@@ -101,22 +103,18 @@ public class PackageSearchService {
                 .toList();
     }
 
-    private static boolean isBackward(Integer last, String before) {
-        return last != null || before != null;
-    }
-
     private static int clamp(Integer requested) {
         return requested == null ? DEFAULT_LIMIT : Math.clamp(requested, 1, MAX_LIMIT);
     }
 
-    // an unparseable cursor falls back to the boundary (index 0), the repo-wide cursor convention
-    private static int indexFrom(String cursor) {
-        String decoded = CursorCodec.decode(cursor);
-        if (decoded == null) {
+    // the decoded cursor is the item's 0-based index; a missing/tampered one falls back to the
+    // boundary (index 0), the repo-wide cursor convention
+    private static int indexOf(String decodedCursor) {
+        if (decodedCursor == null) {
             return 0;
         }
         try {
-            return Math.max(0, Integer.parseInt(decoded));
+            return Math.max(0, Integer.parseInt(decodedCursor));
         } catch (NumberFormatException e) {
             return 0;
         }
