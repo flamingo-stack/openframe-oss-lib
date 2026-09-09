@@ -13,7 +13,31 @@ const MARKDOWN_EDITOR_STYLE_ID = 'ods-markdown-editor-styles';
 
 const mdEditorCSS = `
 :root { --md-editor-text-color: var(--color-text-primary) !important; }
-body .w-md-editor { background-color: var(--color-bg) !important; border: 1px solid var(--ods-system-greys-soft-grey) !important; border-radius: 6px !important; --md-editor-text-color: var(--color-text-primary) !important; --md-editor-box-shadow-color: transparent !important; box-shadow: none !important; }
+/* NAME COLLISION, and the reason the toolbar seam was drawn in a colour ODS does not own.
+   --color-border-default is an ODS semantic alias (:root -> --ods-system-greys-soft-grey,
+   #3a3a3a) AND a GitHub Primer variable that @uiw/react-md-editor redeclares as #30363d on
+   .wmde-markdown / .wmde-markdown-var — and the editor root carries .wmde-markdown-var.
+   The nearer declaration wins, so every rule below that reads the alias inside the editor got
+   the vendor's blue-tinted grey, while the frame's own border, which reads the palette var
+   directly, stayed neutral. .w-md-editor-preview already worked around this for itself;
+   restoring the alias on the container covers the toolbar seam and the resize grip too.
+   SCOPE: custom properties inherit downwards only, and no element outside the editor carries
+   either vendor class (verified in Storybook), so nothing else can be reached — including the
+   two components that also read this alias, smooth-accordion and tab-navigation. The
+   .wmde-markdown half covers the vendor's own preview renderer, which a consumer that does
+   not pass renderPreview still gets. */
+body .w-md-editor, body .w-md-editor .wmde-markdown { --color-border-default: var(--ods-system-greys-soft-grey) !important; }
+/* padding-bottom is a vendor default (1px) and it is INSIDE the border box, so both
+   panes stop 1px short of the frame's inner edge and the frame's own background shows
+   through as a hairline across the entire bottom -- a shade lighter than the preview,
+   which paints --color-bg. Zeroing it also makes the panes' 5px bottom radius exact
+   (the frame's inner radius is its 6px minus the 1px border) instead of an arc floating
+   1px above the one it is meant to follow. The resize handle is positioned against the
+   PADDING box, whose bottom edge the padding never moved, so it stays where it was.
+   The frame's background is covered edge to edge now, but it stays the source-pane
+   surface rather than the body one so that a sub-pixel gap could never read as a dark
+   band across the lighter pane. The toolbar and the preview set their own. */
+body .w-md-editor { background-color: var(--color-bg-card) !important; border: 1px solid var(--ods-system-greys-soft-grey) !important; border-radius: 6px !important; padding-bottom: 0 !important; --md-editor-text-color: var(--color-text-primary) !important; --md-editor-box-shadow-color: transparent !important; box-shadow: none !important; }
 body .w-md-editor-area, body .w-md-editor-input, body .w-md-editor-text, body .w-md-editor-text-pre, body .w-md-editor-text-input, body .w-md-editor-text-textarea { background-color: var(--color-bg-card) !important; color: var(--color-text-primary) !important; font-family: var(--font-family-body) !important; font-size: 18px !important; font-weight: 500 !important; line-height: 24px !important; padding: 16px !important; }
 body .w-md-editor-text-textarea::placeholder { color: var(--color-text-secondary) !important; font-family: var(--font-family-body) !important; font-size: 18px !important; font-weight: 500 !important; }
 body .w-md-editor-text .token, body .w-md-editor-text-pre .token, body .w-md-editor-text-textarea, body .w-md-editor-text-input { color: var(--color-text-primary) !important; }
@@ -31,8 +55,19 @@ body .w-md-editor *:not(.w-md-editor-toolbar *, .w-md-editor-preview *, .custom-
 .w-md-editor-toolbar ul li button.active, .w-md-editor-toolbar ul li button[aria-pressed="true"] { background-color: var(--ods-accent) !important; color: var(--color-text-on-accent) !important; }
 .w-md-editor-toolbar-divider { display: none !important; }
 .w-md-editor-preview { background-color: var(--color-bg) !important; color: var(--color-text-primary) !important; border-left: 1px solid var(--color-border-default) !important; --color-border-default: var(--ods-system-greys-soft-grey) !important; --color-border-muted: var(--ods-system-greys-soft-grey) !important; --color-fg-muted: var(--ods-system-greys-grey) !important; }
-/* No border-top on .w-md-editor-text: the toolbar above already draws its own
-   border-bottom in the same colour, and the two sat adjacent as one 2px line. */
+/* The seam under the toolbar. Two vendor defaults broke it, both visible as one artefact:
+   .w-md-editor-text drew its own border-top in the same colour as the toolbar's
+   border-bottom, so the two sat adjacent as a 2px line (no border-top here any more), and
+   the panes carry a 5px radius whose curve pulls their background off the frame's straight
+   inner edge, reading as a notch in the corner. Squaring the TOP corners is the fix, NOT
+   overflow:hidden on .w-md-editor: a parent's clip cannot square off a child's own rounded
+   corner, and it would cut the toolbar's title dropdown (~240px tall) on any editor shorter
+   than that. The BOTTOM corners keep 5px on purpose -- that is exactly the frame's inner
+   radius (6px border-box minus the 1px border), so with the vendor's padding-bottom zeroed
+   above, the panes' arc now sits on the frame's own arc instead of beside it. In the split
+   view the source pane's bottom-right curve falls in the middle of the frame, where the
+   frame's background matches it, so it is invisible there. */
+.w-md-editor-area, .w-md-editor-input, .w-md-editor-text { border-radius: 0 0 5px 5px !important; }
 .w-md-editor-focus { border-color: var(--ods-accent) !important; }
 body .w-md-editor .w-md-editor-bar { width: 24px !important; height: 12px !important; margin-left: auto !important; margin-right: 8px !important; cursor: ns-resize !important; }
 body .w-md-editor .w-md-editor-bar svg { display: none !important; }
