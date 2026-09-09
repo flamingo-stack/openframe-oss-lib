@@ -64,6 +64,14 @@ public class LoginSsoHandler implements SsoFlowHandler {
     @Value("${openframe.sso.join-confirm-url:}")
     private String joinConfirmUrl;
 
+    /**
+     * Extra gate for the LOGIN (auto-provision) confirm redirect only — lets it roll out per
+     * environment independently of the invitation gate (which needs only the URL above). Off by
+     * default; the redirect fires only when this is true AND the URL is set.
+     */
+    @Value("${openframe.sso.login.join-confirm-enabled:false}")
+    private boolean loginJoinConfirmEnabled;
+
     @Override
     public String cookieName() {
         return SsoFlowCookieNames.OF_SSO_LOGIN;
@@ -102,7 +110,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
                 // flow cookie. Otherwise provision immediately (email already trusted above).
                 Optional<String> provisionTenant = ssoOidcUserService.autoProvisionTenantForDomain(email);
                 if (provisionTenant.isPresent()) {
-                    if (hasText(joinConfirmUrl)) {
+                    if (loginJoinConfirmEnabled && hasText(joinConfirmUrl)) {
                         redirectKeepingCookie(response, joinConfirmUrl);
                         return;
                     }
