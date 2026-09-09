@@ -37,4 +37,7 @@ public interface CommandExecutionRepository extends MongoRepository<CommandExecu
 
     /** All per-machine rows of one batch execution. */
     java.util.List<CommandExecution> findByExecutionId(String executionId);
+
+    /** Tenant-scoped variant — backs the {@code commandExecutions} GraphQL query. */
+    java.util.List<CommandExecution> findByTenantIdAndExecutionId(String tenantId, String executionId);
 }

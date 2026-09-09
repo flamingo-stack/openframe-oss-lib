@@ -1,5 +1,7 @@
 package com.openframe.api.service.rmm.command;
 
+import com.openframe.api.dto.command.CommandExecutionResponse;
+import com.openframe.api.mapper.CommandExecutionMapper;
 import com.openframe.data.document.rmm.command.CommandExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -25,6 +27,7 @@ import java.util.Optional;
 public class CommandExecutionService {
 
     private final CommandExecutionRepository commandExecutionRepository;
+    private final CommandExecutionMapper commandExecutionMapper;
     private final TenantIdProvider tenantIdProvider;
 
     /**
@@ -62,6 +65,15 @@ public class CommandExecutionService {
                 .map(machineId -> commandExecutionRepository
                         .findByTenantIdAndExecutionIdAndMachineId(tenantId, executionId, machineId))
                 .flatMap(Optional::stream)
+                .toList();
+    }
+
+    // backs the commandExecutions GraphQL poll; an unknown executionId yields an empty list
+    public List<CommandExecutionResponse> getExecutionResults(String executionId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<CommandExecution> rows = commandExecutionRepository.findByTenantIdAndExecutionId(tenantId, executionId);
+        return rows.stream()
+                .map(commandExecutionMapper::toResponse)
                 .toList();
     }
 

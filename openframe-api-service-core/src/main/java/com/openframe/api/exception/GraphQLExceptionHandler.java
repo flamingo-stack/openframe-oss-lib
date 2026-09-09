@@ -6,6 +6,7 @@ import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import graphql.GraphQLError;
+import jakarta.validation.ConstraintViolationException;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
 import graphql.execution.DataFetcherExceptionHandlerResult;
 import graphql.execution.SimpleDataFetcherExceptionHandler;
@@ -39,6 +40,9 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             error = buildError(ce.getMessage(), ce.getErrorCode());
         } else if (exception instanceof BaseException be) {
             error = buildError(be.getMessage(), be.getErrorCode());
+        } else if (exception instanceof ConstraintViolationException cve) {
+            // bean-validation failures from @Validated resolvers must surface as 400s, not "unexpected error"
+            error = buildError(cve.getMessage(), ErrorCode.VALIDATION_ERROR);
         } else if (exception instanceof IllegalArgumentException || exception instanceof IllegalStateException) {
             error = buildError(exception.getMessage(), ErrorCode.VALIDATION_ERROR);
         } else if (exception instanceof RuntimeException) {
