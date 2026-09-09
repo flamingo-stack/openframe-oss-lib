@@ -28,8 +28,9 @@ public class AppleSSOProperties extends AbstractOidcProviderProperties {
     /** Apple additionally needs teamId and keyId to mint the client-secret JWT. */
     @Override
     public boolean isConfigured() {
-        return getDefaultClientId() != null && !getDefaultClientId().isBlank()
-                && getDefaultClientSecret() != null && !getDefaultClientSecret().isBlank()
+        // Reuse the base clientId/clientSecret check (inherited from the DefaultProviderConfig
+        // default via AbstractOidcProviderProperties) so it can't drift; add Apple's teamId/keyId.
+        return super.isConfigured()
                 && getDefaultTeamId() != null && !getDefaultTeamId().isBlank()
                 && getDefaultKeyId() != null && !getDefaultKeyId().isBlank();
     }
