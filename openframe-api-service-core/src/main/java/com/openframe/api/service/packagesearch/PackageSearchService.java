@@ -43,15 +43,15 @@ public class PackageSearchService {
     }
 
     public CountedGenericConnection<GenericEdge<PackageSearchItem>> search(
-            PackageManagerType packageManager, String rawQuery, CursorPaginationCriteria pagination) {
-        String query = rawQuery == null ? "" : rawQuery.trim();
-        if (query.length() < MIN_QUERY_LENGTH) {
-            throw new IllegalArgumentException("query must be at least " + MIN_QUERY_LENGTH + " characters long");
+            PackageManagerType packageManager, String rawSearch, CursorPaginationCriteria pagination) {
+        String search = rawSearch == null ? "" : rawSearch.trim();
+        if (search.length() < MIN_QUERY_LENGTH) {
+            throw new IllegalArgumentException("search must be at least " + MIN_QUERY_LENGTH + " characters long");
         }
         Page page = resolvePage(pagination);
 
         PackageManagerClient client = clientFor(packageManager);
-        PackageSearchResult result = client.search(query, page.getLimit(), page.getStartIndex());
+        PackageSearchResult result = client.search(search, page.getLimit(), page.getStartIndex());
         return toConnection(result, page);
     }
 

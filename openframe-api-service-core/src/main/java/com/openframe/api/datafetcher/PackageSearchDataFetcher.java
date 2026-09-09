@@ -23,14 +23,14 @@ public class PackageSearchDataFetcher {
     @DgsQuery
     public CountedGenericConnection<GenericEdge<PackageSearchItem>> searchPackages(
             @InputArgument PackageManagerType packageManager,
-            @InputArgument String query,
+            @InputArgument String search,
             @InputArgument Integer first,
             @InputArgument String after,
             @InputArgument Integer last,
             @InputArgument String before) {
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before).build();
-        return packageSearchService.search(packageManager, query, CursorPaginationCriteria.fromConnectionArgs(args));
+        return packageSearchService.search(packageManager, search, CursorPaginationCriteria.fromConnectionArgs(args));
     }
 
     @DgsQuery
