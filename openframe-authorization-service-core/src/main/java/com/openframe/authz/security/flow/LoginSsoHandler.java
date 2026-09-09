@@ -60,6 +60,10 @@ public class LoginSsoHandler implements SsoFlowHandler {
     @Value("${openframe.sso.login.signup-continue-url:}")
     private String signupContinueUrl;
 
+    /** "One last step" consent page for a shared-domain first login — see {@code SsoJoinController}. */
+    @Value("${openframe.sso.join-confirm-url:}")
+    private String joinConfirmUrl;
+
     @Override
     public String cookieName() {
         return SsoFlowCookieNames.OF_SSO_LOGIN;
@@ -90,15 +94,24 @@ public class LoginSsoHandler implements SsoFlowHandler {
 
         if (authUser == null) {
             requireEmailTrustedForRouting(provider, user);
-            authUser = userService.findActiveByEmail(email)
-                    // Shared-domain tenants (global domain policy, no custom app) auto-provision the
-                    // user on first login — same as the email-discovery path — instead of dropping
-                    // to the registration screen. Email is already trusted (gate above).
-                    .or(() -> ssoOidcUserService.autoProvisionByGlobalDomain(provider, user))
-                    .orElse(null);
+            authUser = userService.findActiveByEmail(email).orElse(null);
             if (authUser == null) {
-                continueIntoRegistration(request, response, authentication, payload, provider, user, email);
-                return;
+                // Shared-domain tenants (global domain policy, no custom app) auto-provision on
+                // first login. If a consent page is configured, defer the CREATE: send the user to
+                // confirm the account + accept Terms (SsoJoinController finalizes), keeping the
+                // flow cookie. Otherwise provision immediately (email already trusted above).
+                Optional<String> provisionTenant = ssoOidcUserService.autoProvisionTenantForDomain(email);
+                if (provisionTenant.isPresent()) {
+                    if (hasText(joinConfirmUrl)) {
+                        redirectKeepingCookie(response, joinConfirmUrl);
+                        return;
+                    }
+                    authUser = ssoOidcUserService.autoProvisionByGlobalDomain(provider, user).orElse(null);
+                }
+                if (authUser == null) {
+                    continueIntoRegistration(request, response, authentication, payload, provider, user, email);
+                    return;
+                }
             }
         }
 
@@ -161,6 +174,14 @@ public class LoginSsoHandler implements SsoFlowHandler {
      * the identity from the session. The flow cookie is deliberately KEPT — the completion endpoint
      * uses it for redirectTo/authMobile and as proof the request belongs to this flow.
      */
+    private void redirectKeepingCookie(HttpServletResponse response, String url) {
+        try {
+            response.sendRedirect(url);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Failed to start account confirmation.", e);
+        }
+    }
+
     private void continueIntoRegistration(HttpServletRequest request,
                                           HttpServletResponse response,
                                           Authentication authentication,

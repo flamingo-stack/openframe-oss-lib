@@ -26,6 +26,14 @@ public class InviteSsoHandler implements SsoFlowHandler {
     private final SsoCookieCodec ssoCookieCodec;
     private final InvitationRegistrationService invitationRegistrationService;
 
+    /**
+     * Frontend "one last step" consent page. When set, a NEW member joining via SSO is sent here
+     * to confirm the account and accept Terms before the user is created; blank keeps the old
+     * create-immediately behavior. See {@code SsoJoinController}.
+     */
+    @org.springframework.beans.factory.annotation.Value("${openframe.sso.join-confirm-url:}")
+    private String joinConfirmUrl;
+
     @Override
     public String cookieName() {
         return SsoFlowCookieNames.OF_SSO_INVITE;
@@ -44,6 +52,20 @@ public class InviteSsoHandler implements SsoFlowHandler {
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
         requireEmail(user); // ensure email present even if not directly used
+
+        // Consent gate: a brand-new member confirms the account + accepts Terms first. The flow
+        // cookie is KEPT so SsoJoinController can finalize from the same session. Existing members
+        // (re-accepting) and unconfigured environments proceed straight through.
+        if (org.springframework.util.StringUtils.hasText(joinConfirmUrl)
+                && invitationRegistrationService.isNewMemberJoin(payload.invitationId())) {
+            try {
+                response.sendRedirect(joinConfirmUrl);
+            } catch (java.io.IOException e) {
+                throw new IllegalStateException("Failed to start account confirmation.", e);
+            }
+            return;
+        }
+
         String[] names = resolveNames(request, authentication, user);
         String givenName = names[0];
         String familyName = names[1];
