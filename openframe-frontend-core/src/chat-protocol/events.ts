@@ -12,7 +12,8 @@
 // rows straight to the accumulator, so restating them here would be two
 // declarations of one wire contract. Type-only import from a React-free
 // module; `nats-decoder.ts` already depends on the same file for MESSAGE_TYPE.
-import type { AskOptionData } from '../components/chat/types/message.types';
+import type { ChatRef } from '../components/chat/chat-ref.types';
+import type { AskOptionData, ChatSource } from '../components/chat/types/message.types';
 // The wire-frame shapes these events carry through are defined ONCE in
 // `./frames.ts` — reuse them here rather than restating their fields.
 import type { ApprovalRequestField, DecisionResolvedFrame, UsageTelemetry } from './frames';
@@ -217,6 +218,25 @@ export interface TicketEventEvent extends ChatStreamEventBase {
   targetStatusKind?: string;
 }
 
+/**
+ * Per-answer source metadata — the documents an answer cited, plus the video
+ * and entity-card references its `[card://type:id]` markers expand with.
+ *
+ * Unlike `ChatMetadataEvent`, this one is DECODED, not passthrough: the payload
+ * comes from a remote MCP server's tool output rather than from our own
+ * backend's frame, so it is validated at the protocol boundary (see
+ * `source-metadata.ts`) and never reaches a consumer half-checked.
+ *
+ * Both fields are optional and never both absent — the decoder returns `null`
+ * instead of emitting an empty event, so applying one can't blank metadata an
+ * earlier chunk of the same turn already supplied.
+ */
+export interface SourcesEvent extends ChatStreamEventBase {
+  type: 'sources';
+  sources?: ChatSource[];
+  refs?: ChatRef[];
+}
+
 /** Per-turn metadata. Raw wire values pass through UNVALIDATED — the
  *  consumer replicates the legacy truthiness/typeof gates (so a
  *  malformed frame degrades identically to the pre-SSOT parser). */
@@ -362,6 +382,7 @@ export type ChatStreamEvent =
   | TicketEscalatedEvent
   | TicketEventEvent
   | ChatMetadataEvent
+  | SourcesEvent
   | UsageEvent
   | TokenUsageEvent
   | CompactionEvent

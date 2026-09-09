@@ -137,6 +137,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       resolveContextIcon,
       renderContextItem,
       renderMention,
+      renderAfterMessage,
       onAskSelect,
       NavLinkAnchor,
       ...props
@@ -985,7 +986,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     !hasNonEmptyContent(message.content) &&
                     (!Array.isArray(message.content) || message.content.every(s => s.type === 'text'));
                   if (isEmptyPendingTurn) return null;
-                  return (
+                  const ownedContent = renderAfterMessage?.(message, index);
+                  const row = (
                     <ChatMessageEnhanced
                       key={message.id}
                       ref={getRegisterMessageEl(message.id)}
@@ -1005,9 +1007,20 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                       renderContextItem={renderContextItem}
                       renderMention={renderMention}
                       renderEntityCard={renderEntityCard}
+                      refs={message.refs}
                       onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}
                       NavLinkAnchor={NavLinkAnchor}
                     />
+                  );
+                  // Only wrap when there IS owned content: the bare row keeps
+                  // its own key and its place as a direct flex child, so a
+                  // thread without any stays byte-identical to before.
+                  if (!ownedContent) return row;
+                  return (
+                    <div key={message.id} className="flex w-full min-w-0 flex-col">
+                      {row}
+                      {ownedContent}
+                    </div>
                   );
                 })}
               </div>

@@ -24,6 +24,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -60,6 +61,7 @@ public class ScheduleScriptService {
     private final ScriptService scriptService;
     private final TenantIdProvider tenantIdProvider;
     private final ScheduleDeviceLocalDispatchRepository deviceLocalDispatchRepository;
+    private final DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
 
     /**
      * Create a new schedule in the current tenant.
@@ -238,6 +240,10 @@ public class ScheduleScriptService {
         long cleared = deviceLocalDispatchRepository.deleteByScheduleId(scheduleId);
         if (cleared > 0) {
             log.info("Cleared {} device-local fire record(s) after timing change scheduleId={} tenantId={}", cleared, scheduleId, tenantId);
+        }
+        long clearedReconnect = onlineDeviceDispatchRepository.deleteByTenantIdAndScheduleId(tenantId, scheduleId);
+        if (clearedReconnect > 0) {
+            log.info("Cleared {} reconnect-retry sentinel(s) after timing change scheduleId={} tenantId={}", clearedReconnect, scheduleId, tenantId);
         }
     }
 
