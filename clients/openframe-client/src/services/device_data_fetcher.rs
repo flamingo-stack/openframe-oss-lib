@@ -91,6 +91,19 @@ impl DeviceDataFetcher {
         }
     }
 
+    pub fn get_timezone(&self) -> Option<String> {
+        match iana_time_zone::get_timezone() {
+            Ok(timezone) => {
+                info!("Resolved system timezone '{}'", timezone);
+                Some(timezone)
+            }
+            Err(e) => {
+                warn!("Failed to get system timezone: {:#}", e);
+                None
+            }
+        }
+    }
+
     pub fn get_agent_version(&self) -> Option<String> {
         let version = env!("OPENFRAME_VERSION").to_string();
         info!("Agent version: {}", version);

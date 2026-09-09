@@ -107,4 +107,6 @@ public class Script implements TenantScoped {
      * Timestamp of the most recent {@link #status} transition.
      */
     private Instant statusChangedAt;
+    private Boolean system;
+    private String contentHash;
 }

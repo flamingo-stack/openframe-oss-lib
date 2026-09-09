@@ -53,6 +53,19 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
     }, [message.parameters, variant]);
 
     const hasResult = isExecuted && typeof message.result === 'string' && message.result.length > 0;
+
+    // A remote (MCP) read-only tool deliberately publishes NO parameters and NO
+    // result — the backend hides both, and sends a human title instead. There is
+    // therefore nothing behind the chevron, and offering one is a promise the
+    // row cannot keep: the reader expands it and gets an empty box. Render the
+    // title as a status line instead, the same static shape the client view uses.
+    //
+    // Keyed on the absent `integratedToolType`, which is what marks a tool as
+    // remote rather than one of ours — and guarded on there being a title to
+    // show, so a title-less row keeps the old behaviour rather than collapsing
+    // to a blank line.
+    const isConciseRemoteRead = !message.integratedToolType && !!previewText && argEntries.length === 0 && !hasResult;
+    const isStaticRow = isClientView || isConciseRemoteRead;
     const hasBody = argEntries.length > 0 || hasResult || isExecuting;
 
     const renderStatusIcon = () => {
@@ -82,7 +95,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
           {previewText}
         </div>
         <div className="flex h-5 w-5 shrink-0 items-center justify-center">{renderStatusIcon()}</div>
-        {!isClientView && (
+        {!isStaticRow && (
           <div className="flex h-5 w-5 shrink-0 items-center justify-center">
             <ExpandChevron expanded={expanded} />
           </div>
@@ -101,9 +114,10 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
         )}
         {...props}
       >
-        {isClientView ? (
-          // Client (Fae end-user): static, non-expandable row — no chevron, no
-          // body. Just the explanation + status; command/args/result are hidden.
+        {isStaticRow ? (
+          // Static, non-expandable row — no chevron, no body. Two cases reach
+          // here: the Fae end-user view (command/args/result are admin-only
+          // detail) and a remote read-only tool (there IS no detail).
           <div className="flex w-full items-start gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] text-left">
             {headerContent}
           </div>

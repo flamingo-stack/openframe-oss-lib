@@ -2,7 +2,7 @@ extend type Query {
     """
     Search packages in a public package-manager repository (Homebrew, Chocolatey, winget).
     Homebrew and winget results are ranked by match quality with popularity/canonical-id
-    tiebreaks; Chocolatey results come in the repository's own download-count order.
+    tiebreaks; Chocolatey results come in the repository's own relevance order.
     """
     searchPackages(input: PackageSearchInput!): PackageSearchResult!
     """

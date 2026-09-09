@@ -7,6 +7,7 @@ import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-tria
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { LabeledDivider } from './labeled-divider';
+import { LegalLinks } from './legal-links';
 import type { AuthSsoProvider } from './sso-providers';
 import { SsoProviderButtons } from './sso-providers';
 
@@ -57,6 +58,13 @@ export interface LoginFormProps {
   title?: string;
   /** Overrides the default sub-heading. */
   subtitle?: ReactNode;
+  /**
+   * Public legal pages, linked in a quiet "Terms of Service • Privacy Policy" row at the foot of
+   * the card. Both are needed for the row to render: this screen has no consent checkbox to carry
+   * the links, so the row is the only place they appear.
+   */
+  termsUrl?: string;
+  privacyPolicyUrl?: string;
   className?: string;
 }
 
@@ -88,6 +96,8 @@ export function LoginForm({
   submitDisabled = false,
   title = 'Login to OpenFrame',
   subtitle = 'Enter your email to access your organization.',
+  termsUrl,
+  privacyPolicyUrl,
   className,
 }: LoginFormProps) {
   const fieldDisabled = disabled || loading;
@@ -183,6 +193,8 @@ export function LoginForm({
           </Button>
         </div>
       )}
+
+      {termsUrl && privacyPolicyUrl && <LegalLinks termsUrl={termsUrl} privacyPolicyUrl={privacyPolicyUrl} />}
     </div>
   );
 }

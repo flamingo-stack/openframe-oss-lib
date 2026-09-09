@@ -95,12 +95,54 @@ function upsertKey(seg: MessageSegment): string | null {
       return `escalated:${seg.data.ticketId}`;
     case 'ticket_event':
       // The stream sequence is the event's only stable id; a seq-less segment
-      // (hydrated history) is pushed raw — `addTicketEvent`'s payload-equality
-      // upsert owns that case.
+      // (a row hydrated without `lastChunkStreamSeq`) is pushed raw and joined
+      // by `seqlessTicketEventTwinIndex` when its replayed copy arrives.
       return seg.streamSeq !== undefined ? `ticket-event:${seg.streamSeq}` : null;
     default:
       return null;
   }
+}
+
+/**
+ * A seq'd ticket event meeting a HYDRATED twin of itself: history stamps the
+ * row's `lastChunkStreamSeq` onto the segment only for standalone rows, and
+ * rows persisted before that field existed hydrate seq-less - so the
+ * `ticket-event:<seq>` key alone cannot join them, and the replayed copy used
+ * to render as a second identical card. Mirror of `addTicketEvent`'s payload
+ * fallback: consider only the LAST ticket_event (older ones may be a genuinely
+ * repeated resolve/reopen cycle) and never collapse two distinct known seqs.
+ */
+function seqlessTicketEventTwinIndex(segments: MessageSegment[], seg: MessageSegment): number {
+  if (seg.type !== 'ticket_event') return -1;
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const s = segments[i];
+    if (s.type !== 'ticket_event') continue;
+    if (
+      s.streamSeq === undefined &&
+      s.data.kind === seg.data.kind &&
+      s.data.actorId === seg.data.actorId &&
+      s.data.actorName === seg.data.actorName &&
+      s.data.actorType === seg.data.actorType &&
+      s.data.reason === seg.data.reason &&
+      s.data.targetStatusKind === seg.data.targetStatusKind
+    ) {
+      return i;
+    }
+    break;
+  }
+  return -1;
+}
+
+/**
+ * First-known time wins, exactly like `addTicketEvent`: the hydrated twin
+ * carries the row's real `createdAt`, while a replay only knows its (late)
+ * arrival time - replacing wholesale would regress the card to arrival time.
+ * Non-ticket-event upserts keep their replace-wholesale semantics.
+ */
+function withFirstKnownOccurredAt(existing: MessageSegment, incoming: MessageSegment): MessageSegment {
+  if (existing.type !== 'ticket_event' || incoming.type !== 'ticket_event') return incoming;
+  const occurredAt = existing.occurredAt ?? incoming.occurredAt;
+  return occurredAt !== undefined ? { ...incoming, occurredAt } : incoming;
 }
 
 /**
@@ -130,8 +172,9 @@ export function appendToTrailingAssistant(
       // Block deltas must be IDEMPOTENT: an emit can be seen twice (live plus
       // the JetStream catch-up replay over hydrated history), so upsert on the
       // block's identity instead of raw-appending a duplicate card.
-      const idx = merged.findIndex(m => upsertKey(m) === key);
-      if (idx !== -1) merged[idx] = seg;
+      let idx = merged.findIndex(m => upsertKey(m) === key);
+      if (idx === -1) idx = seqlessTicketEventTwinIndex(merged, seg);
+      if (idx !== -1) merged[idx] = withFirstKnownOccurredAt(merged[idx], seg);
       else merged.push(seg);
     } else {
       // Other non-text segments are pushed RAW on purpose: EXECUTING↔EXECUTED

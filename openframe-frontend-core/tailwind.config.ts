@@ -55,6 +55,17 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
       fontSize: 'var(--font-size-h6-caption)',
       lineHeight: 'var(--font-line-space-h6-caption)',
     },
+    // BRAND WORDMARKS ONLY — the platform name beside a logo in a header or
+    // footer. Azeret Mono bold at the h5-caption scale, which is exactly what
+    // every hand-written wordmark override spelled before this composite.
+    '.text-wordmark': {
+      fontFamily: 'var(--font-family-heading)',
+      fontWeight: 'var(--font-weight-bold)',
+      fontSize: 'var(--font-size-h5-caption)',
+      lineHeight: 'var(--font-line-space-h5-caption)',
+      textTransform: 'none',
+      letterSpacing: '0',
+    },
     // Badge / stamp SCALE — size only, deliberately NOT a composite: it
     // carries no family, weight or casing, so it composes with whatever the
     // badge already sets (h5 tokens on StatusBadge, DM Sans on Badge). Use it

@@ -36,6 +36,11 @@ const buttonVariants = cva(
       size: {
         default: 'h-11 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 md:h-12',
         small: 'h-6 p-[var(--spacing-system-xs)] text-h5 md:h-8',
+        // The CHILD is the affordance (a badge, a chip, a thumbnail): the button
+        // contributes the hit target, the focus ring and the keyboard/ARIA
+        // semantics, and NO box of its own. Without this, call sites reached for
+        // a `className="h-auto p-0"` override to cancel the default box.
+        wrap: 'h-auto p-0',
         'small-legacy': 'h-10 px-[var(--spacing-system-m)] py-[var(--spacing-system-xs)] text-[14px] font-bold', // Temporary alias for "small" — deprecated; grep size="small-legacy" (lib + hub) and migrate the remaining consumers before removal
         // 24px pill for slim strips (announcement/promo bars, inline banner
         // actions — Primer banner / Polaris banner / Vercel-bar convention).
@@ -213,6 +218,12 @@ interface ButtonProps
    * nav decision directly without `<Button asChild><a {...linkProps}/>`
    * gymnastics. Wins over the separate `href` / `openInNewTab` props.
    */
+  /**
+   * Render a plain `<a href download>` instead of a Next `<Link>`.
+   * A download is a RESOURCE fetch, not a route change: `<Link>` would try to
+   * prefetch/route it. Only meaningful together with `href`.
+   */
+  download?: boolean | string;
   linkProps?: {
     href: string;
     target?: '_blank';
@@ -256,6 +267,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
     openInNewTab,
     prefetch,
     linkProps,
+    download,
     leftIcon,
     rightIcon,
     splitIcon,
@@ -309,6 +321,25 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
         )}
       </>
     );
+
+    // A download is a resource fetch, not a route change: same `Link` as every
+    // other anchor branch (so a host that registered `next/link` keeps ONE
+    // anchor implementation), with prefetch off — there is no route to warm,
+    // and prefetching would fetch the file itself. Checked BEFORE the
+    // linkProps/href resolution.
+    if (download && href) {
+      return (
+        <Link
+          href={href}
+          download={download}
+          prefetch={false}
+          className={cn(shellClasses, isDisabled && 'pointer-events-none')}
+          aria-label={props['aria-label']}
+        >
+          {splitContent}
+        </Link>
+      );
+    }
 
     // `linkProps` (the pre-resolved bundle from `useNavLink({ href, targetPlatform })`)
     // wins over the legacy `href` + `openInNewTab` props so callers can thread
@@ -378,6 +409,21 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
       )}
     </>
   );
+
+  // Same download short-circuit as the splitIcon branch.
+  if (download && href) {
+    return (
+      <Link
+        href={href}
+        download={download}
+        prefetch={false}
+        className={cn(classes, isDisabled && 'pointer-events-none')}
+        aria-label={props['aria-label']}
+      >
+        {content}
+      </Link>
+    );
+  }
 
   // Same `linkProps`-wins-over-href resolution as the splitIcon branch.
   const anchor =

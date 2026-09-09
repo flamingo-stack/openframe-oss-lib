@@ -4,7 +4,7 @@ import { type HTMLAttributes, memo, forwardRef } from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
 import { cn } from '../../utils/cn';
-import { getFirstLastInitials } from '../../utils/format';
+import { personInitials } from '../../utils/format';
 
 interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
   src?: string;
@@ -13,6 +13,12 @@ interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
   /** Exact pixel size (width & height). Overrides the `size` bucket dimensions —
    *  for callers with a numeric-px API (e.g. UserDisplay/MSPDisplay). */
   sizePx?: number;
+  /**
+   * How the image fills the frame. `cover` (default) crops to fill — right for
+   * a portrait. `contain` fits the whole image — required for a LOGO or club
+   * crest, whose round border cover slices off.
+   */
+  fit?: 'cover' | 'contain';
   fallback?: string;
   variant?: 'square' | 'round';
   /** Override the initials-fallback styling (font size/color). Merged over the
@@ -24,7 +30,19 @@ interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
 const SquareAvatar = memo(
   forwardRef<HTMLDivElement, SquareAvatarProps>(
     (
-      { className, src, alt, size = 'md', sizePx, fallback, variant = 'square', initialsClassName, style, ...props },
+      {
+        className,
+        src,
+        alt,
+        size = 'md',
+        sizePx,
+        fit = 'cover',
+        fallback,
+        variant = 'square',
+        initialsClassName,
+        style,
+        ...props
+      },
       ref,
     ) => {
       const resolvedSrc = useAuthedImageSrc(src);
@@ -81,11 +99,18 @@ const SquareAvatar = memo(
               resolvedSrc && 'hidden',
             )}
           >
-            {getFirstLastInitials(fallback || alt) || '?'}
+            {personInitials(fallback || alt) || '?'}
           </div>
           {resolvedSrc && (
             <Image
-              className="absolute -inset-px h-[calc(100%+2px)] w-[calc(100%+2px)] max-w-none object-cover"
+              className={cn(
+                'absolute max-w-none',
+                fit === 'contain'
+                  ? // A LOGO or crest must fit whole; cover would slice its edges.
+                    'inset-0 h-full w-full object-contain'
+                  : // A portrait fills the frame; the 1px overscan hides edge seams.
+                    '-inset-px h-[calc(100%+2px)] w-[calc(100%+2px)] object-cover',
+              )}
               // Images are draggable by default, and a draggable child WINS over a
               // draggable ancestor: an avatar inside a drag-and-drop card lets the
               // browser start its own "drag this picture" instead of the card's

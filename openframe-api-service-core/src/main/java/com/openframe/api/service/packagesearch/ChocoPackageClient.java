@@ -2,6 +2,8 @@ package com.openframe.api.service.packagesearch;
 
 import com.openframe.core.rest.PackageSearchRestClientFactory;
 import com.github.benmanes.caffeine.cache.Cache;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.api.service.packagesearch.PackageSearchProperties;
 import com.openframe.data.document.packagesearch.BrewPackageType;
@@ -19,6 +21,7 @@ import org.springframework.web.util.UriBuilder;
 
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
@@ -30,7 +33,6 @@ public class ChocoPackageClient implements PackageManagerClient {
             "The Chocolatey repository is temporarily unavailable. Please try again later.";
     private static final String FILTER_LATEST_VERSION = "IsLatestVersion";
     private static final String EMPTY_TARGET_FRAMEWORK = "''";
-    private static final String ORDER_BY_DOWNLOADS = "DownloadCount desc";
     private static final String ORDER_BY_PUBLISHED = "Published desc";
     private static final int SEARCH_ITEM_DESCRIPTION_LIMIT = 300;
     private static final int CACHE_MAX_SIZE = 2000;
@@ -76,16 +78,50 @@ public class ChocoPackageClient implements PackageManagerClient {
                 .retrieve()
                 .body(String.class));
         List<ChocoEntry> entries = parseFeed(xml);
-        List<PackageSearchItem> items = entries.stream()
-                .limit(limit)
-                .map(this::toItem)
-                .toList();
         boolean hasMore = entries.size() > limit;
+        List<ChocoEntry> page = entries.stream().limit(limit).toList();
+        List<PackageSearchItem> items = rankAndMap(query, page);
         return PackageSearchResult.builder()
                 .items(items)
                 .total(null)
                 .hasMore(hasMore)
                 .build();
+    }
+
+    private List<PackageSearchItem> rankAndMap(String query, List<ChocoEntry> page) {
+        String matcherQuery = query.toLowerCase(Locale.ROOT);
+        return page.stream()
+                .map(entry -> new Scored(scoreEntry(matcherQuery, entry), entry))
+                .sorted(byRelevance())
+                .map(scored -> toItem(scored.getEntry()))
+                .toList();
+    }
+
+    private static int scoreEntry(String query, ChocoEntry entry) {
+        String description = firstNonNull(entry.getDescription(), entry.getSummary());
+        return PackageMatcher.score(query, entry.getId(), displayName(entry), null, description);
+    }
+
+    private static Comparator<Scored> byRelevance() {
+        Comparator<Scored> byScore = Comparator.comparingInt(Scored::getScore).reversed();
+        Comparator<Scored> byDownloads = Comparator.comparingInt(Scored::downloadsOrZero).reversed();
+        return byScore.thenComparing(byDownloads).thenComparing(Scored::entryId);
+    }
+
+    @Getter
+    @AllArgsConstructor
+    private static final class Scored {
+        private final int score;
+        private final ChocoEntry entry;
+
+        private int downloadsOrZero() {
+            Integer downloads = entry.getDownloadCount();
+            return downloads == null ? 0 : downloads;
+        }
+
+        private String entryId() {
+            return entry.getId();
+        }
     }
 
     private URI searchUri(UriBuilder builder, String quotedQuery, int top, int skip) {
@@ -94,7 +130,6 @@ public class ChocoPackageClient implements PackageManagerClient {
                 .queryParam("searchTerm", quotedQuery)
                 .queryParam("targetFramework", EMPTY_TARGET_FRAMEWORK)
                 .queryParam("includePrerelease", "false")
-                .queryParam("$orderby", ORDER_BY_DOWNLOADS)
                 .queryParam("$top", top)
                 .queryParam("$skip", skip)
                 .build();

@@ -241,6 +241,17 @@ export interface DesignDoc {
   updated_at: string;
   /** DRI, hydrated via the shared author hydrator. */
   author?: EntityAuthor;
+  /**
+   * Engineering feature leads — the people reviewing the doc alongside the
+   * department sign-off sections. DISPLAY-ONLY attribution, like
+   * `how_i_work_participants`: being listed grants NO rights (nothing in the
+   * hub's `design-doc-gate.ts` reads it) and is NOT an input to the approval
+   * gate. The doc-level owner with actual levers is the DRI (`author_id`).
+   *
+   * Carried on BOTH the list and the detail payload — the dashboard renders
+   * their avatars in its own column.
+   */
+  feature_leads: DesignDocPerson[];
   participants: DesignDocParticipant[];
   links: DesignDocLink[];
   /** Doc-level comments only (participant-scoped comments ride on their participant). */
@@ -290,6 +301,8 @@ export interface CreateDesignDocData {
   content?: string | null;
   /** DRI; defaults to the caller. */
   author_id?: string | null;
+  /** Feature leads (profile ids). Display-only — see `DesignDoc.feature_leads`. */
+  feature_lead_ids?: string[];
   participants: CreateDesignDocParticipantInput[];
   links: DesignDocLinkInput[];
 }
@@ -305,6 +318,12 @@ export interface UpdateDesignDocData {
   summary?: string | null;
   content?: string | null;
   author_id?: string | null;
+  /**
+   * Replaces the whole feature-lead set (`[]` clears it); omitted leaves it
+   * untouched. Display-only, so it rides the STANDING floor like the title —
+   * not the DRI-only levers, and not the frozen decision record.
+   */
+  feature_lead_ids?: string[];
   links?: DesignDocLinkInput[];
   /** OCC token — the `updated_at` the editor seeded from; mismatch → 409. */
   expected_updated_at?: string;

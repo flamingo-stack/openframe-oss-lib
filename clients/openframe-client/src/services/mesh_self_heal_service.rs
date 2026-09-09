@@ -22,8 +22,15 @@ const MESH_TOOL_ID: &str = "meshcentral-agent";
 
 /// Stable prefix shared by every control-channel failure line the agent emits ("Connection FAILED: ..." and "Connection FAILED (latest attempt): ...").
 const FAILURE_MARKER: &str = "Connection FAILED";
-/// Printed only after a successful server connect, identically across agent versions.
-const HEALTHY_MARKER: &str = "Received CoreOk from server";
+/// Any of these proves a live, authenticated server session, so an agent build that renames or drops one line cannot turn every hourly reconnect into a heal.
+const HEALTHY_MARKERS: [&str; 3] = [
+    // Fork line at authState=3: the earliest proof of a session, present even when the server never acknowledges the core (the 2026-08-12 false positive).
+    "Server fully authenticated",
+    // Fork line agents <= 0.0.26 print on the server's CoreOk command.
+    "Received CoreOk from server",
+    // Upstream wording (unchanged since 2019) agents >= 0.0.27 print on that same command.
+    "Server verified meshcore",
+];
 
 /// How often we scan the agent log.
 const POLL_INTERVAL: Duration = Duration::from_secs(30);
@@ -171,7 +178,7 @@ impl MeshSelfHealService {
                         last_activity = Instant::now();
                     }
                     for line in &lines {
-                        if line.contains(HEALTHY_MARKER) {
+                        if is_healthy_line(line) {
                             stuck_since = None;
                             last_action = None;
                             last_marker_healthy = true;
@@ -436,6 +443,10 @@ fn parse_msh_field(msh: &str, key: &str) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
+fn is_healthy_line(line: &str) -> bool {
+    HEALTHY_MARKERS.iter().any(|m| line.contains(m))
+}
+
 /// Positive-health check: healthy means a recent healthy marker, not merely the absence of a failing one, so an agent whose log stays busy without ever connecting is still caught.
 /// Before the first marker is ever seen, the watcher's own uptime supplies the grace window, so a fresh start can't fire immediately.
 fn is_disconnected(since_last_healthy: Option<Duration>, watched_for: Duration) -> bool {
@@ -475,7 +486,7 @@ async fn last_marker_in_tail(path: &Path) -> Option<bool> {
 
     let mut last = None;
     for line in String::from_utf8_lossy(&buf).lines() {
-        if line.contains(HEALTHY_MARKER) {
+        if is_healthy_line(line) {
             last = Some(true);
         } else if line.contains(FAILURE_MARKER) {
             last = Some(false);

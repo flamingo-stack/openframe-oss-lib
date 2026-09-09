@@ -75,6 +75,18 @@ export interface ChatRuntime {
      *  prefix covers it). Set explicitly only when the history route lives
      *  elsewhere. */
     chatHistoryUrl?: string;
+    /**
+     * Conversation-list surface for the SSE/Guide chat — the server-side
+     * transcript store exposed as a dialog list:
+     *   GET  `<url>?status=active|archived&cursor=&limit=&search=` → `{ dialogs, nextCursor }`
+     *   PATCH `<url>/<id>` with `{ title }` (rename) or `{ archived }` (archive / restore)
+     * Hub: '/api/docs/chat/conversations'. OPTIONAL and NEVER derived: unset =
+     * the Guide adapter has no dialog list and the panel keeps its single-thread
+     * UI. Set it to enable the "Current Chats" rail / archive / rename in Guide
+     * mode (the same UX openframe gets in Mingo mode). Selecting a row hydrates
+     * through `chatHistoryUrl`.
+     */
+    chatConversationsUrl?: string;
     /** GET RAG-search endpoint behind `<DocSearchBar>` (the in-source search
      *  bar mounted by `<DocViewer>` / `<DocsHubPage>` when `showAIChat` is on).
      *  Hub: '/api/docs/search'. OPTIONAL — falls back to the hub path so

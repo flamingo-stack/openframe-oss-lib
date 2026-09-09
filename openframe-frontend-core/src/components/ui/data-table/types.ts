@@ -6,6 +6,19 @@ export interface DataTableFilterOption {
   id: string;
   label: string;
   value: string | number | boolean;
+  /**
+   * How many rows this option would match, rendered right-aligned beside the
+   * label by `FiltersDropdown`. Optional: a list whose options come from a
+   * plain enum rather than a server facet has no honest number to show, and
+   * `undefined` draws nothing at all — which is the correct answer there.
+   *
+   * A facet is expected to be SELF-EXCLUDING (computed with every active
+   * filter EXCEPT its own field), so the number reads "how many rows if you
+   * pick this" and stays put as the user ticks options in the same dropdown.
+   * A count narrowed by its own filter collapses every unpicked option to 0
+   * the moment one is picked — do not feed one in.
+   */
+  count?: number;
 }
 
 declare module '@tanstack/react-table' {

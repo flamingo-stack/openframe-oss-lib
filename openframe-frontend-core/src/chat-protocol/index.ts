@@ -22,3 +22,4 @@ export * from './ip-normalize';
 // Cross-repo env-flag predicate — the trust assertion that gates the IP
 // forwarding above must be parsed IDENTICALLY on both sides of the seam.
 export * from './env-flag';
+export { isRecord, unwrapEnvelope } from './wire-narrow';

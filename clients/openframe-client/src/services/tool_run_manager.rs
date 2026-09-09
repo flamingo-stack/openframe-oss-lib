@@ -30,6 +30,20 @@ use windows::{
 
 const RETRY_DELAY_SECONDS: u64 = 5;
 
+/// Under the supervision lock, so a concurrent resume either finds the loop alive or relaunches its tool.
+async fn shutdown_break(
+    shutting_down: &AtomicBool,
+    running_tools: &RwLock<HashSet<String>>,
+    tool_id: &str,
+) -> bool {
+    let mut set = running_tools.write().await;
+    if !shutting_down.load(Ordering::Acquire) {
+        return false;
+    }
+    set.remove(tool_id);
+    true
+}
+
 #[cfg(windows)]
 fn get_active_user_session() -> Option<u32> {
     unsafe {
@@ -402,6 +416,8 @@ pub struct ToolRunManager {
     updating_tools: Arc<RwLock<HashMap<String, usize>>>,
     tool_locks: Arc<RwLock<HashMap<String, Arc<Mutex<()>>>>>,
     shutting_down: Arc<AtomicBool>,
+    /// Set by a deactivation stop
+    tools_stopped: Arc<AtomicBool>,
 }
 
 impl ToolRunManager {
@@ -419,6 +435,7 @@ impl ToolRunManager {
             updating_tools: Arc::new(RwLock::new(HashMap::new())),
             tool_locks: Arc::new(RwLock::new(HashMap::new())),
             shutting_down: Arc::new(AtomicBool::new(false)),
+            tools_stopped: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -438,10 +455,14 @@ impl ToolRunManager {
     /// Reversibly stop every managed tool (kill processes / stop services) without uninstalling.
     /// Used when the tenant is gone, to stop tools hammering their now-unreachable endpoints.
     pub async fn stop_all(&self) -> Result<()> {
-        self.signal_shutdown();
-        // Clear supervision so a later restart_all()/run() can relaunch these tools (symmetry
-        // with restart_all): the shutdown-triggered loop break leaves ids in running_tools.
-        self.running_tools.write().await.clear();
+        {
+            // Under the supervision lock so a concurrent resume_after_update_failure cannot undo the stop
+            let mut set = self.running_tools.write().await;
+            self.tools_stopped.store(true, Ordering::Release);
+            self.signal_shutdown();
+            // Clear the set now so restart_all()/run() can relaunch before every loop has noticed the flag
+            set.clear();
+        }
         let tools = self
             .installed_tools_service
             .get_all()
@@ -464,8 +485,12 @@ impl ToolRunManager {
     /// Clears the one-way shutdown flag and the running set, restarts OS-service tools
     /// (which `run()` deliberately skips), then re-spawns the standard/GUI supervisors.
     pub async fn restart_all(&self) -> Result<()> {
-        self.shutting_down.store(false, Ordering::Release);
-        self.running_tools.write().await.clear();
+        {
+            let mut set = self.running_tools.write().await;
+            self.tools_stopped.store(false, Ordering::Release);
+            self.shutting_down.store(false, Ordering::Release);
+            set.clear();
+        }
 
         match self.installed_tools_service.get_all().await {
             Ok(tools) => {
@@ -655,7 +680,7 @@ impl ToolRunManager {
             let mut launch_backoff = FailureLogBackoff::new();
             loop {
                 // Self-update in progress — stop the loop entirely
-                if shutting_down.load(Ordering::Acquire) {
+                if shutdown_break(&shutting_down, &running_tools, &tool.tool_agent_id).await {
                     info!(tool_id = %tool.tool_agent_id, "Shutdown signalled, stopping run loop");
                     break;
                 }
@@ -724,7 +749,9 @@ impl ToolRunManager {
                     } => {
                         #[cfg(windows)]
                         {
-                            if shutting_down.load(Ordering::Acquire) {
+                            if shutdown_break(&shutting_down, &running_tools, &tool.tool_agent_id)
+                                .await
+                            {
                                 info!(tool_id = %tool.tool_agent_id, "Shutdown signalled before launch, stopping run loop");
                                 break;
                             }
@@ -877,7 +904,7 @@ impl ToolRunManager {
                     }
                 }
 
-                if shutting_down.load(Ordering::Acquire) {
+                if shutdown_break(&shutting_down, &running_tools, &tool.tool_agent_id).await {
                     info!(tool_id = %tool.tool_agent_id, "Shutdown signalled before launch, stopping run loop");
                     break;
                 }

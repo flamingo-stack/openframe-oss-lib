@@ -20,6 +20,18 @@ export interface DataTableRowProps<T> {
    * clipped. Default keeps the fixed height.
    */
   autoHeight?: boolean;
+  /**
+   * REPLACES the height this row would otherwise take (`compact`, `autoHeight`
+   * or the design default). The one place a table states how tall a row is, so
+   * the pad rows and the skeleton can reserve the SAME number — see
+   * `DataTableBodyProps.rowHeightClassName`.
+   *
+   * It sizes the row SLOT — the whole card — not the cells inside it. A row
+   * with a `subRow` is taller than its cells, so sizing the cells would leave
+   * the pad rows (which have no sub-row) short by exactly the sub-row: on a
+   * phone board that was 96px per missing row.
+   */
+  rowHeightClassName?: string;
   className?: string;
   /** Expandable content rendered below the cells, inside the same card. */
   subRow?: ReactNode;
@@ -62,7 +74,16 @@ export interface DataTableRowProps<T> {
  * for `onClick` and `className` (if function) via `useCallback` / `useMemo` in
  * the consumer. `href` and string `className` are compared by value.
  */
-function DataTableRowImpl<T>({ row, onClick, href, compact, autoHeight, className, subRow }: DataTableRowProps<T>) {
+function DataTableRowImpl<T>({
+  row,
+  onClick,
+  href,
+  compact,
+  autoHeight,
+  rowHeightClassName,
+  className,
+  subRow,
+}: DataTableRowProps<T>) {
   const hasSubRow = subRow != null && subRow !== false;
   // A sub-row carries its own interactive controls, so it must not live inside the
   // row-level <Link>; when present, the link wraps only the cells.
@@ -90,7 +111,11 @@ function DataTableRowImpl<T>({ row, onClick, href, compact, autoHeight, classNam
   );
 
   const containerClassName = cn(
-    'block overflow-hidden rounded-md border border-ods-border bg-ods-card text-inherit no-underline',
+    'overflow-hidden rounded-md border border-ods-border bg-ods-card text-inherit no-underline',
+    // A stated slot height goes HERE, on the card, with the cells flexing to
+    // fill whatever the sub-row leaves. `border-box` sizing means the number a
+    // caller writes is the number the row occupies, borders included.
+    rowHeightClassName ? `flex flex-col ${rowHeightClassName}` : 'block',
     // With a sub-row the link wraps only the cells, so keep the clickable affordance off the whole card.
     (onClick || isWholeCardLink) && 'cursor-pointer transition-colors hover:bg-ods-bg-active',
     className,
@@ -101,11 +126,13 @@ function DataTableRowImpl<T>({ row, onClick, href, compact, autoHeight, classNam
       className={cn(
         'flex',
         ROW_SHELL_CLASSES,
-        compact
-          ? 'py-[var(--spacing-system-xsf)]'
-          : autoHeight
-            ? 'min-h-[66px] py-[var(--spacing-system-sf)] md:min-h-[78px]'
-            : `py-0 ${ROW_HEIGHT_DESKTOP}`,
+        rowHeightClassName
+          ? 'min-h-0 flex-1 py-0'
+          : compact
+            ? 'py-[var(--spacing-system-xsf)]'
+            : autoHeight
+              ? 'min-h-[66px] py-[var(--spacing-system-sf)] md:min-h-[78px]'
+              : `py-0 ${ROW_HEIGHT_DESKTOP}`,
         hasSubRow && 'border-b border-ods-border',
       )}
     >
@@ -153,7 +180,10 @@ function DataTableRowImpl<T>({ row, onClick, href, compact, autoHeight, classNam
         <Link
           href={href}
           prefetch={false}
-          className="block cursor-pointer text-inherit no-underline transition-colors hover:bg-ods-bg-active"
+          className={cn(
+            'cursor-pointer text-inherit no-underline transition-colors hover:bg-ods-bg-active',
+            rowHeightClassName ? 'flex min-h-0 flex-1 flex-col' : 'block',
+          )}
           onClick={handleClick}
         >
           {cells}

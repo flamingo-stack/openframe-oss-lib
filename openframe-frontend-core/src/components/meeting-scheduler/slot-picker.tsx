@@ -56,6 +56,13 @@ export interface SlotPickerProps {
   onSelectDay: (dayKey: string) => void;
   /** Availability refetch in flight (month change) → per-region skeletons. */
   isLoading?: boolean;
+  /**
+   * A booking POST is in flight (details-first, where the slot click IS the
+   * submit). DISTINCT from `isLoading`, which swaps the whole times column for
+   * a skeleton — here the grid must stay up with the clicked chip spinning, so
+   * the visitor can see WHICH time is being booked.
+   */
+  isSubmitting?: boolean;
 }
 
 /** Stable per-zone day key for an instant, e.g. "2026-08-14" (exported — the
@@ -330,6 +337,7 @@ export function SlotPicker({
   selectedDay,
   onSelectDay,
   isLoading = false,
+  isSubmitting = false,
 }: SlotPickerProps) {
   const slotsByDay = useMemo(() => {
     const map = new Map<string, number[]>();
@@ -391,7 +399,15 @@ export function SlotPicker({
                   <Button
                     key={ms}
                     variant={isSelected ? undefined : 'outline'}
-                    onClick={() => onSelectSlot(ms)}
+                    // The click is the submit in details-first, so the grid
+                    // itself is the double-book guard — the form button that
+                    // used to carry `disabled={isSubmitting}` is not on screen.
+                    disabled={isSubmitting}
+                    loading={isSubmitting && isSelected}
+                    onClick={() => {
+                      if (isSubmitting) return;
+                      onSelectSlot(ms);
+                    }}
                     className={CHIP_CLASS}
                   >
                     {timeLabelInZone(ms, timezone)}

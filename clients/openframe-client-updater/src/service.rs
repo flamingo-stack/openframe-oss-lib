@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use std::path::PathBuf;
+#[cfg(windows)]
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tracing::{info, warn};

@@ -1,4 +1,5 @@
 import type { ElementType, ReactNode } from 'react';
+import type { NoDataProps } from '../no-data';
 
 /** @deprecated Use types from `data-table` instead. */
 export type TailwindBreakpoint = 'md' | 'lg' | 'xl' | '2xl';
@@ -102,6 +103,39 @@ export interface TableProps<T = TableRowData> {
 
   // Skeleton configuration
   skeletonRows?: number; // Number of skeleton rows to show when loading (default: 10)
+  /**
+   * Keep the table height stable by padding with invisible rows when the page
+   * is short, AND by reserving the same slots (empty state centred over them)
+   * when it is empty. Typically the page size. Same name and semantics as
+   * `DataTableBodyProps.minRows` — ONE vocabulary across both tables.
+   *
+   * Unset keeps the legacy behaviour: pad to `skeletonRows`, collapse when empty.
+   */
+  minRows?: number;
+  /** Props for the empty state (`NoData`). Overrides `emptyMessage`. Same shape
+   *  as `DataTableBodyProps.emptyState`.
+   *
+   *  ONE rule, so tables do not each invent their own: pass `emptyMessage` when
+   *  a title is all you need, `emptyState` when you also want a description,
+   *  icon or action — never both. */
+  emptyState?: NoDataProps;
+  /**
+   * @deprecated Pass `minRows` (the page size) instead — one vocabulary with
+   * `DataTable`.
+   *
+   * Kept working, not removed: it shipped in 0.0.597 and hosts pin an exact
+   * version, so deleting it would make every consumer on that release silently
+   * lose its reserved height with nothing failing loudly. Treated as
+   * `minRows = skeletonRows`, which is what every call site meant by it.
+   */
+  keepHeightWhenEmpty?: boolean;
+  /**
+   * @deprecated Pass `emptyState={{ title, description }}` instead.
+   *
+   * Kept working for the same reason as `keepHeightWhenEmpty`. Merged UNDER an
+   * explicit `emptyState`, so a caller passing both gets the newer one.
+   */
+  emptyDescription?: string;
 
   // Styling
   className?: string;
@@ -270,6 +304,12 @@ export interface TableCardSkeletonProps {
 /** @deprecated Use types from `data-table` instead. */
 export interface TableEmptyStateProps {
   message?: string;
+  /** Second line under the title. Defaults to the generic search/filter hint
+   *  only when `message` is also absent. */
+  description?: string;
+  /** Full `NoData` props — overrides `message` AND `description`. Same shape as
+   *  `DataTableEmpty`. */
+  emptyState?: NoDataProps;
   icon?: ReactNode;
   action?: {
     label: string;

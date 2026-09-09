@@ -1,6 +1,8 @@
 package com.openframe.authz.controller;
 
 import com.openframe.authz.dto.TenantRegistrationRequest;
+import com.openframe.authz.service.sso.SsoAlreadyLinkedException;
+import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.sso.apple.AppleNativeTokenVerifier;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import com.openframe.authz.service.tenant.TenantService;
@@ -18,6 +20,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.UUID;
+
+import static com.openframe.authz.config.oidc.AppleSSOProperties.APPLE;
 import static java.util.Locale.ROOT;
 import static org.springframework.http.HttpStatus.*;
 import static org.springframework.util.StringUtils.hasText;
@@ -42,6 +47,7 @@ public class AppleNativeDiscoveryController {
     private final UserService userService;
     private final TenantService tenantService;
     private final TenantRegistrationService registrationService;
+    private final SsoIdentityService ssoIdentityService;
 
     public record AppleNativeDiscoverRequest(String identityToken, String nonce) {}
 
@@ -64,7 +70,10 @@ public class AppleNativeDiscoveryController {
             throw new ResponseStatusException(UNAUTHORIZED, "Apple identity token carries no verified email");
         }
 
-        AuthUser user = userService.findActiveByEmail(email.toLowerCase(ROOT))
+        // Link-first: the Apple sub survives email changes and Hide My Email relay churn.
+        AuthUser user = ssoIdentityService.findLink(APPLE, token.getClaims())
+                .flatMap(link -> userService.findActiveById(link.getUserId()))
+                .or(() -> userService.findActiveByEmail(email.toLowerCase(ROOT)))
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "registration_required"));
 
         tenantService.findById(user.getTenantId())
@@ -105,6 +114,11 @@ public class AppleNativeDiscoveryController {
         if (!hasText(email)) {
             throw new ResponseStatusException(UNAUTHORIZED, "Apple identity token carries no email");
         }
+        try {
+            ssoIdentityService.ensureNotAlreadyLinked(APPLE, token.getClaims());
+        } catch (SsoAlreadyLinkedException e) {
+            throw new ResponseStatusException(CONFLICT, "already_linked");
+        }
         if (userService.findActiveByEmail(email.toLowerCase(ROOT)).isPresent()) {
             throw new ResponseStatusException(CONFLICT, "account_exists");
         }
@@ -113,7 +127,7 @@ public class AppleNativeDiscoveryController {
                 .email(email.toLowerCase(ROOT))
                 .firstName(hasText(body.firstName()) ? body.firstName() : "")
                 .lastName(hasText(body.lastName()) ? body.lastName() : "")
-                .password(java.util.UUID.randomUUID().toString())
+                .password(UUID.randomUUID().toString())
                 .tenantName(body.tenantName())
                 .tenantDomain(body.tenantDomain().toLowerCase(ROOT))
                 .emailPreVerified(OidcUserUtils.emailVerifiedClaimAllows(token.getClaims()))

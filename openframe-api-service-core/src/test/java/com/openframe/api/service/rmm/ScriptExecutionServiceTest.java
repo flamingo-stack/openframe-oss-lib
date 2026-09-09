@@ -286,16 +286,18 @@ class ScriptExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("list: a null filter forwards a null query filter (no status constraint)")
-    void list_nullFilter_forwardsNull() {
+    @DisplayName("list: a null filter still forwards the service-level source exclusion — bootstrap runs never reach History")
+    void list_nullFilter_forwardsSourceExclusion() {
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
         when(scriptExecutionRepository.findPage(eq(TENANT_ID), eq(ExecutionOwnerScope.forScript(SCRIPT_ID)), any(), any(), any(), any(), anyBoolean(), anyInt(), any()))
                 .thenReturn(List.of());
 
         service.list(ExecutionOwnerScope.forScript(SCRIPT_ID), null, null, null, pagination);
 
-        verify(scriptExecutionRepository).findPage(eq(TENANT_ID), eq(ExecutionOwnerScope.forScript(SCRIPT_ID)), eq(null), any(), any(), any(), anyBoolean(), anyInt(), any());
-        verify(scriptExecutionRepository).count(eq(TENANT_ID), eq(ExecutionOwnerScope.forScript(SCRIPT_ID)), eq(null), any());
+        ArgumentCaptor<ScriptExecutionQueryFilter> forwarded = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
+        verify(scriptExecutionRepository).findPage(eq(TENANT_ID), eq(ExecutionOwnerScope.forScript(SCRIPT_ID)), forwarded.capture(), any(), any(), any(), anyBoolean(), anyInt(), any());
+        assertThat(forwarded.getValue().getExcludedSources()).containsExactly(ExecutionSource.SYSTEM_BOOTSTRAP);
+        assertThat(forwarded.getValue().getStatuses()).isNull();
     }
 
     @Test
