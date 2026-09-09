@@ -88,6 +88,9 @@ public interface NotificationReadStateRepository
                                               @Param("entityIds") Collection<String> entityIds,
                                               @Param("tenantId") String tenantId);
 
+    @Query("{ 'tenantId': ?2, 'entityType': ?0, 'entityId': ?1, 'status': 'UNREAD' }")
+    List<NotificationReadState> findUnreadByEntity(NotificationEntityType entityType, String entityId, String tenantId);
+
     @Query("{ 'tenantId': ?5, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, 'entityId': ?3, 'status': ?4 }")
     List<NotificationReadState> findByRecipientIdAndRecipientTypeAndEntity(String recipientId,
                                                                           RecipientType recipientType,

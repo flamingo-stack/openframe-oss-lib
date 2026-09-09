@@ -122,6 +122,22 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    @DisplayName("Given two notifications about one ticket unread for two users and a machine, plus another ticket, when dismissEntityForAllRecipients is called for the first ticket, then every row on it flips to READ and the other ticket stays unread")
+    void dismiss_entity_for_all_recipients_flips_every_row_on_the_entity() {
+        NotificationEntityRef ticket = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-1").orElseThrow();
+        NotificationEntityRef other = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-2").orElseThrow();
+        service.createForAudience("n1", CAT_TICKETS, "title", ticket, U, Set.of(ALICE, BOB));
+        service.createForAudience("n2", CAT_TICKETS, "title", ticket, M, Set.of(MACHINE_1));
+        service.createForAudience("n3", CAT_TICKETS, "title", other, U, Set.of(ALICE));
+
+        assertThat(service.dismissEntityForAllRecipients(NotificationEntityType.TICKET, "ticket-1")).isEqualTo(3L);
+
+        assertThat(service.unreadCountsByEntity(ALICE, U, NotificationEntityType.TICKET)).containsOnly(entry("ticket-2", 1L));
+        assertThat(service.hasUnread(BOB, U)).isFalse();
+        assertThat(service.hasUnread(MACHINE_1, M)).isFalse();
+    }
+
+    @Test
     @DisplayName("Given rows flipped to READ, when they are read back as entities, then readAt is a real Instant — regression: $$NOW must be a server/param timestamp, never the literal string '$$NOW' (which fails Instant conversion on read)")
     void read_at_is_a_real_instant_not_literal_now() {
         Instant before = Instant.now();
