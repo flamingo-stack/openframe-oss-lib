@@ -2,16 +2,8 @@ package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
-import com.openframe.data.document.tool.IntegratedTool;
-import com.openframe.data.document.tool.IntegratedToolId;
-import com.openframe.data.document.tool.ToolApiKey;
-import com.openframe.data.document.tool.ToolCredentials;
-import com.openframe.data.document.tool.ToolUrl;
-import com.openframe.data.document.tool.ToolUrlType;
-import com.openframe.data.repository.tool.IntegratedToolRepository;
-import com.openframe.data.service.TenantIdProvider;
-import com.openframe.sdk.fleetmdm.FleetMdmClient;
-import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
+import com.openframe.api.dto.shared.PageResult;
+import com.openframe.api.service.rmm.fleet.FleetClientProvider;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
@@ -22,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -32,7 +23,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
@@ -41,14 +31,11 @@ import static org.springframework.util.StringUtils.hasText;
 @RequiredArgsConstructor
 public class SoftwareInventoryService {
 
-    private static final String PORT_SEPARATOR = ":";
-
-    private final IntegratedToolRepository integratedToolRepository;
-    private final TenantIdProvider tenantIdProvider;
+    private final FleetClientProvider fleet;
 
     public Optional<SoftwareResponse> findById(String softwareId) {
         return parseNumericId(softwareId)
-                .map(id -> callFleet(client -> client.getSoftwareTitle(id), "get Fleet software title id=" + id))
+                .map(id -> fleet.call(client -> client.getSoftwareTitle(id), "get Fleet software title id=" + id))
                 .map(FleetSoftwareMapper::toResponse);
     }
 
@@ -59,7 +46,7 @@ public class SoftwareInventoryService {
                 .orderKey(orderKey).orderDirection(orderDirection)
                 .vulnerable(vulnerable)
                 .build();
-        SoftwareTitlesResponse response = callFleet(
+        SoftwareTitlesResponse response = fleet.call(
                 client -> client.listSoftwareTitles(request),
                 "list Fleet software titles");
         List<SoftwareResponse> items = response.getSoftwareTitles() == null
@@ -83,7 +70,7 @@ public class SoftwareInventoryService {
         if (parsed.isEmpty()) {
             return PageResult.empty(page);
         }
-        SoftwareTitle title = callFleet(
+        SoftwareTitle title = fleet.call(
                 client -> client.getSoftwareTitle(parsed.get()),
                 "get Fleet software title id=" + parsed.get());
         if (title == null || title.getVersions() == null || title.getVersions().isEmpty()) {
@@ -131,7 +118,7 @@ public class SoftwareInventoryService {
     private Map<String, Vulnerability> enrichCves(Set<String> cves) {
         return cves.parallelStream().collect(Collectors.toConcurrentMap(
                 cve -> cve,
-                cve -> Optional.ofNullable(callFleet(
+                cve -> Optional.ofNullable(fleet.call(
                         client -> client.getVulnerability(cve),
                         "get Fleet vulnerability " + cve)).orElse(null)));
     }
@@ -169,51 +156,5 @@ public class SoftwareInventoryService {
     }
 
     private record VersionCve(String version, String cve) {
-    }
-
-    // ────────── Fleet SDK plumbing ──────────
-
-    private <T> T callFleet(FleetSdkCall<T> call, String action) {
-        try {
-            return call.execute(fleetClient());
-        } catch (IOException e) {
-            throw new FleetMdmException("Failed to " + action, e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new FleetMdmException("Interrupted while " + action, e);
-        }
-    }
-
-    @FunctionalInterface
-    private interface FleetSdkCall<T> {
-        T execute(FleetMdmClient client) throws IOException, InterruptedException;
-    }
-
-    private FleetMdmClient fleetClient() {
-        String key = IntegratedToolId.FLEET_SERVER_ID.getValue();
-        IntegratedTool tool = integratedToolRepository.findByKey(key)
-                .orElseThrow(() -> new IllegalStateException("Fleet MDM tool not configured: " + key));
-        return new FleetMdmClient(resolveApiUrl(tool), resolveApiToken(tool), tenantIdProvider.getTenantId());
-    }
-
-    private static String resolveApiUrl(IntegratedTool tool) {
-        List<ToolUrl> urls = tool.getToolUrls();
-        if (isEmpty(urls)) {
-            throw new IllegalStateException("Fleet MDM tool has no configured URLs");
-        }
-        ToolUrl api = urls.stream()
-                .filter(u -> u.getType() == ToolUrlType.API)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Fleet MDM tool has no API URL"));
-        return hasText(api.getPort()) ? api.getUrl() + PORT_SEPARATOR + api.getPort() : api.getUrl();
-    }
-
-    private static String resolveApiToken(IntegratedTool tool) {
-        ToolCredentials credentials = tool.getCredentials();
-        ToolApiKey apiKey = credentials == null ? null : credentials.getApiKey();
-        if (apiKey == null || !hasText(apiKey.getKey())) {
-            throw new IllegalStateException("Fleet MDM tool has no API token configured");
-        }
-        return apiKey.getKey();
     }
 }

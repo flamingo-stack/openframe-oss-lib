@@ -1,10 +1,10 @@
-package com.openframe.api.service.rmm.software;
+package com.openframe.api.service.rmm.fleet;
 
 import com.openframe.api.dto.rmm.software.SoftwareSource;
 
 import java.util.Set;
 
-enum FleetSoftwareCategory {
+public enum FleetSoftwareCategory {
 
     CHOCOLATEY(SoftwareSource.CHOCOLATEY, "chocolatey_packages"),
     HOMEBREW(SoftwareSource.BREW, "homebrew_packages"),
@@ -18,12 +18,11 @@ enum FleetSoftwareCategory {
         this.fleetSources = Set.of(fleetSources);
     }
 
-    SoftwareSource source() {
+    public SoftwareSource source() {
         return source;
     }
 
-    /** Never returns null — unknown / missing input falls back to {@link #OTHER}. */
-    static FleetSoftwareCategory of(String fleetSource) {
+    public static FleetSoftwareCategory of(String fleetSource) {
         if (fleetSource != null) {
             for (FleetSoftwareCategory c : values()) {
                 if (c.fleetSources.contains(fleetSource)) {

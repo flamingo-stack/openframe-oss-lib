@@ -1,4 +1,4 @@
-package com.openframe.api.service.rmm.software;
+package com.openframe.api.dto.shared;
 
 import java.util.List;
 

@@ -21,6 +21,7 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import com.openframe.sdk.fleetmdm.model.VulnerabilitiesResponse;
 import com.openframe.sdk.fleetmdm.model.Vulnerability;
+import com.openframe.sdk.fleetmdm.model.VulnerabilityRequest;
 
 import java.io.IOException;
 import java.net.URI;
@@ -465,24 +466,52 @@ public class FleetMdmClient {
         return url.toString();
     }
 
-    /**
-     * List vulnerabilities with pagination.
-     */
     public VulnerabilitiesResponse listVulnerabilities(int page, int perPage) {
         try {
-            HttpResponse<String> response = sendRequest(VULNERABILITIES_URL + "?page=" + page + "&per_page=" + perPage, "GET", null);
-            checkResponse(response, "list Fleet vulnerabilities");
-            return MAPPER.readValue(response.body(), VulnerabilitiesResponse.class);
-        } catch (FleetMdmApiException e) {
-            throw e;
-        } catch (Exception e) {
+            return listVulnerabilities(VulnerabilityRequest.builder().page(page).perPage(perPage).build());
+        } catch (IOException e) {
             throw new FleetMdmException("Failed to list Fleet vulnerabilities", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new FleetMdmException("Interrupted while listing Fleet vulnerabilities", e);
         }
     }
 
-    /**
-     * List all global policies.
-     */
+    public VulnerabilitiesResponse listVulnerabilities(VulnerabilityRequest request) throws IOException, InterruptedException {
+        HttpResponse<String> response = sendRequest(buildVulnerabilitiesQuery(request), "GET", null);
+        checkResponse(response, "list Fleet vulnerabilities");
+        return MAPPER.readValue(response.body(), VulnerabilitiesResponse.class);
+    }
+
+    private static String buildVulnerabilitiesQuery(VulnerabilityRequest request) {
+        StringBuilder url = new StringBuilder(VULNERABILITIES_URL);
+        List<String> params = new ArrayList<>();
+        if (request != null) {
+            if (request.getPage() != null) {
+                params.add("page=" + request.getPage());
+            }
+            if (request.getPerPage() != null) {
+                params.add("per_page=" + request.getPerPage());
+            }
+            if (request.getQuery() != null && !request.getQuery().isBlank()) {
+                params.add("query=" + URLEncoder.encode(request.getQuery(), StandardCharsets.UTF_8));
+            }
+            if (request.getOrderKey() != null && !request.getOrderKey().isBlank()) {
+                params.add("order_key=" + URLEncoder.encode(request.getOrderKey(), StandardCharsets.UTF_8));
+            }
+            if (request.getOrderDirection() != null && !request.getOrderDirection().isBlank()) {
+                params.add("order_direction=" + URLEncoder.encode(request.getOrderDirection(), StandardCharsets.UTF_8));
+            }
+            if (Boolean.TRUE.equals(request.getExploit())) {
+                params.add("exploit=true");
+            }
+        }
+        if (!params.isEmpty()) {
+            url.append("?").append(String.join("&", params));
+        }
+        return url.toString();
+    }
+
     public List<Policy> listPolicies() {
         try {
             HttpResponse<String> response = sendRequest(POLICIES_URL, "GET", null);
@@ -497,9 +526,6 @@ public class FleetMdmClient {
         }
     }
 
-    /**
-     * Get a policy by numeric ID.
-     */
     public Policy getPolicy(long policyId) {
         try {
             HttpResponse<String> response = sendRequest(POLICIES_URL + "/" + policyId, "GET", null);
@@ -512,9 +538,6 @@ public class FleetMdmClient {
         }
     }
 
-    /**
-     * Update an existing policy.
-     */
     public Policy updatePolicy(long policyId, UpdatePolicyRequest request) {
         try {
             HttpResponse<String> response = sendRequest(POLICIES_URL + "/" + policyId, "PATCH", MAPPER.writeValueAsString(request));
@@ -527,9 +550,6 @@ public class FleetMdmClient {
         }
     }
 
-    /**
-     * Create a scheduled query.
-     */
     public Query createScheduledQuery(CreateScheduledQueryRequest request) {
         try {
             HttpResponse<String> response = sendRequest(QUERIES_URL, "POST", MAPPER.writeValueAsString(request));
@@ -542,9 +562,6 @@ public class FleetMdmClient {
         }
     }
 
-    /**
-     * List all scheduled queries (interval > 0).
-     */
     public List<Query> listScheduledQueries() {
         try {
             HttpResponse<String> response = sendRequest(QUERIES_URL, "GET", null);
@@ -559,9 +576,6 @@ public class FleetMdmClient {
         }
     }
 
-    /**
-     * Get a scheduled query by numeric ID.
-     */
     public Query getScheduledQuery(long queryId) {
         try {
             HttpResponse<String> response = sendRequest(QUERIES_URL + "/" + queryId, "GET", null);
@@ -574,9 +588,6 @@ public class FleetMdmClient {
         }
     }
 
-    /**
-     * Update an existing scheduled query.
-     */
     public Query updateScheduledQuery(long queryId, UpdateScheduledQueryRequest request) {
         try {
             HttpResponse<String> response = sendRequest(QUERIES_URL + "/" + queryId, "PATCH", MAPPER.writeValueAsString(request));

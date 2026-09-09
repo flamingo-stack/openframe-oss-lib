@@ -49,6 +49,22 @@ extend type Query {
     """Faceted filter-option counts for the software list — Type / Source / Version-status /
     Vulnerability-severity dropdowns. Mirrors scriptFilters / deviceFilters."""
     softwareFilters(filter: SoftwareFilterInput, search: String): SoftwareFilters!
+
+    """Single global CVE record by id (e.g. "CVE-2024-38063"). Null when Fleet has no record.
+    Populates the vulnerability detail page — includes affected-software list."""
+    vulnerability(cveId: String!): Vulnerability
+
+    """Global list of CVEs across every software title in the tenant's fleet.
+    Powers the Vulnerabilities page. One row = one CVE (not one CVE × software)."""
+    vulnerabilities(
+        filter: VulnerabilityFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): VulnerabilityConnection!
 }
 
 # ────────── Software (aggregate row) ──────────
@@ -206,4 +222,66 @@ input SoftwareOnDeviceFilterInput {
 
 input SoftwareVulnerabilityFilterInput {
     severities: [SoftwareCveSeverity!]
+}
+
+# ────────── Global vulnerability (CVE row) ──────────
+
+"""Global CVE record. Detail-only fields (description, resolvedInVersion, affectedSoftware)
+are null on list rows and populated on the detail page."""
+type Vulnerability {
+    cveId: String!
+
+    """Severity bucketed from CVSS via the NVD ranges (CRITICAL ≥ 9, HIGH ≥ 7, MEDIUM ≥ 4, LOW > 0).
+    Null when Fleet has no CVSS score for the CVE."""
+    severity: SoftwareCveSeverity
+
+    cvssScore: Float
+
+    """Exploit Prediction Scoring System probability (0..1) — Fleet Premium only."""
+    epssProbability: Float
+
+    """True when the CVE is on CISA's Known Exploited Vulnerabilities list — Fleet Premium only."""
+    cisaKnownExploit: Boolean
+
+    """CVE publication timestamp (ISO-8601)."""
+    publishedAt: String
+
+    """External details link Fleet returns (usually NVD)."""
+    detailsLink: String
+
+    """Number of tenant devices affected by any (software, version) pair hit by this CVE."""
+    devicesCount: Int
+
+    # ── Detail-only ──
+    description: String
+    resolvedInVersion: String
+    affectedSoftware: [AffectedSoftware!]
+}
+
+"""One row of the "Affected Software" table on the vulnerability detail page."""
+type AffectedSoftware {
+    id: ID!
+    name: String!
+    source: SoftwareSource
+    version: String
+    devicesCount: Int
+    resolvedInVersion: String
+}
+
+type VulnerabilityConnection {
+    edges: [VulnerabilityEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type VulnerabilityEdge {
+    node: Vulnerability!
+    cursor: String!
+}
+
+input VulnerabilityFilterInput {
+    """Cut-off severity — rows with severity below this are excluded."""
+    minSeverity: SoftwareCveSeverity
+    """True → only CVEs on CISA's Known Exploited Vulnerabilities list."""
+    exploited: Boolean
 }
