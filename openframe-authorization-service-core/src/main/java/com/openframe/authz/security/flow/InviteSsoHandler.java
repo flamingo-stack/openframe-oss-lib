@@ -15,7 +15,6 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
-import java.util.UUID;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
 
@@ -71,17 +70,9 @@ public class InviteSsoHandler implements SsoFlowHandler {
         }
 
         String[] names = resolveNames(request, authentication, user);
-        String givenName = names[0];
-        String familyName = names[1];
-
-        InvitationRegistrationRequest req = InvitationRegistrationRequest.builder()
-                .invitationId(payload.invitationId())
-                .firstName(givenName != null ? givenName : "")
-                .lastName(familyName != null ? familyName : "")
-                .password(UUID.randomUUID().toString())
-                .pictureUrl(resolvePictureUrl(user))
-                .switchTenant(Boolean.TRUE.equals(payload.switchTenant()))
-                .build();
+        InvitationRegistrationRequest req = InvitationRegistrationRequest.fromSso(
+                payload.invitationId(), names[0], names[1], resolvePictureUrl(user),
+                Boolean.TRUE.equals(payload.switchTenant()));
 
         var userCreated = invitationRegistrationService.registerByInvitation(req);
         String targetTenantId = userCreated.getTenantId();

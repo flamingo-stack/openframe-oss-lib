@@ -12,6 +12,7 @@ import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
+import com.openframe.authz.util.SsoAuthentication;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
 import jakarta.servlet.http.Cookie;
@@ -21,7 +22,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
@@ -139,9 +139,8 @@ public class LoginSsoHandler implements SsoFlowHandler {
     }
 
     private String registrationId(Authentication authentication, SsoLoginCookiePayload payload) {
-        return authentication instanceof OAuth2AuthenticationToken token
-                ? token.getAuthorizedClientRegistrationId()
-                : payload.provider();
+        String rid = SsoAuthentication.registrationId(authentication);
+        return rid != null ? rid : payload.provider();
     }
 
     /**

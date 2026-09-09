@@ -14,6 +14,7 @@ import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.sso.SsoLoginService;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import com.openframe.authz.util.OidcUserUtils;
+import com.openframe.authz.util.SsoAuthentication;
 import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.authz.web.Redirects;
 import jakarta.servlet.http.Cookie;
@@ -25,7 +26,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -228,11 +228,8 @@ public class SsoLoginController {
     }
 
     private OidcUser requireSessionOidcUser(Authentication authentication) {
-        if (authentication instanceof OAuth2AuthenticationToken token
-                && token.getPrincipal() instanceof OidcUser user) {
-            return user;
-        }
-        throw new IllegalStateException("Your sign-in session expired. Please sign in again.");
+        return SsoAuthentication.oidcUser(authentication)
+                .orElseThrow(() -> new IllegalStateException("Your sign-in session expired. Please sign in again."));
     }
 
     private SsoLoginCookiePayload requireLoginFlowCookie(HttpServletRequest request) {
