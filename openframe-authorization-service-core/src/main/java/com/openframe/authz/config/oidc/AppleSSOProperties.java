@@ -20,6 +20,20 @@ public class AppleSSOProperties extends AbstractOidcProviderProperties {
 
     public static final String APPLE = "apple";
 
+    @Override
+    public String providerId() {
+        return APPLE;
+    }
+
+    /** Apple additionally needs teamId and keyId to mint the client-secret JWT. */
+    @Override
+    public boolean isConfigured() {
+        return getDefaultClientId() != null && !getDefaultClientId().isBlank()
+                && getDefaultClientSecret() != null && !getDefaultClientSecret().isBlank()
+                && getDefaultTeamId() != null && !getDefaultTeamId().isBlank()
+                && getDefaultKeyId() != null && !getDefaultKeyId().isBlank();
+    }
+
     /** Apple Developer Team ID — the issuer of the client-secret JWT. */
     private String defaultTeamId;
 
