@@ -38,8 +38,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.openframe.api.util.AuthPrincipalUtils.*;
 import static org.springframework.util.StringUtils.hasText;
@@ -62,6 +65,7 @@ public class TicketService {
     private final TicketRepository ticketRepository;
     private final TicketNumberService ticketNumberService;
     private final TicketTagService ticketTagService;
+    private final TicketIdsForFilter ticketIdsForFilter;
     private final MachineRepository machineRepository;
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
@@ -86,7 +90,7 @@ public class TicketService {
                 principal.getActorType(), filter, pagination, search, sort);
 
         CursorPaginationCriteria paging = (pagination != null ? pagination : new CursorPaginationCriteria()).normalize();
-        Query query = buildTicketQuery(filter, search, ownerMachineId);
+        Query query = buildTicketQuery(principal, filter, search, ownerMachineId);
         long filteredCount = ticketRepository.countTickets(query);
 
         String sortField = validateSortField(sort);
@@ -471,7 +475,7 @@ public class TicketService {
         validateAdminAccess(principal);
         log.info("Archiving resolved tickets by: {}, filter: {}", principal.getDisplayName(), filter);
 
-        List<String> archivedIds = ticketLifecycleService.archiveResolvedTickets(filter);
+        List<String> archivedIds = ticketLifecycleService.archiveResolvedTickets(principal, filter);
         listeners.forEach(listener -> listener.onTicketsArchived(archivedIds, principal));
         log.info("Archived {} resolved tickets", archivedIds.size());
         return archivedIds.size();
@@ -540,14 +544,10 @@ public class TicketService {
         };
     }
 
-    private Query buildTicketQuery(TicketFilterInput filter, String search, String ownerMachineId) {
+    private Query buildTicketQuery(AuthPrincipal principal, TicketFilterInput filter,
+                                   String search, String ownerMachineId) {
         TicketQueryFilter queryFilter = toQueryFilter(filter);
-
-        List<String> restrictToTicketIds = null;
-        if (filter != null && filter.getTagIds() != null && !filter.getTagIds().isEmpty()) {
-            restrictToTicketIds = ticketTagService.getTicketIdsByTagIds(filter.getTagIds());
-        }
-
+        List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filter);
         return ticketRepository.buildTicketQuery(queryFilter, search, restrictToTicketIds, ownerMachineId);
     }
 

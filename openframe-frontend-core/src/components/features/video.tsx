@@ -34,7 +34,9 @@ import MuxPlayer from '@mux/mux-player-react';
 import type React from 'react';
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useAuthedAssetSrc } from '../../hooks/use-authed-asset-src';
+import { useNearViewport } from '../../hooks/use-near-viewport';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { Button } from '../ui/button';
 import { useIosNativeVideoFullscreen } from './use-ios-native-video-fullscreen';
 import { saveDataEnabled } from './use-video-warmup';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
@@ -281,6 +283,76 @@ export function extractYouTubeId(url: string): string | null {
 }
 
 // =============================================================================
+// Playback-failure handling
+// =============================================================================
+//
+// A stalled or errored player leaves the user on an endless spinner with no way
+// out. Every failure surfaces a retry (`VideoErrorOverlay`) and is reported on
+// a `window` CustomEvent the host subscribes to — no vendor analytics global is
+// touched from here; this package ships to consumers that load different (or
+// no) analytics.
+
+export type VideoFailureKind = 'file' | 'youtube';
+/** `stall`: buffering that never cleared while playback was expected. */
+export type VideoFailureReason = 'error' | 'stall';
+
+export interface VideoPlaybackFailureDetail {
+  kind: VideoFailureKind;
+  /** File URL or YouTube video id — enough to group failures by source. */
+  src: string;
+  reason: VideoFailureReason;
+  /** YouTube IFrame API error code, when the embed reported one. */
+  errorCode?: number;
+}
+
+export const VIDEO_PLAYBACK_FAILED_EVENT = 'flamingo:video-playback-failed';
+
+function reportPlaybackFailure(detail: VideoPlaybackFailureDetail): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(VIDEO_PLAYBACK_FAILED_EVENT, { detail }));
+  } catch {
+    // Analytics must never break playback recovery.
+  }
+}
+
+// Buffering longer than this while playback is expected reads as "broken", not
+// "loading" — surface a retry instead of spinning forever. This is what an
+// `error` callback alone misses: a video that played, then stalled mid-way.
+const VIDEO_STALL_TIMEOUT_MS = 15_000;
+
+/** `watchOnYouTubeId` adds the one recovery that survives an embed the owner
+ *  disabled: opening the video on YouTube itself. */
+function VideoErrorOverlay({
+  onRetry,
+  watchOnYouTubeId,
+}: {
+  onRetry: () => void;
+  watchOnYouTubeId?: string;
+}): React.ReactElement {
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-[var(--spacing-system-sf)] bg-ods-overlay p-[var(--spacing-system-lf)] text-center">
+      <p className="text-ods-text-secondary text-h6">This video failed to play.</p>
+      <div className="flex items-center gap-[var(--spacing-system-sf)]">
+        <Button variant="outline" size="small" onClick={onRetry}>
+          Try again
+        </Button>
+        {watchOnYouTubeId ? (
+          <Button
+            variant="transparent"
+            size="small"
+            href={`https://www.youtube.com/watch?v=${watchOnYouTubeId}`}
+            openInNewTab
+          >
+            Watch on YouTube
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
 // Props
 // =============================================================================
 
@@ -325,6 +397,14 @@ interface VideoCommonProps {
   className?: string;
   /** Accessible label (used as YT facade title; ignored for file branch). */
   title?: string;
+  /**
+   * Mount the player only once its box comes near the viewport (shared
+   * fire-once IntersectionObserver, `NEAR_VIEWPORT_ROOT_MARGIN` lookahead).
+   * Until then the box shows the poster (or nothing) — the caller's container
+   * still owns the size, so nothing shifts when the player mounts. For grids
+   * of players: a library of 20 clips costs 20 posters, not 20 players.
+   */
+  lazy?: boolean;
   /**
    * YouTube-only: hide YT player chrome (controls, info, fullscreen, related
    * videos, keyboard shortcuts). Used for marketing/landing-page embeds that
@@ -481,11 +561,30 @@ export type VideoProps = VideoFileProps | VideoYouTubeProps | VideoAutoProps;
 // =============================================================================
 
 export function Video(props: VideoProps): React.ReactElement | null {
+  // Hooks run unconditionally; the gate only applies when `lazy` is set.
+  const { ref: nearRef, isNear } = useNearViewport<HTMLDivElement>();
   const url = props.url;
   if (!url) return null;
 
   const effectiveKind = resolveKind(props, url);
   const layout = props.layout ?? 'native';
+
+  if (props.lazy && !isNear) {
+    // Same box, poster only: the observer target IS the reserved space.
+    return wrapWithLayout(
+      <div
+        ref={nearRef}
+        className={props.className}
+        style={
+          props.poster
+            ? { backgroundImage: `url(${props.poster})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+            : undefined
+        }
+        aria-hidden="true"
+      />,
+      layout,
+    );
+  }
 
   const inner =
     effectiveKind === 'youtube' ? (
@@ -690,11 +789,13 @@ function FilePlayer({
   const hoverPlayerRef = useRef<{
     play?: () => Promise<void> | void;
     pause?: () => void;
+    load?: () => void;
     muted?: boolean;
     volume?: number;
     currentTime?: number;
     duration?: number;
     paused?: boolean;
+    ended?: boolean;
     addEventListener?: (type: string, listener: () => void) => void;
     removeEventListener?: (type: string, listener: () => void) => void;
   } | null>(null);
@@ -1100,9 +1201,93 @@ function FilePlayer({
     );
   }
 
+  // Only chrome-bearing surfaces (a user actively watching) monitor health —
+  // decorative first-frame and hover previews pass `chromeless` and stay silent.
+  const monitorHealth = !chromeless;
+  const [playbackFailed, setPlaybackFailed] = useState(false);
+  const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearStallTimer = useCallback(() => {
+    if (stallTimerRef.current !== null) {
+      clearTimeout(stallTimerRef.current);
+      stallTimerRef.current = null;
+    }
+  }, []);
+  useEffect(() => clearStallTimer, [clearStallTimer]);
+
+  const failPlayback = useCallback(
+    (reason: VideoFailureReason) => {
+      clearStallTimer();
+      setPlaybackFailed(true);
+      reportPlaybackFailure({ kind: 'file', src: url, reason });
+    },
+    [clearStallTimer, url],
+  );
+
+  // A manually paused or finished video is never a stall.
+  const armStallTimer = useCallback(() => {
+    if (!monitorHealth) return;
+    const el = hoverPlayerRef.current;
+    if (!el || el.paused || el.ended) return;
+    if (stallTimerRef.current !== null) return;
+    stallTimerRef.current = setTimeout(() => {
+      stallTimerRef.current = null;
+      failPlayback('stall');
+    }, VIDEO_STALL_TIMEOUT_MS);
+  }, [monitorHealth, failPlayback]);
+
+  // Progress means the player is alive — a stall that self-heals clears its own
+  // overlay.
+  const handlePlaybackProgress = useCallback(() => {
+    clearStallTimer();
+    setPlaybackFailed(false);
+  }, [clearStallTimer]);
+
+  const handleMediaError = useCallback(() => {
+    if (!monitorHealth) return;
+    failPlayback('error');
+  }, [monitorHealth, failPlayback]);
+
+  // `load()` re-inits the HLS pipeline (`play()` alone can't) but rewinds to
+  // zero — stash the position and seek back on `loadedmetadata`, since an
+  // earlier assignment is dropped while the fresh source has no seekable range.
+  const retryPlayback = useCallback(() => {
+    setPlaybackFailed(false);
+    clearStallTimer();
+    const el = hoverPlayerRef.current;
+    if (!el) return;
+    const resumeAt = typeof el.currentTime === 'number' ? el.currentTime : 0;
+    try {
+      el.load?.();
+      if (resumeAt > 0 && el.addEventListener && el.removeEventListener) {
+        const seekBack = () => {
+          el.removeEventListener?.('loadedmetadata', seekBack);
+          try {
+            el.currentTime = resumeAt;
+          } catch {
+            /* source shorter than the stashed position — start from the top */
+          }
+        };
+        el.addEventListener('loadedmetadata', seekBack);
+      }
+      (el.play?.() as Promise<void> | undefined)?.catch?.(() => {
+        /* a re-rejected play surfaces again via the error/stall handlers */
+      });
+    } catch {
+      /* element torn down */
+    }
+  }, [clearStallTimer]);
+
+  const errorOverlay = monitorHealth && playbackFailed ? <VideoErrorOverlay onRetry={retryPlayback} /> : null;
+
   const player = (
     <MuxPlayer
       ref={hoverPlayerRef as React.Ref<never>}
+      onError={handleMediaError}
+      onWaiting={armStallTimer}
+      onStalled={armStallTimer}
+      onPlaying={handlePlaybackProgress}
+      onTimeUpdate={handlePlaybackProgress}
+      onPause={clearStallTimer}
       src={url}
       poster={poster || undefined}
       streamType="on-demand"
@@ -1187,26 +1372,18 @@ function FilePlayer({
       <div className="relative h-full w-full" onPointerEnter={handleHoverEnter} onPointerLeave={handleHoverLeave}>
         {player}
         {unmuteBadge}
+        {errorOverlay}
       </div>
     );
   }
-  if (hoverControlled) {
+  // A relative wrapper so the unmute badge and the error overlay can dock. The
+  // bare `player` return is left only for chromeless previews (never monitored).
+  if (hoverControlled || autoPlayUnmuted || startMuted || monitorHealth) {
     return (
       <div className="relative h-full w-full">
         {player}
         {unmuteBadge}
-      </div>
-    );
-  }
-  // Handoff surfaces (autoPlayUnmuted / startMuted) need the relative wrapper so
-  // the internal center unmute badge can dock — the bare branch has none. Hosts
-  // that render their OWN control pass hideMutedBadge (unmuteBadge is null then,
-  // but the wrapper is harmless).
-  if (autoPlayUnmuted || startMuted) {
-    return (
-      <div className="relative h-full w-full">
-        {player}
-        {unmuteBadge}
+        {errorOverlay}
       </div>
     );
   }
@@ -1288,6 +1465,9 @@ const YT_PLAYING_BLUR_DELAY_MS = 1000;
 interface YouTubeInfoDeliveryMessage {
   event?: string;
   info?: { playerState?: number };
+  /** `onError` carries its code as a bare number in `info`, not an object:
+   *  `{"event":"onError","info":150}` (101/150 = embedding disabled). */
+  errorCode?: number;
 }
 
 /**
@@ -1307,6 +1487,7 @@ function toYouTubeMessage(parsed: unknown): YouTubeInfoDeliveryMessage | null {
   return {
     event: typeof event === 'string' ? event : undefined,
     info: { playerState: typeof playerState === 'number' ? playerState : undefined },
+    errorCode: typeof info === 'number' ? info : undefined,
   };
 }
 
@@ -1320,7 +1501,17 @@ function YouTubeFacadeInner({
   suspended,
 }: YouTubeFacadeInnerProps): React.ReactElement {
   const [activated, setActivated] = useState(Boolean(autoActivate));
+  // The embed reported a hard player error (see the `onError` branch below).
+  // Retry remounts the iframe via `reloadNonce` — a fresh element, since there
+  // is no way to re-init a cross-origin player from outside.
+  const [failed, setFailed] = useState(false);
+  const [reloadNonce, setReloadNonce] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  const retry = useCallback(() => {
+    setFailed(false);
+    setReloadNonce(n => n + 1);
+  }, []);
 
   // Embed URL + poster URLs only change when `videoId` or `minimalControls`
   // do — memoize so we don't rebuild URLSearchParams on every render.
@@ -1414,7 +1605,7 @@ function YouTubeFacadeInner({
   // end-of-video (ENDED).
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!activated) return undefined;
+    if (!activated || failed) return undefined;
     const iframe = iframeRef.current;
     if (!iframe) return undefined;
 
@@ -1427,6 +1618,10 @@ function YouTubeFacadeInner({
 
     let blurTimer: ReturnType<typeof setTimeout> | null = null;
 
+    // No "never reached PLAYING within N seconds" watchdog on purpose: an embed
+    // whose unmuted autoplay Safari/iOS blocked, or one whose jsapi channel is
+    // dead, is healthy and silent — a timeout would tear those down, and retry
+    // would re-arm it. Only an explicit `onError` is a definitive failure.
     function handleMessage(event: MessageEvent) {
       if (event.origin !== YT_NOCOOKIE_ORIGIN) return;
       if (typeof event.data !== 'string') return;
@@ -1436,7 +1631,13 @@ function YouTubeFacadeInner({
       } catch {
         return;
       }
-      if (!payload || payload.event !== 'infoDelivery') return;
+      if (!payload) return;
+      if (payload.event === 'onError') {
+        setFailed(true);
+        reportPlaybackFailure({ kind: 'youtube', src: videoId, reason: 'error', errorCode: payload.errorCode });
+        return;
+      }
+      if (payload.event !== 'infoDelivery') return;
       const state = payload.info?.playerState;
       if (typeof state !== 'number') return;
 
@@ -1459,7 +1660,7 @@ function YouTubeFacadeInner({
       window.removeEventListener('message', handleMessage);
       if (blurTimer !== null) clearTimeout(blurTimer);
     };
-  }, [activated]);
+  }, [activated, failed, reloadNonce, videoId]);
 
   // Close-side pause: a closing dialog flips `suspended` false→true. Post the
   // pauseVideo command over the same enablejsapi channel so the iframe stops
@@ -1482,10 +1683,19 @@ function YouTubeFacadeInner({
   const wrapperClass = `relative w-full ${className ?? ''}`;
   const wrapperStyle = { paddingBottom: '56.25%' as const };
 
+  if (activated && failed) {
+    return (
+      <div className={wrapperClass} style={wrapperStyle}>
+        <VideoErrorOverlay onRetry={retry} watchOnYouTubeId={videoId} />
+      </div>
+    );
+  }
+
   if (activated) {
     return (
       <div className={wrapperClass} style={wrapperStyle}>
         <iframe
+          key={reloadNonce}
           ref={iframeRef}
           src={embedUrl}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

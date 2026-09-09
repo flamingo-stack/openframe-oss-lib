@@ -45,6 +45,7 @@ export const PLATFORM_DOMAINS: readonly PlatformDomainEntry[] = [
   // ⚠️ DO NOT REORDER — enforced by the module-load self-check at the bottom of this file.
   { key: 'flamingo', defaultUrl: 'https://www.flamingo.run', envVar: 'NEXT_PUBLIC_FLAMINGO_URL' },
   { key: 'tmcg', defaultUrl: 'https://www.tmcg.miami', envVar: 'NEXT_PUBLIC_TMCG_URL' },
+  { key: 'mlg', defaultUrl: 'https://www.mlg.soccer', envVar: 'NEXT_PUBLIC_MLG_URL' },
   {
     key: 'flamingo-teaser',
     defaultUrl: 'https://www.flamingo.run',
@@ -89,6 +90,7 @@ const ENV_OVERRIDES = {
   NEXT_PUBLIC_OPENMSP_URL: process.env.NEXT_PUBLIC_OPENMSP_URL,
   NEXT_PUBLIC_FLAMINGO_URL: process.env.NEXT_PUBLIC_FLAMINGO_URL,
   NEXT_PUBLIC_TMCG_URL: process.env.NEXT_PUBLIC_TMCG_URL,
+  NEXT_PUBLIC_MLG_URL: process.env.NEXT_PUBLIC_MLG_URL,
   NEXT_PUBLIC_OPENFRAME_URL: process.env.NEXT_PUBLIC_OPENFRAME_URL,
   NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL: process.env.NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL,
 } satisfies Record<EnvVarKey, string | undefined>;

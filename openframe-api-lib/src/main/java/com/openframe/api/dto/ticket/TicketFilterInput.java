@@ -25,6 +25,8 @@ public class TicketFilterInput {
     private List<String> assigneeIds;
     @Size(max = 20)
     private List<String> tagIds;
+    /** true keeps only tickets the caller has unread notifications about; false and null do not filter. */
+    private Boolean hasUnreadNotifications;
     //TODO Backward compatibility alias. Remove after FE alignment
     @Deprecated
     private List<String> labelIds;

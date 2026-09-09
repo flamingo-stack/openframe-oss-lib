@@ -136,7 +136,6 @@ export function extractIncompleteMessageState(
       //   backend has already abandoned.
       case 'text':
       case 'thinking':
-      case 'guide':
       case 'ask':
       case 'ticket_escalated':
       case 'ticket_event':

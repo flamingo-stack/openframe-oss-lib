@@ -1,6 +1,7 @@
 'use client';
 
 import React, { forwardRef, memo, useEffect, useMemo, useRef } from 'react';
+import { createCardMarkerScanner } from '../../chat-protocol/card-marker';
 import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
 import { formatDate, formatTime } from '../../utils/format-date';
@@ -16,7 +17,6 @@ import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
-import { GuideDisplay } from './guide-display';
 import { remarkCardLinks } from './remark-card-links';
 import { remarkMentionChips } from './remark-mention-chips';
 import { remarkStripCitations } from './remark-strip-citations';
@@ -37,13 +37,10 @@ import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedPro
  *  `scheduledScript`); id is the mention-token charset. */
 const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-zA-Z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g;
 
-/**
- * Same regex shape as `remarkCardLinks` — kept in lockstep so the
- * pre-scan and the remark plugin see the SAME set of markers. If the
- * grammar widens (today: snake_case OR kebab-case; closer `]` OR `)`),
- * both files must update.
- */
-const CARD_MARKER_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g;
+/** Scanner for `[card://type:id]` in answer text. Built from the shared
+ *  grammar so the body renderer and the metadata decoder cannot disagree on
+ *  what a marker is — see `chat-protocol/card-marker.ts`. */
+const CARD_MARKER_REGEX = createCardMarkerScanner();
 
 /** Timestamp label: today's messages show time only ("2:47 PM"),
  *  older messages prepend a locale-formatted date ("05/05/2026 2:47 PM"
@@ -104,6 +101,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       renderContextItem,
       renderMention,
       renderEntityCard,
+      refs,
       onAskSelect,
       NavLinkAnchor,
       ...props
@@ -181,8 +179,28 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // (and its open menu) survives across chunks. Invalidated per key when the
     // render fn identity changes.
     const renderedCardNodeCache = useRef(
-      new Map<string, { render: ((ref: ChatRef) => React.ReactNode) | undefined; node: React.ReactNode }>(),
+      new Map<
+        string,
+        {
+          render: ((ref: ChatRef) => React.ReactNode) | undefined;
+          /** The descriptor the node was built from. Part of the cache identity
+           *  because metadata can arrive AFTER the marker was first rendered —
+           *  a card mounted from the bare `{type, id}` descriptor has to be
+           *  rebuilt once its real title and URL land. */
+          ref: ChatRef | undefined;
+          node: React.ReactNode;
+        }
+      >(),
     );
+
+    /** The answer's own references, by `type:id`. What turns a bare marker into
+     *  a card with a title and a link, without a per-entity lookup the host may
+     *  not even have an API for. */
+    const refByKey = useMemo(() => {
+      const byKey = new Map<string, ChatRef>();
+      for (const described of refs ?? []) byKey.set(`${described.type}:${described.id}`, described);
+      return byKey;
+    }, [refs]);
 
     /**
      * Per-message rendering plan for `[card://type:id]` markers.
@@ -226,12 +244,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       // duplicates so two siblings never collide on the same React key.
       const emittedBlockKeys = new Set<string>();
       segments.forEach((segment, segIdx) => {
-        // Both markdown-bearing segment types take part: a `guide` body is
-        // authored by the same LLM and carries the same `[card://]` markers,
-        // so skipping it here left its markers with no `inlineByKey` entry and
-        // no hoisted card — the `<a card://>` override silently degraded them
-        // to a bare title / id.
-        if (segment.type !== 'text' && segment.type !== 'guide') return;
+        if (segment.type !== 'text') return;
         const text = segment.text;
         const parts: SegmentPart[] = [];
         let cursor = 0;
@@ -247,8 +260,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           // stops React from re-mounting the card (and closing its open
           // menu / re-fetching) on every stream chunk. Also dedups the same
           // key emitted twice within one message.
+          // The answer's metadata wins when it described this reference: it
+          // carries the title, URL and source the wire marker cannot.
+          const describedRef = refByKey.get(key);
           let entry = cache.get(key);
-          if (!entry || entry.render !== render) {
+          if (!entry || entry.render !== render || entry.ref !== describedRef) {
             // The marker is the ONLY data on the wire: cards hydrate by id
             // from the host's per-object APIs, so a minimal {type, id}
             // descriptor is all the renderer needs to mount the loader.
@@ -263,13 +279,13 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             // the id rather than `undefined`) and `url` to null (matches
             // the no-link semantics fetch-mode cards rely on — they
             // resolve their own URL after fetch).
-            const refForRender: ChatRef = {
+            const refForRender: ChatRef = describedRef ?? {
               type: cardType,
               id: cardId,
               title: cardId,
               url: null,
             };
-            entry = { render, node: render(refForRender) };
+            entry = { render, ref: describedRef, node: render(refForRender) };
             cache.set(key, entry);
           }
           const rendered = entry.node;
@@ -332,7 +348,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         }
       });
       return { inlineByKey, partsBySegment, usedKeys };
-    }, [hasMarkerSupport, renderEntityCard, segments]);
+    }, [hasMarkerSupport, renderEntityCard, refByKey, segments]);
 
     // Drop cached nodes for markers no longer present so the cache can't grow
     // unbounded as a long message's markers change. Deliberately an EFFECT,
@@ -608,12 +624,6 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       {renderSegmentBody(index, segment.text, segmentIsStreaming)}
                     </div>
                   );
-                } else if (segment.type === 'guide') {
-                  return (
-                    <GuideDisplay key={index}>
-                      {renderSegmentBody(index, segment.text, segmentIsStreaming)}
-                    </GuideDisplay>
-                  );
                 } else if (segment.type === 'ask') {
                   // Only the run's head draws — the tail segments are pages of
                   // the card already rendered above them.
@@ -728,6 +738,9 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // equality holds across streaming chunks.
     prevProps.renderMention === nextProps.renderMention &&
     prevProps.renderEntityCard === nextProps.renderEntityCard &&
+    // Reference equality: the reducer sets this once per answer and the host
+    // forwards the same array instance, so it holds across streaming chunks.
+    prevProps.refs === nextProps.refs &&
     // Same stability contract as the renderers above: hosts pass a `useCallback`
     // (EmbeddableChat passes its memoized `handleSend`), so this holds across
     // streaming chunks instead of re-rendering every ask card per chunk.

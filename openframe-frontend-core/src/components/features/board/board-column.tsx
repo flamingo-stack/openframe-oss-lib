@@ -18,8 +18,9 @@ import { useLaneScrollAnchor } from './use-lane-scroll-anchor';
 export interface BoardColumnProps {
   column: BoardColumnDef;
   collapsed?: boolean;
-  /** Takes the id so the board can pass one stable handler to every lane. */
-  onToggleCollapse: (columnId: string) => void;
+  /** Takes the id so the board can pass one stable handler to every lane.
+   *  Absent = the lane cannot collapse and renders no collapse arrow. */
+  onToggleCollapse?: (columnId: string) => void;
   onAddTicket?: (columnId: string) => void;
   onArchive?: (columnId: string) => void;
   getTicketHref?: (ticketId: string) => string;
@@ -30,6 +31,16 @@ export interface BoardColumnProps {
   loadMoreRootMargin?: string;
   joinLeft?: boolean;
   joinRight?: boolean;
+  /**
+   * The touch-pager variant of the lane: registers NO drag-and-drop at all (no
+   * drop target, no auto-scroll, cards forced non-draggable — the HTML5 drag
+   * events Pragmatic builds on never fire under touch) and words the empty
+   * state without "drag". Everything else — header, collapse, load-more — is
+   * the same lane.
+   */
+  touchMode?: boolean;
+  /** Merged last, so the touch pager can override the fixed lane width. */
+  className?: string;
 }
 
 /** Memoized: `Board` rebuilds only the two columns a drag touches, so the
@@ -49,6 +60,8 @@ export const BoardColumn = memo(function BoardColumnImpl({
   loadMoreRootMargin = '200px 0px',
   joinLeft = false,
   joinRight = false,
+  touchMode = false,
+  className,
 }: BoardColumnProps) {
   // The drop zone is the WHOLE lane, header included — not just the list. A
   // target that stops at the list leaves dead strips (the header, the padding)
@@ -63,7 +76,7 @@ export const BoardColumn = memo(function BoardColumnImpl({
 
   useEffect(() => {
     const element = laneRef.current;
-    if (!element || collapsed || column.dropDisabled) return undefined;
+    if (!element || collapsed || touchMode || column.dropDisabled) return undefined;
 
     return dropTargetForElements({
       element,
@@ -94,11 +107,11 @@ export const BoardColumn = memo(function BoardColumnImpl({
       onDragLeave: () => setIsOver(false),
       onDrop: () => setIsOver(false),
     });
-  }, [column.id, column.dropDisabled, column.allowedFromColumns, collapsed]);
+  }, [column.id, column.dropDisabled, column.allowedFromColumns, collapsed, touchMode]);
 
   // The header's own prop stays zero-arg; the id is bound here, where it is
   // already known, rather than by the board building one closure per lane.
-  const handleToggleCollapse = useCallback(() => onToggleCollapse(column.id), [onToggleCollapse, column.id]);
+  const handleToggleCollapse = useCallback(() => onToggleCollapse?.(column.id), [onToggleCollapse, column.id]);
 
   return (
     <div
@@ -111,13 +124,14 @@ export const BoardColumn = memo(function BoardColumnImpl({
         joinLeft && 'rounded-l-none border-l-0',
         joinRight && 'rounded-r-none',
         isOver && 'outline outline-2 -outline-offset-2 outline-ods-focus',
+        className,
       )}
       style={column.system ? undefined : { backgroundColor: tintOnDark(column.color) }}
     >
       <BoardColumnHeader
         column={column}
         collapsed={collapsed}
-        onToggleCollapse={handleToggleCollapse}
+        onToggleCollapse={onToggleCollapse ? handleToggleCollapse : undefined}
         onAddTicket={!collapsed && onAddTicket ? () => onAddTicket(column.id) : undefined}
         onArchive={!collapsed && column.archivable && onArchive ? () => onArchive(column.id) : undefined}
       />
@@ -132,6 +146,7 @@ export const BoardColumn = memo(function BoardColumnImpl({
             onReject={onReject}
             onLoadMore={onLoadMore}
             loadMoreRootMargin={loadMoreRootMargin}
+            touchMode={touchMode}
           />
         </>
       )}
@@ -147,6 +162,7 @@ interface ColumnBodyProps {
   onReject?: (ticketId: string, requestId?: string) => void | Promise<void>;
   onLoadMore?: (columnId: string) => void;
   loadMoreRootMargin: string;
+  touchMode: boolean;
 }
 
 function ColumnBody({
@@ -157,6 +173,7 @@ function ColumnBody({
   onReject,
   onLoadMore,
   loadMoreRootMargin,
+  touchMode,
 }: ColumnBodyProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -168,11 +185,12 @@ function ColumnBody({
   // the board is below exactly one column. The page's own scrollers are
   // registered once by the board, not once per lane: registering them here gave
   // `<main>` one auto-scroller per column, all pulling at the same time.
+  // Touch mode registers nothing: there is no drag to scroll for.
   useEffect(() => {
     const element = scrollRef.current;
-    if (!element) return undefined;
+    if (!element || touchMode) return undefined;
     return autoScrollColumn(element);
-  }, []);
+  }, [touchMode]);
 
   // Refreshed in an unconditional effect, declared before the observer effect
   // so it wins the same flush. Not in the render body: a render attempt React
@@ -218,7 +236,7 @@ function ColumnBody({
       {column.isLoading ? (
         <SkeletonStack />
       ) : column.tickets.length === 0 ? (
-        <EmptyState columnId={column.id} />
+        <EmptyState columnId={column.id} touchMode={touchMode} />
       ) : (
         column.tickets.map(t => (
           <TicketCard
@@ -230,8 +248,8 @@ function ColumnBody({
             renderAssignSlot={renderAssignSlot}
             onApprove={onApprove}
             onReject={onReject}
-            dragDisabled={column.dragDisabled}
-            dropDisabled={column.dropDisabled}
+            dragDisabled={touchMode || column.dragDisabled}
+            dropDisabled={touchMode || column.dropDisabled}
             allowedFromColumns={column.allowedFromColumns}
           />
         ))
@@ -257,7 +275,7 @@ function SkeletonStack({ count = 4 }: { count?: number }) {
 
 /** Also carries the insertion line when a drop is aimed here, since the lane has
  *  no card to hang it off. */
-function EmptyState({ columnId }: { columnId: string }) {
+function EmptyState({ columnId, touchMode }: { columnId: string; touchMode: boolean }) {
   const aim = useDropAim();
   if (aim && aim.columnId === columnId) {
     return <div aria-hidden {...{ [DROP_LINE_ATTRIBUTE]: '' }} className="h-0.5 shrink-0 rounded-full bg-ods-accent" />;
@@ -267,7 +285,12 @@ function EmptyState({ columnId }: { columnId: string }) {
       <TagIcon className="h-6 w-6 shrink-0" />
       <div className="flex w-full flex-col">
         <p className="text-h4">No tickets here</p>
-        <p className="text-h6">Drag a ticket here or change its status to move it to this column</p>
+        <p className="text-h6">
+          {/* No drag to offer on touch — a ticket arrives here by a status change. */}
+          {touchMode
+            ? "Change a ticket's status to move it to this column"
+            : 'Drag a ticket here or change its status to move it to this column'}
+        </p>
       </div>
     </div>
   );

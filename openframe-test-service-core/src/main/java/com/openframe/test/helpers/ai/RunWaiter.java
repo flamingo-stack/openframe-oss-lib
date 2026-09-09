@@ -48,6 +48,17 @@ public class RunWaiter {
     /** Consecutive IDLE observations required before declaring completion (guards the lock-acquire race). */
     private static final int IDLE_CONFIRMATIONS = 2;
 
+    /**
+     * Attempts at resolving one approval when the dialog comes back locked, the first attempt included.
+     * <p>
+     * Four rather than one because the lock clears on its own, and small because it is not free: the
+     * endpoint has been seen taking ~5s to answer a locked request, so the worst case here is on the order
+     * of half a minute and every second of it is spent inside the run's own {@code timeoutSeconds}.
+     */
+    private static final int APPROVAL_LOCK_ATTEMPTS = 4;
+    /** First backoff before re-approving a locked dialog; doubles per attempt. */
+    private static final long APPROVAL_LOCK_BACKOFF_MS = 1000;
+
     private final int timeoutSeconds;
 
     public RunWaiter() {
@@ -149,13 +160,51 @@ public class RunWaiter {
      * {@link #isUnresolvableByCaller} already filters out the case we know cannot succeed, so reaching this
      * failure means something outside that pattern went wrong — the type is included because it is the
      * first thing worth knowing.
+     * <p>
+     * <b>A locked dialog is retried here.</b> The gate above approves the moment an
+     * {@code APPROVAL_REQUEST} appears in the stream, which can be while the turn that emitted it is still
+     * running; the server then answers {@code 409 DIALOG_LOCKED} and, left alone, the case fails on a race
+     * instead of on the product. Retrying is the whole fix, because the lock is released when that turn
+     * ends — only a lock that never clears reaches the assertion below.
+     * <p>
+     * Waiting for {@code streamState} to reach IDLE <em>before</em> approving would be the other way to
+     * close the window, and is deliberately not what this does: the server reports a dialog carrying a
+     * pending approval as busy, so that risks waiting on a state only our own approval can produce.
      */
     private static void resolve(String approvalRequestId, boolean approve, ApprovalType approvalType) {
+        DialogLockedException locked = null;
+        for (int attempt = 1; attempt <= APPROVAL_LOCK_ATTEMPTS; attempt++) {
+            try {
+                ApprovalApi.approve(approvalRequestId, approve);
+                return;
+            } catch (DialogLockedException e) {
+                locked = e;
+                log.info("Approval {} found the dialog still locked (attempt {}/{}); the run had not released it yet",
+                        approvalRequestId, attempt, APPROVAL_LOCK_ATTEMPTS);
+                if (attempt < APPROVAL_LOCK_ATTEMPTS) {
+                    lockBackoff(attempt);
+                }
+            } catch (AssertionError e) {
+                throw new AssertionError(e.getMessage()
+                        + String.format("%nThe request's approvalType was %s.", approvalType), e);
+            }
+        }
+
+        throw new AssertionError(locked.getMessage()
+                + String.format("%nThe request's approvalType was %s.", approvalType)
+                + String.format("%nThe dialog was still locked after %d attempts.", APPROVAL_LOCK_ATTEMPTS),
+                locked);
+    }
+
+    /** Exponential backoff in front of approval retry number {@code attempt + 1}. */
+    private static void lockBackoff(int attempt) {
+        long delay = APPROVAL_LOCK_BACKOFF_MS * (1L << (attempt - 1));
+        log.debug("Backing off {} ms before re-approving the locked dialog", delay);
         try {
-            ApprovalApi.approve(approvalRequestId, approve);
-        } catch (AssertionError e) {
-            throw new AssertionError(e.getMessage()
-                    + String.format("%nThe request's approvalType was %s.", approvalType), e);
+            Thread.sleep(delay);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new InfraFailureException("Interrupted while backing off before re-approving a locked dialog", e);
         }
     }
 

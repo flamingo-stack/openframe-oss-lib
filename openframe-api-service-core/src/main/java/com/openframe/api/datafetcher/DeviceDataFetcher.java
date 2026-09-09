@@ -19,6 +19,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.installedagents.InstalledAgent;
@@ -26,6 +27,7 @@ import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
+import com.openframe.data.document.tool.ToolType;
 import graphql.relay.Relay;
 import graphql.schema.DataFetchingFieldSelectionSet;
 import jakarta.validation.Valid;
@@ -35,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dataloader.DataLoader;
 import org.springframework.validation.annotation.Validated;
 
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -51,6 +54,7 @@ public class DeviceDataFetcher {
     private final DeviceService deviceService;
     private final DeviceFilterService deviceFilterService;
     private final TagService tagService;
+    private final FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     private final GraphQLDeviceMapper mapper;
 
     @DgsQuery
@@ -137,6 +141,15 @@ public class DeviceDataFetcher {
     public String toolConnectionNodeId(DgsDataFetchingEnvironment dfe) {
         ToolConnection tc = dfe.getSource();
         return RELAY.toGlobalId("ToolConnection", tc.getId());
+    }
+
+    @DgsData(parentType = "ToolConnection", field = "vulnerabilitiesUpdatedAt")
+    public Instant toolConnectionVulnerabilitiesUpdatedAt(DgsDataFetchingEnvironment dfe) {
+        ToolConnection tc = dfe.getSource();
+        if (tc.getToolType() != ToolType.FLEET_MDM) {
+            return null;
+        }
+        return fleetVulnerabilityStatusService.getLastCompletedVulnerabilityRunAt();
     }
 
     @DgsData(parentType = "InstalledAgent", field = "id")

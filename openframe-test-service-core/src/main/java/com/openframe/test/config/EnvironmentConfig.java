@@ -13,6 +13,8 @@ public class EnvironmentConfig {
     public static final String DEFAULT_BASE_URL = "https://localhost/";
     public static final String GRAPHQL = "api/graphql";
     public static final String CHAT_GRAPHQL = "chat/graphql";
+    /** Gateway prefix the External API ({@code X-API-Key} authenticated) is served under. */
+    public static final String EXTERNAL_API = "external-api";
 
     private static String envMode;
     private static String testBaseUrl;

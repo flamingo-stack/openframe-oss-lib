@@ -33,7 +33,8 @@ import {
 } from '../../../chat-protocol/events';
 // One normalizer for ask rows, shared with the live decoder — history and the
 // stream must agree on which options are usable.
-import { guideFrameEvent, normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
+import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
+import { mergeSourceMetadata, sourceMetadataEvent, type SourceMetadata } from '../../../chat-protocol/source-metadata';
 import { applyApprovalStatusToSegment } from '../stream/message-mutations';
 import {
   MESSAGE_TYPE,
@@ -47,7 +48,7 @@ import {
   type MessageData,
   type MessageOwner,
 } from '../types';
-import { approvalDisplaysInline, guideApprovalOrigin } from './approval-display';
+import { approvalDisplaysInline } from './approval-display';
 import { type MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator';
 import { getCommandText } from './tool-call-helpers';
 
@@ -121,21 +122,12 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
       }
       return null;
 
-    // Two persisted shapes, mirroring the live `GUIDE` chunk: the answer body
-    // (`text`) and a Product Guide frame the agent re-streamed (`payload`,
-    // persisted so a card survives a reload). Decoded through the SAME
-    // `guideFrameEvent` the live path uses — a second mapping here would let
-    // history and realtime disagree about the same bytes.
-    case MESSAGE_TYPE.GUIDE: {
-      if ('text' in data && data.text) {
-        return { type: 'guide-delta', text: data.text };
-      }
-      const payload = 'payload' in data ? data.payload : undefined;
-      if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-        return guideFrameEvent(payload);
-      }
-      return null;
-    }
+    // Persisted source metadata, through the SAME decoder the live chunk uses
+    // (`sourceMetadataEvent`). That shared parse is the whole reason a reloaded
+    // answer renders identically to the one the reader watched arrive.
+    case MESSAGE_TYPE.GUIDE:
+    case MESSAGE_TYPE.SOURCES:
+      return 'payload' in data ? sourceMetadataEvent(data.payload) : null;
 
     // Same completeness gate as the live decoder (`decodeNatsChunk`): a
     // persisted row without a question or without options is not a card the
@@ -331,6 +323,7 @@ function applyHistoryEvent(
   escalatedApprovals?: EscalatedApprovals,
   offerResolutions?: OfferResolutions,
   rowCreatedAt?: Date,
+  rowStreamSeq?: number,
 ): void {
   // batchApprovalsEnabled is owned by the consumer (oss-tenant chat client /
   // openframe-frontend tickets). Defaults to ON so consumers that haven't
@@ -358,12 +351,16 @@ function applyHistoryEvent(
       });
       break;
 
-    // Seq-less on purpose: the persisted row's sequence lives on the message
-    // (`lastChunkStreamSeq`), not in `messageData`. A live redelivery of the
-    // same event matches this segment by payload equality (see
-    // `addTicketEvent`).
+    // `rowStreamSeq` re-stamps the event's JetStream sequence (the persisted
+    // row's `lastChunkStreamSeq` - `messageData` itself does not carry it).
+    // The store's `ticket-event:<seq>` upsert key is the ONLY join between
+    // this hydrated segment and a catch-up/stale-consumer replay of the same
+    // chunk; a seq-less segment never joins, so the replayed copy rendered as
+    // a second identical card (the resolve/reopen duplication). The payload
+    // fallback in `addTicketEvent` cannot own that case: a COMPLETE hydrated
+    // tail seeds no accumulator, so the twins only ever meet in the store.
     case 'ticket-event':
-      // `rowCreatedAt` is the persisted row's own time — without it the card
+      // `rowCreatedAt` is the persisted row's own time - without it the card
       // renders the enclosing assistant bubble's timestamp, i.e. the FIRST
       // row of the turn, and every lifecycle card reads the same stale time.
       accumulator.addTicketEvent(
@@ -375,7 +372,7 @@ function applyHistoryEvent(
           reason: event.reason,
           targetStatusKind: event.targetStatusKind,
         },
-        undefined,
+        rowStreamSeq,
         rowCreatedAt,
       );
       break;
@@ -397,10 +394,6 @@ function applyHistoryEvent(
       accumulator.appendThinking(event.text);
       break;
 
-    case 'guide-delta':
-      accumulator.appendGuide(event.text);
-      break;
-
     // Mirror of the live path: the intro sentence replays as answer text in
     // front of the card, so a reloaded thread reads exactly like the stream did.
     case 'ask':
@@ -417,23 +410,13 @@ function applyHistoryEvent(
       const toolCalls = event.toolCalls;
       const isBatch = !!toolCalls && toolCalls.length > 0;
       // Same rule the live kernels use — a card must not change where it
-      // renders (or which backend its buttons hit) just because the page was
-      // reloaded and it came back through history instead of the stream.
-      const guideOrigin = guideApprovalOrigin(event);
-
-      if (approvalDisplaysInline(event, approvalType, displayApprovalTypes)) {
+      // renders just because the page was reloaded and it came back through
+      // history instead of the stream.
+      if (approvalDisplaysInline(approvalType, displayApprovalTypes)) {
         if (isBatch) {
           const status = (approvalStatuses[event.requestId] as ChatApprovalStatus) || 'pending';
           if (batchApprovalsEnabled) {
-            accumulator.addApprovalBatch(
-              event.requestId,
-              approvalType,
-              toolCalls,
-              status,
-              undefined,
-              undefined,
-              guideOrigin,
-            );
+            accumulator.addApprovalBatch(event.requestId, approvalType, toolCalls, status, undefined, undefined);
           } else {
             // Flag OFF — unfold batch into N legacy approval cards (same id).
             for (const call of toolCalls) {
@@ -445,7 +428,6 @@ function applyHistoryEvent(
                 approvalType,
                 status,
                 undefined,
-                guideOrigin,
               );
             }
           }
@@ -459,12 +441,7 @@ function applyHistoryEvent(
           // and honor `approvalStatuses`.
           const resolvedStatus = approvalStatuses[event.requestId] as ChatApprovalStatus | undefined;
           const isResolved = resolvedStatus === 'approved' || resolvedStatus === 'rejected';
-          // A guide card is added inline even while pending. The tracked path
-          // below ends in `flushPendingApprovals`, whose segments the consumer
-          // lifts into a sticky footer — that is the treatment for the
-          // consumer's OWN approvals, and it is not how the hub's chat renders
-          // a proposal (nor where its preamble expects it).
-          if (guideOrigin || isResolved) {
+          if (isResolved) {
             accumulator.addApprovalRequest(
               event.requestId,
               event.command || '',
@@ -472,7 +449,6 @@ function applyHistoryEvent(
               approvalType,
               resolvedStatus ?? 'pending',
               event.fields,
-              guideOrigin,
             );
           } else {
             accumulator.trackApprovalRequest(event.requestId, {
@@ -628,6 +604,12 @@ export function processHistoricalMessages(
   // MAX persisted seq across the rows grouped into the current assistant turn
   // — carried onto the flushed message's streamSeq for per-role merge coverage.
   let currentAssistantStreamSeq: number | undefined;
+  // Source metadata for the current assistant turn. It is persisted as its OWN
+  // row (the backend saves it when the remote tool returns, before the answer
+  // text exists), so it arrives as a separate history message that groups into
+  // the same turn — and has to be carried across the group rather than applied
+  // where it was read.
+  let currentAssistantSourceMetadata: SourceMetadata | null = null;
 
   /**
    * Flush the current assistant message to processedMessages.
@@ -646,6 +628,7 @@ export function processHistoricalMessages(
         timestamp: currentAssistantTimestamp || new Date(),
         avatar: assistantAvatar,
         ...(currentAssistantStreamSeq !== undefined ? { streamSeq: currentAssistantStreamSeq } : {}),
+        ...(currentAssistantSourceMetadata ?? {}),
       });
       accumulator.resetSegments();
     }
@@ -660,6 +643,10 @@ export function processHistoricalMessages(
     currentAssistantTimestamp = null;
     lastAssistantId = null;
     currentAssistantStreamSeq = undefined;
+    // Reset UNCONDITIONALLY, for the same reason the seq above is: a turn whose
+    // only row was metadata renders nothing, and leaving it set would stamp the
+    // NEXT answer with citations that belong to this one.
+    currentAssistantSourceMetadata = null;
   };
 
   messages.forEach((msg, index) => {
@@ -726,6 +713,12 @@ export function processHistoricalMessages(
       messageDataArray.forEach(data => {
         const event = decodeHistoricalMessageData(data);
         if (!event) return;
+        // Metadata is a property OF the turn, not a segment in it — it never
+        // reaches the accumulator, which would have nothing to do with it.
+        if (event.type === 'sources') {
+          currentAssistantSourceMetadata = mergeSourceMetadata(currentAssistantSourceMetadata, event);
+          return;
+        }
         applyHistoryEvent(
           event,
           accumulator,
@@ -734,6 +727,13 @@ export function processHistoricalMessages(
           escalatedApprovals,
           offerResolutions,
           new Date(msg.createdAt),
+          // TICKET_EVENT chunks are standalone, one per row, so the row seq IS
+          // the event seq - but vouch for that only when the row holds exactly
+          // one entry: a bundled row's `lastChunkStreamSeq` belongs to its LAST
+          // chunk and could stamp the wrong event.
+          messageDataArray.length === 1 && typeof msg.lastChunkStreamSeq === 'number'
+            ? msg.lastChunkStreamSeq
+            : undefined,
         );
       });
 

@@ -131,3 +131,35 @@ export function getSlackCommunityJoinUrl(): string {
   }
   return url;
 }
+
+/**
+ * Clamp a number into an inclusive range. THE one clamp for the lib and the hub
+ * (step/page/contrast math all bottom out here).
+ */
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+/**
+ * Typed key-subset of an object. Keys whose value is `undefined` on the source
+ * are still copied when present, so `pick(params, dropped)` writes explicit
+ * `null`s (the URL-state writer's "remove this key" signal).
+ */
+export function pick<T extends object, K extends keyof T>(source: T, keys: readonly K[]): Pick<T, K> {
+  const out = {} as Pick<T, K>;
+  for (const key of keys) {
+    if (key in source) out[key] = source[key];
+  }
+  return out;
+}
+
+/**
+ * React Query options for data that MUST NOT be served from the client cache.
+ *
+ * The rule (hub memory `feedback_no_client_query_cache_for_mutable_entities`):
+ * anything a user can mutate, or a cron can rewrite under them, is refetched on
+ * mount. Spread this instead of retyping `staleTime: 0` — it is also the hub
+ * QueryClient's default, so a hook that spreads it is explicit rather than
+ * silently inheriting.
+ */
+export const NO_CLIENT_CACHE = { staleTime: 0 } as const;

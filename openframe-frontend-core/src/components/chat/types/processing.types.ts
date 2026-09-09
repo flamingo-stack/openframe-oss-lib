@@ -18,12 +18,9 @@ export interface PendingApproval {
   command: string;
   explanation?: string;
   approvalType: string;
-  /** Structured label/value rows — a Product Guide card is almost entirely
+  /** Structured label/value rows — a card can be almost entirely
    *  these, so a path that forgets them renders a bare title. */
   fields?: ApprovalRequestField[];
-  /** Where the card came from; `'guide'` keeps it inline and routes its
-   *  buttons to the hub (see `ApprovalRequestData.origin`). */
-  origin?: 'guide';
 }
 
 export interface AccumulatorState {

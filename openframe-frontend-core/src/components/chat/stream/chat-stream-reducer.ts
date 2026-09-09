@@ -51,7 +51,7 @@
  */
 
 import { escapeThinkingTags } from '../../../chat-protocol/decode';
-import { errorDetailsMessage, isGuideOrigin } from '../../../chat-protocol/events';
+import { errorDetailsMessage } from '../../../chat-protocol/events';
 import {
   CHAT_OWNER_ADMIN,
   type ChatStreamEvent,
@@ -60,6 +60,7 @@ import {
   type ParticipantEvent,
   type UsageEvent,
 } from '../../../chat-protocol/events';
+import { mergeSourceMetadata, type SourceMetadata } from '../../../chat-protocol/source-metadata';
 import type {
   ApprovalBatchSegment,
   ApprovalRequestSegment,
@@ -77,7 +78,7 @@ import type {
   UnifiedChatMessage,
   UnifiedUsageBreakdown,
 } from '../types/unified-chat-state.types';
-import { approvalDisplaysInline, guideApprovalOrigin } from '../utils/approval-display';
+import { approvalDisplaysInline } from '../utils/approval-display';
 import {
   type MessageSegmentAccumulator,
   createMessageSegmentAccumulator,
@@ -161,15 +162,6 @@ export interface ChatReducerState {
     contextWindowMaxTokens: number | null;
   } | null;
   approvalStatuses: Record<string, ChatApprovalStatus>;
-  /**
-   * Hub conversation id for the Product Guide half of this dialog, learned from
-   * a guide metadata frame. The hub mints it and requires it back on every
-   * confirm-tool call, so a host resolving a guide approval card reads it from
-   * here. Null until a guide turn has streamed — an approval that arrives from
-   * history (after a reload) has no live frame to learn it from, which is why
-   * the agent should also expose it per dialog.
-   */
-  guideConversationId: string | null;
 }
 
 /** Escalated-approval bookkeeping entry (mirrors the legacy processor). */
@@ -539,7 +531,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   let streamingPhase: StreamingPhase = 'idle';
   let dialogTokenUsage: DialogTokenUsage | null = null;
   let liveModel: ChatReducerState['liveModel'] = null;
-  let guideConversationId: string | null = null;
   let approvalStatuses: Record<string, ChatApprovalStatus> = {
     ...(options.approvalStatuses ?? {}),
   };
@@ -701,7 +692,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         dialogTokenUsage,
         liveModel,
         approvalStatuses,
-        guideConversationId,
       };
     }
     return stateCache;
@@ -766,22 +756,56 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     return [...next.slice(0, -1), { ...last, streamSeq: seq }];
   }
 
+  /**
+   * Source metadata accumulated for the CURRENT turn.
+   *
+   * The chunk is published when a remote tool returns, so it lands inside the
+   * turn but usually BEFORE the answer text the reader will see it under —
+   * sometimes before the assistant bubble exists at all. Holding it here and
+   * stamping it on every trailing-assistant write is what makes the arrival
+   * order stop mattering.
+   *
+   * Reset at `turn-start`, so metadata can never leak onto the next answer.
+   * Losing a chunk that somehow arrived outside a turn is the better failure of
+   * the two: a stale citation strip under an unrelated answer is a wrong
+   * statement about where that answer came from.
+   */
+  let turnSourceMetadata: SourceMetadata | null = null;
+
+  /** Stamp the turn's metadata onto the trailing assistant bubble. A no-op
+   *  when there is none yet — the next write through here picks it up. */
+  function stampTrailingAssistantSourceMetadata(next: UnifiedChatMessage[]): UnifiedChatMessage[] {
+    const metadata = turnSourceMetadata;
+    if (!metadata) return next;
+    const last = next[next.length - 1];
+    if (!last || last.role !== 'assistant') return next;
+    if (last.sources === metadata.sources && last.refs === metadata.refs) return next;
+    return [...next.slice(0, -1), { ...last, ...metadata }];
+  }
+
+  /** The two stamps every trailing-assistant write needs, in one place — a
+   *  write that skips either loses the seq the merge decides with, or the
+   *  citations the answer was built from. */
+  function commitTrailingAssistant(next: UnifiedChatMessage[], seq: number | undefined): UnifiedChatMessage[] {
+    return stampTrailingAssistantSourceMetadata(stampTrailingAssistantSeq(next, seq));
+  }
+
   function applySegmentsToState(segments: MessageSegment[], meta?: SegmentsUpdateMetadata): void {
     const seq = meta?.streamSeq;
     // Standalone compaction updates carry the accumulator's cumulative
     // array — apply only the compaction segment (upsert) or interleaved
     // continuation text would duplicate.
     if (meta?.append && meta.isCompacting) {
-      setMessagesInternal(stampTrailingAssistantSeq(upsertTrailingCompaction(messages, segments), seq));
+      setMessagesInternal(commitTrailingAssistant(upsertTrailingCompaction(messages, segments), seq));
       return;
     }
     // Post-MESSAGE_END continuation fragments append into the existing
     // bubble; replacing would wipe the completed reply.
     if (meta?.append) {
-      setMessagesInternal(stampTrailingAssistantSeq(appendToTrailingAssistant(messages, segments), seq));
+      setMessagesInternal(commitTrailingAssistant(appendToTrailingAssistant(messages, segments), seq));
       return;
     }
-    setMessagesInternal(stampTrailingAssistantSeq(updateTrailingAssistant(messages, segments), seq));
+    setMessagesInternal(commitTrailingAssistant(updateTrailingAssistant(messages, segments), seq));
   }
 
   function applyStreamStartToState(): void {
@@ -980,6 +1004,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         isInStream = true;
         hasEverStreamed = true;
         turnStartedAt = Date.now();
+        turnSourceMetadata = null;
         emit('onStreamStart');
         applyStreamStartToState();
         accumulator.resetSegments();
@@ -995,18 +1020,16 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         break;
       }
 
+      // Per-answer source metadata. Applied to the trailing assistant bubble
+      // immediately when there is one, and held for the next write when the
+      // chunk beat the answer text to the reducer.
+      case 'sources': {
+        turnSourceMetadata = mergeSourceMetadata(turnSourceMetadata, event);
+        setMessagesInternal(stampTrailingAssistantSourceMetadata(messages));
+        break;
+      }
+
       case 'metadata': {
-        // A guide metadata event carries ONLY the hub's conversation id (the
-        // decoder strips the rest): record it and stop. Falling through would
-        // rebuild `liveModel` from an event with no model in it and blank the
-        // dialog's model badge mid-answer.
-        if (isGuideOrigin(event)) {
-          if (typeof event.conversationId === 'string' && event.conversationId) {
-            guideConversationId = event.conversationId;
-            invalidate();
-          }
-          break;
-        }
         // Legacy `parseChunkToAction` action shape, reconstructed for the
         // callback contract.
         emit('onMetadata', {
@@ -1025,21 +1048,13 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         break;
       }
 
-      // The three APPEND-ONLY body streams share one shape: accumulate the
-      // verbatim slice into the trailing segment of the matching kind (the
-      // accumulator coalesces), then emit. `guide-delta` is NATS-only today
-      // but rides the identical path so a guide body streams, coalesces and
-      // continues post-MESSAGE_END exactly like answer text.
+      // Both APPEND-ONLY body streams share one shape: accumulate the verbatim
+      // slice into the trailing segment of the matching kind (the accumulator
+      // coalesces), then emit.
       case 'text-delta':
-      case 'thinking-delta':
-      case 'guide-delta': {
-        const kind = event.type === 'text-delta' ? 'text' : event.type === 'thinking-delta' ? 'thinking' : 'guide';
-        const segments =
-          kind === 'text'
-            ? accumulator.appendText(event.text)
-            : kind === 'thinking'
-              ? accumulator.appendThinking(event.text)
-              : accumulator.appendGuide(event.text);
+      case 'thinking-delta': {
+        const kind = event.type === 'text-delta' ? 'text' : 'thinking';
+        const segments = kind === 'text' ? accumulator.appendText(event.text) : accumulator.appendThinking(event.text);
         // Append-mode only for *true* post-stream continuation (after a
         // MESSAGE_END we actually saw). Cold-start chunks (no prior
         // MESSAGE_START) emit cumulative segments so the consumer can spawn
@@ -1115,10 +1130,8 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         const approvalType = event.approvalType ?? 'USER';
         const toolCalls = event.toolCalls;
         // Where this card renders is ONE rule, shared with the SSE kernel and
-        // the history replay (`approval-display`) — a Product Guide proposal
-        // that renders inline live must not move on the next page load.
-        const guideOrigin = guideApprovalOrigin(event);
-        const displayInline = (type: string) => approvalDisplaysInline(event, type, displayApprovalTypes);
+        // the history replay (`approval-display`).
+        const displayInline = (type: string) => approvalDisplaysInline(type, displayApprovalTypes);
 
         if (toolCalls && toolCalls.length > 0) {
           // ── Batch form ──
@@ -1150,7 +1163,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
               status,
               undefined,
               undefined,
-              guideOrigin,
             );
             applyAccumulated(before, segments);
             break;
@@ -1170,7 +1182,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
               approvalType,
               status,
               undefined,
-              guideOrigin,
             );
           }
           applyAccumulated(before, segments);
@@ -1189,10 +1200,8 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
             explanation,
             approvalType,
             status,
-            // SSE-shaped cards (a re-streamed Product Guide proposal) carry
-            // their body as structured rows rather than prose.
+            // SSE-shaped cards carry their body as structured rows rather than prose.
             event.fields,
-            guideOrigin,
           );
           applyAccumulated(before, segments);
         } else {
@@ -1704,7 +1713,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     streamingPhase = 'idle';
     dialogTokenUsage = null;
     liveModel = null;
-    guideConversationId = null;
     approvalStatuses = {};
     accumulator.reset();
     pendingEscalated.clear();
@@ -1752,7 +1760,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     streamingPhase = 'idle';
     dialogTokenUsage = null;
     liveModel = null;
-    guideConversationId = null;
     accumulator.reset();
     pendingEscalated.clear();
     isInStream = false;

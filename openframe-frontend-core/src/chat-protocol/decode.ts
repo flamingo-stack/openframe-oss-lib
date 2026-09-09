@@ -36,10 +36,9 @@
 import type { ChatStreamEvent } from './events';
 import type { UsageTelemetry } from './frames';
 import { FRAME_TERMINATOR, END_OF_LEADING, TRAILER_SENTINEL } from './frames';
-// The frame table is SHARED with the NATS decoder — guide answers re-stream the
-// hub's frames verbatim inside `GUIDE` chunks — so it lives in its own module.
-// `frameNum` comes from there too: the trailing usage frame's token counts must
-// pass the SAME typeof gate the leading `usage:start` frame's already do.
+// The frame table lives in its own module so it is reusable outside this
+// decoder. `frameNum` comes from there too: the trailing usage frame's token
+// counts must pass the SAME typeof gate the leading `usage:start` frame's do.
 import { mapLeadingFrame, frameNum } from './leading-frames';
 
 export interface SseFrameDecoder {

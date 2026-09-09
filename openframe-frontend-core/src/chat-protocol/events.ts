@@ -12,7 +12,8 @@
 // rows straight to the accumulator, so restating them here would be two
 // declarations of one wire contract. Type-only import from a React-free
 // module; `nats-decoder.ts` already depends on the same file for MESSAGE_TYPE.
-import type { AskOptionData } from '../components/chat/types/message.types';
+import type { ChatRef } from '../components/chat/chat-ref.types';
+import type { AskOptionData, ChatSource } from '../components/chat/types/message.types';
 // The wire-frame shapes these events carry through are defined ONCE in
 // `./frames.ts` — reuse them here rather than restating their fields.
 import type { ApprovalRequestField, DecisionResolvedFrame, UsageTelemetry } from './frames';
@@ -51,18 +52,6 @@ export interface TextDeltaEvent extends ChatStreamEventBase {
  *  verbatim slice; consumers accumulate. Decoders never diff. */
 export interface ThinkingDeltaEvent extends ChatStreamEventBase {
   type: 'thinking-delta';
-  text: string;
-}
-
-/** Guide-body delta (NATS `GUIDE` chunk) — the assistant's how-to /
- *  documentation answer, rendered as a titled "OpenFrame Guide" card rather
- *  than bare prose. Same APPEND-ONLY contract as `text-delta` /
- *  `thinking-delta`: each event carries the next verbatim slice and consumers
- *  coalesce into the trailing `guide` segment. NATS-only today — the SSE
- *  frame grammar has no guide frame — but it lives in the shared union
- *  because the reducer is transport-agnostic. */
-export interface GuideDeltaEvent extends ChatStreamEventBase {
-  type: 'guide-delta';
   text: string;
 }
 
@@ -134,35 +123,6 @@ export interface ApprovalRequestEvent extends ChatStreamEventBase {
   fields?: ApprovalRequestField[];
   toolCalls?: ApprovalToolCall[];
   status?: 'pending';
-  /** Set when the card came from a Product Guide frame — see {@link GuideOrigin}. */
-  origin?: GuideOrigin;
-}
-
-/**
- * Marks an event whose payload is a Product Guide frame, whatever transport
- * carried it. It exists because ONE stream can now mix both worlds: the agent
- * re-streams the hub's frames into a NATS dialog, so a card typed the hub's way
- * (`approvalType` = the tool name, resolved through the hub's confirm route)
- * travels beside cards typed the agent's way (`approvalType` = an approval TIER
- * routed to human escalation).
- *
- * Consumers read it to keep the guide half behaving exactly as it does in the
- * hub's own chat — NOT to give it special treatment. Without it the NATS kernel
- * would have to guess from `approvalType`, and every tool the hub adds would
- * silently fall into the escalation path.
- */
-export type GuideOrigin = 'guide';
-
-/** The only value of {@link GuideOrigin}. Lives beside the type, and beside the
- *  predicate below, because both decoders and every consumer that branches on
- *  provenance must compare against the same token — a bare `'guide'` literal
- *  typo silently disables the branch instead of failing to compile. */
-export const GUIDE_ORIGIN: GuideOrigin = 'guide';
-
-/** True for anything stamped as coming from the Product Guide — a stream event
- *  or the `data` of a segment built from one. */
-export function isGuideOrigin(source: { origin?: GuideOrigin | string } | null | undefined): boolean {
-  return source?.origin === GUIDE_ORIGIN;
 }
 
 /** An approval request was resolved (SSE `decision_resolved` frame /
@@ -178,8 +138,6 @@ export interface ApprovalResolvedEvent extends ChatStreamEventBase {
   receiptText?: string;
   result?: DecisionResolvedFrame['result'];
   willAutoContinue?: boolean;
-  /** Set when the resolution came from a Product Guide frame — see {@link GuideOrigin}. */
-  origin?: GuideOrigin;
 }
 
 /** The client is offered a handoff of this ticket to a human technician
@@ -260,6 +218,25 @@ export interface TicketEventEvent extends ChatStreamEventBase {
   targetStatusKind?: string;
 }
 
+/**
+ * Per-answer source metadata — the documents an answer cited, plus the video
+ * and entity-card references its `[card://type:id]` markers expand with.
+ *
+ * Unlike `ChatMetadataEvent`, this one is DECODED, not passthrough: the payload
+ * comes from a remote MCP server's tool output rather than from our own
+ * backend's frame, so it is validated at the protocol boundary (see
+ * `source-metadata.ts`) and never reaches a consumer half-checked.
+ *
+ * Both fields are optional and never both absent — the decoder returns `null`
+ * instead of emitting an empty event, so applying one can't blank metadata an
+ * earlier chunk of the same turn already supplied.
+ */
+export interface SourcesEvent extends ChatStreamEventBase {
+  type: 'sources';
+  sources?: ChatSource[];
+  refs?: ChatRef[];
+}
+
 /** Per-turn metadata. Raw wire values pass through UNVALIDATED — the
  *  consumer replicates the legacy truthiness/typeof gates (so a
  *  malformed frame degrades identically to the pre-SSOT parser). */
@@ -281,13 +258,6 @@ export interface ChatMetadataEvent extends ChatStreamEventBase {
     routedModel?: string;
     routedThinkingBudget: number | null;
   };
-  /**
-   * Set when the metadata came from a Product Guide frame — see
-   * {@link GuideOrigin}. Such an event carries ONLY `conversationId`: it exists
-   * to record the hub's conversation id (every confirm-tool call must quote it
-   * back), NOT to describe the dialog's model, which stays the agent's.
-   */
-  origin?: GuideOrigin;
 }
 
 /** SSE usage frames — raw wire keys (snake_case) preserved. */
@@ -402,7 +372,6 @@ export type ChatStreamEvent =
   | TurnEndEvent
   | TextDeltaEvent
   | ThinkingDeltaEvent
-  | GuideDeltaEvent
   | AskEvent
   | StatusEvent
   | ToolExecutionEvent
@@ -413,6 +382,7 @@ export type ChatStreamEvent =
   | TicketEscalatedEvent
   | TicketEventEvent
   | ChatMetadataEvent
+  | SourcesEvent
   | UsageEvent
   | TokenUsageEvent
   | CompactionEvent

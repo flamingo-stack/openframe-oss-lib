@@ -1,5 +1,7 @@
 package com.openframe.authz.controller;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import com.openframe.authz.dto.SsoTenantRegistrationInitRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoFlowCookies;
@@ -19,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 
-import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_REG;
+import static com.openframe.core.constants.SsoFlowCookieNames.OF_SSO_REG;
 import static com.openframe.authz.web.AuthStateUtils.clearAuthState;
 import static com.openframe.authz.web.AuthStateUtils.clearOtherSsoFlowCookies;
 import static com.openframe.authz.web.Redirects.seeOther;
@@ -43,16 +45,25 @@ public class TenantRegistrationController {
         return registrationService.registerTenant(request);
     }
 
+    /**
+     * @deprecated Superseded by the unified email-less flow: the signup page starts
+     * {@code /oauth/login/sso} and finishes with {@code /oauth/login/sso/complete} — registration
+     * is just the unknown-identity branch of login, and pre-processing runs at complete time with
+     * the provider-asserted email. Kept while the web frontend and the app shell still call it.
+     * TODO(CU-86ak52ttd): remove together with SsoTenantRegistrationService, TenantRegSsoHandler
+     * and the of_sso_reg cookie once both are migrated.
+     */
+    @Deprecated
     @GetMapping(path = "/register/sso")
     public void startSsoRegistration(@Valid @ModelAttribute SsoTenantRegistrationInitRequest request,
                                      HttpServletRequest httpRequest,
                                      HttpServletResponse httpResponse) throws IOException {
         try {
             clearAuthState(httpRequest, httpResponse);
-            clearOtherSsoFlowCookies(httpResponse, COOKIE_SSO_REG);
+            clearOtherSsoFlowCookies(httpResponse, OF_SSO_REG);
 
             SsoAuthorizeData ssoAuthorizeData = ssoRegistrationService.startRegistration(request);
-            ssoFlowCookies.write(httpResponse, COOKIE_SSO_REG, ssoAuthorizeData.cookieValue(), ssoAuthorizeData.cookieTtlSeconds());
+            ssoFlowCookies.write(httpResponse, OF_SSO_REG, ssoAuthorizeData.cookieValue(), ssoAuthorizeData.cookieTtlSeconds());
 
             seeOther(httpResponse, ssoAuthorizeData.redirectPath());
         } catch (Exception e) {

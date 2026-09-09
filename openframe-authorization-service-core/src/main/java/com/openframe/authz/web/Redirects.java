@@ -4,11 +4,30 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import static jakarta.servlet.http.HttpServletResponse.SC_FOUND;
+import static java.net.URLEncoder.encode;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.springframework.util.StringUtils.hasText;
 import static jakarta.servlet.http.HttpServletResponse.SC_SEE_OTHER;
 import static org.springframework.http.HttpHeaders.LOCATION;
 
 public final class Redirects {
+
     private Redirects() {
+    }
+
+    /**
+     * BFF hop every SSO flow finishes through: mints tokens for the tenant the flow decided on.
+     * {@code redirectTo} and {@code authMobile} keep the semantics of {@code /oauth/login}.
+     */
+    public static String oauthContinuePath(String tenantId, String redirectTo, boolean authMobile) {
+        StringBuilder path = new StringBuilder("/oauth/continue?tenantId=").append(encode(tenantId, UTF_8));
+        if (hasText(redirectTo)) {
+            path.append("&redirectTo=").append(encode(redirectTo, UTF_8));
+        }
+        if (authMobile) {
+            path.append("&authMobile=true");
+        }
+        return path.toString();
     }
 
     public static void seeOther(HttpServletResponse response, String relativePath) {
