@@ -20,8 +20,10 @@ public class PackageSearchDataFetcher {
     public PackageSearchConnection searchPackages(@InputArgument PackageManagerType packageManager,
                                                   @InputArgument String query,
                                                   @InputArgument Integer first,
-                                                  @InputArgument String after) {
-        return packageSearchService.search(packageManager, query, first, after);
+                                                  @InputArgument String after,
+                                                  @InputArgument Integer last,
+                                                  @InputArgument String before) {
+        return packageSearchService.search(packageManager, query, first, after, last, before);
     }
 
     @DgsQuery

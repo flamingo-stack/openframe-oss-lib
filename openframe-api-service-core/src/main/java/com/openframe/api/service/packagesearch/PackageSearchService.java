@@ -10,10 +10,13 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toUnmodifiableMap;
@@ -38,17 +41,17 @@ public class PackageSearchService {
         this.packageManagerProperties = packageManagerProperties;
     }
 
-    public PackageSearchConnection search(PackageManagerType packageManager, String rawQuery, Integer first, String after) {
+    public PackageSearchConnection search(PackageManagerType packageManager, String rawQuery,
+                                          Integer first, String after, Integer last, String before) {
         String query = rawQuery == null ? "" : rawQuery.trim();
         if (query.length() < MIN_QUERY_LENGTH) {
             throw new IllegalArgumentException("query must be at least " + MIN_QUERY_LENGTH + " characters long");
         }
-        int limit = first == null ? DEFAULT_LIMIT : Math.clamp(first, 1, MAX_LIMIT);
-        int offset = offsetFrom(after);
+        Page page = resolvePage(first, after, last, before);
 
         PackageManagerClient client = clientFor(packageManager);
-        PackageSearchResult result = client.search(query, limit, offset);
-        return toConnection(result, offset);
+        PackageSearchResult result = client.search(query, page.getLimit(), page.getStartIndex());
+        return toConnection(result, page);
     }
 
     public PackageDetails findPackage(PackageManagerType packageManager, String packageId, BrewPackageType packageType) {
@@ -60,14 +63,25 @@ public class PackageSearchService {
         return client.findPackage(id, packageType);
     }
 
-    private PackageSearchConnection toConnection(PackageSearchResult result, int offset) {
+    private Page resolvePage(Integer first, String after, Integer last, String before) {
+        if (isBackward(last, before)) {
+            int size = clamp(last);
+            int beforeIndex = indexFrom(before);
+            int startIndex = Math.max(0, beforeIndex - size);
+            return new Page(startIndex, beforeIndex - startIndex, true);
+        }
+        int startIndex = after == null ? 0 : indexFrom(after) + 1;
+        return new Page(startIndex, clamp(first), false);
+    }
+
+    private PackageSearchConnection toConnection(PackageSearchResult result, Page page) {
         List<PackageSearchItem> items = result.getItems();
-        List<GenericEdge<PackageSearchItem>> edges = buildEdges(items, offset);
+        List<GenericEdge<PackageSearchItem>> edges = buildEdges(items, page.getStartIndex());
         String startCursor = edges.isEmpty() ? null : edges.getFirst().getCursor();
         String endCursor = edges.isEmpty() ? null : edges.getLast().getCursor();
         PageInfo pageInfo = PageInfo.builder()
-                .hasNextPage(result.isHasMore())
-                .hasPreviousPage(offset > 0)
+                .hasNextPage(page.isBackward() || result.isHasMore())
+                .hasPreviousPage(page.getStartIndex() > 0)
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
@@ -78,17 +92,26 @@ public class PackageSearchService {
                 .build();
     }
 
-    private static List<GenericEdge<PackageSearchItem>> buildEdges(List<PackageSearchItem> items, int offset) {
-        return java.util.stream.IntStream.range(0, items.size())
+    private static List<GenericEdge<PackageSearchItem>> buildEdges(List<PackageSearchItem> items, int startIndex) {
+        return IntStream.range(0, items.size())
                 .mapToObj(i -> GenericEdge.<PackageSearchItem>builder()
                         .node(items.get(i))
-                        .cursor(CursorCodec.encode(String.valueOf(offset + i + 1)))
+                        .cursor(CursorCodec.encode(String.valueOf(startIndex + i)))
                         .build())
                 .toList();
     }
 
-    private static int offsetFrom(String after) {
-        String decoded = CursorCodec.decode(after);
+    private static boolean isBackward(Integer last, String before) {
+        return last != null || before != null;
+    }
+
+    private static int clamp(Integer requested) {
+        return requested == null ? DEFAULT_LIMIT : Math.clamp(requested, 1, MAX_LIMIT);
+    }
+
+    // an unparseable cursor falls back to the boundary (index 0), the repo-wide cursor convention
+    private static int indexFrom(String cursor) {
+        String decoded = CursorCodec.decode(cursor);
         if (decoded == null) {
             return 0;
         }
@@ -108,5 +131,13 @@ public class PackageSearchService {
             throw new IllegalStateException("no package manager client registered for " + packageManager);
         }
         return client;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    private static final class Page {
+        private final int startIndex;
+        private final int limit;
+        private final boolean backward;
     }
 }

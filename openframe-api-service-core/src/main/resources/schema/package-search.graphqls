@@ -9,7 +9,9 @@ extend type Query {
         packageManager: PackageManagerType!,
         query: String!,
         first: Int,
-        after: String
+        after: String,
+        last: Int,
+        before: String
     ): PackageSearchConnection!
     """
     Package details by identifier, including available versions (newest first).

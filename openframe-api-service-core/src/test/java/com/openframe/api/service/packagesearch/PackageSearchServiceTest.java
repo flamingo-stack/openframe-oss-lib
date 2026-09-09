@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,7 +41,7 @@ class PackageSearchServiceTest {
     }
 
     private static PackageSearchResult resultOf(int count, boolean hasMore, int total) {
-        List<PackageSearchItem> items = java.util.stream.IntStream.range(0, count)
+        List<PackageSearchItem> items = IntStream.range(0, count)
                 .mapToObj(i -> PackageSearchItem.builder().id("pkg-" + i).name("pkg-" + i).build())
                 .toList();
         return PackageSearchResult.builder().items(items).hasMore(hasMore).total(total).build();
@@ -48,7 +49,8 @@ class PackageSearchServiceTest {
 
     @Test
     void rejectsShortQuery() {
-        assertThrows(IllegalArgumentException.class, () -> service.search(PackageManagerType.BREW, " a ", null, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.search(PackageManagerType.BREW, " a ", null, null, null, null));
         verify(brewClient, never()).search(anyString(), anyInt(), anyInt());
     }
 
@@ -56,7 +58,7 @@ class PackageSearchServiceTest {
     void appliesDefaultsAndRoutesToBrew() {
         when(brewClient.search(eq("slack"), anyInt(), anyInt())).thenReturn(resultOf(2, false, 2));
 
-        service.search(PackageManagerType.BREW, " slack ", null, null);
+        service.search(PackageManagerType.BREW, " slack ", null, null, null, null);
 
         verify(brewClient).search("slack", 25, 0);
     }
@@ -65,36 +67,50 @@ class PackageSearchServiceTest {
     void clampsFirstToMax() {
         when(wingetClient.search(eq("slack"), anyInt(), anyInt())).thenReturn(resultOf(1, false, 1));
 
-        service.search(PackageManagerType.WINGET, "slack", 500, null);
+        service.search(PackageManagerType.WINGET, "slack", 500, null, null, null);
 
         verify(wingetClient).search("slack", 39, 0);
     }
 
     @Test
-    void mapsResultToConnectionAndCursors() {
+    void mapsFirstPageToConnectionAndCursors() {
         when(brewClient.search(eq("slack"), anyInt(), anyInt())).thenReturn(resultOf(3, true, 42));
 
-        PackageSearchConnection connection = service.search(PackageManagerType.BREW, "slack", 3, null);
+        PackageSearchConnection connection = service.search(PackageManagerType.BREW, "slack", 3, null, null, null);
 
         assertThat(connection.getEdges()).hasSize(3);
         assertThat(connection.getFilteredCount()).isEqualTo(42);
         assertThat(connection.getPageInfo().isHasNextPage()).isTrue();
         assertThat(connection.getPageInfo().isHasPreviousPage()).isFalse();
-        // cursors encode 1-based positions after the row; endCursor drives the next page
-        assertThat(CursorCodec.decode(connection.getEdges().getFirst().getCursor())).isEqualTo("1");
-        assertThat(CursorCodec.decode(connection.getPageInfo().getEndCursor())).isEqualTo("3");
+        // cursors encode the 0-based index of each item (Relay offsetToCursor style)
+        assertThat(CursorCodec.decode(connection.getEdges().getFirst().getCursor())).isEqualTo("0");
+        assertThat(CursorCodec.decode(connection.getPageInfo().getEndCursor())).isEqualTo("2");
     }
 
     @Test
-    void afterCursorContinuesFromEncodedOffset() {
-        String after = CursorCodec.encode("3");
+    void afterCursorContinuesFromNextIndex() {
+        String after = CursorCodec.encode("2");
         when(brewClient.search(eq("slack"), anyInt(), anyInt())).thenReturn(resultOf(2, false, 5));
 
-        PackageSearchConnection connection = service.search(PackageManagerType.BREW, "slack", 3, after);
+        PackageSearchConnection connection = service.search(PackageManagerType.BREW, "slack", 3, after, null, null);
 
         verify(brewClient).search("slack", 3, 3);
         assertThat(connection.getPageInfo().isHasPreviousPage()).isTrue();
-        assertThat(CursorCodec.decode(connection.getEdges().getFirst().getCursor())).isEqualTo("4");
+        assertThat(CursorCodec.decode(connection.getEdges().getFirst().getCursor())).isEqualTo("3");
+    }
+
+    @Test
+    void lastBeforeReturnsThePreviousPage() {
+        String before = CursorCodec.encode("5");
+        when(brewClient.search(eq("slack"), anyInt(), anyInt())).thenReturn(resultOf(3, false, 20));
+
+        PackageSearchConnection connection = service.search(PackageManagerType.BREW, "slack", null, null, 3, before);
+
+        // last 3 items ending just before index 5 -> window [2, 5)
+        verify(brewClient).search("slack", 3, 2);
+        assertThat(connection.getPageInfo().isHasPreviousPage()).isTrue();
+        assertThat(connection.getPageInfo().isHasNextPage()).isTrue();
+        assertThat(CursorCodec.decode(connection.getEdges().getFirst().getCursor())).isEqualTo("2");
     }
 
     @Test
@@ -102,7 +118,7 @@ class PackageSearchServiceTest {
         packageManagerProperties.setChocoEnabled(false);
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.search(PackageManagerType.CHOCO, "slack", null, null));
+                () -> service.search(PackageManagerType.CHOCO, "slack", null, null, null, null));
         verify(chocoClient, never()).search(anyString(), anyInt(), anyInt());
     }
 
