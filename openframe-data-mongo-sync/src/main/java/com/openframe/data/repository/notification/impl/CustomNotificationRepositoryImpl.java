@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -35,9 +36,26 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
     private static final String FIELD_RECIPIENT_TYPE = "recipientType";
     private static final String FIELD_NOTIFICATION_ID = "notificationId";
     private static final String FIELD_STATUS = "status";
+    private static final String ATTRIBUTES_PREFIX = "attributes.";
 
     public CustomNotificationRepositoryImpl(TenantAwareMongoTemplate mongoTemplate) {
         super(mongoTemplate);
+    }
+
+    @Override
+    public Optional<Notification> findByAttribute(String attributeKey, String attributeValue) {
+        if (isBlankLookup(attributeKey, attributeValue)) {
+            return Optional.empty();
+        }
+        String path = ATTRIBUTES_PREFIX + attributeKey;
+        Criteria criteria = Criteria.where(path).is(attributeValue);
+        Query query = Query.query(criteria);
+        Notification found = mongoTemplate.findOne(query, Notification.class);
+        return Optional.ofNullable(found);
+    }
+
+    private boolean isBlankLookup(String attributeKey, String attributeValue) {
+        return isBlank(attributeKey) || isBlank(attributeValue);
     }
 
     @Override
