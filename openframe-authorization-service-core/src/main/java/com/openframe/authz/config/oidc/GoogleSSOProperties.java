@@ -8,6 +8,11 @@ import org.springframework.stereotype.Component;
 public class GoogleSSOProperties extends AbstractOidcProviderProperties {
 
     public static final String GOOGLE = "google";
+
+    @Override
+    public String providerId() {
+        return GOOGLE;
+    }
 }
 
 
