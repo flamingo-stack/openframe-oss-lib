@@ -61,11 +61,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
             request.getSession(true).setAttribute(
                     com.openframe.authz.security.SsoRegistrationConstants.SESSION_ATTR_JOIN_INVITE_ID,
                     payload.invitationId());
-            try {
-                response.sendRedirect(joinConfirmUrl);
-            } catch (java.io.IOException e) {
-                throw new IllegalStateException("Failed to start account confirmation.", e);
-            }
+            redirectToJoinConfirm(response, joinConfirmUrl, payload.redirectTo(), payload.authMobile());
             return;
         }
 

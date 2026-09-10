@@ -1,34 +1,17 @@
 $ErrorActionPreference = 'Stop'
 
-$FamilyName  = 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe'
-$AliasFolder = "$env:LOCALAPPDATA\Microsoft\WindowsApps"
+$FamilyName = 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe'
 
 function Get-WingetExe {
-    $p = (Get-AppxPackage -Name Microsoft.DesktopAppInstaller -EA SilentlyContinue).InstallLocation
+    $p = (Get-AppxPackage -Name Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue).InstallLocation
     if ($p -and (Test-Path "$p\winget.exe")) { return "$p\winget.exe" }
     return $null
 }
 
-function Ensure-AliasFolderOnPath {
-    $key = 'HKCU:\Environment'
-    # raw read: key is REG_EXPAND_SZ and may hold %USERPROFILE%
-    $raw = (Get-Item $key).GetValue(
-        'Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
-    if (($raw -split ';') -contains $AliasFolder) { return $false }
-    $new = if ($raw) { "$raw;$AliasFolder" } else { $AliasFolder }
-    Set-ItemProperty -Path $key -Name 'Path' -Value $new -Type ExpandString
-    return $true
-}
-
-# winget alias folder must be on PATH
-if (Ensure-AliasFolderOnPath) { Write-Output "added to user PATH: $AliasFolder" }
-if (($env:PATH -split ';') -notcontains $AliasFolder) { $env:PATH = "$env:PATH;$AliasFolder" }
-
 $exe = Get-WingetExe
 
-# staged machine-wide but not registered for this user -> register, no download
 if (-not $exe) {
-    $staged = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Appx\AppxAllUserStore\Applications' -EA SilentlyContinue |
+    $staged = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Appx\AppxAllUserStore\Applications' -ErrorAction SilentlyContinue |
               Where-Object { $_.PSChildName -like 'Microsoft.DesktopAppInstaller*' }
     if ($staged) {
         try { Add-AppxPackage -RegisterByFamilyName -MainPackage $FamilyName }
@@ -38,12 +21,20 @@ if (-not $exe) {
     }
 }
 
-# not on the machine at all -> official bootstrap, pulls deps and latest itself
 if (-not $exe) {
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
         Install-PackageProvider -Name NuGet -Force -Scope CurrentUser | Out-Null
-        Install-Module -Name Microsoft.WinGet.Client -Force -Scope CurrentUser -Repository PSGallery | Out-Null
+
+        $moduleRoot = Join-Path $env:TEMP 'openframe-winget-module'
+        New-Item -ItemType Directory -Force -Path $moduleRoot | Out-Null
+        Save-Module -Name Microsoft.WinGet.Client -Path $moduleRoot -Repository PSGallery -Force
+
+        $psd1 = Get-ChildItem $moduleRoot -Recurse -Filter 'Microsoft.WinGet.Client.psd1' |
+                Select-Object -First 1 -ExpandProperty FullName
+        if (-not $psd1) { Write-Output 'module download produced no manifest'; exit 1 }
+        Import-Module $psd1 -Force
+
         Repair-WinGetPackageManager -Force -Latest
     } catch { Write-Output "bootstrap failed: $_"; exit 1 }
 
@@ -51,7 +42,6 @@ if (-not $exe) {
     if (-not $exe) { Write-Output "bootstrapped but winget still unavailable"; exit 3 }
 }
 
-# accept source agreements once per user - runs on every path
 & $exe list --accept-source-agreements --disable-interactivity | Out-Null
 
 Write-Output "winget ready: $(& $exe --version)"
