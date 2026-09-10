@@ -43,6 +43,11 @@ export interface BoardTicketActivity {
 export interface BoardTicket {
   id: string;
   title: string;
+  /**
+   * Display-ready ticket number (`'3891'`, no `#` - the design never prefixes
+   * it), shown before the relative time on the card's last details line.
+   * `''` hides it; the hub hero card passes that.
+   */
   ticketNumber: string;
   status: string;
 
