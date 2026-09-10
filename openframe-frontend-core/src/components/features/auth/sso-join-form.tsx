@@ -124,7 +124,7 @@ export function SsoJoinForm({
           fullWidth
           className="flex-1"
           loading={loading}
-          disabled={disabled || !agreedToTerms}
+          disabled={fieldsDisabled || !agreedToTerms}
           onClick={onSubmit}
         >
           {submitLabel}

@@ -83,8 +83,14 @@ describe('SsoJoinForm', () => {
   });
 
   it('locks both actions while the submit navigates away', () => {
-    render(<SsoJoinForm {...baseProps} agreedToTerms loading />);
+    const onSubmit = vi.fn();
+    render(<SsoJoinForm {...baseProps} agreedToTerms loading onSubmit={onSubmit} />);
     expect(screen.getByRole('button', { name: 'Back to Login' })).toBeDisabled();
     expect(screen.getByRole('checkbox')).toBeDisabled();
+    // The submit too: a second press mid-navigation must not fire another complete.
+    const submit = screen.getByRole('button', { name: 'Create Account' });
+    expect(submit).toBeDisabled();
+    fireEvent.click(submit);
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });
