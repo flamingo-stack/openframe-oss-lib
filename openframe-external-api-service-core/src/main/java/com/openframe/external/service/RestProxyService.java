@@ -7,7 +7,6 @@ import com.openframe.data.document.tool.ToolCredentials;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
-import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.ToolUrlService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -29,10 +28,12 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
 import static com.openframe.core.constants.HttpHeaders.*;
+import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 
 @Service
@@ -93,7 +94,6 @@ public class RestProxyService {
 
             String method = request.getMethod();
             Map<String, String> headers = buildApiRequestHeaders(tool);
-            log.debug("Headers: {}", maskSensitiveHeaders(headers));
 
             return proxy(tool, targetUri, method, headers, body);
             
@@ -134,25 +134,6 @@ public class RestProxyService {
         return headers;
     }
 
-    private Map<String, String> maskSensitiveHeaders(Map<String, String> headers) {
-        Map<String, String> masked = new HashMap<>();
-        for (Map.Entry<String, String> entry : headers.entrySet()) {
-            masked.put(entry.getKey(), isSensitiveHeader(entry.getKey()) ? MASKED_VALUE : entry.getValue());
-        }
-        return masked;
-    }
-
-    private boolean isSensitiveHeader(String headerName) {
-        if (headerName == null) {
-            return false;
-        }
-        String normalized = headerName.toLowerCase();
-        return normalized.equals(AUTHORIZATION.toLowerCase())
-                || normalized.contains("api-key")
-                || normalized.contains("apikey")
-                || normalized.contains("api_key");
-    }
-
     private ResponseEntity<String> proxy(IntegratedTool tool, URI targetUri, String method, 
                                        Map<String, String> proxyHeaders, String body) {
         log.info("Starting proxy request to {} - method: {}, URI: {}", tool.getName(), method, targetUri);
@@ -161,11 +142,8 @@ public class RestProxyService {
             HttpUriRequestBase httpRequest = createHttpRequest(method, targetUri);
             log.debug("Created HTTP request: {} {}", method, targetUri);
 
-            for (Map.Entry<String, String> header : proxyHeaders.entrySet()) {
-                httpRequest.setHeader(header.getKey(), header.getValue());
-                log.debug("Added header: {} = {}", header.getKey(),
-                        isSensitiveHeader(header.getKey()) ? MASKED_VALUE : header.getValue());
-            }
+            proxyHeaders.forEach(httpRequest::setHeader);
+            log.debug("Headers: {}", maskCredential(proxyHeaders, tool.getCredentials()));
 
             if (isNotEmpty(body)) {
                 log.debug("Setting request body (length: {})", body.length());
@@ -197,9 +175,19 @@ public class RestProxyService {
         }
     }
 
+    private Map<String, String> maskCredential(Map<String, String> headers, ToolCredentials credentials) {
+        String secret = credentials == null || credentials.getApiKey() == null ? null : credentials.getApiKey().getKey();
+        if (isEmpty(secret)) {
+            return headers;
+        }
+        Map<String, String> masked = new HashMap<>();
+        headers.forEach((name, value) -> masked.put(name, value.contains(secret) ? MASKED_VALUE : value));
+        return masked;
+    }
+
     private HttpUriRequestBase createHttpRequest(String method, URI uri) {
         try {
-            Method httpMethod = Method.valueOf(method.toUpperCase());
+            Method httpMethod = Method.valueOf(method.toUpperCase(Locale.ROOT));
             return switch (httpMethod) {
                 case GET -> new HttpGet(uri);
                 case POST -> new HttpPost(uri);

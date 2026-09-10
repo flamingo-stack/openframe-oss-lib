@@ -30,9 +30,8 @@ public class ClientCredentialsHandler {
 
         validateClientSecret(client, clientSecret);
 
-        String clientIdValue = client.getClientId();
         String accessToken = accessTokenGenerator.generate(client, CLIENT_CREDENTIALS_GRANT_TYPE);
-        String refreshToken = refreshTokenGenerator.generate(clientIdValue);
+        String refreshToken = refreshTokenGenerator.generate(client.getClientId());
         long accessTokenExpirationSeconds = accessTokenGenerator.getExpirationSeconds();
 
         return new AgentTokenResponse(
