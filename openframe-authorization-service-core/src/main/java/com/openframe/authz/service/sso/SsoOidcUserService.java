@@ -150,6 +150,19 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
     }
 
     /**
+     * The tenant a shared-domain email would be auto-provisioned into, WITHOUT creating anything —
+     * lets the caller decide (e.g. show a consent step) before the create in
+     * {@link #autoProvisionByGlobalDomain}.
+     */
+    public Optional<String> autoProvisionTenantForDomain(String email) {
+        if (!hasText(email)) {
+            return Optional.empty();
+        }
+        String domain = email.toLowerCase(ROOT).substring(email.lastIndexOf('@') + 1);
+        return globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain);
+    }
+
+    /**
      * Resolve an existing active user, or provision one under the SAME rules as the web SSO login:
      * only when the tenant has a per-tenant config for the provider with auto-provisioning enabled
      * and the email's domain on its allowlist. Used by the native Apple exchange; the web flow keeps

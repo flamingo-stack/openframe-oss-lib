@@ -13,5 +13,6 @@ export * from './openframe-sso-login-form';
 export * from './openframe-sso-signup-form';
 export * from './password-reset-form';
 export * from './sso-auth-shell';
+export * from './sso-join-form';
 export * from './sso-providers';
 export * from './terms-agreement-label';
