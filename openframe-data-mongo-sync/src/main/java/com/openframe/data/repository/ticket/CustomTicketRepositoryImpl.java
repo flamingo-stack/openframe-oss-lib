@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+import static org.springframework.util.StringUtils.hasText;
+
 @Slf4j
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
 public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport implements CustomTicketRepository {
@@ -53,6 +55,8 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String FIELD_RESOLVED_AT = "resolvedAt";
     private static final String FIELD_ORDER = "order";
+
+    private static final String CASE_INSENSITIVE = "i";
 
     private static final String AGG_COUNT = "count";
     private static final String AGG_RESOLUTION_TIME = "resolutionTime";
@@ -109,17 +113,46 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     }
 
     private void applySearchCriteria(Query query, String search) {
-        if (search == null || search.trim().isEmpty()) {
+        if (!hasText(search)) {
             return;
         }
-        String searchTrimmed = Pattern.quote(search.trim());
-        Criteria searchCriteria = new Criteria().orOperator(
-                Criteria.where(FIELD_TITLE).regex(searchTrimmed, "i"),
-                Criteria.where(FIELD_DEVICE_HOSTNAME).regex(searchTrimmed, "i"),
-                Criteria.where(FIELD_ORGANIZATION_NAME).regex(searchTrimmed, "i"),
-                Criteria.where(FIELD_ASSIGNED_NAME).regex(searchTrimmed, "i")
-        );
+        String searchTrimmed = search.trim();
+        List<Criteria> alternatives = buildTextAlternatives(searchTrimmed);
+        Optional<Integer> ticketNumber = parseTicketNumber(searchTrimmed);
+        ticketNumber.map(number -> Criteria.where(FIELD_TICKET_NUMBER).is(number))
+                .ifPresent(alternatives::add);
+
+        Criteria searchCriteria = new Criteria().orOperator(alternatives);
         query.addCriteria(searchCriteria);
+    }
+
+    private List<Criteria> buildTextAlternatives(String searchTrimmed) {
+        String quoted = Pattern.quote(searchTrimmed);
+        List<Criteria> alternatives = new ArrayList<>();
+        alternatives.add(Criteria.where(FIELD_TITLE).regex(quoted, CASE_INSENSITIVE));
+        alternatives.add(Criteria.where(FIELD_DEVICE_HOSTNAME).regex(quoted, CASE_INSENSITIVE));
+        alternatives.add(Criteria.where(FIELD_ORGANIZATION_NAME).regex(quoted, CASE_INSENSITIVE));
+        alternatives.add(Criteria.where(FIELD_ASSIGNED_NAME).regex(quoted, CASE_INSENSITIVE));
+        return alternatives;
+    }
+
+    private Optional<Integer> parseTicketNumber(String searchTrimmed) {
+        if (!hasOnlyDigits(searchTrimmed)) {
+            return Optional.empty();
+        }
+        try {
+            Integer ticketNumber = Integer.valueOf(searchTrimmed);
+            return Optional.of(ticketNumber);
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+    }
+
+    private boolean hasOnlyDigits(String value) {
+        if (value.isEmpty()) {
+            return false;
+        }
+        return value.chars().allMatch(Character::isDigit);
     }
 
     private void addCriteriaIfNotEmpty(Query query, String field, List<?> values) {
