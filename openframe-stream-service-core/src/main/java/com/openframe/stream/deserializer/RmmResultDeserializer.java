@@ -68,9 +68,16 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
         if (executionId == null && machineId == null) {
             return Optional.empty();
         }
-        return Optional.of(String.join(":",
-                executionId == null ? "" : executionId,
-                machineId == null ? "" : machineId));
+        StringBuilder id = new StringBuilder()
+                .append(executionId == null ? "" : executionId)
+                .append(':')
+                .append(machineId == null ? "" : machineId);
+        additionalEventToolIdComponent(after).ifPresent(extra -> id.append(':').append(extra));
+        return Optional.of(id.toString());
+    }
+
+    protected Optional<String> additionalEventToolIdComponent(JsonNode after) {
+        return Optional.empty();
     }
 
     @Override

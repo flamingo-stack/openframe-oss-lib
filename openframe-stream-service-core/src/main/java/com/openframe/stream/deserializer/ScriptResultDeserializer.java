@@ -48,6 +48,11 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     }
 
     @Override
+    protected Optional<String> additionalEventToolIdComponent(JsonNode after) {
+        return parseStringField(after, FIELD_SCRIPT_ID);
+    }
+
+    @Override
     protected Optional<String> getMessage(JsonNode after) {
         String scriptName = findScriptName(after);
         if (scriptName == null || scriptName.isBlank()) {
