@@ -94,8 +94,6 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
-            // agent -> server: "package manager X is not installed" reports
-            // Re-sent every agent check cycle, so cap age to keep the stream small
             StreamConfiguration.builder()
                     .name(PackageManagerMissingMessage.STREAM)
                     .subjects(List.of(PackageManagerMissingMessage.SUBJECT_FILTER))

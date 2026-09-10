@@ -62,9 +62,7 @@ class SeedSystemScriptsChangeUnitTest {
         assertEquals(ScriptStatus.ACTIVE, brew.getStatus());
         assertNotNull(brew.getContentHash());
         assertTrue(brew.getScriptBody().contains("NONINTERACTIVE=1"));
-        // the official installer's root-guard is patched out so it can run under root
         assertTrue(brew.getScriptBody().contains("check_run_command_as_root"));
-        // post-install, brew itself is exercised as the console user
         assertTrue(brew.getScriptBody().contains("sudo -u \"$CONSOLE_USER\""));
 
         Script choco = byName(scripts, SystemScriptCode.INSTALL_CHOCOLATEY.canonicalName());
@@ -73,13 +71,10 @@ class SeedSystemScriptsChangeUnitTest {
         assertTrue(choco.getScriptBody().contains("community.chocolatey.org/install.ps1"));
 
         Script winget = byName(scripts, SystemScriptCode.INSTALL_WINGET.canonicalName());
-        // the Appx registration and PATH fix are per-user, so winget must NOT run elevated
         assertEquals(PrivilegeLevel.USER, winget.getPrivilegeLevel());
         assertTrue(winget.getScriptBody().contains("Repair-WinGetPackageManager -Force -Latest"));
         assertTrue(winget.getScriptBody().contains("--accept-source-agreements"));
 
-        // the watchdog derives its stuck-threshold from the row's timeout, so a long
-        // bootstrap (CLT download) must carry an explicit one
         assertEquals(900, brew.getDefaultTimeoutSeconds());
         assertEquals(1800, winget.getDefaultTimeoutSeconds());
     }

@@ -22,17 +22,6 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Dispatches the seeded bootstrap SYSTEM script when an agent reports a missing
- * package manager. Mirrors the api-lib single-run dispatch (persist a RUNNING
- * row, publish the ScriptMessage) — api-lib itself is not on this classpath.
- *
- * <p>Retry is owned by the agent: it re-reports on its next check cycle, so the
- * server only suppresses repeats — an in-flight run, or anything dispatched
- * within the cooldown window. The scripts themselves are idempotent (exit 0
- * when the manager is already installed), so a lost race double-dispatch is
- * harmless.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j

@@ -7,8 +7,6 @@ import com.openframe.data.document.rmm.script.ScriptShell;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-// Seeded once per tenant. Changing a body/metadata here does NOT re-seed existing
-// tenants — add a new migration to update them.
 @Getter
 @AllArgsConstructor
 public enum SystemScriptDefinition {
@@ -19,7 +17,6 @@ public enum SystemScriptDefinition {
             ScriptShell.BASH,
             OsType.MAC_OS,
             PrivilegeLevel.ADMIN,
-            // 900 is the max the run UI accepts; a CLT download on a slow link can still exceed it
             900,
             "Installs Homebrew for the console user. Managed by OpenFrame."),
 

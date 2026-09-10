@@ -79,12 +79,10 @@ public class PackageManagerMissingListener extends AbstractJetStreamPushListener
 
             message.ack();
         } catch (JsonProcessingException | IllegalArgumentException permanentlyBad) {
-            // A malformed subject/payload never gets better — redelivering it 50 times only spams the log.
             log.warn("Dropping malformed package-manager report subject={} payload={}", subject, payload, permanentlyBad);
             message.ack();
         } catch (Exception e) {
             log.error("Unexpected error processing package-manager report: {}", payload, e);
-            // Leave unacked so JetStream redelivers.
         }
     }
 }

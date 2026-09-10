@@ -54,7 +54,6 @@ public class ScriptBootstrapResultListener {
 
             rmmResultService.processResult(machineId, resultMessage);
         } catch (Exception e) {
-            // Log metadata only — the raw payload may contain sensitive script output.
             log.error("Unexpected error processing bootstrap script result from subject {} (payloadSize={} bytes)",
                     subject, data.length, e);
         }
