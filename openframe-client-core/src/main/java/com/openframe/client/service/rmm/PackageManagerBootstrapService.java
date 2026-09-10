@@ -98,6 +98,7 @@ public class PackageManagerBootstrapService {
                 .privilegeLevel(script.getPrivilegeLevel())
                 .timeoutSeconds(script.getDefaultTimeoutSeconds())
                 .source(ExecutionSource.SYSTEM_BOOTSTRAP)
+                .packageManager(packageManager)
                 .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(now)
                 .statusChangedAt(now)

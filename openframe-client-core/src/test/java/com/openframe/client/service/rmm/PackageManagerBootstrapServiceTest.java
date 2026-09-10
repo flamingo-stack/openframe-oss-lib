@@ -109,6 +109,7 @@ class PackageManagerBootstrapServiceTest {
         verify(scriptExecutionRepository).save(row.capture());
         assertThat(row.getValue().getTenantId()).isEqualTo(TENANT_ID);
         assertThat(row.getValue().getSource()).isEqualTo(ExecutionSource.SYSTEM_BOOTSTRAP);
+        assertThat(row.getValue().getPackageManager()).isEqualTo(PackageManagerType.WINGET);
         assertThat(row.getValue().getStatus()).isEqualTo(ExecutionStatus.RUNNING);
         assertThat(row.getValue().getPrivilegeLevel()).isEqualTo(PrivilegeLevel.USER);
         assertThat(row.getValue().getTimeoutSeconds()).isEqualTo(1800);
