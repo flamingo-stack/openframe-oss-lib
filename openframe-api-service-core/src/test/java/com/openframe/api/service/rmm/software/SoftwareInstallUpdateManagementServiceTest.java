@@ -80,17 +80,17 @@ class SoftwareInstallUpdateManagementServiceTest {
     }
 
     @Test
-    @DisplayName("update: routes to the BREW_UPGRADE system script")
-    void update_usesUpgradeScript() {
-        ScriptResponse upgradeScript = systemScript("brew-upgrade-id");
-        when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPGRADE)).thenReturn(upgradeScript);
+    @DisplayName("update: routes to the BREW_UPDATE system script")
+    void update_usesUpdateScript() {
+        ScriptResponse updateScript = systemScript("brew-update-id");
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(updateScript);
         when(softwareDispatchService.dispatch(any(), anyList(), anyList(), eq(USER), eq(ExecutionSource.MANUAL)))
                 .thenReturn("exec-1");
 
         service.update(input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER);
 
-        verify(scriptService).getSoftwareScript(SoftwareScriptCode.BREW_UPGRADE);
-        verify(softwareDispatchService).dispatch(eq(upgradeScript), eq(MACHINES),
+        verify(scriptService).getSoftwareScript(SoftwareScriptCode.BREW_UPDATE);
+        verify(softwareDispatchService).dispatch(eq(updateScript), eq(MACHINES),
                 eq(List.of("--cask", "slack")), eq(USER), eq(ExecutionSource.MANUAL));
     }
 

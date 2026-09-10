@@ -8,11 +8,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Homebrew (macOS) handler. Casks (GUI apps) need the {@code --cask} flag; formulae (CLI tools)
- * do not — the effective command becomes {@code brew install --cask slack} or
- * {@code brew install wireshark}.
- */
 @Component
 public class BrewPackageManagerHandler implements PackageManagerHandler {
 
@@ -27,7 +22,7 @@ public class BrewPackageManagerHandler implements PackageManagerHandler {
     public SoftwareScriptCode scriptCode(SoftwareAction action) {
         return switch (action) {
             case INSTALL -> SoftwareScriptCode.BREW_INSTALL;
-            case UPDATE -> SoftwareScriptCode.BREW_UPGRADE;
+            case UPDATE -> SoftwareScriptCode.BREW_UPDATE;
         };
     }
 

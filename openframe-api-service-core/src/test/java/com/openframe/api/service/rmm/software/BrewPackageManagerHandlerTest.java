@@ -23,10 +23,10 @@ class BrewPackageManagerHandlerTest {
     }
 
     @Test
-    @DisplayName("scriptCode maps INSTALL->BREW_INSTALL, UPDATE->BREW_UPGRADE")
+    @DisplayName("scriptCode maps INSTALL->BREW_INSTALL, UPDATE->BREW_UPDATE")
     void scriptCode() {
         assertThat(handler.scriptCode(SoftwareAction.INSTALL)).isEqualTo(SoftwareScriptCode.BREW_INSTALL);
-        assertThat(handler.scriptCode(SoftwareAction.UPDATE)).isEqualTo(SoftwareScriptCode.BREW_UPGRADE);
+        assertThat(handler.scriptCode(SoftwareAction.UPDATE)).isEqualTo(SoftwareScriptCode.BREW_UPDATE);
     }
 
     @Test

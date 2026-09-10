@@ -91,13 +91,6 @@ public class ScriptService {
                         "System script not provisioned for this tenant: " + code.canonicalName()));
     }
 
-    /**
-     * Resolve a seeded software-management script (install/update) by its stable
-     * {@link SoftwareScriptCode}. Provisioned per tenant by the management service; software
-     * management references the code rather than a tenant-specific id.
-     *
-     * @throws NotFoundException if the software script has not been seeded for this tenant yet.
-     */
     public ScriptResponse getSoftwareScript(SoftwareScriptCode code) {
         String tenantId = tenantIdProvider.getTenantId();
         return scriptRepository.findSoftwareScript(code, tenantId)

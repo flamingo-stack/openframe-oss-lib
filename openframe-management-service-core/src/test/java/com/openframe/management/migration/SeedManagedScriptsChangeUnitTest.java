@@ -80,10 +80,10 @@ class SeedManagedScriptsChangeUnitTest {
         assertNotNull(brewInstall.getDefaultTimeoutSeconds());
         assertTrue(brewInstall.getScriptBody().contains("install \"$@\""));
 
-        Script brewUpgrade = byName(scripts, SoftwareScriptCode.BREW_UPGRADE.canonicalName());
-        assertEquals(ScriptType.SOFTWARE, brewUpgrade.getType());
-        assertEquals(PrivilegeLevel.USER, brewUpgrade.getPrivilegeLevel());
-        assertTrue(brewUpgrade.getScriptBody().contains("upgrade \"$@\""));
+        Script brewUpdate = byName(scripts, SoftwareScriptCode.BREW_UPDATE.canonicalName());
+        assertEquals(ScriptType.SOFTWARE, brewUpdate.getType());
+        assertEquals(PrivilegeLevel.USER, brewUpdate.getPrivilegeLevel());
+        assertTrue(brewUpdate.getScriptBody().contains("upgrade \"$@\""));
     }
 
     @Test

@@ -29,8 +29,7 @@ public class SoftwareDispatchService {
     private final ScriptExecutionService scriptExecutionService;
     private final SoftwareNatsPublisher softwareNatsPublisher;
 
-    public String dispatch(ScriptResponse script, List<String> machineIds, List<String> args,
-                           String initiatedBy, ExecutionSource source) {
+    public String dispatch(ScriptResponse script, List<String> machineIds, List<String> args, String initiatedBy, ExecutionSource source) {
         verifyMachines(machineIds);
 
         String executionId = UUID.randomUUID().toString();

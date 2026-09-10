@@ -18,8 +18,7 @@ public class PackageManagerRegistry {
         for (PackageManagerHandler handler : handlers) {
             PackageManagerHandler previous = map.putIfAbsent(handler.manager(), handler);
             if (previous != null) {
-                throw new IllegalStateException(
-                        "Duplicate PackageManagerHandler for " + handler.manager()
+                throw new IllegalStateException("Duplicate PackageManagerHandler for " + handler.manager()
                                 + ": " + previous.getClass().getName() + " and " + handler.getClass().getName());
             }
         }

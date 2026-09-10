@@ -8,30 +8,22 @@ import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-/**
- * The seeded software-management scripts: install/update a package with an already-provisioned
- * manager. The chosen package is passed as a script argument (e.g. {@code --cask slack}); the body
- * only supplies the verb. Run as the logged-in user (USER) — Homebrew refuses root — and bootstrap
- * of the manager itself is out of scope here (see {@link SystemScriptDefinition}).
- *
- * <p>Seeded with {@link ScriptType#SOFTWARE}.
- */
 @Getter
 @AllArgsConstructor
 public enum SoftwareScriptDefinition implements ManagedScriptDefinition {
 
     BREW_INSTALL(
             SoftwareScriptCode.BREW_INSTALL,
-            "system-scripts/brew-install.sh",
+            "system-scripts/brew-install-software.sh",
             ScriptShell.BASH,
             OsType.MAC_OS,
             PrivilegeLevel.USER,
             1800,
             "Installs a Homebrew package (passed as a script argument). Managed by OpenFrame."),
 
-    BREW_UPGRADE(
-            SoftwareScriptCode.BREW_UPGRADE,
-            "system-scripts/brew-upgrade.sh",
+    BREW_UPDATE(
+            SoftwareScriptCode.BREW_UPDATE,
+            "system-scripts/brew-update-software.sh",
             ScriptShell.BASH,
             OsType.MAC_OS,
             PrivilegeLevel.USER,

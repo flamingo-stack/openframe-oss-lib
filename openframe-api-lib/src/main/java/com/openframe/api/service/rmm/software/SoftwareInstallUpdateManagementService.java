@@ -35,10 +35,8 @@ public class SoftwareInstallUpdateManagementService {
         return dispatch(SoftwareAction.UPDATE, input, initiatedBy);
     }
 
-    private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input,
-                                                  String initiatedBy) {
+    private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input, String initiatedBy) {
         List<String> machineIds = input.getMachineIds();
-        // Resolve each distinct software script at most once per request (all brew installs share one).
         Map<SoftwareScriptCode, ScriptResponse> scriptCache = new EnumMap<>(SoftwareScriptCode.class);
 
         List<SoftwareDispatchResult> results = new ArrayList<>(input.getPackages().size());
@@ -48,8 +46,7 @@ public class SoftwareInstallUpdateManagementService {
             ScriptResponse script = scriptCache.computeIfAbsent(code, scriptService::getSoftwareScript);
             List<String> args = handler.buildArgs(pkg.getPackageId(), pkg.getPackageType());
 
-            String executionId = softwareDispatchService.dispatch(
-                    script, machineIds, args, initiatedBy, ExecutionSource.MANUAL);
+            String executionId = softwareDispatchService.dispatch(script, machineIds, args, initiatedBy, ExecutionSource.MANUAL);
 
             results.add(SoftwareDispatchResult.builder()
                     .packageManager(pkg.getPackageManager())
@@ -58,8 +55,7 @@ public class SoftwareInstallUpdateManagementService {
                     .build());
         }
 
-        log.info("Software {} dispatched: packages={} machines={} initiatedBy={}",
-                action, input.getPackages().size(), machineIds.size(), initiatedBy);
+        log.info("Software {} dispatched: packages={} machines={} initiatedBy={}", action, input.getPackages().size(), machineIds.size(), initiatedBy);
         return results;
     }
 }
