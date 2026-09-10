@@ -191,9 +191,17 @@ public class DeviceLocalScheduleService {
         }
 
         Instant fireAt = occurrence.atZone(zone).toInstant();
-        boolean retry = schedule.getOfflineBehavior() == ScheduleOfflineBehavior.RETRY_ON_RECONNECT;
-        if (retry && !now.isAfter(fireAt.plusSeconds(window))) {
-            return;
+        if (schedule.getOfflineBehavior() == ScheduleOfflineBehavior.RETRY_ON_RECONNECT) {
+            Instant reconnectDeadline = fireAt.plusSeconds(window);
+            if (!now.isAfter(reconnectDeadline)) {
+                fireDispatcher.armReconnectRetry(schedule, machineId, now, reconnectDeadline);
+                record(schedule, machineId, occurrenceAt, now,
+                        ScheduleDeviceLocalTimeDispatchStatus.ARMED_FOR_RECONNECT, sentinel);
+                log.info("DEVICE_LOCAL scheduleId={} machineId={} offline at occurrence fireAt={} — armed "
+                        + "reconnect-retry until {}", schedule.getId(), machineId, fireAt, reconnectDeadline);
+                return;
+            }
+            // Reconnect window already elapsed while the device stayed offline — give up on this occurrence.
         }
         record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.MISSED, sentinel);
         log.warn("DEVICE_LOCAL scheduleId={} machineId={} offline at occurrence fireAt={} (offlineBehavior={}) "
