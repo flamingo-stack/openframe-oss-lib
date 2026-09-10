@@ -1,0 +1,40 @@
+# GraphQL schema for RMM software management (install / update packages).
+#
+# Built entirely on top of the existing RMM script-execution machinery: each package becomes its
+# own execution over the dedicated software NATS pipe, tracked by the same Execution history and
+# watchdog. Tenant scoping is implicit (resolved from the authenticated principal).
+#
+# PackageManagerType and BrewPackageType are declared in package-search.graphqls and reused here.
+
+extend type Mutation {
+    """Install one or more catalog packages on the given devices, immediately. Each package is
+    dispatched as its own RMM execution; returns one result (with its executionId) per package."""
+    installSoftware(input: SoftwareManagementInput!): [SoftwareDispatchResult!]!
+
+    """Update one or more catalog packages on the given devices, immediately. Each package is
+    dispatched as its own RMM execution; returns one result (with its executionId) per package."""
+    updateSoftware(input: SoftwareManagementInput!): [SoftwareDispatchResult!]!
+}
+
+"""A set of catalog packages to install/update on a set of devices."""
+input SoftwareManagementInput {
+    "Target device machineIds (subject-safe tokens). 1..100."
+    machineIds: [String!]!
+    "Packages to act on. 1..50."
+    packages: [SoftwarePackageInput!]!
+}
+
+"""One package chosen from the catalog, identified exactly as package search returns it."""
+input SoftwarePackageInput {
+    packageManager: PackageManagerType!
+    packageId: String!
+    "Brew sub-type (CASK/FORMULA); optional for managers that do not distinguish."
+    packageType: BrewPackageType
+}
+
+"""The dispatch outcome for one package: its shared executionId across the targeted devices."""
+type SoftwareDispatchResult {
+    packageManager: PackageManagerType!
+    packageId: String!
+    executionId: String!
+}

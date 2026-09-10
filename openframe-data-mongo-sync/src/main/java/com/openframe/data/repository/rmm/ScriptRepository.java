@@ -3,6 +3,8 @@ package com.openframe.data.repository.rmm;
 import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.document.rmm.script.ScriptType;
+import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -41,10 +43,16 @@ public interface ScriptRepository extends MongoRepository<Script, String>, Custo
      */
     Optional<Script> findByTenantIdAndName(String tenantId, String name);
 
-    Optional<Script> findByTenantIdAndNameAndSystemTrue(String tenantId, String name);
+    Optional<Script> findByTenantIdAndNameAndType(String tenantId, String name, ScriptType type);
 
+    /** Resolve an OpenFrame-provisioned package-manager bootstrap script. */
     default Optional<Script> findSystemScript(SystemScriptCode code, String tenantId) {
-        return findByTenantIdAndNameAndSystemTrue(tenantId, code.canonicalName());
+        return findByTenantIdAndNameAndType(tenantId, code.canonicalName(), ScriptType.SYSTEM);
+    }
+
+    /** Resolve an OpenFrame-provisioned software-management (install/update) script. */
+    default Optional<Script> findSoftwareScript(SoftwareScriptCode code, String tenantId) {
+        return findByTenantIdAndNameAndType(tenantId, code.canonicalName(), ScriptType.SOFTWARE);
     }
 
     /**

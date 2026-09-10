@@ -104,9 +104,14 @@ public class Script implements TenantScoped {
     @Builder.Default
     private ScriptStatus status = ScriptStatus.ACTIVE;
     /**
+     * Origin/category of the script — see {@link ScriptType}. Defaults to {@link ScriptType#USER}.
+     * {@code SYSTEM} and {@code SOFTWARE} are OpenFrame-managed (immutable + hidden from the list).
+     */
+    @Builder.Default
+    private ScriptType type = ScriptType.USER;
+    /**
      * Timestamp of the most recent {@link #status} transition.
      */
     private Instant statusChangedAt;
-    private Boolean system;
     private String contentHash;
 }

@@ -4,19 +4,23 @@ import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptShell;
+import com.openframe.data.document.rmm.script.ScriptType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * The seeded package-manager bootstrap scripts. Bodies live as classpath
- * resources. Privilege levels are dictated by the managers themselves:
- * brew runs as ADMIN but drops to the console user (Homebrew refuses root),
- * choco installs machine-wide under SYSTEM/ADMIN, and winget MUST run as the
- * logged-in USER — the Appx registration and PATH fix are per-user.
+ * The seeded package-manager <b>bootstrap</b> scripts (install the manager itself). Bodies live as
+ * classpath resources. Privilege levels are dictated by the managers themselves: brew runs as ADMIN
+ * but drops to the console user (Homebrew refuses root), choco installs machine-wide under
+ * SYSTEM/ADMIN, and winget MUST run as the logged-in USER — the Appx registration and PATH fix are
+ * per-user.
+ *
+ * <p>Seeded with {@link ScriptType#SYSTEM}. Install/update of actual packages lives in
+ * {@link SoftwareScriptDefinition} ({@link ScriptType#SOFTWARE}).
  */
 @Getter
 @AllArgsConstructor
-public enum SystemScriptDefinition {
+public enum SystemScriptDefinition implements ManagedScriptDefinition {
 
     INSTALL_BREW(
             SystemScriptCode.INSTALL_BREW,
@@ -48,4 +52,14 @@ public enum SystemScriptDefinition {
     private final OsType osType;
     private final PrivilegeLevel privilegeLevel;
     private final String description;
+
+    @Override
+    public String getCanonicalName() {
+        return code.canonicalName();
+    }
+
+    @Override
+    public ScriptType getScriptType() {
+        return ScriptType.SYSTEM;
+    }
 }

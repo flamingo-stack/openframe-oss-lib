@@ -13,19 +13,20 @@ import static java.lang.String.format;
 @RequiredArgsConstructor
 @ConditionalOnProperty("spring.cloud.stream.enabled")
 @Slf4j
-public class ScriptNatsPublisher {
+public class SoftwareNatsPublisher {
 
-    private static final String SCRIPT_SUBJECT_TEMPLATE = "machine.%s.script-execution";
+    private static final String SOFTWARE_SUBJECT_TEMPLATE = "machine.%s.software-execution";
 
     private final NatsMessagePublisher natsMessagePublisher;
 
-    public void publishScript(String machineId, ScriptMessage message) {
+    public void publishSoftware(String machineId, ScriptMessage message) {
         if (message == null) {
             throw new IllegalArgumentException("ScriptMessage must not be null");
         }
 
-        String subject = format(SCRIPT_SUBJECT_TEMPLATE, machineId);
+        String subject = format(SOFTWARE_SUBJECT_TEMPLATE, machineId);
         natsMessagePublisher.publish(subject, message);
-        log.info("Published script: machineId={} subject={}", machineId, subject);
+        log.info("Published software execution: machineId={} subject={} executionId={} scriptId={}",
+                machineId, subject, message.getExecutionId(), message.getScriptId());
     }
 }
