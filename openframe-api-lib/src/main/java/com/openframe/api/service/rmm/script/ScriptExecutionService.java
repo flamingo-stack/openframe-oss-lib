@@ -11,9 +11,12 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptExecutionMapper;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -23,17 +26,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Application-level operations on RMM execution rows (the Script Details →
- * Execution History list).
- *
- * <p>Tenant scoping resolves internally via {@link TenantIdProvider} — same
- * pattern as {@link ScriptService}.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -75,13 +70,20 @@ public class ScriptExecutionService {
                                           Integer timeoutSeconds,
                                           String initiatedBy,
                                           ExecutionSource source) {
-        Instant now = Instant.now();
         // Single ad-hoc run (runScript) never originates from a schedule → scheduleId null.
-        ScriptExecution scriptExecution = buildRunningRow(executionId, scriptId, null, machineId, privilegeLevel, timeoutSeconds, initiatedBy, source, now);
-        ScriptExecution saved = scriptExecutionRepository.save(scriptExecution);
+        List<ScriptExecution> saved = scriptExecutionRepository.saveRunning(RunningExecutionRows.builder()
+                .tenantId(tenantIdProvider.getTenantId())
+                .executionId(executionId)
+                .scriptId(scriptId)
+                .machineIds(List.of(machineId))
+                .privilegeLevel(privilegeLevel)
+                .timeoutSeconds(timeoutSeconds)
+                .initiatedBy(initiatedBy)
+                .source(source)
+                .build());
         log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} source={} status=RUNNING",
                 executionId, scriptId, machineId, initiatedBy, source);
-        return scriptExecutionMapper.toResponse(saved);
+        return scriptExecutionMapper.toResponse(saved.get(0));
     }
 
     /**
@@ -100,11 +102,17 @@ public class ScriptExecutionService {
                                                      Integer timeoutSeconds,
                                                      String initiatedBy,
                                                      ExecutionSource source) {
-        Instant now = Instant.now();
-        List<ScriptExecution> rows = machineIds.stream()
-                .map(machineId -> buildRunningRow(executionId, scriptId, scheduleId, machineId, privilegeLevel, timeoutSeconds, initiatedBy, source, now))
-                .toList();
-        List<ScriptExecution> saved = scriptExecutionRepository.saveAll(rows);
+        List<ScriptExecution> saved = scriptExecutionRepository.saveRunning(RunningExecutionRows.builder()
+                .tenantId(tenantIdProvider.getTenantId())
+                .executionId(executionId)
+                .scriptId(scriptId)
+                .scheduleId(scheduleId)
+                .machineIds(machineIds)
+                .privilegeLevel(privilegeLevel)
+                .timeoutSeconds(timeoutSeconds)
+                .initiatedBy(initiatedBy)
+                .source(source)
+                .build());
         log.info("Persisted batch execution rows: executionId={} scriptId={} scheduleId={} machineCount={} initiatedBy={} source={} status=RUNNING",
                 executionId, scriptId, scheduleId, machineIds.size(), initiatedBy, source);
         return saved.stream().map(scriptExecutionMapper::toResponse).toList();
@@ -122,29 +130,32 @@ public class ScriptExecutionService {
                 .toList();
     }
 
-    private ScriptExecution buildRunningRow(String executionId,
-                                            String scriptId,
-                                            String scheduleId,
-                                            String machineId,
-                                            PrivilegeLevel privilegeLevel,
-                                            Integer timeoutSeconds,
-                                            String initiatedBy,
-                                            ExecutionSource source,
-                                            Instant now) {
-        return ScriptExecution.builder()
+    public List<ScriptExecutionResponse> createSoftwareBatch(String executionId,
+                                                             String scriptId,
+                                                             List<String> machineIds,
+                                                             PrivilegeLevel privilegeLevel,
+                                                             Integer timeoutSeconds,
+                                                             String initiatedBy,
+                                                             ExecutionSource source,
+                                                             PackageManagerType packageManager,
+                                                             String packageName,
+                                                             SoftwareAction softwareAction) {
+        List<ScriptExecution> saved = scriptExecutionRepository.saveRunning(RunningExecutionRows.builder()
                 .tenantId(tenantIdProvider.getTenantId())
                 .executionId(executionId)
                 .scriptId(scriptId)
-                .scheduleId(scheduleId)
-                .machineId(machineId)
+                .machineIds(machineIds)
                 .privilegeLevel(privilegeLevel)
                 .timeoutSeconds(timeoutSeconds)
                 .initiatedBy(initiatedBy)
                 .source(source)
-                .status(ExecutionStatus.RUNNING)
-                .dispatchedAt(now)
-                .statusChangedAt(now)
-                .build();
+                .packageManager(packageManager)
+                .packageName(packageName)
+                .softwareAction(softwareAction)
+                .build());
+        log.info("Persisted software batch rows: executionId={} scriptId={} packageManager={} packageName={} action={} machineCount={} initiatedBy={} source={} status=RUNNING",
+                executionId, scriptId, packageManager, packageName, softwareAction, machineIds.size(), initiatedBy, source);
+        return saved.stream().map(scriptExecutionMapper::toResponse).toList();
     }
 
     /**

@@ -5,6 +5,7 @@ import com.openframe.api.dto.rmm.software.SoftwareManagementInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +48,8 @@ public class SoftwareInstallUpdateManagementService {
             ScriptResponse script = scriptCache.computeIfAbsent(code, scriptService::getSoftwareScript);
             List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getPackageType());
 
-            String executionId = softwareDispatchService.dispatch(script, machineIds, args, initiatedBy, source);
+            String executionId = softwareDispatchService.dispatch(script, machineIds, args, initiatedBy, source,
+                    pkg.getPackageManager(), pkg.getPackageName(), action);
 
             results.add(SoftwareDispatchResult.builder()
                     .packageManager(pkg.getPackageManager())

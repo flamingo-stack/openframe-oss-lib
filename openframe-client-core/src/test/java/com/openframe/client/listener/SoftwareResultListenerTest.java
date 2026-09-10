@@ -115,7 +115,7 @@ class SoftwareResultListenerTest {
 
     private MessageHandler captureSubscribedHandler() {
         when(natsConnection.createDispatcher()).thenReturn(dispatcher);
-        listener.subscribeToSoftwareResults();
+        listener.subscribe();
 
         ArgumentCaptor<MessageHandler> handlerCaptor = ArgumentCaptor.forClass(MessageHandler.class);
         verify(dispatcher).subscribe(eq(SUBJECT), handlerCaptor.capture());

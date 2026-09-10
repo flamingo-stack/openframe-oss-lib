@@ -6,6 +6,13 @@
 #
 # PackageManagerType and BrewPackageType are declared in package-search.graphqls and reused here.
 
+"""Install vs update — the two software management actions. Also scopes a package's Execution
+History (softwareExecutions)."""
+enum SoftwareAction {
+    INSTALL
+    UPDATE
+}
+
 extend type Mutation {
     """Install one or more catalog packages on the given devices, immediately. Each package is
     dispatched as its own RMM execution; returns one result (with its executionId) per package."""

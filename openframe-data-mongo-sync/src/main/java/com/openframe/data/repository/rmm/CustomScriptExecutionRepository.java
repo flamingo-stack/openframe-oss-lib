@@ -1,5 +1,6 @@
 package com.openframe.data.repository.rmm;
 
+import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
@@ -22,6 +23,8 @@ import java.util.Optional;
  * {@code CustomScriptExecutionRepositoryImpl}.
  */
 public interface CustomScriptExecutionRepository {
+
+    List<ScriptExecution> saveRunning(RunningExecutionRows request);
 
     Optional<ScriptExecution> findByMachineIdAndExecutionIdAndScriptId(String machineId, String executionId, String scriptId);
 

@@ -3,6 +3,7 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import org.springframework.stereotype.Component;
 

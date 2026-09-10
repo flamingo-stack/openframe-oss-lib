@@ -6,9 +6,11 @@ import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptShell;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
@@ -51,12 +53,14 @@ class SoftwareDispatchServiceTest {
         ScriptResponse script = brewInstall();
 
         String executionId = service.dispatch(script, List.of("m1", "m2"),
-                List.of("--cask", "slack"), USER, ExecutionSource.MANUAL);
+                List.of("--cask", "slack"), USER, ExecutionSource.MANUAL,
+                PackageManagerType.BREW, "slack", SoftwareAction.INSTALL);
 
         assertThat(executionId).isNotBlank();
 
-        verify(scriptExecutionService).createBatch(eq(executionId), eq("brew-install-id"), eq(null),
-                eq(List.of("m1", "m2")), eq(PrivilegeLevel.ADMIN), eq(600), eq(USER), eq(ExecutionSource.MANUAL));
+        verify(scriptExecutionService).createSoftwareBatch(eq(executionId), eq("brew-install-id"),
+                eq(List.of("m1", "m2")), eq(PrivilegeLevel.ADMIN), eq(600), eq(USER), eq(ExecutionSource.MANUAL),
+                eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.INSTALL));
 
         ArgumentCaptor<ScriptMessage> msgCaptor = ArgumentCaptor.forClass(ScriptMessage.class);
         verify(softwareNatsPublisher, times(2)).publishSoftware(any(), msgCaptor.capture());
@@ -78,10 +82,11 @@ class SoftwareDispatchServiceTest {
         when(deviceService.findByMachineId("m1")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.dispatch(brewInstall(), List.of("m1"),
-                List.of("slack"), USER, ExecutionSource.MANUAL))
+                List.of("slack"), USER, ExecutionSource.MANUAL,
+                PackageManagerType.BREW, "slack", SoftwareAction.INSTALL))
                 .isInstanceOf(RuntimeException.class);
 
-        verify(scriptExecutionService, never()).createBatch(any(), any(), any(), anyList(), any(), any(), any(), any());
+        verify(scriptExecutionService, never()).createSoftwareBatch(any(), any(), anyList(), any(), any(), any(), any(), any(), any(), any());
         verify(softwareNatsPublisher, never()).publishSoftware(any(), any());
     }
 

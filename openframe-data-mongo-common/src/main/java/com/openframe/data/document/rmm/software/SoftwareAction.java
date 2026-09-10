@@ -1,4 +1,4 @@
-package com.openframe.api.service.rmm.software;
+package com.openframe.data.document.rmm.software;
 
 public enum SoftwareAction {
     INSTALL,

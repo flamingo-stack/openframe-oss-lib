@@ -7,7 +7,9 @@ import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
@@ -29,13 +31,16 @@ public class SoftwareDispatchService {
     private final ScriptExecutionService scriptExecutionService;
     private final SoftwareNatsPublisher softwareNatsPublisher;
 
-    public String dispatch(ScriptResponse script, List<String> machineIds, List<String> args, String initiatedBy, ExecutionSource source) {
+    public String dispatch(ScriptResponse script, List<String> machineIds, List<String> args, String initiatedBy,
+                           ExecutionSource source, PackageManagerType packageManager, String packageName,
+                           SoftwareAction action) {
         verifyMachines(machineIds);
 
         String executionId = UUID.randomUUID().toString();
 
-        scriptExecutionService.createBatch(executionId, script.getId(), null, machineIds,
-                script.getPrivilegeLevel(), script.getDefaultTimeoutSeconds(), initiatedBy, source);
+        scriptExecutionService.createSoftwareBatch(executionId, script.getId(), machineIds,
+                script.getPrivilegeLevel(), script.getDefaultTimeoutSeconds(), initiatedBy, source,
+                packageManager, packageName, action);
 
         List<String> tokenizedArgs = ScriptArgsTokenizer.tokenize(args);
 

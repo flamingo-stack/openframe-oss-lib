@@ -7,6 +7,7 @@ import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -51,7 +52,8 @@ class SoftwareInstallUpdateManagementServiceTest {
     void install_dispatchesPerPackage() {
         ScriptResponse installScript = systemScript("brew-install-id");
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_INSTALL)).thenReturn(installScript);
-        when(softwareDispatchService.dispatch(any(), anyList(), anyList(), eq(USER), eq(ExecutionSource.MANUAL)))
+        when(softwareDispatchService.dispatch(any(), anyList(), anyList(), eq(USER), eq(ExecutionSource.MANUAL),
+                any(), any(), any()))
                 .thenReturn("exec-slack", "exec-wireshark");
 
         SoftwareManagementInput input = input(
@@ -67,7 +69,8 @@ class SoftwareInstallUpdateManagementServiceTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> argsCaptor = ArgumentCaptor.forClass(List.class);
         verify(softwareDispatchService, times(2))
-                .dispatch(eq(installScript), eq(MACHINES), argsCaptor.capture(), eq(USER), eq(ExecutionSource.MANUAL));
+                .dispatch(eq(installScript), eq(MACHINES), argsCaptor.capture(), eq(USER), eq(ExecutionSource.MANUAL),
+                        eq(PackageManagerType.BREW), any(), eq(SoftwareAction.INSTALL));
         assertThat(argsCaptor.getAllValues().get(0)).containsExactly("--cask", "slack");
         assertThat(argsCaptor.getAllValues().get(1)).containsExactly("wireshark");
 
@@ -84,7 +87,8 @@ class SoftwareInstallUpdateManagementServiceTest {
     void update_usesUpdateScript_andPropagatesSource() {
         ScriptResponse updateScript = systemScript("brew-update-id");
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(updateScript);
-        when(softwareDispatchService.dispatch(any(), anyList(), anyList(), eq(USER), eq(ExecutionSource.AI_ASSISTANT)))
+        when(softwareDispatchService.dispatch(any(), anyList(), anyList(), eq(USER), eq(ExecutionSource.AI_ASSISTANT),
+                any(), any(), any()))
                 .thenReturn("exec-1");
 
         service.update(input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER,
@@ -92,7 +96,8 @@ class SoftwareInstallUpdateManagementServiceTest {
 
         verify(scriptService).getSoftwareScript(SoftwareScriptCode.BREW_UPDATE);
         verify(softwareDispatchService).dispatch(eq(updateScript), eq(MACHINES),
-                eq(List.of("--cask", "slack")), eq(USER), eq(ExecutionSource.AI_ASSISTANT));
+                eq(List.of("--cask", "slack")), eq(USER), eq(ExecutionSource.AI_ASSISTANT),
+                eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.UPDATE));
     }
 
     private static SoftwareManagementInput input(SoftwarePackageInput... packages) {

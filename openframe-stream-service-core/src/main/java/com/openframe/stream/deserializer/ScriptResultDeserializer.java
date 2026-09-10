@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -58,46 +59,44 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
 
     @Override
     protected Optional<String> getMessage(JsonNode after) {
-        String scriptName = findScriptName(after);
-        if (scriptName == null || scriptName.isBlank()) {
-            return Optional.of(FALLBACK_MESSAGE);
-        }
-        return Optional.of("Script " + scriptName + " executed.");
-    }
-
-    private String findScriptName(JsonNode after) {
         try {
             String tenantId = parseStringField(after, FIELD_TENANT_ID).orElse(null);
             if (tenantId == null) {
-                return null;
+                return Optional.of(FALLBACK_MESSAGE);
             }
-            String scriptId = resolveScriptId(after, tenantId);
-            if (scriptId == null) {
-                return null;
+            Optional<ScriptExecution> row = parseStringField(after, FIELD_EXECUTION_ID)
+                    .flatMap(executionId -> scriptExecutionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId));
+
+            Optional<String> packageMessage = row
+                    .filter(r -> r.getPackageName() != null && !r.getPackageName().isBlank())
+                    .map(ScriptResultDeserializer::softwareMessage);
+            if (packageMessage.isPresent()) {
+                return packageMessage;
             }
-            return scriptRepository.findByTenantIdAndId(tenantId, scriptId)
-                    .map(Script::getName)
-                    .orElse(null);
+
+            String scriptName = resolveScriptName(after, tenantId, row.map(ScriptExecution::getScriptId).orElse(null));
+            if (scriptName == null || scriptName.isBlank()) {
+                return Optional.of(FALLBACK_MESSAGE);
+            }
+            return Optional.of("Script " + scriptName + " executed.");
         } catch (Exception e) {
-            log.warn("Failed to look up script name for script-result message formatting", e);
-            return null;
+            log.warn("Failed to build script-result message", e);
+            return Optional.of(FALLBACK_MESSAGE);
         }
     }
 
-    /**
-     * Prefer the {@code scriptId} echoed on the result. Resolving it via the execution
-     * row is only a fallback for agents predating that echo: a schedule run shares one
-     * {@code executionId} across all its scripts, so {@code findFirstByTenantIdAndExecutionId}
-     * would pick an arbitrary one and name the wrong script.
-     */
-    private String resolveScriptId(JsonNode after, String tenantId) {
-        String scriptId = parseStringField(after, FIELD_SCRIPT_ID).orElse(null);
-        if (scriptId != null && !scriptId.isBlank()) {
-            return scriptId;
+    private static String softwareMessage(ScriptExecution row) {
+        String verb = row.getSoftwareAction() == SoftwareAction.UPDATE ? "Updated" : "Installed";
+        return verb + " " + row.getPackageName() + ".";
+    }
+
+    private String resolveScriptName(JsonNode after, String tenantId, String rowScriptId) {
+        String scriptId = parseStringField(after, FIELD_SCRIPT_ID).orElse(rowScriptId);
+        if (scriptId == null || scriptId.isBlank()) {
+            return null;
         }
-        return parseStringField(after, FIELD_EXECUTION_ID)
-                .flatMap(executionId -> scriptExecutionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId))
-                .map(ScriptExecution::getScriptId)
+        return scriptRepository.findByTenantIdAndId(tenantId, scriptId)
+                .map(Script::getName)
                 .orElse(null);
     }
 }
