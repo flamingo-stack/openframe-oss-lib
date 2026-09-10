@@ -7,13 +7,6 @@ import com.openframe.data.document.rmm.script.ScriptShell;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-/**
- * The seeded package-manager bootstrap scripts. Bodies live as classpath
- * resources. Privilege levels are dictated by the managers themselves:
- * brew runs as ADMIN but drops to the console user (Homebrew refuses root),
- * choco installs machine-wide under SYSTEM/ADMIN, and winget MUST run as the
- * logged-in USER — the Appx registration and PATH fix are per-user.
- */
 // Seeded once per tenant. Changing a body/metadata here does NOT re-seed existing
 // tenants — add a new migration to update them.
 @Getter
@@ -26,8 +19,8 @@ public enum SystemScriptDefinition {
             ScriptShell.BASH,
             OsType.MAC_OS,
             PrivilegeLevel.ADMIN,
-            // includes a possible Xcode CLT download, which alone can take tens of minutes
-            3600,
+            // 900 is the max the run UI accepts; a CLT download on a slow link can still exceed it
+            900,
             "Installs Homebrew for the console user. Managed by OpenFrame."),
 
     INSTALL_CHOCOLATEY(

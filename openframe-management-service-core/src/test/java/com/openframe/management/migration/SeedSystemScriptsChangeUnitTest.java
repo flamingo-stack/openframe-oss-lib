@@ -62,7 +62,9 @@ class SeedSystemScriptsChangeUnitTest {
         assertEquals(ScriptStatus.ACTIVE, brew.getStatus());
         assertNotNull(brew.getContentHash());
         assertTrue(brew.getScriptBody().contains("NONINTERACTIVE=1"));
-        // the installer must never run brew itself as root
+        // the official installer's root-guard is patched out so it can run under root
+        assertTrue(brew.getScriptBody().contains("check_run_command_as_root"));
+        // post-install, brew itself is exercised as the console user
         assertTrue(brew.getScriptBody().contains("sudo -u \"$CONSOLE_USER\""));
 
         Script choco = byName(scripts, SystemScriptCode.INSTALL_CHOCOLATEY.canonicalName());
@@ -78,7 +80,7 @@ class SeedSystemScriptsChangeUnitTest {
 
         // the watchdog derives its stuck-threshold from the row's timeout, so a long
         // bootstrap (CLT download) must carry an explicit one
-        assertEquals(3600, brew.getDefaultTimeoutSeconds());
+        assertEquals(900, brew.getDefaultTimeoutSeconds());
         assertEquals(1800, winget.getDefaultTimeoutSeconds());
     }
 
