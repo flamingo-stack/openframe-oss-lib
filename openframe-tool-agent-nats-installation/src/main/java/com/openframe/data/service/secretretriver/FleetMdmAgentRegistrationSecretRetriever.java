@@ -61,8 +61,8 @@ public class FleetMdmAgentRegistrationSecretRetriever implements ToolAgentRegist
             log.info("Successfully retrieved enroll secret from Fleet MDM");
             return enrollSecret;
         } catch (Exception e) {
-            log.error("Unexpected error while retrieving Fleet MDM enroll secret", e);
             throw new IllegalStateException("Failed to retrieve Fleet MDM enroll secret", e);
         }
     }
 }
+
