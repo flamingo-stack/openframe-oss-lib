@@ -28,6 +28,7 @@ public enum SystemScriptDefinition implements ManagedScriptDefinition {
             ScriptShell.BASH,
             OsType.MAC_OS,
             PrivilegeLevel.ADMIN,
+            900,
             "Installs Homebrew for the console user. Managed by OpenFrame."),
 
     INSTALL_CHOCOLATEY(
@@ -36,6 +37,7 @@ public enum SystemScriptDefinition implements ManagedScriptDefinition {
             ScriptShell.POWERSHELL,
             OsType.WINDOWS,
             PrivilegeLevel.ADMIN,
+            1800,
             "Installs Chocolatey. Managed by OpenFrame."),
 
     INSTALL_WINGET(
@@ -44,6 +46,7 @@ public enum SystemScriptDefinition implements ManagedScriptDefinition {
             ScriptShell.POWERSHELL,
             OsType.WINDOWS,
             PrivilegeLevel.USER,
+            1800,
             "Installs or repairs the WinGet package manager for the logged-in user. Managed by OpenFrame.");
 
     private final SystemScriptCode code;
@@ -51,6 +54,7 @@ public enum SystemScriptDefinition implements ManagedScriptDefinition {
     private final ScriptShell shell;
     private final OsType osType;
     private final PrivilegeLevel privilegeLevel;
+    private final Integer defaultTimeoutSeconds;
     private final String description;
 
     @Override
