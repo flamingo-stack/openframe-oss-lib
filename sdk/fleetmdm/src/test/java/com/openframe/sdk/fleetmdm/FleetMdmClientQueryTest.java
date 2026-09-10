@@ -4,6 +4,7 @@ import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.model.Query;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
@@ -103,6 +104,74 @@ public class FleetMdmClientQueryTest {
             client.getQueryById(1L);
         });
         assertTrue(exception.getMessage().contains("Authentication failed"));
+    }
+
+    @Test
+    public void listScheduledQueries_includeManaged_addsQueryParamAndParsesAssignedHosts() throws IOException, InterruptedException {
+        String jsonResponse = """
+            {
+              "queries": [
+                {
+                  "id": 11,
+                  "name": "[OpenFrame] resource-uptime",
+                  "interval": 3600,
+                  "hosts_include_any": [ { "id": 1 }, { "id": 2 } ]
+                }
+              ]
+            }
+            """;
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> mockResponse = (HttpResponse<String>) mock(HttpResponse.class);
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.body()).thenReturn(jsonResponse);
+
+        ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+        when(mockHttpClient.send(captor.capture(), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(mockResponse);
+
+        List<Query> queries = client.listScheduledQueries(true);
+
+        assertEquals(1, queries.size());
+        Query query = queries.get(0);
+        assertEquals(11L, query.getId());
+        assertEquals(2, query.getHostsIncludeAny().size());
+        assertTrue(captor.getValue().uri().toString().endsWith("/api/v1/fleet/queries?include_openframe_managed=1"));
+    }
+
+    @Test
+    public void addQueryHosts_sync_postsHostIdsAndReturnsAddedCount() throws IOException, InterruptedException {
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> mockResponse = (HttpResponse<String>) mock(HttpResponse.class);
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.body()).thenReturn("{\"added\":2}");
+
+        ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+        when(mockHttpClient.send(captor.capture(), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(mockResponse);
+
+        long added = client.addQueryHosts(11L, List.of(1L, 2L));
+
+        assertEquals(2L, added);
+        assertTrue(captor.getValue().uri().toString().endsWith("/api/v1/fleet/queries/11/hosts"));
+        assertEquals("POST", captor.getValue().method());
+    }
+
+    @Test
+    public void deleteScheduledQuery_sync_usesDeleteOnIdPath() throws IOException, InterruptedException {
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> mockResponse = (HttpResponse<String>) mock(HttpResponse.class);
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.body()).thenReturn("");
+
+        ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+        when(mockHttpClient.send(captor.capture(), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(mockResponse);
+
+        client.deleteScheduledQuery(99L);
+
+        assertTrue(captor.getValue().uri().toString().endsWith("/api/v1/fleet/queries/id/99"));
+        assertEquals("DELETE", captor.getValue().method());
     }
 
 }
