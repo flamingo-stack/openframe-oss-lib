@@ -23,6 +23,7 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
 
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_EXECUTION_ID = "executionId";
+    private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_SCRIPT_ID = "scriptId";
     private static final String FALLBACK_MESSAGE = "Script executed";
 
@@ -48,8 +49,11 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     }
 
     @Override
-    protected Optional<String> additionalEventToolIdComponent(JsonNode after) {
-        return parseStringField(after, FIELD_SCRIPT_ID);
+    protected Optional<String> getEventToolId(JsonNode after) {
+        return Optional.of(String.join(":",
+                parseStringField(after, FIELD_EXECUTION_ID).orElse(""),
+                parseStringField(after, FIELD_MACHINE_ID).orElse(""),
+                parseStringField(after, FIELD_SCRIPT_ID).orElse("")));
     }
 
     @Override

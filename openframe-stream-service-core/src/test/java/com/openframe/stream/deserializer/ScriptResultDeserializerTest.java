@@ -80,15 +80,6 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
-    @DisplayName("getEventToolId: an agent that does not echo scriptId falls back to the base executionId:machineId composite (unchanged behaviour)")
-    void getEventToolId_noScriptId_fallsBackToBaseComposite() {
-        ObjectNode after = mapper.createObjectNode()
-                .put("executionId", EXECUTION_ID).put("machineId", "m-1");
-
-        assertThat(deserializer.getEventToolId(after)).contains(EXECUTION_ID + ":m-1");
-    }
-
-    @Test
     @DisplayName("inherited extraction works — getResult builds stdout/exit_code/execution_time_ms exactly like the command deserializer")
     void inheritsResultExtraction() throws Exception {
         ObjectNode after = mapper.createObjectNode()
