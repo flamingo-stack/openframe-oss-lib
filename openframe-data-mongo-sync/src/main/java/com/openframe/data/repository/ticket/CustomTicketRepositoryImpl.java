@@ -86,6 +86,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         Query query = new Query();
 
         if (filter != null) {
+            addCriteriaIfNotEmpty(query, FIELD_TICKET_NUMBER, filter.getTicketNumbers());
             addCriteriaIfNotEmpty(query, FIELD_STATUS, filter.getStatuses());
             addCriteriaIfNotEmpty(query, FIELD_STATUS_ID, filter.getStatusIds());
             addCriteriaIfNotEmpty(query, FIELD_STATUS_KIND, filter.getStatusKinds());
