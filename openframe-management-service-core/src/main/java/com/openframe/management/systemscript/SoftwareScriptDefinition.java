@@ -18,7 +18,7 @@ public enum SoftwareScriptDefinition implements ManagedScriptDefinition {
             ScriptShell.BASH,
             OsType.MAC_OS,
             PrivilegeLevel.USER,
-            1800,
+            90,
             "Installs a Homebrew package (passed as a script argument). Managed by OpenFrame."),
 
     BREW_UPDATE(
@@ -27,8 +27,26 @@ public enum SoftwareScriptDefinition implements ManagedScriptDefinition {
             ScriptShell.BASH,
             OsType.MAC_OS,
             PrivilegeLevel.USER,
-            1800,
-            "Updates a Homebrew package (passed as a script argument). Managed by OpenFrame.");
+            90,
+            "Updates a Homebrew package (passed as a script argument). Managed by OpenFrame."),
+
+    WINGET_INSTALL(
+            SoftwareScriptCode.WINGET_INSTALL,
+            "system-scripts/winget-install-software.ps1",
+            ScriptShell.POWERSHELL,
+            OsType.WINDOWS,
+            PrivilegeLevel.USER,
+            90,
+            "Installs a winget package (passed as a script argument). Managed by OpenFrame."),
+
+    WINGET_UPDATE(
+            SoftwareScriptCode.WINGET_UPDATE,
+            "system-scripts/winget-update-software.ps1",
+            ScriptShell.POWERSHELL,
+            OsType.WINDOWS,
+            PrivilegeLevel.USER,
+            90,
+            "Updates a winget package (passed as a script argument). Managed by OpenFrame.");
 
     private final SoftwareScriptCode code;
     private final String resourcePath;

@@ -84,6 +84,17 @@ class SeedManagedScriptsChangeUnitTest {
         assertEquals(ScriptType.SOFTWARE, brewUpdate.getType());
         assertEquals(PrivilegeLevel.USER, brewUpdate.getPrivilegeLevel());
         assertTrue(brewUpdate.getScriptBody().contains("upgrade \"$@\""));
+
+        Script wingetInstall = byName(scripts, SoftwareScriptCode.WINGET_INSTALL.canonicalName());
+        assertEquals(ScriptType.SOFTWARE, wingetInstall.getType());
+        assertEquals(ScriptShell.POWERSHELL, wingetInstall.getShell());
+        assertEquals(PrivilegeLevel.USER, wingetInstall.getPrivilegeLevel());
+        assertTrue(wingetInstall.getScriptBody().contains("install @args"));
+
+        Script wingetUpdate = byName(scripts, SoftwareScriptCode.WINGET_UPDATE.canonicalName());
+        assertEquals(ScriptType.SOFTWARE, wingetUpdate.getType());
+        assertEquals(ScriptShell.POWERSHELL, wingetUpdate.getShell());
+        assertTrue(wingetUpdate.getScriptBody().contains("upgrade @args"));
     }
 
     @Test
