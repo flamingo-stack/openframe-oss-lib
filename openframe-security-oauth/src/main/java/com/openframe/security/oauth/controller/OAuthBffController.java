@@ -266,10 +266,26 @@ public class OAuthBffController {
      * anything else falls back to the web login page. The auth server never decides the target — it
      * only carries redirectTo to the frontend (see SsoFlowHandler.redirectToJoinConfirm), and this
      * hop is where redirect policy is enforced.
+     *
+     * <p>The native callback carries neither a {@code devTicket} (login) nor an {@code error}, so
+     * without a signal the app cannot tell a deliberate cancel from a broken handoff. The optional
+     * {@code reason} (e.g. {@code USER_CANCELED} / {@code SESSION_EXPIRED}) is forwarded as
+     * {@code error} on the app redirect — same convention as the callback error path — so the app
+     * can stay silent on a user cancel and surface a message on an expired session. Purely
+     * additive: absent reason, or a non-allow-listed target, behaves as before.
      */
     @GetMapping("/join-return")
-    public Mono<ResponseEntity<Void>> joinReturn(@RequestParam("redirectTo") String redirectTo) {
-        String target = redirectTargetResolver.isAllowedRedirectUri(redirectTo) ? redirectTo : joinCancelPage;
+    public Mono<ResponseEntity<Void>> joinReturn(@RequestParam("redirectTo") String redirectTo,
+                                                 @RequestParam(value = "reason", required = false) String reason) {
+        String target;
+        if (redirectTargetResolver.isAllowedRedirectUri(redirectTo)) {
+            target = hasText(reason)
+                    ? redirectTo + (redirectTo.contains("?") ? "&" : "?") + "error="
+                            + URLEncoder.encode(reason, StandardCharsets.UTF_8)
+                    : redirectTo;
+        } else {
+            target = joinCancelPage;
+        }
         return Mono.just(ResponseEntity.status(FOUND).header(LOCATION, target).build());
     }
 
