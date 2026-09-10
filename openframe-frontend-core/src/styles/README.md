@@ -201,6 +201,7 @@ Adding a new platform = add one `[data-app-type="…"]` block in `ods-colors.css
 --color-accent-primary  /* Platform-set */
 --color-accent-hover
 --color-accent-active
+--color-accent-secondary /* Platform-set — muted accent fill for selected rows */
 --color-focus-ring
 
 --color-success / -hover / -secondary

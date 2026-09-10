@@ -195,6 +195,7 @@ const config: Config = {
             DEFAULT: 'var(--color-accent-primary)',
             hover: 'var(--color-accent-hover)',
             active: 'var(--color-accent-active)',
+            secondary: 'var(--color-accent-secondary)',
             focus: 'var(--color-accent-focus)',
             disabled: 'var(--color-accent-disabled)',
           },

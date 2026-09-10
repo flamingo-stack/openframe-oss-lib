@@ -316,6 +316,7 @@
   --color-accent-primary: var(--ods-open-yellow-base);
   --color-accent-hover: var(--ods-open-yellow-hover);
   --color-accent-active: var(--ods-open-yellow-action);
+  --color-accent-secondary: var(--ods-open-yellow-secondary);
   --color-accent-focus: var(--ods-open-yellow-base);
   --color-accent-disabled: var(--ods-system-greys-soft-grey);
 
@@ -415,6 +416,7 @@
   --color-accent-primary: var(--ods-open-yellow-base);
   --color-accent-hover: var(--ods-open-yellow-hover);
   --color-accent-active: var(--ods-open-yellow-action);
+  --color-accent-secondary: var(--ods-open-yellow-secondary);
   --color-accent-focus: var(--ods-open-yellow-base);
   --color-focus-ring: var(--ods-open-yellow-base);
   --color-focus-visible: var(--ods-open-yellow-base);
@@ -428,6 +430,7 @@
   --color-accent-primary: var(--ods-open-yellow-base);
   --color-accent-hover: var(--ods-open-yellow-hover);
   --color-accent-active: var(--ods-open-yellow-action);
+  --color-accent-secondary: var(--ods-open-yellow-secondary);
   --color-accent-focus: var(--ods-open-yellow-base);
   --color-focus-ring: var(--ods-open-yellow-base);
   --color-focus-visible: var(--ods-open-yellow-base);
@@ -441,6 +444,7 @@
   --color-accent-primary: var(--ods-flamingo-pink-base);
   --color-accent-hover: var(--ods-flamingo-pink-hover);
   --color-accent-active: var(--ods-flamingo-pink-action);
+  --color-accent-secondary: var(--ods-flamingo-pink-secondary);
   --color-accent-focus: var(--ods-flamingo-pink-base);
   --color-focus-ring: var(--ods-flamingo-pink-base);
   --color-focus-visible: var(--ods-flamingo-pink-base);
@@ -454,6 +458,7 @@
   --color-accent-primary: var(--ods-flamingo-pink-base);
   --color-accent-hover: var(--ods-flamingo-pink-hover);
   --color-accent-active: var(--ods-flamingo-pink-action);
+  --color-accent-secondary: var(--ods-flamingo-pink-secondary);
   --color-accent-focus: var(--ods-flamingo-pink-base);
   --color-focus-ring: var(--ods-flamingo-pink-base);
   --color-focus-visible: var(--ods-flamingo-pink-base);
@@ -470,6 +475,7 @@
   --color-accent-primary: var(--ods-flamingo-pink-base);
   --color-accent-hover: var(--ods-flamingo-pink-hover);
   --color-accent-active: var(--ods-flamingo-pink-action);
+  --color-accent-secondary: var(--ods-flamingo-pink-secondary);
   --color-accent-focus: var(--ods-flamingo-pink-base);
   --color-focus-ring: var(--ods-flamingo-pink-base);
   --color-focus-visible: var(--ods-flamingo-pink-base);
@@ -489,6 +495,7 @@
   --color-accent-primary: var(--ods-flamingo-pink-base);
   --color-accent-hover: var(--ods-flamingo-pink-hover);
   --color-accent-active: var(--ods-flamingo-pink-action);
+  --color-accent-secondary: var(--ods-flamingo-pink-secondary);
   --color-accent-focus: var(--ods-flamingo-pink-base);
   --color-focus-ring: var(--ods-flamingo-pink-base);
   --color-focus-visible: var(--ods-flamingo-pink-base);
@@ -504,6 +511,7 @@
   --color-accent-primary: var(--ods-flamingo-pink-base);
   --color-accent-hover: var(--ods-flamingo-pink-hover);
   --color-accent-active: var(--ods-flamingo-pink-action);
+  --color-accent-secondary: var(--ods-flamingo-pink-secondary);
   --color-accent-focus: var(--ods-flamingo-pink-base);
   --color-focus-ring: var(--ods-flamingo-pink-base);
   --color-focus-visible: var(--ods-flamingo-pink-base);
@@ -517,6 +525,7 @@
   --color-accent-primary: var(--ods-attention-green-success);
   --color-accent-hover: var(--ods-attention-green-success-hover);
   --color-accent-active: var(--ods-attention-green-success-action);
+  --color-accent-secondary: var(--ods-attention-green-success-secondary);
   --color-accent-focus: var(--ods-attention-green-success);
   --color-focus-ring: var(--ods-attention-green-success);
   --color-focus-visible: var(--ods-attention-green-success);
@@ -530,6 +539,7 @@
   --color-accent-primary: var(--ods-attention-yellow-warning);
   --color-accent-hover: var(--ods-open-yellow-hover);
   --color-accent-active: var(--ods-open-yellow-action);
+  --color-accent-secondary: var(--ods-attention-yellow-warning-secondary);
   --color-accent-focus: var(--ods-attention-yellow-warning);
   --color-focus-ring: var(--ods-attention-yellow-warning);
   --color-focus-visible: var(--ods-attention-yellow-warning);
@@ -543,6 +553,7 @@
   --color-accent-primary: var(--ods-flamingo-cyan-base);
   --color-accent-hover: var(--ods-flamingo-cyan-hover);
   --color-accent-active: var(--ods-flamingo-cyan-action);
+  --color-accent-secondary: var(--ods-flamingo-cyan-secondary);
   --color-accent-focus: var(--ods-flamingo-cyan-base);
   --color-focus-ring: var(--ods-flamingo-cyan-base);
   --color-focus-visible: var(--ods-flamingo-cyan-base);
@@ -556,6 +567,7 @@
   --color-accent-primary: var(--ods-attention-red-error);
   --color-accent-hover: var(--ods-attention-red-error-hover);
   --color-accent-active: var(--ods-attention-red-error-action);
+  --color-accent-secondary: var(--ods-attention-red-error-secondary);
   --color-accent-focus: var(--ods-attention-red-error);
   --color-focus-ring: var(--ods-attention-red-error);
   --color-focus-visible: var(--ods-attention-red-error);
