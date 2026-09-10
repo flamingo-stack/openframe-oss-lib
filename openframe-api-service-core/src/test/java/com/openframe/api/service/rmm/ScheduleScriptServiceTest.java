@@ -23,6 +23,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -64,6 +65,7 @@ class ScheduleScriptServiceTest {
     private ScriptService scriptService;
     private TenantIdProvider tenantIdProvider;
     private ScheduleDeviceLocalDispatchRepository deviceLocalDispatchRepository;
+    private DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
     private ScheduleScriptService scheduleService;
 
     private CreateScriptScheduleInput createInput;
@@ -74,8 +76,9 @@ class ScheduleScriptServiceTest {
         scriptService = mock(ScriptService.class);
         tenantIdProvider = mock(TenantIdProvider.class);
         deviceLocalDispatchRepository = mock(ScheduleDeviceLocalDispatchRepository.class);
+        onlineDeviceDispatchRepository = mock(DeviceOnlineDispatchRepository.class);
         scheduleService = new ScheduleScriptService(scheduleRepository, new ScriptScheduleMapper(), scriptService,
-                tenantIdProvider, deviceLocalDispatchRepository);
+                tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository);
 
         createInput = new CreateScriptScheduleInput();
         createInput.setName("Nightly Maintenance");

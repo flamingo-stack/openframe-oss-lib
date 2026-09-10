@@ -4,10 +4,10 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 import com.openframe.authz.util.AppleUserParam;
+import com.openframe.authz.util.SsoAuthentication;
 import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.web.Redirects;
 
@@ -81,9 +81,7 @@ public interface SsoFlowHandler {
      * request input and must not feed names into other providers' callbacks.
      */
     default String[] resolveNames(HttpServletRequest request, Authentication authentication, OidcUser oidcUser) {
-        String registrationId = authentication instanceof OAuth2AuthenticationToken token
-                ? token.getAuthorizedClientRegistrationId()
-                : null;
+        String registrationId = SsoAuthentication.registrationId(authentication);
         return AppleUserParam.namesOrAppleFallback(OidcUserUtils.resolveNames(oidcUser), registrationId, request);
     }
 
