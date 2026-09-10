@@ -1,8 +1,10 @@
 package com.openframe.api.dto.rmm.schedule;
 
-import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
-import com.openframe.data.document.rmm.OsType;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -12,11 +14,6 @@ import lombok.Data;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * Input payload for fully replacing an existing script schedule (PUT semantics):
- * every writable field overwrites the stored value, including {@code null}s
- * which clear the field. Callers must send the full resource on every update.
- */
 @Data
 public class UpdateScriptScheduleInput {
 
@@ -36,19 +33,18 @@ public class UpdateScriptScheduleInput {
     private List<ScheduledScriptCustomParamsInput> scriptCustomParams;
 
     @NotNull
-    private ScriptScheduleTrigger trigger;
+    private ScheduleScriptTrigger trigger;
+
+    private ScheduleOfflineBehavior offlineBehavior;
+
+    private Long reconnectWindowSeconds;
 
     private ScheduleDeviceSelectionMode selectionMode;
 
-    /**
-     * First scheduled run as an absolute UTC instant. PUT semantics: null clears
-     * the timing (the schedule stops being picked up). Changing this value
-     * reschedules the next run (see {@code ScriptScheduleService.update}).
-     */
+    private ScheduleTimeReference timeReference;
+
     private Instant startAt;
 
-    /** Recurrence interval in seconds; null clears recurrence (one-shot). Must be a whole number
-     * of 30-minute slots (1800, 3600, 5400, …) — the runner ticks on that grid. */
     @Min(value = 1800, message = "repeat must be at least 1800 seconds (30 minutes)")
     private Long repeat;
 }

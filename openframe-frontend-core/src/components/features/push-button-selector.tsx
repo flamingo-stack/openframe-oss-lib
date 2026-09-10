@@ -1,36 +1,63 @@
-"use client";
+'use client';
 
-import { Button, Badge } from "../ui";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Check } from 'lucide-react';
-import React from 'react';
+import type React from 'react';
+import { useEffect, useRef } from 'react';
+import { UnifiedSkeleton } from '../loading';
+import { Badge, Input } from '../ui';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
-export interface SelectableOption {
-  id: string;              // Selection ID (UUID for platforms, value for others)
-  name: string;            // Primary identifier (platform enum or item name)
-  displayName?: string;    // Optional display name (for platforms)
+/** Option ids are whatever the consumer keys its rows by — string (UUID / enum value) or numeric row id. */
+export type SelectableOptionId = string | number;
+
+export interface SelectableOption<Id extends SelectableOptionId = string> {
+  id: Id; // Selection ID (UUID / value for platforms, numeric row id for DB-keyed rows)
+  name: string; // Primary identifier (platform enum or item name)
+  displayName?: string; // Optional display name (for platforms)
   description?: string;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
   icon?: React.ReactNode;
   color?: string;
-  disabled?: boolean;      // If true, option is shown grayed out and not selectable
+  disabled?: boolean; // If true, option is shown grayed out and not selectable
   disabledReason?: string; // Tooltip shown on hover when disabled — explains WHY it's unavailable
-  section?: string;        // Optional section ID to group options
+  section?: string; // Optional section ID to group options
 }
 
 export interface SectionDefinition {
-  id: string;              // Section identifier (matches option.section)
-  label: string;           // Display label for the section
-  icon?: React.ReactNode;  // Optional icon for the section header
-  description?: string;    // Optional description shown under section label
+  id: string; // Section identifier (matches option.section)
+  label: string; // Display label for the section
+  icon?: React.ReactNode; // Optional icon for the section header
+  description?: string; // Optional description shown under section label
 }
 
-interface PushButtonSelectorProps {
-  options: SelectableOption[];
-  selectedIds: string[];
-  onSelectionChange: (selectedIds: string[]) => void;
+/** SERVER-SIDE search: the selector renders the input; the PARENT owns the
+ *  query state and re-fetches `options` (never a client-side .filter of a
+ *  pre-fetched list). While `isLoading`, the input stays mounted (typing
+ *  must not lose focus to a skeleton swap). */
+export interface PushButtonSelectorSearch {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  ariaLabel?: string;
+}
+
+/** Lazy paging: the option list becomes a FIXED-HEIGHT scroll viewport with
+ *  an IntersectionObserver sentinel near the bottom — the selector calls
+ *  `onLoadMore` as the user scrolls; the parent appends to `options`. */
+export interface PushButtonSelectorLazyLoad {
+  hasMore: boolean;
+  isFetchingMore: boolean;
+  onLoadMore: () => void;
+  /** CSS height of the scroll viewport (default '336px' ≈ 6 rows). */
+  maxHeight?: string;
+}
+
+interface PushButtonSelectorProps<Id extends SelectableOptionId = string> {
+  options: SelectableOption<Id>[];
+  selectedIds: Id[];
+  onSelectionChange: (selectedIds: Id[]) => void;
   multiSelect?: boolean;
   title?: string;
   helpText?: string;
@@ -40,28 +67,38 @@ interface PushButtonSelectorProps {
   isLoading?: boolean;
   error?: string | null;
   skeletonCount?: number;
-  sections?: SectionDefinition[];  // Optional sections for grouping options
+  sections?: SectionDefinition[]; // Optional sections for grouping options
+  /** Built-in server-side search input (see PushButtonSelectorSearch). */
+  search?: PushButtonSelectorSearch;
+  /** Built-in fixed-height scroll + infinite paging (see PushButtonSelectorLazyLoad). */
+  lazyLoad?: PushButtonSelectorLazyLoad;
+  /** Rendered inside the list when `options` is empty and not loading. */
+  emptyMessage?: React.ReactNode;
+  /** Rendered under the list (result counts, hints). */
+  footer?: React.ReactNode;
 }
 
-// Skeleton component matching external pattern from announcement-form.tsx
+// Composed from the app-wide UnifiedSkeleton system (components/loading) —
+// the same base every other loading surface uses (bg-ods-skeleton pulse,
+// prefers-reduced-motion support, role="status" a11y). Each skeleton row
+// mirrors a LOADED option row exactly (bg-ods-bg card, p-4, icon + two
+// 20px-tall text lines + selection box) so the list never jumps on load.
 function PushButtonSelectorSkeleton({ count = 3, hasTitle }: { count?: number; hasTitle?: boolean }) {
   return (
-    <div className="space-y-3">
-      {hasTitle && (
-        <div className="h-5 w-20 bg-ods-skeleton rounded animate-pulse" />
-      )}
+    <div className="space-y-3" role="status" aria-label="Loading options">
+      {hasTitle && <UnifiedSkeleton className="h-5 w-20" aria-label="Loading title" />}
       <div className="space-y-3">
-        {[...Array(count)].map((_, i) => (
-          <div key={i} className="p-4 rounded-lg border border-ods-border bg-ods-skeleton animate-pulse">
-            <div className="flex items-center justify-between">
+        {Array.from({ length: count }, (_, i) => (
+          <div key={i} className="rounded-lg border border-ods-border bg-ods-bg p-4">
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-ods-skeleton rounded" />
+                <UnifiedSkeleton className="h-8 w-8" aria-label="Loading icon" />
                 <div>
-                  <div className="h-4 w-20 bg-ods-skeleton rounded mb-1" />
-                  <div className="h-3 w-32 bg-ods-skeleton rounded" />
+                  <UnifiedSkeleton variant="text" className="mb-2 h-4 w-24" aria-label="Loading name" />
+                  <UnifiedSkeleton variant="text" className="h-4 w-36" aria-label="Loading description" />
                 </div>
               </div>
-              <div className="w-6 h-6 bg-ods-skeleton rounded border-2 border-ods-border" />
+              <UnifiedSkeleton className="h-6 w-6" aria-label="Loading selection state" />
             </div>
           </div>
         ))}
@@ -74,21 +111,15 @@ function PushButtonSelectorSkeleton({ count = 3, hasTitle }: { count?: number; h
 function PushButtonSelectorError({ message, title }: { message: string; title?: string }) {
   return (
     <div className="space-y-3">
-      {title && (
-        <h3 className="text-h5 text-ods-text-primary">
-          {title}
-        </h3>
-      )}
-      <div className="p-4 bg-ods-error-secondary border border-ods-error rounded-lg">
-        <div className="text-h6 text-ods-error">
-          ⚠️ {message}
-        </div>
+      {title && <h3 className="text-ods-text-primary text-h5">{title}</h3>}
+      <div className="rounded-lg border border-ods-error bg-ods-error-secondary p-4">
+        <div className="text-ods-error text-h6">⚠️ {message}</div>
       </div>
     </div>
   );
 }
 
-export function PushButtonSelector({
+export function PushButtonSelector<Id extends SelectableOptionId = string>({
   options,
   selectedIds,
   onSelectionChange,
@@ -101,20 +132,69 @@ export function PushButtonSelector({
   isLoading = false,
   error = null,
   skeletonCount = 3,
-  sections
-}: PushButtonSelectorProps) {
+  sections,
+  search,
+  lazyLoad,
+  emptyMessage,
+  footer,
+}: PushButtonSelectorProps<Id>) {
+  // Lazy-load sentinel: observe within the scroll viewport so onLoadMore
+  // fires as the user approaches the bottom. Hooks run unconditionally
+  // (before the early returns) per the rules of hooks. Pass a STABLE
+  // onLoadMore (react-query's fetchNextPage is) — an inline arrow re-arms
+  // the observer each render (harmless, just wasteful).
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const lazyHasMore = lazyLoad?.hasMore ?? false;
+  const lazyFetching = lazyLoad?.isFetchingMore ?? false;
+  const onLoadMore = lazyLoad?.onLoadMore;
+  const optionCount = options.length;
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root = scrollRef.current;
+    if (!sentinel || !root || !onLoadMore || !lazyHasMore) return undefined;
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(e => e.isIntersecting) && !lazyFetching) {
+          onLoadMore();
+        }
+      },
+      { root, rootMargin: '80px' },
+    );
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+    };
+    // optionCount: re-arm when the list grows (the sentinel moves).
+  }, [lazyHasMore, lazyFetching, onLoadMore, optionCount]);
 
-  // LOADING STATE
-  if (isLoading) {
+  const searchInput = search ? (
+    <Input
+      value={search.value}
+      onChange={e => search.onChange(e.target.value)}
+      placeholder={search.placeholder}
+      aria-label={search.ariaLabel ?? search.placeholder ?? 'Search'}
+    />
+  ) : null;
+
+  // Framed mode (search and/or lazyLoad): loading and error are NOT early
+  // returns — the frame (title, search input, fixed-height viewport, footer)
+  // must stay pixel-identical across loading/loaded/empty/error, with only
+  // the viewport CONTENT swapping. An early-return skeleton dropped the
+  // bordered viewport + footer and rendered shorter rows, so the whole
+  // section collapsed and jumped on every debounced search.
+  const framed = !!search || !!lazyLoad;
+
+  // LOADING / ERROR STATES — legacy (unframed) consumers keep the historical
+  // whole-component swap, byte-identical.
+  if (isLoading && !framed) {
     return (
       <div className={className}>
         <PushButtonSelectorSkeleton count={skeletonCount} hasTitle={!!title} />
       </div>
     );
   }
-
-  // ERROR STATE
-  if (error) {
+  if (error && !framed) {
     return (
       <div className={className}>
         <PushButtonSelectorError message={error} title={title} />
@@ -123,9 +203,8 @@ export function PushButtonSelector({
   }
 
   // VALIDATION: Only filter invalid selectedIds if options are loaded
-  const validSelectedIds = options.length > 0
-    ? selectedIds.filter(id => options.some(option => option.id === id))
-    : selectedIds; // Keep all IDs if options not loaded yet
+  const validSelectedIds =
+    options.length > 0 ? selectedIds.filter(id => options.some(option => option.id === id)) : selectedIds; // Keep all IDs if options not loaded yet
 
   // Dev warning for debugging (only when options are loaded)
   if (process.env.NODE_ENV === 'development' && options.length > 0 && validSelectedIds.length !== selectedIds.length) {
@@ -133,7 +212,7 @@ export function PushButtonSelector({
     console.warn('[PushButtonSelector] Invalid selected IDs filtered:', invalidIds);
   }
 
-  const toggleSelection = (optionId: string) => {
+  const toggleSelection = (optionId: Id) => {
     if (multiSelect) {
       const isSelected = validSelectedIds.includes(optionId);
       if (isSelected) {
@@ -150,38 +229,36 @@ export function PushButtonSelector({
   const getSelectedOptions = () => options.filter(option => validSelectedIds.includes(option.id));
 
   // Helper to render a single option
-  const renderOption = (option: SelectableOption) => {
+  const renderOption = (option: SelectableOption<Id>) => {
     const isSelected = validSelectedIds.includes(option.id);
 
     const optionEl = (
       <div
         key={option.id}
-        className={`
-          p-4 rounded-lg border transition-all duration-200 group
-          ${option.disabled
-            ? `${isSelected ? 'cursor-pointer' : 'cursor-not-allowed'} opacity-40 bg-ods-card border-ods-border`
+        className={`group rounded-lg border p-4 transition-all duration-200 ${
+          option.disabled
+            ? `${isSelected ? 'cursor-pointer' : 'cursor-not-allowed'} border-ods-border bg-ods-card opacity-40`
             : isSelected
-              ? 'cursor-pointer bg-ods-bg-surface border-ods-accent shadow-sm'
-              : 'cursor-pointer bg-ods-bg border-ods-border hover:border-ods-border-hover hover:bg-ods-bg-hover'
-          }
-        `}
+              ? 'cursor-pointer border-ods-accent bg-ods-bg-surface shadow-sm'
+              : 'cursor-pointer border-ods-border bg-ods-bg hover:border-ods-border-hover hover:bg-ods-bg-hover'
+        } `}
         // Disabled options can't be newly SELECTED, but an already-selected one
         // (e.g. it later became unavailable) must still be removable.
         onClick={() => (!option.disabled || isSelected) && toggleSelection(option.id)}
       >
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             {option.icon && (
-              <div className={`flex-shrink-0 transition-transform duration-200 ${isSelected ? 'scale-110' : 'group-hover:scale-105'}`}>
+              <div
+                className={`flex-shrink-0 transition-transform duration-200 ${isSelected ? 'scale-110' : 'group-hover:scale-105'}`}
+              >
                 {option.icon}
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <div className="text-h6 font-semibold text-ods-text-primary">
-                {option.displayName || option.name}
-              </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-ods-text-primary text-h6">{option.displayName || option.name}</div>
               {option.description && (
-                <div className="text-h6 text-ods-text-secondary line-clamp-2" title={option.description}>
+                <div className="line-clamp-2 text-ods-text-secondary text-h6" title={option.description}>
                   {option.description}
                 </div>
               )}
@@ -189,16 +266,14 @@ export function PushButtonSelector({
           </div>
 
           {/* Selection Indicator */}
-          <div className={`
-            flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all duration-200
-            ${isSelected
-              ? 'bg-ods-accent border-ods-accent scale-110'
-              : 'border-ods-border group-hover:border-ods-border-hover'
-            }
-          `}>
-            {isSelected && (
-              <Check className="w-4 h-4 text-ods-text-primary font-bold" strokeWidth={3} />
-            )}
+          <div
+            className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded border-2 transition-all duration-200 ${
+              isSelected
+                ? 'scale-110 border-ods-accent bg-ods-accent'
+                : 'border-ods-border group-hover:border-ods-border-hover'
+            } `}
+          >
+            {isSelected && <Check className="h-4 w-4 font-bold text-ods-text-primary" strokeWidth={3} />}
           </div>
         </div>
       </div>
@@ -221,16 +296,12 @@ export function PushButtonSelector({
   const renderOptionsContent = () => {
     if (!sections || sections.length === 0) {
       // No sections - render flat list
-      return (
-        <div className="space-y-3">
-          {options.map(renderOption)}
-        </div>
-      );
+      return <div className="space-y-3">{options.map(renderOption)}</div>;
     }
 
     // Group options by section
-    const optionsBySection = new Map<string, SelectableOption[]>();
-    const ungroupedOptions: SelectableOption[] = [];
+    const optionsBySection = new Map<string, SelectableOption<Id>[]>();
+    const ungroupedOptions: SelectableOption<Id>[] = [];
 
     options.forEach(option => {
       if (option.section) {
@@ -252,90 +323,100 @@ export function PushButtonSelector({
             <div key={section.id} className="space-y-2">
               {/* Section Header */}
               <div className="flex items-center gap-2 px-1">
-                {section.icon && (
-                  <div className="text-ods-text-secondary">
-                    {section.icon}
-                  </div>
-                )}
+                {section.icon && <div className="text-ods-text-secondary">{section.icon}</div>}
                 <div>
-                  <div className="text-h6 font-semibold text-ods-text-primary">
-                    {section.label}
-                  </div>
-                  {section.description && (
-                    <div className="text-h6 text-ods-text-tertiary">
-                      {section.description}
-                    </div>
-                  )}
+                  <div className="font-semibold text-ods-text-primary text-h6">{section.label}</div>
+                  {section.description && <div className="text-ods-text-tertiary text-h6">{section.description}</div>}
                 </div>
               </div>
               {/* Section Options */}
-              <div className="space-y-2">
-                {sectionOptions.map(renderOption)}
-              </div>
+              <div className="space-y-2">{sectionOptions.map(renderOption)}</div>
             </div>
           );
         })}
 
         {/* Render ungrouped options at the end */}
-        {ungroupedOptions.length > 0 && (
-          <div className="space-y-2">
-            {ungroupedOptions.map(renderOption)}
-          </div>
-        )}
+        {ungroupedOptions.length > 0 && <div className="space-y-2">{ungroupedOptions.map(renderOption)}</div>}
       </div>
     );
   };
 
+  // ~82px per row: enough skeleton rows to fill the fixed viewport, so the
+  // loading state occupies the SAME height as the loaded list.
+  const framedSkeletonCount = lazyLoad ? Math.max(skeletonCount, 4) : skeletonCount;
+  const listContent = isLoading ? (
+    <PushButtonSelectorSkeleton count={framedSkeletonCount} />
+  ) : error ? (
+    <PushButtonSelectorError message={error} />
+  ) : (
+    <>
+      {options.length === 0 && emptyMessage !== undefined ? (
+        <div className="text-ods-text-secondary text-h6">{emptyMessage}</div>
+      ) : (
+        renderOptionsContent()
+      )}
+      {lazyLoad ? (
+        <>
+          <div ref={sentinelRef} />
+          {lazyLoad.isFetchingMore ? (
+            <div className="py-2 text-center text-ods-text-secondary text-h6">Loading more…</div>
+          ) : null}
+        </>
+      ) : null}
+    </>
+  );
+
   return (
     <TooltipProvider delayDuration={150}>
-    <div className={`space-y-4 ${className}`}>
-      {title && (
-        <h3 className="text-h5 text-ods-text-primary">
-          {title}
-        </h3>
-      )}
+      <div className={`space-y-4 ${className}`}>
+        {title && <h3 className="text-ods-text-primary text-h5">{title}</h3>}
 
-      {renderOptionsContent()}
+        {searchInput}
 
-      {/* Selection Summary */}
-      {selectionSummary && validSelectedIds.length > 0 && (
-        <div className="p-4 bg-ods-success-secondary border border-ods-success rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 bg-ods-success rounded-full"></div>
-            <span className="text-h6 text-ods-success">
-              {validSelectedIds.length} {multiSelect ? 'items' : 'item'} selected
-            </span>
+        {lazyLoad ? (
+          <div
+            ref={scrollRef}
+            className="space-y-4 overflow-y-auto rounded-lg border border-ods-border p-2"
+            style={{ height: lazyLoad.maxHeight ?? '336px' }}
+          >
+            {listContent}
           </div>
+        ) : (
+          listContent
+        )}
 
-          <div className="flex flex-wrap gap-2">
-            {getSelectedOptions().map(option => (
-              <Badge
-                key={option.id}
-                className="bg-ods-accent text-ods-text-primary text-h6"
-              >
-                {option.displayName || option.name}
-              </Badge>
-            ))}
+        {footer}
+
+        {/* Selection Summary */}
+        {!isLoading && !error && selectionSummary && validSelectedIds.length > 0 && (
+          <div className="rounded-lg border border-ods-success bg-ods-success-secondary p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-ods-success"></div>
+              <span className="text-ods-success text-h6">
+                {validSelectedIds.length} {multiSelect ? 'items' : 'item'} selected
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {getSelectedOptions().map(option => (
+                <Badge key={option.id} className="bg-ods-accent text-ods-text-primary text-h6">
+                  {option.displayName || option.name}
+                </Badge>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Help Text */}
-      {helpText && (
-        <div className="text-h6 text-ods-text-secondary">
-          {helpText}
-        </div>
-      )}
+        {/* Help Text */}
+        {helpText && <div className="text-ods-text-secondary text-h6">{helpText}</div>}
 
-      {/* Empty State Warning */}
-      {validSelectedIds.length === 0 && title && !optional && (
-        <div className="p-3 bg-ods-error-secondary border border-ods-error rounded-lg">
-          <div className="text-h6 text-ods-error">
-            ⚠️ Please select at least one option
+        {/* Empty State Warning */}
+        {validSelectedIds.length === 0 && title && !optional && (
+          <div className="rounded-lg border border-ods-error bg-ods-error-secondary p-3">
+            <div className="text-ods-error text-h6">⚠️ Please select at least one option</div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
     </TooltipProvider>
   );
 }

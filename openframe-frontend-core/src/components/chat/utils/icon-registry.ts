@@ -24,7 +24,6 @@
  * never renders without an icon.
  */
 
-import { createElement, type ComponentType, type ReactNode } from 'react'
 import {
   Activity,
   Banknote,
@@ -61,7 +60,8 @@ import {
   Users,
   Video,
   Youtube,
-} from 'lucide-react'
+} from 'lucide-react';
+import { createElement, type ComponentType, type ReactNode } from 'react';
 // Brand icons — lib-local exports.
 import {
   SlackIcon,
@@ -75,7 +75,7 @@ import {
   WhatsAppIcon,
   XLogo,
   OpenFrameLogo as RawOpenFrameLogo,
-} from '../../icons'
+} from '../../icons';
 
 // Wrapper so the OpenFrame logo's outer frame inherits the parent's text
 // color instead of its hardcoded default — that default is invisible on
@@ -87,7 +87,7 @@ import {
 // IconComponent type, but ignores it — the logo's outer frame is wired
 // to `currentColor` via the upperPathColor pass-through.
 const OpenFrameLogoIcon: ComponentType<{ className?: string; color?: string }> = ({ className }) =>
-  createElement(RawOpenFrameLogo, { className, upperPathColor: 'currentColor' })
+  createElement(RawOpenFrameLogo, { className, upperPathColor: 'currentColor' });
 
 /**
  * Loose icon-component shape: every entry accepts `className`; `color` is
@@ -95,7 +95,7 @@ const OpenFrameLogoIcon: ComponentType<{ className?: string; color?: string }> =
  * but `color` is optional so passing `undefined` is a no-op). Loose enough
  * to accept both lucide's `LucideIcon` and our brand SVG components.
  */
-type IconComponent = ComponentType<{ className?: string; color?: string }>
+type IconComponent = ComponentType<{ className?: string; color?: string }>;
 
 /**
  * The kebab-case registry. ALL lookups go through here; PascalCase
@@ -103,62 +103,62 @@ type IconComponent = ComponentType<{ className?: string; color?: string }>
  */
 export const ICON_REGISTRY: Record<string, IconComponent> = {
   // lucide-react (kebab-case)
-  activity:          Activity,
-  banknote:          Banknote,
-  bell:              Bell,
-  'book-open':       BookOpen,
-  box:               Box,
-  briefcase:         Briefcase,
-  calendar:          Calendar,
-  'check-square':    CheckSquare,
-  'dollar-sign':     DollarSign,
+  activity: Activity,
+  banknote: Banknote,
+  bell: Bell,
+  'book-open': BookOpen,
+  box: Box,
+  briefcase: Briefcase,
+  calendar: Calendar,
+  'check-square': CheckSquare,
+  'dollar-sign': DollarSign,
   // For brand-vs-lucide variants the kebab key is the BRAND (most-common
   // social-platform intent); `'<name>-lucide'` carries the lucide outline.
-  facebook:          FacebookIcon,
+  facebook: FacebookIcon,
   'facebook-lucide': Facebook,
-  'file-text':       FileText,
+  'file-text': FileText,
   // `'github-lucide'` is the lucide outline glyph (used by
   // `social_platforms.icon_name='Github'`); `'github'` is the brand icon
   // (used by `chat_admin_slash_commands.icon_name='github'`). The PascalCase
   // alias `'Github' → 'github-lucide'` routes the lucide glyph for
   // social-platform DB rows; `'GitHubIcon' → 'github'` keeps brand routing
   // consistent for callers that store the PascalCase component name.
-  github:            GitHubIcon,
-  'github-lucide':   Github,
-  globe:             Globe,
-  'graduation-cap':  GraduationCap,
-  headphones:        Headphones,
-  info:              Info,
-  instagram:         InstagramIcon,
+  github: GitHubIcon,
+  'github-lucide': Github,
+  globe: Globe,
+  'graduation-cap': GraduationCap,
+  headphones: Headphones,
+  info: Info,
+  instagram: InstagramIcon,
   'instagram-lucide': Instagram,
-  mail:              Mail,
-  megaphone:         Megaphone,
-  'message-circle':  MessageCircle,
-  'message-square':  MessageSquare,
-  newspaper:         Newspaper,
-  package:           Package,
-  'pen-square':      PenSquare,
-  rocket:            Rocket,
-  search:            Search,
-  send:              Send,
-  shield:            Shield,
-  star:              Star,
-  table:             TableProperties,
-  'trending-up':     TrendingUp,
-  twitter:           Twitter,
-  users:             Users,
-  video:             Video,
-  whatsapp:          WhatsAppIcon,
-  youtube:           YouTubeIcon,
-  'youtube-lucide':  Youtube,
+  mail: Mail,
+  megaphone: Megaphone,
+  'message-circle': MessageCircle,
+  'message-square': MessageSquare,
+  newspaper: Newspaper,
+  package: Package,
+  'pen-square': PenSquare,
+  rocket: Rocket,
+  search: Search,
+  send: Send,
+  shield: Shield,
+  star: Star,
+  table: TableProperties,
+  'trending-up': TrendingUp,
+  twitter: Twitter,
+  users: Users,
+  video: Video,
+  whatsapp: WhatsAppIcon,
+  youtube: YouTubeIcon,
+  'youtube-lucide': Youtube,
   // brand-only icons (no lucide variant in current use)
-  slack:             SlackIcon,
-  clickup:           ClickUpIcon,
-  hubspot:           HubspotIcon,
-  linkedin:          LinkedInIcon,
-  x:                 XLogo,
-  openframe:         OpenFrameLogoIcon,
-}
+  slack: SlackIcon,
+  clickup: ClickUpIcon,
+  hubspot: HubspotIcon,
+  linkedin: LinkedInIcon,
+  x: XLogo,
+  openframe: OpenFrameLogoIcon,
+};
 
 /**
  * PascalCase → kebab-case alias table for DB columns that store icon
@@ -167,56 +167,56 @@ export const ICON_REGISTRY: Record<string, IconComponent> = {
  */
 const PASCAL_TO_KEBAB_ALIASES: Record<string, string> = {
   // Lucide PascalCase names → kebab equivalents
-  Activity:        'activity',
-  Banknote:        'banknote',
-  Bell:            'bell',
-  BookOpen:        'book-open',
-  Box:             'box',
-  Briefcase:       'briefcase',
-  Calendar:        'calendar',
-  CheckSquare:     'check-square',
-  DollarSign:      'dollar-sign',
+  Activity: 'activity',
+  Banknote: 'banknote',
+  Bell: 'bell',
+  BookOpen: 'book-open',
+  Box: 'box',
+  Briefcase: 'briefcase',
+  Calendar: 'calendar',
+  CheckSquare: 'check-square',
+  DollarSign: 'dollar-sign',
   // Lucide PascalCase → the `-lucide` kebab variant (kebab default is the
   // brand icon for the social-platform names below).
-  Facebook:        'facebook-lucide',
-  FileText:        'file-text',
-  Github:          'github-lucide',
-  Globe:           'globe',
-  GraduationCap:   'graduation-cap',
-  Headphones:      'headphones',
-  Info:            'info',
-  Instagram:       'instagram-lucide',
-  Mail:            'mail',
-  Megaphone:       'megaphone',
-  MessageCircle:   'message-circle',
-  MessageSquare:   'message-square',
-  Newspaper:       'newspaper',
-  Package:         'package',
-  PenSquare:       'pen-square',
-  Rocket:          'rocket',
-  Search:          'search',
-  Send:            'send',
-  Shield:          'shield',
-  Star:            'star',
+  Facebook: 'facebook-lucide',
+  FileText: 'file-text',
+  Github: 'github-lucide',
+  Globe: 'globe',
+  GraduationCap: 'graduation-cap',
+  Headphones: 'headphones',
+  Info: 'info',
+  Instagram: 'instagram-lucide',
+  Mail: 'mail',
+  Megaphone: 'megaphone',
+  MessageCircle: 'message-circle',
+  MessageSquare: 'message-square',
+  Newspaper: 'newspaper',
+  Package: 'package',
+  PenSquare: 'pen-square',
+  Rocket: 'rocket',
+  Search: 'search',
+  Send: 'send',
+  Shield: 'shield',
+  Star: 'star',
   TableProperties: 'table',
-  TrendingUp:      'trending-up',
-  Twitter:         'twitter',
-  Users:           'users',
-  Video:           'video',
-  Youtube:         'youtube-lucide',
+  TrendingUp: 'trending-up',
+  Twitter: 'twitter',
+  Users: 'users',
+  Video: 'video',
+  Youtube: 'youtube-lucide',
   // Brand-icon PascalCase exports → kebab (kebab default is the brand)
-  SlackIcon:        'slack',
-  GitHubIcon:       'github',
-  ClickUpIcon:      'clickup',
-  HubspotIcon:      'hubspot',
-  LinkedInIcon:     'linkedin',
-  FacebookIcon:     'facebook',
-  InstagramIcon:    'instagram',
-  YouTubeIcon:      'youtube',
-  WhatsAppIcon:     'whatsapp',
-  XLogo:            'x',
-  OpenFrameLogo:    'openframe',
-}
+  SlackIcon: 'slack',
+  GitHubIcon: 'github',
+  ClickUpIcon: 'clickup',
+  HubspotIcon: 'hubspot',
+  LinkedInIcon: 'linkedin',
+  FacebookIcon: 'facebook',
+  InstagramIcon: 'instagram',
+  YouTubeIcon: 'youtube',
+  WhatsAppIcon: 'whatsapp',
+  XLogo: 'x',
+  OpenFrameLogo: 'openframe',
+};
 
 /**
  * Normalize an icon key to the registry's canonical kebab-case form.
@@ -224,7 +224,7 @@ const PASCAL_TO_KEBAB_ALIASES: Record<string, string> = {
  * columns) and passes kebab-case keys through unchanged.
  */
 export function normalizeIconKey(key: string): string {
-  return PASCAL_TO_KEBAB_ALIASES[key] ?? key
+  return PASCAL_TO_KEBAB_ALIASES[key] ?? key;
 }
 
 /**
@@ -237,23 +237,23 @@ export function normalizeIconKey(key: string): string {
 export function getIconComponent(
   iconName: string | null | undefined,
 ): ComponentType<{ className?: string; color?: string }> {
-  if (!iconName) return FileText
-  return ICON_REGISTRY[normalizeIconKey(iconName)] ?? FileText
+  if (!iconName) return FileText;
+  return ICON_REGISTRY[normalizeIconKey(iconName)] ?? FileText;
 }
 
 // ---------------------------------------------------------------------------
 // Sized-icon rendering helper (migrated from `src/utils/dynamic-icons.tsx`)
 // ---------------------------------------------------------------------------
 
-export type DynamicIconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+export type DynamicIconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 const SIZE_CLASSES: Record<DynamicIconSize, string> = {
-  xs: 'w-3 h-3',    // 12px
-  sm: 'w-4 h-4',    // 16px
-  md: 'w-6 h-6',    // 24px
-  lg: 'w-8 h-8',    // 32px
-  xl: 'w-12 h-12',  // 48px
-}
+  xs: 'w-3 h-3', // 12px
+  sm: 'w-4 h-4', // 16px
+  md: 'w-6 h-6', // 24px
+  lg: 'w-8 h-8', // 32px
+  xl: 'w-12 h-12', // 48px
+};
 
 /**
  * Optional per-icon color overrides. Keys are kebab-case (canonical
@@ -264,7 +264,7 @@ const ICON_COLORS: Record<string, { color?: string; fill?: string }> = {
   linkedin: { color: '#0A66C2' },
   facebook: { color: '#1877F2' },
   youtube: { color: '#FF0000' },
-}
+};
 
 /**
  * Render an icon by name with a size preset + optional className.
@@ -277,24 +277,24 @@ export function getDynamicIcon(
   className?: string,
 ): ReactNode {
   if (!iconName) {
-    console.warn('[getDynamicIcon] No iconName provided, using Globe fallback')
-    return createElement(Globe, { className: SIZE_CLASSES[size] })
+    console.warn('[getDynamicIcon] No iconName provided, using Globe fallback');
+    return createElement(Globe, { className: SIZE_CLASSES[size] });
   }
 
-  const sizeClass = SIZE_CLASSES[size]
-  const finalClassName = className ? `${sizeClass} ${className}` : sizeClass
+  const sizeClass = SIZE_CLASSES[size];
+  const finalClassName = className ? `${sizeClass} ${className}` : sizeClass;
 
-  const canonicalKey = normalizeIconKey(iconName)
-  const IconComponent = ICON_REGISTRY[canonicalKey]
+  const canonicalKey = normalizeIconKey(iconName);
+  const IconComponent = ICON_REGISTRY[canonicalKey];
 
   if (IconComponent) {
-    const colorConfig = ICON_COLORS[canonicalKey] || {}
-    return createElement(IconComponent, { className: finalClassName, ...colorConfig })
+    const colorConfig = ICON_COLORS[canonicalKey] || {};
+    return createElement(IconComponent, { className: finalClassName, ...colorConfig });
   }
 
   console.error(
     `[getDynamicIcon] Icon NOT found in registry: "${iconName}" (normalized to "${canonicalKey}"). Available icons:`,
     Object.keys(ICON_REGISTRY),
-  )
-  return createElement(Globe, { className: finalClassName })
+  );
+  return createElement(Globe, { className: finalClassName });
 }

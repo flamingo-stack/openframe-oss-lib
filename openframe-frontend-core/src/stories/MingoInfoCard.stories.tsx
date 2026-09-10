@@ -1,10 +1,10 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { MingoInfoCard } from '../components/chat/mingo-info-card'
-import { MonitorIcon } from '../components/icons-v2-generated/devices/monitor-icon'
-import { Copy01Icon } from '../components/icons-v2-generated/documents/copy-01-icon'
-import { TrashIcon } from '../components/icons-v2-generated/interface/trash-icon'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { MingoInfoCard } from '../components/chat/mingo-info-card';
+import { MonitorIcon } from '../components/icons-v2-generated/devices/monitor-icon';
+import { Copy01Icon } from '../components/icons-v2-generated/documents/copy-01-icon';
+import { TrashIcon } from '../components/icons-v2-generated/interface/trash-icon';
 
-const AVATAR_SRC = 'https://i.pravatar.cc/80?img=12'
+const AVATAR_SRC = 'https://i.pravatar.cc/80?img=12';
 
 const SAMPLE_MENU = [
   {
@@ -14,8 +14,7 @@ const SAMPLE_MENU = [
         label: 'Copy link',
         icon: <Copy01Icon size={16} />,
         onClick: () => {
-          // eslint-disable-next-line no-console
-          console.log('[story] copy link')
+          console.log('[story] copy link');
         },
       },
       {
@@ -24,13 +23,12 @@ const SAMPLE_MENU = [
         icon: <TrashIcon size={16} />,
         danger: true,
         onClick: () => {
-          // eslint-disable-next-line no-console
-          console.log('[story] remove')
+          console.log('[story] remove');
         },
       },
     ],
   },
-]
+];
 
 const meta: Meta<typeof MingoInfoCard> = {
   title: 'Chat/MingoInfoCard',
@@ -54,16 +52,16 @@ const meta: Meta<typeof MingoInfoCard> = {
     onClick: { control: false },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div className="w-full bg-ods-bg p-6">
         <Story />
       </div>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 // =============================================================================
 // The two Figma media variants
@@ -78,7 +76,7 @@ export const WithImage: Story = {
     status: { label: 'Status' },
     menuGroups: SAMPLE_MENU,
   },
-}
+};
 
 export const WithIcon: Story = {
   args: {
@@ -88,7 +86,7 @@ export const WithIcon: Story = {
     status: { label: 'Status' },
     menuGroups: SAMPLE_MENU,
   },
-}
+};
 
 // =============================================================================
 // Optional-element permutations
@@ -101,7 +99,7 @@ export const WithoutStatus: Story = {
     icon: <MonitorIcon size={24} />,
     menuGroups: SAMPLE_MENU,
   },
-}
+};
 
 export const WithoutDescription: Story = {
   args: {
@@ -111,7 +109,7 @@ export const WithoutDescription: Story = {
     status: { label: 'Status' },
     menuGroups: SAMPLE_MENU,
   },
-}
+};
 
 export const WithoutMenu: Story = {
   args: {
@@ -120,7 +118,7 @@ export const WithoutMenu: Story = {
     icon: <MonitorIcon size={24} />,
     status: { label: 'Status' },
   },
-}
+};
 
 export const Clickable: Story = {
   args: {
@@ -131,11 +129,10 @@ export const Clickable: Story = {
     status: { label: 'Online' },
     menuGroups: SAMPLE_MENU,
     onClick: () => {
-      // eslint-disable-next-line no-console
-      console.log('[story] card clicked')
+      console.log('[story] card clicked');
     },
   },
-}
+};
 
 export const StatusVariants: Story = {
   parameters: {
@@ -178,7 +175,7 @@ export const StatusVariants: Story = {
       />
     </div>
   ),
-}
+};
 
 export const LongContentTruncates: Story = {
   args: {
@@ -190,4 +187,4 @@ export const LongContentTruncates: Story = {
     status: { label: 'Status' },
     menuGroups: SAMPLE_MENU,
   },
-}
+};

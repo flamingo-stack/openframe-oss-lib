@@ -1,5 +1,6 @@
 package com.openframe.data.repository.notification;
 
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
@@ -11,6 +12,7 @@ import org.springframework.data.mongodb.repository.Update;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -49,9 +51,12 @@ public interface NotificationReadStateRepository
     @Update("{ '$set': { 'status': 'DELETED' } }")
     long softDelete(String recipientId, RecipientType recipientType, String notificationId);
 
-    @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'status': 'READ' }")
+    @Query("{ 'tenantId': ?0, 'recipientId': ?1, 'recipientType': ?2, 'notificationId': { '$in': ?3 }, 'status': 'READ' }")
     @Update("{ '$set': { 'status': 'DELETED' } }")
-    long softDeleteAllRead(String recipientId, RecipientType recipientType);
+    long softDeleteByIds(String tenantId,
+                         String recipientId,
+                         RecipientType recipientType,
+                         Collection<String> notificationIds);
 
     @Aggregation(pipeline = {
             "{ '$match': { 'tenantId': ?2, 'recipientId': ?0, 'recipientType': ?1, 'status': 'UNREAD' } }",
@@ -60,4 +65,43 @@ public interface NotificationReadStateRepository
     List<CategoryCount> unreadCountsByCategory(@Param("recipientId") String recipientId,
                                                @Param("recipientType") RecipientType recipientType,
                                                @Param("tenantId") String tenantId);
+
+    // tenantId must stay explicit — aggregations and @Update bypass tenant scoping.
+    @Aggregation(pipeline = {
+            "{ '$match': { 'tenantId': ?3, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, "
+                    + "'status': 'UNREAD', 'entityId': { '$exists': true, '$ne': null } } }",
+            "{ '$group': { '_id': '$entityId', 'count': { '$sum': 1 } } }"
+    })
+    List<EntityCount> unreadCountsByEntity(@Param("recipientId") String recipientId,
+                                           @Param("recipientType") RecipientType recipientType,
+                                           @Param("entityType") NotificationEntityType entityType,
+                                           @Param("tenantId") String tenantId);
+
+    @Aggregation(pipeline = {
+            "{ '$match': { 'tenantId': ?4, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, "
+                    + "'status': 'UNREAD', 'entityId': { '$in': ?3 } } }",
+            "{ '$group': { '_id': '$entityId', 'count': { '$sum': 1 } } }"
+    })
+    List<EntityCount> unreadCountsByEntityIds(@Param("recipientId") String recipientId,
+                                              @Param("recipientType") RecipientType recipientType,
+                                              @Param("entityType") NotificationEntityType entityType,
+                                              @Param("entityIds") Collection<String> entityIds,
+                                              @Param("tenantId") String tenantId);
+
+    @Query("{ 'tenantId': ?5, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, 'entityId': ?3, 'status': ?4 }")
+    List<NotificationReadState> findByRecipientIdAndRecipientTypeAndEntity(String recipientId,
+                                                                          RecipientType recipientType,
+                                                                          NotificationEntityType entityType,
+                                                                          String entityId,
+                                                                          ReadStatus status,
+                                                                          String tenantId);
+
+    // Flips exactly the ids the caller snapshotted, never "everything still unread on that entity":
+    // a notification arriving mid-call would otherwise turn read without anyone retracting its push.
+    @Query("{ 'tenantId': ?0, 'recipientId': ?1, 'recipientType': ?2, 'notificationId': { '$in': ?3 }, 'status': 'UNREAD' }")
+    @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
+    long markAsReadByIds(String tenantId,
+                         String recipientId,
+                         RecipientType recipientType,
+                         Collection<String> notificationIds);
 }

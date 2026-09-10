@@ -1,10 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { HubspotTicketCard } from '../components/chat/entity-cards'
-import {
-  ChatColumnDecorator,
-  makeAnchorProps,
-} from './__fixtures__/chat-card-decorator'
-import { hubspotTicketItem } from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { HubspotTicketCard } from '../components/chat/entity-cards';
+import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator';
+import { hubspotTicketItem } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof HubspotTicketCard> = {
   title: 'Chat/EntityCards/HubspotTicketCard',
@@ -18,11 +15,17 @@ const meta: Meta<typeof HubspotTicketCard> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Full: Story = {
   args: {
@@ -30,7 +33,7 @@ export const Full: Story = {
     variant: 'compact',
     anchorProps: makeAnchorProps(hubspotTicketItem.url ?? '#'),
   },
-}
+};
 
 export const Anon: Story = {
   args: {
@@ -50,7 +53,7 @@ export const Anon: Story = {
       },
     },
   },
-}
+};
 
 export const SelfTicket: Story = {
   args: {
@@ -69,12 +72,11 @@ export const SelfTicket: Story = {
   parameters: {
     docs: {
       description: {
-        story:
-          'Self-ticket variant — shown to a chat user looking at their own ticket; admin URL is stripped.',
+        story: 'Self-ticket variant — shown to a chat user looking at their own ticket; admin URL is stripped.',
       },
     },
   },
-}
+};
 
 export const ClosedTicket: Story = {
   args: {
@@ -87,7 +89,7 @@ export const ClosedTicket: Story = {
     variant: 'compact',
     anchorProps: makeAnchorProps(hubspotTicketItem.url ?? '#'),
   },
-}
+};
 
 export const RowVariant: Story = {
   args: {
@@ -95,4 +97,4 @@ export const RowVariant: Story = {
     variant: 'row',
     anchorProps: makeAnchorProps(hubspotTicketItem.url ?? '#'),
   },
-}
+};

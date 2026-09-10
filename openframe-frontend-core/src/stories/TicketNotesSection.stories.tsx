@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import { TicketNotesSection } from '../components/ui/ticket-notes-section';
 import type { TicketNote } from '../components/ui/ticket-note-card';
+import { TicketNotesSection } from '../components/ui/ticket-notes-section';
 
 const meta = {
   title: 'Tickets/TicketNotesSection',
@@ -10,13 +10,14 @@ const meta = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Notes section with note cards (avatar, text, author, date), edit/delete for own notes, and input to add new notes.',
+        component:
+          'Notes section with note cards (avatar, text, author, date), edit/delete for own notes, and input to add new notes.',
       },
     },
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '600px' }}>
         <Story />
       </div>
@@ -71,17 +72,20 @@ export const Interactive: Story = {
     return (
       <TicketNotesSection
         notes={notes}
-        onAddNote={(text) => {
-          setNotes(prev => [...prev, {
-            id: String(Date.now()),
-            text,
-            authorName: 'You',
-            createdAt: new Date().toLocaleString(),
-            isOwn: true,
-          }]);
+        onAddNote={text => {
+          setNotes(prev => [
+            ...prev,
+            {
+              id: String(Date.now()),
+              text,
+              authorName: 'You',
+              createdAt: new Date().toLocaleString(),
+              isOwn: true,
+            },
+          ]);
         }}
-        onEditNote={(id) => alert(`Edit note: ${id}`)}
-        onDeleteNote={(id) => setNotes(prev => prev.filter(n => n.id !== id))}
+        onEditNote={id => alert(`Edit note: ${id}`)}
+        onDeleteNote={id => setNotes(prev => prev.filter(n => n.id !== id))}
       />
     );
   },

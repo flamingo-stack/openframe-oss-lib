@@ -19,14 +19,14 @@
  * cares about a handful of string-equal branches.
  */
 
-export const AUTO_CONTINUATION_DIRECTIVE_PREFIX = '[internal-auto-continuation]'
+export const AUTO_CONTINUATION_DIRECTIVE_PREFIX = '[internal-auto-continuation]';
 
 export interface BuildAutoContinuationOptions {
-  ticketId?: string
+  ticketId?: string;
   /** Reading of `args.status` on the just-approved tool call. Used to
    *  branch the directive between "post-create diagnostic Qs",
    *  "post-close resolution ask", and "post-update acknowledgement". */
-  status?: string
+  status?: string;
 }
 
 /**
@@ -37,13 +37,10 @@ export interface BuildAutoContinuationOptions {
  * Branch logic mirrors `TICKET_TOOL_PROTOCOL` §1a/§1b — keep them in
  * sync: the directive tells the model WHICH section to follow.
  */
-export function buildAutoContinuationDirective(
-  toolName: string,
-  opts: BuildAutoContinuationOptions = {},
-): string {
-  const ticketRef = opts.ticketId ? ` (ticket #${opts.ticketId})` : ''
-  const ticketHash = opts.ticketId ? ` #${opts.ticketId}` : ''
-  const isClose = toolName === 'update_ticket' && opts.status?.toUpperCase() === 'CLOSED'
+export function buildAutoContinuationDirective(toolName: string, opts: BuildAutoContinuationOptions = {}): string {
+  const ticketRef = opts.ticketId ? ` (ticket #${opts.ticketId})` : '';
+  const ticketHash = opts.ticketId ? ` #${opts.ticketId}` : '';
+  const isClose = toolName === 'update_ticket' && opts.status?.toUpperCase() === 'CLOSED';
   if (toolName === 'create_ticket') {
     return (
       `${AUTO_CONTINUATION_DIRECTIVE_PREFIX} The user just approved create_ticket${ticketRef}. ` +
@@ -51,7 +48,7 @@ export function buildAutoContinuationDirective(
       `tailored to the symptom they reported in their original message. When they answer, ` +
       `propose an update_ticket with content_addendum carrying a clean Q&A digest. ` +
       `Do NOT call any tool in this turn — just write the questions as prose.`
-    )
+    );
   }
   if (isClose) {
     return (
@@ -60,11 +57,11 @@ export function buildAutoContinuationDirective(
       `to the ticket as a closing note." Phrase kindly even if the user was curt. When they ` +
       `answer, propose an update_ticket with content_addendum="[Resolution] <their words>". ` +
       `Do NOT call any tool in this turn — just write the prose ask.`
-    )
+    );
   }
   return (
     `${AUTO_CONTINUATION_DIRECTIVE_PREFIX} The user just approved update_ticket${ticketHash}. ` +
     `Acknowledge the change in ONE short sentence; if anything else looks like it needs ` +
     `attention, ask. Do NOT call any tool in this turn.`
-  )
+  );
 }

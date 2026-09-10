@@ -1,8 +1,8 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import type React from "react";
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type React from 'react';
 
-import { ToolExecutionDisplay } from "../components/chat/tool-execution-display";
-import type { ToolExecutionData } from "../components/chat/types";
+import { ToolExecutionDisplay } from '../components/chat/tool-execution-display';
+import type { ToolExecutionData } from '../components/chat/types';
 
 /**
  * CLIENT (Fae) variant of the standalone tool-execution card. Same component
@@ -11,43 +11,47 @@ import type { ToolExecutionData } from "../components/chat/types";
  */
 
 const executingMessage: ToolExecutionData = {
-	type: "EXECUTING_TOOL",
-	integratedToolType: "OPENFRAME_RMM",
-	toolFunction: "run_script",
-	parameters: { RunAsUser: "False", timeoutSeconds: 60 },
+  type: 'EXECUTING_TOOL',
+  integratedToolType: 'OPENFRAME_RMM',
+  toolFunction: 'run_script',
+  parameters: { RunAsUser: 'False', timeoutSeconds: 60 },
 };
 
 const executedSuccessMessage: ToolExecutionData = {
-	type: "EXECUTED_TOOL",
-	integratedToolType: "OPENFRAME_RMM",
-	toolFunction: "run_script",
-	parameters: { RunAsUser: "False", timeoutSeconds: 60 },
-	result: `pid  | name           | path                          | cmdline
+  type: 'EXECUTED_TOOL',
+  integratedToolType: 'OPENFRAME_RMM',
+  toolFunction: 'run_script',
+  parameters: { RunAsUser: 'False', timeoutSeconds: 60 },
+  result: `pid  | name           | path                          | cmdline
 4821 | suspicious.exe | C:\\Users\\Public\\suspicious.exe | suspicious.exe --hidden --connect 185.220.101.45`,
-	success: true,
+  success: true,
 };
 
-const constrainedDecorator =
-	(width?: number) => (Story: React.ComponentType) => (
-		<div style={{ maxWidth: width ?? 400, background: "var(--color-bg)" }}>
-			<Story />
-		</div>
-	);
+const constrainedDecorator = (width?: number) =>
+  // Named function expression: Storybook renders decorators as components, so
+  // the name is what shows up in the React tree instead of `Anonymous`.
+  function ConstrainedDecorator(Story: React.ComponentType) {
+    return (
+      <div style={{ maxWidth: width ?? 400, background: 'var(--color-bg)' }}>
+        <Story />
+      </div>
+    );
+  };
 
 const meta = {
-	title: "Chat/Client/ToolExecutionDisplay",
-	component: ToolExecutionDisplay,
-	tags: ["autodocs"],
-	args: { assistantType: "fae" },
-	parameters: {
-		docs: {
-			description: {
-				component:
-					"CLIENT (Fae) tool-execution card — no tool icon. Same component/props as Admin, gated by assistantType='fae'.",
-			},
-		},
-	},
-	decorators: [constrainedDecorator()],
+  title: 'Chat/Client/ToolExecutionDisplay',
+  component: ToolExecutionDisplay,
+  tags: ['autodocs'],
+  args: { assistantType: 'fae' },
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "CLIENT (Fae) tool-execution card — no tool icon. Same component/props as Admin, gated by assistantType='fae'.",
+      },
+    },
+  },
+  decorators: [constrainedDecorator()],
 } satisfies Meta<typeof ToolExecutionDisplay>;
 
 export default meta;
@@ -55,10 +59,10 @@ type Story = StoryObj<typeof meta>;
 
 /** Collapsed, executing — spinner + 2-line preview, no tool icon. */
 export const CollapsedExecuting: Story = {
-	args: { message: executingMessage },
+  args: { message: executingMessage },
 };
 
 /** Collapsed, success — green check, no tool icon. */
 export const CollapsedSuccess: Story = {
-	args: { message: executedSuccessMessage },
+  args: { message: executedSuccessMessage },
 };

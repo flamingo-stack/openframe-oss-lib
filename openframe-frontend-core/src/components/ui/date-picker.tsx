@@ -1,32 +1,21 @@
-"use client";
+'use client';
 
-import * as Popover from "@radix-ui/react-popover";
-import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
-import * as React from "react";
-import {
-  DayPicker,
-  type DateRange,
-  type DayPickerProps,
-  type Matcher,
-} from "react-day-picker";
-import { useMdUp } from "../../hooks";
-import { cn } from "../../utils/cn";
-import { Button } from "./button";
-import { FieldWrapper } from "./field-wrapper";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./select";
-import type { SortDirection } from "./sort-column-item";
+import * as Popover from '@radix-ui/react-popover';
+import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { DayPicker, type DateRange, type DayPickerProps, type Matcher } from 'react-day-picker';
+import { useMdUp } from '../../hooks';
+import { cn } from '../../utils/cn';
+import { Button } from './button';
+import { FieldWrapper } from './field-wrapper';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
+import type { SortDirection } from './sort-column-item';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type DatePickerMode = "single" | "range";
+export type DatePickerMode = 'single' | 'range';
 
 export interface DatePickerBaseProps {
   /** Placeholder text when no date is selected */
@@ -44,7 +33,7 @@ export interface DatePickerBaseProps {
   /** Maximum selectable date */
   toDate?: Date;
   /** Locale for formatting */
-  locale?: DayPickerProps["locale"];
+  locale?: DayPickerProps['locale'];
   /** Label text displayed above the picker */
   label?: string;
   /** Error message displayed below the picker */
@@ -54,13 +43,13 @@ export interface DatePickerBaseProps {
 }
 
 export interface SingleDatePickerProps extends DatePickerBaseProps {
-  mode: "single";
+  mode: 'single';
   value?: Date;
   onChange?: (date: Date | undefined) => void;
 }
 
 export interface RangeDatePickerProps extends DatePickerBaseProps {
-  mode: "range";
+  mode: 'range';
   value?: DateRange;
   onChange?: (range: DateRange | undefined) => void;
 }
@@ -72,18 +61,15 @@ export type DatePickerProps = SingleDatePickerProps | RangeDatePickerProps;
 // ============================================================================
 
 const defaultFormatDate = (date: Date): string => {
-  return date.toLocaleDateString("en-US", {
-    month: "2-digit",
-    day: "2-digit",
-    year: "numeric",
+  return date.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
   });
 };
 
-const formatDateRange = (
-  range: DateRange | undefined,
-  formatFn: (date: Date) => string
-): string => {
-  if (!range?.from) return "";
+const formatDateRange = (range: DateRange | undefined, formatFn: (date: Date) => string): string => {
+  if (!range?.from) return '';
   if (!range.to) return formatFn(range.from);
   return `${formatFn(range.from)} - ${formatFn(range.to)}`;
 };
@@ -93,11 +79,11 @@ const formatDateRange = (
 // ============================================================================
 
 interface CalendarNavButtonProps {
-  direction: "left" | "right";
+  direction: 'left' | 'right';
   onClick?: () => void;
   /** Set at a `fromDate` / `toDate` bound — there is nothing selectable past it. */
   disabled?: boolean;
-  "aria-label"?: string;
+  'aria-label'?: string;
 }
 
 /** The DS icon button, at its standard size in every placement — month
@@ -105,7 +91,7 @@ interface CalendarNavButtonProps {
  *  to give instead is the calendar's WIDTH: a `bare` host states one wide
  *  enough for the caption to sit between the two buttons (see the meeting
  *  scheduler's `CALENDAR_W`). */
-function CalendarNavButton({ direction, onClick, disabled, "aria-label": ariaLabel }: CalendarNavButtonProps) {
+function CalendarNavButton({ direction, onClick, disabled, 'aria-label': ariaLabel }: CalendarNavButtonProps) {
   return (
     <Button
       type="button"
@@ -115,7 +101,7 @@ function CalendarNavButton({ direction, onClick, disabled, "aria-label": ariaLab
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
-      leftIcon={direction === "left" ? <ChevronLeft className="size-6" /> : <ChevronRight className="size-6" />}
+      leftIcon={direction === 'left' ? <ChevronLeft className="size-6" /> : <ChevronRight className="size-6" />}
     />
   );
 }
@@ -131,7 +117,7 @@ export interface DatePickerCalendarProps {
   numberOfMonths?: 1 | 2;
   fromDate?: Date;
   toDate?: Date;
-  locale?: DayPickerProps["locale"];
+  locale?: DayPickerProps['locale'];
   /**
    * When true the calendar fills its container width and day cells flex to
    * fit (instead of the fixed 40px cells). Used by DateFilterMenu so the grid
@@ -204,22 +190,28 @@ export function DatePickerCalendar({
   const isMdUp = useMdUp() ?? true;
   const monthsToShow = isMdUp ? numberOfMonths : 1;
 
-  const [draftRange, setDraftRange] = React.useState<DateRange | undefined>(
-    mode === "range" ? (selected as DateRange | undefined) : undefined
+  const [draftRange, setDraftRange] = useState<DateRange | undefined>(
+    mode === 'range' ? (selected as DateRange | undefined) : undefined,
   );
-  const [hoveredDate, setHoveredDate] = React.useState<Date | undefined>(undefined);
+  const [hoveredDate, setHoveredDate] = useState<Date | undefined>(undefined);
 
   // Keep the internal range in sync when the consumer changes `selected`
   // externally (e.g. DateFilterMenu Reset while the popover stays open).
-  React.useEffect(() => {
-    if (mode === "range") {
+  // Adjusted while rendering — React's documented prop-sync pattern — rather
+  // than from an effect: the calendar highlights `draftRange` in THIS render,
+  // so a Reset done from an effect painted the old selection one more time
+  // before clearing it.
+  const [syncedSelection, setSyncedSelection] = useState({ mode, selected });
+  if (syncedSelection.mode !== mode || syncedSelection.selected !== selected) {
+    setSyncedSelection({ mode, selected });
+    if (mode === 'range') {
       setDraftRange(selected as DateRange | undefined);
     }
-  }, [mode, selected]);
+  }
 
   const rangeSelected = draftRange;
   const hasCompleteRange =
-    mode === "range" &&
+    mode === 'range' &&
     !!rangeSelected?.from &&
     !!rangeSelected?.to &&
     rangeSelected.from.getTime() !== rangeSelected.to.getTime();
@@ -245,9 +237,7 @@ export function DatePickerCalendar({
     // Second click closes the range, ordering the two ends.
     const start = draftRange.from;
     const completed: DateRange =
-      triggerDate.getTime() < start.getTime()
-        ? { from: triggerDate, to: start }
-        : { from: start, to: triggerDate };
+      triggerDate.getTime() < start.getTime() ? { from: triggerDate, to: start } : { from: start, to: triggerDate };
     setDraftRange(completed);
     setHoveredDate(undefined);
     onSelect(completed);
@@ -265,7 +255,7 @@ export function DatePickerCalendar({
   // cells across a phone's 340px would be a 356px-tall month, half again what
   // the design budgets, and the same rule handed a wide column a month tall
   // enough to push a card that states its height.
-  const cellOuter = bare ? "flex-1 min-w-0 h-[32px]" : isFluid ? "flex-1 aspect-square min-w-0" : "size-10";
+  const cellOuter = bare ? 'flex-1 min-w-0 h-[32px]' : isFluid ? 'flex-1 aspect-square min-w-0' : 'size-10';
   // ...but the DAY ITSELF stays square inside that wider cell: `h-full` gives
   // the button the row's height and `aspect-square` turns it into a 32x32
   // rounded square, centred by the cell. `w-auto` is load-bearing — it drops
@@ -275,22 +265,18 @@ export function DatePickerCalendar({
   // rather than on the cell: react-day-picker puts `selected`/`today` on the
   // cell, and a cell 48px wide by 30 tall renders the selection as a stretched
   // pill. Same colours, same radius, smaller box.
-  const cellInner = bare
-    ? "h-full w-auto aspect-square rounded-[6px]"
-    : isFluid
-      ? "size-full"
-      : "size-10";
+  const cellInner = bare ? 'h-full w-auto aspect-square rounded-[6px]' : isFluid ? 'size-full' : 'size-10';
   // The weekday strip is a LABEL row, not a day: `bare` gives it the height of
   // its own text rather than a full row.
-  const weekdayOuter = bare ? "flex-1 min-w-0 h-6" : cellOuter;
+  const weekdayOuter = bare ? 'flex-1 min-w-0 h-6' : cellOuter;
 
   // Day states, per paint target (see `cellInner`). Range mode is never bare —
   // a range MUST fill its cells or the middle would break into islands — so
   // only these three single-day states fork.
-  const hoverClass = bare ? "[&>button]:hover:bg-ods-bg-surface" : "hover:bg-ods-bg-surface hover:rounded-[6px]";
+  const hoverClass = bare ? '[&>button]:hover:bg-ods-bg-surface' : 'hover:bg-ods-bg-surface hover:rounded-[6px]';
   const todayClass = bare
-    ? "[&>button]:bg-ods-bg-surface [&>button]:hover:!bg-ods-bg-surface"
-    : "bg-ods-bg-surface rounded-[6px] hover:!bg-ods-bg-surface";
+    ? '[&>button]:bg-ods-bg-surface [&>button]:hover:!bg-ods-bg-surface'
+    : 'bg-ods-bg-surface rounded-[6px] hover:!bg-ods-bg-surface';
   /**
    * Today's tint applies only while today is NOT part of the selection.
    *
@@ -307,7 +293,7 @@ export function DatePickerCalendar({
   const dayNumber = (date: Date): number => date.getFullYear() * 10000 + date.getMonth() * 100 + date.getDate();
   const isSelectedDay = (date: Date): boolean => {
     const n = dayNumber(date);
-    if (mode === "single") {
+    if (mode === 'single') {
       const picked = selected as Date | undefined;
       return !!picked && dayNumber(picked) === n;
     }
@@ -319,66 +305,62 @@ export function DatePickerCalendar({
   const isUnclaimedToday = (date: Date): boolean => dayNumber(date) === dayNumber(today) && !isSelectedDay(date);
 
   const selectedClass = bare
-    ? "[&>button]:!bg-ods-accent [&>button]:!text-ods-card [&>button]:!font-bold [&>button]:hover:!bg-ods-accent"
-    : "!bg-ods-accent !text-ods-card !font-bold !rounded-[6px] hover:!bg-ods-accent";
+    ? '[&>button]:!bg-ods-accent [&>button]:!text-ods-card [&>button]:!font-bold [&>button]:hover:!bg-ods-accent'
+    : '!bg-ods-accent !text-ods-card !font-bold !rounded-[6px] hover:!bg-ods-accent';
 
   // Surface + inset, per placement. Bare drops the card and the 16px inset
   // (the host's panel provides both) and replaces the inset with the 8px the
   // design puts between the header and the grid — the ONLY spacing it keeps.
   const surfaceClass = bare
-    ? "flex w-full flex-col"
-    : cn("bg-ods-card border border-ods-border rounded-[6px] overflow-hidden", isFluid && "w-full");
+    ? 'flex w-full flex-col'
+    : cn('overflow-hidden rounded-[6px] border border-ods-border bg-ods-card', isFluid && 'w-full');
   // Bare: an unpadded header row over the grid, 8px apart — the calendar's
   // whole height is the two of them added up, never the container's.
-  const captionRowClass = cn("flex items-center justify-between gap-1", bare ? "shrink-0" : "px-4 pt-4");
+  const captionRowClass = cn('flex items-center justify-between gap-1', bare ? 'shrink-0' : 'px-4 pt-4');
   // The caption is the only elastic thing in the header: it takes the space
   // the two fixed buttons leave and truncates rather than pushing into them.
   // "September 2026" is ~131px at text-h4, and the two 48px buttons plus their
   // gaps take 104 — so a `bare` host has to state a width of ~256 or more, or
   // the label and the next-month button collide (worse in a locale with longer
   // month names).
-  const captionClass = "min-w-0 flex-1 truncate text-center text-h4 text-ods-text-primary";
+  const captionClass = 'min-w-0 flex-1 truncate text-center text-h4 text-ods-text-primary';
 
-  const classNames: DayPickerProps["classNames"] = {
+  const classNames: DayPickerProps['classNames'] = {
     root: cn(
-      "date-picker-calendar",
-      bare ? "flex w-full flex-col pt-[var(--spacing-system-xsf)]" : cn("p-4", isFluid && "w-full"),
+      'date-picker-calendar',
+      bare ? 'flex w-full flex-col pt-[var(--spacing-system-xsf)]' : cn('p-4', isFluid && 'w-full'),
     ),
-    months: cn("flex gap-8", bare && "w-full"),
-    month: cn("flex flex-col", bare ? "w-full" : cn("gap-2", isFluid && "w-full")),
-    month_caption: "hidden",
-    nav: "hidden",
-    month_grid: cn("border-collapse", bare ? "flex w-full flex-col" : isFluid && "w-full"),
-    weekdays: "flex",
-    ...(bare ? { weeks: "flex flex-col" } : {}),
-    weekday: cn(
-      weekdayOuter,
-      "flex items-center justify-center",
-      "text-h6 text-ods-text-secondary"
-    ),
-    week: "flex",
+    months: cn('flex gap-8', bare && 'w-full'),
+    month: cn('flex flex-col', bare ? 'w-full' : cn('gap-2', isFluid && 'w-full')),
+    month_caption: 'hidden',
+    nav: 'hidden',
+    month_grid: cn('border-collapse', bare ? 'flex w-full flex-col' : isFluid && 'w-full'),
+    weekdays: 'flex',
+    ...(bare ? { weeks: 'flex flex-col' } : {}),
+    weekday: cn(weekdayOuter, 'flex items-center justify-center', 'text-ods-text-secondary text-h6'),
+    week: 'flex',
     day: cn(
       cellOuter,
-      "flex items-center justify-center",
-      "text-h4 text-ods-text-primary",
-      "cursor-pointer",
-      "transition-colors duration-150",
-      hoverClass
+      'flex items-center justify-center',
+      'text-ods-text-primary text-h4',
+      'cursor-pointer',
+      'transition-colors duration-150',
+      hoverClass,
     ),
     day_button: cn(
       cellInner,
-      "flex items-center justify-center",
-      "cursor-pointer bg-transparent border-none outline-none",
-      "text-inherit font-inherit"
+      'flex items-center justify-center',
+      'cursor-pointer border-none bg-transparent outline-none',
+      'font-inherit text-inherit',
     ),
     // Painted through the `todayTint` modifier instead — see `isUnclaimedToday`.
-    today: "",
+    today: '',
     selected: cn(
       selectedClass,
       // In range mode, selected class should not override range_start/range_end/range_middle
-      mode === "range" && "range-selected"
+      mode === 'range' && 'range-selected',
     ),
-    outside: "text-ods-border opacity-50 hover:!bg-transparent",
+    outside: 'text-ods-border opacity-50 hover:!bg-transparent',
     // Out of bounds: greyed, un-hoverable, and not-allowed under the cursor.
     //
     // Every rule here is `!`, and the inner button is targeted explicitly —
@@ -391,8 +373,8 @@ export function DatePickerCalendar({
     // the `day_button` INSIDE the cell that carries `cursor-pointer`, and a
     // `disabled` <button> does not inherit the cell's cursor on its own.
     disabled: cn(
-      "!text-ods-text-disabled !cursor-not-allowed hover:!bg-transparent",
-      "[&>button]:!cursor-not-allowed [&>button]:!text-ods-text-disabled",
+      '!cursor-not-allowed !text-ods-text-disabled hover:!bg-transparent',
+      '[&>button]:!cursor-not-allowed [&>button]:!text-ods-text-disabled',
       // Also drop the `today` tint, or an unselectable today renders BLANK:
       // `--color-text-disabled` and `--color-bg-surface` are the SAME token
       // (`--ods-system-greys-soft-grey`), so the number disappears into the
@@ -404,32 +386,31 @@ export function DatePickerCalendar({
       // not actionable, so a highlight claiming otherwise is the wrong signal.
       // The day still reads as today's position in the month by being the one
       // dimmed cell between yesterday and tomorrow.
-      "!bg-transparent [&>button]:!bg-transparent"
+      '!bg-transparent [&>button]:!bg-transparent',
     ),
-    hidden: "invisible",
+    hidden: 'invisible',
     // Range styles matching Figma design:
     // - range_start: bright yellow #ffc008, bold, left radius (full radius if single selection)
     // - range_end: bright yellow #ffc008, bold, right radius
     // - range_middle: dark yellow var(--ods-open-yellow-light), medium weight text
     // Border radius on row edges is handled via CSS in the style tag below
     range_start: cn(
-      "range-start !bg-ods-accent !text-ods-card !font-bold hover:!bg-ods-accent",
-      hasCompleteRange ? "!rounded-l-[6px] !rounded-r-none" : "!rounded-[6px]"
+      'range-start !bg-ods-accent !font-bold !text-ods-card hover:!bg-ods-accent',
+      hasCompleteRange ? '!rounded-l-[6px] !rounded-r-none' : '!rounded-[6px]',
     ),
     range_end: cn(
-      "range-end !bg-ods-accent !text-ods-card !font-bold hover:!bg-ods-accent",
-      hasCompleteRange ? "!rounded-r-[6px] !rounded-l-none" : "!rounded-[6px]"
+      'range-end !bg-ods-accent !font-bold !text-ods-card hover:!bg-ods-accent',
+      hasCompleteRange ? '!rounded-l-none !rounded-r-[6px]' : '!rounded-[6px]',
     ),
-    range_middle: "range-middle !bg-ods-open-yellow-light !text-ods-card !font-medium !rounded-none hover:!bg-ods-open-yellow-light",
+    range_middle:
+      'range-middle !bg-ods-open-yellow-light !text-ods-card !font-medium !rounded-none hover:!bg-ods-open-yellow-light',
   };
 
   // Controlled when the host passes `month`, self-owned otherwise. The
   // internal state is kept either way so an uncontrolled calendar still works;
   // controlled it is simply never read, which keeps `changeMonth` one path.
-  const [uncontrolledMonth, setUncontrolledMonth] = React.useState<Date>(
-    mode === "single"
-      ? (selected as Date) || today
-      : (selected as DateRange)?.from || today
+  const [uncontrolledMonth, setUncontrolledMonth] = useState<Date>(
+    mode === 'single' ? (selected as Date) || today : (selected as DateRange)?.from || today,
   );
   const month = monthProp ?? uncontrolledMonth;
   const changeMonth = (next: Date): void => {
@@ -452,7 +433,7 @@ export function DatePickerCalendar({
    * The public API is unchanged: consumers keep passing `fromDate`/`toDate`, and
    * this is the single place either is translated.
    */
-  const disabledDays = React.useMemo<Matcher[]>(() => {
+  const disabledDays = useMemo<Matcher[]>(() => {
     const matchers: Matcher[] = [];
     if (fromDate) matchers.push({ before: fromDate });
     if (toDate) matchers.push({ after: toDate });
@@ -485,9 +466,9 @@ export function DatePickerCalendar({
   const handleNextMonth = () => shiftMonth(1);
 
   const formatMonthYear = (date: Date): string => {
-    return date.toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
     });
   };
 
@@ -527,7 +508,7 @@ export function DatePickerCalendar({
     }
   `;
 
-  if (mode === "single") {
+  if (mode === 'single') {
     return (
       <div className={surfaceClass}>
         <div className={captionRowClass}>
@@ -548,7 +529,7 @@ export function DatePickerCalendar({
         <DayPicker
           mode="single"
           selected={selected as Date | undefined}
-          onSelect={(date) => onSelect(date)}
+          onSelect={date => onSelect(date)}
           month={month}
           onMonthChange={changeMonth}
           classNames={classNames}
@@ -567,7 +548,7 @@ export function DatePickerCalendar({
   // Range mode
   return (
     <div
-      className={cn("bg-ods-card border border-ods-border rounded-md overflow-hidden", isFluid && "w-full")}
+      className={cn('overflow-hidden rounded-md border border-ods-border bg-ods-card', isFluid && 'w-full')}
       onMouseLeave={() => setHoveredDate(undefined)}
     >
       <style>{rangeStyles}</style>
@@ -596,9 +577,9 @@ export function DatePickerCalendar({
             mode="range"
             selected={draftRange}
             onSelect={(_range, triggerDate) => handleRangeSelect(triggerDate)}
-            onDayMouseEnter={(day) => setHoveredDate(day)}
+            onDayMouseEnter={day => setHoveredDate(day)}
             modifiers={{ preview: isPreviewDate, todayTint: isUnclaimedToday }}
-            modifiersClassNames={{ preview: "bg-ods-bg-surface", todayTint: todayClass }}
+            modifiersClassNames={{ preview: 'bg-ods-bg-surface', todayTint: todayClass }}
             month={month}
             onMonthChange={changeMonth}
             classNames={classNames}
@@ -627,9 +608,9 @@ export function DatePickerCalendar({
               mode="range"
               selected={draftRange}
               onSelect={(_range, triggerDate) => handleRangeSelect(triggerDate)}
-              onDayMouseEnter={(day) => setHoveredDate(day)}
+              onDayMouseEnter={day => setHoveredDate(day)}
               modifiers={{ preview: isPreviewDate, todayTint: isUnclaimedToday }}
-              modifiersClassNames={{ preview: "bg-ods-bg-surface", todayTint: todayClass }}
+              modifiersClassNames={{ preview: 'bg-ods-bg-surface', todayTint: todayClass }}
               month={getSecondMonth(month)}
               classNames={classNames}
               showOutsideDays
@@ -651,36 +632,36 @@ export function DatePickerCalendar({
 
 const triggerButtonStyles = cn(
   // Layout
-  "flex items-center gap-2 w-full",
-  "h-11 md:h-12 rounded-[6px] border px-3",
+  'flex w-full items-center gap-2',
+  'h-11 rounded-[6px] border px-3 md:h-12',
   // Colors
-  "bg-ods-card border-ods-border",
+  'border-ods-border bg-ods-card',
   // Typography
-  "text-h4",
+  'text-h4',
   // Hover & active (not disabled)
-  "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
-  "focus:outline-none",
+  'enabled:hover:border-ods-border-hover enabled:hover:bg-ods-bg-hover enabled:active:border-ods-border-active enabled:active:bg-ods-bg-active',
+  'focus:outline-none',
   // Disabled - match Input exactly. The value/placeholder span inside sets its
   // own colour, so the child rule (higher specificity) greys it too. Scoped to
   // DIRECT children like every other field, so nested content that owns its
   // colour keeps it.
-  "disabled:!cursor-not-allowed disabled:bg-ods-bg",
-  "disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled",
+  'disabled:!cursor-not-allowed disabled:bg-ods-bg',
+  'disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled',
   // Animation
-  "transition-colors duration-200"
+  'transition-colors duration-200',
 );
 
 const timeSelectTriggerStyles = cn(
-  "flex items-center justify-between gap-1",
-  "h-11 md:h-12 min-h-0 px-3 rounded-[6px] border",
-  "bg-ods-card border-ods-border",
-  "text-h4",
-  "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
-  "focus:outline-none",
-  "disabled:!cursor-not-allowed disabled:bg-ods-bg",
-  "disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled",
-  "transition-colors duration-200 cursor-pointer",
-  "text-ods-text-primary"
+  'flex items-center justify-between gap-1',
+  'h-11 min-h-0 rounded-[6px] border px-3 md:h-12',
+  'border-ods-border bg-ods-card',
+  'text-h4',
+  'enabled:hover:border-ods-border-hover enabled:hover:bg-ods-bg-hover enabled:active:border-ods-border-active enabled:active:bg-ods-bg-active',
+  'focus:outline-none',
+  'disabled:!cursor-not-allowed disabled:bg-ods-bg',
+  'disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled',
+  'cursor-pointer transition-colors duration-200',
+  'text-ods-text-primary',
 );
 
 // ============================================================================
@@ -689,7 +670,7 @@ const timeSelectTriggerStyles = cn(
 
 export function DatePicker(props: DatePickerProps) {
   const {
-    placeholder = "Select date",
+    placeholder = 'Select date',
     formatDate = defaultFormatDate,
     disabled = false,
     className,
@@ -702,18 +683,18 @@ export function DatePicker(props: DatePickerProps) {
     invalid = false,
   } = props;
 
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
   const isInvalid = invalid || !!error;
 
-  const displayValue = React.useMemo(() => {
-    if (props.mode === "single") {
-      return props.value ? formatDate(props.value) : "";
+  const displayValue = useMemo(() => {
+    if (props.mode === 'single') {
+      return props.value ? formatDate(props.value) : '';
     }
     return formatDateRange(props.value, formatDate);
   }, [props.mode, props.value, formatDate]);
 
   const handleSelect = (value: Date | DateRange | undefined) => {
-    if (props.mode === "single") {
+    if (props.mode === 'single') {
       props.onChange?.(value as Date | undefined);
       if (value) {
         setOpen(false);
@@ -736,13 +717,19 @@ export function DatePicker(props: DatePickerProps) {
           // Same marker Input/Textarea/Select expose — it is how a form finds
           // (and scrolls to) the first field that failed validation.
           data-invalid={isInvalid || undefined}
-          className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", className)}
+          className={cn(
+            triggerButtonStyles,
+            'group',
+            open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
+            isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
+            className,
+          )}
         >
-          <Calendar className="size-6 text-ods-text-secondary shrink-0" />
+          <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
           <span
             className={cn(
-              "flex-1 text-left truncate",
-              displayValue ? "text-ods-text-primary" : "text-ods-text-secondary"
+              'flex-1 truncate text-left',
+              displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
             )}
           >
             {displayValue || placeholder}
@@ -753,11 +740,11 @@ export function DatePicker(props: DatePickerProps) {
       <Popover.Portal>
         <Popover.Content
           className={cn(
-            "z-[9999]",
-            "animate-in fade-in-0 zoom-in-95",
-            "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-            "data-[side=bottom]:slide-in-from-top-2",
-            "data-[side=top]:slide-in-from-bottom-2"
+            'z-[9999]',
+            'animate-in fade-in-0 zoom-in-95',
+            'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+            'data-[side=bottom]:slide-in-from-top-2',
+            'data-[side=top]:slide-in-from-bottom-2',
           )}
           sideOffset={8}
           align="start"
@@ -788,7 +775,7 @@ export function DatePicker(props: DatePickerProps) {
 // ============================================================================
 
 export interface DatePickerInputProps extends DatePickerBaseProps {
-  mode?: "single";
+  mode?: 'single';
   value?: Date;
   onChange?: (date: Date | undefined) => void;
   /** Show time selector next to date */
@@ -800,18 +787,18 @@ export interface DatePickerInputProps extends DatePickerBaseProps {
 // Generate hour options
 const generateHourOptions = (use24Hour: boolean): string[] => {
   if (use24Hour) {
-    return Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, "0"));
+    return Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
   }
-  return Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0"));
+  return Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 };
 
 // Generate minute options (00, 01, 02, ... 59)
 const generateMinuteOptions = (): string[] => {
-  return Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, "0"));
+  return Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
 };
 
 export function DatePickerInput({
-  placeholder = "Select date",
+  placeholder = 'Select date',
   formatDate = defaultFormatDate,
   disabled = false,
   className,
@@ -827,30 +814,30 @@ export function DatePickerInput({
   error,
   invalid = false,
 }: DatePickerInputProps) {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
   const isInvalid = invalid || !!error;
 
-  const displayValue = value ? formatDate(value) : "";
+  const displayValue = value ? formatDate(value) : '';
 
   // Extract time from value
-  const hour = React.useMemo(() => {
-    if (!value) return "";
+  const hour = useMemo(() => {
+    if (!value) return '';
     const hours = value.getHours();
     if (use24HourFormat) {
-      return hours.toString().padStart(2, "0");
+      return hours.toString().padStart(2, '0');
     }
     const hour12 = hours % 12 || 12;
-    return hour12.toString().padStart(2, "0");
+    return hour12.toString().padStart(2, '0');
   }, [value, use24HourFormat]);
 
-  const minute = React.useMemo(() => {
-    if (!value) return "";
-    return value.getMinutes().toString().padStart(2, "0");
+  const minute = useMemo(() => {
+    if (!value) return '';
+    return value.getMinutes().toString().padStart(2, '0');
   }, [value]);
 
-  const period = React.useMemo((): "AM" | "PM" => {
-    if (!value) return "AM";
-    return value.getHours() >= 12 ? "PM" : "AM";
+  const period = useMemo((): 'AM' | 'PM' => {
+    if (!value) return 'AM';
+    return value.getHours() >= 12 ? 'PM' : 'AM';
   }, [value]);
 
   const handleSelect = (date: Date | DateRange | undefined) => {
@@ -869,7 +856,7 @@ export function DatePickerInput({
     const date = value ? new Date(value) : new Date();
     let hours = parseInt(newHour, 10);
     if (!use24HourFormat) {
-      const isPM = period === "PM";
+      const isPM = period === 'PM';
       if (hours === 12) {
         hours = isPM ? 12 : 0;
       } else {
@@ -886,23 +873,23 @@ export function DatePickerInput({
     onChange?.(date);
   };
 
-  const handlePeriodChange = (newPeriod: "AM" | "PM") => {
+  const handlePeriodChange = (newPeriod: 'AM' | 'PM') => {
     const date = value ? new Date(value) : new Date();
     let hours = date.getHours();
-    if (newPeriod === "AM" && hours >= 12) {
+    if (newPeriod === 'AM' && hours >= 12) {
       hours -= 12;
-    } else if (newPeriod === "PM" && hours < 12) {
+    } else if (newPeriod === 'PM' && hours < 12) {
       hours += 12;
     }
     date.setHours(hours);
     onChange?.(date);
   };
 
-  const hourOptions = React.useMemo(() => generateHourOptions(use24HourFormat), [use24HourFormat]);
-  const minuteOptions = React.useMemo(() => generateMinuteOptions(), []);
+  const hourOptions = useMemo(() => generateHourOptions(use24HourFormat), [use24HourFormat]);
+  const minuteOptions = useMemo(() => generateMinuteOptions(), []);
 
   const content = (
-    <div className={cn("flex items-center gap-2", !label && !error && className)}>
+    <div className={cn('flex items-center gap-2', !label && !error && className)}>
       {/* Date Picker */}
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
@@ -912,13 +899,19 @@ export function DatePickerInput({
             // Same marker Input/Textarea/Select expose — it is how a form finds
             // (and scrolls to) the first field that failed validation.
             data-invalid={isInvalid || undefined}
-            className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", "flex-1")}
+            className={cn(
+              triggerButtonStyles,
+              'group',
+              open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
+              isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
+              'flex-1',
+            )}
           >
-            <Calendar className="size-6 text-ods-text-secondary shrink-0" />
+            <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
             <span
               className={cn(
-                "flex-1 text-left truncate",
-                displayValue ? "text-ods-text-primary" : "text-ods-text-secondary"
+                'flex-1 truncate text-left',
+                displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
               )}
             >
               {displayValue || placeholder}
@@ -929,11 +922,11 @@ export function DatePickerInput({
         <Popover.Portal>
           <Popover.Content
             className={cn(
-              "z-[9999]",
-              "animate-in fade-in-0 zoom-in-95",
-              "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-              "data-[side=bottom]:slide-in-from-top-2",
-              "data-[side=top]:slide-in-from-bottom-2"
+              'z-[9999]',
+              'animate-in fade-in-0 zoom-in-95',
+              'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+              'data-[side=bottom]:slide-in-from-top-2',
+              'data-[side=top]:slide-in-from-bottom-2',
             )}
             sideOffset={8}
             align="start"
@@ -955,16 +948,12 @@ export function DatePickerInput({
       {showTime && (
         <div className="flex items-center gap-1">
           {/* Hour Select */}
-          <Select
-            value={hour}
-            onValueChange={handleHourChange}
-            disabled={disabled}
-          >
-            <SelectTrigger className={cn(timeSelectTriggerStyles, "w-[80px]")}>
+          <Select value={hour} onValueChange={handleHourChange} disabled={disabled}>
+            <SelectTrigger className={cn(timeSelectTriggerStyles, 'w-[80px]')}>
               <SelectValue placeholder="HH" />
             </SelectTrigger>
             <SelectContent>
-              {hourOptions.map((h) => (
+              {hourOptions.map(h => (
                 <SelectItem key={h} value={h}>
                   {h}
                 </SelectItem>
@@ -975,16 +964,12 @@ export function DatePickerInput({
           <span className="text-ods-text-secondary text-h4">:</span>
 
           {/* Minute Select */}
-          <Select
-            value={minute}
-            onValueChange={handleMinuteChange}
-            disabled={disabled}
-          >
-            <SelectTrigger className={cn(timeSelectTriggerStyles, "w-[80px]")}>
+          <Select value={minute} onValueChange={handleMinuteChange} disabled={disabled}>
+            <SelectTrigger className={cn(timeSelectTriggerStyles, 'w-[80px]')}>
               <SelectValue placeholder="MM" />
             </SelectTrigger>
             <SelectContent>
-              {minuteOptions.map((m) => (
+              {minuteOptions.map(m => (
                 <SelectItem key={m} value={m}>
                   {m}
                 </SelectItem>
@@ -994,12 +979,8 @@ export function DatePickerInput({
 
           {/* AM/PM Select (only for 12-hour format) */}
           {!use24HourFormat && (
-            <Select
-              value={period}
-              onValueChange={(val) => handlePeriodChange(val as "AM" | "PM")}
-              disabled={disabled}
-            >
-              <SelectTrigger className={cn(timeSelectTriggerStyles, "w-[80px]")}>
+            <Select value={period} onValueChange={val => handlePeriodChange(val as 'AM' | 'PM')} disabled={disabled}>
+              <SelectTrigger className={cn(timeSelectTriggerStyles, 'w-[80px]')}>
                 <SelectValue placeholder="AM" />
               </SelectTrigger>
               <SelectContent>
@@ -1025,7 +1006,7 @@ export function DatePickerInput({
 // ============================================================================
 
 export interface DatePickerInputSimpleProps extends DatePickerBaseProps {
-  mode?: "single";
+  mode?: 'single';
   value?: Date;
   onChange?: (date: Date | undefined) => void;
   /** Show time selector next to date */
@@ -1037,10 +1018,7 @@ export interface DatePickerInputSimpleProps extends DatePickerBaseProps {
 }
 
 // Generate time options with specified interval
-const generateTimeOptions = (
-  intervalMinutes: number,
-  use24Hour: boolean
-): { value: string; label: string }[] => {
+const generateTimeOptions = (intervalMinutes: number, use24Hour: boolean): { value: string; label: string }[] => {
   const options: { value: string; label: string }[] = [];
   const totalMinutesInDay = 24 * 60;
 
@@ -1048,15 +1026,15 @@ const generateTimeOptions = (
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
 
-    const value = `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
+    const value = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 
     let label: string;
     if (use24Hour) {
       label = value;
     } else {
       const hour12 = hours % 12 || 12;
-      const period = hours >= 12 ? "PM" : "AM";
-      label = `${hour12.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")} ${period}`;
+      const period = hours >= 12 ? 'PM' : 'AM';
+      label = `${hour12.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')} ${period}`;
     }
 
     options.push({ value, label });
@@ -1066,7 +1044,7 @@ const generateTimeOptions = (
 };
 
 export function DatePickerInputSimple({
-  placeholder = "Select date",
+  placeholder = 'Select date',
   formatDate = defaultFormatDate,
   disabled = false,
   className,
@@ -1083,32 +1061,32 @@ export function DatePickerInputSimple({
   error,
   invalid = false,
 }: DatePickerInputSimpleProps) {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
   const isInvalid = invalid || !!error;
 
-  const displayValue = value ? formatDate(value) : "";
+  const displayValue = value ? formatDate(value) : '';
 
   // Get current time value as HH:MM string
-  const timeValue = React.useMemo(() => {
-    if (!value) return "";
+  const timeValue = useMemo(() => {
+    if (!value) return '';
     const hours = value.getHours();
     const minutes = value.getMinutes();
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   }, [value]);
 
   // Get display label for current time
-  const timeDisplayLabel = React.useMemo(() => {
-    if (!value) return "";
+  const timeDisplayLabel = useMemo(() => {
+    if (!value) return '';
     const hours = value.getHours();
     const minutes = value.getMinutes();
 
     if (use24HourFormat) {
-      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     }
 
     const hour12 = hours % 12 || 12;
-    const period = hours >= 12 ? "PM" : "AM";
-    return `${hour12.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")} ${period}`;
+    const period = hours >= 12 ? 'PM' : 'AM';
+    return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
   }, [value, use24HourFormat]);
 
   const handleSelect = (date: Date | DateRange | undefined) => {
@@ -1124,19 +1102,19 @@ export function DatePickerInputSimple({
   };
 
   const handleTimeChange = (newTime: string) => {
-    const [hours, minutes] = newTime.split(":").map(Number);
+    const [hours, minutes] = newTime.split(':').map(Number);
     const date = value ? new Date(value) : new Date();
     date.setHours(hours, minutes, 0, 0);
     onChange?.(date);
   };
 
-  const timeOptions = React.useMemo(
+  const timeOptions = useMemo(
     () => generateTimeOptions(timeInterval, use24HourFormat),
-    [timeInterval, use24HourFormat]
+    [timeInterval, use24HourFormat],
   );
 
   const content = (
-    <div className={cn("flex items-center gap-2", !label && !error && className)}>
+    <div className={cn('flex items-center gap-2', !label && !error && className)}>
       {/* Date Picker */}
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
@@ -1146,13 +1124,19 @@ export function DatePickerInputSimple({
             // Same marker Input/Textarea/Select expose — it is how a form finds
             // (and scrolls to) the first field that failed validation.
             data-invalid={isInvalid || undefined}
-            className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", "flex-1")}
+            className={cn(
+              triggerButtonStyles,
+              'group',
+              open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
+              isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
+              'flex-1',
+            )}
           >
-            <Calendar className="size-6 text-ods-text-secondary shrink-0" />
+            <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
             <span
               className={cn(
-                "flex-1 text-left truncate",
-                displayValue ? "text-ods-text-primary" : "text-ods-text-secondary"
+                'flex-1 truncate text-left',
+                displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
               )}
             >
               {displayValue || placeholder}
@@ -1163,11 +1147,11 @@ export function DatePickerInputSimple({
         <Popover.Portal>
           <Popover.Content
             className={cn(
-              "z-[9999]",
-              "animate-in fade-in-0 zoom-in-95",
-              "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-              "data-[side=bottom]:slide-in-from-top-2",
-              "data-[side=top]:slide-in-from-bottom-2"
+              'z-[9999]',
+              'animate-in fade-in-0 zoom-in-95',
+              'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+              'data-[side=bottom]:slide-in-from-top-2',
+              'data-[side=top]:slide-in-from-bottom-2',
             )}
             sideOffset={8}
             align="start"
@@ -1187,18 +1171,12 @@ export function DatePickerInputSimple({
 
       {/* Single Time Select (optional) */}
       {showTime && (
-        <Select
-          value={timeValue}
-          onValueChange={handleTimeChange}
-          disabled={disabled}
-        >
-          <SelectTrigger className={cn(timeSelectTriggerStyles, "flex-1")}>
-            <SelectValue placeholder="Select time">
-              {timeDisplayLabel || "Select time"}
-            </SelectValue>
+        <Select value={timeValue} onValueChange={handleTimeChange} disabled={disabled}>
+          <SelectTrigger className={cn(timeSelectTriggerStyles, 'flex-1')}>
+            <SelectValue placeholder="Select time">{timeDisplayLabel || 'Select time'}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {timeOptions.map((option) => (
+            {timeOptions.map(option => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
@@ -1234,7 +1212,7 @@ export interface DateFilterPanelProps {
   /** Maximum selectable date. */
   toDate?: Date;
   /** Locale for the calendar. */
-  locale?: DayPickerProps["locale"];
+  locale?: DayPickerProps['locale'];
   /** Label for the ascending sort option. */
   ascLabel?: string;
   /** Label for the descending sort option. */
@@ -1248,7 +1226,7 @@ export interface DateFilterPanelProps {
  * Filter"). Owns no state: the consumer drafts and commits the values.
  */
 export function DateFilterPanel({
-  mode = "range",
+  mode = 'range',
   sort,
   onSortChange,
   selected,
@@ -1256,17 +1234,14 @@ export function DateFilterPanel({
   fromDate,
   toDate,
   locale,
-  ascLabel = "Sort by Ascending",
-  descLabel = "Sort by Descending",
+  ascLabel = 'Sort by Ascending',
+  descLabel = 'Sort by Descending',
   className,
 }: DateFilterPanelProps) {
   return (
-    <div className={cn("flex flex-col gap-4", className)}>
+    <div className={cn('flex flex-col gap-4', className)}>
       {/* Sort direction selector */}
-      <Select
-        value={sort}
-        onValueChange={(value) => onSortChange(value as SortDirection)}
-      >
+      <Select value={sort} onValueChange={value => onSortChange(value as SortDirection)}>
         <SelectTrigger className="gap-2" aria-label="Sort direction">
           {/* Wrapper is a <div> (not <span>) so SelectTrigger's
               `[&>span]:line-clamp-1` rule doesn't force it to a vertical
@@ -1331,7 +1306,7 @@ export interface DateFilterMenuProps {
   onClose?: () => void;
   /** Custom trigger element (rendered via Radix `asChild` — must accept a ref,
    *  e.g. a native button). Defaults to the outline calendar icon Button. */
-  trigger?: React.ReactNode;
+  trigger?: ReactNode;
   /** Disable the trigger. */
   disabled?: boolean;
   /** Minimum selectable date. */
@@ -1339,9 +1314,9 @@ export interface DateFilterMenuProps {
   /** Maximum selectable date. */
   toDate?: Date;
   /** Locale for the calendar. */
-  locale?: DayPickerProps["locale"];
+  locale?: DayPickerProps['locale'];
   /** Popover alignment relative to the trigger. */
-  align?: "start" | "center" | "end";
+  align?: 'start' | 'center' | 'end';
   /** Label for the ascending sort option. */
   ascLabel?: string;
   /** Label for the descending sort option. */
@@ -1349,7 +1324,7 @@ export interface DateFilterMenuProps {
   /** Additional class name for the trigger button. */
   className?: string;
   /** Accessible label for the trigger. */
-  "aria-label"?: string;
+  'aria-label'?: string;
 }
 
 /**
@@ -1361,9 +1336,9 @@ export interface DateFilterMenuProps {
  * drops the filter.
  */
 export function DateFilterMenu({
-  mode = "range",
-  sort = "desc",
-  defaultSort = "desc",
+  mode = 'range',
+  sort = 'desc',
+  defaultSort = 'desc',
   date,
   range,
   onApply,
@@ -1373,23 +1348,21 @@ export function DateFilterMenu({
   fromDate,
   toDate,
   locale,
-  align = "start",
-  ascLabel = "Sort by Ascending",
-  descLabel = "Sort by Descending",
+  align = 'start',
+  ascLabel = 'Sort by Ascending',
+  descLabel = 'Sort by Descending',
   className,
-  "aria-label": ariaLabel = "Open date filter",
+  'aria-label': ariaLabel = 'Open date filter',
 }: DateFilterMenuProps) {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
 
   // Drafted selection — initialized from props each time the menu opens.
-  const [draftSort, setDraftSort] = React.useState<SortDirection>(sort);
-  const [draftSelected, setDraftSelected] = React.useState<
-    Date | DateRange | undefined
-  >(mode === "single" ? date : range);
+  const [draftSort, setDraftSort] = useState<SortDirection>(sort);
+  const [draftSelected, setDraftSelected] = useState<Date | DateRange | undefined>(mode === 'single' ? date : range);
 
-  const resetDraft = React.useCallback(() => {
+  const resetDraft = useCallback(() => {
     setDraftSort(sort);
-    setDraftSelected(mode === "single" ? date : range);
+    setDraftSelected(mode === 'single' ? date : range);
   }, [sort, date, range, mode]);
 
   const handleOpenChange = (next: boolean) => {
@@ -1403,7 +1376,7 @@ export function DateFilterMenu({
 
   const handleApply = () => {
     const result: DateFilterResult =
-      mode === "single"
+      mode === 'single'
         ? { sort: draftSort, date: draftSelected as Date | undefined }
         : { sort: draftSort, range: draftSelected as DateRange | undefined };
     onApply?.(result);
@@ -1417,9 +1390,7 @@ export function DateFilterMenu({
 
   // Anything to reset? A calendar selection or a non-default sort — drives Close vs Reset.
   const hasSelection =
-    mode === "single"
-      ? Boolean(draftSelected)
-      : Boolean((draftSelected as DateRange | undefined)?.from);
+    mode === 'single' ? Boolean(draftSelected) : Boolean((draftSelected as DateRange | undefined)?.from);
   const hasChanges = hasSelection || draftSort !== defaultSort;
 
   // Reset restores the defaults and commits them so the consumer drops the
@@ -1427,11 +1398,7 @@ export function DateFilterMenu({
   const handleReset = () => {
     setDraftSort(defaultSort);
     setDraftSelected(undefined);
-    onApply?.(
-      mode === "single"
-        ? { sort: defaultSort, date: undefined }
-        : { sort: defaultSort, range: undefined }
-    );
+    onApply?.(mode === 'single' ? { sort: defaultSort, date: undefined } : { sort: defaultSort, range: undefined });
   };
 
   return (
@@ -1453,12 +1420,12 @@ export function DateFilterMenu({
       <Popover.Portal>
         <Popover.Content
           className={cn(
-            "z-[9999] w-80 max-w-[calc(100vw-2rem)]",
-            "flex flex-col gap-4 rounded-[6px] border border-ods-border bg-ods-bg p-4",
-            "animate-in fade-in-0 zoom-in-95",
-            "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-            "data-[side=bottom]:slide-in-from-top-2",
-            "data-[side=top]:slide-in-from-bottom-2"
+            'z-[9999] w-80 max-w-[calc(100vw-2rem)]',
+            'flex flex-col gap-4 rounded-[6px] border border-ods-border bg-ods-bg p-4',
+            'animate-in fade-in-0 zoom-in-95',
+            'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+            'data-[side=bottom]:slide-in-from-top-2',
+            'data-[side=top]:slide-in-from-bottom-2',
           )}
           sideOffset={8}
           align={align}
@@ -1479,20 +1446,10 @@ export function DateFilterMenu({
 
           {/* Actions */}
           <div className="flex w-full items-stretch gap-4">
-            <Button
-              type="button"
-              variant="outline"
-              fullWidth
-              onClick={hasChanges ? handleReset : handleClose}
-            >
-              {hasChanges ? "Reset" : "Close"}
+            <Button type="button" variant="outline" fullWidth onClick={hasChanges ? handleReset : handleClose}>
+              {hasChanges ? 'Reset' : 'Close'}
             </Button>
-            <Button
-              type="button"
-              variant="accent"
-              fullWidth
-              onClick={handleApply}
-            >
+            <Button type="button" variant="accent" fullWidth onClick={handleApply}>
               Apply
             </Button>
           </div>

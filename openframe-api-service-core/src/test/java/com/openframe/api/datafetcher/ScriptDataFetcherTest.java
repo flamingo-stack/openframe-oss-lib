@@ -17,10 +17,10 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLScriptMapper;
-import com.openframe.api.service.rmm.ScriptDispatchService;
-import com.openframe.api.service.rmm.ScriptFilterService;
-import com.openframe.api.service.rmm.ScriptService;
-import com.openframe.data.document.rmm.ExecutionSource;
+import com.openframe.api.service.rmm.script.ScriptDispatchService;
+import com.openframe.api.service.rmm.script.ScriptFilterService;
+import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import graphql.relay.Relay;
 

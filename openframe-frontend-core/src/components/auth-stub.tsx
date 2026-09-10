@@ -1,10 +1,20 @@
-"use client"
+'use client';
 
 // Stub auth provider and hooks
-import { createContext, useContext } from 'react';
+import { createContext } from 'react';
+import type { ReactNode } from 'react';
 
-interface AuthContextType {
-  user: any | null;
+/** The signed-in user, as far as this stub's consumers care. Hosts inject a
+ *  richer object through `setRealAuthHook`; only `id` and `name` are read
+ *  inside the lib (see `comment-card.tsx`). */
+export interface AuthStubUser {
+  id: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
+export interface AuthContextType {
+  user: AuthStubUser | null;
   isLoading: boolean;
 }
 
@@ -14,13 +24,13 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 // Global reference to real auth hook when available
-let realUseAuth: (() => any) | null = null;
+let realUseAuth: (() => AuthContextType) | null = null;
 
-export function setRealAuthHook(authHook: () => any) {
+export function setRealAuthHook(authHook: () => AuthContextType) {
   realUseAuth = authHook;
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextType {
   // Use real auth hook if available (when used in main app)
   if (realUseAuth) {
     try {
@@ -28,7 +38,7 @@ export function useAuth() {
       if (realAuth && realAuth.user) {
         return realAuth;
       }
-    } catch (error) {
+    } catch {
       // Fallback if real auth fails
     }
   }
@@ -36,14 +46,14 @@ export function useAuth() {
   // Fallback mock user for UI kit context
   return {
     user: { id: 'mock-user-id', name: 'Mock User' },
-    isLoading: false
+    isLoading: false,
   };
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{ user: { id: 'mock-user-id', name: 'Mock User' }, isLoading: false }}>
-      {children as any}
+      {children}
     </AuthContext.Provider>
   );
 }

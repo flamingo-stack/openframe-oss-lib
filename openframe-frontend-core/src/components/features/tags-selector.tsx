@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useState } from 'react';
 import { Search, X, Plus, Loader2 } from 'lucide-react';
-import { Button } from '../ui';
+import { useState } from 'react';
 import { cn } from '../../utils';
+import { Button } from '../ui';
 
 interface Tag {
   id: number;
@@ -40,12 +40,12 @@ export function TagsSelector({
   onTagsChange,
   onCreateTag,
   maxTags = 10,
-  placeholder = "Search tags...",
+  placeholder = 'Search tags...',
   className,
   disabled = false,
-  allowCreate = true
+  allowCreate = true,
 }: TagsSelectorProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -80,9 +80,8 @@ export function TagsSelector({
   };
 
   const getFilteredTagsForAutocomplete = () => {
-    return availableTags.filter(tag =>
-      !selectedTagIds.includes(tag.id) &&
-      tag.name.toLowerCase().includes(searchQuery.toLowerCase())
+    return availableTags.filter(
+      tag => !selectedTagIds.includes(tag.id) && tag.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   };
 
@@ -99,39 +98,41 @@ export function TagsSelector({
   const filteredTags = getFilteredTagsForAutocomplete();
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn('space-y-2', className)}>
       <div className="relative">
         {/* Search Icon */}
-        <div className="absolute top-3 left-3 flex items-center pointer-events-none z-10">
+        <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center">
           <Search className="h-4 w-4 text-ods-text-secondary" />
         </div>
 
         {/* Input Container with Chips Inside */}
-        <div className={cn(
-          "w-full bg-ods-bg border border-ods-border rounded-lg",
-          "focus-within:ring-2 focus-within:ring-ods-accent focus-within:border-ods-accent",
-          "transition-all duration-200 flex flex-wrap items-center gap-1.5 p-2 pl-10 min-h-[42px]",
-          disabled && "opacity-50 cursor-not-allowed"
-        )}>
+        <div
+          className={cn(
+            'w-full rounded-lg border border-ods-border bg-ods-bg',
+            'focus-within:border-ods-accent focus-within:ring-2 focus-within:ring-ods-accent',
+            'flex min-h-[42px] flex-wrap items-center gap-1.5 p-2 pl-10 transition-all duration-200',
+            disabled && 'cursor-not-allowed opacity-50',
+          )}
+        >
           {/* Selected Tag Chips Inside Search Bar */}
-          {getSelectedTags().map((tag) => (
+          {getSelectedTags().map(tag => (
             <span
               key={tag.id}
-              className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-md bg-ods-accent/15 border border-ods-accent/30 text-ods-text-primary text-h6"
+              className="inline-flex items-center gap-1 rounded-md border border-ods-accent/30 bg-ods-accent/15 py-1 pl-2.5 pr-1 text-ods-text-primary text-h6"
             >
               {tag.name}
               {!disabled && (
                 <button
                   type="button"
-                  onClick={(e) => {
+                  onClick={e => {
                     e.preventDefault();
                     e.stopPropagation();
                     handleTagRemove(tag.id);
                   }}
-                  className="inline-flex items-center justify-center w-4 h-4 rounded-full text-ods-text-secondary hover:text-ods-text-primary hover:bg-ods-accent/20 transition-colors"
+                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-ods-text-secondary transition-colors hover:bg-ods-accent/20 hover:text-ods-text-primary"
                   aria-label={`Remove ${tag.name}`}
                 >
-                  <X className="w-3 h-3" />
+                  <X className="h-3 w-3" />
                 </button>
               )}
             </span>
@@ -141,7 +142,7 @@ export function TagsSelector({
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => {
+            onChange={e => {
               setSearchQuery(e.target.value);
               setShowDropdown(true);
             }}
@@ -153,17 +154,24 @@ export function TagsSelector({
             onBlur={() => {
               setTimeout(() => setShowDropdown(false), 200);
             }}
-            onKeyDown={(e) => {
+            onKeyDown={e => {
               if (e.key === 'Enter' && canCreateNewTag) {
                 e.preventDefault();
-                handleCreateTag();
+                // handleCreateTag never rejects — it try/catch/finally's internally.
+                void handleCreateTag();
               }
             }}
-            placeholder={selectedTagIds.length >= maxTags ? "Maximum tags reached" : selectedTagIds.length === 0 ? placeholder : "Add more..."}
+            placeholder={
+              selectedTagIds.length >= maxTags
+                ? 'Maximum tags reached'
+                : selectedTagIds.length === 0
+                  ? placeholder
+                  : 'Add more...'
+            }
             disabled={disabled || selectedTagIds.length >= maxTags}
             className={cn(
-              "flex-1 min-w-[100px] bg-transparent border-none outline-none text-ods-text-primary placeholder:text-ods-text-secondary text-h4 py-1 focus:outline-none focus:ring-0 focus:border-0",
-              selectedTagIds.length >= maxTags && "cursor-not-allowed opacity-50"
+              'min-w-[100px] flex-1 border-none bg-transparent py-1 text-ods-text-primary outline-none text-h4 placeholder:text-ods-text-secondary focus:border-0 focus:outline-none focus:ring-0',
+              selectedTagIds.length >= maxTags && 'cursor-not-allowed opacity-50',
             )}
           />
 
@@ -173,11 +181,11 @@ export function TagsSelector({
               variant="transparent"
               type="button"
               onClick={() => {
-                setSearchQuery("");
+                setSearchQuery('');
                 setShowDropdown(false);
               }}
-              leftIcon={<X className="w-3 h-3" />}
-              className="w-5 h-5 p-0 min-h-0 min-w-0 shrink-0 text-ods-text-secondary hover:text-ods-text-primary hover:bg-transparent"
+              leftIcon={<X className="h-3 w-3" />}
+              className="h-5 min-h-0 w-5 min-w-0 shrink-0 p-0 text-ods-text-secondary hover:bg-transparent hover:text-ods-text-primary"
               aria-label="Clear search"
             />
           )}
@@ -185,7 +193,7 @@ export function TagsSelector({
 
         {/* Autocomplete Dropdown - Shows all available tags on focus */}
         {showDropdown && !disabled && (
-          <div className="absolute z-50 w-full mt-1 bg-ods-card border border-ods-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          <div className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-ods-border bg-ods-card shadow-lg">
             <div className="p-3">
               {/* Create New Tag Option */}
               {canCreateNewTag && (
@@ -194,8 +202,8 @@ export function TagsSelector({
                   type="button"
                   onClick={handleCreateTag}
                   disabled={isCreating}
-                  leftIcon={isCreating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                  className="w-full flex flex-row items-center gap-1.5 px-2 py-1 mb-2 h-auto rounded border-dashed border-ods-accent bg-ods-bg hover:bg-ods-card text-ods-accent !text-h6"
+                  leftIcon={isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                  className="mb-2 flex h-auto w-full flex-row items-center gap-1.5 rounded border-dashed border-ods-accent bg-ods-bg px-2 py-1 text-ods-accent !text-h6 hover:bg-ods-card"
                 >
                   Create tag: <strong>"{searchQuery.trim()}"</strong>
                 </Button>
@@ -204,22 +212,22 @@ export function TagsSelector({
               {/* Existing Tags */}
               {filteredTags.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
-                  {filteredTags.map((tag) => (
+                  {filteredTags.map(tag => (
                     <Button
                       key={tag.id}
                       variant="outline"
                       type="button"
                       onClick={() => handleTagAdd(tag.id)}
-                      className="h-auto px-2 py-0.5 rounded border-ods-border hover:border-ods-accent bg-ods-bg hover:bg-ods-card text-ods-text-primary !text-h6"
+                      className="h-auto rounded border-ods-border bg-ods-bg px-2 py-0.5 text-ods-text-primary !text-h6 hover:border-ods-accent hover:bg-ods-card"
                     >
                       {tag.name}
                     </Button>
                   ))}
                 </div>
               ) : !canCreateNewTag ? (
-                <div className="py-4 px-4 text-center w-full">
+                <div className="w-full px-4 py-4 text-center">
                   <p className="text-ods-text-secondary text-h6">
-                    {searchQuery.trim() ? `No tags found for "${searchQuery}"` : "No tags available"}
+                    {searchQuery.trim() ? `No tags found for "${searchQuery}"` : 'No tags available'}
                   </p>
                 </div>
               ) : null}
@@ -230,14 +238,10 @@ export function TagsSelector({
 
       {/* Tag Counter */}
       <div className="flex items-center justify-between">
-        <div className="text-h6 text-ods-text-secondary">
+        <div className="text-ods-text-secondary text-h6">
           {selectedTagIds.length} / {maxTags} tags selected
         </div>
-        {selectedTagIds.length >= maxTags && (
-          <span className="text-h6 text-ods-error">
-            (Maximum reached)
-          </span>
-        )}
+        {selectedTagIds.length >= maxTags && <span className="text-ods-error text-h6">(Maximum reached)</span>}
       </div>
     </div>
   );

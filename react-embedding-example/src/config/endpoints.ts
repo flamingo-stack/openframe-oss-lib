@@ -12,6 +12,9 @@ const AGENT_BASE = `${CONTENT}/chat/agent`
 export const EP = {
   // chat
   chatStream: `${CONTENT}/docs/chat`,
+  // MCP server (streamable HTTP JSON-RPC) — the /mcp playground page's
+  // official-SDK transport points here; the proxy injects Bearer + act-as.
+  mcp: `${CONTENT}/mcp`,
   commands: `${CONTENT}/docs/commands`,
   // Guide-mode empty-state config (greeting + enabled RAG tables + quick-action
   // chips WITH icons). The host injects these at SSR; a cross-origin embedder has
@@ -79,6 +82,9 @@ export const EP = {
   legal: (docType: string) => `${CONTENT}/legal/${docType}`,
   contact: `${CONTENT}/contact`,
   announcements: `${CONTENT}/announcements/active`,
+  // Private-storage view proxy base — ClaudeEmbed derives artifact
+  // mirror urls under it, through the same /content reverse proxy.
+  storageView: `${CONTENT}/storage/view`,
   accessValidate: `${CONTENT}/validate-access-code`,
   accessConsume: `${CONTENT}/consume-access-code`,
   // Rich-markdown embedded surfaces (reddit/twitter cards + OG link preview).

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from 'react';
 
@@ -34,9 +34,7 @@ function extractEdgeColor(img: HTMLImageElement): string {
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const isEdge =
-        x < edgeW || x >= w - edgeW ||
-        y < edgeH || y >= h - edgeH;
+      const isEdge = x < edgeW || x >= w - edgeW || y < edgeH || y >= h - edgeH;
 
       if (!isEdge) continue;
 
@@ -101,11 +99,18 @@ function extractEdgeColor(img: HTMLImageElement): string {
 export function useImageEdgeColor(imageUrl: string | undefined | null, fallback = '#000000'): string {
   const [color, setColor] = useState(fallback);
 
+  // Losing the url (or being given a different fallback) is a prop-driven
+  // reset, so it happens while rendering — React's documented alternative to a
+  // sync-from-props effect. From the effect it would commit one frame with the
+  // departed image's colour still painted behind an image that is already gone.
+  const [resetFor, setResetFor] = useState({ imageUrl, fallback });
+  if (resetFor.imageUrl !== imageUrl || resetFor.fallback !== fallback) {
+    setResetFor({ imageUrl, fallback });
+    if (!imageUrl) setColor(fallback);
+  }
+
   useEffect(() => {
-    if (!imageUrl) {
-      setColor(fallback);
-      return;
-    }
+    if (!imageUrl) return undefined;
 
     let cancelled = false;
     const img = new Image();
@@ -127,7 +132,9 @@ export function useImageEdgeColor(imageUrl: string | undefined | null, fallback 
 
     img.src = imageUrl;
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [imageUrl, fallback]);
 
   return color;

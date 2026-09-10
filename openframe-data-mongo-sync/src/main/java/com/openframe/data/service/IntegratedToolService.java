@@ -31,6 +31,10 @@ public class IntegratedToolService {
         return toolRepository.findByKey(key);
     }
 
+    public Optional<IntegratedTool> getToolByTenantAndKey(String tenantId, String key) {
+        return toolRepository.findByTenantIdAndKey(tenantId, key);
+    }
+
     /** Look up by UUID _id — use only when you already hold the MongoDB document UUID. */
     public Optional<IntegratedTool> findByUuid(String uuid) {
         return toolRepository.findById(uuid);

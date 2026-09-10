@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { AuthShell, BackToLoginLink, PasswordResetForm } from '../../components/features/auth'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { AuthShell, BackToLoginLink, PasswordResetForm } from '../../components/features/auth';
 
 const meta = {
   title: 'Auth/Password Reset',
@@ -15,22 +15,26 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof PasswordResetForm>
+} satisfies Meta<typeof PasswordResetForm>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /** Full page: password reset form + marketing panel (no tabs). */
-function PasswordResetPage({ initialPassword = '', initialConfirm = '' }: { initialPassword?: string; initialConfirm?: string }) {
-  const [password, setPassword] = useState(initialPassword)
-  const [confirmPassword, setConfirmPassword] = useState(initialConfirm)
+function PasswordResetPage({
+  initialPassword = '',
+  initialConfirm = '',
+}: {
+  initialPassword?: string;
+  initialConfirm?: string;
+}) {
+  const [password, setPassword] = useState(initialPassword);
+  const [confirmPassword, setConfirmPassword] = useState(initialConfirm);
 
-  const isValid = password.length >= 8 && password === confirmPassword
+  const isValid = password.length >= 8 && password === confirmPassword;
 
   return (
-    <AuthShell
-      footer={<BackToLoginLink onClick={() => {}} />}
-    >
+    <AuthShell footer={<BackToLoginLink onClick={() => {}} />}>
       <PasswordResetForm
         password={password}
         confirmPassword={confirmPassword}
@@ -41,20 +45,19 @@ function PasswordResetPage({ initialPassword = '', initialConfirm = '' }: { init
         onBackToLogin={() => {}}
         submitDisabled={!isValid}
         errors={{
-          confirmPassword:
-            confirmPassword && password !== confirmPassword ? 'Passwords do not match' : undefined,
+          confirmPassword: confirmPassword && password !== confirmPassword ? 'Passwords do not match' : undefined,
         }}
       />
     </AuthShell>
-  )
+  );
 }
 
 /** Empty fields, submit disabled. */
 export const Empty: Story = {
   render: () => <PasswordResetPage />,
-}
+};
 
 /** Both passwords entered and matching, submit enabled. */
 export const Filled: Story = {
   render: () => <PasswordResetPage initialPassword="SuperSecret1" initialConfirm="SuperSecret1" />,
-}
+};

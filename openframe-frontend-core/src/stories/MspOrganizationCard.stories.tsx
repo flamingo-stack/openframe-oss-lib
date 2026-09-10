@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import type { ReactNode } from 'react'
-import { MspOrganizationCard } from '../components/chat/msp-organization-card'
-import { MspOrganizationCardSkeleton } from '../components/chat/msp-organization-card-skeleton'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { ReactNode } from 'react';
+import { MspOrganizationCard } from '../components/chat/msp-organization-card';
+import { MspOrganizationCardSkeleton } from '../components/chat/msp-organization-card-skeleton';
 
 /**
  * MSP Organization card for the AI Assistant welcome screen.
@@ -36,11 +36,11 @@ const meta: Meta<typeof MspOrganizationCard> = {
     website: 'www.techflow.com',
     href: 'https://www.techflow.com',
   },
-}
+};
 
-export default meta
+export default meta;
 
-type Story = StoryObj<typeof MspOrganizationCard>
+type Story = StoryObj<typeof MspOrganizationCard>;
 
 /** Default — logo image, website, and a link-out anchor (opens in a new tab). */
 export const Default: Story = {
@@ -51,10 +51,10 @@ export const Default: Story = {
         '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="%231d4ed8"/><circle cx="24" cy="24" r="12" fill="%2360a5fa"/></svg>',
       ),
   },
-}
+};
 
 /** No logo — falls back to initials derived from `name`. */
-export const NoLogo: Story = {}
+export const NoLogo: Story = {};
 
 /** Callback variant — the button fires `onOpenWebsite` instead of navigating. */
 export const WithCallback: Story = {
@@ -62,7 +62,7 @@ export const WithCallback: Story = {
     href: undefined,
     onOpenWebsite: () => alert('Open organization website'),
   },
-}
+};
 
 /** No action — omit both `href` and `onOpenWebsite` to hide the trailing button. */
 export const WithoutAction: Story = {
@@ -70,7 +70,7 @@ export const WithoutAction: Story = {
     href: undefined,
     onOpenWebsite: undefined,
   },
-}
+};
 
 /** Long values truncate to a single line each. */
 export const LongValues: Story = {
@@ -78,10 +78,10 @@ export const LongValues: Story = {
     name: 'Global Managed Services & Infrastructure Partners International',
     website: 'www.global-managed-services-and-infrastructure-partners.example.com',
   },
-}
+};
 
 /** Loading — skeleton placeholder shown while the tenant info loads, then
  *  replaced by the card. Mirrors the card's blocks at the same 80px height. */
 export const Loading: Story = {
   render: () => <MspOrganizationCardSkeleton />,
-}
+};

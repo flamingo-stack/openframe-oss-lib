@@ -1,7 +1,7 @@
-import Link from '../../../embed-shims/next-link'
-import type { EntityAuthor } from '../../../types/entity-author'
-import { SquareAvatar } from '../../ui/square-avatar'
-import { formatDate, nameInitials } from '../../../utils/format'
+import Link from '../../../embed-shims/next-link';
+import type { EntityAuthor } from '../../../types/entity-author';
+import { formatDate, nameInitials } from '../../../utils/format';
+import { SquareAvatar } from '../../ui/square-avatar';
 
 /**
  * Author + publication metadata, rendered as the SAME 2-or-N-cell grid pattern
@@ -34,23 +34,23 @@ export const EMPTY_AUTHOR_PLACEHOLDER = {
   full_name: '—',
   avatar_url: null,
   job_title: 'Unknown',
-} as const
+} as const;
 
 export interface EntityAuthorCardProps {
-  author: EntityAuthor | null | undefined
+  author: EntityAuthor | null | undefined;
   /** Role label rendered under the name. Defaults to "Author". Override
    *  to e.g. "Presenter" / "Contributor" if semantics differ. */
-  roleLabel?: string
+  roleLabel?: string;
   /** Link target for the author name (e.g. the public author page). The
    *  HOST computes it (route availability is host knowledge) — absent ⇒
    *  plain text, exactly the prior render. */
-  authorHref?: string
+  authorHref?: string;
   /** Optional publication date. When provided, the component renders as a
    *  2-cell grid (Published | Author). When omitted, only the Author cell
    *  renders inside the same bordered container. */
-  publishedAt?: string | Date | null
+  publishedAt?: string | Date | null;
   /** Label for the Published cell. Defaults to "Published". */
-  publishedLabel?: string
+  publishedLabel?: string;
   /**
    * Extra value cells inserted into the metadata grid BEFORE the
    * Published cell. Each item renders as an `<EntityMetadataValueCell>`
@@ -60,15 +60,14 @@ export interface EntityAuthorCardProps {
    * webinar host, customer-interview customer). The grid auto-sizes via
    * `grid-cols-N`.
    */
-  extraCells?: Array<{ value: string; label: string; uppercase?: boolean }>
+  extraCells?: Array<{ value: string; label: string; uppercase?: boolean }>;
   /** When true, render the author cell even when `author?.full_name` is
    *  missing — using the `EMPTY_AUTHOR_PLACEHOLDER` shape above. Used by
    *  catalog grids that must keep a fixed shape so skeleton alignment
    *  holds. Defaults to false. */
-  renderEmptyAuthor?: boolean
-  className?: string
+  renderEmptyAuthor?: boolean;
+  className?: string;
 }
-
 
 /**
  * Single value cell — top: large `text-h4` value (uppercase), bottom: small
@@ -80,23 +79,19 @@ export function EntityMetadataValueCell({
   className,
   uppercase = true,
 }: {
-  value: string
-  label: string
-  className?: string
-  uppercase?: boolean
+  value: string;
+  label: string;
+  className?: string;
+  uppercase?: boolean;
 }) {
   return (
-    <div className={`bg-ods-card p-4 flex flex-col gap-3 ${className ?? ''}`}>
+    <div className={`flex flex-col gap-3 bg-ods-card p-4 ${className ?? ''}`}>
       <div className="flex flex-col gap-0">
-        <p className="text-h4 text-ods-text-primary">
-          {uppercase ? value.toLocaleUpperCase() : value}
-        </p>
-        <p className="text-h6 text-ods-text-secondary">
-          {label}
-        </p>
+        <p className="text-ods-text-primary text-h4">{uppercase ? value.toLocaleUpperCase() : value}</p>
+        <p className="text-ods-text-secondary text-h6">{label}</p>
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -109,18 +104,18 @@ export function EntityMetadataAuthorCell({
   authorHref,
   className,
 }: {
-  author: NonNullable<EntityAuthorCardProps['author']>
-  roleLabel?: string
-  authorHref?: string
-  className?: string
+  author: NonNullable<EntityAuthorCardProps['author']>;
+  roleLabel?: string;
+  authorHref?: string;
+  className?: string;
 }) {
   // Trimmed real name gates the LINK — a placeholder/unknown label must
   // never render as a clickable author (an authorHref passed alongside an
   // empty name would link "Unknown Author").
-  const trimmedName = typeof author.full_name === 'string' ? author.full_name.trim() : ''
-  const fullName = trimmedName || 'Unknown Author'
+  const trimmedName = typeof author.full_name === 'string' ? author.full_name.trim() : '';
+  const fullName = trimmedName || 'Unknown Author';
   return (
-    <div className={`bg-ods-card p-4 flex items-center gap-3 ${className ?? ''}`}>
+    <div className={`flex items-center gap-3 bg-ods-card p-4 ${className ?? ''}`}>
       <SquareAvatar
         src={author.avatar_url || ''}
         alt={fullName}
@@ -128,24 +123,22 @@ export function EntityMetadataAuthorCell({
         size="md"
         variant="round"
       />
-      <div className="flex flex-col gap-0 flex-1 min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col gap-0">
         {/* title = full-name tooltip on truncation (carried over from the
             release page's cell when it adopted this shared one). */}
-        <p className="text-h3 text-ods-text-primary truncate" title={fullName}>
+        <p className="truncate text-ods-text-primary text-h3" title={fullName}>
           {authorHref && trimmedName ? (
-            <Link href={authorHref} className="hover:text-ods-accent transition-colors">
+            <Link href={authorHref} className="transition-colors hover:text-ods-accent">
               {fullName}
             </Link>
           ) : (
             fullName
           )}
         </p>
-        <p className="text-h6 text-ods-text-secondary">
-          {author.job_title || roleLabel}
-        </p>
+        <p className="text-ods-text-secondary text-h6">{author.job_title || roleLabel}</p>
       </div>
     </div>
-  )
+  );
 }
 
 export function EntityAuthorCard({
@@ -158,36 +151,39 @@ export function EntityAuthorCard({
   renderEmptyAuthor = false,
   className,
 }: EntityAuthorCardProps) {
-  const hasAuthor = !!author?.full_name
-  if (!hasAuthor && !renderEmptyAuthor) return null
-  const effectiveAuthor = hasAuthor ? (author as NonNullable<EntityAuthorCardProps['author']>) : EMPTY_AUTHOR_PLACEHOLDER
+  const hasAuthor = !!author?.full_name;
+  if (!hasAuthor && !renderEmptyAuthor) return null;
+  const effectiveAuthor = hasAuthor ? author : EMPTY_AUTHOR_PLACEHOLDER;
 
   // Resolve the date label. `formatDate` returns "Invalid Date" for
   // unparseable inputs; collapse that to empty so the cell is hidden, not
   // literal text.
-  const formatted = publishedAt ? formatDate(publishedAt as Date | string) : ''
-  const dateLabel = formatted === 'Invalid Date' ? '' : formatted
+  const formatted = publishedAt ? formatDate(publishedAt) : '';
+  const dateLabel = formatted === 'Invalid Date' ? '' : formatted;
 
-  const showDateCell = !!dateLabel
-  const extras = extraCells ?? []
+  const showDateCell = !!dateLabel;
+  const extras = extraCells ?? [];
   // Total cell count = extras + (optional Published) + Author. Map to
   // an explicit tailwind `md:grid-cols-N` class string so JIT picks it
   // up at build time.
-  const totalCells = extras.length + (showDateCell ? 1 : 0) + 1
+  const totalCells = extras.length + (showDateCell ? 1 : 0) + 1;
   const gridColsClass =
-    totalCells >= 4 ? 'md:grid-cols-4'
-    : totalCells === 3 ? 'md:grid-cols-3'
-    : totalCells === 2 ? 'md:grid-cols-2'
-    : 'md:grid-cols-1'
+    totalCells >= 4
+      ? 'md:grid-cols-4'
+      : totalCells === 3
+        ? 'md:grid-cols-3'
+        : totalCells === 2
+          ? 'md:grid-cols-2'
+          : 'md:grid-cols-1';
 
   // Helper — every cell EXCEPT the last needs the dividers (bottom on
   // mobile, right on desktop). The last cell (Author) closes the grid
   // without a trailing divider so the rounded corner stays clean.
-  const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border'
+  const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border';
 
   return (
     <div
-      className={`grid grid-cols-1 ${gridColsClass} border border-ods-border rounded-md overflow-hidden w-full ${className ?? ''}`}
+      className={`grid grid-cols-1 ${gridColsClass} w-full overflow-hidden rounded-md border border-ods-border ${className ?? ''}`}
     >
       {extras.map((cell, i) => (
         <EntityMetadataValueCell
@@ -199,14 +195,9 @@ export function EntityAuthorCard({
         />
       ))}
       {showDateCell && (
-        <EntityMetadataValueCell
-          value={dateLabel}
-          label={publishedLabel}
-          uppercase={false}
-          className={dividerClass}
-        />
+        <EntityMetadataValueCell value={dateLabel} label={publishedLabel} uppercase={false} className={dividerClass} />
       )}
       <EntityMetadataAuthorCell author={effectiveAuthor} roleLabel={roleLabel} authorHref={authorHref} />
     </div>
-  )
+  );
 }

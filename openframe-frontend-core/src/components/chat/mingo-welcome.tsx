@@ -1,20 +1,16 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { MingoIcon } from '../icons'
-import { MingoChatHistorySkeleton } from './mingo-chat-history'
-import { QuickActionChipButton } from './quick-action-chip'
-import { QuickActionWall } from './quick-action-wall'
-import { Button } from '../ui/button'
-import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
-import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
-import {
-  CompassIcon,
-  Arrow01DownIcon,
-  AlertCircleIcon,
-  Refresh01RightIcon,
-} from '../icons-v2-generated'
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { cn } from '../../utils/cn';
+import { MingoIcon } from '../icons';
+import { CompassIcon, Arrow01DownIcon, AlertCircleIcon, Refresh01RightIcon } from '../icons-v2-generated';
+import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { Button } from '../ui/button';
+import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
+import { MingoChatHistorySkeleton } from './mingo-chat-history';
+import { QuickActionChipButton } from './quick-action-chip';
+import { QuickActionWall } from './quick-action-wall';
 
 // =============================================================================
 // Types
@@ -22,92 +18,91 @@ import {
 
 /** "New to OpenFrame?" one-time notification config. `null` hides the card. */
 export interface MingoWelcomePromo {
-  title: React.ReactNode
-  description: React.ReactNode
+  title: ReactNode;
+  description: ReactNode;
 }
 
 /** Extra quick-action chip rendered after the built-in "Start Guide Chat". */
 export interface MingoQuickAction {
   /** Stable React key. */
-  id: string
-  label: string
-  icon?: React.ReactNode
+  id: string;
+  label: string;
+  icon?: ReactNode;
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip. */
-  variant?: 'primary' | 'outline'
-  onClick?: () => void
+  variant?: 'primary' | 'outline';
+  onClick?: () => void;
   /** Full prompt text previewed as ghost text in the composer on hover/focus.
    *  The chip `label` is short; this reveals what the action will actually ask.
    *  Omitted → falls back to `label`. */
-  prompt?: string
+  prompt?: string;
 }
 
 export interface MingoWelcomeProps {
   /** Greeting heading. Defaults to `Hey, I'm Mingo`. */
-  title?: React.ReactNode
+  title?: ReactNode;
   /** Greeting sub-line under the heading. */
-  subtitle?: React.ReactNode
+  subtitle?: ReactNode;
   /** One-time "New to OpenFrame?" notification below the grid. `null` hides
    *  it; omitting falls back to the OpenFrame default (only rendered when
    *  `onStartGuideChat` is wired, i.e. Guide mode exists to advertise). */
-  promo?: MingoWelcomePromo | null
+  promo?: MingoWelcomePromo | null;
   /** Storage key used to remember the promo dismissal. */
-  promoStorageKey?: string
+  promoStorageKey?: string;
   /** Where the dismissal is persisted. `'local'` (default) survives across
    *  sessions; `'session'` clears when the tab closes. */
-  promoStorage?: 'local' | 'session'
+  promoStorage?: 'local' | 'session';
   /** Extra quick-action chips appended after the "Start Guide Chat" chip. */
-  quickActions?: ReadonlyArray<MingoQuickAction>
+  quickActions?: ReadonlyArray<MingoQuickAction>;
   /** Pointer/keyboard focus enters a quick-action chip — e.g. preview the
    *  action's full `prompt` in the composer input. */
-  onQuickActionHover?: (action: MingoQuickAction) => void
+  onQuickActionHover?: (action: MingoQuickAction) => void;
   /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
-  onQuickActionHoverEnd?: () => void
+  onQuickActionHoverEnd?: () => void;
   /** Returning-user variation: the user already has chats. Hides the
    *  "New to OpenFrame?" notification entirely and renders the "Start Guide
    *  Chat" chip in the muted `outline` style instead of the accent yellow. */
-  hasExistingChats?: boolean
+  hasExistingChats?: boolean;
   /** Returning-user main content — when provided (typically a
    *  `<MingoChatHistory>`), it replaces the greeting + feature grid and owns
    *  its own scroll region. The chips below stay pinned. */
-  dialogHistory?: React.ReactNode
+  dialogHistory?: ReactNode;
   /** True while the FIRST page of dialogs is still loading and we don't yet
    *  know if the user is new or returning. Renders a history skeleton in place
    *  of both the greeting+grid and the history, so the empty state doesn't
    *  flash the new-user layout before the list arrives. Ignored once
    *  `dialogHistory` is provided. */
-  isLoadingHistory?: boolean
+  isLoadingHistory?: boolean;
   /** The dialog-list load FAILED (e.g. backend down) and there's nothing
    *  cached. Renders an error + retry block in place of the new-user empty
    *  state (which would otherwise misleadingly advertise Guide). Takes
    *  priority over `isLoadingHistory`. Ignored once `dialogHistory` is set. */
-  loadError?: boolean
+  loadError?: boolean;
   /** Retry handler for the `loadError` state. */
-  onRetry?: () => void
+  onRetry?: () => void;
   /** When provided, renders the "Start Guide Chat" chip (the only wired
    *  action — switches the host chat to Guide mode) and enables the default
    *  promo notification. When omitted, both are suppressed. */
-  onStartGuideChat?: () => void
+  onStartGuideChat?: () => void;
   /** Agent this empty state belongs to — forwarded to the quick-action
    *  {@link QuickActionWall} so a built-in agent (`'fae'`/`'mingo'`) caps the
    *  brick stack at 2 rows. Defaults to `'mingo'` (this is the Mingo surface). */
-  agentSlug?: string
+  agentSlug?: string;
   /** Appended to the root element. */
-  className?: string
+  className?: string;
 }
 
 // =============================================================================
 // Defaults (OpenFrame copy — overridable per Core Rule: platform-agnostic kit)
 // =============================================================================
 
-const DEFAULT_SUBTITLE =
-  'Ready to help with your technical tasks. What can I do for you?'
+const DEFAULT_SUBTITLE = 'Ready to help with your technical tasks. What can I do for you?';
 
 const DEFAULT_PROMO: MingoWelcomePromo = {
   title: 'New to OpenFrame?',
   description: 'Start a Guide Chat to learn how it works and how to set it up.',
-}
+};
 
-const DEFAULT_PROMO_STORAGE_KEY = 'mingo-welcome:promo-dismissed'
+const DEFAULT_PROMO_STORAGE_KEY = 'mingo-welcome:promo-dismissed';
 
 // =============================================================================
 // Component
@@ -147,7 +142,7 @@ export function MingoWelcome({
 }: MingoWelcomeProps) {
   // Greeting never weaves the user's name in — always the plain "Hey, I'm
   // Mingo" (design node 113:69208). A host `title` override still wins.
-  const heading = title ?? "Hey, I'm Mingo"
+  const heading = title ?? "Hey, I'm Mingo";
 
   // `promo` omitted → fall back to the OpenFrame default, but only when guide
   // mode exists to advertise (otherwise the notification points nowhere).
@@ -158,39 +153,46 @@ export function MingoWelcome({
       ? onStartGuideChat
         ? DEFAULT_PROMO
         : null
-      : promo
+      : promo;
 
   // One-time notification: hydrate the dismissal from storage after mount
   // (SSR-safe — `window` is untouched on the server). Default to "not
   // dismissed" so the first paint shows it, then hide if storage says so.
-  const [promoDismissed, setPromoDismissed] = React.useState(false)
-  React.useEffect(() => {
-    if (!resolvedPromo) return
+  // Derived rather than published from an effect. The storage read is the ONLY
+  // client-only part, and `useIsHydrated` is that gate stated directly: the
+  // first paint (server + hydration) still shows the notification, and it is
+  // gone in the very next render instead of costing a second render pass —
+  // which is also one fewer frame in which a returning user sees a notification
+  // they dismissed long ago.
+  const hydrated = useIsHydrated();
+  const [dismissedThisSession, setPromoDismissed] = useState(false);
+  const storedDismissed = useMemo(() => {
+    if (!hydrated || !resolvedPromo) return false;
     try {
-      const store =
-        promoStorage === 'session' ? window.sessionStorage : window.localStorage
-      if (store.getItem(promoStorageKey) === '1') setPromoDismissed(true)
+      const store = promoStorage === 'session' ? window.sessionStorage : window.localStorage;
+      return store.getItem(promoStorageKey) === '1';
     } catch {
       // Storage can throw (private mode, blocked cookies) — treat as
       // "not dismissed" and simply keep showing the notification.
+      return false;
     }
-  }, [resolvedPromo, promoStorage, promoStorageKey])
+  }, [hydrated, resolvedPromo, promoStorage, promoStorageKey]);
+  const promoDismissed = dismissedThisSession || storedDismissed;
 
-  const dismissPromo = React.useCallback(() => {
-    setPromoDismissed(true)
+  const dismissPromo = useCallback(() => {
+    setPromoDismissed(true);
     try {
-      const store =
-        promoStorage === 'session' ? window.sessionStorage : window.localStorage
-      store.setItem(promoStorageKey, '1')
+      const store = promoStorage === 'session' ? window.sessionStorage : window.localStorage;
+      store.setItem(promoStorageKey, '1');
     } catch {
       // Best-effort persistence; the in-memory state still hides it for
       // the rest of this session.
     }
-  }, [promoStorage, promoStorageKey])
+  }, [promoStorage, promoStorageKey]);
 
   // Scroll-fade affordances — shared ui/scroll-fade (48px edge gradients shown
   // only while content is hidden in that direction).
-  const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>()
+  const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>();
 
   // While we don't yet know whether the user is new or returning (first page
   // loading, or it errored with nothing cached), suppress the pinned region —
@@ -198,7 +200,7 @@ export function MingoWelcome({
   // history skeleton both clutters the loading frame and pre-judges the user as
   // new. They return once a resolved state (history, or the new-user greeting)
   // renders. `dialogHistory` always wins — a returning user keeps the chips.
-  const showPinnedRegion = !!dialogHistory || (!isLoadingHistory && !loadError)
+  const showPinnedRegion = !!dialogHistory || (!isLoadingHistory && !loadError);
 
   return (
     <div
@@ -206,7 +208,7 @@ export function MingoWelcome({
         // `@container` makes the panel itself the responsive context (the
         // drawer width ≠ viewport width) so the notification's down-arrow can
         // appear only once the panel is genuinely wide.
-        '@container flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)]',
+        'flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)] @container',
         className,
       )}
     >
@@ -215,104 +217,96 @@ export function MingoWelcome({
           page loading (skeleton) → new-user greeting+grid. The error branch
           stops a failed fetch from masquerading as "no chats" (which would
           otherwise show the Guide promo). */}
-      {dialogHistory ?? (loadError ? (
-        <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-[var(--spacing-system-m)] text-center">
-          <AlertCircleIcon className="h-8 w-8 text-ods-text-secondary shrink-0" />
-          <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-            <p className="text-h4 text-ods-text-primary">Couldn’t load your chats</p>
-            <p className="text-body-sm text-ods-text-secondary">
-              Something went wrong reaching the server. Check your connection and try again.
-            </p>
+      {dialogHistory ??
+        (loadError ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[var(--spacing-system-m)] text-center">
+            <AlertCircleIcon className="h-8 w-8 shrink-0 text-ods-text-secondary" />
+            <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
+              <p className="text-ods-text-primary text-h4">Couldn’t load your chats</p>
+              <p className="text-body-sm text-ods-text-secondary">
+                Something went wrong reaching the server. Check your connection and try again.
+              </p>
+            </div>
+            {onRetry && (
+              <Button variant="outline" size="small" leftIcon={<Refresh01RightIcon />} onClick={onRetry}>
+                Try again
+              </Button>
+            )}
           </div>
-          {onRetry && (
-            <Button
-              variant="outline"
-              size="small"
-              leftIcon={<Refresh01RightIcon />}
-              onClick={onRetry}
-            >
-              Try again
-            </Button>
-          )}
-        </div>
-      ) : isLoadingHistory ? (
-        <MingoChatHistorySkeleton />
-      ) : (
-      <>
-      {/* Scrollable region — only the greeting + grid scroll; the notification
+        ) : isLoadingHistory ? (
+          <MingoChatHistorySkeleton />
+        ) : (
+          <>
+            {/* Scrollable region — only the greeting + grid scroll; the notification
           and chips below stay pinned so they're always visible above the
           input. The wrapper is `relative` so the scroll-fade gradients can
           overlay the top/bottom edges. */}
-      <div className="relative flex flex-1 min-h-0 flex-col">
-      <div
-        ref={scrollRef}
-        onScroll={updateScrollFade}
-        className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
-      >
-        {/* Greeting — grows to fill (`flex-1`) so it centres vertically,
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              <div
+                ref={scrollRef}
+                onScroll={updateScrollFade}
+                className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
+              >
+                {/* Greeting — grows to fill (`flex-1`) so it centres vertically,
             keeping the grid anchored at the bottom of the scroll area. Default
             `min-height: auto` (no `min-h-0`) stops it shrinking below its own
             content, so the region scrolls instead of the greeting overlapping
             the grid. Padding is modest so it never dominates the narrow panel. */}
-        <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-l)] px-[var(--spacing-system-l)] py-[var(--spacing-system-xxl)] text-center">
-        <MingoIcon
-          className="h-12 w-12"
-          color="white"
-          eyesColor="var(--ods-flamingo-cyan-base)"
-          cornerColor="var(--ods-flamingo-cyan-base)"
-        />
-        <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
-          <p className="text-h2 text-ods-text-primary">{heading}</p>
-          <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
-        </div>
-      </div>
-      </div>
+                <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-l)] px-[var(--spacing-system-l)] py-[var(--spacing-system-xxl)] text-center">
+                  <MingoIcon
+                    className="h-12 w-12"
+                    color="white"
+                    eyesColor="var(--ods-flamingo-cyan-base)"
+                    cornerColor="var(--ods-flamingo-cyan-base)"
+                  />
+                  <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
+                    <p className="text-ods-text-primary text-h2">{heading}</p>
+                    <p className="text-ods-text-secondary text-h4">{subtitle}</p>
+                  </div>
+                </div>
+              </div>
 
-      {/* Edge scroll-fades — visible only when content is hidden beyond them.
+              {/* Edge scroll-fades — visible only when content is hidden beyond them.
           Fade into the panel's dark `ods-bg` surface (the default color), matching
           the black Mingo welcome background (node 113:69208). */}
-      <ScrollFadeOverlay edge="top" visible={fadeTop} className="h-12" />
-      <ScrollFadeOverlay edge="bottom" visible={fadeBottom} className="h-12" />
-      </div>
-      </>
-      ))}
+              <ScrollFadeOverlay edge="top" visible={fadeTop} className="h-12" />
+              <ScrollFadeOverlay edge="bottom" visible={fadeBottom} className="h-12" />
+            </div>
+          </>
+        ))}
 
       {/* Pinned region — visible above the input once the new/returning-user
           state is known (hidden during first-page load / error). */}
       {showPinnedRegion && (
-      <div className="flex shrink-0 flex-col gap-[var(--spacing-system-m)]">
-      {/* "New to OpenFrame?" — a one-time informational notification (no
+        <div className="flex shrink-0 flex-col gap-[var(--spacing-system-m)]">
+          {/* "New to OpenFrame?" — a one-time informational notification (no
           action). The leading down-arrow (Figma node 7532:317130) only shows
           once the panel is wide (`@2xl`), mirroring the responsive design. The
           dismiss "X" persists to local/session storage via `dismissPromo`, so
           once closed it stays hidden. The actual Guide entry point is the
           "Start Guide Chat" chip below. */}
-      {resolvedPromo && !promoDismissed && (
-        <div className="relative shrink-0 flex items-center gap-[var(--spacing-system-m)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-m)] pr-[var(--spacing-system-xl)]">
-          <span className="hidden @2xl:flex size-4 shrink-0 items-center justify-center text-ods-text-primary">
-            <Arrow01DownIcon size={16} />
-          </span>
-          <div className="flex min-w-0 flex-col items-start gap-1">
-            <span className="text-h3 text-ods-text-primary">
-              {resolvedPromo.title}
-            </span>
-            <span className="text-h6 text-ods-text-secondary">
-              {resolvedPromo.description}
-            </span>
-          </div>
-          {/* Plain cross — no button chrome, just a clickable icon. */}
-          <button
-            type="button"
-            onClick={dismissPromo}
-            aria-label="Dismiss"
-            className="absolute right-2 top-2 text-ods-text-secondary transition-colors hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent rounded-sm"
-          >
-            <XmarkIcon size={16} />
-          </button>
-        </div>
-      )}
+          {resolvedPromo && !promoDismissed && (
+            <div className="relative flex shrink-0 items-center gap-[var(--spacing-system-m)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-m)] pr-[var(--spacing-system-xl)]">
+              <span className="hidden size-4 shrink-0 items-center justify-center text-ods-text-primary @2xl:flex">
+                <Arrow01DownIcon size={16} />
+              </span>
+              <div className="flex min-w-0 flex-col items-start gap-1">
+                <span className="text-ods-text-primary text-h3">{resolvedPromo.title}</span>
+                <span className="text-ods-text-secondary text-h6">{resolvedPromo.description}</span>
+              </div>
+              {/* Plain cross — no button chrome, just a clickable icon. */}
+              <button
+                type="button"
+                onClick={dismissPromo}
+                aria-label="Dismiss"
+                className="absolute right-2 top-2 rounded-sm text-ods-text-secondary transition-colors hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
+              >
+                <XmarkIcon size={16} />
+              </button>
+            </div>
+          )}
 
-      {/* Quick actions. "Start Guide Chat" stays pinned above the wall — it's
+          {/* Quick actions. "Start Guide Chat" stays pinned above the wall — it's
           the primary mode switch and must never scroll out of reach. The rest
           render in the shared {@link QuickActionWall} in BRICK mode (the SAME
           chip wall the website hero uses): 2 stacked row marquees under left/
@@ -320,43 +314,43 @@ export function MingoWelcome({
           squeezing the composer. `pauseOnHover` freezes the hovered row so a
           moving chip never dodges a click; hover/focus previews the action's
           full prompt in the composer. */}
-      {(onStartGuideChat || (quickActions && quickActions.length > 0)) && (
-        <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xsf)]">
-          {onStartGuideChat && (
-            <QuickActionChipButton
-              label="Start Guide Chat"
-              icon={<CompassIcon size={16} />}
-              variant={hasExistingChats ? 'outline' : 'primary'}
-              onSelect={onStartGuideChat}
-              className="self-start"
-            />
-          )}
-          {quickActions && quickActions.length > 0 && (
-            <QuickActionWall
-              chips={quickActions.map((action) => ({
-                id: action.id,
-                label: action.label,
-                icon: action.icon,
-                variant: action.variant,
-                onSelect: action.onClick,
-                onHoverStart: () => onQuickActionHover?.(action),
-                onHoverEnd: () => onQuickActionHoverEnd?.(),
-              }))}
-              agentSlug={agentSlug}
-              rows={4}
-              pauseOnHover
-              dragScroll
-              fade={['left', 'right']}
-              fadeSize={{ left: 32 }}
-              fadeColor="var(--color-bg)"
-              copyGap="var(--spacing-system-xxs)"
-              className="max-h-44 shrink-0"
-            />
+          {(onStartGuideChat || (quickActions && quickActions.length > 0)) && (
+            <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xsf)]">
+              {onStartGuideChat && (
+                <QuickActionChipButton
+                  label="Start Guide Chat"
+                  icon={<CompassIcon size={16} />}
+                  variant={hasExistingChats ? 'outline' : 'primary'}
+                  onSelect={onStartGuideChat}
+                  className="self-start"
+                />
+              )}
+              {quickActions && quickActions.length > 0 && (
+                <QuickActionWall
+                  chips={quickActions.map(action => ({
+                    id: action.id,
+                    label: action.label,
+                    icon: action.icon,
+                    variant: action.variant,
+                    onSelect: action.onClick,
+                    onHoverStart: () => onQuickActionHover?.(action),
+                    onHoverEnd: () => onQuickActionHoverEnd?.(),
+                  }))}
+                  agentSlug={agentSlug}
+                  rows={4}
+                  pauseOnHover
+                  dragScroll
+                  fade={['left', 'right']}
+                  fadeSize={{ left: 32 }}
+                  fadeColor="var(--color-bg)"
+                  copyGap="var(--spacing-system-xxs)"
+                  className="max-h-44 shrink-0"
+                />
+              )}
+            </div>
           )}
         </div>
       )}
-      </div>
-      )}
     </div>
-  )
+  );
 }

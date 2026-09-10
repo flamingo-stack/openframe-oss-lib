@@ -1,64 +1,81 @@
-"use client";
+'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { formatLargeNumber } from '../../utils/format';
+import type { MediaItem as CarouselMediaItem } from '../../utils/media-carousel-utils-stub';
 import { socialCache } from '../../utils/social-embed-cache';
 import { MediaCarousel } from '../media-carousel';
 import { RedditContainer } from './embed-container';
-import { formatLargeNumber } from '../../utils/format';
 import { useRichMarkdownRuntime } from './rich-markdown-runtime';
-import type { MediaItem as CarouselMediaItem } from '../../utils/media-carousel-utils-stub';
 
 // Using inline SVG icons to avoid dependency issues
 const MessageCircleIcon = () => (
   <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
   </svg>
 );
 
 const ExternalLinkIcon = () => (
   <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
-    <polyline points="15,3 21,3 21,9"/>
-    <line x1="10" y1="14" x2="21" y2="3"/>
+    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+    <polyline points="15,3 21,3 21,9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
   </svg>
 );
 
 const ArrowUpIcon = () => (
   <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <polyline points="18,15 12,9 6,15"/>
+    <polyline points="18,15 12,9 6,15" />
   </svg>
 );
 
 const ClockIcon = () => (
   <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="10"/>
-    <polyline points="12,6 12,12 16,14"/>
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12,6 12,12 16,14" />
   </svg>
 );
 
 const UserIcon = () => (
   <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-    <circle cx="12" cy="7" r="4"/>
+    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
   </svg>
 );
 
 const RedditIcon = () => (
   <svg width="20" height="20" fill="#FF4500" viewBox="0 0 24 24">
-    <circle cx="9" cy="12" r="1"/>
-    <circle cx="15" cy="12" r="1"/>
-    <path d="M22 12a2 2 0 1 0-4 0c0 5.5-4.5 10-10 10S-2 17.5-2 12a2 2 0 1 0-4 0c0 7.7 6.3 14 14 14s14-6.3 14-14z"/>
-    <path d="M8 10c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2"/>
+    <circle cx="9" cy="12" r="1" />
+    <circle cx="15" cy="12" r="1" />
+    <path d="M22 12a2 2 0 1 0-4 0c0 5.5-4.5 10-10 10S-2 17.5-2 12a2 2 0 1 0-4 0c0 7.7 6.3 14 14 14s14-6.3 14-14z" />
+    <path d="M8 10c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2" />
   </svg>
 );
 
 // Simplified Reddit profile picture component
 const RedditProfilePic = ({ username }: { username: string }) => {
   return (
-    <div className="w-8 h-8 bg-[#FF4500] rounded-full flex items-center justify-center flex-shrink-0">
-      <span className="text-white font-bold text-xs">u/</span>
+    <div
+      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#FF4500]"
+      title={`u/${username}`}
+    >
+      <span className="text-xs font-bold text-white">u/</span>
     </div>
   );
+};
+
+/** Coarse "3h ago" label. Module scope on purpose: it closes over nothing,
+ *  and `Date.now()` inside a component's render body is an impurity React
+ *  Compiler rejects (the label is day/hour granularity, so a per-render read
+ *  is harmless — it just must not happen during render). */
+const formatTimeAgo = (timestamp: number) => {
+  const now = Math.floor(Date.now() / 1000);
+  const diffSeconds = now - timestamp;
+
+  if (diffSeconds < 60) return 'just now';
+  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
+  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h ago`;
+  return `${Math.floor(diffSeconds / 86400)}d ago`;
 };
 
 interface RedditPost {
@@ -109,13 +126,16 @@ interface RedditPost {
       media_id: string;
     }>;
   };
-  media_metadata?: Record<string, {
-    s: {
-      u: string;
-      x: number;
-      y: number;
-    };
-  }>;
+  media_metadata?: Record<
+    string,
+    {
+      s: {
+        u: string;
+        x: number;
+        y: number;
+      };
+    }
+  >;
 }
 
 // Internal media-item shape; we cast to the carousel's expected MediaItem at
@@ -130,6 +150,12 @@ interface MediaItem {
   poster?: string;
 }
 
+/**
+ * `<permalink>.json` response: `[postListing, commentListing]`. Only the post
+ * listing's first child is read.
+ */
+type RedditListingResponse = Array<{ data?: { children?: Array<{ data?: RedditPost }> } }>;
+
 interface RedditEmbedProps {
   url: string;
   maxWidth?: number;
@@ -140,56 +166,77 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
   const [redditData, setRedditData] = useState<RedditPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const initializationDone = useRef(false);
+  const fetchedForRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Only run once
-    if (initializationDone.current) return;
-    initializationDone.current = true;
-
     // Normalize the Reddit URL to JSON format
     const jsonUrl = url.endsWith('.json') ? url : `${url.replace(/\/$/, '')}.json`;
 
+    // Fetch once PER URL: StrictMode's double mount is deduped, and a genuinely
+    // different `url` prop now refetches instead of showing the first embed
+    // forever.
+    if (fetchedForRef.current === jsonUrl) return;
+    fetchedForRef.current = jsonUrl;
+
     // Reddit-specific data validator
-    const validateRedditData = (data: any): boolean => {
-      return data && Array.isArray(data) && data[0] && data[0].data && data[0].data.children && data[0].data.children[0];
+    const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+    const validateRedditData = (data: unknown): data is RedditListingResponse => {
+      if (!Array.isArray(data)) return false;
+      const postListing: unknown = data[0];
+      if (!isRecord(postListing) || !isRecord(postListing.data)) return false;
+      const children = postListing.data.children;
+      return Array.isArray(children) && children.length > 0;
     };
 
+    // Stale-response guard. Deliberately keyed on `fetchedForRef` rather than a
+    // per-run `cancelled` boolean: the ref above makes StrictMode's second
+    // effect run a no-op, so a per-run flag would cancel the ONLY in-flight
+    // request and leave the embed spinning forever. Comparing against the ref
+    // suppresses only genuinely superseded responses — without it, a `url`
+    // change lets the previous post's payload land last and render the WRONG
+    // Reddit post (or drop the spinner while the new fetch is still running).
+    const isCurrent = () => fetchedForRef.current === jsonUrl;
+
     // Use centralized cache hierarchy
-    socialCache.fetchWithHierarchy({
+    // `fetchWithHierarchy` never rejects — failures arrive through `onError`.
+    void socialCache.fetchWithHierarchy({
       platform: 'reddit',
       url: jsonUrl,
       apiEndpoint: redditProxyUrl,
       dataValidator: validateRedditData,
-      onDataUpdate: (data) => {
-        if (data[0]?.data?.children?.[0]?.data) {
+      onDataUpdate: data => {
+        if (isCurrent() && data[0]?.data?.children?.[0]?.data) {
           setRedditData(data[0].data.children[0].data);
         }
       },
-      onError: (errorMsg) => setError(errorMsg),
-      onLoading: (loading) => setLoading(loading)
+      onError: errorMsg => {
+        if (isCurrent()) setError(errorMsg);
+      },
+      onLoading: isLoading => {
+        if (isCurrent()) setLoading(isLoading);
+      },
     });
-  }, []); // Empty dependency array - only run once
+  }, [url, redditProxyUrl]);
 
   if (loading) {
     return (
       <RedditContainer>
-        <div className="border border-ods-border rounded-lg p-6 bg-ods-card animate-pulse">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-ods-border rounded-full"></div>
+        <div className="animate-pulse rounded-lg border border-ods-border bg-ods-card p-6">
+          <div className="mb-4 flex items-center space-x-3">
+            <div className="h-12 w-12 rounded-full bg-ods-border"></div>
             <div>
-              <div className="h-4 bg-ods-border rounded w-32 mb-2"></div>
-              <div className="h-3 bg-ods-border rounded w-24"></div>
+              <div className="mb-2 h-4 w-32 rounded bg-ods-border"></div>
+              <div className="h-3 w-24 rounded bg-ods-border"></div>
             </div>
           </div>
-          <div className="space-y-2 mb-4">
-            <div className="h-4 bg-ods-border rounded w-full"></div>
-            <div className="h-4 bg-ods-border rounded w-3/4"></div>
+          <div className="mb-4 space-y-2">
+            <div className="h-4 w-full rounded bg-ods-border"></div>
+            <div className="h-4 w-3/4 rounded bg-ods-border"></div>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="h-4 bg-ods-border rounded w-16"></div>
-            <div className="h-4 bg-ods-border rounded w-16"></div>
-            <div className="h-4 bg-ods-border rounded w-16"></div>
+            <div className="h-4 w-16 rounded bg-ods-border"></div>
+            <div className="h-4 w-16 rounded bg-ods-border"></div>
+            <div className="h-4 w-16 rounded bg-ods-border"></div>
           </div>
         </div>
       </RedditContainer>
@@ -199,21 +246,22 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
   if (error || !redditData) {
     return (
       <RedditContainer>
-        <div className="border border-ods-border rounded-lg p-6 bg-ods-card">
-          <div className="flex items-center space-x-3 text-ods-text-secondary mb-4">
+        <div className="rounded-lg border border-ods-border bg-ods-card p-6">
+          <div className="mb-4 flex items-center space-x-3 text-ods-text-secondary">
             <RedditIcon />
             <span>Reddit post unavailable</span>
           </div>
 
           <div className="text-center">
-            <p className="text-ods-text-secondary text-h6 mb-4">
-              This Reddit post could not be loaded. It may have been deleted, made private, or the subreddit may be restricted.
+            <p className="mb-4 text-ods-text-secondary text-h6">
+              This Reddit post could not be loaded. It may have been deleted, made private, or the subreddit may be
+              restricted.
             </p>
             <a
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-[#FF4500] text-white rounded-md text-h6 hover:bg-[#E03D00] transition-colors"
+              className="inline-flex items-center space-x-2 rounded-md bg-[#FF4500] px-4 py-2 text-white transition-colors text-h6 hover:bg-[#E03D00]"
             >
               <RedditIcon />
               <span>View on Reddit</span>
@@ -231,10 +279,11 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
     // `title.toLowerCase().includes('removed' | 'deleted')` which suppressed
     // legitimate posts whose titles mention those words (e.g. "Comment was
     // removed by mods", "Deleted scenes from my favorite movie").
-    const isRemovedOrDeleted = redditData.selftext === '[removed]' ||
-                               redditData.selftext === '[deleted]' ||
-                               redditData.author === '[deleted]' ||
-                               (redditData.title && redditData.title.includes('[removed]'));
+    const isRemovedOrDeleted =
+      redditData.selftext === '[removed]' ||
+      redditData.selftext === '[deleted]' ||
+      redditData.author === '[deleted]' ||
+      (redditData.title && redditData.title.includes('[removed]'));
 
     if (isRemovedOrDeleted) {
       console.log('🚫 Post content removed - skipping all media extraction for:', redditData.title);
@@ -253,7 +302,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
       secure_media: redditData.secure_media,
       preview: redditData.preview,
       gallery_data: redditData.gallery_data,
-      media_metadata: redditData.media_metadata
+      media_metadata: redditData.media_metadata,
     });
 
     // 1. Check for Reddit hosted video (v.redd.it) - PRIORITY
@@ -274,7 +323,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
           const baseUrl = video.fallback_url.replace(/DASH_\d+\.mp4.*$/, '');
           posterUrl = `${baseUrl}DASH_720.jpg`;
           console.log('🎯 Generated poster URL:', posterUrl);
-        } catch (e) {
+        } catch {
           console.log('Could not generate poster URL');
         }
       }
@@ -286,9 +335,9 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
       if (videoUrl.includes('DASH_')) {
         // Try different quality levels for Reddit videos
         const baseUrl = videoUrl.replace(/DASH_\d+\.mp4.*$/, '');
-        const qualities = ['480', '360', '720', '240']; // Start with 480p for better compatibility
 
-        // Use 480p as default for better compatibility
+        // 480p as default: the widest-compatibility rung of Reddit's DASH
+        // ladder (the others are 240/360/720).
         videoUrl = `${baseUrl}DASH_480.mp4`;
         console.log('🎯 Optimized Reddit video URL for compatibility:', videoUrl);
       }
@@ -299,7 +348,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
         width: video.width || 640,
         height: video.height || 480,
         isGif: video.is_gif || false,
-        poster: posterUrl
+        poster: posterUrl,
       });
 
       // Return early for videos to avoid showing preview images as well
@@ -326,7 +375,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
             src: imageUrl,
             width: mediaInfo.s.x || 0,
             height: mediaInfo.s.y || 0,
-            alt: redditData.title
+            alt: redditData.title,
           });
         }
       }
@@ -346,9 +395,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
       let source = imageData.source;
       if (imageData.resolutions && imageData.resolutions.length > 0) {
         // Find best resolution under 1200px width, or use source
-        const bestResolution = imageData.resolutions
-          .filter(r => r.width <= 1200)
-          .sort((a, b) => b.width - a.width)[0];
+        const bestResolution = imageData.resolutions.filter(r => r.width <= 1200).sort((a, b) => b.width - a.width)[0];
         source = bestResolution || imageData.source;
       }
 
@@ -360,7 +407,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
           src: cleanUrl,
           width: source.width,
           height: source.height,
-          alt: redditData.title
+          alt: redditData.title,
         });
       }
     }
@@ -378,7 +425,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
           src: redditData.url,
           width: 0,
           height: 0,
-          alt: redditData.title
+          alt: redditData.title,
         });
       }
       // Video formats
@@ -397,7 +444,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
           width: 0,
           height: 0,
           isGif: false,
-          poster: posterUrl
+          poster: posterUrl,
         });
       }
       // Special handling for imgur
@@ -412,7 +459,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
             src: `https://i.imgur.com/${imgurId}.jpg`,
             width: 0,
             height: 0,
-            alt: redditData.title
+            alt: redditData.title,
           });
         }
       }
@@ -424,7 +471,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
           src: redditData.url,
           width: 0,
           height: 0,
-          alt: redditData.title
+          alt: redditData.title,
         });
       }
     }
@@ -448,17 +495,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
     height: m.height,
   }));
 
-  // Format time
-  const formatTimeAgo = (timestamp: number) => {
-    const now = Math.floor(Date.now() / 1000);
-    const diffSeconds = now - timestamp;
-
-    if (diffSeconds < 60) return 'just now';
-    if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
-    if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h ago`;
-    return `${Math.floor(diffSeconds / 86400)}d ago`;
-  };
-
   // Format numbers using utility function
   const formatNumber = formatLargeNumber;
 
@@ -469,13 +505,13 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
 
   return (
     <RedditContainer>
-      <div className="border border-ods-border rounded-lg bg-ods-card overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-ods-border bg-ods-card">
         {/* Header with Profile Picture */}
-        <div className="p-4 border-b border-ods-border">
+        <div className="border-b border-ods-border p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {/* Lazy-loaded User Profile Picture */}
-              <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+              <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full">
                 <RedditProfilePic username={redditData.author} />
               </div>
               <div>
@@ -493,28 +529,19 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
 
         {/* Content - Matching Twitter Style */}
         <div className="p-4">
-          <h3 className="text-ods-text-primary text-h3 mb-3">
-            {redditData.title}
-          </h3>
+          <h3 className="mb-3 text-ods-text-primary text-h3">{redditData.title}</h3>
 
           {redditData.selftext && (
             <div
-              className="text-ods-text-secondary text-h6 mb-4 overflow-hidden"
+              className="mb-4 overflow-hidden text-ods-text-secondary text-h6"
               style={{ maxHeight: `${maxWidth - 200}px` }}
             >
-              <p className="whitespace-pre-wrap">
-                {truncateText(redditData.selftext)}
-              </p>
+              <p className="whitespace-pre-wrap">{truncateText(redditData.selftext)}</p>
             </div>
           )}
 
           {/* Enhanced Media Section with Carousel */}
-          {carouselItems.length > 0 && (
-            <MediaCarousel
-              media={carouselItems}
-              aspectRatio="16/9"
-            />
-          )}
+          {carouselItems.length > 0 && <MediaCarousel media={carouselItems} aspectRatio="16/9" />}
 
           {/* Stats - Matching Twitter Style */}
           <div className="flex items-center space-x-6 text-ods-text-secondary text-h6">
@@ -530,12 +557,12 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
         </div>
 
         {/* Footer - Matching Twitter Style */}
-        <div className="px-4 py-3 bg-ods-bg-surface border-t border-ods-border">
+        <div className="border-t border-ods-border bg-ods-bg-surface px-4 py-3">
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center space-x-2 text-ods-accent hover:opacity-80 transition-colors text-h6"
+            className="inline-flex items-center space-x-2 text-ods-accent transition-colors text-h6 hover:opacity-80"
           >
             <ExternalLinkIcon />
             <span>View on Reddit</span>

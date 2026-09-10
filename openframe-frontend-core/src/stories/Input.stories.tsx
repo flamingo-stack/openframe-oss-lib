@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
+import { SearchIcon } from '../components/icons-v2-generated/interface/search-icon';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { SearchIcon } from '../components/icons-v2-generated/interface/search-icon';
 
 const meta = {
   title: 'UI/Input',
@@ -158,7 +158,7 @@ export const SearchInput: Story = {
     return (
       <Input
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={e => setValue(e.target.value)}
         placeholder="Search..."
         startAdornment={<SearchIcon size={20} />}
       />
@@ -185,12 +185,7 @@ export const WithButton: Story = {
     const [value, setValue] = useState('');
     return (
       <div className="flex items-start gap-2">
-        <Input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Enter your email..."
-          error='sdfsd'
-        />
+        <Input value={value} onChange={e => setValue(e.target.value)} placeholder="Enter your email..." error="sdfsd" />
         <Button variant="accent" size="default">
           Submit
         </Button>
@@ -242,18 +237,9 @@ export const ErrorState: Story = {
           defaultValue="ada@example.com"
           error="This email is already registered. Sign in instead."
         />
-        <Input
-          label="Organization Name"
-          defaultValue="A"
-          error="Organization Name must be 2-100 characters"
-        />
+        <Input label="Organization Name" defaultValue="A" error="Organization Name must be 2-100 characters" />
       </div>
-      <Input
-        label="Success status"
-        defaultValue="ada@example.com"
-        error="Email is available"
-        errorVariant="success"
-      />
+      <Input label="Success status" defaultValue="ada@example.com" error="Email is available" errorVariant="success" />
       <Input
         label="Muted status (long, truncating)"
         defaultValue="ada-lovelace-computing"

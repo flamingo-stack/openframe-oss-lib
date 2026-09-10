@@ -1,6 +1,6 @@
 package com.openframe.api.controller;
 
-import com.openframe.api.service.DeviceService;
+import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.dto.device.UpdateDeviceStatusRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

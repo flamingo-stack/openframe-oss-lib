@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * useUnifiedChat — the single public entry point for the unified chat
@@ -18,20 +18,19 @@
  * consumes this hook, NOT here. This module is pure state plumbing.
  */
 
-import { useCallback, useMemo, useRef } from 'react'
-import { useSseChatAdapter, type UseSseChatAdapterOptions } from './use-sse-chat-adapter'
-import {
-  useNatsChatAdapter,
-  type UseNatsChatAdapterConfig,
-} from './use-nats-chat-adapter'
-import type { UnifiedChatState } from '../types/unified-chat-state.types'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { EMPTY_DIALOG_CAPABILITIES } from '../types/unified-chat-state.types';
+import type { ChatDialogCapabilities, UnifiedChatState } from '../types/unified-chat-state.types';
+import { useNatsChatAdapter, type UseNatsChatAdapterConfig } from './use-nats-chat-adapter';
+import { useSseChatAdapter, type UseSseChatAdapterOptions } from './use-sse-chat-adapter';
+import { useStableShallow } from './use-stable-shallow';
 
 // =============================================================================
 // Modes
 // =============================================================================
 
 /** Discriminator for the active transport mode. */
-export type ChatMode = 'guide' | 'mingo'
+export type ChatMode = 'guide' | 'mingo';
 
 /**
  * Per-mode configuration. Each slot is optional — consumers that only
@@ -47,19 +46,19 @@ export interface UseUnifiedChatModes {
    * so this slot is just an opt-in flag plus its adapter options.
    * The presence of the key signals "guide mode is configured".
    */
-  guide?: UseSseChatAdapterOptions
+  guide?: UseSseChatAdapterOptions;
 
   /**
    * Mingo mode (NATS → openframe). All wiring is explicit: dialog id,
    * NATS URL builder, publish callback, optional catchup fetcher.
    * See `UseNatsChatAdapterConfig` for the field-by-field contract.
    */
-  mingo?: UseNatsChatAdapterConfig
+  mingo?: UseNatsChatAdapterConfig;
 }
 
 export interface UseUnifiedChatOptions {
-  modes: UseUnifiedChatModes
-  activeMode: ChatMode
+  modes: UseUnifiedChatModes;
+  activeMode: ChatMode;
 
   /**
    * Pre-built Mingo-mode state, supplied by the host instead of letting
@@ -72,14 +71,26 @@ export interface UseUnifiedChatOptions {
    * store + cache (so it survives the panel unmounting) rather than in this
    * hook's local React state. Guide mode is unaffected.
    */
-  mingoStateOverride?: UnifiedChatState
+  mingoStateOverride?: UnifiedChatState;
+
+  /**
+   * Conversation-list capabilities for a `mingoStateOverride`. A host that
+   * builds the whole state in its own store has no adapter to report them, so
+   * it declares them alongside the state it injects.
+   *
+   * Supplying the override AT ALL declares that its panel owns a conversation
+   * list — an override with no capabilities still resolves to an empty object,
+   * never `undefined`, so such a host keeps its list surface exactly as before.
+   * Ignored unless the override is the active state.
+   */
+  injectedDialogCapabilities?: ChatDialogCapabilities;
 }
 
 // =============================================================================
 // Defaults — fill the inactive slot so both hooks run safely
 // =============================================================================
 
-const EMPTY_SSE_OPTIONS: UseSseChatAdapterOptions = {}
+const EMPTY_SSE_OPTIONS: UseSseChatAdapterOptions = {};
 
 function createDisabledNatsConfig(): UseNatsChatAdapterConfig {
   return {
@@ -89,50 +100,53 @@ function createDisabledNatsConfig(): UseNatsChatAdapterConfig {
       throw new Error(
         '[useUnifiedChat] publishUserMessage invoked but mingo mode is not configured. ' +
           'Pass `modes.mingo` to enable Mingo agent transport.',
-      )
+      );
     },
-  }
+  };
 }
 
 // =============================================================================
 // Hook
 // =============================================================================
 
-export function useUnifiedChat(
-  options: UseUnifiedChatOptions,
-): UnifiedChatState {
-  const { modes, activeMode, mingoStateOverride } = options
+export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState {
+  const { modes, activeMode, mingoStateOverride, injectedDialogCapabilities } = options;
 
   // The mingo config object identity matters — `useNatsChatAdapter`
   // wires its `dialogId`/url/publish into deps. Stabilise the disabled
   // fallback so a guide-only consumer doesn't churn NATS hook state
   // every render.
-  const disabledNatsRef = useRef<UseNatsChatAdapterConfig | null>(null)
-  if (disabledNatsRef.current === null) {
-    disabledNatsRef.current = createDisabledNatsConfig()
-  }
+  // Built once by `useState`'s lazy initialiser — that is exactly the
+  // create-on-first-render shape, without a ref filled during render.
+  const [disabledNatsConfig] = useState<UseNatsChatAdapterConfig>(createDisabledNatsConfig);
 
   // Each adapter receives the user's config OR the disabled fallback,
   // plus an `active` flag that gates its live network work. Both
   // hooks are always called — only one is doing real work.
-  const sseActive = activeMode === 'guide' && modes.guide !== undefined
-  const natsActive = activeMode === 'mingo' && modes.mingo !== undefined
+  const sseActive = activeMode === 'guide' && modes.guide !== undefined;
+  const natsActive = activeMode === 'mingo' && modes.mingo !== undefined;
 
   const sseState = useSseChatAdapter(modes.guide ?? EMPTY_SSE_OPTIONS, {
     active: sseActive,
-  })
-  const natsState = useNatsChatAdapter(
-    modes.mingo ?? disabledNatsRef.current,
-    { active: natsActive },
-  )
+  });
+  const natsState = useNatsChatAdapter(modes.mingo ?? disabledNatsConfig, { active: natsActive });
 
   // Host-injected Mingo state wins when present: the internal `natsState`
   // still runs (rules of hooks) but is idle (no `modes.mingo` → not active),
   // and we hand the host's store-backed state straight through as active.
-  const activeState =
-    activeMode === 'guide'
-      ? sseState
-      : (mingoStateOverride ?? natsState)
+  const activeState = activeMode === 'guide' ? sseState : (mingoStateOverride ?? natsState);
+  // The ONE place the injected state's capabilities are defaulted, because this
+  // is the ONE place that decides which state won. `EmbeddableChat` therefore
+  // reads a single resolved `dialogCapabilities` and never re-derives it from
+  // the mode.
+  const activeStateIsInjected = activeState === mingoStateOverride;
+  // Latched: hosts write the companion prop inline, and a fresh object each
+  // render would invalidate the state memo below (and every memo a consumer
+  // hangs off its identity) forever.
+  const stableInjected = useStableShallow(injectedDialogCapabilities);
+  const dialogCapabilities = activeStateIsInjected
+    ? (activeState.dialogCapabilities ?? stableInjected ?? EMPTY_DIALOG_CAPABILITIES)
+    : activeState.dialogCapabilities;
 
   // Live ref to the active state. The injected `mingoState` (and the SSE/NATS
   // adapters) hand back a NEW state object on EVERY streaming chunk
@@ -142,82 +156,58 @@ export function useUnifiedChat(
   // `embeddable-chat`, whose new identity defeats `ChatMessageEnhanced`'s memo
   // and re-renders (re-mounts inline cards on) every message each chunk.
   // Reading through the ref keeps the forwards referentially STABLE while
-  // still calling the latest active state.
-  const activeStateRef = useRef(activeState)
-  activeStateRef.current = activeState
+  // still calling the latest active state. Republished in an unconditional
+  // effect rather than in the render body: every reader below is a forwarded
+  // command invoked from a user gesture, which can only run after a commit, so
+  // a render attempt React discards must not be able to point the forwards at
+  // an adapter state that was never committed.
+  const activeStateRef = useRef(activeState);
+  useEffect(() => {
+    activeStateRef.current = activeState;
+  });
 
   // Re-wrap so the returned identity is stable for the active state.
   // Consumers shouldn't see the inactive adapter's state at all.
-  const stopMessage = useCallback(() => activeStateRef.current.stopMessage(), [])
-  const clearMessages = useCallback(
-    () => activeStateRef.current.clearMessages(),
-    [],
-  )
+  const stopMessage = useCallback(() => activeStateRef.current.stopMessage(), []);
+  const clearMessages = useCallback(() => activeStateRef.current.clearMessages(), []);
   const sendMessage = useCallback(
     (text: string, opts?: Parameters<UnifiedChatState['sendMessage']>[1]) =>
       activeStateRef.current.sendMessage(text, opts),
     [],
-  )
+  );
   const discussRef = useCallback(
-    (ref: Parameters<UnifiedChatState['discussRef']>[0]) =>
-      activeStateRef.current.discussRef(ref),
+    (ref: Parameters<UnifiedChatState['discussRef']>[0]) => activeStateRef.current.discussRef(ref),
     [],
-  )
-  const displayRef = useCallback(
-    (ref: Parameters<UnifiedChatState['displayRef']>[0]) =>
-      activeStateRef.current.displayRef(ref),
+  );
+  // `displayRef` is OPTIONAL on the state and consumers gate the "Display"
+  // affordance on its presence, so the forward has to be able to be absent
+  // too: an always-truthy wrapper around a missing method advertises a
+  // display path that isn't there and throws when the menu row is clicked.
+  // Only the flag flips identity — the wrapper itself stays stable.
+  const displayRefForward = useCallback(
+    (ref: Parameters<NonNullable<UnifiedChatState['displayRef']>>[0]) => activeStateRef.current.displayRef?.(ref),
     [],
-  )
+  );
+  const displayRef = activeState.displayRef ? displayRefForward : undefined;
 
   // Dialog-management forwards — one thin wrapper per action so the
   // returned identity stays stable as long as the active adapter's
   // identity does. We don't recreate per-call to avoid spurious child
   // re-renders downstream.
-  const selectDialog = useCallback(
-    (id: string | null) => activeStateRef.current.selectDialog(id),
-    [],
-  )
-  const startNewDialog = useCallback(
-    () => activeStateRef.current.startNewDialog(),
-    [],
-  )
-  const deleteDialog = useCallback(
-    (id: string) => activeStateRef.current.deleteDialog(id),
-    [],
-  )
-  const renameDialog = useCallback(
-    (id: string, title: string) => activeStateRef.current.renameDialog(id, title),
-    [],
-  )
-  const archiveDialog = useCallback(
-    (id: string) => activeStateRef.current.archiveDialog(id),
-    [],
-  )
-  const loadMoreDialogs = useCallback(
-    () => activeStateRef.current.loadMoreDialogs(),
-    [],
-  )
-  const setDialogScope = useCallback(
-    (scope: 'my' | 'all') => activeStateRef.current.setDialogScope?.(scope),
-    [],
-  )
-  const reloadDialogs = useCallback(
-    () => activeStateRef.current.reloadDialogs(),
-    [],
-  )
-  const loadMoreMessages = useCallback(
-    () => activeStateRef.current.loadMoreMessages(),
-    [],
-  )
-  const approveRequest = useCallback(
-    (requestId: string) => activeStateRef.current.approveRequest(requestId),
-    [],
-  )
+  const selectDialog = useCallback((id: string | null) => activeStateRef.current.selectDialog(id), []);
+  const startNewDialog = useCallback(() => activeStateRef.current.startNewDialog(), []);
+  const deleteDialog = useCallback((id: string) => activeStateRef.current.deleteDialog(id), []);
+  const renameDialog = useCallback((id: string, title: string) => activeStateRef.current.renameDialog(id, title), []);
+  const archiveDialog = useCallback((id: string) => activeStateRef.current.archiveDialog(id), []);
+  const loadMoreDialogs = useCallback(() => activeStateRef.current.loadMoreDialogs(), []);
+  const setDialogScope = useCallback((scope: 'my' | 'all') => activeStateRef.current.setDialogScope?.(scope), []);
+  const reloadDialogs = useCallback(() => activeStateRef.current.reloadDialogs(), []);
+  const loadMoreMessages = useCallback(() => activeStateRef.current.loadMoreMessages(), []);
+  const approveRequest = useCallback((requestId: string) => activeStateRef.current.approveRequest(requestId), []);
   const rejectRequest = useCallback(
-    (requestId: string, reason?: string) =>
-      activeStateRef.current.rejectRequest(requestId, reason),
+    (requestId: string, reason?: string) => activeStateRef.current.rejectRequest(requestId, reason),
     [],
-  )
+  );
 
   return useMemo<UnifiedChatState>(
     () => ({
@@ -256,6 +246,8 @@ export function useUnifiedChat(
       setDialogScope,
       hasMoreMessages: activeState.hasMoreMessages,
       loadMoreMessages,
+      // THE conversation-list signal — resolved once, above.
+      dialogCapabilities,
       // Approvals
       approveRequest,
       rejectRequest,
@@ -265,6 +257,7 @@ export function useUnifiedChat(
     }),
     [
       activeState,
+      dialogCapabilities,
       sendMessage,
       stopMessage,
       clearMessages,
@@ -282,5 +275,5 @@ export function useUnifiedChat(
       approveRequest,
       rejectRequest,
     ],
-  )
+  );
 }

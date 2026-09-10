@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Campaign Card Admin (chat compact variant).
@@ -9,9 +9,9 @@
  * lives here in lib.
  */
 
-import React from 'react'
-import { Megaphone } from 'lucide-react'
-import { formatDateShort } from '../../../utils/date-formatters'
+import { Megaphone } from 'lucide-react';
+import type React from 'react';
+import { formatDateShort } from '../../../utils/date-formatters';
 import {
   COMPACT_CARD_ICON_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -25,33 +25,32 @@ import {
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
-} from '../utils/compact-card-classes'
+} from '../utils/compact-card-classes';
 
 /** Minimal campaign shape needed by the chat-inline compact card. */
 export interface CampaignCardItem {
-  id: string
-  name: string
-  description?: string | null
-  start_date?: string | null
-  goals?: Array<unknown> | null
+  id: string;
+  name: string;
+  description?: string | null;
+  start_date?: string | null;
+  goals?: Array<unknown> | null;
 }
 
 export interface CampaignCardAdminAnchorProps {
-  href: string
-  target?: '_blank'
-  rel?: 'noopener noreferrer'
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+  href: string;
+  target?: '_blank';
+  rel?: 'noopener noreferrer';
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
 export interface CampaignCardAdminProps {
-  campaign: CampaignCardItem
-  className?: string
-  anchorProps?: CampaignCardAdminAnchorProps
+  campaign: CampaignCardItem;
+  className?: string;
+  anchorProps?: CampaignCardAdminAnchorProps;
 }
 
-
 export function CampaignCardAdmin({ campaign, className, anchorProps }: CampaignCardAdminProps) {
-  const goalsCount = campaign.goals?.length || 0
+  const goalsCount = campaign.goals?.length || 0;
 
   const innerChildren = (
     <>
@@ -68,29 +67,29 @@ export function CampaignCardAdmin({ campaign, className, anchorProps }: Campaign
               campaign.start_date ? formatDateShort(campaign.start_date) : null,
               goalsCount > 0 ? `${goalsCount} goal${goalsCount !== 1 ? 's' : ''}` : null,
               'Marketing campaign',
-            ].filter(Boolean).join(' · ')}
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </span>
         </span>
         <span className={COMPACT_CARD_META_ROW_BOX}>
-          <span className={COMPACT_CARD_SUMMARY}>
-            {campaign.description || COMPACT_CARD_ROW_FILLER}
-          </span>
+          <span className={COMPACT_CARD_SUMMARY}>{campaign.description || COMPACT_CARD_ROW_FILLER}</span>
         </span>
       </span>
     </>
-  )
+  );
   if (anchorProps) {
     return (
       <a {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {innerChildren}
       </a>
-    )
+    );
   }
   return (
     <span className={`${COMPACT_CARD_OUTER_STATIC} ${className ?? ''}`} aria-label="No link available">
       {innerChildren}
     </span>
-  )
+  );
 }
 
 export function CampaignCardAdminSkeleton({ className }: { className?: string }) {
@@ -109,5 +108,5 @@ export function CampaignCardAdminSkeleton({ className }: { className?: string })
         </span>
       </span>
     </span>
-  )
+  );
 }

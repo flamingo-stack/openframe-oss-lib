@@ -48,7 +48,7 @@ export const InheritsTextColor: Story = {
   args: {
     size: 40,
   },
-  render: (args) => (
+  render: args => (
     <div className="text-ods-accent">
       <DotsLoaderIcon {...args} />
     </div>
@@ -62,7 +62,7 @@ export const OdsColors: Story = {
   args: {
     size: 40,
   },
-  render: (args) => (
+  render: args => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
       <DotsLoaderIcon {...args} color="var(--ods-text-primary)" />
       <DotsLoaderIcon {...args} color="var(--ods-text-secondary)" />
@@ -95,8 +95,8 @@ export const InCard: Story = {
   args: {
     size: 32,
   },
-  render: (args) => (
-    <div className="flex items-center justify-center bg-ods-card border border-ods-border rounded-lg w-64 h-40 text-ods-text-secondary">
+  render: args => (
+    <div className="flex h-40 w-64 items-center justify-center rounded-lg border border-ods-border bg-ods-card text-ods-text-secondary">
       <DotsLoaderIcon {...args} />
     </div>
   ),

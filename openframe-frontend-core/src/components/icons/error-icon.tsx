@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type { SVGProps } from 'react';
 import { cn } from '../../utils/cn';
 
 /**
@@ -6,7 +6,7 @@ import { cn } from '../../utils/cn';
  * Usage: <ErrorIcon className="h-12 w-12" />
  */
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function ErrorIcon({ className, fill = '#FF6B6B', ...props }: React.SVGProps<SVGSVGElement>) {
+export function ErrorIcon({ className, fill = '#FF6B6B', ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

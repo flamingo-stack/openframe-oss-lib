@@ -1,14 +1,10 @@
-import React from 'react';
-
 interface GlobeIconProps {
   color?: string;
   className?: string;
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function GlobeIcon({ className ,
-  color = 'white'
-}:  GlobeIconProps) {
+export function GlobeIcon({ className, color = 'white' }: GlobeIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

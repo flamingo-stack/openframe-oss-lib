@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import type React from "react";
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type React from 'react';
 
-import { TicketEscalatedMessage } from "../components/chat/ticket-escalated-message";
+import { TicketEscalatedMessage } from '../components/chat/ticket-escalated-message';
 
 /**
  * `ticket_escalated` message segment — the handoff receipt (Figma:
@@ -19,34 +19,34 @@ import { TicketEscalatedMessage } from "../components/chat/ticket-escalated-mess
  */
 
 const baseData = {
-	ticketId: "68a1f0c2b3d4e5f6a7b8c9d0",
-	ticketNumber: 1002,
-	reason: "INACTIVITY",
-	text: "Automatically escalated to a human technician because the conversation had no new messages for an extended period.",
+  ticketId: '68a1f0c2b3d4e5f6a7b8c9d0',
+  ticketNumber: 1002,
+  reason: 'INACTIVITY',
+  text: 'Automatically escalated to a human technician because the conversation had no new messages for an extended period.',
 };
 
 /** Fixed so the timestamp doesn't churn between snapshots. */
-const TIMESTAMP = new Date("2026-08-07T14:47:00");
+const TIMESTAMP = new Date('2026-08-07T14:47:00');
 
 const plainDecorator = (Story: React.ComponentType) => (
-	<div style={{ maxWidth: 600, background: "var(--color-bg)" }} className="p-4">
-		<Story />
-	</div>
+  <div style={{ maxWidth: 600, background: 'var(--color-bg)' }} className="p-4">
+    <Story />
+  </div>
 );
 
 const meta = {
-	title: "Chat/Client/TicketEscalatedMessage",
-	component: TicketEscalatedMessage,
-	tags: ["autodocs"],
-	parameters: {
-		docs: {
-			description: {
-				component:
-					"Renders a `TICKET_ESCALATED` block: a bordered info tile, the fixed 'Handed Off to a Technician' title, the message timestamp, and the backend's explanation.",
-			},
-		},
-	},
-	decorators: [plainDecorator],
+  title: 'Chat/Client/TicketEscalatedMessage',
+  component: TicketEscalatedMessage,
+  tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Renders a `TICKET_ESCALATED` block: a bordered info tile, the fixed 'Handed Off to a Technician' title, the message timestamp, and the backend's explanation.",
+      },
+    },
+  },
+  decorators: [plainDecorator],
 } satisfies Meta<typeof TicketEscalatedMessage>;
 
 export default meta;
@@ -54,7 +54,7 @@ type Story = StoryObj<typeof meta>;
 
 /** The inactivity auto-escalation — the only reason the wire defines today. */
 export const Inactivity: Story = {
-	args: { data: baseData, timestamp: TIMESTAMP },
+  args: { data: baseData, timestamp: TIMESTAMP },
 };
 
 /**
@@ -62,23 +62,23 @@ export const Inactivity: Story = {
  * line rather than rendering an empty body.
  */
 export const NoBodyFallback: Story = {
-	args: { data: { ...baseData, text: undefined }, timestamp: TIMESTAMP },
+  args: { data: { ...baseData, text: undefined }, timestamp: TIMESTAMP },
 };
 
 /** No timestamp — the row collapses to title-only, body unchanged. */
 export const WithoutTimestamp: Story = {
-	args: { data: baseData },
+  args: { data: baseData },
 };
 
 /** Long explanation — wraps and the block grows; nothing is clipped. */
 export const LongBody: Story = {
-	args: {
-		data: {
-			...baseData,
-			text: "Automatically escalated to a human technician because the conversation had no new messages for an extended period while the ticket was still assigned to the AI assistant, and no diagnostic step produced a resolution.",
-		},
-		timestamp: TIMESTAMP,
-	},
+  args: {
+    data: {
+      ...baseData,
+      text: 'Automatically escalated to a human technician because the conversation had no new messages for an extended period while the ticket was still assigned to the AI assistant, and no diagnostic step produced a resolution.',
+    },
+    timestamp: TIMESTAMP,
+  },
 };
 
 /**
@@ -87,12 +87,12 @@ export const LongBody: Story = {
  * change — this story is the regression guard for that.
  */
 export const UnknownReason: Story = {
-	args: {
-		data: {
-			...baseData,
-			reason: "USER_REQUESTED",
-			text: "Escalated at the user's request.",
-		},
-		timestamp: TIMESTAMP,
-	},
+  args: {
+    data: {
+      ...baseData,
+      reason: 'USER_REQUESTED',
+      text: "Escalated at the user's request.",
+    },
+    timestamp: TIMESTAMP,
+  },
 };

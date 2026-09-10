@@ -1,16 +1,16 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../../utils/cn'
-import { ApprovalBatchMessage } from '../../chat/approval-batch-message'
-import { useCollapsible } from '../../chat/hooks/use-collapsible'
-import { Chevron02DownIcon, Chevron02UpIcon, DotsLoaderIcon, ShieldCheckIcon } from '../../icons-v2-generated'
-import type { BoardTicketPendingApproval } from './types'
+import { useState } from 'react';
+import { cn } from '../../../utils/cn';
+import { ApprovalBatchMessage } from '../../chat/approval-batch-message';
+import { useCollapsible } from '../../chat/hooks/use-collapsible';
+import { Chevron02DownIcon, Chevron02UpIcon, DotsLoaderIcon, ShieldCheckIcon } from '../../icons-v2-generated';
+import type { BoardTicketPendingApproval } from './types';
 
 export interface BoardTicketApprovalProps {
-  pendingApproval: BoardTicketPendingApproval
-  onApprove?: (requestId?: string) => void | Promise<void>
-  onReject?: (requestId?: string) => void | Promise<void>
+  pendingApproval: BoardTicketPendingApproval;
+  onApprove?: (requestId?: string) => void | Promise<void>;
+  onReject?: (requestId?: string) => void | Promise<void>;
 }
 
 /**
@@ -21,9 +21,9 @@ export interface BoardTicketApprovalProps {
  * "Technician approval required") on `approvalType`.
  */
 export function BoardTicketApproval({ pendingApproval, onApprove, onReject }: BoardTicketApprovalProps) {
-  const [expanded, setExpanded] = React.useState(false)
-  const { innerRef, containerStyle } = useCollapsible({ expanded })
-  const isAdmin = pendingApproval.approvalType === 'ADMIN'
+  const [expanded, setExpanded] = useState(false);
+  const { innerRef, containerStyle } = useCollapsible({ expanded });
+  const isAdmin = pendingApproval.approvalType === 'ADMIN';
 
   return (
     <div className="pointer-events-auto flex flex-col">
@@ -72,5 +72,5 @@ export function BoardTicketApproval({ pendingApproval, onApprove, onReject }: Bo
         </div>
       </div>
     </div>
-  )
+  );
 }

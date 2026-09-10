@@ -1,9 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import * as React from 'react'
-import {
-  RenameChatModal,
-  ArchiveChatModal,
-} from '../components/chat/mingo-chat-modals'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { RenameChatModal, ArchiveChatModal } from '../components/chat/mingo-chat-modals';
 
 const meta: Meta = {
   title: 'Chat/MingoChatModals',
@@ -17,26 +14,26 @@ const meta: Meta = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div className="min-h-[100dvh] bg-ods-bg">
         <Story />
       </div>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj
+export default meta;
+type Story = StoryObj;
 
 /** Rename Chat — input seeded with the current name, Cancel + Save. */
 export const Rename: Story = {
   render: () => {
-    const [open, setOpen] = React.useState(true)
+    const [open, setOpen] = useState(true);
     return (
       <>
         <button
           type="button"
-          className="m-8 rounded-md bg-ods-accent px-4 py-2 text-h3 text-ods-text-on-accent"
+          className="m-8 rounded-md bg-ods-accent px-4 py-2 text-ods-text-on-accent text-h3"
           onClick={() => setOpen(true)}
         >
           Open Rename modal
@@ -45,25 +42,25 @@ export const Rename: Story = {
           isOpen={open}
           initialName="Troubleshooting Exchange Online connection issues"
           onClose={() => setOpen(false)}
-          onSave={(name) => {
-            console.log('save', name)
-            setOpen(false)
+          onSave={name => {
+            console.log('save', name);
+            setOpen(false);
           }}
         />
       </>
-    )
+    );
   },
-}
+};
 
 /** Archive Chat — confirmation with a destructive red action. */
 export const Archive: Story = {
   render: () => {
-    const [open, setOpen] = React.useState(true)
+    const [open, setOpen] = useState(true);
     return (
       <>
         <button
           type="button"
-          className="m-8 rounded-md bg-ods-accent px-4 py-2 text-h3 text-ods-text-on-accent"
+          className="m-8 rounded-md bg-ods-accent px-4 py-2 text-ods-text-on-accent text-h3"
           onClick={() => setOpen(true)}
         >
           Open Archive modal
@@ -72,11 +69,11 @@ export const Archive: Story = {
           isOpen={open}
           onClose={() => setOpen(false)}
           onConfirm={() => {
-            console.log('archive confirmed')
-            setOpen(false)
+            console.log('archive confirmed');
+            setOpen(false);
           }}
         />
       </>
-    )
+    );
   },
-}
+};

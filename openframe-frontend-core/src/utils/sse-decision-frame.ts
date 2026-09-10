@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Shared decoder for the `decision_resolved` leading frame the
@@ -29,21 +29,21 @@
  */
 
 export interface DecisionResolvedFrame {
-  kind: 'decision_resolved'
-  ok: boolean
-  action: 'approved' | 'rejected'
-  toolName?: string
-  willAutoContinue?: boolean
-  proposalId?: string
+  kind: 'decision_resolved';
+  ok: boolean;
+  action: 'approved' | 'rejected';
+  toolName?: string;
+  willAutoContinue?: boolean;
+  proposalId?: string;
   /** Approve-path result envelope. `mirror_synced=false` means the
    *  HubSpot REST call succeeded but the local mirror upsert lagged —
    *  callers should optimistic-render and schedule a delayed refetch. */
   result?: {
-    ticket_id?: string
-    status?: string | null
-    mirror_synced?: boolean
-  } | null
-  receiptText?: string
+    ticket_id?: string;
+    status?: string | null;
+    mirror_synced?: boolean;
+  } | null;
+  receiptText?: string;
 }
 
 /**
@@ -54,54 +54,46 @@ export interface DecisionResolvedFrame {
  * @throws {Error} when the body is empty, the first frame is not
  *   `decision_resolved`, or the leading JSON is malformed.
  */
-export async function readLeadingDecisionFrame(
-  response: Response,
-): Promise<DecisionResolvedFrame> {
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error('readLeadingDecisionFrame: response has no body')
+export async function readLeadingDecisionFrame(response: Response): Promise<DecisionResolvedFrame> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('readLeadingDecisionFrame: response has no body');
 
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let frame: DecisionResolvedFrame | null = null
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let frame: DecisionResolvedFrame | null = null;
 
   try {
     while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
       // Try to extract the leading frame ASAP — we only need the first
       // chunk that contains a `\0`. Everything after is either phase-2
       // text (unexpected for tickets-UI but tolerated) or end-of-stream.
       if (frame === null) {
-        const nullIdx = buffer.indexOf('\0')
-        const recIdx = buffer.indexOf('\x1E')
+        const nullIdx = buffer.indexOf('\0');
+        const recIdx = buffer.indexOf('\x1E');
         // If `\x1E` (text-body marker) shows up before `\0`, the server
         // emitted phase-2 without a leading frame — protocol violation.
         if (recIdx !== -1 && (nullIdx === -1 || recIdx < nullIdx)) {
-          throw new Error(
-            'readLeadingDecisionFrame: text-body sentinel arrived before leading frame',
-          )
+          throw new Error('readLeadingDecisionFrame: text-body sentinel arrived before leading frame');
         }
         if (nullIdx !== -1) {
-          const raw = buffer.slice(0, nullIdx)
-          let parsed: unknown
+          const raw = buffer.slice(0, nullIdx);
+          let parsed: unknown;
           try {
-            parsed = JSON.parse(raw)
+            parsed = JSON.parse(raw);
           } catch (err) {
-            throw new Error(
-              `readLeadingDecisionFrame: leading JSON parse failed: ${(err as Error).message}`,
-            )
+            throw new Error(`readLeadingDecisionFrame: leading JSON parse failed: ${(err as Error).message}`);
           }
-          const obj = parsed as Record<string, unknown>
+          const obj = parsed as Record<string, unknown>;
           if (obj?.kind !== 'decision_resolved') {
-            throw new Error(
-              `readLeadingDecisionFrame: expected decision_resolved, got kind=${String(obj?.kind)}`,
-            )
+            throw new Error(`readLeadingDecisionFrame: expected decision_resolved, got kind=${String(obj?.kind)}`);
           }
-          frame = normalizeDecisionFrame(obj)
+          frame = normalizeDecisionFrame(obj);
           // Continue draining so the server-side stream closes cleanly.
-          buffer = buffer.slice(nullIdx + 1)
+          buffer = buffer.slice(nullIdx + 1);
         }
       }
       // Past the leading frame: just consume + discard the remainder.
@@ -111,21 +103,21 @@ export async function readLeadingDecisionFrame(
   } finally {
     // Release the lock even if we threw mid-loop.
     try {
-      reader.releaseLock()
+      reader.releaseLock();
     } catch {
       // No-op: reader may already be released if the stream ended cleanly.
     }
   }
 
   if (frame === null) {
-    throw new Error('readLeadingDecisionFrame: stream closed before leading frame arrived')
+    throw new Error('readLeadingDecisionFrame: stream closed before leading frame arrived');
   }
-  return frame
+  return frame;
 }
 
 function normalizeDecisionFrame(obj: Record<string, unknown>): DecisionResolvedFrame {
-  const action = obj.action === 'rejected' ? 'rejected' : 'approved'
-  const result = (obj.result ?? null) as DecisionResolvedFrame['result']
+  const action = obj.action === 'rejected' ? 'rejected' : 'approved';
+  const result = (obj.result ?? null) as DecisionResolvedFrame['result'];
   return {
     kind: 'decision_resolved',
     ok: obj.ok === true,
@@ -135,5 +127,5 @@ function normalizeDecisionFrame(obj: Record<string, unknown>): DecisionResolvedF
     ...(typeof obj.proposalId === 'string' ? { proposalId: obj.proposalId } : {}),
     ...(result ? { result } : {}),
     ...(typeof obj.receiptText === 'string' ? { receiptText: obj.receiptText } : {}),
-  }
+  };
 }

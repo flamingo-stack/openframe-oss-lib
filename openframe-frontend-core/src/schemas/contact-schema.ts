@@ -3,14 +3,7 @@ import { z } from 'zod';
 // Dropdown option constants — re-exported by `<ContactForm>` consumers
 // that want to surface their own custom Select widgets keyed on the
 // same allowed-value set.
-export const companySizeOptions = [
-  '1-10',
-  '11-50',
-  '51-200',
-  '201-500',
-  '501-1000',
-  '1001+',
-] as const;
+export const companySizeOptions = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001+'] as const;
 
 export const referralSourceOptions = [
   'Google',
@@ -46,12 +39,12 @@ export const LinkedInUrlSchema = z
   .string()
   .url({ message: 'Please enter a valid LinkedIn URL' })
   .refine(
-    (url) => {
+    url => {
       try {
-        const host = new URL(url).hostname.toLowerCase()
-        return host === 'linkedin.com' || host.endsWith('.linkedin.com')
+        const host = new URL(url).hostname.toLowerCase();
+        return host === 'linkedin.com' || host.endsWith('.linkedin.com');
       } catch {
-        return false
+        return false;
       }
     },
     {
@@ -69,14 +62,8 @@ export const LinkedInUrlSchema = z
  * hit historically.
  */
 export const ContactBaseSchema = z.object({
-  name: z
-    .string()
-    .min(2, { message: 'Name must be at least 2 characters' })
-    .max(255, { message: 'Name is too long' }),
-  email: z
-    .string()
-    .email({ message: 'Please enter a valid email address' })
-    .max(255),
+  name: z.string().min(2, { message: 'Name must be at least 2 characters' }).max(255, { message: 'Name is too long' }),
+  email: z.string().email({ message: 'Please enter a valid email address' }).max(255),
   linkedin_url: LinkedInUrlSchema,
   helpCategory: z
     .string()
@@ -96,13 +83,13 @@ export const ContactSchema = ContactBaseSchema.extend({
   companySize: z
     .string()
     .optional()
-    .refine((val) => !val || companySizeOptions.includes(val as (typeof companySizeOptions)[number]), {
+    .refine(val => !val || companySizeOptions.includes(val as (typeof companySizeOptions)[number]), {
       message: 'Please select a valid company size',
     }),
   referralSource: z
     .string()
     .optional()
-    .refine((val) => !val || referralSourceOptions.includes(val as (typeof referralSourceOptions)[number]), {
+    .refine(val => !val || referralSourceOptions.includes(val as (typeof referralSourceOptions)[number]), {
       message: 'Please select a valid referral source',
     }),
 });

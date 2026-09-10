@@ -1,10 +1,9 @@
-"use client";
+'use client';
 
-import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { AIEnrichSection } from './ai-enrich';
-import { TranscriptSummaryEditor } from './transcript-summary-editor';
 import type { AIRequiredField } from './ai-enrich';
+import { TranscriptSummaryEditor } from './transcript-summary-editor';
 
 export interface TranscribeAndSummarizeCombinedSectionProps {
   // ===== AIEnrichSection Props =====
@@ -97,15 +96,15 @@ export function TranscribeAndSummarizeCombinedSection({
   requiredFields,
   status,
   statusMessage,
-  disabledMessage = "Upload a video first",
+  disabledMessage = 'Upload a video first',
   showCancel = true,
   onCancel,
   isCancelling = false,
   hasResult = false,
   buttonLabel,
-  title = "Transcribe & Summarize",
-  description = "Generate transcript with speaker diarization and AI summary",
-  loadingLabel = "Processing...",
+  title = 'Transcribe & Summarize',
+  description = 'Generate transcript with speaker diarization and AI summary',
+  loadingLabel = 'Processing...',
   // TranscriptSummaryEditor props
   videoSummary = '',
   onVideoSummaryChange,
@@ -114,20 +113,19 @@ export function TranscribeAndSummarizeCombinedSection({
   isAIGenerated = false,
   videoSummaryConfidence,
   transcriptConfidence,
-  videoSummaryLabel = "Video Summary (Markdown supported)",
-  videoSummaryHelperText = "AI-generated summary from video content.",
-  videoSummaryPlaceholder = "Summary of the video content...",
-  transcriptLabel = "Video Transcript",
-  transcriptHelperText = "Full video transcript with speaker diarization and timestamps",
-  transcriptPlaceholder = "**[00:00] Speaker Name:** Text here...",
+  videoSummaryLabel = 'Video Summary (Markdown supported)',
+  videoSummaryHelperText = 'AI-generated summary from video content.',
+  videoSummaryPlaceholder = 'Summary of the video content...',
+  transcriptLabel = 'Video Transcript',
+  transcriptHelperText = 'Full video transcript with speaker diarization and timestamps',
+  transcriptPlaceholder = '**[00:00] Speaker Name:** Text here...',
   transcriptMinHeight,
   subtitles,
   onSubtitlesChange,
   disabled = false,
   className = '',
-  hasSubtitles = false,
 }: TranscribeAndSummarizeCombinedSectionProps) {
-  const defaultButtonLabel = hasResult ? "Regenerate" : "Generate";
+  const defaultButtonLabel = hasResult ? 'Regenerate' : 'Generate';
 
   return (
     <div className={`space-y-4 ${className}`}>

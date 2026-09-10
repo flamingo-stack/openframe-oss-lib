@@ -35,7 +35,13 @@ public class TicketsTest extends BaseTest {
         TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(20));
         assertThat(connection).as("Tickets connection should not be null").isNotNull();
         assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
-        assertThat(connection.getEdges()).withFailMessage("Expected tickets to have mandatory fields")
+        // No withFailMessage() here on purpose. It overrides the per-field .as() descriptions below,
+        // which is what this assertion is worth: the tenant is shared, tickets arrive from the AI cases,
+        // the External API suite and every pipeline run, and ticketNumber/title/status are all nullable
+        // in the schema (only id is ID!). So a legitimate null is possible, and the failure has to name
+        // which field on which ticket -- "Expected tickets to have mandatory fields" alone is not
+        // diagnosable from a nightly log, because response bodies are not logged.
+        assertThat(connection.getEdges())
                 .allSatisfy(edge -> {
                     Ticket ticket = edge.getNode();
                     assertThat(ticket.getId()).as("No Id").isNotNull();

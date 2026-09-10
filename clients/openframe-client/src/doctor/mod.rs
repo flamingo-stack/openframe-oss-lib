@@ -4,6 +4,7 @@ pub mod healing;
 use crate::installation_initial_config_service::InstallConfigParams;
 use crate::platform::DirectoryManager;
 use crate::service::Service;
+use crate::services::MachineIdService;
 use checks::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -181,11 +182,102 @@ pub async fn run_preinstall(params: &InstallConfigParams) -> DoctorReport {
     results.push(check_service_config_writable());
 
     let server_url = params.server_url.as_deref().unwrap_or_default();
-    run_network_checks(&mut results, server_url).await;
+    let machine_id = local_machine_id(&dir_manager);
+    run_network_checks(&mut results, server_url, machine_id.as_deref()).await;
 
     DoctorReport {
         results,
         title: "pre-install diagnostics",
+    }
+}
+
+/// Pre-install diagnostics for a parameterless (package-manager) install: only what
+/// this step is about to do. No argument or network checks — there are no tenant
+/// parameters yet — and no WebView2, which moves to `auth` along with them.
+pub fn run_preinstall_parameterless() -> DoctorReport {
+    let mut results = Vec::new();
+
+    results.push(check_admin_privileges());
+    if results.last().unwrap().status == CheckStatus::Fail {
+        return DoctorReport {
+            results,
+            title: "pre-install diagnostics",
+        };
+    }
+
+    let dir_manager = DirectoryManager::new();
+    let install_path = Service::get_install_location();
+    let bin_dir = install_path.parent().unwrap_or(&install_path);
+    results.push(check_dir_writable(bin_dir, &bin_dir.display().to_string()));
+    results.push(check_disk_space(dir_manager.app_support_dir(), 200));
+
+    for (path, label) in [
+        (
+            dir_manager.app_support_dir(),
+            dir_manager
+                .app_support_dir()
+                .to_str()
+                .unwrap_or("app support"),
+        ),
+        (
+            dir_manager.secured_dir(),
+            dir_manager.secured_dir().to_str().unwrap_or("secured"),
+        ),
+        (
+            dir_manager.logs_dir(),
+            dir_manager.logs_dir().to_str().unwrap_or("logs"),
+        ),
+    ] {
+        results.push(check_dir_writable(path, label));
+    }
+
+    results.push(check_service_config_writable());
+
+    DoctorReport {
+        results,
+        title: "pre-install diagnostics",
+    }
+}
+
+/// Pre-auth validation: the params and the network they point at, checked while
+/// the user is at the keyboard — nothing tenant-specific is written unless this passes.
+pub async fn run_auth(params: &InstallConfigParams) -> DoctorReport {
+    let mut results = Vec::new();
+
+    results.push(check_required_args(params));
+    if results.last().unwrap().status == CheckStatus::Fail {
+        return DoctorReport {
+            results,
+            title: "authentication diagnostics",
+        };
+    }
+
+    results.push(check_admin_privileges());
+    if results.last().unwrap().status == CheckStatus::Fail {
+        return DoctorReport {
+            results,
+            title: "authentication diagnostics",
+        };
+    }
+
+    // The chat tool arrives right after registration, so its runtime is checked (and
+    // healed) here rather than at install time, where no tools are provisioned yet.
+    if let Some(webview2) = check_webview2_runtime() {
+        results.push(webview2);
+    }
+
+    // Install may lie far in the past (golden image, pre-provisioned package), and tool
+    // provisioning starts as soon as this succeeds.
+    let dir_manager = DirectoryManager::new();
+    results.push(check_disk_space(dir_manager.app_support_dir(), 200));
+
+    let server_url = params.server_url.as_deref().unwrap_or_default();
+    let machine_id = local_machine_id(&dir_manager);
+    run_network_checks(&mut results, server_url, machine_id.as_deref()).await;
+
+    DoctorReport {
+        results,
+        title: "authentication diagnostics",
     }
 }
 
@@ -245,14 +337,25 @@ pub async fn run_healthcheck() -> DoctorReport {
                 };
             }
         },
-        Err(_) => {
+        // Not an error: a parameterless install runs unauthenticated until
+        // `openframe auth` writes the config.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            results.push(CheckResult::info(
+                CheckCategory::Command,
+                "Awaiting authentication — run 'openframe auth' with your tenant parameters to connect this device",
+            ));
+            return DoctorReport {
+                results,
+                title: "health check",
+            };
+        }
+        // Anything else (permission denied, locked file, I/O error) is a real failure:
+        // the config exists but the agent cannot read it.
+        Err(e) => {
             results.push(CheckResult::fail(
                 CheckCategory::Command,
                 "Config: initial_config.json",
-                format!(
-                    "Config not found at {}. Is the agent installed?",
-                    config_path.display()
-                ),
+                format!("Cannot read {}: {}", config_path.display(), e),
             ));
             return DoctorReport {
                 results,
@@ -261,7 +364,8 @@ pub async fn run_healthcheck() -> DoctorReport {
         }
     };
 
-    run_network_checks(&mut results, &server_url).await;
+    let machine_id = local_machine_id(&dir_manager);
+    run_network_checks(&mut results, &server_url, machine_id.as_deref()).await;
 
     DoctorReport {
         results,
@@ -269,15 +373,27 @@ pub async fn run_healthcheck() -> DoctorReport {
     }
 }
 
-async fn run_network_checks(results: &mut Vec<CheckResult>, server_url: &str) {
+/// Same id the agent will send; created here if missing so the install reuses it. Best effort.
+fn local_machine_id(dir_manager: &DirectoryManager) -> Option<String> {
+    MachineIdService::new(dir_manager)
+        .get_or_create()
+        .ok()
+        .filter(|id| reqwest::header::HeaderValue::from_str(id).is_ok())
+}
+
+async fn run_network_checks(
+    results: &mut Vec<CheckResult>,
+    server_url: &str,
+    machine_id: Option<&str>,
+) {
     results.push(check_dns_resolve(server_url));
     if results.last().unwrap().status == CheckStatus::Fail {
         return;
     }
 
     results.push(check_tcp_connect(server_url));
-    results.push(check_tls_handshake(server_url).await);
-    results.push(check_websocket_upgrade(server_url).await);
+    results.push(check_tls_handshake(server_url, machine_id).await);
+    results.push(check_websocket_upgrade(server_url, machine_id).await);
 
     if let Some(proxy) = check_proxy_env() {
         results.push(proxy);

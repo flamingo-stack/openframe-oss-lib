@@ -1,8 +1,9 @@
-"use client"
+'use client';
 
-import { ExternalLink, Info } from 'lucide-react'
-import { Button } from './button'
-import { FloatingTooltip } from './floating-tooltip'
+import { ExternalLink, Info } from 'lucide-react';
+import type { AnchorHTMLAttributes, ReactNode } from 'react';
+import { Button } from './button';
+import { FloatingTooltip } from './floating-tooltip';
 
 /**
  * Source-reference tooltip — a (i) info icon whose tooltip lists every source
@@ -21,52 +22,62 @@ import { FloatingTooltip } from './floating-tooltip'
 
 export interface SourceRef {
   /** The figure this source backs, e.g. "$121.2B" — leads the button label. */
-  value: string
+  value: string;
   /** Short source name after the value (buttons are nowrap — keep it tight). */
-  label: string
+  label: string;
   /** Exactly where the number lives in the research (report · table/figure ·
    *  column) — "click the link and can't find the number" is a credibility
    *  bug. Rendered as a fine-print line under the button. */
-  where?: string
-  href: string
+  where?: string;
+  href: string;
 }
 
 export interface SourceTooltipProps {
   /** One-line setup above the source rows (e.g. how the figures add up). */
-  intro?: React.ReactNode
-  sources: SourceRef[]
+  intro?: ReactNode;
+  sources: SourceRef[];
   /** Fine print under the rows (e.g. what the cited segment covers). */
-  note?: React.ReactNode
+  note?: ReactNode;
   /** Classes for the trigger's <Info> icon (size/color live with the host). */
-  iconClassName?: string
+  iconClassName?: string;
   /** Extra attributes for the trigger anchor — e.g. a host's click-intercept
    *  opt-out vocabulary like the deck's `data-no-nav`. */
-  triggerAnchorProps?: React.AnchorHTMLAttributes<HTMLAnchorElement> & { [k: `data-${string}`]: string | boolean | undefined }
+  triggerAnchorProps?: AnchorHTMLAttributes<HTMLAnchorElement> & {
+    [k: `data-${string}`]: string | boolean | undefined;
+  };
 }
 
 export function SourceTooltip({ intro, sources, note, iconClassName, triggerAnchorProps }: SourceTooltipProps) {
   return (
-    <FloatingTooltip as="span" side="top" delayDuration={0} className="max-w-sm" content={
-      <span className="flex flex-col gap-2 py-0.5">
-        {intro && <span className="font-semibold text-ods-text-primary">{intro}</span>}
-        {sources.map((s) => (
-          <span key={s.href} className="flex flex-col gap-1">
-            <Button
-              variant="outline"
-              size="compact"
-              fullWidth
-              linkProps={{ href: s.href, target: '_blank', rel: 'noopener noreferrer' }}
-              rightIcon={<ExternalLink />}
-            >
-              {s.value} · {s.label}
-            </Button>
-            {s.where && <span className="text-ods-text-secondary">{s.where}</span>}
-          </span>
-        ))}
-        {note && <span className="text-ods-text-secondary">{note}</span>}
-      </span>
-    }>
-      <a href={sources[0].href} target="_blank" rel="noreferrer" aria-label="Source research" {...triggerAnchorProps}><Info className={iconClassName} /></a>
+    <FloatingTooltip
+      as="span"
+      side="top"
+      delayDuration={0}
+      className="max-w-sm"
+      content={
+        <span className="flex flex-col gap-2 py-0.5">
+          {intro && <span className="font-semibold text-ods-text-primary">{intro}</span>}
+          {sources.map(s => (
+            <span key={s.href} className="flex flex-col gap-1">
+              <Button
+                variant="outline"
+                size="compact"
+                fullWidth
+                linkProps={{ href: s.href, target: '_blank', rel: 'noopener noreferrer' }}
+                rightIcon={<ExternalLink />}
+              >
+                {s.value} · {s.label}
+              </Button>
+              {s.where && <span className="text-ods-text-secondary">{s.where}</span>}
+            </span>
+          ))}
+          {note && <span className="text-ods-text-secondary">{note}</span>}
+        </span>
+      }
+    >
+      <a href={sources[0].href} target="_blank" rel="noreferrer" aria-label="Source research" {...triggerAnchorProps}>
+        <Info className={iconClassName} />
+      </a>
     </FloatingTooltip>
-  )
+  );
 }

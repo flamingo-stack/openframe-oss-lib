@@ -48,10 +48,7 @@ export type GetProxiedImageUrlOptions = {
  *   5. `skipDomains` matches the URL's host → return unchanged.
  *   6. Else return `<proxyPrefix>?url=<encoded>`.
  */
-export function getProxiedImageUrl(
-  imageUrl: string | null,
-  options?: GetProxiedImageUrlOptions,
-): string | null {
+export function getProxiedImageUrl(imageUrl: string | null, options?: GetProxiedImageUrlOptions): string | null {
   if (!imageUrl) return null;
 
   const proxyPrefix = options?.proxyPrefix;
@@ -109,10 +106,7 @@ export function urlPathLooksLikeSvg(imageUrl: string): boolean {
  * value passed to `getProxiedImageUrl` — used to short-circuit the
  * self-skip case.
  */
-export function shouldProxyImage(
-  imageUrl: string | null,
-  proxyPrefix?: string,
-): boolean {
+export function shouldProxyImage(imageUrl: string | null, proxyPrefix?: string): boolean {
   if (!imageUrl) return false;
   if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) return false;
   if (proxyPrefix && imageUrl.includes(proxyPrefix)) return false;

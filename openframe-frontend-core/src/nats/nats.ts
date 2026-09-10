@@ -10,27 +10,27 @@ import type {
   Msg,
   NatsConnection,
   Subscription,
-} from 'nats.ws'
+} from 'nats.ws';
 
-export type { JsMsg, Msg, Subscription } from 'nats.ws'
+export type { JsMsg, Msg, Subscription } from 'nats.ws';
 
-export type JetStreamDeliverPolicy = 'new' | 'byStartSequence'
+export type JetStreamDeliverPolicy = 'new' | 'byStartSequence';
 
 export interface JetStreamOrderedSubscribeOptions {
-  streamName: string
-  filterSubject: string
-  deliverPolicy: JetStreamDeliverPolicy
+  streamName: string;
+  filterSubject: string;
+  deliverPolicy: JetStreamDeliverPolicy;
   /** Required when deliverPolicy === 'byStartSequence'. */
-  optStartSeq?: number
+  optStartSeq?: number;
   /**
    * Auto-cleanup the ephemeral consumer after this idle time. Defaults to
    * nats.ws's own. Applies to the consumer created first: nats.ws only reads it
    * when the start sequence is the one it was built with, so every consumer it
    * recreates afterwards reverts to the library default.
    */
-  inactiveThresholdMs?: number
+  inactiveThresholdMs?: number;
   /** AbortSignal to tear down the consumer. */
-  signal?: AbortSignal
+  signal?: AbortSignal;
   /**
    * The ordered consumer had to be rebuilt: the server dropped the ephemeral
    * consumer (its inactivity threshold elapsed while the page was suspended or
@@ -42,11 +42,11 @@ export interface JetStreamOrderedSubscribeOptions {
    * the live tail must refetch it here, or they keep showing a snapshot from
    * before the gap.
    */
-  onRecovered?: () => void
+  onRecovered?: () => void;
 }
 
 export interface JetStreamSubscriptionHandle {
-  unsubscribe(): void
+  unsubscribe(): void;
 }
 
 export interface NatsClientOptions {
@@ -55,26 +55,26 @@ export interface NatsClientOptions {
    * - "wss://nats.example.com:443"
    * - ["wss://nats-1.example.com:443", "wss://nats-2.example.com:443"]
    */
-  servers: string | string[]
+  servers: string | string[];
 
   /**
    * Connection name (shows up in NATS monitoring).
    */
-  name?: string
+  name?: string;
 
   /**
    * Auth options (pick one: token or user/pass).
    */
-  token?: string
-  user?: string
-  pass?: string
+  token?: string;
+  user?: string;
+  pass?: string;
 
   /**
    * Reconnect behavior.
    */
-  reconnect?: boolean
-  maxReconnectAttempts?: number
-  reconnectTimeWaitMs?: number
+  reconnect?: boolean;
+  maxReconnectAttempts?: number;
+  reconnectTimeWaitMs?: number;
 
   /**
    * Exponential backoff for reconnect delays.
@@ -83,112 +83,106 @@ export interface NatsClientOptions {
    */
   exponentialBackoff?: {
     /** Initial delay in ms (default: 1000) */
-    initialDelayMs?: number
+    initialDelayMs?: number;
     /** Maximum delay cap in ms (default: 30000) */
-    maxDelayMs?: number
+    maxDelayMs?: number;
     /** Multiplier per attempt (default: 2) */
-    multiplier?: number
+    multiplier?: number;
     /** Add random jitter 0-50% of delay to prevent thundering herd (default: true) */
-    jitter?: boolean
-  }
+    jitter?: boolean;
+  };
 
   /**
    * Ping behavior (keep-alive).
    */
-  pingIntervalMs?: number
-  maxPingOut?: number
+  pingIntervalMs?: number;
+  maxPingOut?: number;
 
   /**
    * Optional inbox prefix (useful if you want to isolate request/reply inboxes).
    */
-  inboxPrefix?: string
+  inboxPrefix?: string;
 
   /**
    * Connection timeout in milliseconds (maps to `nats.ws` connect option `timeout`).
    * If you see `NatsError: TIMEOUT` during connect, increase this.
    */
-  connectTimeoutMs?: number
+  connectTimeoutMs?: number;
 }
 
 export interface NatsSubscribeOptions {
   /**
    * Queue group for load-balancing messages across subscribers.
    */
-  queue?: string
+  queue?: string;
 
   /**
    * Auto-unsubscribe after receiving this many messages.
    */
-  max?: number
+  max?: number;
 
   /**
    * Abort signal to stop message iteration and unsubscribe.
    */
-  signal?: AbortSignal
+  signal?: AbortSignal;
 }
 
-export type NatsHeadersInit = Record<string, string> | NatsHeaders | undefined
+export type NatsHeadersInit = Record<string, string> | NatsHeaders | undefined;
 
 export interface NatsPublishOptions {
-  headers?: NatsHeadersInit
+  headers?: NatsHeadersInit;
 }
 
 export interface NatsRequestOptions {
-  timeoutMs?: number
-  headers?: NatsHeadersInit
+  timeoutMs?: number;
+  headers?: NatsHeadersInit;
 }
 
 export interface NatsSubscriptionHandle {
-  readonly subscription: Subscription
-  unsubscribe(): void
+  readonly subscription: Subscription;
+  unsubscribe(): void;
 }
 
-export type NatsStatus =
-  | 'connecting'
-  | 'connected'
-  | 'disconnected'
-  | 'reconnecting'
-  | 'closed'
-  | 'error'
+export type NatsStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'closed' | 'error';
 
 export interface NatsStatusEvent {
-  status: NatsStatus
-  data?: unknown
+  status: NatsStatus;
+  data?: unknown;
 }
 
 export interface NatsClient {
-  connect(): Promise<void>
-  close(): Promise<void>
+  connect(): Promise<void>;
+  close(): Promise<void>;
 
-  isConnected(): boolean
+  isConnected(): boolean;
 
-  publishBytes(subject: string, payload: Uint8Array, options?: NatsPublishOptions): void
-  publishString(subject: string, payload: string, options?: NatsPublishOptions): void
-  publishJson<T>(subject: string, payload: T, options?: NatsPublishOptions): void
+  publishBytes(subject: string, payload: Uint8Array, options?: NatsPublishOptions): void;
+  publishString(subject: string, payload: string, options?: NatsPublishOptions): void;
+  publishJson<T>(subject: string, payload: T, options?: NatsPublishOptions): void;
 
-  requestBytes(subject: string, payload: Uint8Array, options?: NatsRequestOptions): Promise<Msg>
-  requestString(subject: string, payload: string, options?: NatsRequestOptions): Promise<string>
+  requestBytes(subject: string, payload: Uint8Array, options?: NatsRequestOptions): Promise<Msg>;
+  requestString(subject: string, payload: string, options?: NatsRequestOptions): Promise<string>;
   requestJson<TResponse, TRequest = unknown>(
     subject: string,
     payload: TRequest,
     options?: NatsRequestOptions,
-  ): Promise<TResponse>
+  ): Promise<TResponse>;
 
   subscribeBytes(
     subject: string,
     onMessage: (msg: Msg) => void | Promise<void>,
     options?: NatsSubscribeOptions,
-  ): NatsSubscriptionHandle
+  ): NatsSubscriptionHandle;
   subscribeString(
     subject: string,
     onMessage: (payload: string, msg: Msg) => void | Promise<void>,
     options?: NatsSubscribeOptions,
-  ): NatsSubscriptionHandle
+  ): NatsSubscriptionHandle;
   subscribeJson<T>(
     subject: string,
     onMessage: (payload: T, msg: Msg) => void | Promise<void>,
     options?: NatsSubscribeOptions,
-  ): NatsSubscriptionHandle
+  ): NatsSubscriptionHandle;
 
   /**
    * Subscribe to a JetStream subject via an ephemeral OrderedConsumer (no acks).
@@ -198,71 +192,79 @@ export interface NatsClient {
   subscribeJetStreamOrdered(
     onMessage: (msg: JsMsg) => void | Promise<void>,
     options: JetStreamOrderedSubscribeOptions,
-  ): Promise<JetStreamSubscriptionHandle>
+  ): Promise<JetStreamSubscriptionHandle>;
 
-  onStatus(listener: (event: NatsStatusEvent) => void): () => void
+  onStatus(listener: (event: NatsStatusEvent) => void): () => void;
 }
 
 function assertClientSide(): void {
   // This wrapper is meant for browser/Tauri usage via WebSockets.
   // Keep it safe to import from Next.js server bundles by throwing only when used.
   if (typeof window === 'undefined') {
-    throw new Error('NATS client can only connect from the browser/runtime with WebSocket support (window is undefined).')
+    throw new Error(
+      'NATS client can only connect from the browser/runtime with WebSocket support (window is undefined).',
+    );
   }
 }
 
-async function importNats(): Promise<typeof import('nats.ws')> {
+async function importNats() {
   // Browser/Tauri only: always use the websocket client (no Node-only deps).
-  return await import('nats.ws')
+  return import('nats.ws');
 }
 
-function toNatsHeaders(nats: typeof import('nats.ws'), init: NatsHeadersInit): NatsHeaders | undefined {
-  if (!init) return undefined
-  if (typeof (init as NatsHeaders).get === 'function') return init as NatsHeaders
+/**
+ * The module's own shape, derived from the one dynamic `import()` above rather
+ * than restated as `typeof import('nats.ws')` at every use site. Keeps a single
+ * source of truth and stays a pure type — nothing here reaches the bundle.
+ */
+type NatsModule = Awaited<ReturnType<typeof importNats>>;
 
-  const h = nats.headers()
+function toNatsHeaders(nats: NatsModule, init: NatsHeadersInit): NatsHeaders | undefined {
+  if (!init) return undefined;
+  if (typeof (init as NatsHeaders).get === 'function') return init as NatsHeaders;
+
+  const h = nats.headers();
   for (const [k, v] of Object.entries(init as Record<string, string>)) {
-    if (v !== undefined && v !== null) h.set(k, String(v))
+    if (v !== undefined && v !== null) h.set(k, String(v));
   }
-  return h
+  return h;
 }
 
 /** Returns a cryptographically random float in [0, 1). */
 function cryptoRandom(): number {
-  const buf = new Uint32Array(1)
-  crypto.getRandomValues(buf)
-  return buf[0] / (0xffffffff + 1)
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] / (0xffffffff + 1);
 }
 
 interface ExponentialBackoffHandle {
-  handler: () => number
-  reset: () => void
+  handler: () => number;
+  reset: () => void;
 }
 
-function createExponentialBackoffHandler(opts: NonNullable<NatsClientOptions['exponentialBackoff']>): ExponentialBackoffHandle {
-  const initialDelay = opts.initialDelayMs ?? 1000
-  const maxDelay = opts.maxDelayMs ?? 30_000
-  const multiplier = opts.multiplier ?? 2
-  const jitter = opts.jitter ?? true
+function createExponentialBackoffHandler(
+  opts: NonNullable<NatsClientOptions['exponentialBackoff']>,
+): ExponentialBackoffHandle {
+  const initialDelay = opts.initialDelayMs ?? 1000;
+  const maxDelay = opts.maxDelayMs ?? 30_000;
+  const multiplier = opts.multiplier ?? 2;
+  const jitter = opts.jitter ?? true;
 
-  let attempt = 0
+  let attempt = 0;
 
   return {
     handler: (): number => {
-      const delay = Math.min(initialDelay * multiplier ** attempt, maxDelay)
-      attempt++
-      return jitter ? delay * (0.5 + cryptoRandom() * 0.5) : delay
+      const delay = Math.min(initialDelay * multiplier ** attempt, maxDelay);
+      attempt++;
+      return jitter ? delay * (0.5 + cryptoRandom() * 0.5) : delay;
     },
     reset: () => {
-      attempt = 0
+      attempt = 0;
     },
-  }
+  };
 }
 
-function mapOptionsToConnectionOptions(
-  opts: NatsClientOptions,
-  backoff?: ExponentialBackoffHandle,
-): ConnectionOptions {
+function mapOptionsToConnectionOptions(opts: NatsClientOptions, backoff?: ExponentialBackoffHandle): ConnectionOptions {
   return {
     servers: opts.servers,
     name: opts.name,
@@ -277,7 +279,7 @@ function mapOptionsToConnectionOptions(
     pingInterval: opts.pingIntervalMs,
     maxPingOut: opts.maxPingOut,
     inboxPrefix: opts.inboxPrefix,
-  }
+  };
 }
 
 /**
@@ -312,25 +314,25 @@ function mapOptionsToConnectionOptions(
  */
 function mapNatsTypeToStatus(
   type: Events | DebugEvents,
-  events: typeof import('nats.ws').Events,
-  debugEvents: typeof import('nats.ws').DebugEvents,
+  events: NatsModule['Events'],
+  debugEvents: NatsModule['DebugEvents'],
 ): NatsStatus | null {
   switch (type) {
     case events.Disconnect:
-      return 'disconnected'
+      return 'disconnected';
     case events.Reconnect:
-      return 'connected'
+      return 'connected';
     case events.Error:
-      return 'error'
+      return 'error';
     case debugEvents.Reconnecting:
     case debugEvents.ClientInitiatedReconnect:
-      return 'reconnecting'
+      return 'reconnecting';
     case debugEvents.StaleConnection:
-      return 'disconnected'
+      return 'disconnected';
     // Events.Update (cluster gossip), Events.LDM and DebugEvents.PingTimer say
     // nothing about reachability.
     default:
-      return null
+      return null;
   }
 }
 
@@ -355,41 +357,39 @@ function watchForRecovery(
   recreatedEvent: ConsumerEvents.OrderedConsumerRecreated,
   onRecovered?: () => void,
 ): void {
-  if (!onRecovered) return
+  if (!onRecovered) return;
   void (async () => {
     try {
-      const status = await iter.status()
+      const status = await iter.status();
       for await (const event of status) {
-        if (event.type !== recreatedEvent) continue
+        if (event.type !== recreatedEvent) continue;
         try {
-          onRecovered()
+          onRecovered();
         } catch (e) {
           // A caller that throws must not take the watch down with it — this
           // loop is the only thing reporting recoveries for this subscription.
-          console.warn('[nats] onRecovered threw:', e)
+          console.warn('[nats] onRecovered threw:', e);
         }
       }
     } catch {
       // Status ends with the subscription — nothing left to report.
     }
-  })()
+  })();
 }
 
 export function createNatsClient(options: NatsClientOptions): NatsClient {
-  let nc: NatsConnection | null = null
-  let statusLoopAbort: AbortController | null = null
-  let connectInFlight: Promise<void> | null = null
+  let nc: NatsConnection | null = null;
+  let statusLoopAbort: AbortController | null = null;
+  let connectInFlight: Promise<void> | null = null;
 
-  const backoff = options.exponentialBackoff
-    ? createExponentialBackoffHandler(options.exponentialBackoff)
-    : undefined
+  const backoff = options.exponentialBackoff ? createExponentialBackoffHandler(options.exponentialBackoff) : undefined;
 
-  const statusListeners = new Set<(event: NatsStatusEvent) => void>()
+  const statusListeners = new Set<(event: NatsStatusEvent) => void>();
 
   function emitStatus(event: NatsStatusEvent) {
     for (const listener of statusListeners) {
       try {
-        listener(event)
+        listener(event);
       } catch {
         // ignore listener failures
       }
@@ -397,129 +397,132 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
   }
 
   async function connect(): Promise<void> {
-    if (nc && !nc.isClosed()) return
-    if (connectInFlight) return connectInFlight
-    assertClientSide()
+    if (nc && !nc.isClosed()) return;
+    if (connectInFlight) {
+      await connectInFlight;
+      return;
+    }
+    assertClientSide();
 
     connectInFlight = (async () => {
       try {
-        emitStatus({ status: 'connecting' })
+        emitStatus({ status: 'connecting' });
 
-        const nats = await importNats()
-        const conn = await nats.connect(mapOptionsToConnectionOptions(options, backoff))
-        nc = conn
+        const nats = await importNats();
+        const conn = await nats.connect(mapOptionsToConnectionOptions(options, backoff));
+        nc = conn;
 
-        emitStatus({ status: 'connected' })
+        emitStatus({ status: 'connected' });
 
-        statusLoopAbort = new AbortController()
-        const signal = statusLoopAbort.signal
+        statusLoopAbort = new AbortController();
+        const signal = statusLoopAbort.signal;
 
-        ;(async () => {
+        (async () => {
           try {
             for await (const s of conn.status()) {
-              if (signal.aborted) return
-              const mapped = mapNatsTypeToStatus(s.type, nats.Events, nats.DebugEvents)
+              if (signal.aborted) return;
+              const mapped = mapNatsTypeToStatus(s.type, nats.Events, nats.DebugEvents);
               if (mapped) {
                 if (mapped === 'connected' && backoff) {
-                  backoff.reset()
+                  backoff.reset();
                 }
-                emitStatus({ status: mapped, data: s.data })
+                emitStatus({ status: mapped, data: s.data });
               }
             }
           } catch (e) {
             if (!signal.aborted) {
-              emitStatus({ status: 'error', data: e })
-              
+              emitStatus({ status: 'error', data: e });
+
               if (nc === conn && conn.isClosed()) {
-                nc = null
-                emitStatus({ status: 'closed' })
+                nc = null;
+                emitStatus({ status: 'closed' });
               }
             }
           }
         })().catch(() => {
           // ignore
-        })
+        });
       } finally {
-        connectInFlight = null
+        connectInFlight = null;
       }
-    })()
+    })();
 
-    return connectInFlight
+    await connectInFlight;
   }
 
   async function close(): Promise<void> {
-    const conn = nc
-    nc = null
+    const conn = nc;
+    nc = null;
 
     if (statusLoopAbort) {
       try {
-        statusLoopAbort.abort()
+        statusLoopAbort.abort();
       } catch {
         // ignore
       }
-      statusLoopAbort = null
+      statusLoopAbort = null;
     }
 
-    if (!conn) return
+    if (!conn) return;
     try {
-      await conn.drain()
+      await conn.drain();
     } finally {
       try {
-        await conn.close()
+        await conn.close();
       } finally {
-        emitStatus({ status: 'closed' })
+        emitStatus({ status: 'closed' });
       }
     }
   }
 
   function requireConnection(): NatsConnection {
-    if (!nc) throw new Error('NATS is not connected. Call client.connect() first.')
-    return nc
+    if (!nc) throw new Error('NATS is not connected. Call client.connect() first.');
+    return nc;
   }
 
   function isConnected(): boolean {
-    return Boolean(nc) && !nc!.isClosed()
+    return nc !== null && !nc.isClosed();
   }
 
   function publishBytes(subject: string, payload: Uint8Array, opts?: NatsPublishOptions): void {
-    const conn = requireConnection()
-    ;(async () => {
-      const nats = await importNats()
-      conn.publish(subject, payload, { headers: toNatsHeaders(nats, opts?.headers) })
-    })().catch((e) => emitStatus({ status: 'error', data: e }))
+    const conn = requireConnection();
+    (async () => {
+      const nats = await importNats();
+      conn.publish(subject, payload, { headers: toNatsHeaders(nats, opts?.headers) });
+    })().catch((e: unknown) => emitStatus({ status: 'error', data: e }));
   }
 
   function publishString(subject: string, payload: string, opts?: NatsPublishOptions): void {
-    ;(async () => {
-      const nats = await importNats()
-      const sc = nats.StringCodec()
-      publishBytes(subject, sc.encode(payload), opts)
-    })().catch((e) => emitStatus({ status: 'error', data: e }))
+    (async () => {
+      const nats = await importNats();
+      const sc = nats.StringCodec();
+      publishBytes(subject, sc.encode(payload), opts);
+    })().catch((e: unknown) => emitStatus({ status: 'error', data: e }));
   }
 
   function publishJson<T>(subject: string, payload: T, opts?: NatsPublishOptions): void {
-    ;(async () => {
-      const nats = await importNats()
-      const jc = nats.JSONCodec<T>()
-      publishBytes(subject, jc.encode(payload), opts)
-    })().catch((e) => emitStatus({ status: 'error', data: e }))
+    (async () => {
+      const nats = await importNats();
+      const jc = nats.JSONCodec<T>();
+      publishBytes(subject, jc.encode(payload), opts);
+    })().catch((e: unknown) => emitStatus({ status: 'error', data: e }));
   }
 
   async function requestBytes(subject: string, payload: Uint8Array, opts?: NatsRequestOptions): Promise<Msg> {
-    const conn = requireConnection()
-    const nats = await importNats()
+    const conn = requireConnection();
+    const nats = await importNats();
     const msg = await conn.request(subject, payload, {
       timeout: opts?.timeoutMs ?? 2000,
       headers: toNatsHeaders(nats, opts?.headers),
-    })
-    return msg
+    });
+    return msg;
   }
 
   async function requestString(subject: string, payload: string, opts?: NatsRequestOptions): Promise<string> {
-    const nats = await importNats()
-    const sc = nats.StringCodec()
-    const msg = await requestBytes(subject, sc.encode(payload), opts)
-    return sc.decode(msg.data)
+    const nats = await importNats();
+    const sc = nats.StringCodec();
+    const msg = await requestBytes(subject, sc.encode(payload), opts);
+    return sc.decode(msg.data);
   }
 
   async function requestJson<TResponse, TRequest = unknown>(
@@ -527,11 +530,11 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     payload: TRequest,
     opts?: NatsRequestOptions,
   ): Promise<TResponse> {
-    const nats = await importNats()
-    const reqCodec = nats.JSONCodec<TRequest>()
-    const resCodec = nats.JSONCodec<TResponse>()
-    const msg = await requestBytes(subject, reqCodec.encode(payload), opts)
-    return resCodec.decode(msg.data)
+    const nats = await importNats();
+    const reqCodec = nats.JSONCodec<TRequest>();
+    const resCodec = nats.JSONCodec<TResponse>();
+    const msg = await requestBytes(subject, reqCodec.encode(payload), opts);
+    return resCodec.decode(msg.data);
   }
 
   function subscribeBytes(
@@ -539,45 +542,45 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     onMessage: (msg: Msg) => void | Promise<void>,
     opts?: NatsSubscribeOptions,
   ): NatsSubscriptionHandle {
-    const conn = requireConnection()
-    const sub = conn.subscribe(subject, { queue: opts?.queue })
-    if (typeof opts?.max === 'number') sub.unsubscribe(opts.max)
+    const conn = requireConnection();
+    const sub = conn.subscribe(subject, { queue: opts?.queue });
+    if (typeof opts?.max === 'number') sub.unsubscribe(opts.max);
 
-    const abortController = new AbortController()
-    const signal = opts?.signal ?? abortController.signal
+    const abortController = new AbortController();
+    const signal = opts?.signal ?? abortController.signal;
 
-    ;(async () => {
+    (async () => {
       try {
         for await (const msg of sub) {
-          if (signal.aborted) break
-          await onMessage(msg)
+          if (signal.aborted) break;
+          await onMessage(msg);
         }
       } catch (e) {
-        emitStatus({ status: 'error', data: e })
+        emitStatus({ status: 'error', data: e });
       } finally {
         try {
-          sub.unsubscribe()
+          sub.unsubscribe();
         } catch {
           // ignore
         }
       }
-    })().catch((e) => emitStatus({ status: 'error', data: e }))
+    })().catch((e: unknown) => emitStatus({ status: 'error', data: e }));
 
     return {
       subscription: sub,
       unsubscribe() {
         try {
-          abortController.abort()
+          abortController.abort();
         } catch {
           // ignore
         }
         try {
-          sub.unsubscribe()
+          sub.unsubscribe();
         } catch {
           // ignore
         }
       },
-    }
+    };
   }
 
   function subscribeString(
@@ -587,13 +590,13 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
   ): NatsSubscriptionHandle {
     return subscribeBytes(
       subject,
-      async (msg) => {
-        const nats = await importNats()
-        const sc = nats.StringCodec()
-        await onMessage(sc.decode(msg.data), msg)
+      async msg => {
+        const nats = await importNats();
+        const sc = nats.StringCodec();
+        await onMessage(sc.decode(msg.data), msg);
       },
       opts,
-    )
+    );
   }
 
   function subscribeJson<T>(
@@ -603,30 +606,30 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
   ): NatsSubscriptionHandle {
     return subscribeBytes(
       subject,
-      async (msg) => {
-        const nats = await importNats()
-        const jc = nats.JSONCodec<T>()
-        await onMessage(jc.decode(msg.data), msg)
+      async msg => {
+        const nats = await importNats();
+        const jc = nats.JSONCodec<T>();
+        await onMessage(jc.decode(msg.data), msg);
       },
       opts,
-    )
+    );
   }
 
   async function subscribeJetStreamOrdered(
     onMessage: (msg: JsMsg) => void | Promise<void>,
     opts: JetStreamOrderedSubscribeOptions,
   ): Promise<JetStreamSubscriptionHandle> {
-    const conn = requireConnection()
+    const conn = requireConnection();
     if (opts.signal?.aborted) {
-      return { unsubscribe() {} }
+      return { unsubscribe() {} };
     }
 
-    const nats = await importNats()
+    const nats = await importNats();
     if (opts.signal?.aborted) {
-      return { unsubscribe() {} }
+      return { unsubscribe() {} };
     }
 
-    const js = conn.jetstream()
+    const js = conn.jetstream();
     const consumer: Consumer = await js.consumers.get(opts.streamName, {
       filterSubjects: opts.filterSubject,
       deliver_policy: nats.DeliverPolicy.StartSequence,
@@ -640,25 +643,25 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
       // consumer's self-repair. Undefined stays undefined so nats.ws applies its
       // own default rather than a copy of it.
       inactive_threshold: opts.inactiveThresholdMs,
-    })
+    });
 
-    const iterRef: { current: ConsumerMessages | null } = { current: null }
-    let closed = false
+    const iterRef: { current: ConsumerMessages | null } = { current: null };
+    let closed = false;
 
     const onAbort = () => {
-      void teardown()
-    }
-    opts.signal?.addEventListener('abort', onAbort, { once: true })
+      void teardown();
+    };
+    opts.signal?.addEventListener('abort', onAbort, { once: true });
 
     async function teardown(): Promise<void> {
-      if (closed) return
-      closed = true
-      opts.signal?.removeEventListener('abort', onAbort)
-      const iter = iterRef.current
-      iterRef.current = null
+      if (closed) return;
+      closed = true;
+      opts.signal?.removeEventListener('abort', onAbort);
+      const iter = iterRef.current;
+      iterRef.current = null;
       if (iter) {
         try {
-          await iter.close()
+          await iter.close();
         } catch {
           // ignore
         }
@@ -666,46 +669,46 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     }
 
     if (opts.signal?.aborted) {
-      void teardown()
-      return { unsubscribe() {} }
+      void teardown();
+      return { unsubscribe() {} };
     }
 
-    ;(async () => {
+    (async () => {
       try {
-        const iter = await consumer.consume()
+        const iter = await consumer.consume();
         if (closed) {
           try {
-            await iter.close()
+            await iter.close();
           } catch {
             // ignore
           }
-          return
+          return;
         }
-        iterRef.current = iter
-        watchForRecovery(iter, nats.ConsumerEvents.OrderedConsumerRecreated, opts.onRecovered)
+        iterRef.current = iter;
+        watchForRecovery(iter, nats.ConsumerEvents.OrderedConsumerRecreated, opts.onRecovered);
         for await (const msg of iter) {
-          if (closed) break
+          if (closed) break;
           try {
-            await onMessage(msg)
+            await onMessage(msg);
           } catch (e) {
-            emitStatus({ status: 'error', data: e })
+            emitStatus({ status: 'error', data: e });
           }
         }
       } catch (e) {
-        if (!closed) emitStatus({ status: 'error', data: e })
+        if (!closed) emitStatus({ status: 'error', data: e });
       }
-    })().catch((e) => emitStatus({ status: 'error', data: e }))
+    })().catch((e: unknown) => emitStatus({ status: 'error', data: e }));
 
     return {
       unsubscribe() {
-        void teardown()
+        void teardown();
       },
-    }
+    };
   }
 
   function onStatus(listener: (event: NatsStatusEvent) => void): () => void {
-    statusListeners.add(listener)
-    return () => statusListeners.delete(listener)
+    statusListeners.add(listener);
+    return () => statusListeners.delete(listener);
   }
 
   return {
@@ -723,5 +726,5 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     subscribeJson,
     subscribeJetStreamOrdered,
     onStatus,
-  }
+  };
 }

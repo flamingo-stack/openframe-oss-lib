@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { DetailPageSkeleton } from '../detail-page-skeleton';
 

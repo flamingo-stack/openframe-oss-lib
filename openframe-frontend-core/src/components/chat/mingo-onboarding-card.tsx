@@ -1,39 +1,39 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { Button } from '../ui/button'
+import type { MouseEvent, ReactNode } from 'react';
+import { cn } from '../../utils/cn';
+import { Button } from '../ui/button';
 
 export interface MingoOnboardingCardAction {
   /** Stable React key. */
-  id: string
+  id: string;
   /** Button label (e.g. "Recent", "Search", "Find"). Rendered as-is. */
-  label: React.ReactNode
+  label: ReactNode;
   /** Click handler — receives the original mouse event so callers that
    *  also have a card-level `onClick` can `stopPropagation`. */
-  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }
 
 export interface MingoOnboardingCardProps {
   /** Leading 16×16 icon rendered to the left of the title row. */
-  icon?: React.ReactNode
+  icon?: ReactNode;
   /** Card title (DM Sans Medium 14px, white). Truncates on overflow. */
-  title: React.ReactNode
+  title: ReactNode;
   /** Slash-command label rendered right-aligned in the title row (e.g. `/roadmap`). */
-  slashCommand?: React.ReactNode
+  slashCommand?: ReactNode;
   /** Optional description rendered below the title row. */
-  description?: React.ReactNode
+  description?: ReactNode;
   /** Optional row of small outline action buttons rendered below the
    *  description (e.g. `Recent`, `Search`, `Find`). When supplied, the
    *  card itself stays a non-interactive `<div>` — each action button
    *  owns its own click contract. */
-  actions?: ReadonlyArray<MingoOnboardingCardAction>
+  actions?: ReadonlyArray<MingoOnboardingCardAction>;
   /** Optional click handler — when set AND `actions` is empty/undefined,
    *  the card renders as a `<button>` with hover/focus affordances.
    *  Ignored when `actions` is non-empty. */
-  onClick?: () => void
+  onClick?: () => void;
   /** Optional className appended to the root element. */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -62,44 +62,36 @@ export function MingoOnboardingCard({
   onClick,
   className,
 }: MingoOnboardingCardProps) {
-  const hasActions = !!actions && actions.length > 0
-  const isInteractive = !hasActions && !!onClick
+  const hasActions = !!actions && actions.length > 0;
+  const isInteractive = !hasActions && !!onClick;
 
   const body = (
-    <div className="flex flex-col gap-[var(--spacing-system-xxs)] w-full">
-      <div className="flex items-center gap-[var(--spacing-system-xxs)] w-full">
+    <div className="flex w-full flex-col gap-[var(--spacing-system-xxs)]">
+      <div className="flex w-full items-center gap-[var(--spacing-system-xxs)]">
         {icon ? (
           // Icon slot — monochrome `ods-text-secondary` (≈ #888) so
           // consumers can drop any `icons-v2-generated` glyph (they use
           // `currentColor`) without per-card styling. Brand multi-color
           // SVGs ignore this color.
-          <span className="flex shrink-0 size-4 items-center justify-center text-ods-text-secondary">
-            {icon}
-          </span>
+          <span className="flex size-4 shrink-0 items-center justify-center text-ods-text-secondary">{icon}</span>
         ) : null}
-        <span className="flex-1 min-w-0 truncate text-h6 text-ods-text-primary">
-          {title}
-        </span>
+        <span className="min-w-0 flex-1 truncate text-ods-text-primary text-h6">{title}</span>
         {slashCommand ? (
-          <span className="text-h6 text-ods-text-secondary whitespace-nowrap">
-            {slashCommand}
-          </span>
+          <span className="whitespace-nowrap text-ods-text-secondary text-h6">{slashCommand}</span>
         ) : null}
       </div>
-      {description ? (
-        <p className="text-h6 text-ods-text-secondary w-full">{description}</p>
-      ) : null}
+      {description ? <p className="w-full text-ods-text-secondary text-h6">{description}</p> : null}
       {hasActions ? (
-        <div className="flex flex-wrap items-center gap-[var(--spacing-system-xxs)] mt-[var(--spacing-system-xs)]">
-          {actions!.map((action) => (
+        <div className="mt-[var(--spacing-system-xs)] flex flex-wrap items-center gap-[var(--spacing-system-xxs)]">
+          {actions.map(action => (
             <Button
               key={action.id}
               type="button"
               variant="outline"
               size="small"
-              onClick={(e) => {
-                e.stopPropagation()
-                action.onClick(e)
+              onClick={e => {
+                e.stopPropagation();
+                action.onClick(e);
               }}
             >
               {action.label}
@@ -108,22 +100,22 @@ export function MingoOnboardingCard({
         </div>
       ) : null}
     </div>
-  )
+  );
 
   const baseClass = cn(
-    'flex w-full items-start p-[var(--spacing-system-s)] bg-ods-card border-b border-ods-border last:border-b-0 text-left',
+    'flex w-full items-start border-b border-ods-border bg-ods-card p-[var(--spacing-system-s)] text-left last:border-b-0',
     isInteractive &&
-      'transition-colors hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent cursor-pointer',
+      'cursor-pointer transition-colors hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
     className,
-  )
+  );
 
   if (isInteractive) {
     return (
       <button type="button" onClick={onClick} className={baseClass}>
         {body}
       </button>
-    )
+    );
   }
 
-  return <div className={baseClass}>{body}</div>
+  return <div className={baseClass}>{body}</div>;
 }

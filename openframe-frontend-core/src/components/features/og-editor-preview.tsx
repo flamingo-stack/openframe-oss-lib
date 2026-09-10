@@ -1,5 +1,6 @@
-"use client";
+'use client';
 
+import type { ReactNode } from 'react';
 import { Input, Textarea, Label } from '../ui';
 
 export interface OGEditorPreviewProps {
@@ -22,10 +23,10 @@ export interface OGEditorPreviewProps {
   onOgImageUrlChange: (value: string) => void;
 
   // OG Image Upload Component (passed from parent)
-  OGImageUploadComponent: React.ReactNode;
+  OGImageUploadComponent: ReactNode;
 
   // OG Preview Component (passed from parent)
-  OGPreviewComponent: React.ReactNode;
+  OGPreviewComponent: ReactNode;
 
   disabled?: boolean;
   className?: string;
@@ -46,73 +47,59 @@ export function OGEditorPreview({
   OGImageUploadComponent,
   OGPreviewComponent,
   disabled = false,
-  className = ''
+  className = '',
 }: OGEditorPreviewProps) {
   return (
-    <div className={`space-y-6 p-6 bg-ods-card border border-ods-border rounded-lg ${className}`}>
-      <h3 className="text-h5 text-ods-text-primary">
-        SEO & Open Graph
-      </h3>
+    <div className={`space-y-6 rounded-lg border border-ods-border bg-ods-card p-6 ${className}`}>
+      <h3 className="text-ods-text-primary text-h5">SEO & Open Graph</h3>
 
       {/* SEO Title & Keywords - Same Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-2">
-          <Label>
-            SEO Title
-          </Label>
+          <Label>SEO Title</Label>
           <Input
             value={seoTitle}
-            onChange={(e) => onSeoTitleChange(e.target.value)}
+            onChange={e => onSeoTitleChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO meta title..."
-            className="bg-ods-bg border-ods-border text-ods-text-primary"
+            className="border-ods-border bg-ods-bg text-ods-text-primary"
           />
         </div>
 
         <div className="space-y-2">
-          <Label>
-            SEO Keywords
-          </Label>
+          <Label>SEO Keywords</Label>
           <Input
             value={seoKeywords}
-            onChange={(e) => onSeoKeywordsChange(e.target.value)}
+            onChange={e => onSeoKeywordsChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO keywords..."
-            className="bg-ods-bg border-ods-border text-ods-text-primary"
+            className="border-ods-border bg-ods-bg text-ods-text-primary"
           />
         </div>
       </div>
 
       {/* SEO Description & OG Image - Same Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="space-y-2 flex flex-col h-full">
-          <Label>
-            SEO Description
-          </Label>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="flex h-full flex-col space-y-2">
+          <Label>SEO Description</Label>
           <Textarea
             value={seoDescription}
-            onChange={(e) => onSeoDescriptionChange(e.target.value)}
+            onChange={e => onSeoDescriptionChange(e.target.value)}
             disabled={disabled}
             placeholder="Enter SEO meta description..."
-            className="bg-ods-bg border-ods-border text-ods-text-primary flex-1 resize-none"
+            className="flex-1 resize-none border-ods-border bg-ods-bg text-ods-text-primary"
             rows={6}
           />
         </div>
 
-        <div className="space-y-2 flex flex-col h-full">
-          <Label>
-            OG Image
-          </Label>
-          <div className="flex-1">
-            {OGImageUploadComponent}
-          </div>
+        <div className="flex h-full flex-col space-y-2">
+          <Label>OG Image</Label>
+          <div className="flex-1">{OGImageUploadComponent}</div>
         </div>
       </div>
 
       {/* OG Preview */}
-      <div className="pt-4 border-t border-ods-border">
-        {OGPreviewComponent}
-      </div>
+      <div className="border-t border-ods-border pt-4">{OGPreviewComponent}</div>
     </div>
   );
 }

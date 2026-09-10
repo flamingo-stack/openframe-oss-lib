@@ -1,12 +1,11 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import * as React from 'react'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { PendingToolCallData } from '../components/chat/types';
 import {
   TicketCard,
   type TicketCardProps,
   type BoardTicket,
   type BoardTicketActivityKind,
-} from '../components/features/board'
-import type { PendingToolCallData } from '../components/chat/types'
+} from '../components/features/board';
 
 // =============================================================================
 // Harness — the card registers its own drag behaviour against the DOM and needs
@@ -20,7 +19,7 @@ function Harness(args: TicketCardProps) {
     <div className="w-[320px] rounded-lg bg-ods-card p-[var(--spacing-system-sf)]">
       <TicketCard {...args} />
     </div>
-  )
+  );
 }
 
 // =============================================================================
@@ -30,7 +29,7 @@ function Harness(args: TicketCardProps) {
 // ~2h ago so the relative timestamp ("2h ago") reads naturally. Assignees carry
 // no `avatarUrl`, so `SquareAvatar` renders initials fallbacks — no external
 // image dependency in the story.
-const CREATED_AT = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+const CREATED_AT = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
 const ASSIGNEES = [
   { id: 'u1', initials: 'RS', name: 'Rachel Santos' },
@@ -38,7 +37,7 @@ const ASSIGNEES = [
   { id: 'u3', initials: 'JD', name: 'Jamie Diaz' },
   { id: 'u4', initials: 'AK', name: 'Aiden Kim' },
   { id: 'u5', initials: 'LN', name: 'Lena Novak' },
-]
+];
 
 const BASE_TICKET: BoardTicket = {
   id: 'ticket-1',
@@ -51,15 +50,14 @@ const BASE_TICKET: BoardTicket = {
   assignees: [ASSIGNEES[0]],
   tags: ['network', 'vpn'],
   createdAt: CREATED_AT,
-}
+};
 
 const APPROVAL_TOOL_CALLS: PendingToolCallData[] = [
   {
     toolExecutionRequestId: 'req-1',
     toolName: 'run_script',
     toolTitle: 'Reset local admin password policy',
-    toolExplanation:
-      'Runs a PowerShell remediation on SRV-MAIL-01 to enforce the password policy.',
+    toolExplanation: 'Runs a PowerShell remediation on SRV-MAIL-01 to enforce the password policy.',
     toolType: 'TACTICAL',
     requiresApproval: true,
     approvalType: 'CLIENT',
@@ -68,7 +66,7 @@ const APPROVAL_TOOL_CALLS: PendingToolCallData[] = [
         'Get-LocalUser | Where-Object { $_.PasswordRequired -eq $false } | Set-LocalUser -PasswordNeverExpires $false',
     },
   },
-]
+];
 
 // =============================================================================
 // Meta
@@ -78,22 +76,22 @@ const meta: Meta<typeof TicketCard> = {
   title: 'Features/Board/TicketCard',
   component: TicketCard,
   parameters: { layout: 'centered' },
-  render: (args) => <Harness {...args} />,
+  render: args => <Harness {...args} />,
   args: {
     ticket: BASE_TICKET,
     columnId: 'TECH_REQUIRED',
   },
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 // =============================================================================
 // Stories
 // =============================================================================
 
 /** Full card: title, device/org row, priority flag, one assignee, tags, timestamp. */
-export const Default: Story = {}
+export const Default: Story = {};
 
 /** Bare minimum — only the required fields, so every optional row is absent. */
 export const Minimal: Story = {
@@ -105,7 +103,7 @@ export const Minimal: Story = {
       status: 'ACTIVE',
     },
   },
-}
+};
 
 /** Long title truncates to one line; long device/org row truncates too. */
 export const LongContent: Story = {
@@ -119,7 +117,7 @@ export const LongContent: Story = {
       organizationName: 'Digital Wave Media Group International',
     },
   },
-}
+};
 
 /** Assignee overflow (+N badge) and tag overflow (+N pill). */
 export const ManyAssigneesAndTags: Story = {
@@ -131,7 +129,7 @@ export const ManyAssigneesAndTags: Story = {
       tags: ['hardware-failure', 'software-bug', 'urgent', 'escalated'],
     },
   },
-}
+};
 
 /**
  * `hasNewMessage` + `columnColor` renders the colored "New Message" tag and
@@ -142,7 +140,7 @@ export const WithNewMessage: Story = {
     ticket: { ...BASE_TICKET, id: 'ticket-new-msg', hasNewMessage: true },
     columnColor: '#2890fa',
   },
-}
+};
 
 /**
  * The client asked for a human and confirmed the handoff — an amber footer row
@@ -154,7 +152,7 @@ export const EscalatedByUser: Story = {
   args: {
     ticket: { ...BASE_TICKET, id: 'ticket-escalated', escalatedByUser: true },
   },
-}
+};
 
 /**
  * The `activity` footer row, one card per kind. The three live kinds (animated
@@ -169,10 +167,10 @@ export const ActivityIndicators: Story = {
       { kind: 'user-typing' },
       { kind: 'waiting-external' },
       { kind: 'stale', label: 'No activity for 2 hours' },
-    ]
+    ];
     return (
       <div className="flex w-[320px] flex-col gap-[var(--spacing-system-sf)] rounded-lg bg-ods-card p-[var(--spacing-system-sf)]">
-        {activities.map((activity) => (
+        {activities.map(activity => (
           <TicketCard
             key={activity.kind}
             columnId="ACTIVE"
@@ -186,9 +184,9 @@ export const ActivityIndicators: Story = {
           />
         ))}
       </div>
-    )
+    );
   },
-}
+};
 
 /**
  * Pending CLIENT approval — collapsed grey "Pending client approval" row with a
@@ -205,12 +203,10 @@ export const PendingClientApproval: Story = {
         toolCalls: APPROVAL_TOOL_CALLS,
       },
     },
-    onApprove: (ticketId, requestId) =>
-      console.log('[story] approve', { ticketId, requestId }),
-    onReject: (ticketId, requestId) =>
-      console.log('[story] reject', { ticketId, requestId }),
+    onApprove: (ticketId, requestId) => console.log('[story] approve', { ticketId, requestId }),
+    onReject: (ticketId, requestId) => console.log('[story] reject', { ticketId, requestId }),
   },
-}
+};
 
 /** Pending ADMIN approval — yellow shield "Technician approval required" header. */
 export const PendingTechApproval: Story = {
@@ -224,12 +220,10 @@ export const PendingTechApproval: Story = {
         toolCalls: APPROVAL_TOOL_CALLS,
       },
     },
-    onApprove: (ticketId, requestId) =>
-      console.log('[story] approve', { ticketId, requestId }),
-    onReject: (ticketId, requestId) =>
-      console.log('[story] reject', { ticketId, requestId }),
+    onApprove: (ticketId, requestId) => console.log('[story] approve', { ticketId, requestId }),
+    onReject: (ticketId, requestId) => console.log('[story] reject', { ticketId, requestId }),
   },
-}
+};
 
 /** `href` set — the whole card is a link (Link anchor overlays the surface). */
 export const AsLink: Story = {
@@ -237,7 +231,7 @@ export const AsLink: Story = {
     ticket: { ...BASE_TICKET, id: 'ticket-link' },
     href: '#ticket-1042',
   },
-}
+};
 
 /** `dragDisabled` — the card is pinned (no grab cursor, sortable listeners off). */
 export const DragDisabled: Story = {
@@ -245,22 +239,25 @@ export const DragDisabled: Story = {
     ticket: { ...BASE_TICKET, id: 'ticket-pinned' },
     dragDisabled: true,
   },
-}
+};
 
 /** All four priority flag colors side by side. */
 export const Priorities: Story = {
   render: () => {
-    const priorities: BoardTicket['priority'][] = ['low', 'medium', 'high', 'urgent']
+    // `NonNullable`: `priority` is optional on the ticket, but this story only
+    // ever lists the four real values — typing the array that way lets the
+    // label be built from `p` directly.
+    const priorities: NonNullable<BoardTicket['priority']>[] = ['low', 'medium', 'high', 'urgent'];
     return (
       <div className="flex w-[320px] flex-col gap-[var(--spacing-system-sf)] rounded-lg bg-ods-card p-[var(--spacing-system-sf)]">
-        {priorities.map((p) => (
+        {priorities.map(p => (
           <TicketCard
             key={p}
             columnId="ACTIVE"
             ticket={{
               ...BASE_TICKET,
               id: `ticket-prio-${p}`,
-              title: `${p![0].toUpperCase()}${p!.slice(1)} priority ticket`,
+              title: `${p[0].toUpperCase()}${p.slice(1)} priority ticket`,
               priority: p,
               tags: undefined,
               assignees: undefined,
@@ -268,6 +265,6 @@ export const Priorities: Story = {
           />
         ))}
       </div>
-    )
+    );
   },
-}
+};

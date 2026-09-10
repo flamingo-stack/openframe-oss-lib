@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 interface StatusIndicatorProps {
   status: 'success' | 'pending' | 'error' | 'missing';
@@ -7,8 +7,8 @@ interface StatusIndicatorProps {
 }
 
 export function StatusIndicator({ status, label, href }: StatusIndicatorProps) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  const getStatusColor = (kind: string) => {
+    switch (kind) {
       case 'success':
         return 'bg-ods-success text-ods-success';
       case 'pending':
@@ -28,20 +28,13 @@ export function StatusIndicator({ status, label, href }: StatusIndicatorProps) {
   const content = (
     <div className="flex items-center gap-1.5">
       <div className={`h-3 w-3 rounded-full ${dotColor}`} />
-      <span className={`text-h6 ${textColor}`}>
-        {label}
-      </span>
+      <span className={`text-h6 ${textColor}`}>{label}</span>
     </div>
   );
 
   if (href) {
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="hover:underline cursor-pointer"
-      >
+      <a href={href} target="_blank" rel="noopener noreferrer" className="cursor-pointer hover:underline">
         {content}
       </a>
     );

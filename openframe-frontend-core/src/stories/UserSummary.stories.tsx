@@ -1,20 +1,20 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { UserSummary } from '../components/user-summary-stub'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { UserSummary } from '../components/user-summary-stub';
 
 /** Generate a square colored SVG avatar as a data URI */
 const makeAvatar = (initials: string, bg = '#6366f1') =>
   `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">` +
-    `<rect width="96" height="96" fill="${bg}"/>` +
-    `<text x="48" y="54" text-anchor="middle" fill="#fff" font-size="36" font-family="sans-serif">${initials}</text>` +
-    `</svg>`
-  )}`
+      `<rect width="96" height="96" fill="${bg}"/>` +
+      `<text x="48" y="54" text-anchor="middle" fill="#fff" font-size="36" font-family="sans-serif">${initials}</text>` +
+      `</svg>`,
+  )}`;
 
-const avatarJohn = makeAvatar('JD', '#6366f1')
-const avatarJane = makeAvatar('JS', '#ec4899')
-const avatarAlex = makeAvatar('AJ', '#14b8a6')
-const avatarSarah = makeAvatar('SC', '#f59e0b')
-const mspLogo = makeAvatar('S', '#161616')
+const avatarJohn = makeAvatar('JD', '#6366f1');
+const avatarJane = makeAvatar('JS', '#ec4899');
+const avatarAlex = makeAvatar('AJ', '#14b8a6');
+const avatarSarah = makeAvatar('SC', '#f59e0b');
+const mspLogo = makeAvatar('S', '#161616');
 
 const meta = {
   title: 'Components/UserSummary',
@@ -29,10 +29,10 @@ const meta = {
     layout: 'padded',
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof UserSummary>
+} satisfies Meta<typeof UserSummary>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 // === Default (Full) ===
 
@@ -45,7 +45,7 @@ export const Default: Story = {
     email: 'john.doe@example.com',
     avatarUrl: avatarJohn,
   },
-}
+};
 
 /**
  * Full variant without an avatar — shows initials fallback.
@@ -55,7 +55,7 @@ export const NoAvatar: Story = {
     name: 'Jane Smith',
     email: 'jane.smith@example.com',
   },
-}
+};
 
 /**
  * Full variant with subtitle replacing the email line.
@@ -67,7 +67,7 @@ export const WithSubtitle: Story = {
     avatarUrl: avatarAlex,
     subtitle: '3 hours ago',
   },
-}
+};
 
 // === Auth Providers ===
 
@@ -81,7 +81,7 @@ export const WithAuthProviders: Story = {
     avatarUrl: avatarJohn,
     authProviders: ['google', 'microsoft'],
   },
-}
+};
 
 // === MSP Preview ===
 
@@ -101,7 +101,7 @@ export const WithMSP: Story = {
       logoUrl: mspLogo,
     },
   },
-}
+};
 
 /**
  * MSP preview without a logo — shows initial fallback on the badge.
@@ -117,7 +117,7 @@ export const WithMSPNoLogo: Story = {
       technicianCount: 12,
     },
   },
-}
+};
 
 // === Edit Button ===
 
@@ -131,7 +131,7 @@ export const WithEditButton: Story = {
     avatarUrl: avatarJohn,
     showEditButton: true,
   },
-}
+};
 
 // === Full Featured ===
 
@@ -153,7 +153,7 @@ export const FullFeatured: Story = {
       logoUrl: mspLogo,
     },
   },
-}
+};
 
 // === Compact Variant ===
 
@@ -167,7 +167,7 @@ export const Compact: Story = {
     avatarUrl: avatarJohn,
     compact: true,
   },
-}
+};
 
 /**
  * Compact mode without avatar.
@@ -178,7 +178,7 @@ export const CompactNoAvatar: Story = {
     email: 'jane@example.com',
     compact: true,
   },
-}
+};
 
 /**
  * Compact mode with subtitle instead of email.
@@ -191,7 +191,7 @@ export const CompactWithSubtitle: Story = {
     compact: true,
     subtitle: '5 minutes ago',
   },
-}
+};
 
 /**
  * Compact mode with MSP badge.
@@ -207,7 +207,7 @@ export const CompactWithMSP: Story = {
       logoUrl: mspLogo,
     },
   },
-}
+};
 
 /**
  * Compact mode with a custom larger avatar size.
@@ -220,4 +220,4 @@ export const CompactLargeAvatar: Story = {
     compact: true,
     avatarSize: 64,
   },
-}
+};

@@ -1,0 +1,12 @@
+#!/bin/sh
+# Whole-project checks that lint-staged structurally CANNOT do: it only sees the
+# files you staged, so a type error your change caused in a DIFFERENT module is
+# invisible to it. Both are incremental/cached, so this stays cheap.
+#
+# Skipped entirely when the node package was never installed — see pre-commit.
+[ -d openframe-frontend-core/node_modules ] || exit 0
+cd openframe-frontend-core || exit 1
+
+echo "pre-push: type-check + lint …"
+npm run --silent type-check || { echo "pre-push: tsc failed. Fix it or push with --no-verify."; exit 1; }
+npm run --silent lint       || { echo "pre-push: eslint failed. Fix it or push with --no-verify."; exit 1; }

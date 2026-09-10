@@ -1,25 +1,20 @@
-'use client'
+'use client';
 
-import type { KeyboardEvent, MouseEvent } from 'react'
-import { cn } from '../../../utils/cn'
-import type { RenderNotificationTile } from './types'
-import { useOptionalNotifications } from './notifications-context'
-import { NotificationTile } from './notification-tile'
-import type { Notification } from './types'
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { cn } from '../../../utils/cn';
+import { NotificationTile } from './notification-tile';
+import { useOptionalNotifications } from './notifications-context';
+import type { RenderNotificationTile, Notification } from './types';
 
-export type NotificationPopupsPosition =
-  | 'top-right'
-  | 'top-left'
-  | 'bottom-right'
-  | 'bottom-left'
+export type NotificationPopupsPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
 
 export interface NotificationPopupsProps {
-  className?: string
-  liveDurationMs?: number
-  maxVisible?: number
-  position?: NotificationPopupsPosition
-  hideWhenDrawerOpen?: boolean
-  renderTile?: RenderNotificationTile
+  className?: string;
+  liveDurationMs?: number;
+  maxVisible?: number;
+  position?: NotificationPopupsPosition;
+  hideWhenDrawerOpen?: boolean;
+  renderTile?: RenderNotificationTile;
 }
 
 const positionClasses: Record<NotificationPopupsPosition, string> = {
@@ -27,7 +22,7 @@ const positionClasses: Record<NotificationPopupsPosition, string> = {
   'top-left': 'top-4 left-4',
   'bottom-right': 'bottom-4 right-4 flex-col-reverse',
   'bottom-left': 'bottom-4 left-4 flex-col-reverse',
-}
+};
 
 export function NotificationPopups({
   className,
@@ -37,45 +32,63 @@ export function NotificationPopups({
   hideWhenDrawerOpen = true,
   renderTile: renderTileProp,
 }: NotificationPopupsProps) {
-  const ctx = useOptionalNotifications()
-  if (!ctx) return null
+  const ctx = useOptionalNotifications();
 
-  const { notifications, showPopups, isOpen, open, markRead, markSettled, renderTile: ctxRenderTile } = ctx
-  const renderTile = renderTileProp ?? ctxRenderTile
+  // The age filter below needs the CURRENT time, and reading a clock in the
+  // render body makes the output depend on something React cannot replay. So
+  // `now` is state, advanced by an interval that only runs while something
+  // could still age out — an idle popup container ticks nothing.
+  //
+  // Both hooks sit above every early return on purpose: `ctx` may be absent
+  // and `showPopups` may flip at any time, and a hook below those branches
+  // would change how many hooks this component renders.
+  const [now, setNow] = useState(() => Date.now());
+  const hasAgeingNotifications = Boolean(ctx?.notifications.some(n => !n.read && !n.settled));
+  useEffect(() => {
+    if (!hasAgeingNotifications) return undefined;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [hasAgeingNotifications]);
 
-  if (!showPopups) return null
-  if (hideWhenDrawerOpen && isOpen) return null
+  if (!ctx) return null;
 
-  const now = Date.now()
+  const { notifications, showPopups, isOpen, open, markRead, markSettled, renderTile: ctxRenderTile } = ctx;
+  const renderTile = renderTileProp ?? ctxRenderTile;
+
+  if (!showPopups) return null;
+  if (hideWhenDrawerOpen && isOpen) return null;
+
+  // Drops anything created while the popups were hidden — a notification that
+  // arrived behind an open drawer must not pop up late when the drawer closes.
   const live = notifications
-    .filter((n) => !n.read && !n.settled && now - n.createdAt < liveDurationMs)
-    .slice(0, maxVisible)
+    .filter(n => !n.read && !n.settled && now - n.createdAt < liveDurationMs)
+    .slice(0, maxVisible);
 
-  if (live.length === 0) return null
+  if (live.length === 0) return null;
 
   const activate = (notification: Notification) => {
     if (notification.onClick) {
-      notification.onClick()
-      markRead(notification.id)
-      markSettled(notification.id)
-      return
+      notification.onClick();
+      markRead(notification.id);
+      markSettled(notification.id);
+      return;
     }
-    open()
-    markSettled(notification.id)
-  }
+    open();
+    markSettled(notification.id);
+  };
 
   const handleBodyClick = (notification: Notification) => (event: MouseEvent<HTMLDivElement>) => {
     // Nested interactive controls (X, check button) handle their own actions.
-    if ((event.target as HTMLElement).closest('button')) return
-    activate(notification)
-  }
+    if ((event.target as HTMLElement).closest('button')) return;
+    activate(notification);
+  };
 
   const handleBodyKeyDown = (notification: Notification) => (event: KeyboardEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest('button')) return
-    if (event.key !== 'Enter' && event.key !== ' ') return
-    event.preventDefault()
-    activate(notification)
-  }
+    if ((event.target as HTMLElement).closest('button')) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    activate(notification);
+  };
 
   return (
     <div
@@ -86,17 +99,18 @@ export function NotificationPopups({
         className,
       )}
     >
-      {live.map((n) => {
-        const custom = renderTile?.(n, { onComplete: markRead, onSettle: markSettled, liveDurationMs })
+      {live.map(n => {
+        const custom = renderTile?.(n, { onComplete: markRead, onSettle: markSettled, liveDurationMs });
         if (custom) {
           return (
             <div key={n.id} className="pointer-events-auto">
               {custom}
             </div>
-          )
+          );
         }
         return (
-          // biome-ignore lint/a11y/useSemanticElements: nested interactive elements forbid <button>
+          // `role="button"` rather than a real <button>: the row hosts its own
+          // nested interactive elements, which a <button> may not contain.
           <div
             key={n.id}
             role="button"
@@ -112,8 +126,8 @@ export function NotificationPopups({
               onSettle={markSettled}
             />
           </div>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

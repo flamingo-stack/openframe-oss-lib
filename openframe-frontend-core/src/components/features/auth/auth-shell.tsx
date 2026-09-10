@@ -1,20 +1,20 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../../utils/cn'
-import { OpenFrameWordmark, PoweredByFlamingo } from './auth-branding'
-import { AuthBenefitsPanel } from './auth-benefits-panel'
+import type { ReactNode } from 'react';
+import { cn } from '../../../utils/cn';
+import { AuthBenefitsPanel } from './auth-benefits-panel';
+import { OpenFrameWordmark, PoweredByFlamingo } from './auth-branding';
 
 export interface AuthShellProps {
   /** Tab selector (Sign Up / Login) rendered above the form. */
-  tabs?: React.ReactNode
+  tabs?: ReactNode;
   /** Main form content (Create Organization, Login, …). */
-  children: React.ReactNode
+  children: ReactNode;
   /** Marketing panel. Defaults to <AuthBenefitsPanel />. */
-  benefits?: React.ReactNode
+  benefits?: ReactNode;
   /** Pinned to the bottom-left of the form column on desktop only (e.g. "Back to Login"). */
-  footer?: React.ReactNode
-  className?: string
+  footer?: ReactNode;
+  className?: string;
 }
 
 /**
@@ -29,10 +29,12 @@ export interface AuthShellProps {
  * native mobile shell pads it by the top safe-area inset).
  */
 export function AuthShell({ tabs, children, benefits, footer, className }: AuthShellProps) {
-  const benefitsNode = benefits ?? <AuthBenefitsPanel />
+  const benefitsNode = benefits ?? <AuthBenefitsPanel />;
 
   return (
-    <div className={cn('of-auth-shell min-h-screen w-full bg-ods-bg lg:flex lg:h-screen lg:overflow-hidden', className)}>
+    <div
+      className={cn('of-auth-shell min-h-screen w-full bg-ods-bg lg:flex lg:h-screen lg:overflow-hidden', className)}
+    >
       {/* Main column — form */}
       <div className="flex min-h-screen w-full flex-col items-center p-[var(--spacing-system-l)] lg:h-full lg:min-h-0 lg:w-1/2 lg:justify-start lg:overflow-y-auto lg:px-[var(--spacing-system-xl)] lg:py-[var(--spacing-system-xxl)]">
         <div
@@ -63,5 +65,5 @@ export function AuthShell({ tabs, children, benefits, footer, className }: AuthS
         <PoweredByFlamingo />
       </div>
     </div>
-  )
+  );
 }

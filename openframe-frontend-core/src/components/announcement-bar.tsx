@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
 import { useSelfFetch } from '../hooks/use-self-fetch';
 import type { Announcement, AnnouncementBarProps, AnnouncementResponse } from '../types/announcement';
@@ -57,6 +57,14 @@ import { Button } from './ui/button';
  * storage reads happen ONLY in effects (a render-time read would desync
  * hydration in SSR mode).
  */
+/**
+ * The dismissal store has no change event of its own — it is written only by
+ * this component (and by another tab, which we notice on the next revalidation
+ * render). So the subscription is a no-op and `getSnapshot` is simply re-read
+ * on every render. Module-level so its identity never forces a re-subscribe.
+ */
+const subscribeToNothing = () => () => {};
+
 export function AnnouncementBar({
   initialAnnouncement,
   previewMode = false,
@@ -92,46 +100,71 @@ export function AnnouncementBar({
   // Hold the last non-null announcement so DEACTIVATION (a revalidation that
   // returns null) collapses with the same 1fr->0fr animation as dismissal
   // instead of unmounting in place (a hard 44px jump).
-  const lastAnnouncementRef = useRef<Announcement | null>(initialAnnouncement ?? null);
-  useEffect(() => {
-    if (announcement) lastAnnouncementRef.current = announcement;
-  }, [announcement]);
-  const displayAnnouncement = announcement ?? lastAnnouncementRef.current;
-
+  //
+  // State adjusted during render, not a ref written in an effect: the value is
+  // read on the very next line, so a ref would make this render depend on
+  // something React cannot replay (and the effect wrote it a commit LATE).
+  // The guard makes it idempotent — React re-runs this component immediately
+  // and the second pass takes the early exit.
+  const [lastAnnouncement, setLastAnnouncement] = useState<Announcement | null>(initialAnnouncement ?? null);
   // Expanded (height) state — initial value is a pure function of props so
   // the SSR HTML and the hydration render agree for every cohort.
   const [expandedState, setExpandedState] = useState<boolean>(() => initialAnnouncement != null);
-  // Preview always mirrors the draft directly (effects are disabled there).
-  const expanded = previewMode ? announcement != null : expandedState;
+  if (announcement && announcement !== lastAnnouncement) {
+    setLastAnnouncement(announcement);
+    // A DIFFERENT announcement re-arms the bar — the `else` half of the old
+    // reconciliation effect. It is masked by `dismissed` below, so a
+    // revalidation that returns an already-dismissed announcement stays
+    // collapsed exactly as before.
+    setExpandedState(true);
+  }
+  const displayAnnouncement = announcement ?? lastAnnouncement;
 
-  // One-time cleanup of the pre-refactor localStorage announcement cache.
+  // Dismissal lives in a cookie (with a legacy localStorage fallback) — an
+  // external store, and one that MUST NOT be read during a plain render or SSR
+  // and hydration desync (see the header note). `useSyncExternalStore` is the
+  // primitive for exactly that: `getServerSnapshot` reports "not dismissed",
+  // matching what the server already folded into `initialAnnouncement`, and the
+  // client re-reads after hydration and on every subsequent render — including
+  // the one a revalidation causes, which is what collapses a bar dismissed
+  // seconds earlier in another tab.
+  //
+  // This replaces a reconciliation effect that called `setExpandedState` on
+  // every single run: a guaranteed second render pass per mount AND per
+  // completed fetch, to publish something derivable from the store.
+  const dismissed = useSyncExternalStore(
+    subscribeToNothing,
+    () => (!previewMode && announcement ? isAnnouncementDismissed(platform, announcement.id) : false),
+    () => false,
+  );
+
+  // Preview always mirrors the draft directly (storage is not consulted there).
+  const expanded = previewMode ? announcement != null : announcement != null && expandedState && !dismissed;
+
+  // Cleanup of the pre-refactor localStorage announcement cache. Keyed on
+  // `platform` rather than `[]`: the cache is per-platform, so a platform
+  // switch has its own stale entry to clear. Idempotent either way.
   useEffect(() => {
     if (previewMode) return;
     clearLegacyAnnouncementCache(platform);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [platform, previewMode]);
 
-  // Visibility reconciliation — runs on the seed and after EVERY completed
-  // fetch (keyed on `data` identity, not announcement id, so a refocus
-  // revalidation that returns the same announcement still re-checks the
-  // dismissal store: this is what keeps a bar dismissed seconds earlier in
-  // another tab from resurrecting). Also the legacy-migration point: an
-  // LS-only dismissal (no cookie — server couldn't see it) collapses once,
-  // animated, and backfills the cookie so the next SSR skips the bar.
+  // Legacy migration, and now the ONLY thing this pass does: an LS-only
+  // dismissal (no cookie — the server couldn't see it) backfills the cookie so
+  // the next SSR skips the bar. The visible collapse it used to perform here is
+  // derived from `dismissed` above instead. Idempotent, and a pure side effect
+  // on the external store, so it holds no state of its own.
+  //
+  // `data` is the trigger (it fires on the seed and after every completed
+  // fetch); the rest are read inside and are stable per mount in practice, but
+  // listing them is what keeps a changed `platform` from backfilling against
+  // the previous platform's store.
   useEffect(() => {
-    if (previewMode) return;
-    if (!announcement) {
-      setExpandedState(false);
-      return;
-    }
+    if (previewMode || !announcement) return;
     if (isAnnouncementDismissed(platform, announcement.id)) {
       dismissAnnouncement(platform, announcement.id); // idempotent cookie backfill
-      setExpandedState(false);
-    } else {
-      setExpandedState(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [data, announcement, platform, previewMode]);
 
   const handleDismiss = () => {
     if (previewMode || !announcement) return;
@@ -158,9 +191,11 @@ export function AnnouncementBar({
     } catch {
       return;
     }
-    announcement.cta_target === '_blank'
-      ? window.open(safeUrl, '_blank', 'noopener,noreferrer')
-      : (window.location.href = safeUrl);
+    if (announcement.cta_target === '_blank') {
+      window.open(safeUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      window.location.href = safeUrl;
+    }
   };
 
   // Never had anything to show: render nothing. Dismissal AND deactivation
@@ -199,7 +234,7 @@ export function AnnouncementBar({
       // sliding admin sidebar). Admin PREVIEW instances must NOT carry it, or
       // a preview card inflates that offset (phantom gap above the drawer).
       {...(previewMode ? {} : { 'data-announcement-bar': true })}
-      className={`relative w-full grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${previewMode ? '' : 'z-50'} ${className ?? ''}`}
+      className={`relative grid w-full transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${previewMode ? '' : 'z-50'} ${className ?? ''}`}
       style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
     >
       {/*
@@ -239,10 +274,10 @@ export function AnnouncementBar({
                truncating as one unit, at the strip's caption scale (`text-h6`
                = 13/14px — the same treatment string titles get from the view).
                Separator is a middot (house rule: no en/em dashes in copy). */
-            <p className="min-w-0 max-w-full text-h6 truncate mb-0">
+            <p className="mb-0 min-w-0 max-w-full truncate text-h6">
               <span className="font-[number:var(--font-weight-semibold)]">{displayAnnouncement.title}</span>
               {displayAnnouncement.description && (
-                <span className="hidden sm:inline opacity-80"> · {displayAnnouncement.description}</span>
+                <span className="hidden opacity-80 sm:inline"> · {displayAnnouncement.description}</span>
               )}
             </p>
           }
@@ -278,7 +313,7 @@ export function AnnouncementBar({
                     <EntityIcon
                       icon={{ name: displayAnnouncement.cta_icon_name, props: displayAnnouncement.cta_icon_props }}
                       size={14}
-                      className="w-3.5 h-3.5"
+                      className="h-3.5 w-3.5"
                     />
                   ) : undefined
                 }

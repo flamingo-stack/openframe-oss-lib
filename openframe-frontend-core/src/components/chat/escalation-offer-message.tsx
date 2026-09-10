@@ -1,16 +1,16 @@
-"use client"
+'use client';
 
-import { forwardRef, type HTMLAttributes } from "react"
-import { cn } from "../../utils/cn"
-import { ApprovalRequestMessage } from "./approval-request-message"
-import type { EscalationOfferSegment } from "./types/message.types"
+import { forwardRef, type HTMLAttributes } from 'react';
+import { cn } from '../../utils/cn';
+import { ApprovalRequestMessage } from './approval-request-message';
+import type { EscalationOfferSegment } from './types/message.types';
 
 export interface EscalationOfferMessageProps extends HTMLAttributes<HTMLDivElement> {
-  data: EscalationOfferSegment['data']
-  status?: EscalationOfferSegment['status']
-  resolvedByName?: string | null
-  onApprove?: EscalationOfferSegment['onApprove']
-  onReject?: EscalationOfferSegment['onReject']
+  data: EscalationOfferSegment['data'];
+  status?: EscalationOfferSegment['status'];
+  resolvedByName?: string | null;
+  onApprove?: EscalationOfferSegment['onApprove'];
+  onReject?: EscalationOfferSegment['onReject'];
 }
 
 /**
@@ -29,7 +29,7 @@ export interface EscalationOfferMessageProps extends HTMLAttributes<HTMLDivEleme
  */
 const EscalationOfferMessage = forwardRef<HTMLDivElement, EscalationOfferMessageProps>(
   ({ className, data, status = 'pending', resolvedByName, onApprove, onReject, ...props }, ref) => (
-    <div ref={ref} className={cn("flex flex-col", className)} {...props}>
+    <div ref={ref} className={cn('flex flex-col', className)} {...props}>
       <ApprovalRequestMessage
         variant="client"
         // Only the client may resolve an offer — the backend rejects every
@@ -47,9 +47,9 @@ const EscalationOfferMessage = forwardRef<HTMLDivElement, EscalationOfferMessage
         onReject={onReject}
       />
     </div>
-  )
-)
+  ),
+);
 
-EscalationOfferMessage.displayName = "EscalationOfferMessage"
+EscalationOfferMessage.displayName = 'EscalationOfferMessage';
 
-export { EscalationOfferMessage }
+export { EscalationOfferMessage };

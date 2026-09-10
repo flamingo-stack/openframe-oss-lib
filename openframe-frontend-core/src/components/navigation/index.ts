@@ -1,35 +1,35 @@
-"use client"
+'use client';
 
 // Navigation component exports
-export { Header } from './header'
-export type { HeaderConfig, HeaderProps } from './header'
+export { Header } from './header';
+export type { HeaderConfig, HeaderProps } from './header';
 
-export { MingoAiButton } from './mingo-ai-button'
-export type { MingoAiButtonProps } from './mingo-ai-button'
+export { MingoAiButton } from './mingo-ai-button';
+export type { MingoAiButtonProps } from './mingo-ai-button';
 
-export { ClientOnlyHeader } from './client-only-header'
-export type { ClientOnlyHeaderProps } from './client-only-header'
+export { ClientOnlyHeader } from './client-only-header';
+export type { ClientOnlyHeaderProps } from './client-only-header';
 
-export { HeaderSkeleton } from './header-skeleton'
-export type { HeaderSkeletonProps } from './header-skeleton'
+export { HeaderSkeleton } from './header-skeleton';
+export type { HeaderSkeletonProps } from './header-skeleton';
 
-export { MobileNavPanel, MOBILE_NAV_PANEL_ID } from './mobile-nav-panel'
-export type { MobileNavPanelProps } from './mobile-nav-panel'
+export { MobileNavPanel, MOBILE_NAV_PANEL_ID } from './mobile-nav-panel';
+export type { MobileNavPanelProps } from './mobile-nav-panel';
 
-export { SlidingSidebar } from './sliding-sidebar'
-export type { SlidingSidebarProps } from './sliding-sidebar'
+export { SlidingSidebar } from './sliding-sidebar';
+export type { SlidingSidebarProps } from './sliding-sidebar';
 
-export { StickySectionNav, useSectionNavigation } from './sticky-section-nav'
-export type { StickyNavSection } from './sticky-section-nav'
+export { StickySectionNav, useSectionNavigation } from './sticky-section-nav';
+export type { StickyNavSection } from './sticky-section-nav';
 
-export { NAVIGATION_SIDEBAR_WIDTH_VAR, NavigationSidebar } from './navigation-sidebar'
-export type { NavigationSidebarProps } from './navigation-sidebar'
+export { NAVIGATION_SIDEBAR_WIDTH_VAR, NavigationSidebar } from './navigation-sidebar';
+export type { NavigationSidebarProps } from './navigation-sidebar';
 
-export { AppHeader } from './app-header'
-export type { AppHeaderProps, HeaderLoadingCell } from './app-header'
+export { AppHeader } from './app-header';
+export type { AppHeaderProps, HeaderLoadingCell } from './app-header';
 
-export { AppLayout, useAppLayoutDrawerContainer } from './app-layout'
-export type { AppLayoutProps } from './app-layout'
+export { AppLayout, useAppLayoutDrawerContainer } from './app-layout';
+export type { AppLayoutProps } from './app-layout';
 
 export {
   AppLayoutDrawer,
@@ -41,38 +41,42 @@ export {
   AppLayoutDrawerDescription,
   AppLayoutDrawerBody,
   AppLayoutDrawerFooter,
-} from './app-layout-drawer'
-export type { AppLayoutDrawerContentProps } from './app-layout-drawer'
+} from './app-layout-drawer';
+export type { AppLayoutDrawerContentProps } from './app-layout-drawer';
 
-export { MobileBurgerMenu } from './mobile-burger-menu'
-export type { MobileBurgerMenuProps } from './mobile-burger-menu'
+export { MobileBurgerMenu } from './mobile-burger-menu';
+export type { MobileBurgerMenuProps } from './mobile-burger-menu';
 
-export { HeaderButton } from './header-button'
-export type { HeaderButtonProps } from './header-button'
-export { UnreadDot, UnreadCountBadge } from './unread-dot'
-export type { UnreadDotProps, UnreadCountBadgeProps } from './unread-dot'
-export { TicketAlertsButton } from './ticket-alerts-button'
-export type { TicketAlertsButtonProps } from './ticket-alerts-button'
+export { HeaderButton } from './header-button';
+export type { HeaderButtonProps } from './header-button';
+export { UnreadDot, UnreadCountBadge } from './unread-dot';
+export type { UnreadDotProps, UnreadCountBadgeProps } from './unread-dot';
+export { TicketAlertsButton } from './ticket-alerts-button';
+export type { TicketAlertsButtonProps } from './ticket-alerts-button';
 
-export { TopNavigation } from './top-navigation'
-export type { TopNavigationProps, TopNavigationCenterBreakpoint } from './top-navigation'
+export { TopNavigation } from './top-navigation';
+export type { TopNavigationProps, TopNavigationCenterBreakpoint } from './top-navigation';
 
-export { HeaderMingoButton } from './header-mingo-button'
-export type { HeaderMingoButtonProps } from './header-mingo-button'
+export { HeaderMingoButton } from './header-mingo-button';
+export type { HeaderMingoButtonProps } from './header-mingo-button';
 
-export { HeaderGlobalSearch } from './header-global-search'
-export type { HeaderGlobalSearchProps } from './header-global-search'
+export { HeaderGlobalSearch } from './header-global-search';
+export type { HeaderGlobalSearchProps } from './header-global-search';
 
-export { HeaderOrganizationFilter } from './header-organization-filter'
-export type { HeaderOrganizationFilterOrganization, HeaderOrganizationFilterProps } from './header-organization-filter'
+export { HeaderOrganizationFilter } from './header-organization-filter';
+export type { HeaderOrganizationFilterOrganization, HeaderOrganizationFilterProps } from './header-organization-filter';
 
 // Multi-level navigation — sidebar + mobile dropdown for the doc-viewer
 // (DocViewer / DocSourceViewer) and any other tree-shaped navigation surface.
-export { MultiLevelNavigation, MobileNavigationDropdown } from './multi-level-navigation'
-export type { NavigationNode } from './multi-level-navigation'
+export { MultiLevelNavigation, MobileNavigationDropdown } from './multi-level-navigation';
+export type { NavigationNode } from './multi-level-navigation';
 
 // Re-export types from navigation types
 export type {
-  MobileNavConfig, NavigationItem, NavigationSidebarConfig,
-  NavigationSidebarItem, SlidingSidebarConfig, UnifiedSidebarUser
-} from '../../types/navigation'
+  MobileNavConfig,
+  NavigationItem,
+  NavigationSidebarConfig,
+  NavigationSidebarItem,
+  SlidingSidebarConfig,
+  UnifiedSidebarUser,
+} from '../../types/navigation';

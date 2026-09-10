@@ -84,7 +84,7 @@ public class ApiKeyService {
             apiKey.setExpiresAt(request.expiresAt());
         }
 
-        apiKey.setUpdatedAt(Instant.now());
+        touch(apiKey, userId);
 
         return mapToResponse(apiKeyRepository.save(apiKey));
     }
@@ -115,6 +115,11 @@ public class ApiKeyService {
         }
     }
 
+
+    private void touch(ApiKey apiKey, String actor) {
+        apiKey.setUpdatedAt(Instant.now());
+        apiKey.setUpdatedBy(actor);
+    }
 
     private String generateKeyId() {
         byte[] bytes = new byte[KEY_ID_LENGTH / 2];
@@ -155,6 +160,8 @@ public class ApiKeyService {
                 .enabled(apiKey.isEnabled())
                 .createdAt(apiKey.getCreatedAt())
                 .updatedAt(apiKey.getUpdatedAt())
+                .createdBy(apiKey.getCreatedBy())
+                .updatedBy(apiKey.getUpdatedBy())
                 .expiresAt(apiKey.getExpiresAt())
                 .lastUsed(totalStats != null && totalStats.getLastUsed() != null ?
                         totalStats.getLastUsed().toInstant(ZoneOffset.UTC) : null)
@@ -193,6 +200,7 @@ public class ApiKeyService {
         log.debug("Generated keyId: {}", keyId);
         log.debug("Generated secret length: {}", secret.length());
 
+        Instant now = Instant.now();
         ApiKey apiKey = ApiKey.builder()
                 .keyId(keyId)
                 .hashedKey(hashedSecret)
@@ -201,8 +209,10 @@ public class ApiKeyService {
                 .userId(userId)
                 .enabled(true)
                 .expiresAt(expiresAt)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
+                .createdAt(now)
+                .updatedAt(now)
+                .createdBy(userId)
+                .updatedBy(userId)
                 .build();
 
         log.debug("Built API key with keyId: {}", apiKey.getKeyId());

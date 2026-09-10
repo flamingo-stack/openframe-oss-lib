@@ -1,6 +1,6 @@
-"use client"
+'use client';
 
-import React from 'react'
+import type React from 'react';
 
 export interface BlockCardProps {
   /** The inline pill rendered AT the marker position inside the
@@ -8,14 +8,14 @@ export interface BlockCardProps {
    *  56×56 thumbnail card for webinars / customer interviews). When
    *  omitted, the marker is replaced by the ref title in a plain
    *  inline `<span>`. */
-  inline?: React.ReactNode
+  inline?: React.ReactNode;
   /** The block-level content rendered as a SIBLING below the markdown
    *  paragraph. Use for elements that cannot legally nest inside
    *  `<p>` — `<div>`, `<header>`, `<EntityVideoSection>`, `<Video>`,
    *  etc. The pre-scan in `chat-message-enhanced` extracts this and
    *  appends it after the `<SimpleMarkdownRenderer>` output for the
    *  containing segment, where block content is HTML-valid. */
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 /**
@@ -40,5 +40,5 @@ export interface BlockCardProps {
  * mis-routed `<BlockCard>` outside the chat path doesn't crash.
  */
 export function BlockCard(_props: BlockCardProps): React.ReactElement | null {
-  return null
+  return null;
 }

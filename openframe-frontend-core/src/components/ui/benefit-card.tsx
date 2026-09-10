@@ -1,14 +1,14 @@
-"use client"
+'use client';
 
-import React from 'react'
-import { cn } from '../../utils'
+import React from 'react';
+import { cn } from '../../utils';
 
 interface BenefitCardProps {
-  icon?: React.ReactNode
-  title: string
-  description: string
-  variant?: 'default' | 'dark' | 'auth-figma'
-  className?: string
+  icon?: React.ReactNode;
+  title: string;
+  description: string;
+  variant?: 'default' | 'dark' | 'auth-figma';
+  className?: string;
 }
 
 export const BenefitCard: React.FC<BenefitCardProps> = ({
@@ -16,112 +16,125 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
   title,
   description,
   variant = 'default',
-  className = ''
+  className = '',
 }) => {
-  const getBaseStyles = (variant: string) => {
-    const gap = variant === 'auth-figma' ? 'gap-4' : 'gap-2'
-    return `flex ${gap} items-start justify-start relative`
-  }
-  
+  // Direction and cross-axis alignment only — every other per-variant value
+  // (including `gap`, which used to hide in a ternary here) lives in
+  // `variantStyles` so one variant is one place.
+  const baseStyles = 'flex items-start justify-start relative';
+
   const variantStyles = {
     default: {
-      container: "bg-ods-bg p-2 md:p-4",
-      title: "font-body font-bold text-body-md md:text-body-lg text-ods-text-primary",
-      description: "font-body font-medium text-body-sm md:text-body-md text-ods-text-secondary"
+      container:
+        'gap-[var(--spacing-system-xsf)] bg-ods-bg p-[var(--spacing-system-xsf)] md:p-[var(--spacing-system-mf)]',
+      title: 'font-body font-bold text-body-md md:text-body-lg text-ods-text-primary',
+      description: 'font-body font-medium text-body-sm md:text-body-md text-ods-text-secondary',
     },
     dark: {
-      container: "bg-transparent p-0 shadow-[0px_48px_80px_0px_rgba(0,0,0,0.24)]",
-      title: "font-mono font-semibold text-heading-4 leading-[40px] text-ods-text-primary tracking-[-0.64px]",
-      description: "font-body font-medium text-body-lg leading-6 text-ods-text-tertiary"
+      container: 'gap-[var(--spacing-system-xsf)] bg-transparent p-0 shadow-[0px_48px_80px_0px_rgba(0,0,0,0.24)]',
+      title: 'font-mono font-semibold text-heading-4 leading-[40px] text-ods-text-primary tracking-[-0.64px]',
+      description: 'font-body font-medium text-body-lg leading-6 text-ods-text-tertiary',
     },
     'auth-figma': {
-      container: "bg-transparent p-6",
-      title: "text-h3 text-ods-text-primary tracking-[-0.36px]",
-      description: "text-h4 text-ods-text-secondary"
-    }
-  }
-  
-  const styles = variantStyles[variant]
-  
+      container: 'gap-[var(--spacing-system-mf)] bg-transparent p-[var(--spacing-system-lf)]',
+      title: 'text-h3 text-ods-text-primary tracking-[-0.36px]',
+      description: 'text-h4 text-ods-text-secondary',
+    },
+  };
+
+  const styles = variantStyles[variant];
+
   return (
-    <div className={cn(
-      getBaseStyles(variant),
-      styles.container,
-      className
-    )}>
-      {icon && (
-        <div>
-          {icon}
-        </div>
-      )}
-      <div className="flex flex-col gap-1 flex-1 min-w-0">
-        <h3 className={cn(
-          styles.title
-        )}>
-          {title}
-        </h3>
-        <p className={cn(
-          styles.description
-        )}>
-          {description}
-        </p>
+    <div className={cn(baseStyles, styles.container, className)}>
+      {icon && <div>{icon}</div>}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <h3 className={cn(styles.title)}>{title}</h3>
+        <p className={cn(styles.description)}>{description}</p>
       </div>
     </div>
-  )
-}
+  );
+};
 
 interface BenefitCardGridProps {
-  children: React.ReactNode
-  className?: string
-  columns?: 2 | 3 | 4 // Support 2, 3, or 4 columns
+  children: React.ReactNode;
+  className?: string;
+  columns?: 2 | 3 | 4; // Support 2, 3, or 4 columns
 }
 
-export const BenefitCardGrid: React.FC<BenefitCardGridProps> = ({
-  children,
-  className = '',
-  columns = 2
-}) => {
-  const childrenArray = React.Children.toArray(children)
+/**
+ * Which dividers card `index` of `totalItems` draws in a `columns` grid. Pure:
+ * the per-breakpoint row math (a 3-column grid lays out 1-up / 2-up / 3-up, so a
+ * card's row differs per breakpoint) is what needs testing, and the grid itself
+ * is a `cloneElement` over children.
+ */
+export function benefitCardBorderClass(
+  index: number,
+  totalItems: number,
+  columns: NonNullable<BenefitCardGridProps['columns']>,
+): string {
+  const isLastItem = index === totalItems - 1;
+  if (columns === 4) {
+    // 4-column grid borders
+    const isLastInRow = (index + 1) % 4 === 0;
+    const isInLastRow = index >= totalItems - 4;
+    return cn(
+      !isLastInRow && 'border-ods-border md:border-r',
+      !isInLastRow && 'border-b md:border-b lg:border-b-0',
+      index < 2 && 'lg:border-b-0',
+    );
+  } else if (columns === 3) {
+    // 3 columns lay out 1-up / 2-up / 3-up, so the row a card sits in
+    // differs per breakpoint and a single rule cannot describe it. The
+    // old shared 2-3 branch assumed one row and, at `md` (grid-cols-2),
+    // gave card 1 a trailing `md:border-r` while suppressing the divider
+    // between the two rows.
+    const isLastInMdRow = (index + 1) % 2 === 0;
+    const isInLastMdRow = index >= totalItems - (totalItems % 2 === 0 ? 2 : 1);
+    const isLastInLgRow = (index + 1) % 3 === 0;
+    const isInLastLgRow = index >= totalItems - (totalItems % 3 === 0 ? 3 : totalItems % 3);
+    return cn(
+      'border-ods-border',
+      !isLastItem && 'border-b',
+      isInLastMdRow && 'md:border-b-0',
+      !isLastInMdRow && !isLastItem && 'md:border-r',
+      isLastInMdRow && 'md:border-r-0',
+      isInLastLgRow && 'lg:border-b-0',
+      !isInLastMdRow && !isInLastLgRow && 'lg:border-b',
+      !isLastInLgRow && !isLastItem && 'lg:border-r',
+      isLastInLgRow && 'lg:border-r-0',
+    );
+  } else {
+    // 2 columns: a flex row, so one rule genuinely does describe it.
+    return isLastItem ? 'border-b-0' : 'border-b md:border-b-0 md:border-r border-ods-border';
+  }
+}
 
-  const gridClass = columns === 4
-    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
-    : columns === 3
-    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-    : 'flex flex-col md:flex-row'
+export const BenefitCardGrid: React.FC<BenefitCardGridProps> = ({ children, className = '', columns = 2 }) => {
+  const childrenArray = React.Children.toArray(children);
+
+  const gridClass =
+    columns === 4
+      ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
+      : columns === 3
+        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+        : 'flex flex-col md:flex-row';
 
   return (
-    <div className={cn(
-      "bg-ods-card rounded-lg shadow-ods-card border border-ods-border overflow-hidden",
-      gridClass,
-      className
-    )}>
+    <div
+      className={cn(
+        'overflow-hidden rounded-lg border border-ods-border bg-ods-card shadow-ods-card',
+        gridClass,
+        className,
+      )}
+    >
       {childrenArray.map((child, index) => {
-        const totalItems = childrenArray.length
-        const isLastItem = index === totalItems - 1
+        const borderClass = benefitCardBorderClass(index, childrenArray.length, columns);
 
-        // Dynamic border logic based on columns
-        let borderClass = ''
-        if (columns === 4) {
-          // 4-column grid borders
-          const isLastInRow = (index + 1) % 4 === 0
-          const isInLastRow = index >= totalItems - 4
-          borderClass = cn(
-            !isLastInRow && 'md:border-r border-ods-border',
-            !isInLastRow && 'border-b md:border-b lg:border-b-0',
-            index < 2 && 'lg:border-b-0'
-          )
-        } else {
-          // Original 2-3 column logic
-          borderClass = isLastItem
-            ? 'border-b-0'
-            : 'border-b md:border-b-0 md:border-r border-ods-border'
-        }
-
-        return React.cloneElement(child as React.ReactElement<any>, {
+        return React.cloneElement(child as React.ReactElement<{ className?: string }>, {
           key: index,
-          className: borderClass
-        })
+          className: borderClass,
+        });
       })}
     </div>
-  )
-}
+  );
+};

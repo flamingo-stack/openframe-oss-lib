@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Regression tests for the `next/navigation` shim fallback (unregistered host).
@@ -15,25 +15,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  * reload) is observable — jsdom leaves those methods unimplemented anyway.
  */
 
-const ORIGIN = 'http://localhost:3000'
+const ORIGIN = 'http://localhost:3000';
 
 async function freshModule() {
-  vi.resetModules()
-  return import('../next-navigation')
+  vi.resetModules();
+  return import('../next-navigation');
 }
 
-let assignSpy: ReturnType<typeof vi.fn>
-let replaceSpy: ReturnType<typeof vi.fn>
-let reloadSpy: ReturnType<typeof vi.fn>
-let pushStateSpy: ReturnType<typeof vi.spyOn>
-let replaceStateSpy: ReturnType<typeof vi.spyOn>
-let originalLocation: Location
+let assignSpy: ReturnType<typeof vi.fn>;
+let replaceSpy: ReturnType<typeof vi.fn>;
+let reloadSpy: ReturnType<typeof vi.fn>;
+let pushStateSpy: ReturnType<typeof vi.spyOn>;
+let replaceStateSpy: ReturnType<typeof vi.spyOn>;
+let originalLocation: Location;
 
 beforeEach(() => {
-  originalLocation = window.location
-  assignSpy = vi.fn()
-  replaceSpy = vi.fn()
-  reloadSpy = vi.fn()
+  originalLocation = window.location;
+  assignSpy = vi.fn();
+  replaceSpy = vi.fn();
+  reloadSpy = vi.fn();
   Object.defineProperty(window, 'location', {
     configurable: true,
     value: {
@@ -45,100 +45,100 @@ beforeEach(() => {
       replace: replaceSpy,
       reload: reloadSpy,
     },
-  })
+  });
   // Real jsdom history — spy without changing behavior so we can assert which
   // History API the fallback used (push vs replace encodes the nav semantics).
-  pushStateSpy = vi.spyOn(window.history, 'pushState')
-  replaceStateSpy = vi.spyOn(window.history, 'replaceState')
-})
+  pushStateSpy = vi.spyOn(window.history, 'pushState');
+  replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+});
 
 afterEach(() => {
-  Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
-  vi.restoreAllMocks()
-})
+  Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+  vi.restoreAllMocks();
+});
 
 describe('fallback useRouter (unregistered host)', () => {
   it('replace() writes the URL via history.replaceState — never a hard navigation', async () => {
-    const { useRouter } = await freshModule()
-    const popstate = vi.fn()
-    window.addEventListener('popstate', popstate)
+    const { useRouter } = await freshModule();
+    const popstate = vi.fn();
+    window.addEventListener('popstate', popstate);
 
-    useRouter().replace('?search=laptop')
+    useRouter().replace('?search=laptop');
 
-    expect(replaceStateSpy).toHaveBeenCalledWith(null, '', `${ORIGIN}/?search=laptop`)
-    expect(pushStateSpy).not.toHaveBeenCalled()
+    expect(replaceStateSpy).toHaveBeenCalledWith(null, '', `${ORIGIN}/?search=laptop`);
+    expect(pushStateSpy).not.toHaveBeenCalled();
     // No full-document navigation of any kind — this is the reported bug.
-    expect(assignSpy).not.toHaveBeenCalled()
-    expect(replaceSpy).not.toHaveBeenCalled()
-    expect(reloadSpy).not.toHaveBeenCalled()
+    expect(assignSpy).not.toHaveBeenCalled();
+    expect(replaceSpy).not.toHaveBeenCalled();
+    expect(reloadSpy).not.toHaveBeenCalled();
     // Subscribers (usePathname/useSearchParams) get a re-render signal.
-    expect(popstate).toHaveBeenCalledTimes(1)
+    expect(popstate).toHaveBeenCalledTimes(1);
 
-    window.removeEventListener('popstate', popstate)
-  })
+    window.removeEventListener('popstate', popstate);
+  });
 
   it('push() uses history.pushState (new entry) — never a hard navigation', async () => {
-    const { useRouter } = await freshModule()
-    useRouter().push('/scripts?tab=list')
+    const { useRouter } = await freshModule();
+    useRouter().push('/scripts?tab=list');
 
-    expect(pushStateSpy).toHaveBeenCalledWith(null, '', `${ORIGIN}/scripts?tab=list`)
-    expect(replaceStateSpy).not.toHaveBeenCalled()
-    expect(assignSpy).not.toHaveBeenCalled()
-    expect(reloadSpy).not.toHaveBeenCalled()
-  })
+    expect(pushStateSpy).toHaveBeenCalledWith(null, '', `${ORIGIN}/scripts?tab=list`);
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+    expect(assignSpy).not.toHaveBeenCalled();
+    expect(reloadSpy).not.toHaveBeenCalled();
+  });
 
   it('falls back to a real navigation for cross-origin targets, honoring replace semantics', async () => {
-    const { useRouter } = await freshModule()
-    useRouter().replace('https://example.com/evil')
+    const { useRouter } = await freshModule();
+    useRouter().replace('https://example.com/evil');
 
     // replace() must use location.replace (no back-button entry), not assign.
-    expect(replaceSpy).toHaveBeenCalledWith('https://example.com/evil')
-    expect(assignSpy).not.toHaveBeenCalled()
-    expect(replaceStateSpy).not.toHaveBeenCalled()
-    expect(pushStateSpy).not.toHaveBeenCalled()
-  })
+    expect(replaceSpy).toHaveBeenCalledWith('https://example.com/evil');
+    expect(assignSpy).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+    expect(pushStateSpy).not.toHaveBeenCalled();
+  });
 
   it('uses location.assign for a cross-origin push (new history entry)', async () => {
-    const { useRouter } = await freshModule()
-    useRouter().push('https://example.com/evil')
+    const { useRouter } = await freshModule();
+    useRouter().push('https://example.com/evil');
 
-    expect(assignSpy).toHaveBeenCalledWith('https://example.com/evil')
-    expect(replaceSpy).not.toHaveBeenCalled()
-    expect(pushStateSpy).not.toHaveBeenCalled()
-  })
+    expect(assignSpy).toHaveBeenCalledWith('https://example.com/evil');
+    expect(replaceSpy).not.toHaveBeenCalled();
+    expect(pushStateSpy).not.toHaveBeenCalled();
+  });
 
   it('falls back to a real navigation for a malformed href (push → assign)', async () => {
-    const { useRouter } = await freshModule()
-    useRouter().push('http://[invalid')
+    const { useRouter } = await freshModule();
+    useRouter().push('http://[invalid');
 
-    expect(assignSpy).toHaveBeenCalledWith('http://[invalid')
-    expect(replaceSpy).not.toHaveBeenCalled()
-    expect(pushStateSpy).not.toHaveBeenCalled()
-  })
+    expect(assignSpy).toHaveBeenCalledWith('http://[invalid');
+    expect(replaceSpy).not.toHaveBeenCalled();
+    expect(pushStateSpy).not.toHaveBeenCalled();
+  });
 
   it('falls back to a real navigation for a malformed href (replace → replace)', async () => {
-    const { useRouter } = await freshModule()
-    useRouter().replace('http://[invalid')
+    const { useRouter } = await freshModule();
+    useRouter().replace('http://[invalid');
 
-    expect(replaceSpy).toHaveBeenCalledWith('http://[invalid')
-    expect(assignSpy).not.toHaveBeenCalled()
-    expect(replaceStateSpy).not.toHaveBeenCalled()
-  })
+    expect(replaceSpy).toHaveBeenCalledWith('http://[invalid');
+    expect(assignSpy).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+  });
 
   it('back/forward remain history-based (unchanged)', async () => {
-    const { useRouter } = await freshModule()
-    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
-    const forwardSpy = vi.spyOn(window.history, 'forward').mockImplementation(() => {})
-    useRouter().back()
-    useRouter().forward()
-    expect(backSpy).toHaveBeenCalledTimes(1)
-    expect(forwardSpy).toHaveBeenCalledTimes(1)
-  })
-})
+    const { useRouter } = await freshModule();
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    const forwardSpy = vi.spyOn(window.history, 'forward').mockImplementation(() => {});
+    useRouter().back();
+    useRouter().forward();
+    expect(backSpy).toHaveBeenCalledTimes(1);
+    expect(forwardSpy).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('registered useRouter (Next host)', () => {
   it('delegates to the host router and never touches window.location or history', async () => {
-    const { useRouter, registerNavigation } = await freshModule()
+    const { useRouter, registerNavigation } = await freshModule();
     const hostRouter = {
       push: vi.fn(),
       replace: vi.fn(),
@@ -146,20 +146,20 @@ describe('registered useRouter (Next host)', () => {
       forward: vi.fn(),
       refresh: vi.fn(),
       prefetch: vi.fn(),
-    }
-    registerNavigation({ useRouter: () => hostRouter })
+    };
+    registerNavigation({ useRouter: () => hostRouter });
 
-    const r = useRouter()
-    r.replace('?search=laptop', { scroll: false })
-    r.push('/scripts')
+    const r = useRouter();
+    r.replace('?search=laptop', { scroll: false });
+    r.push('/scripts');
 
-    expect(hostRouter.replace).toHaveBeenCalledWith('?search=laptop', { scroll: false })
-    expect(hostRouter.push).toHaveBeenCalledWith('/scripts')
+    expect(hostRouter.replace).toHaveBeenCalledWith('?search=laptop', { scroll: false });
+    expect(hostRouter.push).toHaveBeenCalledWith('/scripts');
     // The fallback path is completely bypassed — no navigation side effects.
-    expect(assignSpy).not.toHaveBeenCalled()
-    expect(replaceSpy).not.toHaveBeenCalled()
-    expect(reloadSpy).not.toHaveBeenCalled()
-    expect(pushStateSpy).not.toHaveBeenCalled()
-    expect(replaceStateSpy).not.toHaveBeenCalled()
-  })
-})
+    expect(assignSpy).not.toHaveBeenCalled();
+    expect(replaceSpy).not.toHaveBeenCalled();
+    expect(reloadSpy).not.toHaveBeenCalled();
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+  });
+});

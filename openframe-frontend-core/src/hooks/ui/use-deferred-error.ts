@@ -1,12 +1,12 @@
-'use client'
+'use client';
 
-import * as React from 'react'
+import { useState, useEffect, useCallback } from 'react';
 
 export interface UseDeferredErrorResult {
   /** The message to render (undefined while the reveal is deferred or the field is valid). */
-  error: string | undefined
+  error: string | undefined;
   /** Attach to the field's onBlur — reveals validation immediately and keeps it live from then on. */
-  onBlur: () => void
+  onBlur: () => void;
 }
 
 /**
@@ -18,21 +18,31 @@ export interface UseDeferredErrorResult {
  * valid) disappears immediately.
  */
 export function useDeferredError(error: string | undefined, value: string, delay = 1500): UseDeferredErrorResult {
-  const [touched, setTouched] = React.useState(false)
-  const [paused, setPaused] = React.useState(false)
+  const [touched, setTouched] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [pausedFor, setPausedFor] = useState(value);
 
-  // Typing hides the message and restarts the pause timer.
-  React.useEffect(() => {
-    if (touched) return
-    setPaused(false)
-    const timer = setTimeout(() => setPaused(true), delay)
-    return () => clearTimeout(timer)
-  }, [value, delay, touched])
+  // Typing hides the message: React's "adjust state while rendering" reset, not
+  // an effect. The keystroke has already scheduled this render, so clearing
+  // `paused` here costs nothing, whereas doing it from the effect below commits
+  // a render with the stale message still on screen and then immediately
+  // re-renders to remove it.
+  if (pausedFor !== value) {
+    setPausedFor(value);
+    setPaused(false);
+  }
 
-  const onBlur = React.useCallback(() => setTouched(true), [])
+  // …and restarts the pause timer.
+  useEffect(() => {
+    if (touched) return undefined;
+    const timer = setTimeout(() => setPaused(true), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay, touched]);
+
+  const onBlur = useCallback(() => setTouched(true), []);
 
   return {
     error: error && (touched || paused) ? error : undefined,
     onBlur,
-  }
+  };
 }

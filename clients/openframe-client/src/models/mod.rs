@@ -10,6 +10,7 @@ pub mod initial_configuration;
 pub mod installed_agent_message;
 pub mod installed_tool;
 pub mod machine_heartbeat_message;
+pub mod machine_timezone_message;
 pub mod openframe_client_info;
 pub mod openframe_client_update_message;
 pub mod tool_agent_update_message;
@@ -23,9 +24,9 @@ pub mod tool_version_overrides;
 pub mod update_state;
 
 pub use execution::{
-    CommandMessage, ExecutionMessage, ExecutionRequest, PrivilegeLevel, RmmResult, ScriptEnvVar,
-    ScriptMessage, ScriptScheduleExecutionItem, ScriptScheduleExecutionMessage, ScriptShell,
-    ScriptSpec,
+    is_ack_subject, CommandMessage, ExecutionAck, ExecutionMessage, ExecutionRequest,
+    PrivilegeLevel, RmmResult, ScriptEnvVar, ScriptMessage, ScriptScheduleExecutionItem,
+    ScriptScheduleExecutionMessage, ScriptShell, ScriptSpec, EXECUTION_ACK_KIND,
 };
 
 pub use agent_configuration::AgentConfiguration;
@@ -39,6 +40,7 @@ pub use initial_configuration::InitialConfiguration;
 pub use installed_agent_message::InstalledAgentMessage;
 pub use installed_tool::{Installation, InstalledAsset, InstalledTool, ToolRecordState};
 pub use machine_heartbeat_message::MachineHeartbeatMessage;
+pub use machine_timezone_message::MachineTimezoneMessage;
 pub use openframe_client_info::OpenFrameClientInfo;
 pub use openframe_client_update_message::OpenFrameClientUpdateMessage;
 pub use tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};

@@ -1,21 +1,22 @@
-"use client"
+'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react'
-import { cn } from '../../utils'
-import { scrollElementIntoView } from '../../utils/scroll-into-view'
+import type React from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { cn } from '../../utils';
+import { scrollElementIntoView } from '../../utils/scroll-into-view';
 
 export interface StickyNavSection {
-  id: string
-  label: string
+  id: string;
+  label: string;
 }
 
 interface StickySectionNavProps {
-  sections: StickyNavSection[]
-  activeSection: string
-  onSectionClick: (sectionId: string) => void
-  className?: string
-  ribbonPosition?: 'left' | 'right'
-  ribbonColor?: string
+  sections: StickyNavSection[];
+  activeSection: string;
+  onSectionClick: (sectionId: string) => void;
+  className?: string;
+  ribbonPosition?: 'left' | 'right';
+  ribbonColor?: string;
 }
 
 /**
@@ -28,12 +29,12 @@ export function StickySectionNav({
   onSectionClick,
   className,
   ribbonPosition = 'left',
-  ribbonColor = 'var(--color-accent-primary)'
+  ribbonColor = 'var(--color-accent-primary)',
 }: StickySectionNavProps) {
-  const navHeight = sections.length * 40 // 40px per item (h-10)
+  const navHeight = sections.length * 40; // 40px per item (h-10)
 
   return (
-    <nav className={cn("bg-ods-bg relative", className)}>
+    <nav className={cn('relative bg-ods-bg', className)}>
       {/* Background gray vertical line for all nav items */}
       <div
         className="absolute bg-ods-border"
@@ -41,15 +42,12 @@ export function StickySectionNav({
           width: '1px',
           height: `${navHeight}px`,
           [ribbonPosition === 'left' ? 'left' : 'right']: '-2px',
-          top: '0px'
+          top: '0px',
         }}
       />
 
-      {sections.map((section) => (
-        <div
-          key={section.id}
-          className="relative w-full h-10 transition-all duration-200 flex items-stretch"
-        >
+      {sections.map(section => (
+        <div key={section.id} className="relative flex h-10 w-full items-stretch transition-all duration-200">
           {/* Yellow ribbon for active state */}
           {activeSection === section.id && (
             <div
@@ -60,7 +58,7 @@ export function StickySectionNav({
                 height: '24px',
                 [ribbonPosition === 'left' ? 'left' : 'right']: '-2px',
                 top: '8px',
-                borderRadius: '2px'
+                borderRadius: '2px',
               }}
             />
           )}
@@ -68,21 +66,23 @@ export function StickySectionNav({
           {/* Navigation button */}
           <button
             onClick={() => onSectionClick(section.id)}
-            className="flex-1 flex items-center gap-2 px-3 py-2 cursor-pointer relative"
+            className="relative flex flex-1 cursor-pointer items-center gap-2 px-3 py-2"
           >
-            <span className={cn(
-              "text-left text-h6 transition-all duration-200",
-              activeSection === section.id
-                ? "text-ods-text-primary"
-                : "text-ods-text-secondary hover:text-ods-text-primary"
-            )}>
+            <span
+              className={cn(
+                'text-left transition-all duration-200 text-h6',
+                activeSection === section.id
+                  ? 'text-ods-text-primary'
+                  : 'text-ods-text-secondary hover:text-ods-text-primary',
+              )}
+            >
               {section.label}
             </span>
           </button>
         </div>
       ))}
     </nav>
-  )
+  );
 }
 
 /**
@@ -91,81 +91,85 @@ export function StickySectionNav({
 export function useSectionNavigation(
   sections: { id: string; ref: React.RefObject<HTMLElement> }[],
   options?: {
-    offset?: number
-  }
+    offset?: number;
+  },
 ) {
-  const [activeSection, setActiveSection] = useState(sections[0]?.id || '')
-  const isScrollingFromClick = useRef(false)
-  const { offset = 100 } = options || {}
+  const [activeSection, setActiveSection] = useState(sections[0]?.id || '');
+  const isScrollingFromClick = useRef(false);
+  const { offset = 100 } = options || {};
 
   // Handle click - scroll to the element via the canonical helper.
   // The `offset` prop maps to `headerOffset` (sticky chrome above the
   // section nav); same smooth-scroll mechanics every other anchor
   // surface in the app uses.
-  const handleSectionClick = useCallback((sectionId: string) => {
-    const targetElement = document.getElementById(sectionId)
-    if (!targetElement) return
+  const handleSectionClick = useCallback(
+    (sectionId: string) => {
+      const targetElement = document.getElementById(sectionId);
+      if (!targetElement) return;
 
-    // Prevent scroll spy while we're scrolling
-    isScrollingFromClick.current = true
-    setActiveSection(sectionId)
+      // Prevent scroll spy while we're scrolling
+      isScrollingFromClick.current = true;
+      setActiveSection(sectionId);
 
-    scrollElementIntoView(targetElement, { headerOffset: offset })
+      scrollElementIntoView(targetElement, { headerOffset: offset });
 
-    // Allow scroll spy again after scroll completes
-    setTimeout(() => {
-      isScrollingFromClick.current = false
-    }, 500)
-  }, [offset])
+      // Allow scroll spy again after scroll completes
+      setTimeout(() => {
+        isScrollingFromClick.current = false;
+      }, 500);
+    },
+    [offset],
+  );
 
   // Make sure elements have IDs
   useEffect(() => {
     sections.forEach(section => {
-      if (section.ref.current && !section.ref.current.id) {
-        section.ref.current.id = section.id
+      const el = section.ref.current;
+      if (el && !el.id) {
+        el.id = section.id;
       }
-    })
-  }, [sections])
+    });
+  }, [sections]);
 
   // Simple scroll spy
   useEffect(() => {
     const handleScroll = () => {
-      if (isScrollingFromClick.current) return
+      if (isScrollingFromClick.current) return;
 
-      const scrollPosition = window.scrollY + offset + 50
+      const scrollPosition = window.scrollY + offset + 50;
 
       // Find which section we're in
-      let currentSection = sections[0]?.id || ''
-      
+      let currentSection = sections[0]?.id || '';
+
       for (let i = sections.length - 1; i >= 0; i--) {
-        const element = document.getElementById(sections[i].id)
+        const element = document.getElementById(sections[i].id);
         if (element && scrollPosition >= element.offsetTop) {
-          currentSection = sections[i].id
-          break
+          currentSection = sections[i].id;
+          break;
         }
       }
 
-      setActiveSection(currentSection)
-    }
+      setActiveSection(currentSection);
+    };
 
     // Throttle the scroll handler
-    let scrollTimer: NodeJS.Timeout
+    let scrollTimer: NodeJS.Timeout;
     const throttledScroll = () => {
-      clearTimeout(scrollTimer)
-      scrollTimer = setTimeout(handleScroll, 100)
-    }
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(handleScroll, 100);
+    };
 
-    window.addEventListener('scroll', throttledScroll)
-    handleScroll() // Check initial position
+    window.addEventListener('scroll', throttledScroll);
+    handleScroll(); // Check initial position
 
     return () => {
-      window.removeEventListener('scroll', throttledScroll)
-      clearTimeout(scrollTimer)
-    }
-  }, [sections, offset])
+      window.removeEventListener('scroll', throttledScroll);
+      clearTimeout(scrollTimer);
+    };
+  }, [sections, offset]);
 
   return {
     activeSection,
-    handleSectionClick
-  }
+    handleSectionClick,
+  };
 }

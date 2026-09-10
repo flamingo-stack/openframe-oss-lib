@@ -31,6 +31,8 @@ public class OrganizationResponse {
     private LocalDate contractEndDate;
     private Instant createdAt;
     private Instant updatedAt;
+    /** Canonical last-activity timestamp: updatedAt, falling back to createdAt (display value; the lastActivityFrom/To filter matches updatedAt only, mirroring GraphQL). */
+    private Instant lastActivityAt;
     private Boolean isDefault;
     private String status;
     private Instant statusChangedAt;

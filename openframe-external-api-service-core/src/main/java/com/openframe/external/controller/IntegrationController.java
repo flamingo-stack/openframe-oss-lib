@@ -1,5 +1,6 @@
 package com.openframe.external.controller;
 
+import com.openframe.external.web.ApiCaller;
 import com.openframe.external.service.RestProxyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -25,12 +26,8 @@ public class IntegrationController {
         summary = "Proxy API request to integrated tool",
         description = "Proxy any HTTP request to the specified integrated tool"
     )
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Request proxied successfully"),
-        @ApiResponse(responseCode = "400", description = "Bad request or tool error"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing API key"),
-        @ApiResponse(responseCode = "404", description = "Tool not found"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "Tool not found")
     })
     @RequestMapping(
             value = "{toolId}/**",
@@ -46,13 +43,12 @@ public class IntegrationController {
             @Parameter(description = "Tool identifier") @PathVariable String toolId,
             HttpServletRequest request,
             @Parameter(description = "Request body (for POST/PUT/PATCH requests)") @RequestBody(required = false) String body,
-            @Parameter(hidden = true) @RequestHeader(value = "X-User-Id", required = false) String userId,
-            @Parameter(hidden = true) @RequestHeader(value = "X-API-Key-Id", required = false) String apiKeyId) {
+            @Parameter(hidden = true) ApiCaller caller) {
         
         String path = request.getRequestURI();
         String method = request.getMethod();
         log.info("Proxying api request for tool: {}, path: {}, method: {} - userId: {}, apiKeyId: {}", 
-                toolId, path, method, userId, apiKeyId);
+                toolId, path, method, caller.userId(), caller.apiKeyId());
         try {
             return restProxyService.proxyApiRequest(toolId, request, body);
         } catch (Exception e) {

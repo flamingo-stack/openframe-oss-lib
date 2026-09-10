@@ -16,7 +16,7 @@ const OUTPUT_DIR = join(rootDir, 'src/components/icons-v2-generated');
 function toPascalCase(str) {
   return str
     .split(/[-\s]+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join('');
 }
 
@@ -31,7 +31,7 @@ function toKebabCase(str) {
 // silently breaks looping animations after the first cycle. Re-sync the
 // references to the actual prefixed ids.
 function fixSmilReferences(content) {
-  const ids = [...content.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  const ids = [...content.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
   if (ids.length === 0) return content;
 
   // Map the "bare" id (token after the last `__`, i.e. the form SVGO
@@ -44,10 +44,8 @@ function fixSmilReferences(content) {
   if (bareToFull.size === 0) return content;
 
   return content.replace(/\b(begin|end)="([^"]+)"/g, (_m, attr, value) => {
-    const fixed = value.replace(
-      /(?<![\w-])([\w-]+)\.(begin|end)/g,
-      (ref, token, evt) =>
-        bareToFull.has(token) ? `${bareToFull.get(token)}.${evt}` : ref
+    const fixed = value.replace(/(?<![\w-])([\w-]+)\.(begin|end)/g, (ref, token, evt) =>
+      bareToFull.has(token) ? `${bareToFull.get(token)}.${evt}` : ref,
     );
     return `${attr}="${fixed}"`;
   });
@@ -55,7 +53,7 @@ function fixSmilReferences(content) {
 
 // Get all category directories
 function getCategories() {
-  return readdirSync(ICONS_V2_DIR).filter((item) => {
+  return readdirSync(ICONS_V2_DIR).filter(item => {
     const itemPath = join(ICONS_V2_DIR, item);
     return statSync(itemPath).isDirectory() && !item.startsWith('.');
   });
@@ -72,8 +70,8 @@ function getOriginalSvgNames(categoryPath) {
     if (/^\d/.test(name)) {
       throw new Error(
         `Invalid icon name: "${name}" starts with a number. ` +
-        `Icon names cannot start with numbers as they would generate invalid JavaScript/TypeScript identifiers. ` +
-        `Please rename the file to start with a letter (e.g., "point-100" instead of "100-point").`
+          `Icon names cannot start with numbers as they would generate invalid JavaScript/TypeScript identifiers. ` +
+          `Please rename the file to start with a letter (e.g., "point-100" instead of "100-point").`,
       );
     }
   }
@@ -141,9 +139,10 @@ function processGeneratedCategory(categoryPath, originalNames) {
   exports.sort((a, b) => a.componentName.localeCompare(b.componentName));
 
   // Generate index.ts
-  const indexContent = exports
-    .map(({ componentName, kebabName }) => `export { ${componentName} } from './${kebabName}-icon';`)
-    .join('\n') + '\n';
+  const indexContent =
+    exports
+      .map(({ componentName, kebabName }) => `export { ${componentName} } from './${kebabName}-icon';`)
+      .join('\n') + '\n';
 
   writeFileSync(join(categoryPath, 'index.ts'), indexContent);
 
@@ -175,10 +174,7 @@ const allCategories = getCategories();
 let categoriesToProcess;
 if (targetCategory) {
   if (!allCategories.includes(targetCategory)) {
-    console.error(
-      `Unknown category: "${targetCategory}".\n` +
-      `Available: ${allCategories.join(', ')}`
-    );
+    console.error(`Unknown category: "${targetCategory}".\n` + `Available: ${allCategories.join(', ')}`);
     process.exit(1);
   }
   categoriesToProcess = [targetCategory];
@@ -216,10 +212,10 @@ for (const category of categoriesToProcess) {
 
   // Run SVGR for entire category at once
   try {
-    execSync(
-      `npx @svgr/cli --config-file svgr.config.cjs --out-dir "${outputPath}" -- "${inputPath}"`,
-      { cwd: rootDir, stdio: 'pipe' }
-    );
+    execSync(`npx @svgr/cli --config-file svgr.config.cjs --out-dir "${outputPath}" -- "${inputPath}"`, {
+      cwd: rootDir,
+      stdio: 'pipe',
+    });
 
     // Post-process generated files
     const count = processGeneratedCategory(outputPath, originalNames);
@@ -234,15 +230,11 @@ for (const category of categoriesToProcess) {
 // (not from the source listing) so single-category runs preserve any
 // categories that already exist in OUTPUT_DIR but weren't touched.
 const presentCategories = readdirSync(OUTPUT_DIR).filter(
-  (item) =>
-    statSync(join(OUTPUT_DIR, item)).isDirectory() &&
-    existsSync(join(OUTPUT_DIR, item, 'index.ts'))
+  item => statSync(join(OUTPUT_DIR, item)).isDirectory() && existsSync(join(OUTPUT_DIR, item, 'index.ts')),
 );
 presentCategories.sort();
 
-const categoryExports = presentCategories
-  .map((cat) => `export * from './${cat}';`)
-  .join('\n');
+const categoryExports = presentCategories.map(cat => `export * from './${cat}';`).join('\n');
 
 writeFileSync(join(OUTPUT_DIR, 'index.ts'), categoryExports + '\n');
 

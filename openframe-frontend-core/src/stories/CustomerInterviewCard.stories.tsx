@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { CustomerInterviewCard } from '../components/chat/entity-cards'
-import { ChatColumnDecorator } from './__fixtures__/chat-card-decorator'
-import { customerInterview } from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { CustomerInterviewCard } from '../components/chat/entity-cards';
+import { ChatColumnDecorator } from './__fixtures__/chat-card-decorator';
+import { customerInterview } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof CustomerInterviewCard> = {
   title: 'Chat/EntityCards/CustomerInterviewCard',
@@ -15,11 +15,17 @@ const meta: Meta<typeof CustomerInterviewCard> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const ChatInlineSm: Story = {
   args: {
@@ -29,7 +35,7 @@ export const ChatInlineSm: Story = {
     target: '_blank',
     rel: 'noopener noreferrer',
   },
-}
+};
 
 export const Default: Story = {
   args: {
@@ -39,4 +45,4 @@ export const Default: Story = {
     target: '_blank',
     rel: 'noopener noreferrer',
   },
-}
+};

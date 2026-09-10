@@ -15,15 +15,15 @@
  */
 
 import type { ReactNode } from 'react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter, useSearchParams, usePathname } from '../../../embed-shims';
-import { SearchInput } from '../../ui';
-import { StatusFilterComponent } from '../../features';
 import {
   OPENFRAME_DEV_SECTIONS,
   type OpenframeDevSection,
   type OpenframeDevSectionKey,
 } from '../../../utils/dev-sections/openframe-dev-sections';
+import { StatusFilterComponent } from '../../features';
+import { SearchInput } from '../../ui';
 
 export interface DevSectionViewProps {
   /** Which section to render — drives title, search, and filter
@@ -74,9 +74,7 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
   const filter = section.filter;
 
   const currentSearch = search ? searchParams.get(search.paramKey) || '' : '';
-  const currentFilterValue = filter
-    ? searchParams.get(filter.paramKey) || filter.defaultValue
-    : '';
+  const currentFilterValue = filter ? searchParams.get(filter.paramKey) || filter.defaultValue : '';
 
   // Controlled search-input state — TYPING commits to the URL only on
   // Enter (not on every keystroke), but CLEARING commits immediately:
@@ -86,9 +84,16 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
   // Lazy init from URL avoids a brief flash of stale value on first
   // paint after URL-driven re-render (e.g. tab switch).
   const [searchValue, setSearchValue] = useState(() => currentSearch);
-  useEffect(() => {
+  // Re-sync when the URL changes underneath us (tab switch, back/forward,
+  // a companion param cleared elsewhere). Adjusted while rendering — React's
+  // documented prop-sync pattern — rather than from an effect, which would
+  // commit one frame with the input still showing the previous section's
+  // query before replacing it.
+  const [syncedSearch, setSyncedSearch] = useState(currentSearch);
+  if (syncedSearch !== currentSearch) {
+    setSyncedSearch(currentSearch);
     setSearchValue(currentSearch);
-  }, [currentSearch]);
+  }
 
   const handleSearchSubmit = (value: string) => {
     if (!search) return;
@@ -119,21 +124,19 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
   };
 
   return (
-    <div className="w-full flex flex-col gap-10">
+    <div className="flex w-full flex-col gap-10">
       {showHeading &&
         (hero ? (
           <div className="space-y-4">
-            <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary flex items-center gap-3">
+            <h1 className="flex items-center gap-3 tracking-[-1.12px] text-ods-text-primary text-h1">
               {hero.icon}
               {hero.title ?? section.hero.title}
             </h1>
-            <p className="text-h4 text-ods-text-secondary max-w-3xl">
-              {hero.description}
-            </p>
+            <p className="max-w-3xl text-ods-text-secondary text-h4">{hero.description}</p>
           </div>
         ) : (
-          <div className="flex items-center justify-between w-full">
-            <h2 className="font-['Azeret_Mono'] font-semibold text-[32px] md:text-[40px] lg:text-[48px] leading-[40px] md:leading-[48px] lg:leading-[56px] text-ods-text-primary tracking-[-0.64px] md:tracking-[-0.8px] lg:tracking-[-0.96px]">
+          <div className="flex w-full items-center justify-between">
+            <h2 className="font-['Azeret_Mono'] text-[32px] font-semibold leading-[40px] tracking-[-0.64px] text-ods-text-primary md:text-[40px] md:leading-[48px] md:tracking-[-0.8px] lg:text-[48px] lg:leading-[56px] lg:tracking-[-0.96px]">
               {section.hero.title}
               <span className="text-ods-accent">:</span>
             </h2>

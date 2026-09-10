@@ -1,7 +1,7 @@
 package com.openframe.api.dto.command;
 
-import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.document.rmm.ScriptShell;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

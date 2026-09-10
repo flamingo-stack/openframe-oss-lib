@@ -1,9 +1,10 @@
 package com.openframe.stream.service;
 
-import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.repository.rmm.CustomScriptExecutionRepository.LeafStatusCounts;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.stream.service.rmm.ScheduleScriptExecutionAggregator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
