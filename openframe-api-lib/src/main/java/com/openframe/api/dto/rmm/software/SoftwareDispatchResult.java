@@ -9,6 +9,6 @@ import lombok.Data;
 public class SoftwareDispatchResult {
 
     private PackageManagerType packageManager;
-    private String packageId;
+    private String packageName;
     private String executionId;
 }

@@ -20,19 +20,16 @@ public class BrewPackageManagerHandler implements PackageManagerHandler {
 
     @Override
     public SoftwareScriptCode scriptCode(SoftwareAction action) {
-        return switch (action) {
-            case INSTALL -> SoftwareScriptCode.BREW_INSTALL;
-            case UPDATE -> SoftwareScriptCode.BREW_UPDATE;
-        };
+        return action.select(SoftwareScriptCode.BREW_INSTALL, SoftwareScriptCode.BREW_UPDATE);
     }
 
     @Override
-    public List<String> buildArgs(String packageId, BrewPackageType packageType) {
-        if (packageId == null || packageId.isBlank()) {
-            throw new BadRequestException("packageId is required for a brew package");
+    public List<String> buildArgs(String packageName, BrewPackageType packageType) {
+        if (packageName == null || packageName.isBlank()) {
+            throw new BadRequestException("packageName is required for a brew package");
         }
         return packageType == BrewPackageType.CASK
-                ? List.of(CASK_FLAG, packageId)
-                : List.of(packageId);
+                ? List.of(CASK_FLAG, packageName)
+                : List.of(packageName);
     }
 }

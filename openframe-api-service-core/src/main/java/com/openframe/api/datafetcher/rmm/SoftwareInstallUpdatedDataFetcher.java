@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.rmm.software.SoftwareDispatchResult;
 import com.openframe.api.dto.rmm.software.SoftwareManagementInput;
 import com.openframe.api.service.rmm.software.SoftwareInstallUpdateManagementService;
+import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,12 +28,12 @@ public class SoftwareInstallUpdatedDataFetcher {
 
     @DgsMutation
     public List<SoftwareDispatchResult> installSoftware(@InputArgument @Valid SoftwareManagementInput input) {
-        return softwareInstallUpdateManagementService.install(input, getCurrentUserId());
+        return softwareInstallUpdateManagementService.install(input, getCurrentUserId(), ExecutionSource.MANUAL);
     }
 
     @DgsMutation
     public List<SoftwareDispatchResult> updateSoftware(@InputArgument @Valid SoftwareManagementInput input) {
-        return softwareInstallUpdateManagementService.update(input, getCurrentUserId());
+        return softwareInstallUpdateManagementService.update(input, getCurrentUserId(), ExecutionSource.MANUAL);
     }
 
     private String getCurrentUserId() {

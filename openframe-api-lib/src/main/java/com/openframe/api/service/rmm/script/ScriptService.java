@@ -85,7 +85,7 @@ public class ScriptService {
 
     public ScriptResponse getSystemScript(SystemScriptCode code) {
         String tenantId = tenantIdProvider.getTenantId();
-        return scriptRepository.findSystemScript(code, tenantId)
+        return scriptRepository.findByTenantIdAndNameAndType(tenantId, code.canonicalName(), ScriptType.SYSTEM)
                 .map(scriptMapper::toResponse)
                 .orElseThrow(() -> new NotFoundException(
                         "System script not provisioned for this tenant: " + code.canonicalName()));
@@ -93,7 +93,7 @@ public class ScriptService {
 
     public ScriptResponse getSoftwareScript(SoftwareScriptCode code) {
         String tenantId = tenantIdProvider.getTenantId();
-        return scriptRepository.findSoftwareScript(code, tenantId)
+        return scriptRepository.findByTenantIdAndNameAndType(tenantId, code.canonicalName(), ScriptType.SOFTWARE)
                 .map(scriptMapper::toResponse)
                 .orElseThrow(() -> new NotFoundException(
                         "Software script not provisioned for this tenant: " + code.canonicalName()));

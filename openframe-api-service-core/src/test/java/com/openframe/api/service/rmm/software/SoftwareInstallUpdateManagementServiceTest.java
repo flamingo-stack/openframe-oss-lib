@@ -58,7 +58,7 @@ class SoftwareInstallUpdateManagementServiceTest {
                 pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK),
                 pkg(PackageManagerType.BREW, "wireshark", BrewPackageType.FORMULA));
 
-        List<SoftwareDispatchResult> results = service.install(input, USER);
+        List<SoftwareDispatchResult> results = service.install(input, USER, ExecutionSource.MANUAL);
 
         // System script resolved once for both brew packages (cached).
         verify(scriptService, times(1)).getSoftwareScript(SoftwareScriptCode.BREW_INSTALL);
@@ -71,7 +71,7 @@ class SoftwareInstallUpdateManagementServiceTest {
         assertThat(argsCaptor.getAllValues().get(0)).containsExactly("--cask", "slack");
         assertThat(argsCaptor.getAllValues().get(1)).containsExactly("wireshark");
 
-        assertThat(results).extracting(SoftwareDispatchResult::getPackageId)
+        assertThat(results).extracting(SoftwareDispatchResult::getPackageName)
                 .containsExactly("slack", "wireshark");
         assertThat(results).extracting(SoftwareDispatchResult::getExecutionId)
                 .containsExactly("exec-slack", "exec-wireshark");
@@ -80,18 +80,19 @@ class SoftwareInstallUpdateManagementServiceTest {
     }
 
     @Test
-    @DisplayName("update: routes to the BREW_UPDATE system script")
-    void update_usesUpdateScript() {
+    @DisplayName("update: routes to the BREW_UPDATE system script and propagates the caller's ExecutionSource (e.g. AI_ASSISTANT for MingoAI)")
+    void update_usesUpdateScript_andPropagatesSource() {
         ScriptResponse updateScript = systemScript("brew-update-id");
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(updateScript);
-        when(softwareDispatchService.dispatch(any(), anyList(), anyList(), eq(USER), eq(ExecutionSource.MANUAL)))
+        when(softwareDispatchService.dispatch(any(), anyList(), anyList(), eq(USER), eq(ExecutionSource.AI_ASSISTANT)))
                 .thenReturn("exec-1");
 
-        service.update(input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER);
+        service.update(input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER,
+                ExecutionSource.AI_ASSISTANT);
 
         verify(scriptService).getSoftwareScript(SoftwareScriptCode.BREW_UPDATE);
         verify(softwareDispatchService).dispatch(eq(updateScript), eq(MACHINES),
-                eq(List.of("--cask", "slack")), eq(USER), eq(ExecutionSource.MANUAL));
+                eq(List.of("--cask", "slack")), eq(USER), eq(ExecutionSource.AI_ASSISTANT));
     }
 
     private static SoftwareManagementInput input(SoftwarePackageInput... packages) {
@@ -104,7 +105,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     private static SoftwarePackageInput pkg(PackageManagerType manager, String id, BrewPackageType type) {
         SoftwarePackageInput p = new SoftwarePackageInput();
         p.setPackageManager(manager);
-        p.setPackageId(id);
+        p.setPackageName(id);
         p.setPackageType(type);
         return p;
     }

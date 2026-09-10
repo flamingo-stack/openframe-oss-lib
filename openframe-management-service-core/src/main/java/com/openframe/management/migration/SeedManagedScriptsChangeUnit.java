@@ -20,16 +20,6 @@ import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 
-/**
- * Ensures every OpenFrame-managed script exists for the tenant: the package-manager bootstrap
- * scripts ({@link SystemScriptDefinition}, type SYSTEM) and the software-management install/update
- * scripts ({@link SoftwareScriptDefinition}, type SOFTWARE). Seeds a missing script and re-seeds one
- * whose stored contentHash no longer matches the shipped body, stamping each with its category.
- *
- * <p>{@code runAlways} on purpose — the bodies ship with the lib, so every release with a changed
- * body reconciles on next startup, and Mongock's lock serializes concurrent replicas. Runs after the
- * {@code migrate-script-system-flag-to-type} backfill so lookups are type-based.
- */
 @Slf4j
 @ChangeUnit(id = "seed-system-scripts", order = "013", author = "openframe", runAlways = true)
 public class SeedManagedScriptsChangeUnit {

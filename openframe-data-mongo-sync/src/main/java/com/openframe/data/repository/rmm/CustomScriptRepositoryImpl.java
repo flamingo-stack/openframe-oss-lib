@@ -186,8 +186,6 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
     }
 
     private static void applyManagedScriptShield(Criteria criteria) {
-        // Hide OpenFrame-managed scripts (bootstrap + software-management); only USER scripts are
-        // listable. nin() also shows legacy docs that predate the type field (missing type).
         criteria.and(FIELD_TYPE).nin(ScriptType.SYSTEM, ScriptType.SOFTWARE);
     }
 

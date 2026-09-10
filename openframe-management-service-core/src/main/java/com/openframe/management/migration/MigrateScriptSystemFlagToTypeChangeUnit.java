@@ -11,18 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
-/**
- * Backfills the {@link Script#getType()} category from the retired {@code system} boolean:
- * {@code system == true} → {@link ScriptType#SYSTEM}, everything else → {@link ScriptType#USER},
- * and drops the {@code system} field. Runs before {@code seed-system-scripts} (order 013) so the
- * seeder's type-based lookups resolve the (now categorised) bootstrap scripts instead of creating
- * duplicates.
- *
- * <p>Order-safe and idempotent: the SYSTEM pass runs first and unsets {@code system}; the USER pass
- * then targets only documents that still lack a {@code type}, so it never clobbers the rows just set
- * to SYSTEM, and a re-run matches nothing. Software scripts do not exist yet at migration time — the
- * seeder creates them with {@code type = SOFTWARE} directly. Forward-only (empty rollback).
- */
 @Slf4j
 @ChangeUnit(id = "migrate-script-system-flag-to-type", order = "012", author = "openframe")
 public class MigrateScriptSystemFlagToTypeChangeUnit {

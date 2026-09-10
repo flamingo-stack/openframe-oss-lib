@@ -27,15 +27,16 @@ public class SoftwareInstallUpdateManagementService {
     private final ScriptService scriptService;
     private final SoftwareDispatchService softwareDispatchService;
 
-    public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy) {
-        return dispatch(SoftwareAction.INSTALL, input, initiatedBy);
+    public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
+        return dispatch(SoftwareAction.INSTALL, input, initiatedBy, source);
     }
 
-    public List<SoftwareDispatchResult> update(SoftwareManagementInput input, String initiatedBy) {
-        return dispatch(SoftwareAction.UPDATE, input, initiatedBy);
+    public List<SoftwareDispatchResult> update(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
+        return dispatch(SoftwareAction.UPDATE, input, initiatedBy, source);
     }
 
-    private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input, String initiatedBy) {
+    private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input,
+                                                  String initiatedBy, ExecutionSource source) {
         List<String> machineIds = input.getMachineIds();
         Map<SoftwareScriptCode, ScriptResponse> scriptCache = new EnumMap<>(SoftwareScriptCode.class);
 
@@ -44,18 +45,19 @@ public class SoftwareInstallUpdateManagementService {
             PackageManagerHandler handler = packageManagerRegistry.handlerFor(pkg.getPackageManager());
             SoftwareScriptCode code = handler.scriptCode(action);
             ScriptResponse script = scriptCache.computeIfAbsent(code, scriptService::getSoftwareScript);
-            List<String> args = handler.buildArgs(pkg.getPackageId(), pkg.getPackageType());
+            List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getPackageType());
 
-            String executionId = softwareDispatchService.dispatch(script, machineIds, args, initiatedBy, ExecutionSource.MANUAL);
+            String executionId = softwareDispatchService.dispatch(script, machineIds, args, initiatedBy, source);
 
             results.add(SoftwareDispatchResult.builder()
                     .packageManager(pkg.getPackageManager())
-                    .packageId(pkg.getPackageId())
+                    .packageName(pkg.getPackageName())
                     .executionId(executionId)
                     .build());
         }
 
-        log.info("Software {} dispatched: packages={} machines={} initiatedBy={}", action, input.getPackages().size(), machineIds.size(), initiatedBy);
+        log.info("Software {} dispatched: packages={} machines={} initiatedBy={} source={}",
+                action, input.getPackages().size(), machineIds.size(), initiatedBy, source);
         return results;
     }
 }

@@ -44,7 +44,7 @@ class BrewPackageManagerHandlerTest {
     }
 
     @Test
-    @DisplayName("blank packageId is rejected")
+    @DisplayName("blank packageName is rejected")
     void blankRejected() {
         assertThatThrownBy(() -> handler.buildArgs("  ", BrewPackageType.CASK))
                 .isInstanceOf(BadRequestException.class);

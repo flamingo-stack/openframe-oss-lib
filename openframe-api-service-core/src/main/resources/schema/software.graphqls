@@ -27,7 +27,7 @@ input SoftwareManagementInput {
 """One package chosen from the catalog, identified exactly as package search returns it."""
 input SoftwarePackageInput {
     packageManager: PackageManagerType!
-    packageId: String!
+    packageName: String!
     "Brew sub-type (CASK/FORMULA); optional for managers that do not distinguish."
     packageType: BrewPackageType
 }
@@ -35,6 +35,6 @@ input SoftwarePackageInput {
 """The dispatch outcome for one package: its shared executionId across the targeted devices."""
 type SoftwareDispatchResult {
     packageManager: PackageManagerType!
-    packageId: String!
+    packageName: String!
     executionId: String!
 }

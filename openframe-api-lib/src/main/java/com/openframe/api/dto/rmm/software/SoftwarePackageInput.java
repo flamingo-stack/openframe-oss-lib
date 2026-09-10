@@ -13,7 +13,7 @@ public class SoftwarePackageInput {
     private PackageManagerType packageManager;
 
     @NotBlank
-    private String packageId;
+    private String packageName;
 
     private BrewPackageType packageType;
 }
