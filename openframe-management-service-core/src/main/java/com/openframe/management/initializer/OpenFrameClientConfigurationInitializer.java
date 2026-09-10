@@ -25,13 +25,19 @@ public class OpenFrameClientConfigurationInitializer implements ApplicationRunne
     private final OpenFrameClientConfigurationService clientConfigurationService;
 
     @Override
-    public void run(ApplicationArguments args) throws IOException {
+    public void run(ApplicationArguments args) {
         log.info("Initializing OpenFrame client configuration");
         ClassPathResource resource = new ClassPathResource(CONFIG_FILE);
-        OpenFrameClientConfiguration fromConfig = objectMapper.readValue(resource.getInputStream(), OpenFrameClientConfiguration.class);
+        OpenFrameClientConfiguration fromConfig;
+        try {
+            fromConfig = objectMapper.readValue(resource.getInputStream(), OpenFrameClientConfiguration.class);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to load OpenFrame client configuration from " + CONFIG_FILE, e);
+        }
 
         clientConfigurationService.updateConfigurationFields(fromConfig);
 
         log.info("Initialized OpenFrame client configuration");
     }
 }
+

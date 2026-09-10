@@ -30,6 +30,9 @@ public class RefreshTokenHandler {
         validateExpiration(jwt);
 
         Long refreshCount = jwt.getClaim("refresh_count");
+        if (refreshCount == null) {
+            throw new IllegalArgumentException("Refresh token missing refresh_count claim");
+        }
         validateRefreshCount(refreshCount);
 
         String clientId = jwt.getSubject();

@@ -1,6 +1,8 @@
 package com.openframe.client.controller;
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,11 +30,11 @@ public class ToolAgentFileController {
 
         try (InputStream stream = ToolAgentFileController.class.getResourceAsStream(path)) {
             if (stream == null) {
-                throw new RuntimeException("No content");
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No content");
             }
             return stream.readAllBytes();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to read tool agent file", e);
         }
     }
 
