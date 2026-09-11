@@ -4,6 +4,7 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
+import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
@@ -238,7 +239,7 @@ public class ScheduleFireDispatcher {
                     .scripts(items)
                     .build();
             scriptScheduleNatsPublisher.publish(machineId, message);
-            retryStore.store(fire.executionId(), machineId, message);
+            retryStore.store(fire.executionId(), machineId, DeliveryChannel.SCHEDULE, message);
         });
     }
 

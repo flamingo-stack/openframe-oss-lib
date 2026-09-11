@@ -2,6 +2,7 @@ package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.script.ScriptType;
 import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,35 +27,33 @@ class CustomScriptRepositoryImplSystemShieldTest {
     private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
     private final CustomScriptRepositoryImpl repo = new CustomScriptRepositoryImpl(mongoTemplate);
 
-    private static Document systemClause(Document queryObject) {
-        Object node = queryObject.get("system");
-        return node instanceof Document doc ? doc : null;
+    /** The managed-script shield lives on the {@code type} field as {@code $nin [SYSTEM, SOFTWARE]}. */
+    private static void assertShielded(Query query) {
+        Object node = query.getQueryObject().get("type");
+        assertThat(node).isInstanceOf(Document.class);
+        Object nin = ((Document) node).get("$nin");
+        assertThat(nin).asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.list(Object.class))
+                .containsExactlyInAnyOrder(ScriptType.SYSTEM, ScriptType.SOFTWARE);
     }
 
     @Test
-    @DisplayName("findPageForTenant: default query carries the system-shield ($ne true) — bootstrap presets are excluded even without an opt-in")
-    void findPageForTenant_shieldsSystemScripts() {
+    @DisplayName("findPageForTenant: default query carries the managed-script shield — bootstrap/software presets are excluded even without an opt-in")
+    void findPageForTenant_shieldsManagedScripts() {
         when(mongoTemplate.find(any(Query.class), eq(Script.class))).thenReturn(List.of());
 
         repo.findPageForTenant(TENANT_ID, null, null, "_id", Sort.Direction.DESC, null, false, 10);
 
-        Query captured = captureFind();
-        Document systemClause = systemClause(captured.getQueryObject());
-        assertThat(systemClause).isNotNull();
-        assertThat(systemClause.get("$ne")).isEqualTo(true);
+        assertShielded(captureFind());
     }
 
     @Test
     @DisplayName("countForTenant: the count query gets the same shield — count agrees with the list, presets never inflate the total")
-    void countForTenant_shieldsSystemScripts() {
+    void countForTenant_shieldsManagedScripts() {
         when(mongoTemplate.count(any(Query.class), eq(Script.class))).thenReturn(0L);
 
         repo.countForTenant(TENANT_ID, null, null);
 
-        Query captured = captureCount();
-        Document systemClause = systemClause(captured.getQueryObject());
-        assertThat(systemClause).isNotNull();
-        assertThat(systemClause.get("$ne")).isEqualTo(true);
+        assertShielded(captureCount());
     }
 
     @Test
@@ -66,10 +65,7 @@ class CustomScriptRepositoryImplSystemShieldTest {
 
         repo.findPageForTenant(TENANT_ID, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
 
-        Query captured = captureFind();
-        Document systemClause = systemClause(captured.getQueryObject());
-        assertThat(systemClause).isNotNull();
-        assertThat(systemClause.get("$ne")).isEqualTo(true);
+        assertShielded(captureFind());
     }
 
     private Query captureFind() {

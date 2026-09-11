@@ -7,6 +7,7 @@ import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptBootstrapNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
@@ -49,7 +50,8 @@ public class PackageManagerBootstrapService {
         }
 
         String tenantId = machine.getTenantId();
-        Optional<Script> foundScript = scriptRepository.findSystemScript(packageManager.bootstrapScript(), tenantId);
+        Optional<Script> foundScript = scriptRepository.findByTenantIdAndNameAndType(
+                tenantId, packageManager.bootstrapScript().canonicalName(), ScriptType.SYSTEM);
         if (foundScript.isEmpty()) {
             log.warn("Bootstrap script {} not seeded for tenant {}, ignoring report from machineId={}",
                     packageManager.bootstrapScript(), tenantId, machineId);

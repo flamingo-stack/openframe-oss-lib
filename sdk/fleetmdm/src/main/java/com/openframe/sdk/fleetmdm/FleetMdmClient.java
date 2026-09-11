@@ -49,6 +49,7 @@ public class FleetMdmClient {
     private static final String VULNERABILITIES_URL = "/api/latest/fleet/vulnerabilities";
     private static final String SOFTWARE_TITLES_URL = "/api/latest/fleet/software/titles";
     private static final String VULNERABILITY_DETAIL_URL = "/api/latest/fleet/vulnerabilities/";
+    private static final String INCLUDE_MANAGED_QUERY = "?include_openframe_managed=1";
 
     static final String TENANT_ID_HEADER = "X-Tenant-Id";
 
@@ -566,9 +567,22 @@ public class FleetMdmClient {
         });
     }
 
+    /**
+     * List all scheduled queries (interval > 0), excluding OpenFrame-managed ones.
+     */
     public List<Query> listScheduledQueries() {
+        return listScheduledQueries(false);
+    }
+
+    /**
+     * List all scheduled queries (interval > 0).
+     * @param includeOpenframeManaged when true, keeps OpenFrame-managed queries in the listing so the
+     *        platform can enumerate what it owns (name prefix still identifies ownership).
+     */
+    public List<Query> listScheduledQueries(boolean includeOpenframeManaged) {
+        String path = includeOpenframeManaged ? QUERIES_URL + INCLUDE_MANAGED_QUERY : QUERIES_URL;
         return call("list Fleet scheduled queries", () -> {
-            HttpResponse<String> response = sendRequest(QUERIES_URL, "GET", null);
+            HttpResponse<String> response = sendRequest(path, "GET", null);
             checkResponse(response, "list Fleet scheduled queries");
             return MAPPER.convertValue(
                     listNodeOrEmpty(response.body(), "queries"),
@@ -754,6 +768,59 @@ public class FleetMdmClient {
             CompletableFuture<LiveQueryCampaign> failed = new CompletableFuture<>();
             failed.completeExceptionally(new FleetMdmException("Failed to create Fleet live-query campaign", e));
             return failed;
+        }
+    }
+
+    /**
+     * Assign hosts to a saved query so the query targets them on its scheduled interval.
+     * @return number of hosts added
+     */
+    public long addQueryHosts(long queryId, List<Long> hostIds) {
+        return modifyQueryHosts(queryId, hostIds, "POST", "added");
+    }
+
+    /**
+     * Unassign hosts from a saved query.
+     * @return number of hosts removed
+     */
+    public long removeQueryHosts(long queryId, List<Long> hostIds) {
+        return modifyQueryHosts(queryId, hostIds, "DELETE", "removed");
+    }
+
+    /**
+     * Delete a saved (scheduled) query by ID. Equivalent to DELETE /api/v1/fleet/queries/id/{id}.
+     */
+    public void deleteScheduledQuery(long queryId) {
+        String action = "delete Fleet scheduled query: " + queryId;
+        try {
+            HttpResponse<String> response = sendRequest(QUERIES_URL + "/id/" + queryId, "DELETE", null);
+            checkResponse(response, action);
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to " + action, e);
+        }
+    }
+
+    private long modifyQueryHosts(long queryId, List<Long> hostIds, String method, String responseField) {
+        if (hostIds == null || hostIds.isEmpty()) {
+            throw new IllegalArgumentException("hostIds must not be empty");
+        }
+        String path = QUERIES_URL + "/" + queryId + "/hosts";
+        String action = ("POST".equals(method) ? "assign hosts to " : "remove hosts from ")
+                + "Fleet query (queryId=" + queryId + ")";
+        try {
+            String body = MAPPER.writeValueAsString(MAPPER.createObjectNode()
+                    .set("host_ids", MAPPER.valueToTree(hostIds)));
+            HttpResponse<String> response = sendRequest(path, method, body);
+            checkResponse(response, action);
+            JsonNode root = MAPPER.readTree(response.body());
+            JsonNode count = root.get(responseField);
+            return count != null && count.canConvertToLong() ? count.asLong() : 0L;
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to " + action, e);
         }
     }
 
