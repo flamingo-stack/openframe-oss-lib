@@ -28,5 +28,8 @@ public class DeserializedDebeziumMessage extends CommonDebeziumMessage {
     private Boolean skipProcessing;
     private Boolean isVisible;
     private String tenantId;
+    private String organizationId;
+    private String organizationName;
+    private String userId;
     private Set<Destination> excludedDestinations;
 }

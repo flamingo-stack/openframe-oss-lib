@@ -250,4 +250,29 @@ public interface SourceEventTypes {
         String POLICY_MEMBERSHIP_PASS = "policy_membership_pass";
         String POLICY_MEMBERSHIP_FAIL = "policy_membership_fail";
     }
+
+    /**
+     * Microsoft 365 Entra directory audit event types (Graph directoryAudits {@code category} values).
+     */
+    interface Microsoft365 {
+
+        String USER_MANAGEMENT = "UserManagement";
+        String GROUP_MANAGEMENT = "GroupManagement";
+        String APPLICATION_MANAGEMENT = "ApplicationManagement";
+        String ROLE_MANAGEMENT = "RoleManagement";
+        String POLICY = "Policy";
+        String DIRECTORY_MANAGEMENT = "DirectoryManagement";
+    }
+
+    /**
+     * Google Workspace directory audit event types (Reports API {@code admin} application event types).
+     */
+    interface GoogleWorkspace {
+
+        String USER_SETTINGS = "USER_SETTINGS";
+        String GROUP_SETTINGS = "GROUP_SETTINGS";
+        String SECURITY_SETTINGS = "SECURITY_SETTINGS";
+        String DOMAIN_SETTINGS = "DOMAIN_SETTINGS";
+        String DELEGATED_ADMIN_SETTINGS = "DELEGATED_ADMIN_SETTINGS";
+    }
 }
