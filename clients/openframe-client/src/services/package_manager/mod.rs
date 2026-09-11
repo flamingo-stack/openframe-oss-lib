@@ -225,7 +225,7 @@ impl PackageManagerUpdateRunManager {
                 ticker.tick().await;
 
                 for manager in managers() {
-                    if manager.id().presence() == Presence::Absent {
+                    if manager.id().presence().await == Presence::Absent {
                         continue;
                     }
 

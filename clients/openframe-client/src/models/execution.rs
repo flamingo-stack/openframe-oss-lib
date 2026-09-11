@@ -266,6 +266,29 @@ impl ExecutionMessage for BootstrapScriptMessage {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SoftwareScriptMessage(pub ScriptMessage);
+
+impl ExecutionMessage for SoftwareScriptMessage {
+    const KIND: &'static str = "software-execution";
+
+    fn from_payload(payload: &str) -> Result<Self> {
+        Ok(Self(serde_json::from_str(payload)?))
+    }
+
+    fn execution_id(&self) -> &str {
+        self.0.execution_id()
+    }
+
+    fn schedule_id(&self) -> Option<&str> {
+        self.0.schedule_id()
+    }
+
+    fn to_requests(&self) -> Vec<ExecutionRequest<'_>> {
+        self.0.to_requests()
+    }
+}
+
 impl ExecutionMessage for ScriptScheduleExecutionMessage {
     const KIND: &'static str = "script-schedule-execution";
     const RESULT_KIND: &'static str = ScriptMessage::KIND;

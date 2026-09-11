@@ -49,6 +49,7 @@ use crate::listener::tool_uninstall_message_listener::ToolUninstallMessageListen
 use crate::logging::nats_streaming::LogStreamingRunManager;
 use crate::models::{
     BootstrapScriptMessage, CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage,
+    SoftwareScriptMessage,
 };
 use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
@@ -170,6 +171,7 @@ pub struct Client {
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
     script_bootstrap_execution_listener: ExecutionListener<BootstrapScriptMessage>,
+    software_execution_listener: ExecutionListener<SoftwareScriptMessage>,
     script_schedule_execution_listener: ExecutionListener<ScriptScheduleExecutionMessage>,
     tool_run_manager: ToolRunManager,
     token_refresh_run_manager: TokenRefreshRunManager,
@@ -557,6 +559,14 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
+        let software_execution_listener = ExecutionListener::<SoftwareScriptMessage>::new(
+            nats_connection_manager.clone(),
+            nats_message_publisher.clone(),
+            execution_service.clone(),
+            config_service.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
         let script_schedule_execution_listener =
             ExecutionListener::<ScriptScheduleExecutionMessage>::new(
                 nats_connection_manager.clone(),
@@ -610,6 +620,7 @@ impl Client {
             command_execution_listener,
             script_execution_listener,
             script_bootstrap_execution_listener,
+            software_execution_listener,
             script_schedule_execution_listener,
             tool_run_manager,
             token_refresh_run_manager,
@@ -731,6 +742,9 @@ impl Client {
         info!("Starting script bootstrap execution listener...");
         self.script_bootstrap_execution_listener.start().await?;
         info!("Script bootstrap execution listener started");
+        info!("Starting software execution listener...");
+        self.software_execution_listener.start().await?;
+        info!("Software execution listener started");
         info!("Starting script schedule execution listener...");
         self.script_schedule_execution_listener.start().await?;
         info!("Script schedule execution listener started");
