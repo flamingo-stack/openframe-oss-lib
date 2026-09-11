@@ -111,7 +111,7 @@ class SoftwareInstallUpdateManagementServiceTest {
         SoftwarePackageInput p = new SoftwarePackageInput();
         p.setPackageManager(manager);
         p.setPackageName(id);
-        p.setPackageType(type);
+        p.setBrewPackageType(type);
         return p;
     }
 

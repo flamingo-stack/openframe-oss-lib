@@ -15,6 +15,6 @@ public class SoftwarePackageInput {
     @NotBlank
     private String packageName;
 
-    @NotNull
-    private BrewPackageType packageType;
+    /** Brew-only sub-type (CASK/FORMULA). Required for brew (enforced by its handler), ignored by managers that do not distinguish. */
+    private BrewPackageType brewPackageType;
 }

@@ -26,7 +26,7 @@ public class WingetPackageManagerHandler implements PackageManagerHandler {
     }
 
     @Override
-    public List<String> buildArgs(String packageName, BrewPackageType packageType) {
+    public List<String> buildArgs(String packageName, BrewPackageType brewPackageType) {
         if (packageName == null || packageName.isBlank()) {
             throw new BadRequestException("packageName is required for a winget package");
         }

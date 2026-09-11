@@ -13,5 +13,5 @@ public interface PackageManagerHandler {
 
     SoftwareScriptCode scriptCode(SoftwareAction action);
 
-    List<String> buildArgs(String packageName, BrewPackageType packageType);
+    List<String> buildArgs(String packageName, BrewPackageType brewPackageType);
 }

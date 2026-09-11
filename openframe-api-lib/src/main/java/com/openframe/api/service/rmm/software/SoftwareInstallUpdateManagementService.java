@@ -46,7 +46,7 @@ public class SoftwareInstallUpdateManagementService {
             PackageManagerHandler handler = packageManagerRegistry.handlerFor(pkg.getPackageManager());
             SoftwareScriptCode code = handler.scriptCode(action);
             ScriptResponse script = scriptCache.computeIfAbsent(code, scriptService::getSoftwareScript);
-            List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getPackageType());
+            List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
 
             String executionId = softwareDispatchService.dispatch(script, machineIds, args, initiatedBy, source,
                     pkg.getPackageManager(), pkg.getPackageName(), action);

@@ -36,10 +36,16 @@ class BrewPackageManagerHandlerTest {
     }
 
     @Test
-    @DisplayName("formula (or null type) is a bare token -> brew install wireshark")
+    @DisplayName("formula is a bare token -> brew install wireshark")
     void formulaArgs() {
         assertThat(handler.buildArgs("wireshark", BrewPackageType.FORMULA)).containsExactly("wireshark");
-        assertThat(handler.buildArgs("wireshark", null)).containsExactly("wireshark");
+    }
+
+    @Test
+    @DisplayName("brew requires the brewPackageType: a null sub-type is rejected (brew must know cask vs formula)")
+    void nullBrewPackageTypeRejected() {
+        assertThatThrownBy(() -> handler.buildArgs("slack", null))
+                .isInstanceOf(BadRequestException.class);
     }
 
     @Test

@@ -35,8 +35,8 @@ input SoftwareManagementInput {
 input SoftwarePackageInput {
     packageManager: PackageManagerType!
     packageName: String!
-    "Package sub-type (e.g. brew CASK/FORMULA). Required; ignored by managers that do not distinguish."
-    packageType: BrewPackageType!
+    "Brew-only sub-type (CASK/FORMULA). Required for brew (enforced server-side), ignored by managers that do not distinguish."
+    brewPackageType: BrewPackageType
 }
 
 """The dispatch outcome for one package: its shared executionId across the targeted devices."""

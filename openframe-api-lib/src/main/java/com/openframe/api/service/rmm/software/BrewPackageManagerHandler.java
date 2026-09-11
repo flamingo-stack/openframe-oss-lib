@@ -25,11 +25,14 @@ public class BrewPackageManagerHandler implements PackageManagerHandler {
     }
 
     @Override
-    public List<String> buildArgs(String packageName, BrewPackageType packageType) {
+    public List<String> buildArgs(String packageName, BrewPackageType brewPackageType) {
         if (packageName == null || packageName.isBlank()) {
             throw new BadRequestException("packageName is required for a brew package");
         }
-        return packageType == BrewPackageType.CASK
+        if (brewPackageType == null) {
+            throw new BadRequestException("brewPackageType (CASK/FORMULA) is required for a brew package");
+        }
+        return brewPackageType == BrewPackageType.CASK
                 ? List.of(CASK_FLAG, packageName)
                 : List.of(packageName);
     }
