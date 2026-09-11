@@ -21,9 +21,15 @@ public class SoftwareScheduleExecutionService {
     private final SoftwareScheduleRepository softwareScheduleRepository;
     private final SoftwareScheduleMachineAssignedRepository assignedRepository;
     private final SoftwareScheduleFireDispatcher fireDispatcher;
+    private final SoftwareDeviceLocalScheduleService deviceLocalScheduleService;
 
     public void runDueSchedules() {
         Instant now = Instant.now();
+        runDueServerSchedules(now);
+        deviceLocalScheduleService.runDueDeviceLocalSchedules(now);
+    }
+
+    private void runDueServerSchedules(Instant now) {
         List<SoftwareSchedule> due = softwareScheduleRepository
                 .findByStatusAndNextRunAtLessThanEqual(ScriptStatus.ACTIVE, now);
         if (due.isEmpty()) {

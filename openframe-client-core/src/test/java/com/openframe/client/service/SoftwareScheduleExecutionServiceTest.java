@@ -1,5 +1,6 @@
 package com.openframe.client.service;
 
+import com.openframe.client.service.rmm.SoftwareDeviceLocalScheduleService;
 import com.openframe.client.service.rmm.SoftwareScheduleExecutionService;
 import com.openframe.client.service.rmm.SoftwareScheduleFireDispatcher;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
@@ -29,9 +30,10 @@ class SoftwareScheduleExecutionServiceTest {
     private final SoftwareScheduleRepository scheduleRepository = mock(SoftwareScheduleRepository.class);
     private final SoftwareScheduleMachineAssignedRepository assignedRepository = mock(SoftwareScheduleMachineAssignedRepository.class);
     private final SoftwareScheduleFireDispatcher fireDispatcher = mock(SoftwareScheduleFireDispatcher.class);
+    private final SoftwareDeviceLocalScheduleService deviceLocalScheduleService = mock(SoftwareDeviceLocalScheduleService.class);
 
     private final SoftwareScheduleExecutionService service =
-            new SoftwareScheduleExecutionService(scheduleRepository, assignedRepository, fireDispatcher);
+            new SoftwareScheduleExecutionService(scheduleRepository, assignedRepository, fireDispatcher, deviceLocalScheduleService);
 
     @Test
     @DisplayName("a due repeating schedule fires to its SPECIFIC targets and advances nextRunAt into the future")
