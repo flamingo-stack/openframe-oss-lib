@@ -67,6 +67,19 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
+    @DisplayName("getEventToolId: appends scriptId so two scripts of one schedule run (shared executionId+machineId) get DISTINCT ids — the fix for the Cassandra/Pinot tool_event_id collision")
+    void getEventToolId_appendsScriptId_distinguishesScriptsOfOneScheduleRun() {
+        ObjectNode scriptA = mapper.createObjectNode()
+                .put("executionId", EXECUTION_ID).put("machineId", "m-1").put("scriptId", "script-A");
+        ObjectNode scriptB = mapper.createObjectNode()
+                .put("executionId", EXECUTION_ID).put("machineId", "m-1").put("scriptId", "script-B");
+
+        assertThat(deserializer.getEventToolId(scriptA)).contains(EXECUTION_ID + ":m-1:script-A");
+        assertThat(deserializer.getEventToolId(scriptB)).contains(EXECUTION_ID + ":m-1:script-B");
+        assertThat(deserializer.getEventToolId(scriptA)).isNotEqualTo(deserializer.getEventToolId(scriptB));
+    }
+
+    @Test
     @DisplayName("inherited extraction works — getResult builds stdout/exit_code/execution_time_ms exactly like the command deserializer")
     void inheritsResultExtraction() throws Exception {
         ObjectNode after = mapper.createObjectNode()
