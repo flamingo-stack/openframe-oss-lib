@@ -50,10 +50,16 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
 
     @Override
     protected Optional<String> getEventToolId(JsonNode after) {
+        String executionId = parseStringField(after, FIELD_EXECUTION_ID).orElse(null);
+        String machineId = parseStringField(after, FIELD_MACHINE_ID).orElse(null);
+        if (executionId == null && machineId == null) {
+            return Optional.empty();
+        }
+        String scriptId = parseStringField(after, FIELD_SCRIPT_ID).orElse(null);
         return Optional.of(String.join(":",
-                parseStringField(after, FIELD_EXECUTION_ID).orElse(""),
-                parseStringField(after, FIELD_MACHINE_ID).orElse(""),
-                parseStringField(after, FIELD_SCRIPT_ID).orElse("")));
+                executionId == null ? "" : executionId,
+                machineId == null ? "" : machineId,
+                scriptId == null ? "" : scriptId));
     }
 
     @Override
