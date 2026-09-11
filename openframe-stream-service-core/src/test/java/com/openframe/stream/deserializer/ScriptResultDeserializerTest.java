@@ -80,6 +80,25 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
+    @DisplayName("getEventToolId: no executionId AND no machineId → empty, so the base uses its content-hash fallback (distinct per event) rather than a shared \"::\" id Pinot would collapse across tenants")
+    void getEventToolId_noExecutionIdentity_isEmptyForHashFallback() {
+        // Even a lone scriptId is not an execution identity — must still defer to the hash fallback.
+        ObjectNode scriptOnly = mapper.createObjectNode().put("scriptId", "script-A");
+
+        assertThat(deserializer.getEventToolId(scriptOnly)).isEmpty();
+        assertThat(deserializer.getEventToolId(mapper.createObjectNode())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getEventToolId: an agent that does not echo scriptId still keys on exec:machine: — execution identity is preserved (trailing empty component), no collapse to the hash fallback")
+    void getEventToolId_missingScriptId_keepsExecMachineComposite() {
+        ObjectNode after = mapper.createObjectNode()
+                .put("executionId", EXECUTION_ID).put("machineId", "m-1");
+
+        assertThat(deserializer.getEventToolId(after)).contains(EXECUTION_ID + ":m-1:");
+    }
+
+    @Test
     @DisplayName("inherited extraction works — getResult builds stdout/exit_code/execution_time_ms exactly like the command deserializer")
     void inheritsResultExtraction() throws Exception {
         ObjectNode after = mapper.createObjectNode()
