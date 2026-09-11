@@ -15,5 +15,6 @@ public class SoftwarePackageInput {
     @NotBlank
     private String packageName;
 
+    @NotNull
     private BrewPackageType packageType;
 }

@@ -58,14 +58,10 @@ class ScriptExecutionServiceTest {
     void setUp() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         service = new ScriptExecutionService(scriptExecutionRepository, tenantIdProvider, new ScriptExecutionMapper());
-        // Persistence + RUNNING/dispatchedAt stamping now lives in the repository (saveRunning); the
-        // service only forwards a RunningExecutionRows and maps the saved rows to DTOs. The stub
-        // mirrors the repository so the mapping assertions have real rows to map.
         lenient().when(scriptExecutionRepository.saveRunning(any(RunningExecutionRows.class)))
                 .thenAnswer(inv -> rowsFrom(inv.getArgument(0)));
     }
 
-    /** Mirrors {@code CustomScriptExecutionRepositoryImpl.saveRunning} so the service test can assert mapping. */
     private static List<ScriptExecution> rowsFrom(RunningExecutionRows r) {
         return r.getMachineIds().stream()
                 .map(machineId -> ScriptExecution.builder()
@@ -112,12 +108,11 @@ class ScriptExecutionServiceTest {
         assertThat(request.getScheduleId()).isNull();               // ad-hoc run — no schedule origin
         assertThat(request.getMachineIds()).containsExactly(MACHINE_ID);
         assertThat(request.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
-        assertThat(request.getTimeoutSeconds()).isEqualTo(TIMEOUT_SECONDS);   // persisted for the watchdog's per-execution threshold
+        assertThat(request.getTimeoutSeconds()).isEqualTo(TIMEOUT_SECONDS);
         assertThat(request.getInitiatedBy()).isEqualTo(INITIATED_BY);
         assertThat(request.getSource()).isEqualTo(ExecutionSource.MANUAL);
-        assertThat(request.getPackageName()).isNull();              // not a software run
+        assertThat(request.getPackageName()).isNull();
 
-        // Service returns a DTO (never the entity), mapped from the persisted row.
         assertThat(result.getExecutionId()).isEqualTo(EXECUTION_ID);
         assertThat(result.getScriptId()).isEqualTo(SCRIPT_ID);
         assertThat(result.getMachineId()).isEqualTo(MACHINE_ID);

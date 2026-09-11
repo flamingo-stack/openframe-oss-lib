@@ -8,16 +8,17 @@ import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
 import jakarta.annotation.PreDestroy;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 
 import java.time.Duration;
 
+@Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 public abstract class AbstractRmmResultListener<T extends RmmResultMessage> {
-
-    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final Connection natsConnection;
     private final RmmResultParser resultParser;
@@ -25,16 +26,6 @@ public abstract class AbstractRmmResultListener<T extends RmmResultMessage> {
     private final NatsTopicMachineIdExtractor machineIdExtractor;
 
     private Dispatcher dispatcher;
-
-    protected AbstractRmmResultListener(Connection natsConnection,
-                                        RmmResultParser resultParser,
-                                        RmmResultService rmmResultService,
-                                        NatsTopicMachineIdExtractor machineIdExtractor) {
-        this.natsConnection = natsConnection;
-        this.resultParser = resultParser;
-        this.rmmResultService = rmmResultService;
-        this.machineIdExtractor = machineIdExtractor;
-    }
 
     protected abstract String subject();
 
