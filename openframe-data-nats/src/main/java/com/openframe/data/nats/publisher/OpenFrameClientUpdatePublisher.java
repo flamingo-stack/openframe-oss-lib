@@ -37,6 +37,9 @@ public class OpenFrameClientUpdatePublisher {
                 openFrameClientConfigurationService.markAsNonPublished(configuration);
             } catch (OptimisticLockingFailureException ole) {
                 log.warn("Concurrent writer for client configuration during failure-mark; skipping");
+            } catch (Exception markEx) {
+                log.error("Failed to mark client configuration version {} as non-published after publish failure",
+                        configurationVersion, markEx);
             }
             return;
         }

@@ -93,12 +93,25 @@ public class CommandDispatchService {
                 .timeout(input.getTimeoutSeconds())
                 .build();
 
-        machineIds.forEach(machineId -> commandNatsPublisher.publishCommand(machineId, message));
+        machineIds.forEach(machineId -> publishCommandSafely(machineId, message, executionId));
 
         log.info("Dispatched batch command executionId={} to {} machines", executionId, machineIds.size());
         return DispatchResponse.builder()
                 .executionId(executionId)
                 .build();
+    }
+
+    /**
+     * Publish a single machine's command, isolating failures so that one
+     * machine's publish error never aborts dispatch to the rest of the batch.
+     */
+    private void publishCommandSafely(String machineId, CommandMessage message, String executionId) {
+        try {
+            commandNatsPublisher.publishCommand(machineId, message);
+        } catch (Exception e) {
+            log.error("Failed to publish batch command executionId={} machineId={}",
+                    executionId, machineId, e);
+        }
     }
 
     private void verifyMachine(String machineId) {
