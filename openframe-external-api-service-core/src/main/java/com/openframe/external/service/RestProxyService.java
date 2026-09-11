@@ -1,13 +1,12 @@
 package com.openframe.external.service;
 
 import com.openframe.core.service.ProxyUrlResolver;
-import com.openframe.data.document.apikey.APIKeyType;
 import com.openframe.data.document.tool.IntegratedTool;
+import com.openframe.data.document.tool.ToolApiKey;
 import com.openframe.data.document.tool.ToolCredentials;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
-import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.ToolUrlService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +28,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -38,6 +38,8 @@ import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 @Service
 @Slf4j
 public class RestProxyService {
+
+    private static final String MASKED_VALUE = "****";
 
     private final IntegratedToolRepository toolRepository;
     private final ProxyUrlResolver proxyUrlResolver;
@@ -91,7 +93,6 @@ public class RestProxyService {
 
             String method = request.getMethod();
             Map<String, String> headers = buildApiRequestHeaders(tool);
-            log.debug("Headers: {}", headers);
 
             return proxy(tool, targetUri, method, headers, body);
             
@@ -104,31 +105,18 @@ public class RestProxyService {
         }
     }
 
-    private Map<String, String> buildApiRequestHeaders(IntegratedTool tool) {
+    Map<String, String> buildApiRequestHeaders(IntegratedTool tool) {
         Map<String, String> headers = new HashMap<>();
         headers.put(ACCEPT_CHARSET, "UTF-8");
         headers.put(ACCEPT_LANGUAGE, "en-US,en;q=0.9");
         headers.put(CONTENT_TYPE, APPLICATION_JSON);
         headers.put(ACCEPT, APPLICATION_JSON);
 
-        ToolCredentials credentials = tool.getCredentials();
-        APIKeyType apiKeyType = credentials != null
-                && credentials.getApiKey() != null ? credentials.getApiKey().getType() : APIKeyType.NONE;
-        
-        switch (apiKeyType) {
-            case HEADER:
-                String keyName = credentials.getApiKey().getKeyName();
-                String key = credentials.getApiKey().getKey();
-                headers.put(keyName, key);
-                break;
-            case BEARER_TOKEN:
-                String token = credentials.getApiKey().getKey();
-                headers.put(AUTHORIZATION, "Bearer " + token);
-                break;
-            case NONE:
-                break;
+        CredentialHeader credential = credentialHeader(tool.getCredentials());
+        if (credential != null) {
+            headers.put(credential.name(), credential.value());
         }
-
+        
         return headers;
     }
 
@@ -140,9 +128,9 @@ public class RestProxyService {
             HttpUriRequestBase httpRequest = createHttpRequest(method, targetUri);
             log.debug("Created HTTP request: {} {}", method, targetUri);
 
-            for (Map.Entry<String, String> header : proxyHeaders.entrySet()) {
-                httpRequest.setHeader(header.getKey(), header.getValue());
-                log.debug("Added header: {} = {}", header.getKey(), header.getValue());
+            proxyHeaders.forEach(httpRequest::setHeader);
+            if (log.isDebugEnabled()) {
+                log.debug("Headers: {}", maskCredential(proxyHeaders, tool.getCredentials()));
             }
 
             if (isNotEmpty(body)) {
@@ -158,11 +146,9 @@ public class RestProxyService {
                 HttpEntity entity = response.getEntity();
                 String responseBody = entity != null ? EntityUtils.toString(entity) : "";
                 
-                log.info("Successfully proxied request to {} - status: {}, response length: {}", 
+                log.info("Successfully proxied request to {} - status: {}, response length: {}",
                         tool.getName(), statusCode, responseBody.length());
-                log.debug("Response body: {}", responseBody.length() > 1000 ? 
-                         responseBody.substring(0, 1000) + "..." : responseBody);
-                
+
                 return ResponseEntity.status(statusCode).body(responseBody);
             });
             
@@ -175,9 +161,34 @@ public class RestProxyService {
         }
     }
 
+    Map<String, String> maskCredential(Map<String, String> headers, ToolCredentials credentials) {
+        CredentialHeader credential = credentialHeader(credentials);
+        if (credential == null) {
+            return headers;
+        }
+        Map<String, String> masked = new HashMap<>();
+        headers.forEach((name, value) -> masked.put(name, name.equalsIgnoreCase(credential.name()) ? MASKED_VALUE : value));
+        return masked;
+    }
+
+    private CredentialHeader credentialHeader(ToolCredentials credentials) {
+        if (credentials == null || credentials.getApiKey() == null || credentials.getApiKey().getType() == null) {
+            return null;
+        }
+        ToolApiKey apiKey = credentials.getApiKey();
+        return switch (apiKey.getType()) {
+            case HEADER -> new CredentialHeader(apiKey.getKeyName(), apiKey.getKey());
+            case BEARER_TOKEN -> new CredentialHeader(AUTHORIZATION, "Bearer " + apiKey.getKey());
+            case NONE -> null;
+        };
+    }
+
+    private record CredentialHeader(String name, String value) {
+    }
+
     private HttpUriRequestBase createHttpRequest(String method, URI uri) {
         try {
-            Method httpMethod = Method.valueOf(method.toUpperCase());
+            Method httpMethod = Method.valueOf(method.toUpperCase(Locale.ROOT));
             return switch (httpMethod) {
                 case GET -> new HttpGet(uri);
                 case POST -> new HttpPost(uri);
