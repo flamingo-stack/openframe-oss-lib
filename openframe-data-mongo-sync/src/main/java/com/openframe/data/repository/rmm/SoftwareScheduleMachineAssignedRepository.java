@@ -15,6 +15,8 @@ public interface SoftwareScheduleMachineAssignedRepository
 
     List<SoftwareScheduleMachineAssigned> findByTenantIdAndMachineId(String tenantId, String machineId);
 
+    long countByTenantIdAndSoftwareScheduleId(String tenantId, String softwareScheduleId);
+
     long deleteByTenantIdAndSoftwareScheduleId(String tenantId, String softwareScheduleId);
 
     long deleteByTenantIdAndSoftwareScheduleIdAndMachineIdIn(String tenantId, String softwareScheduleId, Collection<String> machineIds);
