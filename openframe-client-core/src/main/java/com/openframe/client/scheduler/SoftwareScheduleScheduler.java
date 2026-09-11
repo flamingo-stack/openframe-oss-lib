@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@ConditionalOnProperty(name = "openframe.rmm.schedule.runner.enabled", havingValue = "true")
+@ConditionalOnProperty(name = {"openframe.rmm.schedule.runner.enabled", "openframe.rmm.software.enabled"}, havingValue = "true")
 public class SoftwareScheduleScheduler {
 
     private final SoftwareScheduleExecutionService softwareScheduleExecutionService;

@@ -20,6 +20,7 @@ import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -31,6 +32,7 @@ import java.util.Set;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 public class SoftwareScheduleService {
 
     private static final List<ScriptStatus> NAME_UNIQUE_STATUSES = List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);

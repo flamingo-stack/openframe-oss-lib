@@ -2,6 +2,7 @@ package com.openframe.data.service.rmm.software;
 
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.EnumMap;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 public class PackageManagerRegistry {
 
     private final Map<PackageManagerType, PackageManagerHandler> byManager;

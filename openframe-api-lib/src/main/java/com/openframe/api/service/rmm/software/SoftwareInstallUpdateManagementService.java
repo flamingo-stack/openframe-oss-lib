@@ -22,7 +22,7 @@ import java.util.Map;
 
 @Slf4j
 @Service
-@ConditionalOnProperty("spring.cloud.stream.enabled")
+@ConditionalOnProperty(name = {"spring.cloud.stream.enabled", "openframe.rmm.software.enabled"}, havingValue = "true")
 @RequiredArgsConstructor
 public class SoftwareInstallUpdateManagementService {
 

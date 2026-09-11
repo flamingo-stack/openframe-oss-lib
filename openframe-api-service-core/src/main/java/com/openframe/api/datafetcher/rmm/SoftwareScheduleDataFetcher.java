@@ -1,6 +1,7 @@
 package com.openframe.api.datafetcher.rmm;
 
 import com.netflix.graphql.dgs.DgsComponent;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import com.netflix.graphql.dgs.DgsData;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
@@ -43,6 +44,7 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 @Slf4j
 @Validated
+@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 public class SoftwareScheduleDataFetcher {
 
     private static final Relay RELAY = new Relay();

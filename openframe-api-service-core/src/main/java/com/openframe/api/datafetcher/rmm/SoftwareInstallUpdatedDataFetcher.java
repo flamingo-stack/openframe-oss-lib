@@ -1,6 +1,7 @@
 package com.openframe.api.datafetcher.rmm;
 
 import com.netflix.graphql.dgs.DgsComponent;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.rmm.software.SoftwareDispatchResult;
@@ -19,6 +20,7 @@ import org.springframework.validation.annotation.Validated;
 import java.util.List;
 
 @DgsComponent
+@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 @Validated
