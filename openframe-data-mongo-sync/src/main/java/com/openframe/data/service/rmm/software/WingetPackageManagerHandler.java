@@ -1,4 +1,4 @@
-package com.openframe.api.service.rmm.software;
+package com.openframe.data.service.rmm.software;
 
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.packagesearch.BrewPackageType;

@@ -1,10 +1,10 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.script.RunningExecutionRows;
-import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
+import com.openframe.data.document.rmm.script.RunningExecutionRows;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import org.springframework.data.domain.Sort;
 
 import java.util.Collection;
@@ -25,6 +25,8 @@ import java.util.Optional;
 public interface CustomScriptExecutionRepository {
 
     List<ScriptExecution> saveRunning(RunningExecutionRows request);
+
+    List<ScriptExecution> saveQueued(RunningExecutionRows request);
 
     Optional<ScriptExecution> findByMachineIdAndExecutionIdAndScriptId(String machineId, String executionId, String scriptId);
 

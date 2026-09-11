@@ -1,5 +1,7 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
+
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;

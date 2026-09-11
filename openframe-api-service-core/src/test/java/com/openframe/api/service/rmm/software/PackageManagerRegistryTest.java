@@ -2,6 +2,8 @@ package com.openframe.api.service.rmm.software;
 
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
+import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

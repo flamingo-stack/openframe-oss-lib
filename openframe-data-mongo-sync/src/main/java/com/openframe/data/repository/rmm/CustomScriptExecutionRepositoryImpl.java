@@ -1,11 +1,12 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.script.ExecutionStatus;
-import com.openframe.data.document.rmm.script.RunningExecutionRows;
-import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.mongodb.ReadPreference;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.RunningExecutionRows;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
@@ -14,7 +15,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
-import com.mongodb.ReadPreference;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
@@ -23,10 +23,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
-import java.util.Optional;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -74,6 +74,15 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
 
     @Override
     public List<ScriptExecution> saveRunning(RunningExecutionRows request) {
+        return save(request, ExecutionStatus.RUNNING);
+    }
+
+    @Override
+    public List<ScriptExecution> saveQueued(RunningExecutionRows request) {
+        return save(request, ExecutionStatus.QUEUED);
+    }
+
+    private List<ScriptExecution> save(RunningExecutionRows request, ExecutionStatus initialStatus) {
         Instant now = Instant.now();
         List<ScriptExecution> rows = request.getMachineIds().stream()
                 .map(machineId -> ScriptExecution.builder()
@@ -89,7 +98,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                         .packageManager(request.getPackageManager())
                         .packageName(request.getPackageName())
                         .softwareAction(request.getSoftwareAction())
-                        .status(ExecutionStatus.RUNNING)
+                        .status(initialStatus)
                         .dispatchedAt(now)
                         .statusChangedAt(now)
                         .build())
