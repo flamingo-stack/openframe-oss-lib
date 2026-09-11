@@ -4,6 +4,7 @@ import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
 import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.UpdateSoftwareScheduleInput;
+import com.openframe.api.service.rmm.schedule.ScheduleGrid;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
@@ -16,6 +17,7 @@ import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,13 +33,12 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class SoftwareScheduleService {
 
-    private static final long SLOT_SECONDS = 1800L;
-
     private static final List<ScriptStatus> NAME_UNIQUE_STATUSES = List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
     private static final List<ScriptStatus> VISIBLE_STATUSES = List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
 
     private final SoftwareScheduleRepository scheduleRepository;
     private final SoftwareScheduleMachineAssignedRepository assignedRepository;
+    private final SoftwareScheduleTargetResolver targetResolver;
     private final TenantIdProvider tenantIdProvider;
 
     public SoftwareScheduleResponse create(CreateSoftwareScheduleInput input, String createdBy) {
@@ -185,9 +186,7 @@ public class SoftwareScheduleService {
     }
 
     public List<String> getMachineIds(String scheduleId) {
-        return assignedRepository
-                .findByTenantIdAndSoftwareScheduleId(tenantIdProvider.getTenantId(), scheduleId)
-                .stream().map(SoftwareScheduleMachineAssigned::getMachineId).toList();
+        return targetResolver.resolveMachineIds(tenantIdProvider.getTenantId(), scheduleId);
     }
 
     public int deviceCount(String scheduleId) {
@@ -226,12 +225,7 @@ public class SoftwareScheduleService {
         if (startAt == null) {
             throw new BadRequestException("A software schedule requires a run date and time (startAt)");
         }
-        if (startAt.getEpochSecond() % SLOT_SECONDS != 0) {
-            throw new BadRequestException("startAt must fall on a 30-minute boundary (xx:00 or xx:30)");
-        }
-        if (repeatSeconds != null && (repeatSeconds <= 0 || repeatSeconds % SLOT_SECONDS != 0)) {
-            throw new BadRequestException("repeat must be a positive whole number of 30-minute slots (1800, 3600, …)");
-        }
+        ScheduleGrid.validateGrid(startAt, repeatSeconds);
     }
 
     private static List<SoftwareSchedulePackage> toPackages(List<SoftwareSchedulePackageInput> packages) {

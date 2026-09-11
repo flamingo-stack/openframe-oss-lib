@@ -9,14 +9,13 @@ import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
-import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.nats.publisher.MachineTimezoneRequestNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
-import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -40,14 +39,14 @@ class SoftwareDeviceLocalScheduleServiceTest {
     private static final String SCHEDULE_ID = "ss-1";
 
     private final SoftwareScheduleRepository scheduleRepository = mock(SoftwareScheduleRepository.class);
-    private final SoftwareScheduleMachineAssignedRepository assignedRepository = mock(SoftwareScheduleMachineAssignedRepository.class);
+    private final SoftwareScheduleTargetResolver targetResolver = mock(SoftwareScheduleTargetResolver.class);
     private final MachineRepository machineRepository = mock(MachineRepository.class);
     private final ScheduleDeviceLocalDispatchRepository dispatchRepository = mock(ScheduleDeviceLocalDispatchRepository.class);
     private final SoftwareScheduleFireDispatcher fireDispatcher = mock(SoftwareScheduleFireDispatcher.class);
     private final MachineTimezoneRequestNatsPublisher timezoneRequestPublisher = mock(MachineTimezoneRequestNatsPublisher.class);
 
     private final SoftwareDeviceLocalScheduleService service = new SoftwareDeviceLocalScheduleService(
-            scheduleRepository, assignedRepository, machineRepository, dispatchRepository, fireDispatcher, timezoneRequestPublisher);
+            scheduleRepository, targetResolver, machineRepository, dispatchRepository, fireDispatcher, timezoneRequestPublisher);
 
     {
         ReflectionTestUtils.setField(service, "catchupSeconds", 1800L);
@@ -100,9 +99,8 @@ class SoftwareDeviceLocalScheduleServiceTest {
         when(scheduleRepository.findByStatusAndTriggerAndTimeReference(
                 ScriptStatus.ACTIVE, ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL))
                 .thenReturn(List.of(schedule));
-        when(assignedRepository.findByTenantIdAndSoftwareScheduleId(TENANT, SCHEDULE_ID))
-                .thenReturn(List.of(SoftwareScheduleMachineAssigned.builder()
-                        .tenantId(TENANT).softwareScheduleId(SCHEDULE_ID).machineId(machine.getMachineId()).build()));
+        when(targetResolver.resolveMachineIds(TENANT, SCHEDULE_ID))
+                .thenReturn(List.of(machine.getMachineId()));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(machine));
         when(dispatchRepository.findByScheduleIdAndMachineIdIn(eq(SCHEDULE_ID), any())).thenReturn(List.of());
     }

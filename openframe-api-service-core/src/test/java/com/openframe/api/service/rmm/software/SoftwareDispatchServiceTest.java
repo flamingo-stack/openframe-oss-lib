@@ -4,8 +4,6 @@ import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.core.exception.BadRequestException;
-import com.openframe.data.document.device.DeviceStatus;
-import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -22,17 +20,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SoftwareDispatchServiceTest {
@@ -48,8 +45,6 @@ class SoftwareDispatchServiceTest {
     @Test
     @DisplayName("persists RUNNING batch rows and fans one software message per machine, shared executionId")
     void dispatch_persistsAndFansOut() {
-        when(deviceService.findByMachineId("m1")).thenReturn(Optional.of(online("m1")));
-        when(deviceService.findByMachineId("m2")).thenReturn(Optional.of(online("m2")));
         ScriptResponse script = brewInstall();
 
         String executionId = service.dispatch(script, List.of("m1", "m2"),
@@ -57,6 +52,7 @@ class SoftwareDispatchServiceTest {
                 PackageManagerType.BREW, "slack", SoftwareAction.INSTALL);
 
         assertThat(executionId).isNotBlank();
+        verify(deviceService).verifyDispatchable(List.of("m1", "m2"));
 
         verify(scriptExecutionService).createSoftwareBatch(eq(executionId), eq("brew-install-id"),
                 eq(List.of("m1", "m2")), eq(PrivilegeLevel.ADMIN), eq(600), eq(USER), eq(ExecutionSource.MANUAL),
@@ -77,24 +73,18 @@ class SoftwareDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("an unknown / non-dispatchable machine rejects the whole dispatch — nothing persisted or published")
+    @DisplayName("a machine the dispatch guard rejects fails the whole dispatch — nothing persisted or published")
     void dispatch_rejectsBadMachine() {
-        when(deviceService.findByMachineId("m1")).thenReturn(Optional.empty());
+        doThrow(new BadRequestException("Machine is not in a dispatchable state (must be ONLINE or OFFLINE): m1"))
+                .when(deviceService).verifyDispatchable(anyList());
 
         assertThatThrownBy(() -> service.dispatch(brewInstall(), List.of("m1"),
                 List.of("slack"), USER, ExecutionSource.MANUAL,
                 PackageManagerType.BREW, "slack", SoftwareAction.INSTALL))
-                .isInstanceOf(RuntimeException.class);
+                .isInstanceOf(BadRequestException.class);
 
         verify(scriptExecutionService, never()).createSoftwareBatch(any(), any(), anyList(), any(), any(), any(), any(), any(), any(), any());
         verify(softwareNatsPublisher, never()).publishSoftware(any(), any());
-    }
-
-    private static Machine online(String machineId) {
-        Machine m = new Machine();
-        m.setMachineId(machineId);
-        m.setStatus(DeviceStatus.ONLINE);
-        return m;
     }
 
     private static ScriptResponse brewInstall() {

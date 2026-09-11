@@ -7,6 +7,7 @@ import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
@@ -77,6 +78,44 @@ class DeviceServiceTest {
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         verify(machineRepository).countMachines(any(), captor.capture(), any());
         return captor.getValue();
+    }
+
+    private static Machine machine(String machineId, DeviceStatus status) {
+        Machine m = new Machine();
+        m.setMachineId(machineId);
+        m.setStatus(status);
+        return m;
+    }
+
+    @Test
+    @DisplayName("verifyDispatchable: an unknown machine throws DeviceNotFoundException")
+    void verifyDispatchable_unknownMachine() {
+        when(machineRepository.findByMachineId("m-x")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service().verifyDispatchable("m-x"))
+                .isInstanceOf(DeviceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("verifyDispatchable: a non-eligible machine (PENDING_DELETION) throws BadRequestException")
+    void verifyDispatchable_nonEligibleMachine() {
+        when(machineRepository.findByMachineId("m-x")).thenReturn(Optional.of(machine("m-x", DeviceStatus.PENDING_DELETION)));
+
+        assertThatThrownBy(() -> service().verifyDispatchable("m-x"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("dispatchable state");
+    }
+
+    @Test
+    @DisplayName("verifyDispatchable(list): ONLINE and OFFLINE machines both pass; every id is checked")
+    void verifyDispatchable_eligibleMachines() {
+        when(machineRepository.findByMachineId("m-on")).thenReturn(Optional.of(machine("m-on", DeviceStatus.ONLINE)));
+        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(machine("m-off", DeviceStatus.OFFLINE)));
+
+        service().verifyDispatchable(List.of("m-on", "m-off"));
+
+        verify(machineRepository).findByMachineId("m-on");
+        verify(machineRepository).findByMachineId("m-off");
     }
 
     @Test

@@ -18,6 +18,7 @@ import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,7 @@ class SoftwareScheduleServiceTest {
 
     private SoftwareScheduleRepository scheduleRepository;
     private SoftwareScheduleMachineAssignedRepository assignedRepository;
+    private SoftwareScheduleTargetResolver targetResolver;
     private TenantIdProvider tenantIdProvider;
     private SoftwareScheduleService service;
 
@@ -56,8 +58,9 @@ class SoftwareScheduleServiceTest {
     void setUp() {
         scheduleRepository = mock(SoftwareScheduleRepository.class);
         assignedRepository = mock(SoftwareScheduleMachineAssignedRepository.class);
+        targetResolver = mock(SoftwareScheduleTargetResolver.class);
         tenantIdProvider = mock(TenantIdProvider.class);
-        service = new SoftwareScheduleService(scheduleRepository, assignedRepository, tenantIdProvider);
+        service = new SoftwareScheduleService(scheduleRepository, assignedRepository, targetResolver, tenantIdProvider);
 
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // Saves are identity so assertions can read back what the service built.

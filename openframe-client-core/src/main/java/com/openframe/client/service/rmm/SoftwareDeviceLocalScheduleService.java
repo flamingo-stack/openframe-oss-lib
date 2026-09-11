@@ -7,13 +7,12 @@ import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
-import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.nats.publisher.MachineTimezoneRequestNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
-import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,7 +37,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 public class SoftwareDeviceLocalScheduleService {
 
     private final SoftwareScheduleRepository scheduleRepository;
-    private final SoftwareScheduleMachineAssignedRepository assignedRepository;
+    private final SoftwareScheduleTargetResolver targetResolver;
     private final MachineRepository machineRepository;
     private final ScheduleDeviceLocalDispatchRepository dispatchRepository;
     private final SoftwareScheduleFireDispatcher fireDispatcher;
@@ -184,11 +183,7 @@ public class SoftwareDeviceLocalScheduleService {
     }
 
     private List<String> resolveTargets(SoftwareSchedule schedule) {
-        return assignedRepository
-                .findByTenantIdAndSoftwareScheduleId(schedule.getTenantId(), schedule.getId())
-                .stream()
-                .map(SoftwareScheduleMachineAssigned::getMachineId)
-                .toList();
+        return targetResolver.resolveMachineIds(schedule.getTenantId(), schedule.getId());
     }
 
     private ZoneId parseZone(SoftwareSchedule schedule, String machineId, String zoneId) {

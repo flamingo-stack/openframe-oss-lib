@@ -4,10 +4,9 @@ import com.openframe.client.service.rmm.SoftwareDeviceLocalScheduleService;
 import com.openframe.client.service.rmm.SoftwareScheduleExecutionService;
 import com.openframe.client.service.rmm.SoftwareScheduleFireDispatcher;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
-import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
 import com.openframe.data.document.rmm.script.ScriptStatus;
-import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -28,12 +27,12 @@ class SoftwareScheduleExecutionServiceTest {
     private static final String TENANT = "t-1";
 
     private final SoftwareScheduleRepository scheduleRepository = mock(SoftwareScheduleRepository.class);
-    private final SoftwareScheduleMachineAssignedRepository assignedRepository = mock(SoftwareScheduleMachineAssignedRepository.class);
+    private final SoftwareScheduleTargetResolver targetResolver = mock(SoftwareScheduleTargetResolver.class);
     private final SoftwareScheduleFireDispatcher fireDispatcher = mock(SoftwareScheduleFireDispatcher.class);
     private final SoftwareDeviceLocalScheduleService deviceLocalScheduleService = mock(SoftwareDeviceLocalScheduleService.class);
 
     private final SoftwareScheduleExecutionService service =
-            new SoftwareScheduleExecutionService(scheduleRepository, assignedRepository, fireDispatcher, deviceLocalScheduleService);
+            new SoftwareScheduleExecutionService(scheduleRepository, targetResolver, fireDispatcher, deviceLocalScheduleService);
 
     @Test
     @DisplayName("a due repeating schedule fires to its SPECIFIC targets and advances nextRunAt into the future")
@@ -44,8 +43,7 @@ class SoftwareScheduleExecutionServiceTest {
                 .build();
         when(scheduleRepository.findByStatusAndNextRunAtLessThanEqual(eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of(schedule));
-        when(assignedRepository.findByTenantIdAndSoftwareScheduleId(TENANT, "ss-1"))
-                .thenReturn(List.of(assigned("m-1"), assigned("m-2")));
+        when(targetResolver.resolveMachineIds(TENANT, "ss-1")).thenReturn(List.of("m-1", "m-2"));
 
         service.runDueSchedules();
 
@@ -65,8 +63,7 @@ class SoftwareScheduleExecutionServiceTest {
                 .build();
         when(scheduleRepository.findByStatusAndNextRunAtLessThanEqual(eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of(schedule));
-        when(assignedRepository.findByTenantIdAndSoftwareScheduleId(TENANT, "ss-1"))
-                .thenReturn(List.of(assigned("m-1")));
+        when(targetResolver.resolveMachineIds(TENANT, "ss-1")).thenReturn(List.of("m-1"));
 
         service.runDueSchedules();
 
@@ -86,9 +83,5 @@ class SoftwareScheduleExecutionServiceTest {
 
         verify(fireDispatcher, never()).dispatch(any(), any(), any());
         verify(scheduleRepository, never()).save(any());
-    }
-
-    private static SoftwareScheduleMachineAssigned assigned(String machineId) {
-        return SoftwareScheduleMachineAssigned.builder().tenantId(TENANT).softwareScheduleId("ss-1").machineId(machineId).build();
     }
 }
