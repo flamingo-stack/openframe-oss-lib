@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -47,19 +46,7 @@ public class ScheduleScriptExecutionService {
     }
 
     private void advanceAndSave(ScheduleScript schedule, Instant now) {
-        schedule.setNextRunAt(nextRunAfter(schedule.getNextRunAt(), schedule.getRepeat(), now));
+        schedule.setNextRunAt(ScheduleRecurrence.nextRunAfter(schedule.getNextRunAt(), schedule.getRepeat(), now));
         scheduleRepository.save(schedule);
-    }
-
-    private static Instant nextRunAfter(Instant currentNextRun, Long repeatSeconds, Instant now) {
-        if (repeatSeconds == null || repeatSeconds <= 0) {
-            return null;
-        }
-        Duration step = Duration.ofSeconds(repeatSeconds);
-        Instant next = currentNextRun != null ? currentNextRun : now;
-        while (!next.isAfter(now)) {
-            next = next.plus(step);
-        }
-        return next;
     }
 }
