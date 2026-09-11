@@ -4,6 +4,7 @@ import com.openframe.data.pinot.model.LogProjection;
 import com.openframe.data.pinot.model.OrganizationOption;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pinot.client.Connection;
+import org.apache.pinot.client.ResultSet;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
@@ -14,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 @Repository
@@ -45,7 +48,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                                         List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit,
                                         String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
-                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
@@ -66,7 +69,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                                           List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit,
                                           String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
-                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
@@ -178,22 +181,33 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
         return DEFAULT_SORT_COLUMN;
     }
 
+    // Most devices have no nickname: Pinot stores the schema default (empty string) for those rows,
+    // and the API contract is an absent nickname, not an empty one.
+    private String readNickname(ResultSet resultSet, int rowIndex, Map<String, Integer> columnIndexMap) {
+        String nickname = readString(resultSet, rowIndex, columnIndexMap, "nickname");
+        if (!hasText(nickname)) {
+            return null;
+        }
+        return nickname;
+    }
+
     private List<LogProjection> executeLogQuery(String query) {
         return executeQuery(query, resultSet -> {
             Map<String, Integer> columnIndexMap = buildColumnIndexMap(resultSet);
             return rowIndex -> {
                 LogProjection projection = new LogProjection();
-                projection.toolEventId = resultSet.getString(rowIndex, columnIndexMap.get("toolEventId"));
-                projection.ingestDay = resultSet.getString(rowIndex, columnIndexMap.get("ingestDay"));
-                projection.toolType = resultSet.getString(rowIndex, columnIndexMap.get("toolType"));
-                projection.eventType = resultSet.getString(rowIndex, columnIndexMap.get("eventType"));
-                projection.severity = resultSet.getString(rowIndex, columnIndexMap.get("severity"));
-                projection.userId = resultSet.getString(rowIndex, columnIndexMap.get("userId"));
-                projection.deviceId = resultSet.getString(rowIndex, columnIndexMap.get("deviceId"));
-                projection.hostname = resultSet.getString(rowIndex, columnIndexMap.get("hostname"));
-                projection.organizationId = resultSet.getString(rowIndex, columnIndexMap.get("organizationId"));
-                projection.organizationName = resultSet.getString(rowIndex, columnIndexMap.get("organizationName"));
-                projection.summary = resultSet.getString(rowIndex, columnIndexMap.get("summary"));
+                projection.toolEventId = readString(resultSet, rowIndex, columnIndexMap, "toolEventId");
+                projection.ingestDay = readString(resultSet, rowIndex, columnIndexMap, "ingestDay");
+                projection.toolType = readString(resultSet, rowIndex, columnIndexMap, "toolType");
+                projection.eventType = readString(resultSet, rowIndex, columnIndexMap, "eventType");
+                projection.severity = readString(resultSet, rowIndex, columnIndexMap, "severity");
+                projection.userId = readString(resultSet, rowIndex, columnIndexMap, "userId");
+                projection.deviceId = readString(resultSet, rowIndex, columnIndexMap, "deviceId");
+                projection.hostname = readString(resultSet, rowIndex, columnIndexMap, "hostname");
+                projection.nickname = readNickname(resultSet, rowIndex, columnIndexMap);
+                projection.organizationId = readString(resultSet, rowIndex, columnIndexMap, "organizationId");
+                projection.organizationName = readString(resultSet, rowIndex, columnIndexMap, "organizationName");
+                projection.summary = readString(resultSet, rowIndex, columnIndexMap, "summary");
                 projection.eventTimestamp = Instant.ofEpochMilli(resultSet.getLong(rowIndex, columnIndexMap.get("eventTimestamp")));
                 return projection;
             };

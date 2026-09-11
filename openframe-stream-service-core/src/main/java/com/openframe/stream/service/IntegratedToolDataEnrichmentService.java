@@ -55,6 +55,7 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
         }
         enriched.setMachineId(machine.getMachineId());
         enriched.setHostname(machine.getHostname());
+        enriched.setNickname(machine.getNickname());
 
         CachedOrganizationInfo organization = machineIdCacheService.getOrganization(machine.getOrganizationId());
         log.debug("Found machine ID {} for agent {} (organization {})",

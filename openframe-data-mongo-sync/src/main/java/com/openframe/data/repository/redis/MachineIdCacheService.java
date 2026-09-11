@@ -30,7 +30,7 @@ public class MachineIdCacheService {
 
     /**
      * Get cached machine info from cache or database by agent ID
-     * Returns only essential fields (machineId, hostname, organizationId)
+`     * Returns only essential fields (machineId, hostname, nickname, organizationId)
      *
      * @param agentId the agent ID
      * @return the CachedMachineInfo object, or null if not found
@@ -46,6 +46,7 @@ public class MachineIdCacheService {
                 .map(machine -> new CachedMachineInfo(
                     machine.getMachineId(),
                     machine.getHostname(),
+                    machine.getNickname(),
                     machine.getOrganizationId()
                 ))
                 .orElse(null);
@@ -66,6 +67,7 @@ public class MachineIdCacheService {
                 .map(machine -> new CachedMachineInfo(
                     machine.getMachineId(),
                     machine.getHostname(),
+                    machine.getNickname(),
                     machine.getOrganizationId()
                 ))
                 .orElse(null);
@@ -90,6 +92,7 @@ public class MachineIdCacheService {
                 .map(machine -> new CachedMachineInfo(
                     machine.getMachineId(),
                     machine.getHostname(),
+                    machine.getNickname(),
                     machine.getOrganizationId()
                 ))
                 .orElse(null);

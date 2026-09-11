@@ -7,6 +7,7 @@ public class IntegratedToolEnrichedData {
 
     private String machineId;
     private String hostname;
+    private String nickname;
     private String organizationId;
     private String organizationName;
     private String userId;

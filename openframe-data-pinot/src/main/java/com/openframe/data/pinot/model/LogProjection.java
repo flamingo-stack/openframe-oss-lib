@@ -21,6 +21,7 @@ public class LogProjection {
     public String userId;
     public String deviceId;
     public String hostname;
+    public String nickname;
     public String organizationId;
     public String organizationName;
     public String summary;
