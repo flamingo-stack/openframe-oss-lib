@@ -97,14 +97,14 @@ public class ScriptDeliveryRetryService {
     private List<ScriptExecution> failExhaustedDelivery(DeliveryKey delivery, List<ScriptExecution> leaves, Instant now) {
         log.warn("QUEUED delivery exhausted: executionId={} machineId={} — {} leaf(s) FAILED (agent never received)",
                 delivery.executionId(), delivery.machineId(), leaves.size());
-        watchdogMetrics.recordDeliveryFailedExhausted(leaves.size());
+        watchdogMetrics.recordDeliveryFailedExhausted(leaves);
         return failDelivery(delivery, leaves, now, DELIVERY_FAILED_ERROR_FORMAT.formatted(retrySize));
     }
 
     private List<ScriptExecution> failOfflineDelivery(DeliveryKey delivery, List<ScriptExecution> leaves, Instant now) {
         log.info("QUEUED delivery skipped: device offline executionId={} machineId={} — {} leaf(s) FAILED",
                 delivery.executionId(), delivery.machineId(), leaves.size());
-        watchdogMetrics.recordDeliveryFailedOffline(leaves.size());
+        watchdogMetrics.recordDeliveryFailedOffline(leaves);
         return failDelivery(delivery, leaves, now, OFFLINE_ERROR_MESSAGE);
     }
 

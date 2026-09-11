@@ -48,7 +48,8 @@ public class ClientCredentialsHandler {
             log.debug("Client secret validation failed for client: {} ", clientId);
             throw new IllegalArgumentException("Invalid client secret");
         }
-        log.debug("Client secret validation passed for client: " + clientId);
+        log.debug("Client secret validation passed for client: {}", clientId);
     }
 
 }
+

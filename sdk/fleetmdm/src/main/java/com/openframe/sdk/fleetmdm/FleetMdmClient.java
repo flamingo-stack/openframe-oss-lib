@@ -58,6 +58,41 @@ public class FleetMdmClient {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /**
+     * Body of a Fleet API call. It may throw checked exceptions so the call sites keep plain
+     * request/parse code and the wrapping lives in exactly one place.
+     */
+    @FunctionalInterface
+    private interface FleetCall<T> {
+        T execute() throws Exception;
+    }
+
+    /**
+     * The single place where a failed Fleet call becomes an unchecked {@link FleetMdmException}.
+     *
+     * <p>{@link FleetMdmApiException} keeps its own type so callers can still react to an HTTP
+     * status. An interrupt re-arms the thread's interrupt flag before wrapping: once the checked
+     * {@code InterruptedException} is gone from the signature, that flag is the only thing left
+     * telling the caller that its thread is being shut down.
+     *
+     * @param action what the call was trying to do, phrased to follow "Failed to" /
+     *               "Interrupted while trying to" (e.g. {@code "fetch Fleet query 7"})
+     */
+    private <T> T call(String action, FleetCall<T> body) {
+        try {
+            return body.execute();
+        } catch (FleetMdmApiException e) {
+            throw e;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new FleetMdmException("Interrupted while trying to " + action, e);
+        } catch (FleetMdmException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new FleetMdmException("Failed to " + action, e);
+        }
+    }
+
+    /**
      * Constructor intended for unit-tests – allows passing a pre-configured or mocked {@link HttpClient}.
      */
     FleetMdmClient(String baseUrl, String apiToken, HttpClient httpClient) {
@@ -91,40 +126,41 @@ public class FleetMdmClient {
      * @param id Host ID
      * @return Host object or null if not found
      */
-    public Host getHostById(long id) throws IOException, InterruptedException {
-        HttpRequest request = addHeaders(HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + HOSTS_URL + "/" + id)))
-                .GET()
-                .timeout(Duration.ofSeconds(30))
-                .build();
+    public Host getHostById(long id) {
+        return call("fetch Fleet host " + id, () -> {
+            HttpRequest request = addHeaders(HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + HOSTS_URL + "/" + id)))
+                    .GET()
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        if (response.statusCode() == 401) {
-            throw new RuntimeException("Authentication failed. Please check your API token. Response: " + response.body());
-        } else if (response.statusCode() == 404) {
-            return null; // Host not found
-        } else if (response.statusCode() != 200) {
-            throw new RuntimeException("Failed to fetch host. Status: " + response.statusCode() + ", Response: " + response.body());
-        }
+            if (response.statusCode() == 401) {
+                throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
+            } else if (response.statusCode() == 404) {
+                return null; // Host not found
+            } else if (response.statusCode() != 200) {
+                throw new FleetMdmApiException("Failed to fetch host", response.statusCode(), response.body());
+            }
 
-        return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("host"), Host.class);
+            return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("host"), Host.class);
+        });
     }
 
     /**
      * Search for hosts using the provided query parameters
      * @param searchRequest Search parameters including query string, page, and per_page
      * @return List of matching Host objects
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
+     * @throws FleetMdmException if the call fails or the thread is interrupted
      */
-    public List<Host> searchHosts(HostSearchRequest searchRequest) throws IOException, InterruptedException {
+    public List<Host> searchHosts(HostSearchRequest searchRequest) {
         if (searchRequest == null) {
             throw new IllegalArgumentException("Search request cannot be null");
         }
 
-        try {
+        return call("process host search request", () -> {
             String url = buildSearchUrl(searchRequest);
             HttpRequest request = addHeaders(HttpRequest.newBuilder()
                     .uri(URI.create(url)))
@@ -142,23 +178,17 @@ public class FleetMdmClient {
 
             HostSearchResponse searchResponse = MAPPER.readValue(response.body(), HostSearchResponse.class);
             return searchResponse.getHosts() != null ? searchResponse.getHosts() : new ArrayList<>();
-        } catch (Exception e) {
-            if (e instanceof FleetMdmApiException) {
-                throw e;
-            }
-            throw new FleetMdmException("Failed to process host search request", e);
-        }
+        });
     }
 
     /**
      * Search for hosts by query string with default pagination
      * @param query Search query (e.g., hostname, UUID, IP address)
      * @return List of matching Host objects
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
+     * @throws FleetMdmException if the call fails or the thread is interrupted
      */
-    public List<Host> searchHosts(String query) throws IOException, InterruptedException {
+    public List<Host> searchHosts(String query) {
         return searchHosts(new HostSearchRequest(query));
     }
 
@@ -168,11 +198,10 @@ public class FleetMdmClient {
      * @param page Page number (0-based)
      * @param perPage Number of results per page
      * @return List of matching Host objects
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
+     * @throws FleetMdmException if the call fails or the thread is interrupted
      */
-    public List<Host> searchHosts(String query, Integer page, Integer perPage) throws IOException, InterruptedException {
+    public List<Host> searchHosts(String query, Integer page, Integer perPage) {
         return searchHosts(new HostSearchRequest(query, page, perPage));
     }
 
@@ -215,23 +244,18 @@ public class FleetMdmClient {
      * @param hostId The numeric ID of the host to query
      * @param query The osquery SQL statement to execute
      * @return QueryResult containing the query results or error information
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
+     * @throws FleetMdmException if the call fails or the thread is interrupted
      */
-    public QueryResult runQuery(long hostId, String query) throws IOException, InterruptedException {
+    public QueryResult runQuery(long hostId, String query) {
         validateQuery(query);
 
-        try {
+        return call("execute query on host: " + hostId, () -> {
             HttpRequest request = buildRunQueryRequest(hostId, query);
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             checkRunQueryResponse(response, hostId);
             return parseQueryResult(response.body(), query);
-        } catch (FleetMdmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new FleetMdmException("Failed to execute query on host: " + hostId, e);
-        }
+        });
     }
 
     /**
@@ -306,7 +330,7 @@ public class FleetMdmClient {
      * @return The enroll secret string or null if not found
      */
     public String getEnrollSecret() {
-        try {
+        return call("process get enroll secret request", () -> {
             HttpRequest request = addHeaders(HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + GET_ENROLL_SECRET_URL)))
                     .GET()
@@ -328,9 +352,7 @@ public class FleetMdmClient {
             }
 
             throw new FleetMdmException("Failed to parse enroll secret: " + response.body());
-        } catch (Exception e) {
-            throw new FleetMdmException("Failed to process get enroll secret request", e);
-        }
+        });
     }
 
     /**
@@ -338,28 +360,29 @@ public class FleetMdmClient {
      *
      * @param id Query ID
      * @return Query object or null if not found
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
+     * @throws FleetMdmException if the call fails or the thread is interrupted
      */
-    public Query getQueryById(long id) throws IOException, InterruptedException {
-        HttpRequest request = addHeaders(HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + QUERIES_URL + "/" + id)))
-                .GET()
-                .timeout(Duration.ofSeconds(30))
-                .build();
+    public Query getQueryById(long id) {
+        return call("fetch Fleet query " + id, () -> {
+            HttpRequest request = addHeaders(HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + QUERIES_URL + "/" + id)))
+                    .GET()
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        if (response.statusCode() == 401) {
-            throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
-        } else if (response.statusCode() == 404) {
-            return null; // Query not found
-        } else if (response.statusCode() != 200) {
-            throw new FleetMdmApiException("Failed to fetch query", response.statusCode(), response.body());
-        }
+            if (response.statusCode() == 401) {
+                throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
+            } else if (response.statusCode() == 404) {
+                return null; // Query not found
+            } else if (response.statusCode() != 200) {
+                throw new FleetMdmApiException("Failed to fetch query", response.statusCode(), response.body());
+            }
 
-        return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("query"), Query.class);
+            return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("query"), Query.class);
+        });
     }
 
     /**
@@ -367,120 +390,97 @@ public class FleetMdmClient {
      *
      * @param id Policy ID
      * @return Policy object or null if not found
-     * @throws IOException if an I/O exception occurs
-     * @throws InterruptedException if the request is interrupted
      * @throws FleetMdmApiException if the API returns an error
+     * @throws FleetMdmException if the call fails or the thread is interrupted
      */
-    public Policy getPolicyById(long id) throws IOException, InterruptedException {
-        HttpRequest request = addHeaders(HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + POLICIES_URL + "/" + id)))
-                .GET()
-                .timeout(Duration.ofSeconds(30))
-                .build();
+    public Policy getPolicyById(long id) {
+        return call("fetch Fleet policy " + id, () -> {
+            HttpRequest request = addHeaders(HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + POLICIES_URL + "/" + id)))
+                    .GET()
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        if (response.statusCode() == 401) {
-            throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
-        } else if (response.statusCode() == 404) {
-            return null; // Policy not found
-        } else if (response.statusCode() != 200) {
-            throw new FleetMdmApiException("Failed to fetch policy", response.statusCode(), response.body());
-        }
+            if (response.statusCode() == 401) {
+                throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
+            } else if (response.statusCode() == 404) {
+                return null; // Policy not found
+            } else if (response.statusCode() != 200) {
+                throw new FleetMdmApiException("Failed to fetch policy", response.statusCode(), response.body());
+            }
 
-        return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("policy"), Policy.class);
+            return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("policy"), Policy.class);
+        });
     }
 
     /**
      * Create a global policy.
      */
     public Policy createPolicy(CreatePolicyRequest request) {
-        try {
+        return call("create Fleet policy", () -> {
             HttpResponse<String> response = sendRequest(POLICIES_URL, "POST", MAPPER.writeValueAsString(request));
             checkResponse(response, "create Fleet policy");
             return MAPPER.treeToValue(requireNode(response.body(), "policy"), Policy.class);
-        } catch (FleetMdmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new FleetMdmException("Failed to create Fleet policy", e);
-        }
+        });
     }
 
     /**
      * List vulnerabilities with pagination.
      */
     public VulnerabilitiesResponse listVulnerabilities(int page, int perPage) {
-        try {
+        return call("list Fleet vulnerabilities", () -> {
             HttpResponse<String> response = sendRequest(VULNERABILITIES_URL + "?page=" + page + "&per_page=" + perPage, "GET", null);
             checkResponse(response, "list Fleet vulnerabilities");
             return MAPPER.readValue(response.body(), VulnerabilitiesResponse.class);
-        } catch (FleetMdmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new FleetMdmException("Failed to list Fleet vulnerabilities", e);
-        }
+        });
     }
 
     /**
      * List all global policies.
      */
     public List<Policy> listPolicies() {
-        try {
+        return call("list Fleet policies", () -> {
             HttpResponse<String> response = sendRequest(POLICIES_URL, "GET", null);
             checkResponse(response, "list Fleet policies");
             return MAPPER.convertValue(
                     listNodeOrEmpty(response.body(), "policies"),
                     MAPPER.getTypeFactory().constructCollectionType(List.class, Policy.class));
-        } catch (FleetMdmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new FleetMdmException("Failed to list Fleet policies", e);
-        }
+        });
     }
 
     /**
      * Get a policy by numeric ID.
      */
     public Policy getPolicy(long policyId) {
-        try {
+        return call("get Fleet policy: " + policyId, () -> {
             HttpResponse<String> response = sendRequest(POLICIES_URL + "/" + policyId, "GET", null);
             checkResponse(response, "get Fleet policy");
             return MAPPER.treeToValue(requireNode(response.body(), "policy"), Policy.class);
-        } catch (FleetMdmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new FleetMdmException("Failed to get Fleet policy: " + policyId, e);
-        }
+        });
     }
 
     /**
      * Update an existing policy.
      */
     public Policy updatePolicy(long policyId, UpdatePolicyRequest request) {
-        try {
+        return call("update Fleet policy: " + policyId, () -> {
             HttpResponse<String> response = sendRequest(POLICIES_URL + "/" + policyId, "PATCH", MAPPER.writeValueAsString(request));
             checkResponse(response, "update Fleet policy");
             return MAPPER.treeToValue(requireNode(response.body(), "policy"), Policy.class);
-        } catch (FleetMdmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new FleetMdmException("Failed to update Fleet policy: " + policyId, e);
-        }
+        });
     }
 
     /**
      * Create a scheduled query.
      */
     public Query createScheduledQuery(CreateScheduledQueryRequest request) {
-        try {
+        return call("create Fleet scheduled query", () -> {
             HttpResponse<String> response = sendRequest(QUERIES_URL, "POST", MAPPER.writeValueAsString(request));
             checkResponse(response, "create Fleet scheduled query");
             return MAPPER.treeToValue(requireNode(response.body(), "query"), Query.class);
-        } catch (FleetMdmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new FleetMdmException("Failed to create Fleet scheduled query", e);
-        }
+        });
     }
 
     /**
@@ -497,47 +497,35 @@ public class FleetMdmClient {
      */
     public List<Query> listScheduledQueries(boolean includeOpenframeManaged) {
         String path = includeOpenframeManaged ? QUERIES_URL + INCLUDE_MANAGED_QUERY : QUERIES_URL;
-        try {
+        return call("list Fleet scheduled queries", () -> {
             HttpResponse<String> response = sendRequest(path, "GET", null);
             checkResponse(response, "list Fleet scheduled queries");
             return MAPPER.convertValue(
                     listNodeOrEmpty(response.body(), "queries"),
                     MAPPER.getTypeFactory().constructCollectionType(List.class, Query.class));
-        } catch (FleetMdmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new FleetMdmException("Failed to list Fleet scheduled queries", e);
-        }
+        });
     }
 
     /**
      * Get a scheduled query by numeric ID.
      */
     public Query getScheduledQuery(long queryId) {
-        try {
+        return call("get Fleet scheduled query: " + queryId, () -> {
             HttpResponse<String> response = sendRequest(QUERIES_URL + "/" + queryId, "GET", null);
             checkResponse(response, "get Fleet scheduled query");
             return MAPPER.treeToValue(requireNode(response.body(), "query"), Query.class);
-        } catch (FleetMdmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new FleetMdmException("Failed to get Fleet scheduled query: " + queryId, e);
-        }
+        });
     }
 
     /**
      * Update an existing scheduled query.
      */
     public Query updateScheduledQuery(long queryId, UpdateScheduledQueryRequest request) {
-        try {
+        return call("update Fleet scheduled query: " + queryId, () -> {
             HttpResponse<String> response = sendRequest(QUERIES_URL + "/" + queryId, "PATCH", MAPPER.writeValueAsString(request));
             checkResponse(response, "update Fleet scheduled query");
             return MAPPER.treeToValue(requireNode(response.body(), "query"), Query.class);
-        } catch (FleetMdmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new FleetMdmException("Failed to update Fleet scheduled query: " + queryId, e);
-        }
+        });
     }
 
     public CompletableFuture<Policy> createPolicyAsync(CreatePolicyRequest request) {

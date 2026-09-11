@@ -111,7 +111,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
                 Optional<String> provisionTenant = ssoOidcUserService.autoProvisionTenantForDomain(email);
                 if (provisionTenant.isPresent()) {
                     if (loginJoinConfirmEnabled && hasText(joinConfirmUrl)) {
-                        redirectKeepingCookie(response, joinConfirmUrl);
+                        redirectToJoinConfirm(response, joinConfirmUrl, payload.redirectTo(), payload.authMobile());
                         return;
                     }
                     authUser = ssoOidcUserService.autoProvisionByGlobalDomain(provider, user).orElse(null);
@@ -171,21 +171,6 @@ public class LoginSsoHandler implements SsoFlowHandler {
             log.warn("event=sso-login-forbidden-provider tenant={} provider={}", tenantId, provider);
             throw new IllegalStateException(
                     "Your organization uses its own sign-in for this provider. Enter your email on the login page to be redirected to it.");
-        }
-    }
-
-    /**
-     * Unknown email, verified identity: too valuable to throw away. The SAS session already holds
-     * the authenticated OidcUser, so the frontend continuation page only needs to collect what SSO
-     * cannot provide (organization name and domain) and call the completion endpoint, which reads
-     * the identity from the session. The flow cookie is deliberately KEPT — the completion endpoint
-     * uses it for redirectTo/authMobile and as proof the request belongs to this flow.
-     */
-    private void redirectKeepingCookie(HttpServletResponse response, String url) {
-        try {
-            response.sendRedirect(url);
-        } catch (java.io.IOException e) {
-            throw new IllegalStateException("Failed to start account confirmation.", e);
         }
     }
 

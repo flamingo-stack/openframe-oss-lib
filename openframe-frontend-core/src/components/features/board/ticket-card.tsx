@@ -138,6 +138,11 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
 
   const timestampLabel = ticket.createdAt ? formatTicketRelativeTime(ticket.createdAt) : null;
   const tooltipLabel = ticket.createdAt ? formatTicketFullTimestamp(ticket.createdAt) : null;
+  // Last line of the details block (Figma tickets 8001-90111): `3891 • 5 min ago`.
+  // The number is display-ready text the host passes (no `#` in the design) and
+  // may be empty - the hub hero card and tickets without one send '' - so either
+  // half stands on its own and the line disappears with both missing.
+  const metaLabel = [ticket.ticketNumber || null, timestampLabel].filter(Boolean).join(' \u2022 ');
 
   return (
     <>
@@ -156,16 +161,19 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
         {rightSection}
       </div>
       {ticket.tags?.length ? <TicketTagRow tags={ticket.tags} /> : null}
-      {timestampLabel && tooltipLabel && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <p className="pointer-events-auto truncate text-ods-text-secondary text-h6">{timestampLabel}</p>
-            </TooltipTrigger>
-            <TooltipContent>{tooltipLabel}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
+      {metaLabel &&
+        (tooltipLabel ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <p className="pointer-events-auto truncate text-ods-text-secondary text-h6">{metaLabel}</p>
+              </TooltipTrigger>
+              <TooltipContent>{tooltipLabel}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          <p className="truncate text-ods-text-secondary text-h6">{metaLabel}</p>
+        ))}
       {ticket.escalatedByUser && (
         <div className="flex items-center gap-[var(--spacing-system-xxs)] text-ods-open-yellow text-h6">
           <UserCheckIcon className="size-4 shrink-0" />

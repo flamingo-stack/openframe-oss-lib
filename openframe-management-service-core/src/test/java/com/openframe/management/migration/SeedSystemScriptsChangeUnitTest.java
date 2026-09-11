@@ -62,7 +62,7 @@ class SeedSystemScriptsChangeUnitTest {
         assertEquals(ScriptStatus.ACTIVE, brew.getStatus());
         assertNotNull(brew.getContentHash());
         assertTrue(brew.getScriptBody().contains("NONINTERACTIVE=1"));
-        // the installer must never run brew itself as root
+        assertTrue(brew.getScriptBody().contains("check_run_command_as_root"));
         assertTrue(brew.getScriptBody().contains("sudo -u \"$CONSOLE_USER\""));
 
         Script choco = byName(scripts, SystemScriptCode.INSTALL_CHOCOLATEY.canonicalName());
@@ -71,31 +71,16 @@ class SeedSystemScriptsChangeUnitTest {
         assertTrue(choco.getScriptBody().contains("community.chocolatey.org/install.ps1"));
 
         Script winget = byName(scripts, SystemScriptCode.INSTALL_WINGET.canonicalName());
-        // the Appx registration and PATH fix are per-user, so winget must NOT run elevated
         assertEquals(PrivilegeLevel.USER, winget.getPrivilegeLevel());
         assertTrue(winget.getScriptBody().contains("Repair-WinGetPackageManager -Force -Latest"));
         assertTrue(winget.getScriptBody().contains("--accept-source-agreements"));
+
+        assertEquals(900, brew.getDefaultTimeoutSeconds());
+        assertEquals(1800, winget.getDefaultTimeoutSeconds());
     }
 
     @Test
-    void refreshesTheScriptWhenTheShippedBodyChanged() {
-        Script stale = new Script();
-        stale.setName(SystemScriptCode.INSTALL_BREW.canonicalName());
-        stale.setSystem(true);
-        stale.setContentHash("stale-hash");
-        when(scriptRepository.findSystemScript(any(), any())).thenAnswer(inv ->
-                inv.getArgument(0) == SystemScriptCode.INSTALL_BREW ? Optional.of(stale) : Optional.empty());
-        when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        changeUnit.execution(scriptRepository, tenantIdProvider);
-
-        assertTrue(stale.getScriptBody().contains("NONINTERACTIVE=1"));
-        assertNotNull(stale.getContentHash());
-        assertTrue(!"stale-hash".equals(stale.getContentHash()));
-    }
-
-    @Test
-    void leavesUpToDateScriptsUntouched() {
+    void skipsScriptsThatAlreadyExist() {
         when(scriptRepository.findSystemScript(any(), any())).thenReturn(Optional.empty());
         when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         changeUnit.execution(scriptRepository, tenantIdProvider);

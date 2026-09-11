@@ -139,14 +139,14 @@ function MingoChatHistoryRow({
     <div
       className={cn(
         'group/row relative flex h-12 items-center border-b border-ods-border transition-colors last:border-b-0',
-        // Active (selected) dialog — Figma 259:91610: an open-yellow-secondary
-        // fill, a 4px open-yellow accent bar down the leading edge, and yellow
+        // Active (selected) dialog — Figma 259:91610: an accent-secondary
+        // fill, a 4px accent bar down the leading edge, and accent-colored
         // title text. Inactive rows keep the dark surface with a hover tint.
-        isActive ? 'bg-ods-open-yellow-secondary' : 'bg-ods-bg hover:bg-ods-bg-hover',
+        isActive ? 'bg-ods-accent-secondary' : 'bg-ods-bg hover:bg-ods-bg-hover',
       )}
     >
       {isActive ? (
-        <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-ods-open-yellow" />
+        <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-ods-accent" />
       ) : null}
       <div
         role="button"
@@ -166,7 +166,7 @@ function MingoChatHistoryRow({
           </span>
         ) : null}
         <span
-          className={cn('min-w-0 flex-1 truncate text-h4', isActive ? 'text-ods-open-yellow' : 'text-ods-text-primary')}
+          className={cn('min-w-0 flex-1 truncate text-h4', isActive ? 'text-ods-accent' : 'text-ods-text-primary')}
           title={title}
         >
           {title}
