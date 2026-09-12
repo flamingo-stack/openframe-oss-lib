@@ -11,6 +11,13 @@ package com.openframe.test.data.dto.ai;
  * failure surfaces as an unrelated-looking deserialization error rather than as missing data. The
  * harness needs no fields from most of these — only the constant has to exist. Mirror the schema when
  * it grows; do not prune values just because no test reads them.
+ *
+ * <p><strong>Kept in sync by hand:</strong> this enum, the server's
+ * {@code message.graphqls} schema, and the frontend's {@code MESSAGE_TYPE} constant
+ * ({@code message.types.ts}) are three independently maintained copies of the same wire vocabulary.
+ * There is currently no shared schema-driven codegen or CI check that diffs the three lists, so a
+ * value added to one is not guaranteed to appear in the others. When adding or removing a value here,
+ * check the other two locations as well.
  */
 public enum MessageDataType {
     TEXT,

@@ -33,7 +33,11 @@ export type ContentRefLayout = 'list' | 'grid';
 /** Subset of `EntityCardSize` (entity-card dispatch) appropriate for
  *  grid/list rendering in RelatedContentSection. Duplicated as a literal
  *  union here to avoid a config→component import cycle. Kept in lockstep
- *  with `EntityCardSize`; widen here when a new size is added there. */
+ *  with `EntityCardSize`; widen here when a new size is added there.
+ *  NOTE: there is a type-level equality assertion against `EntityCardSize`
+ *  in a non-cyclic test file (see e.g. content-ref-groups.type-check.test.ts)
+ *  intended to catch drift between the two unions at build/test time — if
+ *  that assertion doesn't exist yet, add it before relying on this comment. */
 export type ContentRefGridSize = 'lg' | 'default' | 'sm';
 
 export interface ContentRefGroupConfig {

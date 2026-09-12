@@ -13,7 +13,11 @@
  *   1. `<ChatTicketItem>` summary tile. Clicking it toggles the
  *      `expandedTicketId` state owned by the parent `<TicketCenter>` —
  *      we use the item's existing `onClick` prop rather than nesting a
- *      `<CollapsibleTrigger>` (button-in-button is invalid).
+ *      `<CollapsibleTrigger>` (button-in-button is invalid). We also
+ *      wire `onKeyDown` to fire the same toggle on Enter/Space in case
+ *      `ChatTicketItem` forwards these handlers onto a non-button
+ *      element, so keyboard/AT users retain the ability to expand and
+ *      collapse the row.
  *   2. `<CollapsibleContent>` wrapping `<TicketDetailDrawer />`,
  *      rendered only when this row is the expanded one.
  */
@@ -90,6 +94,18 @@ export function TicketRow({
     });
   }, [onToggle, ticket.id]);
 
+  // Keyboard fallback for the toggle above: mirrors the native
+  // button behavior (Enter/Space activates) in case `ChatTicketItem`
+  // forwards this handler onto a non-button element internally.
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      handleClick();
+    },
+    [handleClick],
+  );
+
   const tileData: ChatTicketItemData = {
     id: ticket.id,
     title: ticket.subject ?? '(untitled)',
@@ -121,6 +137,7 @@ export function TicketRow({
         <ChatTicketItem
           ticket={tileData}
           onClick={optimistic ? undefined : handleClick}
+          onKeyDown={optimistic ? undefined : handleKeyDown}
           aria-expanded={expanded && !optimistic}
           aria-controls={`ticket-drawer-${ticket.id}`}
         />

@@ -27,8 +27,9 @@ export interface HoverDropdownItem {
   path?: string | null;
   /**
    * @deprecated Pass `targetPlatform` to the consumer's `renderAnchor` and
-   * let it decide. Kept on the item shape for caller-side decisions but
-   * unused by this component.
+   * let it decide. Kept on the item shape for caller-side decisions and
+   * still forwarded to `renderAnchor` for backward compatibility, but no
+   * longer used internally by this component to make routing decisions.
    */
   alwaysNewTab?: boolean;
   onClick?: () => void;

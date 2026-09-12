@@ -10,6 +10,15 @@
  * and `[card://<type>:<id>]` markers inside the assistant body expand into
  * whatever JSX the host returns.
  */
+
+/** Known metadata shape for `slack_message` refs — `{ channelName, userName }`
+ *  resolved server-side from the slack-channels / slack-users tables, so the
+ *  compact card surfaces human-readable names instead of opaque Slack IDs. */
+export interface SlackMessageMetadata {
+  channelName?: string;
+  userName?: string;
+}
+
 export interface ChatRef {
   /** documentType from the host's RAG config (e.g. 'webinar', 'customer_interview').
    *  Treated as opaque by the OSS-lib — the host owns the type vocabulary. */
@@ -42,6 +51,8 @@ export interface ChatRef {
    *  the host's renderer can pull from. Used today by `slack_message`
    *  refs to ship `{ channelName, userName }` resolved server-side from
    *  the slack-channels / slack-users tables, so the compact card
-   *  surfaces human-readable names instead of opaque Slack IDs. */
-  metadata?: Record<string, unknown>;
+   *  surfaces human-readable names instead of opaque Slack IDs. See
+   *  `SlackMessageMetadata` for that known shape; other `type`s may
+   *  carry arbitrary host-defined extras, hence the index signature. */
+  metadata?: SlackMessageMetadata & Record<string, unknown>;
 }

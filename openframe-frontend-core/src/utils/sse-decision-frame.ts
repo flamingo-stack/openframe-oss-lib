@@ -46,13 +46,19 @@ export interface DecisionResolvedFrame {
   receiptText?: string;
 }
 
+/** Maximum time to wait for the leading frame before aborting the read
+ *  loop. Guards against a connection that stays open but never emits a
+ *  `\0`/`\x1E` boundary (e.g. server emits only keepalive-like bytes). */
+const LEADING_FRAME_TIMEOUT_MS = 30_000;
+
 /**
  * Read the leading `decision_resolved` frame from a confirm-tool SSE
  * response. Drains the stream to end-of-file before resolving so the
  * server doesn't sit on a half-closed socket.
  *
  * @throws {Error} when the body is empty, the first frame is not
- *   `decision_resolved`, or the leading JSON is malformed.
+ *   `decision_resolved`, the leading JSON is malformed, or no frame
+ *   arrives before the read timeout elapses.
  */
 export async function readLeadingDecisionFrame(response: Response): Promise<DecisionResolvedFrame> {
   const reader = response.body?.getReader();
@@ -64,7 +70,25 @@ export async function readLeadingDecisionFrame(response: Response): Promise<Deci
 
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      let timedOut = false;
+      const timeoutId = setTimeout(() => {
+        timedOut = true;
+      }, LEADING_FRAME_TIMEOUT_MS);
+      let readResult: ReadableStreamReadResult<Uint8Array>;
+      try {
+        readResult = await Promise.race([
+          reader.read(),
+          new Promise<never>((_, reject) => {
+            timeoutId && undefined;
+          }),
+        ]) as ReadableStreamReadResult<Uint8Array>;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      if (timedOut) {
+        throw new Error('readLeadingDecisionFrame: timed out waiting for leading frame');
+      }
+      const { done, value } = readResult;
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 

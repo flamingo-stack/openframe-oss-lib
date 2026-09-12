@@ -6,7 +6,10 @@ interface SparklesIconProps {
   size?: number;
 }
 
-/** @deprecated Use icons from icons-v2-generated instead. */
+/**
+ * @deprecated Use icons from icons-v2-generated instead. This component is still
+ * imported by AIRequiredBadge.tsx; migrate that call site before removing this file.
+ */
 export const SparklesIcon: React.FC<SparklesIconProps> = ({ className = '', color = 'currentColor', size = 20 }) => {
   return (
     <svg
@@ -25,3 +28,4 @@ export const SparklesIcon: React.FC<SparklesIconProps> = ({ className = '', colo
     </svg>
   );
 };
+

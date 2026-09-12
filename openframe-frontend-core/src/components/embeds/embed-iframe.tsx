@@ -22,6 +22,27 @@ export function EmbedLoadingSkeleton({ height }: { height?: string }) {
   );
 }
 
+/**
+ * First-party vendor origins that are trusted with the full (unsandboxed)
+ * frame contract. Any `src` that does not match one of these MUST be
+ * accompanied by an explicit `sandbox` prop — see `EmbedIframeProps.sandbox`.
+ */
+const FIRST_PARTY_EMBED_ORIGINS = [
+  'https://www.figma.com',
+  'https://figma.com',
+  'https://docs.google.com',
+  'https://sheets.google.com',
+];
+
+function isFirstPartyEmbedSrc(src: string): boolean {
+  try {
+    const { origin } = new URL(src);
+    return FIRST_PARTY_EMBED_ORIGINS.includes(origin);
+  } catch {
+    return false;
+  }
+}
+
 export interface EmbedIframeProps {
   /** The URL to embed */
   src: string;
@@ -40,16 +61,27 @@ export interface EmbedIframeProps {
   /** iframe `allowFullScreen` attribute */
   allowFullScreen?: boolean;
   /**
-   * iframe `sandbox` attribute. Omitted by default — a first-party vendor
-   * (Figma, Google Sheets) is trusted with the full frame contract.
+   * iframe `sandbox` attribute. May be omitted ONLY when `src` resolves to a
+   * trusted first-party vendor origin (Figma, Google Sheets/Docs) — those are
+   * trusted with the full frame contract.
    *
    * Pass it for a frame whose contents are AUTHORED BY USERS: without the
    * attribute an embedded document may navigate the top window, and a sandbox
    * that omits `allow-top-navigation` takes that away. On a CROSS-ORIGIN frame
    * `allow-same-origin` grants the frame its own origin, never the host's.
+   *
+   * If `sandbox` is omitted and `src` is NOT a recognized first-party origin,
+   * a restrictive default sandbox (`allow-scripts allow-same-origin
+   * allow-forms allow-popups`, without `allow-top-navigation`) is applied
+   * automatically and a console warning is emitted in development.
    */
   sandbox?: string;
 }
+
+/** Restrictive default applied when `sandbox` is omitted for a `src` that is
+ *  not on the first-party allowlist. Deliberately excludes
+ *  `allow-top-navigation` so an untrusted embed cannot navigate the host page. */
+const DEFAULT_UNTRUSTED_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups';
 
 /**
  * Base iframe wrapper with loading skeleton and proper memory cleanup.
@@ -93,7 +125,18 @@ export function EmbedIframe({
     };
   }, [src]);
 
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && !sandbox && !isFirstPartyEmbedSrc(src)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `EmbedIframe: "sandbox" was not provided for a non-first-party src ("${src}"). ` +
+          `Applying a restrictive default sandbox. Pass an explicit "sandbox" prop for embeds whose contents are authored by users.`
+      );
+    }
+  }, [src, sandbox]);
+
   const resolvedHeight = height || 'calc(100vh - 250px)';
+  const resolvedSandbox = sandbox ?? (isFirstPartyEmbedSrc(src) ? undefined : DEFAULT_UNTRUSTED_SANDBOX);
 
   return (
     <>
@@ -113,7 +156,7 @@ export function EmbedIframe({
           referrerPolicy={referrerPolicy}
           loading={loading}
           allowFullScreen={allow?.includes('fullscreen') ? undefined : allowFullScreen}
-          sandbox={sandbox}
+          sandbox={resolvedSandbox}
         />
       </div>
     </>
