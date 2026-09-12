@@ -61,7 +61,6 @@ export function MadeWithLove({ className = '', size = 'md', showOnMobile = true 
     gap: config.gap,
     fontSize: isMobile ? config.fontSizeMobile : config.fontSizeDesktop,
     lineHeight: 1.5,
-    color: '#ffffff',
     fontFamily: 'inherit',
   };
 
@@ -76,7 +75,6 @@ export function MadeWithLove({ className = '', size = 'md', showOnMobile = true 
     border: 'none',
     cursor: 'pointer',
     textDecoration: isHovered ? 'underline' : 'none',
-    color: '#ffffff',
     fontSize: '14px',
     fontFamily: '"Azeret Mono", monospace',
     transition: 'text-decoration 0.2s ease',
@@ -93,29 +91,29 @@ export function MadeWithLove({ className = '', size = 'md', showOnMobile = true 
 
   // Text span styles
   const textStyle: React.CSSProperties = {
-    color: '#ffffff',
     marginLeft: '4px',
     textDecoration: 'none',
   };
 
   return (
-    <div style={containerStyle} className={className}>
+    <div style={containerStyle} className={`text-ods-text-on-dark ${className}`}>
       Made with love by
       <a
         href={flamingoUrl}
         target="_blank"
         rel="noopener noreferrer"
         style={linkStyle}
+        className="text-ods-text-on-dark"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
         <div style={logoStyle}>
           <FlamingoLogo
             size={config.logoSize}
-            color="#f357bb" // Direct hex instead of CSS variable for cross-framework compatibility
+            color="var(--ods-accent)"
           />
         </div>
-        <span style={textStyle}>Flamingo</span>
+        <span style={textStyle} className="text-ods-text-on-dark">Flamingo</span>
       </a>
     </div>
   );
