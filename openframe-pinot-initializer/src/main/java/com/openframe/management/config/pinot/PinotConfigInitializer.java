@@ -41,13 +41,13 @@ public class PinotConfigInitializer {
     @Value("${pinot.controller.url}")
     private String pinotControllerUrl;
 
-    @Value("${pinot.config.enabled:true}")
+    @Value("${pinot.config.enabled}")
     private boolean pinotConfigEnabled;
 
-    @Value("${pinot.config.retry.max-attempts:5}")
+    @Value("${pinot.config.retry.max-attempts}")
     private int maxRetries;
 
-    @Value("${pinot.config.retry.delay-ms:5000}")
+    @Value("${pinot.config.retry.delay-ms}")
     private long retryDelayMs;
 
     private static final List<PinotConfig> PINOT_CONFIGS = Arrays.asList(
@@ -131,6 +131,11 @@ public class PinotConfigInitializer {
     }
 
     private void deployWithRetry(Runnable deployment, String configType) {
+        if (maxRetries <= 0) {
+            log.error("Invalid pinot.config.retry.max-attempts={} for {}; must be greater than 0", maxRetries, configType);
+            throw new IllegalStateException("pinot.config.retry.max-attempts must be greater than 0, but was " + maxRetries);
+        }
+
         int retryCount = 0;
         Exception lastException = null;
 
