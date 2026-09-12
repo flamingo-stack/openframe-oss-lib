@@ -7,6 +7,22 @@
 // blocking comment is open. That math lives in the hub's
 // `lib/utils/design-doc-gate.ts` (isomorphic, shared by server + client).
 
+// MIGRATION NOTE (2026-09-11). This file dropped `status`, `DesignDocStatus`,
+// `DesignDocStatusTransition`, `approved_at`, `dri_vacated_by`, `by_status` and
+// `facets.status`, and added `spec_mode`. Two things a reader will ask:
+//
+//   · LOCKSTEP — the hub is the ONLY consumer. Nothing else in this package
+//     references those names, and neither does the sibling oss-frontend
+//     checkout; every hub reference moves in multi-platform-hub#1257, which
+//     merges after this package is released and the hub's pin bumped.
+//   · `dri_vacated_by` was already VESTIGIAL, so removing it drops no live
+//     protection. It existed for an anti-self-serve rule — a DRI who also held
+//     management could not vacate the seat, act as a "third party" and approve
+//     their own doc — that was removed earlier by product decision, and no
+//     database column ever backed the field. There is no approval step left to
+//     protect: readiness is DERIVED from the department sign-offs, so there is
+//     no seat to vacate and nothing to self-approve.
+
 import type { RoadmapItem } from '../components/chat/types/entities/roadmap-item';
 import type { DeliveryItem } from './delivery';
 import type { DepartmentRef } from './department';
