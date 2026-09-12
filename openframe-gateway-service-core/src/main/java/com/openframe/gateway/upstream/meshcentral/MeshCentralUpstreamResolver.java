@@ -6,11 +6,14 @@ import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import com.openframe.gateway.upstream.ToolUpstreamResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
@@ -26,6 +29,7 @@ import java.util.Optional;
  * URL schemes (http vs ws).
  */
 @Component
+@ConditionalOnProperty(name = "openframe.gateway.tenant-routing.enabled", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
 
@@ -75,12 +79,15 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
     /**
      * Substitute the {@code tenant-uuid} placeholder token in the configured path-prefix with the
      * per-request tenant id. Multi-tenant mode only — the {@code X-Tenant-Id} header is guaranteed.
+     * The tenant id is percent-encoded before substitution so it cannot introduce path-traversal
+     * or URL-special characters into the resolved upstream path.
      */
     private static String resolveTenantPathPrefix(String pathPrefix, ServerHttpRequest request) {
         if (pathPrefix == null) {
             return null;
         }
-        return pathPrefix.replace(TenantRoutingHeaders.TENANT_UUID_PLACEHOLDER, TenantRoutingHeaders.tenantId(request));
+        String encodedTenantId = URLEncoder.encode(TenantRoutingHeaders.tenantId(request), StandardCharsets.UTF_8);
+        return pathPrefix.replace(TenantRoutingHeaders.TENANT_UUID_PLACEHOLDER, encodedTenantId);
     }
 
     private URI prependPathPrefix(URI uri, String pathPrefix) {
