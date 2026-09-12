@@ -1,5 +1,6 @@
 package com.openframe.data.document.rmm.script;
 
+import com.openframe.data.document.tenant.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,10 +16,12 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "script_delivery_retry")
-public class ScriptDeliveryRetry {
+public class ScriptDeliveryRetry implements TenantScoped {
 
     @Id
     private String id;
+
+    private String tenantId;
 
     private String executionId;
 

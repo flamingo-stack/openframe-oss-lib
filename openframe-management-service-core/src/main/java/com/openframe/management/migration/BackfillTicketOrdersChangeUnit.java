@@ -24,12 +24,15 @@ public class BackfillTicketOrdersChangeUnit {
     private static final String ORDER_FIELD = "order";
     private static final String CREATED_AT_FIELD = "createdAt";
     private static final String ID_FIELD = "_id";
+    private static final String TENANT_ID_FIELD = "tenantId";
 
     @Execution
     public void execution(MongoTemplate mongoTemplate, TenantIdProvider tenantIdProvider) {
-        String tenantId = tenantIdProvider.getTenantId();
-        for (TicketStatus status : TicketStatus.values()) {
-            backfillColumn(mongoTemplate, status, tenantId);
+        List<String> tenantIds = mongoTemplate.findDistinct(new Query(), TENANT_ID_FIELD, Ticket.class, String.class);
+        for (String tenantId : tenantIds) {
+            for (TicketStatus status : TicketStatus.values()) {
+                backfillColumn(mongoTemplate, status, tenantId);
+            }
         }
     }
 
@@ -49,7 +52,7 @@ public class BackfillTicketOrdersChangeUnit {
             assignOrder(mongoTemplate, ticket.getId(), rank.format());
             rank = rank.genNext();
         }
-        log.info("Backfilled order on {} tickets in status {}", tickets.size(), status);
+        log.info("Backfilled order on {} tickets in status {} for tenant {}", tickets.size(), status, tenantId);
     }
 
     private void assignOrder(MongoTemplate mongoTemplate, String ticketId, String order) {

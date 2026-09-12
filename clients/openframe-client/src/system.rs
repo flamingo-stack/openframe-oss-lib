@@ -32,7 +32,7 @@ impl SystemInfo {
     }
 
     pub fn collect_metrics(&self) -> Result<SystemMetrics> {
-        let mut sys = self.sys.lock().unwrap();
+        let mut sys = self.sys.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         sys.refresh_cpu();
         sys.refresh_memory();
 
@@ -48,6 +48,8 @@ impl SystemInfo {
             disk_used = (space.total - space.free) * 1024;
         }
 
+        let uptime = System::uptime();
+
         Ok(SystemMetrics {
             timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
             cpu_usage,
@@ -55,7 +57,7 @@ impl SystemInfo {
             memory_used,
             disk_total,
             disk_used,
-            uptime: 0, // TODO: remove as deprecated class
+            uptime,
         })
     }
 }
