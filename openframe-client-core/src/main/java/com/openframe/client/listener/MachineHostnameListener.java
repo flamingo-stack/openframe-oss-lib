@@ -1,6 +1,7 @@
 package com.openframe.client.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.openframe.client.service.MachineHostnameService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
@@ -81,6 +82,9 @@ public class MachineHostnameListener extends AbstractJetStreamPushListener {
 
             message.ack();
             log.debug("Hostname update processed successfully and acked");
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            log.error("Non-retryable error processing hostname update, acking to avoid redelivery loop: {}", messagePayload, e);
+            message.ack();
         } catch (Exception e) {
             log.error("Unexpected error processing hostname update: {}", messagePayload, e);
             // Don't ack the message and let it be redelivered
