@@ -16,7 +16,7 @@ import type { EntityAuthor } from './entity-author';
 // ---------------------------------------------------------------------------
 // Value vocabularies — DATA, not source code.
 //
-// Every enumerable design-doc value (tier, participant status, comment
+// Every enumerable design-doc value (tier, spec mode, participant status, comment
 // type/status, link type, media type) is a row in the `design_doc_vocabulary`
 // table, with its label, badge colour, display order and the semantic ROLES it
 // claims. Nothing here lists members: a union of literals would be a second,
@@ -37,7 +37,7 @@ import type { EntityAuthor } from './entity-author';
 /** One value of `design_doc_vocabulary.kind` — the STRUCTURAL list (one per
  *  value column), the only design-doc vocabulary that is code. */
 export type DesignDocVocabularyKind =
-  'tier' | 'participant_status' | 'comment_type' | 'comment_status' | 'link_type' | 'media_type';
+  'tier' | 'spec_mode' | 'participant_status' | 'comment_type' | 'comment_status' | 'link_type' | 'media_type';
 
 /** A `design_doc_vocabulary` row, as the DAL and the vocabulary API return it. */
 export interface DesignDocVocabularyOption {
@@ -48,6 +48,9 @@ export interface DesignDocVocabularyOption {
   /** A `StatusBadge` colorScheme name (validated against the badge's own union
    *  when the hub reads the row — an unknown scheme degrades to 'default'). */
   color_scheme: string;
+  /** Human copy for surfaces that EXPLAIN a value rather than just naming it —
+   *  the spec-mode picker's per-option hint. Display only. */
+  description: string | null;
   display_order: number;
   is_active: boolean;
   /** Engine capabilities this member claims (`complete`, `blocks_ready`, …).
@@ -76,6 +79,8 @@ export interface DesignDocVocabulary {
 
 /** A `design_doc_vocabulary.value` of kind `tier`. */
 export type DesignDocTier = string;
+/** A `design_doc_vocabulary.value` of kind `spec_mode`. */
+export type DesignDocSpecMode = string;
 /** A `design_doc_vocabulary.value` of kind `participant_status`. */
 export type DesignDocParticipantStatus = string;
 /** A `design_doc_vocabulary.value` of kind `comment_type`. */
@@ -207,6 +212,12 @@ export interface DesignDoc {
   title: string;
   slug: string;
   tier: DesignDocTier;
+  /**
+   * How much of the solution is knowable before build starts — spec-first
+   * (settled up front) or discovery-first (engineering resolves the design
+   * while building). A LABEL on the doc: no rule reads it.
+   */
+  spec_mode: DesignDocSpecMode;
   summary: string | null;
   content: string | null;
   author_id: string | null;
@@ -269,6 +280,8 @@ export interface CreateDesignDocData {
   title: string;
   slug: string;
   tier: DesignDocTier;
+  /** Defaults to the `spec_mode` row claiming `default` when omitted. */
+  spec_mode?: DesignDocSpecMode;
   summary?: string | null;
   /** Spec markdown (Why / What / How); the create screen carries the same body editor as edit. */
   content?: string | null;
@@ -288,6 +301,7 @@ export interface UpdateDesignDocData {
   title?: string;
   slug?: string;
   tier?: DesignDocTier;
+  spec_mode?: DesignDocSpecMode;
   summary?: string | null;
   content?: string | null;
   author_id?: string | null;
@@ -333,6 +347,8 @@ export type DesignDocReadyFilter = 'ready' | 'not_ready';
 
 export interface DesignDocFilters {
   ready?: DesignDocReadyFilter;
+  /** One or more `spec_mode` values (CSV on the wire). */
+  spec_mode?: string;
   search?: string;
   mine?: 'open';
   limit?: number;
@@ -342,6 +358,9 @@ export interface DesignDocFilters {
 export interface DesignDocListResponse {
   data: DesignDoc[];
   count: number;
+  /** Server-computed spec-mode counts over the scope, MINUS the spec-mode
+   *  filter itself — so a filtered row still shows what the other value holds. */
+  facets: { spec_mode: Record<string, number> };
 }
 
 export interface DesignDocStats {
