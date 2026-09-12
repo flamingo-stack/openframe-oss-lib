@@ -7,6 +7,7 @@ import { useDataTableContext } from './data-table';
 import { DataTableEmpty } from './data-table-empty';
 import { DataTableRow } from './data-table-row';
 import { DataTableSkeleton, PlaceholderRows, ReservedEmptyState } from './data-table-skeleton';
+import { useTableMotion } from './use-table-motion';
 
 export interface DataTableBodyProps<T = unknown> {
   /** Show skeleton rows while `loading` is true and data is empty. */
@@ -68,6 +69,25 @@ export interface DataTableBodyProps<T = unknown> {
    * Interactive content inside must carry `data-no-row-click`.
    */
   renderSubRow?: (item: T) => ReactNode;
+  /**
+   * Opt-in: a data reorder (same row id, new order) slides rows into place via
+   * FLIP instead of jumping. Rows render as framer-motion `motion.div`s with
+   * `layout="position"`, and framer-motion is loaded lazily — its own chunk —
+   * ONLY when this is set, so every other table stays motion-free. Off by
+   * default; the first paint after enabling is non-animated and the FLIP kicks
+   * in once the chunk has loaded.
+   *
+   * Two things stay with the consumer:
+   * - pass `getRowId` to `useDataTable`. TanStack's default row id is the row
+   *   INDEX, and an index does not move when the data does, so React would
+   *   re-render cells in place and nothing would animate;
+   * - honour `prefers-reduced-motion` at the call site (pass `false` when
+   *   reduced motion is requested) so this prop stays purely mechanical.
+   *
+   * Rows that are a whole-card `<Link>` (`rowHref` without `onRowClick`, no
+   * sub-row) are not animated.
+   */
+  animateRowReorder?: boolean;
 }
 
 /**
@@ -90,9 +110,13 @@ export function DataTableBody<T = unknown>({
   rowHref,
   minRows,
   renderSubRow,
+  animateRowReorder,
 }: DataTableBodyProps<T>) {
   const table = useDataTableContext<T>();
   const rows = table.getRowModel().rows;
+  // Above the early returns — hooks run unconditionally. Resolves to `null`
+  // (and fetches nothing) unless `animateRowReorder` is set.
+  const tableMotion = useTableMotion(Boolean(animateRowReorder));
 
   if (loading && rows.length === 0) {
     return (
@@ -132,26 +156,37 @@ export function DataTableBody<T = unknown>({
 
   const padCount = minRows ? Math.max(0, minRows - rows.length) : 0;
 
+  const rowNodes = rows.map((row, index) => {
+    const item = row.original;
+    const href = rowHref?.(item) ?? undefined;
+    const cls = typeof rowClassName === 'function' ? rowClassName(item, index) : rowClassName;
+    return (
+      <DataTableRow<T>
+        key={row.id}
+        row={row}
+        onClick={onRowClick}
+        href={href}
+        compact={compact}
+        autoHeight={autoHeight}
+        rowHeightClassName={rowHeightClassName}
+        className={cls}
+        subRow={renderSubRow?.(item)}
+        animateRowReorder={animateRowReorder}
+        motionDiv={tableMotion?.motionDiv}
+      />
+    );
+  });
+  // With `animateRowReorder` on, ONLY the real rows go inside a `LayoutGroup`
+  // so a reorder (same id, new order) animates via FLIP — the invisible pad
+  // rows below are deliberately left outside it. Until framer-motion has
+  // lazily resolved (and whenever the prop is off) the rows render as plain
+  // `<div>`s. No `AnimatePresence`: the row set is stable across a reorder
+  // (no enter/exit); add it if a future task animates rows being added/removed.
+  const LayoutGroup = tableMotion?.LayoutGroup;
+
   return (
     <div className={cn('flex w-full flex-col gap-[var(--spacing-system-xsf)]', className)}>
-      {rows.map((row, index) => {
-        const item = row.original;
-        const href = rowHref?.(item) ?? undefined;
-        const cls = typeof rowClassName === 'function' ? rowClassName(item, index) : rowClassName;
-        return (
-          <DataTableRow<T>
-            key={row.id}
-            row={row}
-            onClick={onRowClick}
-            href={href}
-            compact={compact}
-            autoHeight={autoHeight}
-            rowHeightClassName={rowHeightClassName}
-            className={cls}
-            subRow={renderSubRow?.(item)}
-          />
-        );
-      })}
+      {animateRowReorder && LayoutGroup ? <LayoutGroup>{rowNodes}</LayoutGroup> : rowNodes}
       {padCount > 0 && <PlaceholderRows count={padCount} rowHeightClassName={rowHeightClassName} />}
     </div>
   );

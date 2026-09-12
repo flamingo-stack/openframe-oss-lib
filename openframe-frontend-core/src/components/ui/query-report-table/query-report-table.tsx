@@ -5,7 +5,7 @@ import { useHorizontalScrollbar } from '../../../hooks/ui/use-horizontal-scrollb
 import { cn } from '../../../utils/cn';
 import { Download02Icon } from '../../icons-v2-generated/interface/download-02-icon';
 import { Button } from '../button';
-import { TableEmptyState } from '../table/table-empty-state';
+import { DataTableEmpty } from '../data-table/data-table-empty';
 import { QueryReportTableHeader } from './query-report-table-header';
 import { QueryReportTableRow } from './query-report-table-row';
 import { QueryReportTableSkeleton } from './query-report-table-skeleton';
@@ -87,7 +87,11 @@ export function QueryReportTable({
       )}
 
       {/* Empty state */}
-      {!loading && data.length === 0 && <TableEmptyState message={emptyMessage} />}
+      {/* Same two-vocabulary rule as `DataTable.Body`: a caller-supplied message is the
+          title and nothing else, the default keeps the generic search/filter hint. */}
+      {!loading &&
+        data.length === 0 &&
+        (emptyMessage != null ? <DataTableEmpty title={emptyMessage} description={undefined} /> : <DataTableEmpty />)}
 
       {/* Table content */}
       {!loading && data.length > 0 && (

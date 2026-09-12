@@ -1,4 +1,5 @@
 import type { ElementType, ReactNode } from 'react';
+import type { TableFilters } from '../data-table/types';
 import type { NoDataProps } from '../no-data';
 
 /** @deprecated Use types from `data-table` instead. */
@@ -55,11 +56,9 @@ export interface FilterSection {
   allowSelectAll?: boolean;
 }
 
-/** @deprecated Use types from `data-table` instead. */
-export interface TableFilters {
-  /** Selected option ids for a column — what `FiltersDropdown` emits. */
-  [columnKey: string]: string[];
-}
+// `TableFilters` is defined in `data-table/types` (one definition for both tables);
+// re-exported so the legacy surface keeps the name until it is deleted.
+export type { TableFilters };
 
 /** @deprecated Use types from `data-table` instead. */
 export interface CursorPagination {
