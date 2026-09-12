@@ -22,6 +22,13 @@ export interface TableColumn<T = TableRowData> {
   hideAt?: TailwindBreakpoint | TailwindBreakpoint[];
   renderCell?: (item: T, column: TableColumn<T>) => ReactNode;
   renderHeader?: () => ReactNode;
+  /**
+   * A definition shown in an `InfoHint` beside the header label. The header
+   * owns the icon, spacing and accessible name, so a column never needs a
+   * hand-rolled `renderHeader` just to explain itself. Ignored when
+   * `renderHeader` is set — a custom header owns its whole contents.
+   */
+  hint?: ReactNode;
   className?: string;
   // Sorting
   sortKey?: string;

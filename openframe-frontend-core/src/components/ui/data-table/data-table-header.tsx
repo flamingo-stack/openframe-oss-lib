@@ -4,6 +4,7 @@ import { flexRender, type Header } from '@tanstack/react-table';
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { Arrow01DownIcon, Arrow01UpIcon, SwitchVrIcon } from '../../icons-v2-generated';
+import { InfoHint } from '../info-hint';
 import { useDataTableContext } from './data-table';
 import { DataTableColumnFilter } from './data-table-column-filter';
 import type { TailwindBreakpoint } from './types';
@@ -248,14 +249,31 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
       )}
     >
       {filter ? (
-        <DataTableColumnFilter
-          column={column}
-          options={filter.options}
-          placement={filter.placement}
-          pending={filter.pending}
-          label={resolveHeaderLabel(header)}
-          align={align}
-        />
+        // Only a column that HAS a hint gets the extra row, so every existing
+        // filter header keeps its exact structure — the trigger stays a direct
+        // child of the cell.
+        meta?.hint ? (
+          <div className="flex items-center gap-[var(--spacing-system-xxs)]">
+            <DataTableColumnFilter
+              column={column}
+              options={filter.options}
+              placement={filter.placement}
+              pending={filter.pending}
+              label={resolveHeaderLabel(header)}
+              align={align}
+            />
+            <InfoHint label={resolveHeaderLabel(header)}>{meta.hint}</InfoHint>
+          </div>
+        ) : (
+          <DataTableColumnFilter
+            column={column}
+            options={filter.options}
+            placement={filter.placement}
+            pending={filter.pending}
+            label={resolveHeaderLabel(header)}
+            align={align}
+          />
+        )
       ) : (
         <div
           className={cn(
@@ -270,6 +288,7 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
           onClick={canSort ? () => onSortChange?.(column.id) : undefined}
         >
           <HeaderLabel header={header} />
+          {meta?.hint ? <InfoHint label={resolveHeaderLabel(header)}>{meta.hint}</InfoHint> : null}
           {canSort && <SortIcon sorted={sortDir} />}
         </div>
       )}
@@ -281,9 +300,15 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
  * THE header label styling. Exported because a column may supply a NODE header
  * (an icon beside the text), and without this those headers rendered unstyled
  * beside the string ones — same row, two different type treatments.
+ *
+ * The label WRAPS inside its own cell (`min-w-0`, no `whitespace-nowrap`). A
+ * nowrapped label longer than its column does not truncate — it paints straight
+ * across the next column's header, which is how "Implementation owners" landed
+ * on top of "Updated". Two lines of the 20px label still fit the fixed 48px
+ * header, so a label that fits looks exactly as it did.
  */
 export const DATA_TABLE_HEADER_LABEL_CLASS =
-  'whitespace-nowrap uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary';
+  'min-w-0 uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary';
 
 function HeaderLabel({ header }: { header: AnyHeader }) {
   const headerDef = header.column.columnDef.header;
