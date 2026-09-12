@@ -146,4 +146,13 @@ type InstalledAgent implements Node {
 extend type Mutation {
 
     updateDeviceNickname(machineId: String!, nickname: String): Machine!
+
+    # Tag a device, creating the tag key on first use. Values are merged into whatever the
+    # device already carries for that key, so this only ever adds. Returns the tag with
+    # THIS device's values.
+    assignDeviceTag(machineId: String!, key: String!, values: [String!]): Tag!
+
+    # Detach a tag from a device. The tag key itself is kept (use deleteTag to drop it
+    # everywhere). False when the device did not carry the tag.
+    removeDeviceTag(machineId: String!, tagId: ID!): Boolean!
 }
