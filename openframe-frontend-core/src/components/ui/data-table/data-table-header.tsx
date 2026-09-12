@@ -218,6 +218,17 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
   // the `sort` prop; we do not consult TanStack's sort APIs here.
   const canSort = meta?.sortable === true;
   const sortDir: false | 'asc' | 'desc' = sort?.id === column.id ? (sort.desc ? 'desc' : 'asc') : false;
+  // Built once: rendered bare, or beside the column's hint.
+  const filterTrigger = filter ? (
+    <DataTableColumnFilter
+      column={column}
+      options={filter.options}
+      placement={filter.placement}
+      pending={filter.pending}
+      label={resolveHeaderLabel(header)}
+      align={align}
+    />
+  ) : null;
 
   return (
     <div
@@ -248,31 +259,17 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
         meta?.headerClassName,
       )}
     >
-      {filter ? (
+      {filterTrigger ? (
         // Only a column that HAS a hint gets the extra row, so every existing
         // filter header keeps its exact structure — the trigger stays a direct
         // child of the cell.
         meta?.hint ? (
           <div className="flex items-start gap-[var(--spacing-system-xxs)]">
-            <DataTableColumnFilter
-              column={column}
-              options={filter.options}
-              placement={filter.placement}
-              pending={filter.pending}
-              label={resolveHeaderLabel(header)}
-              align={align}
-            />
+            {filterTrigger}
             <InfoHint label={resolveHeaderLabel(header)}>{meta.hint}</InfoHint>
           </div>
         ) : (
-          <DataTableColumnFilter
-            column={column}
-            options={filter.options}
-            placement={filter.placement}
-            pending={filter.pending}
-            label={resolveHeaderLabel(header)}
-            align={align}
-          />
+          filterTrigger
         )
       ) : (
         <div
