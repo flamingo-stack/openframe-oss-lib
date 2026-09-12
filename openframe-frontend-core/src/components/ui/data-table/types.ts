@@ -1,4 +1,5 @@
 import type { RowData } from '@tanstack/react-table';
+import type { ReactNode } from 'react';
 
 export type TailwindBreakpoint = 'md' | 'lg' | 'xl' | '2xl';
 
@@ -61,5 +62,13 @@ declare module '@tanstack/react-table' {
     cellClassName?: string;
     /** Extra class names applied to the header cell wrapper. */
     headerClassName?: string;
+    /**
+     * A definition shown in an `InfoHint` beside the header label — for a
+     * column whose NAME is a term of art a reader may not know. The header owns
+     * the icon, its spacing and its accessible name (`About <label>`), so every
+     * table explains a column the same way instead of each hand-rolling a node
+     * header to fit one in.
+     */
+    hint?: ReactNode;
   }
 }
