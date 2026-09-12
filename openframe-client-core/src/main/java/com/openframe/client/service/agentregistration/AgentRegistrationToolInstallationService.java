@@ -22,9 +22,16 @@ public class AgentRegistrationToolInstallationService {
     @Async(AsyncConfig.TOOL_INSTALL_EXECUTOR)
     public void process(String machineId) {
         List<IntegratedToolAgent> toolAgents = integratedToolAgentService.getAllEnabled();
-        toolAgents.forEach(toolAgent -> toolInstallationService.process(machineId, toolAgent));
+        toolAgents.forEach(toolAgent -> {
+            try {
+                toolInstallationService.process(machineId, toolAgent);
+            } catch (Exception e) {
+                log.error("Failed to install tool {} for machine {}", toolAgent, machineId, e);
+            }
+        });
     }
 
 
 
 }
+
