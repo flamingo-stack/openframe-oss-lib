@@ -9,12 +9,14 @@ import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Handles tag creation and assignment during agent registration.
@@ -77,8 +79,9 @@ public class RegistrationTagAssignmentService {
      * to the tag's predefined options list (deduplicating).
      */
     private Tag findOrCreateTag(String key, List<String> values, Instant now) {
-        Tag existing = tagRepository.findByKeyAndEntityType(key, TagEntityType.DEVICE);
-        if (existing != null) {
+        Optional<Tag> existingOpt = Optional.ofNullable(tagRepository.findByKeyAndEntityType(key, TagEntityType.DEVICE));
+        if (existingOpt.isPresent()) {
+            Tag existing = existingOpt.get();
             if (values != null && !values.isEmpty()) {
                 List<String> existingValues = existing.getValues();
                 if (existingValues == null) {
@@ -101,7 +104,17 @@ public class RegistrationTagAssignmentService {
                 .createdAt(now)
                 .build();
 
-        Tag saved = tagRepository.save(tag);
+        Tag saved;
+        try {
+            saved = tagRepository.save(tag);
+        } catch (DuplicateKeyException e) {
+            log.info("Tag '{}' was concurrently created; fetching existing tag during registration", key);
+            Tag concurrentlyCreated = tagRepository.findByKeyAndEntityType(key, TagEntityType.DEVICE);
+            if (concurrentlyCreated == null) {
+                throw e;
+            }
+            return concurrentlyCreated;
+        }
         log.info("Created tag '{}' (id={}) with DEVICE entity type during registration", key, saved.getId());
         return saved;
     }

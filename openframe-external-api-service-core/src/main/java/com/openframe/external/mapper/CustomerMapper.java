@@ -30,7 +30,7 @@ public class CustomerMapper extends BaseRestMapper {
     public CustomerResponse toResponse(Organization organization) {
         OrganizationResponse response = sharedMapper.toResponse(organization);
         if (response == null) {
-            return null;
+            throw new IllegalStateException("Organization mapping produced no response for id: " + organization.getId());
         }
         return CustomerResponse.builder()
                 .id(response.getOrganizationId())

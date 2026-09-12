@@ -11,6 +11,7 @@ import com.openframe.api.dto.organization.OrganizationSortInput;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.exception.OrganizationNotFoundException;
 import com.openframe.api.mapper.GraphQLOrganizationMapper;
 import com.openframe.api.service.organization.OrganizationQueryService;
 import com.openframe.data.document.organization.Organization;
@@ -82,12 +83,14 @@ public class OrganizationDataFetcher {
     public Organization organization(@InputArgument @NotBlank String id) {
         String organizationId = RELAY.fromGlobalId(id).getId();
         log.debug("Fetching organization by global ID: {}, organizationId: {}", id, organizationId);
-        return organizationService.getOrganizationByOrganizationId(organizationId).orElse(null);
+        return organizationService.getOrganizationByOrganizationId(organizationId)
+                .orElseThrow(() -> new OrganizationNotFoundException(organizationId));
     }
 
     @DgsQuery
     public Organization organizationByOrganizationId(@InputArgument @NotBlank String organizationId) {
         log.debug("Fetching organization by organizationId: {}", organizationId);
-        return organizationService.getOrganizationByOrganizationId(organizationId).orElse(null);
+        return organizationService.getOrganizationByOrganizationId(organizationId)
+                .orElseThrow(() -> new OrganizationNotFoundException(organizationId));
     }
 }

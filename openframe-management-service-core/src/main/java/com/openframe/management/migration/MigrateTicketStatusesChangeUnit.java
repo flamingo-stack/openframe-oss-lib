@@ -159,11 +159,8 @@ public class MigrateTicketStatusesChangeUnit {
 
     private TicketStatusDefinition resolveByKind(MongoTemplate mongoTemplate, TicketStatusKind kind) {
         Query query = new Query(Criteria.where(FIELD_KIND).is(kind.name()));
-        TicketStatusDefinition found = mongoTemplate.findOne(query, TicketStatusDefinition.class);
-        if (found == null) {
-            throw new IllegalStateException("System status " + kind + " missing");
-        }
-        return found;
+        return Optional.ofNullable(mongoTemplate.findOne(query, TicketStatusDefinition.class))
+                .orElseThrow(() -> new IllegalStateException("System status " + kind + " missing"));
     }
 
     private Optional<TicketStatusDefinition> findByName(MongoTemplate mongoTemplate, String name) {

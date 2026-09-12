@@ -5,6 +5,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.service.ToolUrlService;
+import com.openframe.gateway.upstream.exception.ToolUrlNotConfiguredException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -42,7 +43,7 @@ public class DefaultToolUpstreamResolver implements ToolUpstreamResolver {
     private URI resolveByType(IntegratedTool tool, ServerHttpRequest request,
                               String stripPrefix, ToolUrlType type) {
         ToolUrl toolUrl = toolUrlService.getUrlByToolType(tool, type)
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new ToolUrlNotConfiguredException(
                         "Tool " + tool.getKey() + " has no " + type + " url configured"));
         return proxyUrlResolver.resolve(
                 tool.getKey(), toolUrl.getUrl(), toolUrl.getPort(), request.getURI(), stripPrefix);
