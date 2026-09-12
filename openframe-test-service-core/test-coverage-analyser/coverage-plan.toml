@@ -1,0 +1,172 @@
+# Coverage plan — the backlog of test work that closes gaps in the API coverage matrix.
+#
+# coverage_matrix.py scores every item on each run (see the "Plan" section of coverage.md):
+# an item is proved `done` only when every op it lists is reached by a direct, enabled test.
+# Effort is computed from the fixtures still missing; you do not estimate it here.
+#
+# Fields
+#   id          stable, CP-<n>; referenced from commits, PRs and the report
+#   title       one line
+#   status      proposed | planned | in-progress | done | dropped   (human-owned; the analyser never changes it)
+#   priority    P1 | P2 | P3
+#   ops         matrix keys this item closes: "query:<field>", "mutation:<field>", "<METHOD> <service path>"
+#   test_class  target class under tests/ (existing or new); used for the effort model
+#   tags        JUnit tags the new cases carry; phase follows from them (see prompt.md Step 4)
+#   depends_on  other CP ids that must be done first (fixtures they create)
+#   needs       preconditions or decisions the item waits on (free text)
+#   source      where the item came from (report date and proposal number)
+#   owner / branch / pr / clickup / notes   optional bookkeeping
+#
+# The headless run may append new items with status = "proposed" and may add to `notes` and `needs`;
+# it never edits status, priority or ops of an existing item. Promote `proposed` → `planned` by hand.
+
+[[items]]
+id = "CP-1"
+title = "Script-schedule lifecycle"
+status = "proposed"
+priority = "P1"
+ops = [
+  "mutation:createScriptSchedule", "mutation:updateScriptSchedule", "mutation:archiveScriptSchedule",
+  "mutation:unarchiveScriptSchedule", "query:scriptSchedule", "query:scriptSchedules", "query:scriptScheduleFilters",
+]
+test_class = "ScriptScheduleTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = ["decision: may script dispatch reach the enrolled box outside the device phase (use a far-future startAt otherwise)"]
+source = "report 2026-09-12 #1"
+notes = "Do not reuse data/dto/script/ScriptSchedule*.java or ScriptGenerator.createOnlineCheckSchedule(): Tactical-RMM shaped. startAt must sit on a 30-minute boundary; repeat in 1800 s multiples; update has PUT semantics."
+
+[[items]]
+id = "CP-2"
+title = "Script-schedule device targeting"
+status = "proposed"
+priority = "P1"
+ops = [
+  "mutation:addDevicesToSchedule", "mutation:removeDevicesFromSchedule", "mutation:addAllDevicesToSchedule",
+  "mutation:removeAllDevicesFromSchedule", "mutation:setScheduleDeviceCriteria",
+]
+test_class = "ScriptScheduleTest"
+tags = ["saas", "feature"]
+depends_on = ["CP-1"]
+needs = []
+source = "report 2026-09-12 #2"
+notes = "Same class and client as CP-1; negative case = criteria with an OS the enrolled device does not match."
+
+[[items]]
+id = "CP-3"
+title = "Take over a ticket"
+status = "proposed"
+priority = "P1"
+ops = ["mutation:takeOverTicket"]
+test_class = "TicketsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #3"
+notes = "Assert status and assignee after take-over; forbidden target yields userErrors."
+
+[[items]]
+id = "CP-4"
+title = "Reopen a resolved ticket"
+status = "proposed"
+priority = "P1"
+ops = ["mutation:requestTicketReopen"]
+test_class = "TicketsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #4"
+notes = "resolve → reopen → assert targetStatusKind; call twice for idempotence."
+
+[[items]]
+id = "CP-5"
+title = "Notification read state"
+status = "proposed"
+priority = "P1"
+ops = [
+  "mutation:markNotificationAsRead", "mutation:markAllNotificationsAsRead", "mutation:deleteNotification",
+  "mutation:deleteAllReadNotifications", "mutation:markNotificationsReadForEntity",
+  "query:notifications", "query:unreadCountsByCategory",
+]
+test_class = "NotificationsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = ["decision: may a test delete notifications in the shared qa tenant"]
+source = "report 2026-09-12 #5"
+
+[[items]]
+id = "CP-6"
+title = "Time-tracking timers and entries"
+status = "proposed"
+priority = "P1"
+ops = [
+  "mutation:startTimer", "mutation:pauseTimer", "mutation:resumeTimer", "mutation:stopTimer", "mutation:cancelTimer",
+  "mutation:createTimeEntry", "mutation:updateTimeEntry", "mutation:deleteTimeEntry",
+  "query:currentTimer", "query:myTimeEntries", "query:employeeTimeEntries", "query:employeeTimeStats",
+]
+test_class = "TimeTrackingTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #6"
+notes = "Timer lifecycle first (start → pause → resume → stop), then manual-entry CRUD; billable time, so assert durations."
+
+[[items]]
+id = "CP-7"
+title = "AI guardrail policies (REST)"
+status = "proposed"
+priority = "P1"
+ops = [
+  "GET api/v1/policies", "GET api/v1/policies/{}", "PUT api/v1/policies/custom", "POST api/v1/policies/{}/activate",
+]
+test_class = "AiPolicyTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = ["decision: may policy activation run in the functional phase before fae/mingo (save and restore), or read-only until decided"]
+source = "report 2026-09-12 #7"
+notes = "Paths are service-relative; the test sends them under chat/ (chat/api/v1/policies)."
+
+[[items]]
+id = "CP-8"
+title = "Assistant AI settings"
+status = "proposed"
+priority = "P1"
+ops = [
+  "query:adminAiConfig", "query:clientAiConfig", "query:clientView",
+  "mutation:updateAdminAiConfig", "mutation:updateClientAiConfig", "mutation:updateClientView", "mutation:resetClientView",
+]
+test_class = "AiSettingsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = ["decision: tenant-wide AI settings writes in the functional phase — allow with save/restore or forbid"]
+source = "report 2026-09-12 #8"
+notes = "Served on chat/graphql. Read configs first; write only one organization's clientView."
+
+[[items]]
+id = "CP-9"
+title = "Knowledge-base tags and unpublish"
+status = "proposed"
+priority = "P2"
+ops = [
+  "mutation:addTagToKnowledgeBaseItem", "mutation:removeTagFromKnowledgeBaseItem", "mutation:unpublishArticle",
+  "query:knowledgeBaseTags",
+]
+test_class = "KnowledgeBaseTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #9"
+notes = "KnowledgeBaseApi.addTagToItem and getKnowledgeBaseTags already exist and are unused; the tags query is reached only by a @Disabled test today."
+
+[[items]]
+id = "CP-10"
+title = "Return-leg mutations: device nickname, unarchive script"
+status = "proposed"
+priority = "P2"
+ops = ["mutation:updateDeviceNickname", "mutation:unarchiveScript"]
+test_class = "DevicesTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #10"
+notes = "One case each in DevicesTest and ScriptsTest; both are the return leg of an action that is already covered."
