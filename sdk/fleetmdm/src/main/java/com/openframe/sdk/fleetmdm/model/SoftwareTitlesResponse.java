@@ -8,11 +8,12 @@ import java.util.List;
 
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class VulnerabilitiesResponse {
+public class SoftwareTitlesResponse {
 
-    private List<Vulnerability> vulnerabilities;
+    @JsonProperty("software_titles")
+    private List<SoftwareTitle> softwareTitles;
 
-    private Long count;
+    private Integer count;
 
     @JsonProperty("counts_updated_at")
     private String countsUpdatedAt;

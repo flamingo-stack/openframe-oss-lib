@@ -16,7 +16,12 @@ import com.openframe.sdk.fleetmdm.model.CreatePolicyRequest;
 import com.openframe.sdk.fleetmdm.model.UpdatePolicyRequest;
 import com.openframe.sdk.fleetmdm.model.CreateScheduledQueryRequest;
 import com.openframe.sdk.fleetmdm.model.UpdateScheduledQueryRequest;
+import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
+import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
+import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import com.openframe.sdk.fleetmdm.model.VulnerabilitiesResponse;
+import com.openframe.sdk.fleetmdm.model.Vulnerability;
+import com.openframe.sdk.fleetmdm.model.VulnerabilityRequest;
 
 import java.io.IOException;
 import java.net.URI;
@@ -42,6 +47,8 @@ public class FleetMdmClient {
     private static final String LIVE_QUERY_RUN_URL = "/api/v1/fleet/queries/run";
     private static final String POLICIES_DELETE_URL = "/api/latest/fleet/policies/delete";
     private static final String VULNERABILITIES_URL = "/api/latest/fleet/vulnerabilities";
+    private static final String SOFTWARE_TITLES_URL = "/api/latest/fleet/software/titles";
+    private static final String VULNERABILITY_DETAIL_URL = "/api/latest/fleet/vulnerabilities/";
     private static final String INCLUDE_MANAGED_QUERY = "?include_openframe_managed=1";
 
     static final String TENANT_ID_HEADER = "X-Tenant-Id";
@@ -426,20 +433,106 @@ public class FleetMdmClient {
         });
     }
 
-    /**
-     * List vulnerabilities with pagination.
-     */
-    public VulnerabilitiesResponse listVulnerabilities(int page, int perPage) {
-        return call("list Fleet vulnerabilities", () -> {
-            HttpResponse<String> response = sendRequest(VULNERABILITIES_URL + "?page=" + page + "&per_page=" + perPage, "GET", null);
-            checkResponse(response, "list Fleet vulnerabilities");
-            return MAPPER.readValue(response.body(), VulnerabilitiesResponse.class);
-        });
+    public SoftwareTitlesResponse listSoftwareTitles(SoftwareTitleRequest request) throws IOException, InterruptedException {
+        HttpResponse<String> response = sendRequest(buildSoftwareTitlesQuery(request), "GET", null);
+        checkResponse(response, "list Fleet software titles");
+        return MAPPER.readValue(response.body(), SoftwareTitlesResponse.class);
     }
 
-    /**
-     * List all global policies.
-     */
+    public SoftwareTitle getSoftwareTitle(long id) throws IOException, InterruptedException {
+        HttpResponse<String> response = sendRequest(SOFTWARE_TITLES_URL + "/" + id, "GET", null);
+        if (response.statusCode() == 404) {
+            return null;
+        }
+        checkResponse(response, "get Fleet software title");
+        return MAPPER.treeToValue(requireNode(response.body(), "software_title"), SoftwareTitle.class);
+    }
+
+    public Vulnerability getVulnerability(String cve) throws IOException, InterruptedException {
+        HttpResponse<String> response = sendRequest(VULNERABILITY_DETAIL_URL + URLEncoder.encode(cve, StandardCharsets.UTF_8),
+                "GET", null);
+        if (response.statusCode() == 404) {
+            return null;
+        }
+        checkResponse(response, "get Fleet vulnerability");
+        return MAPPER.treeToValue(requireNode(response.body(), "vulnerability"), Vulnerability.class);
+    }
+
+    private static String buildSoftwareTitlesQuery(SoftwareTitleRequest request) {
+        StringBuilder url = new StringBuilder(SOFTWARE_TITLES_URL);
+        List<String> params = new ArrayList<>();
+        if (request != null) {
+            if (request.getPage() != null) {
+                params.add("page=" + request.getPage());
+            }
+            if (request.getPerPage() != null) {
+                params.add("per_page=" + request.getPerPage());
+            }
+            if (request.getQuery() != null && !request.getQuery().isBlank()) {
+                params.add("query=" + URLEncoder.encode(request.getQuery(), StandardCharsets.UTF_8));
+            }
+            if (request.getOrderKey() != null && !request.getOrderKey().isBlank()) {
+                params.add("order_key=" + URLEncoder.encode(request.getOrderKey(), StandardCharsets.UTF_8));
+            }
+            if (request.getOrderDirection() != null && !request.getOrderDirection().isBlank()) {
+                params.add("order_direction=" + URLEncoder.encode(request.getOrderDirection(), StandardCharsets.UTF_8));
+            }
+            if (Boolean.TRUE.equals(request.getVulnerable())) {
+                params.add("vulnerable=true");
+            }
+        }
+        if (!params.isEmpty()) {
+            url.append("?").append(String.join("&", params));
+        }
+        return url.toString();
+    }
+
+    public VulnerabilitiesResponse listVulnerabilities(int page, int perPage) {
+        try {
+            return listVulnerabilities(VulnerabilityRequest.builder().page(page).perPage(perPage).build());
+        } catch (IOException e) {
+            throw new FleetMdmException("Failed to list Fleet vulnerabilities", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new FleetMdmException("Interrupted while listing Fleet vulnerabilities", e);
+        }
+    }
+
+    public VulnerabilitiesResponse listVulnerabilities(VulnerabilityRequest request) throws IOException, InterruptedException {
+        HttpResponse<String> response = sendRequest(buildVulnerabilitiesQuery(request), "GET", null);
+        checkResponse(response, "list Fleet vulnerabilities");
+        return MAPPER.readValue(response.body(), VulnerabilitiesResponse.class);
+    }
+
+    private static String buildVulnerabilitiesQuery(VulnerabilityRequest request) {
+        StringBuilder url = new StringBuilder(VULNERABILITIES_URL);
+        List<String> params = new ArrayList<>();
+        if (request != null) {
+            if (request.getPage() != null) {
+                params.add("page=" + request.getPage());
+            }
+            if (request.getPerPage() != null) {
+                params.add("per_page=" + request.getPerPage());
+            }
+            if (request.getQuery() != null && !request.getQuery().isBlank()) {
+                params.add("query=" + URLEncoder.encode(request.getQuery(), StandardCharsets.UTF_8));
+            }
+            if (request.getOrderKey() != null && !request.getOrderKey().isBlank()) {
+                params.add("order_key=" + URLEncoder.encode(request.getOrderKey(), StandardCharsets.UTF_8));
+            }
+            if (request.getOrderDirection() != null && !request.getOrderDirection().isBlank()) {
+                params.add("order_direction=" + URLEncoder.encode(request.getOrderDirection(), StandardCharsets.UTF_8));
+            }
+            if (Boolean.TRUE.equals(request.getExploit())) {
+                params.add("exploit=true");
+            }
+        }
+        if (!params.isEmpty()) {
+            url.append("?").append(String.join("&", params));
+        }
+        return url.toString();
+    }
+
     public List<Policy> listPolicies() {
         return call("list Fleet policies", () -> {
             HttpResponse<String> response = sendRequest(POLICIES_URL, "GET", null);
@@ -450,9 +543,6 @@ public class FleetMdmClient {
         });
     }
 
-    /**
-     * Get a policy by numeric ID.
-     */
     public Policy getPolicy(long policyId) {
         return call("get Fleet policy: " + policyId, () -> {
             HttpResponse<String> response = sendRequest(POLICIES_URL + "/" + policyId, "GET", null);
@@ -461,9 +551,6 @@ public class FleetMdmClient {
         });
     }
 
-    /**
-     * Update an existing policy.
-     */
     public Policy updatePolicy(long policyId, UpdatePolicyRequest request) {
         return call("update Fleet policy: " + policyId, () -> {
             HttpResponse<String> response = sendRequest(POLICIES_URL + "/" + policyId, "PATCH", MAPPER.writeValueAsString(request));
@@ -472,9 +559,6 @@ public class FleetMdmClient {
         });
     }
 
-    /**
-     * Create a scheduled query.
-     */
     public Query createScheduledQuery(CreateScheduledQueryRequest request) {
         return call("create Fleet scheduled query", () -> {
             HttpResponse<String> response = sendRequest(QUERIES_URL, "POST", MAPPER.writeValueAsString(request));
@@ -506,9 +590,6 @@ public class FleetMdmClient {
         });
     }
 
-    /**
-     * Get a scheduled query by numeric ID.
-     */
     public Query getScheduledQuery(long queryId) {
         return call("get Fleet scheduled query: " + queryId, () -> {
             HttpResponse<String> response = sendRequest(QUERIES_URL + "/" + queryId, "GET", null);
@@ -517,9 +598,6 @@ public class FleetMdmClient {
         });
     }
 
-    /**
-     * Update an existing scheduled query.
-     */
     public Query updateScheduledQuery(long queryId, UpdateScheduledQueryRequest request) {
         return call("update Fleet scheduled query: " + queryId, () -> {
             HttpResponse<String> response = sendRequest(QUERIES_URL + "/" + queryId, "PATCH", MAPPER.writeValueAsString(request));
@@ -869,7 +947,7 @@ public class FleetMdmClient {
         return builder.build();
     }
 
-    private HttpResponse<String> sendRequest(String path, String method, String body) throws Exception {
+    private HttpResponse<String> sendRequest(String path, String method, String body) throws IOException, InterruptedException {
         return httpClient.send(buildRequest(path, method, body), HttpResponse.BodyHandlers.ofString());
     }
 
@@ -882,7 +960,7 @@ public class FleetMdmClient {
                 + (body.isEmpty() ? "" : ": " + body), response.statusCode(), body);
     }
 
-    private static JsonNode listNodeOrEmpty(String responseBody, String fieldName) throws Exception {
+    private static JsonNode listNodeOrEmpty(String responseBody, String fieldName) throws IOException {
         JsonNode root = MAPPER.readTree(responseBody);
         JsonNode node = root.get(fieldName);
         if (node == null || node.isNull()) {
@@ -891,7 +969,7 @@ public class FleetMdmClient {
         return node;
     }
 
-    private static JsonNode requireNode(String responseBody, String fieldName) throws Exception {
+    private static JsonNode requireNode(String responseBody, String fieldName) throws IOException {
         JsonNode root = MAPPER.readTree(responseBody);
         JsonNode node = root.get(fieldName);
         if (node == null || node.isNull()) {

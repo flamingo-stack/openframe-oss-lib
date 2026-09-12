@@ -1,3 +1,291 @@
+# Software inventory (read side, thin proxy over Fleet MDM REST).
+#
+# The wire contract is stable so the frontend can start binding against it;
+# resolvers currently return null / empty because the feature is stubbed under
+# a Conditional-property. Enable via openframe.software-management.enabled=true.
+
+extend type Query {
+    """Single software row by id (Relay global id). Null when unknown."""
+    software(id: ID!): Software
+
+    """Paginated list of software titles installed across the tenant's fleet.
+    One row = one software title (aggregated across devices)."""
+    softwares(
+        filter: SoftwareFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): SoftwareConnection!
+
+    """Devices that have a given software title installed, with each device's own
+    installed version and per-device software status (OUTDATED / SCHEDULED_UPDATE / …).
+    Powers the Software → Devices tab."""
+    softwareDevices(
+        softwareId: ID!,
+        filter: SoftwareOnDeviceFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): SoftwareOnDeviceConnection!
+
+    """CVEs affecting a given software title. Powers the Software → Vulnerabilities tab."""
+    softwareVulnerabilities(
+        softwareId: ID!,
+        filter: SoftwareVulnerabilityFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): SoftwareVulnerabilityConnection!
+
+    """Faceted filter-option counts for the software list — Type / Source / Version-status /
+    Vulnerability-severity dropdowns. Mirrors scriptFilters / deviceFilters."""
+    softwareFilters(filter: SoftwareFilterInput, search: String): SoftwareFilters!
+
+    """Single global CVE record by id (e.g. "CVE-2024-38063"). Null when Fleet has no record.
+    Populates the vulnerability detail page — includes affected-software list."""
+    vulnerability(cveId: String!): Vulnerability
+
+    """Global list of CVEs across every software title in the tenant's fleet.
+    Powers the Vulnerabilities page. One row = one CVE (not one CVE × software)."""
+    vulnerabilities(
+        filter: VulnerabilityFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): VulnerabilityConnection!
+}
+
+# ────────── Software (aggregate row) ──────────
+
+type Software {
+    id: ID!
+    name: String!
+    publisher: String
+
+    """Package-manager source — WINGET / CHOCOLATEY / BREW / UNMANAGED."""
+    source: SoftwareSource
+
+    """Most-recent version installed anywhere in the fleet — shown as CURRENT VERSION."""
+    currentVersion: String
+
+    """Most up-to-date known version — shown as Latest Version on the detail page."""
+    latestVersion: String
+
+    """UP_TO_DATE / OUTDATED / UNKNOWN — drives the "OUTDATED" chip in the list."""
+    versionStatus: SoftwareVersionStatus
+
+    """Additional older versions in use across the fleet, beyond currentVersion.
+    Shows as "+N older versions" line in the list."""
+    olderVersionsCount: Int
+
+    """Number of devices with this software installed."""
+    devicesCount: Int
+
+    """Vulnerability roll-up — highest severity + CVE count for the badge."""
+    vulnerabilitySummary: SoftwareVulnerabilitySummary
+
+    """False when the vulnerability scanner could not find a matching CPE entry
+    — shown as "no CPE match" instead of a severity badge."""
+    cpeMatched: Boolean
+}
+
+type SoftwareVulnerabilitySummary {
+    highestSeverity: SoftwareCveSeverity
+    cveCount: Int!
+}
+
+# ────────── Software on device (per-device row) ──────────
+
+type SoftwareOnDevice {
+    device: Machine!
+    softwareVersion: String
+    status: SoftwareOnDeviceStatus
+}
+
+# ────────── Vulnerability (CVE row) ──────────
+
+type SoftwareVulnerability {
+    cveId: String!
+    severity: SoftwareCveSeverity
+    cvssScore: Float
+    affectedVersion: String
+    publishedAt: String
+}
+
+# ────────── Enums ──────────
+
+enum SoftwareSource {
+    WINGET
+    CHOCOLATEY
+    BREW
+    UNMANAGED
+}
+
+enum SoftwareVersionStatus {
+    UP_TO_DATE
+    OUTDATED
+    UNKNOWN
+}
+
+enum SoftwareCveSeverity {
+    CRITICAL
+    HIGH
+    MEDIUM
+    LOW
+    NONE
+}
+
+"""Per-device software state: static (UP_TO_DATE / OUTDATED) or in a lifecycle
+transition (SCHEDULED_UPDATE / UNINSTALLING / SCHEDULED_UNINSTALL)."""
+enum SoftwareOnDeviceStatus {
+    UP_TO_DATE
+    OUTDATED
+    SCHEDULED_UPDATE
+    UNINSTALLING
+    SCHEDULED_UNINSTALL
+}
+
+# ────────── Connections (Relay-style) ──────────
+
+type SoftwareConnection {
+    edges: [SoftwareEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type SoftwareEdge {
+    node: Software!
+    cursor: String!
+}
+
+type SoftwareOnDeviceConnection {
+    edges: [SoftwareOnDeviceEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type SoftwareOnDeviceEdge {
+    node: SoftwareOnDevice!
+    cursor: String!
+}
+
+type SoftwareVulnerabilityConnection {
+    edges: [SoftwareVulnerabilityEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type SoftwareVulnerabilityEdge {
+    node: SoftwareVulnerability!
+    cursor: String!
+}
+
+# ────────── Facet dropdowns ──────────
+
+type SoftwareFilters {
+    sources: [SoftwareFilterOption!]!
+    versionStatuses: [SoftwareFilterOption!]!
+    severities: [SoftwareFilterOption!]!
+}
+
+type SoftwareFilterOption {
+    value: String!
+    label: String!
+    count: Int!
+}
+
+# ────────── Inputs ──────────
+
+input SoftwareFilterInput {
+    sources: [SoftwareSource!]
+    versionStatuses: [SoftwareVersionStatus!]
+    minSeverity: SoftwareCveSeverity
+    deviceTagIds: [ID!]
+}
+
+input SoftwareOnDeviceFilterInput {
+    statuses: [SoftwareOnDeviceStatus!]
+    deviceTagIds: [ID!]
+}
+
+input SoftwareVulnerabilityFilterInput {
+    severities: [SoftwareCveSeverity!]
+}
+
+# ────────── Global vulnerability (CVE row) ──────────
+
+"""Global CVE record. Detail-only fields (description, resolvedInVersion, affectedSoftware)
+are null on list rows and populated on the detail page."""
+type Vulnerability {
+    cveId: String!
+
+    """Severity bucketed from CVSS via the NVD ranges (CRITICAL ≥ 9, HIGH ≥ 7, MEDIUM ≥ 4, LOW > 0).
+    Null when Fleet has no CVSS score for the CVE."""
+    severity: SoftwareCveSeverity
+
+    cvssScore: Float
+
+    """Exploit Prediction Scoring System probability (0..1) — Fleet Premium only."""
+    epssProbability: Float
+
+    """True when the CVE is on CISA's Known Exploited Vulnerabilities list — Fleet Premium only."""
+    cisaKnownExploit: Boolean
+
+    """CVE publication timestamp (ISO-8601)."""
+    publishedAt: String
+
+    """External details link Fleet returns (usually NVD)."""
+    detailsLink: String
+
+    """Number of tenant devices affected by any (software, version) pair hit by this CVE."""
+    devicesCount: Int
+
+    # ── Detail-only ──
+    description: String
+    resolvedInVersion: String
+    affectedSoftware: [AffectedSoftware!]
+}
+
+"""One row of the "Affected Software" table on the vulnerability detail page."""
+type AffectedSoftware {
+    id: ID!
+    name: String!
+    source: SoftwareSource
+    version: String
+    devicesCount: Int
+    resolvedInVersion: String
+}
+
+type VulnerabilityConnection {
+    edges: [VulnerabilityEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type VulnerabilityEdge {
+    node: Vulnerability!
+    cursor: String!
+}
+
+input VulnerabilityFilterInput {
+    """Cut-off severity — rows with severity below this are excluded."""
+    minSeverity: SoftwareCveSeverity
+    """True → only CVEs on CISA's Known Exploited Vulnerabilities list."""
+    exploited: Boolean
+}
+
 # GraphQL schema for RMM software management (install / update packages).
 #
 # Built entirely on top of the existing RMM script-execution machinery: each package becomes its
