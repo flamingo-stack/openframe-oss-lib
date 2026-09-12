@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from '../../embed-shims/next-image';
 import { socialCache } from '../../utils/social-embed-cache';
-import { XLogo } from '../icons/x-logo';
+import { XLogo } from '../icons-v2-generated/brand-logos/x-logo';
 import { TwitterContainer } from './embed-container';
 import { useRichMarkdownRuntime } from './rich-markdown-runtime';
 

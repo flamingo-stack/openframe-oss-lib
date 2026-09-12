@@ -1,3 +1,6 @@
+/**
+ * @deprecated Use icons from icons-v2-generated instead.
+ */
 interface ClickUpIconProps {
   width?: number | string;
   height?: number | string;
