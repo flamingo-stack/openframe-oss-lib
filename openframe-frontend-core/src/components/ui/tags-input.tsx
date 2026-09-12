@@ -1,12 +1,13 @@
 'use client';
 
-import { X, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { type KeyboardEvent, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { Badge } from './badge';
 import { Button } from './button';
 import { Input } from './input';
 import { Label } from './label';
+import { IconXClose } from './icons-v2-generated';
 
 interface TagsInputProps {
   value: string[];
@@ -97,10 +98,10 @@ export function TagsInput({
                 <button
                   type="button"
                   onClick={() => handleRemoveTag(tag)}
-                  className="rounded p-0.5 transition-colors hover:bg-white/20"
+                  className="rounded p-0.5 transition-colors hover:bg-ods-bg-hover"
                   aria-label={`Remove ${tag} tag`}
                 >
-                  <X className="h-3 w-3" />
+                  <IconXClose className="h-3 w-3" />
                 </button>
               )}
             </Badge>
