@@ -3,14 +3,15 @@ package com.openframe.client.service;
 import com.openframe.client.metrics.ScriptExecutionWatchdogMetrics;
 import com.openframe.client.service.rmm.ScriptDeliveryRetryStore;
 import com.openframe.client.service.rmm.ScriptDeliveryRetryStore.RetryState;
+import com.openframe.client.service.rmm.watchdog.DeliveryRepublisher;
+import com.openframe.client.service.rmm.watchdog.DeliveryRepublisherRegistry;
 import com.openframe.client.service.rmm.watchdog.ScheduleJobExecutionWatchdogService;
 import com.openframe.client.service.rmm.watchdog.ScriptDeliveryRetryService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
-import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
-import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -39,6 +40,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ScriptDeliveryRetryServiceTest {
 
+    private static final String SCHEDULE_JSON = "{\"executionId\":\"exec-1\",\"machineId\":\"m-1\"}";
+
     @Mock
     private ScriptExecutionRepository repository;
 
@@ -49,7 +52,10 @@ class ScriptDeliveryRetryServiceTest {
     private ScriptDeliveryRetryStore retryStore;
 
     @Mock
-    private ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    private DeliveryRepublisherRegistry deliveryRepublisherRegistry;
+
+    @Mock
+    private DeliveryRepublisher republisher;
 
     @Mock
     private MachineRepository machineRepository;
@@ -59,42 +65,43 @@ class ScriptDeliveryRetryServiceTest {
     @BeforeEach
     void setUp() {
         service = new ScriptDeliveryRetryService(repository, headerWatchdogService,
-                new ScriptExecutionWatchdogMetrics(new SimpleMeterRegistry()), retryStore, scriptScheduleNatsPublisher,
+                new ScriptExecutionWatchdogMetrics(new SimpleMeterRegistry()), retryStore, deliveryRepublisherRegistry,
                 machineRepository);
         ReflectionTestUtils.setField(service, "retrySize", 3);
         ReflectionTestUtils.setField(service, "queuedThresholdSeconds", 30L);
-        // Default: no target is offline. Individual tests override as needed.
+        // Default: no target is offline; the SCHEDULE republisher is the one resolved. Tests override.
         lenient().when(machineRepository.findByMachineIdInAndStatus(any(), eq(DeviceStatus.OFFLINE)))
                 .thenReturn(List.of());
+        lenient().when(deliveryRepublisherRegistry.get(any())).thenReturn(republisher);
     }
 
     @Test
-    @DisplayName("within budget → re-sends the stored message and increments, not failed")
+    @DisplayName("within budget → re-publishes the stored message via the channel's republisher and increments, not failed")
     void withinBudget_resends() {
         ScriptExecution q = queued("exec-1", "m-1", "s-a");
-        ScriptScheduleExecutionMessage msg = ScriptScheduleExecutionMessage.builder().executionId("exec-1").machineId("m-1").build();
         when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any())).thenReturn(List.of(q));
-        when(retryStore.get("exec-1", "m-1")).thenReturn(Optional.of(new RetryState(1, msg)));
+        when(retryStore.get("exec-1", "m-1")).thenReturn(Optional.of(new RetryState(1, DeliveryChannel.SCHEDULE, SCHEDULE_JSON)));
 
         service.retryStuckQueuedDeliveries();
 
-        verify(scriptScheduleNatsPublisher).publish(eq("m-1"), eq(msg));
+        verify(deliveryRepublisherRegistry).get(DeliveryChannel.SCHEDULE);
+        verify(republisher).republish("m-1", SCHEDULE_JSON);
         verify(retryStore).incrementRetryCount(eq("exec-1"), eq("m-1"), any());
         verify(repository, never()).saveAll(any());
     }
 
     @Test
-    @DisplayName("budget exhausted → leaves FAILED, retry state evicted, header finalized")
+    @DisplayName("budget exhausted → leaves FAILED, retry state evicted, header finalized, nothing re-published")
     void exhausted_fails() {
         ScriptExecution q = queued("exec-1", "m-1", "s-a");
         q.setScheduleId("sch-1");
         when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any())).thenReturn(List.of(q));
         when(retryStore.get("exec-1", "m-1"))
-                .thenReturn(Optional.of(new RetryState(3, ScriptScheduleExecutionMessage.builder().build())));
+                .thenReturn(Optional.of(new RetryState(3, DeliveryChannel.SCHEDULE, SCHEDULE_JSON)));
 
         service.retryStuckQueuedDeliveries();
 
-        verify(scriptScheduleNatsPublisher, never()).publish(any(), any());
+        verify(republisher, never()).republish(any(), any());
         ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
         verify(repository).saveAll(captor.capture());
         assertThat(captor.getValue()).allMatch(r -> r.getStatus() == ExecutionStatus.FAILED);
@@ -112,26 +119,25 @@ class ScriptDeliveryRetryServiceTest {
 
         service.retryStuckQueuedDeliveries();
 
-        verify(scriptScheduleNatsPublisher, never()).publish(any(), any());
+        verify(republisher, never()).republish(any(), any());
         verify(repository).saveAll(any());
         verify(retryStore).evict("exec-1", "m-1");
     }
 
     @Test
-    @DisplayName("two leaves on one (executionId, machineId) collapse to a single re-send")
+    @DisplayName("two leaves on one (executionId, machineId) collapse to a single re-publish")
     void groupsByDelivery() {
-        ScriptScheduleExecutionMessage msg = ScriptScheduleExecutionMessage.builder().build();
         when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any()))
                 .thenReturn(List.of(queued("exec-1", "m-1", "s-a"), queued("exec-1", "m-1", "s-b")));
-        when(retryStore.get("exec-1", "m-1")).thenReturn(Optional.of(new RetryState(0, msg)));
+        when(retryStore.get("exec-1", "m-1")).thenReturn(Optional.of(new RetryState(0, DeliveryChannel.SCHEDULE, SCHEDULE_JSON)));
 
         service.retryStuckQueuedDeliveries();
 
-        verify(scriptScheduleNatsPublisher, times(1)).publish(eq("m-1"), eq(msg));
+        verify(republisher, times(1)).republish("m-1", SCHEDULE_JSON);
     }
 
     @Test
-    @DisplayName("an OFFLINE target is failed immediately — no re-send, retry store untouched, header finalized")
+    @DisplayName("an OFFLINE target is failed immediately — no re-publish, retry store/registry untouched, header finalized")
     void offlineDevice_failsWithoutRetry() {
         ScriptExecution q = queued("exec-1", "m-1", "s-a");
         q.setScheduleId("sch-1");
@@ -141,7 +147,7 @@ class ScriptDeliveryRetryServiceTest {
 
         service.retryStuckQueuedDeliveries();
 
-        verify(scriptScheduleNatsPublisher, never()).publish(any(), any());
+        verify(republisher, never()).republish(any(), any());
         verify(retryStore, never()).get(any(), any());
         verify(retryStore, never()).incrementRetryCount(any(), any(), any());
         ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();

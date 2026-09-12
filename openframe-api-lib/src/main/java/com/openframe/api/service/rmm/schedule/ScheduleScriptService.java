@@ -46,13 +46,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ScheduleScriptService {
 
-    /**
-     * Schedules live on a half-hour grid: every run happens at xx:00 or xx:30 and every
-     * repeat is a whole number of these slots. The management runner ticks on the same
-     * grid, so an off-grid instant would simply never coincide with a tick.
-     */
-    private static final long SLOT_SECONDS = 1800L;
-
     private static final List<ScriptStatus> NAME_UNIQUE_STATUSES =
             List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
 
@@ -321,23 +314,7 @@ public class ScheduleScriptService {
         if (startAt == null) {
             throw new BadRequestException("A scheduled (DATE_TIME) schedule requires a run date and time (startAt)");
         }
-        validateGrid(startAt, repeatSeconds);
-    }
-
-    private static void validateGrid(Instant startAt, Long repeatSeconds) {
-        if (startAt != null && !isOnSlot(startAt)) {
-            throw new BadRequestException(
-                    "startAt must fall on a 30-minute boundary (xx:00 or xx:30), got " + startAt);
-        }
-        if (repeatSeconds != null && (repeatSeconds <= 0 || repeatSeconds % SLOT_SECONDS != 0)) {
-            throw new BadRequestException(
-                    "repeat must be a positive whole number of 30-minute slots (multiple of " + SLOT_SECONDS
-                            + " seconds), got " + repeatSeconds);
-        }
-    }
-
-    private static boolean isOnSlot(Instant instant) {
-        return instant.getNano() == 0 && Math.floorMod(instant.getEpochSecond(), SLOT_SECONDS) == 0;
+        ScheduleGrid.validateGrid(startAt, repeatSeconds);
     }
 
     private static void validateOfflineBehavior(ScheduleScriptTrigger trigger,

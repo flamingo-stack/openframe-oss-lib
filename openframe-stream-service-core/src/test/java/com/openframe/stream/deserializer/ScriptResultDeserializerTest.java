@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -22,17 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * {@link ScriptResultDeserializer} is the saved-script binding of the shared
- * {@link RmmResultDeserializer}: it differs from {@link CommandResultDeserializer}
- * in the bound {@link MessageType} AND in {@code getMessage}, which produces a
- * human-readable {@code "Script <name> executed."} summary instead of the base
- * "Command finished/timed out" template.
- *
- * <p>The script name is NOT snapshotted on the Execution row — it is resolved at
- * read time: the result's {@code (tenantId, executionId)} → the Execution row's
- * {@code scriptId} → the {@link Script} document's name.
- */
 @ExtendWith(MockitoExtension.class)
 class ScriptResultDeserializerTest {
 
@@ -209,8 +199,40 @@ class ScriptResultDeserializerTest {
         verifyNoInteractions(scriptRepository);
     }
 
+    @Test
+    @DisplayName("getMessage: a software install row is labeled by its package (\"Installed slack.\"), not by the shared generic script")
+    void getMessage_softwareInstall_labeledByPackage() {
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 0);
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(softwareExecution("slack", SoftwareAction.INSTALL)));
+
+        assertThat(deserializer.getMessage(after)).contains("Installed slack.");
+        verifyNoInteractions(scriptRepository);
+    }
+
+    @Test
+    @DisplayName("getMessage: a software update row reads \"Updated <package>.\"")
+    void getMessage_softwareUpdate_labeledByPackage() {
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 0);
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(softwareExecution("Mozilla.Firefox", SoftwareAction.UPDATE)));
+
+        assertThat(deserializer.getMessage(after)).contains("Updated Mozilla.Firefox.");
+        verifyNoInteractions(scriptRepository);
+    }
+
     private static ScriptExecution executionWithScriptId(String scriptId) {
         return ScriptExecution.builder().scriptId(scriptId).build();
+    }
+
+    private static ScriptExecution softwareExecution(String packageName, SoftwareAction action) {
+        return ScriptExecution.builder()
+                .scriptId("generic-software-script")
+                .packageName(packageName)
+                .softwareAction(action)
+                .build();
     }
 
     private static Script scriptWithName(String name) {

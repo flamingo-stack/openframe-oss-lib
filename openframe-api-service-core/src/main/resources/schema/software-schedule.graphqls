@@ -1,0 +1,154 @@
+# GraphQL schema for RMM Software Schedule CRUD — the software sibling of script-schedule.graphqls,
+# scoped to the DATE_TIME trigger and SPECIFIC device selection (criteria out of scope for now).
+#
+# Tenant scoping is implicit (resolved from the authenticated principal). Reuses SoftwareAction,
+# PackageManagerType and BrewPackageType (software.graphqls / package-search.graphqls) and the
+# schedule enums / device-picker types (ScheduleTimeReference, ScheduleOfflineBehavior,
+# ScheduleDeviceSelectionMode, ScriptStatus, DeviceConnection, AvailableDeviceConnection,
+# DeviceFilters, DeviceFilterInput, User, PageInfo, SortInput) defined elsewhere in the merged schema.
+
+extend type Query {
+    """Get a single software schedule by id within the current tenant. Throws (not null) if the id is absent, soft-deleted, or in another tenant."""
+    softwareSchedule(id: ID!): SoftwareSchedule!
+
+    """All software schedules in the current tenant, newest-first (by _id). Soft-deleted schedules are excluded."""
+    softwareSchedules: [SoftwareSchedule!]!
+}
+
+extend type Mutation {
+    """Create a new software schedule. Returns the created schedule with its server-assigned id."""
+    createSoftwareSchedule(input: CreateSoftwareScheduleInput!): SoftwareSchedule!
+
+    """Full replacement (PUT) of an existing software schedule. The target id travels inside the input.
+    machineIds null leaves the device assignment untouched; a list (including empty) replaces it."""
+    updateSoftwareSchedule(input: UpdateSoftwareScheduleInput!): SoftwareSchedule!
+
+    """Soft-delete a software schedule (sets status to DELETED). Returns the id; idempotent."""
+    deleteSoftwareSchedule(id: ID!): ID!
+
+    """Archive a software schedule (sets status to ARCHIVED). Idempotent. Returns the updated schedule."""
+    archiveSoftwareSchedule(id: ID!): SoftwareSchedule!
+
+    """Restore an archived software schedule back to ACTIVE. Idempotent. Returns the updated schedule."""
+    unarchiveSoftwareSchedule(id: ID!): SoftwareSchedule!
+
+    """Replace the full set of devices assigned to a software schedule (PUT — backs "Edit Devices").
+    machineIds are Machine global ids. Returns the updated schedule."""
+    setSoftwareScheduleDevices(scheduleId: ID!, machineIds: [ID!]!): SoftwareSchedule!
+
+    """Incrementally assign the given devices (the "+"/"Add selected" actions). Idempotent."""
+    addDevicesToSoftwareSchedule(scheduleId: ID!, machineIds: [ID!]!): SoftwareSchedule!
+
+    """Incrementally unassign the given devices (the trash / "Remove selected" actions). Missing ids are no-ops."""
+    removeDevicesFromSoftwareSchedule(scheduleId: ID!, machineIds: [ID!]!): SoftwareSchedule!
+}
+
+type SoftwareSchedule implements Node {
+    id: ID!
+    name: String!
+    description: String
+    """Install vs update — applied to every package in this schedule."""
+    action: SoftwareAction!
+    """The packages this schedule installs/updates."""
+    packages: [SoftwareSchedulePackage!]!
+    """How this schedule targets devices. Always SPECIFIC for now (criteria out of scope)."""
+    selectionMode: ScheduleDeviceSelectionMode!
+    """How a DATE_TIME schedule reads its startAt: SERVER (an absolute instant) or DEVICE_LOCAL (a wall-clock re-based into each device's own timezone). Never null; defaults to SERVER."""
+    timeReference: ScheduleTimeReference!
+    """What to do when a target device is offline at the scheduled time. Never null; defaults to SKIP."""
+    offlineBehavior: ScheduleOfflineBehavior!
+    """Max seconds to wait for an offline device to reconnect. Set only when offlineBehavior is RETRY_ON_RECONNECT."""
+    reconnectWindowSeconds: Long
+    """The scheduled run time. For SERVER: an absolute UTC instant. For DEVICE_LOCAL: the picked Date + Time with no zone offset, re-based into each device's own timezone at run time."""
+    startAt: Instant
+    """Recurrence interval in seconds. Null for a one-shot schedule."""
+    repeat: Long
+    """Next instant the runner will fire this schedule. Null when not scheduled (DEVICE_LOCAL, archived, or a one-shot that already fired)."""
+    nextRunAt: Instant
+    """Instant of the most recent run. Null until the first fire."""
+    lastRunAt: Instant
+    """Machines assigned to this schedule — same filter/search/sort/pagination as the top-level `devices` query, scoped to this schedule's assignments."""
+    assignedDevices(
+        filter: DeviceFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): DeviceConnection!
+    """Devices selectable for this schedule — the "Available Devices" picker. Each edge carries `assigned`."""
+    availableDevices(
+        filter: DeviceFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): AvailableDeviceConnection!
+    """Faceted filter options over this schedule's assigned devices."""
+    assignedDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
+    """Faceted filter options over this schedule's selectable device set."""
+    availableDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
+    """Number of machines assigned to this schedule (the DEVICES column)."""
+    deviceCount: Int!
+    """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete, hidden from default queries."""
+    status: ScriptStatus!
+    statusChangedAt: Instant
+    createdAt: Instant
+    updatedAt: Instant
+    """The creating user (resolved from the internal createdBy id via the user DataLoader)."""
+    author: User
+}
+
+"""One package a software schedule installs/updates."""
+type SoftwareSchedulePackage {
+    packageManager: PackageManagerType!
+    packageName: String!
+    """Brew-only sub-type (CASK/FORMULA); null for managers that do not distinguish."""
+    brewPackageType: BrewPackageType
+}
+
+input SoftwareSchedulePackageInput {
+    packageManager: PackageManagerType!
+    packageName: String!
+    "Brew-only sub-type (CASK/FORMULA). Required for brew (enforced server-side), ignored by other managers."
+    brewPackageType: BrewPackageType
+}
+
+input CreateSoftwareScheduleInput {
+    name: String!
+    description: String
+    action: SoftwareAction!
+    "Packages to install/update. At least one."
+    packages: [SoftwareSchedulePackageInput!]!
+    "How the schedule reads its startAt: SERVER (an absolute instant) or DEVICE_LOCAL (a wall-clock re-based per device). Null defaults to SERVER."
+    timeReference: ScheduleTimeReference
+    "What to do when a target device is offline at the scheduled time. Null defaults to SKIP."
+    offlineBehavior: ScheduleOfflineBehavior
+    "Max seconds to wait for an offline device to reconnect. Set only when offlineBehavior is RETRY_ON_RECONNECT."
+    reconnectWindowSeconds: Long
+    "The scheduled run time. For SERVER: an absolute UTC instant. For DEVICE_LOCAL: the picked Date + Time with NO zone offset applied, re-based per device. Required; must fall on a 30-minute boundary (xx:00 or xx:30)."
+    startAt: Instant!
+    "Recurrence interval in seconds — a whole number of 30-minute slots (1800, 3600, …). Null = run once."
+    repeat: Long
+    "SPECIFIC target device ids (Machine global ids)."
+    machineIds: [ID!]
+}
+
+"""Full-replacement (PUT) payload for an existing software schedule."""
+input UpdateSoftwareScheduleInput {
+    id: ID!
+    name: String!
+    description: String
+    action: SoftwareAction!
+    packages: [SoftwareSchedulePackageInput!]!
+    timeReference: ScheduleTimeReference
+    offlineBehavior: ScheduleOfflineBehavior
+    reconnectWindowSeconds: Long
+    startAt: Instant!
+    repeat: Long
+    "Full replacement of the assigned device set (Machine global ids). Null leaves the assignment untouched."
+    machineIds: [ID!]
+}

@@ -40,6 +40,32 @@ extend type Query {
 
     """Facet options for a schedule's Execution History — parallel to scriptExecutionFilters."""
     scheduleExecutionFilters(scheduleId: ID!, filter: ScriptExecutionFilterInput, search: String): ScriptExecutionFilters!
+
+    """Execution History rows for one software package's install/update runs — parallel to
+    scriptExecutions but scoped by (packageManager, packageName, action). All packages of a manager
+    share one generic script, so the package identity (not scriptId) narrows the rows. Same
+    ScriptExecutionConnection shape, same filter / search / sort options."""
+    softwareExecutions(
+        packageManager: PackageManagerType!,
+        packageName: String!,
+        action: SoftwareAction!,
+        filter: ScriptExecutionFilterInput,
+        search: String,
+        sort: SortInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String
+    ): ScriptExecutionConnection!
+
+    """Facet options for a software package's Execution History — parallel to scriptExecutionFilters."""
+    softwareExecutionFilters(
+        packageManager: PackageManagerType!,
+        packageName: String!,
+        action: SoftwareAction!,
+        filter: ScriptExecutionFilterInput,
+        search: String
+    ): ScriptExecutionFilters!
 }
 
 type ScriptExecutionFilters {
@@ -85,6 +111,11 @@ type ScriptExecution implements Node {
     scriptId: ID!
     # Resolved at read time from scriptId
     scriptName: String
+    # Software install/update identity — set only for software executions, null for ordinary
+    # script/command runs. Lets History label the row by its package instead of the shared script.
+    packageManager: PackageManagerType
+    packageName: String
+    softwareAction: SoftwareAction
     # Schedule this execution originated from, stamped at dispatch.
     # Null for ad-hoc runs (runScript / batchRunScript). Backs "execution history per schedule job".
     scheduleId: ID
