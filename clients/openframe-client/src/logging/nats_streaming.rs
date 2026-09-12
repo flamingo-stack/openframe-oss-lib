@@ -135,7 +135,9 @@ impl LogStreamingRunManager {
         installed_tools_service: &InstalledToolsService,
         directory_manager: &DirectoryManager,
     ) -> Result<Self> {
-        let server_host = initial_config_service.get_server_url()?;
+        let server_host = initial_config_service
+            .get_server_url()
+            .context("Failed to get server URL")?;
         let tenant_domain = extract_tenant_domain(&server_host);
 
         let device_data_fetcher = DeviceDataFetcher::new();
@@ -145,7 +147,9 @@ impl LogStreamingRunManager {
 
         let log_file_path = directory_manager.logs_dir().join("openframe.log");
         let offset_file_path = directory_manager.secured_dir().join("log_stream_offset");
-        let machine_id = MachineIdService::new(directory_manager).get_or_create()?;
+        let machine_id = MachineIdService::new(directory_manager)
+            .get_or_create()
+            .context("Failed to get or create machine ID")?;
 
         Ok(Self {
             server_host,
@@ -256,9 +260,13 @@ fn spawn_source_discovery(
                 Some(source) => {
                     info!("Meshcentral log source discovered, registering");
                     if tx.send(source).await.is_err() {
+                        // Receiver dropped; no point continuing discovery.
                         return;
                     }
-                    return;
+                    // Only one source to discover today; if more platform
+                    // tools are added in the future, this loop should
+                    // continue instead of exiting here.
+                    break;
                 }
                 None => {
                     debug!(
