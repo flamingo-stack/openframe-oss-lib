@@ -26,7 +26,17 @@ public class IntegratedToolService {
         return toolRepository.findByType(toolType);
     }
 
-    /** Look up by human-readable key (e.g. "fleetmdm-server"). TenantAwareMongoTemplate auto-scopes by tenantId. */
+    /**
+     * Look up by human-readable key (e.g. "fleetmdm-server").
+     * UNSCOPED: this bypasses tenant scoping and must only be used in single-tenant
+     * (non-gateway) contexts. In multi-tenant gateway mode, callers must use
+     * {@link #getToolByTenantAndKey(String, String)} instead. This method must not be
+     * relied upon for tenant isolation; it does not perform any tenant scoping guard.
+     *
+     * @deprecated use {@link #getToolByTenantAndKey(String, String)} in any multi-tenant
+     * gateway context; this method is retained only for single-tenant deployments.
+     */
+    @Deprecated
     public Optional<IntegratedTool> getToolByKey(String key) {
         return toolRepository.findByKey(key);
     }
