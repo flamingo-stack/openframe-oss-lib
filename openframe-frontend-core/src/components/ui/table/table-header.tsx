@@ -9,6 +9,9 @@ import { Checkbox } from '../checkbox';
 import { InfoHint } from '../info-hint';
 import { TableColumnFilterDropdown } from './table-column-filter-dropdown';
 import type { TableColumn, TableHeaderProps, TableRowData } from './types';
+
+/** The default header label: wraps inside its cell with a balanced split. */
+const TABLE_HEADER_LABEL_CLASS = 'min-w-0 text-balance uppercase text-ods-text-secondary text-h5';
 import { getHideClasses } from './utils';
 
 /** @deprecated Use `DataTableHeader` from `data-table` instead. */
@@ -149,10 +152,23 @@ export function TableHeader<T = TableRowData>({
                   </>
                 ) : (
                   <>
-                    {/* Wraps inside the cell. A nowrapped label longer than its
-                        column paints straight across the next column's header. */}
-                    <span className="min-w-0 uppercase text-ods-text-secondary text-h5">{column.label}</span>
-                    {column.hint ? <InfoHint label={column.label}>{column.hint}</InfoHint> : null}
+                    {/* Wraps inside the cell, with a BALANCED split — "IMPLEMENTATION
+                        / OWNERS", never one word stranded on a line of its own. A
+                        nowrapped label longer than its column paints straight
+                        across the next column's header. */}
+                    {column.hint ? (
+                      /* The hint sits in a LABEL GROUP with the text, pinned to the
+                        FIRST line (`items-start`): on a label that breaks onto a
+                        second line it reads beside the opening word instead of
+                        floating in the gap between the two. Added only when a
+                        hint exists, so a hint-less header keeps its DOM. */
+                      <span className="flex min-w-0 items-start gap-[var(--spacing-system-xxs)]">
+                        <span className={TABLE_HEADER_LABEL_CLASS}>{column.label}</span>
+                        <InfoHint label={column.label}>{column.hint}</InfoHint>
+                      </span>
+                    ) : (
+                      <span className={TABLE_HEADER_LABEL_CLASS}>{column.label}</span>
+                    )}
                     {getSortIcon(column)}
                   </>
                 )}

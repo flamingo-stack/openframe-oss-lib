@@ -56,5 +56,14 @@ describe('DataTable header hint', () => {
   it('the shared label class wraps inside the cell', () => {
     expect(DATA_TABLE_HEADER_LABEL_CLASS).not.toContain('whitespace-nowrap');
     expect(DATA_TABLE_HEADER_LABEL_CLASS).toContain('min-w-0');
+    // A GOOD break: even lines, never one word stranded on its own.
+    expect(DATA_TABLE_HEADER_LABEL_CLASS).toContain('text-balance');
+  });
+
+  it('pins the hint to the first line of a label that breaks onto two', () => {
+    // The assertion is about a CLASS reaching the DOM, which has no
+    // accessible-name equivalent to query by.
+    const { container } = render(<HintTable hint="Engineers building it." />);
+    expect(container.innerHTML).toContain('flex min-w-0 items-start gap-[var(--spacing-system-xxs)]');
   });
 });

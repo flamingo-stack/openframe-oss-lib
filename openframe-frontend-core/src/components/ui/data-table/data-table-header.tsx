@@ -253,7 +253,7 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
         // filter header keeps its exact structure — the trigger stays a direct
         // child of the cell.
         meta?.hint ? (
-          <div className="flex items-center gap-[var(--spacing-system-xxs)]">
+          <div className="flex items-start gap-[var(--spacing-system-xxs)]">
             <DataTableColumnFilter
               column={column}
               options={filter.options}
@@ -287,8 +287,20 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
           )}
           onClick={canSort ? () => onSortChange?.(column.id) : undefined}
         >
-          <HeaderLabel header={header} />
-          {meta?.hint ? <InfoHint label={resolveHeaderLabel(header)}>{meta.hint}</InfoHint> : null}
+          {meta?.hint ? (
+            // The hint shares a LABEL GROUP with the text, pinned to the FIRST
+            // line (`items-start`): on a label that breaks onto a second line it
+            // reads beside the opening word instead of floating in the gap
+            // between the two. Only a column WITH a hint gets the group, so a
+            // hint-less header keeps its DOM. The sort icon stays outside it,
+            // centred on the row.
+            <span className="flex min-w-0 items-start gap-[var(--spacing-system-xxs)]">
+              <HeaderLabel header={header} />
+              <InfoHint label={resolveHeaderLabel(header)}>{meta.hint}</InfoHint>
+            </span>
+          ) : (
+            <HeaderLabel header={header} />
+          )}
           {canSort && <SortIcon sorted={sortDir} />}
         </div>
       )}
@@ -304,11 +316,13 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
  * The label WRAPS inside its own cell (`min-w-0`, no `whitespace-nowrap`). A
  * nowrapped label longer than its column does not truncate — it paints straight
  * across the next column's header, which is how "Implementation owners" landed
- * on top of "Updated". Two lines of the 20px label still fit the fixed 48px
- * header, so a label that fits looks exactly as it did.
+ * on top of "Updated". `text-balance` makes the break a GOOD one: the lines come
+ * out even ("IMPLEMENTATION / OWNERS") instead of one word stranded on its own.
+ * Two lines of the 20px label still fit the fixed 48px header, and a label that
+ * fits on one line looks exactly as it did.
  */
 export const DATA_TABLE_HEADER_LABEL_CLASS =
-  'min-w-0 uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary';
+  'min-w-0 text-balance uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary';
 
 function HeaderLabel({ header }: { header: AnyHeader }) {
   const headerDef = header.column.columnDef.header;

@@ -69,5 +69,17 @@ describe('Table column hint', () => {
     const label = screen.getAllByText('Implementation owners')[0];
     expect(label.className).not.toContain('whitespace-nowrap');
     expect(label.className).toContain('min-w-0');
+    // A GOOD break: even lines, never one word stranded on its own.
+    expect(label.className).toContain('text-balance');
+  });
+
+  it('pins the hint to the first line of a label that breaks onto two', () => {
+    const columns: TableColumn<Row>[] = [
+      { key: 'name', label: 'Implementation owners', hint: 'Engineers building it.' },
+    ];
+    // The assertion is about a CLASS reaching the DOM, which has no
+    // accessible-name equivalent to query by — the actions-column test's shape.
+    const { container } = render(<Table data={data} columns={columns} rowKey="id" />);
+    expect(container.innerHTML).toContain('flex min-w-0 items-start gap-[var(--spacing-system-xxs)]');
   });
 });
