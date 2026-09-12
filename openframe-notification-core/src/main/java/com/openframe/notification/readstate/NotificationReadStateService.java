@@ -24,6 +24,9 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import static java.util.stream.Collectors.toSet;
 
 @Slf4j
 @Service
@@ -116,6 +119,19 @@ public class NotificationReadStateService {
         for (NotificationReadState row : unreadRows) {
             publish(row.getRecipientId(), row.getRecipientType(),
                     List.of(notificationId), NotificationReadEvent.Transition.READ);
+        }
+        return flipped;
+    }
+
+    public long dismissEntityForAllRecipients(@NotNull NotificationEntityType entityType, @NotBlank String entityId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<NotificationReadState> unreadRows = repository.findUnreadByEntity(entityType, entityId, tenantId);
+        Set<String> notificationIds = unreadRows.stream()
+                .map(NotificationReadState::getNotificationId)
+                .collect(toSet());
+        long flipped = 0L;
+        for (String notificationId : notificationIds) {
+            flipped += dismissForAllRecipients(notificationId);
         }
         return flipped;
     }
