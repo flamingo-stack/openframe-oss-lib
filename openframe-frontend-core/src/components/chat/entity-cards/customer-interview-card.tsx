@@ -131,7 +131,7 @@ export function CustomerInterviewCard({
             />
           ) : null}
           {interview.main_video_url ? (
-            <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <span className="absolute inset-0 flex items-center justify-center bg-ods-overlay/30">
               <Video className="h-4 w-4 text-ods-text-on-dark" />
             </span>
           ) : null}
@@ -195,7 +195,7 @@ export function CustomerInterviewCard({
                 onError={hideOnError}
               />
               {interview.main_video_url && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <div className="absolute inset-0 flex items-center justify-center bg-ods-overlay/40">
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ods-accent/90">
                     <Video className="h-8 w-8 text-ods-text-on-accent" />
                   </div>

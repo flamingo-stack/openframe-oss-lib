@@ -52,8 +52,8 @@ export function CategoriesCart({
           </div>
 
           {/* Gradient overlays for fade effect */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-[#212121] to-transparent md:w-6" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-[#212121] to-transparent md:w-6" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-ods-card to-transparent md:w-6" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-ods-card to-transparent md:w-6" />
         </div>
 
         {/* Category Information - Updated to use real data */}

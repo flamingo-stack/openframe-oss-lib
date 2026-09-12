@@ -28,11 +28,11 @@ export function CategoryCard({ name, description, categoryCount, productCount, i
         <div className="flex flex-row items-start">
           <p className="flex-1 text-left text-ods-text-primary text-h6">{description}</p>
           <button
-            className="ml-4 flex h-12 w-12 items-center justify-center rounded-[6px] border border-ods-border bg-transparent transition-colors hover:bg-ods-accent"
+            className="ml-4 flex h-12 w-12 items-center justify-center rounded-[6px] border border-ods-border bg-transparent text-ods-text-primary transition-colors hover:bg-ods-accent"
             style={{ minWidth: 48, minHeight: 48 }}
             aria-label={`View ${name}`}
           >
-            <svg width="24" height="24" fill="none" stroke="#FAFAFA" strokeWidth="2" viewBox="0 0 24 24">
+            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M9 18l6-6-6-6" />
             </svg>
           </button>

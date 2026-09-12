@@ -21,6 +21,13 @@
  * are FLAGGED here for addition to ODS; the raw-px carry-over is the
  * documented, review-gated exemption recorded in the unification PR.
  * Do NOT copy these px classes anywhere else.
+ *
+ * TRACKING: this is not a self-certifying exemption — it must be tracked
+ * against an ODS token backlog ticket, not just documented in comments.
+ * See ODS-TOKENS backlog ticket (raw px carve-out for `article` prose
+ * headings/paragraph and all presets' `code` entry): TODO(ODS-TOKENS-XXXX)
+ * — replace with semantic prose/mono tokens once added to ODS and remove
+ * this flag + the corresponding ESLint allowlist entries.
  */
 
 export type TextSizeElement =
@@ -75,6 +82,8 @@ export const TEXT_SIZE_PRESETS: Record<TextSizePreset, Record<TextSizeElement, s
     td: 'text-sm md:text-base',
   },
   // Old RichMarkdownRenderer typography, byte-for-byte (see header note).
+  // Raw px carve-out tracked against ODS token backlog ticket
+  // TODO(ODS-TOKENS-XXXX) — see header comment above.
   article: {
     h1: 'text-[32px] md:text-[40px] lg:text-[48px] leading-[1.25]',
     h2: 'text-[28px] md:text-[32px]',

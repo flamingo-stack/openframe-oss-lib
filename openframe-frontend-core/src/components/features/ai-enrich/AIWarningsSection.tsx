@@ -34,7 +34,7 @@ export const AIWarningsSection: React.FC<AIWarningsSectionProps> = ({ warnings, 
           <h4 className="mb-2 font-semibold text-ods-warning text-h6">{title}</h4>
           <ul className="space-y-1">
             {warnings.map((warning, index) => (
-              <li key={index} className="list-inside list-disc text-ods-warning/80 text-h6">
+              <li key={index} className="list-inside list-disc text-ods-warning text-h6">
                 {warning}
               </li>
             ))}

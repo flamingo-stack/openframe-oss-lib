@@ -57,7 +57,7 @@ const DialogContent = forwardRef<
         // track is what hands the wrapper a scrollbar; `1fr` still collapses to
         // max-content when the dialog is shorter than the cap, so short dialogs
         // keep hugging their content.
-        'fixed left-[50%] top-[calc(50%_-_var(--of-keyboard-inset,0px)/2)] z-[9999] grid max-h-[calc(100dvh_-_var(--of-keyboard-inset,0px)_-_2rem)] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] grid-rows-[minmax(0,1fr)] border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-1/2 data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-1/2 md:rounded-lg',
+        'fixed left-[50%] top-[calc(50%_-_var(--of-keyboard-inset,0px)/2)] z-[9999] grid max-h-[calc(100dvh_-_var(--of-keyboard-inset,0px)_-_2rem)] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] grid-rows-[minmax(0,1fr)] border bg-ods-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-1/2 data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-1/2 md:rounded-lg',
         className,
       )}
       {...props}
@@ -66,7 +66,7 @@ const DialogContent = forwardRef<
           would refuse to shrink below its content, so the cap above would push
           past the viewport instead of handing this box a scrollbar. */}
       <div className="grid min-h-0 gap-[var(--spacing-system-mf)] overflow-y-auto">{children}</div>
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-ods-card transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ods-border-focus focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-ods-bg-hover data-[state=open]:text-ods-text-secondary">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
@@ -97,7 +97,7 @@ const DialogDescription = forwardRef<
   ElementRef<typeof DialogPrimitive.Description>,
   ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description ref={ref} className={cn('text-muted-foreground text-h6', className)} {...props} />
+  <DialogPrimitive.Description ref={ref} className={cn('text-ods-text-secondary text-h6', className)} {...props} />
 ));
 DialogDescription.displayName = DialogPrimitive.Description.displayName;
 

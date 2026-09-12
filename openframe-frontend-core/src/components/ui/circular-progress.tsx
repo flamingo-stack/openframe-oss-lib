@@ -27,7 +27,7 @@ interface CircularProgressProps {
 
 // Fallback track for variants that don't have a designed secondary color
 // (info, accent). success/warning/error use their ODS `*-secondary` token.
-const SUBTLE_TRACK = 'rgba(255, 255, 255, 0.06)';
+const SUBTLE_TRACK = 'var(--color-track-subtle, rgba(255, 255, 255, 0.06))';
 
 const variantColors: Record<CircularProgressVariant, { progress: string; track: string }> = {
   success: {
