@@ -42,7 +42,11 @@ public class InvitationService {
 
         Invitation saved = invitationRepository.save(invitationMapper.toEntity(request));
 
-        emailService.sendInvitationEmail(saved.getEmail(), saved.getId());
+        try {
+            emailService.sendInvitationEmail(saved.getEmail(), saved.getId());
+        } catch (Exception e) {
+            log.error("Failed to send invitation email id={} email={}", saved.getId(), saved.getEmail(), e);
+        }
 
         invitationProcessor.postProcessInvitationCreated(saved);
 
