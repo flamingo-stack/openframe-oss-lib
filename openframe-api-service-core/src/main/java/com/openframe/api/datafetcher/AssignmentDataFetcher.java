@@ -110,6 +110,9 @@ public class AssignmentDataFetcher {
     public CompletableFuture<?> resolveTarget(DgsDataFetchingEnvironment dfe) {
         ItemAssignment assignment = dfe.getSource();
         String targetId = assignment.getTargetId();
+        if (targetId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
         return switch (assignment.getTargetType()) {
             case ORGANIZATION -> dfe.<String, Organization>getDataLoader("organizationDataLoader").load(targetId);
             case DEVICE -> dfe.<String, Machine>getDataLoader("machineDataLoader").load(targetId);
@@ -118,3 +121,4 @@ public class AssignmentDataFetcher {
         };
     }
 }
+
