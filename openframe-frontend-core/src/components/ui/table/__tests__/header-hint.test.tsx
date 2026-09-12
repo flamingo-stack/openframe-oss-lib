@@ -25,7 +25,7 @@ const data: Row[] = [{ id: '1', name: 'Alpha' }];
 // narrow branch, so this file opts into the wide one for its own cases.
 const realMatchMedia = window.matchMedia;
 beforeEach(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string) => ({
     matches: true,
     media: query,
     onchange: null,
@@ -34,7 +34,7 @@ beforeEach(() => {
     addListener: () => {},
     removeListener: () => {},
     dispatchEvent: () => false,
-  })) as typeof window.matchMedia;
+  });
 });
 afterEach(() => {
   window.matchMedia = realMatchMedia;
