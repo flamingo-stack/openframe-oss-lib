@@ -222,7 +222,7 @@ export function SchedulerContextPanel({
             )}
             {hosts.length > 3 && (
               <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-                <AvatarStack people={hosts} max={4} size="lg" />
+                <AvatarStack people={hosts} max={4} size="lg" label="Hosts" />
                 <p className="text-ods-text-secondary text-h6">{hosts.length} hosts on this calendar</p>
               </div>
             )}

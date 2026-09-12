@@ -207,6 +207,19 @@ export function personInitials(name?: string | null): string {
   return nameInitials(name, '', { pick: 'first-last' });
 }
 
+/**
+ * A PERSON's first name: the first whitespace-delimited word, or `fallback`
+ * (default `null`) when there is nothing usable. THE named first-name policy,
+ * beside `personInitials`, so a greeting, a byline and a people cell agree on
+ * leading whitespace and on an empty name.
+ */
+export function personFirstName(name: string | null | undefined): string | null;
+export function personFirstName(name: string | null | undefined, fallback: string): string;
+export function personFirstName(name: string | null | undefined, fallback: string | null = null): string | null {
+  const first = (typeof name === 'string' ? name.trim() : '').split(/\s+/)[0];
+  return first || fallback;
+}
+
 /** A single leading letter, `?` when there is no name. THE named one-letter policy. */
 export function singleInitial(name?: string | null): string {
   return nameInitials(name, '?', { maxLetters: 1 });
