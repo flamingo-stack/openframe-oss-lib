@@ -73,6 +73,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   // People-hub employee content
   'what-i-shipped': 'package',
   'how-i-work': 'book-open',
+  'ai-prompts': 'message-square',
 
   // Product-hub internal
   'design-docs': 'file-text',
@@ -154,6 +155,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   // People-hub employee content
   'what-i-shipped': 'What I Shipped',
   'how-i-work': 'How I Work',
+  'ai-prompts': 'Squawkbox',
 
   // Product-hub internal
   'design-docs': 'Design Docs',
@@ -237,6 +239,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   // People-hub employee content
   what_i_shipped: 'what-i-shipped',
   how_i_work: 'how-i-work',
+  ai_prompt: 'ai-prompts',
 
   // Product-hub internal
   design_doc: 'design-docs',
