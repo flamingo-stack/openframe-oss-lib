@@ -28,11 +28,23 @@ public class ToolAgentFileController {
 
         try (InputStream stream = ToolAgentFileController.class.getResourceAsStream(path)) {
             if (stream == null) {
-                throw new RuntimeException("No content");
+                throw new ToolAgentFileNotFoundException("No content for asset: " + assetId);
             }
             return stream.readAllBytes();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new ToolAgentFileReadException("Failed to read tool agent file for asset: " + assetId, e);
+        }
+    }
+
+    public static class ToolAgentFileNotFoundException extends RuntimeException {
+        public ToolAgentFileNotFoundException(String message) {
+            super(message);
+        }
+    }
+
+    public static class ToolAgentFileReadException extends RuntimeException {
+        public ToolAgentFileReadException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 

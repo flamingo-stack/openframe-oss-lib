@@ -20,6 +20,11 @@ public class ApiCallerArgumentResolver implements HandlerMethodArgumentResolver 
     @Override
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
                                   NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
-        return new ApiCaller(webRequest.getHeader(X_USER_ID), webRequest.getHeader(X_API_KEY_ID));
+        String userId = webRequest.getHeader(X_USER_ID);
+        String apiKeyId = webRequest.getHeader(X_API_KEY_ID);
+        if (userId == null || apiKeyId == null) {
+            throw new MissingApiIdentityException(X_USER_ID, X_API_KEY_ID);
+        }
+        return new ApiCaller(userId, apiKeyId);
     }
 }

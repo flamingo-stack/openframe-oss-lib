@@ -55,7 +55,7 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
     public String transform(String machineId, String agentToolId, boolean lastAttempt) {
         if (isBlank(agentToolId)) {
             log.warn("Agent tool ID is blank for Fleet MDM, machineId={}", machineId);
-            return agentToolId;
+            throw new IllegalStateException("Agent tool ID is blank for Fleet MDM, machineId=" + machineId);
         }
 
         try {

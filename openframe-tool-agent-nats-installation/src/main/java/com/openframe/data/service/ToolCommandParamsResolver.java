@@ -19,18 +19,19 @@ public class ToolCommandParamsResolver {
 
     public List<String> process(String toolId, List<String> commandArgs) {
         if (commandArgs == null) {
-            return null;
+            return List.of();
         }
 
         // Process each argument and replace placeholders where found
         return commandArgs.stream()
+                .filter(arg -> arg != null)
                 .map(arg -> processArgument(toolId, arg))
                 .toList();
     }
 
     private String processArgument(String toolId, String argument) {
         if (argument == null) {
-            return null;
+            throw new IllegalArgumentException("Command argument must not be null");
         }
 
         // Retrieve and inject the registration secret only when the placeholder is present.
@@ -47,7 +48,7 @@ public class ToolCommandParamsResolver {
                 .filter(retriever -> isSuitable(toolId, retriever))
                 .findFirst()
                 .map(ToolAgentRegistrationSecretRetriever::getSecret)
-                .orElseThrow(() -> new IllegalStateException("No tool agent registration secret retriver found for " + toolId));
+                .orElseThrow(() -> new IllegalStateException("No tool agent registration secret retriever found for " + toolId));
     }
 
     private boolean isSuitable(String toolId, ToolAgentRegistrationSecretRetriever retriever) {

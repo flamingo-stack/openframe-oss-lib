@@ -19,7 +19,12 @@ public class ToolAgentIdTransformerService {
                 .filter(transformer -> toolType.equals(transformer.getToolType()))
                 .findFirst()
                 .map(transformer -> transformer.transform(machineId, agentToolId, lastAttempt))
-                .orElse(agentToolId);
+                .orElseGet(() -> {
+                    log.warn("No ToolAgentIdTransformer registered for toolType={}; returning original agentToolId={} for machineId={}",
+                            toolType, agentToolId, machineId);
+                    return agentToolId;
+                });
     }
 
 }
+

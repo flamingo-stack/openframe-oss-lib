@@ -109,6 +109,10 @@ public class KnowledgeBaseTempAttachmentService {
         if (!attachments.isEmpty()) {
             attachmentRepository.saveAll(attachments);
         }
+        if (attachments.size() != temps.size()) {
+            log.warn("Attachment move partially failed for article: {}. Expected: {}, Moved: {}. See preceding error logs for details.",
+                    articleId, temps.size(), attachments.size());
+        }
         log.info("Linked {} of {} attachments to article: {}", attachments.size(), temps.size(), articleId);
         return attachments;
     }
@@ -130,7 +134,8 @@ public class KnowledgeBaseTempAttachmentService {
                     .uploadedBy(uploadedBy)
                     .build();
         } catch (Exception e) {
-            log.error("Failed to move temp file to article: {}", temp.getId(), e);
+            log.error("Failed to move temp file to article: {} (tempId={}, fileName={})",
+                    articleId, temp.getId(), temp.getFileName(), e);
             return null;
         }
     }

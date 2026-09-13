@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
@@ -26,7 +27,8 @@ public class ApiKeyStatsSyncRepository {
      * Get all stats keys from Redis
      */
     public Set<String> getAllStatsKeys() {
-        return redisTemplate.keys(statsKeyPrefix() + ":*");
+        Set<String> keys = redisTemplate.keys(statsKeyPrefix() + ":*");
+        return keys != null ? keys : Collections.emptySet();
     }
 
     /**

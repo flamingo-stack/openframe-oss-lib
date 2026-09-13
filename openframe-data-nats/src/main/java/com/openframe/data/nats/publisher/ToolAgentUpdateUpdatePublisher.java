@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -83,7 +84,7 @@ public class ToolAgentUpdateUpdatePublisher {
 
     private List<ToolAgentUpdateMessage.AssetUpdate> mapAssets(List<ToolAgentAsset> assets) {
         if (assets == null) {
-            return null;
+            return Collections.emptyList();
         }
         return assets.stream()
                 .map(this::mapAsset)
@@ -104,3 +105,4 @@ public class ToolAgentUpdateUpdatePublisher {
         return assetUpdate;
     }
 }
+
