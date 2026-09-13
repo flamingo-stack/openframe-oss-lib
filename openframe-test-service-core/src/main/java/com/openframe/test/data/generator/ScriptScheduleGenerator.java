@@ -50,15 +50,26 @@ public final class ScriptScheduleGenerator {
      * nothing dispatches when the slot arrives.
      */
     public static CreateScriptScheduleInput dateTimeSchedule(String name, String scriptId, Instant startAt, Long repeat) {
+        return dateTimeSchedule(name, scriptId, startAt, repeat, List.of("WINDOWS"));
+    }
+
+    /** As above, for an explicit platform set (the schedule's device pickers are scoped to it). */
+    public static CreateScriptScheduleInput dateTimeSchedule(String name, String scriptId, Instant startAt, Long repeat,
+                                                             List<String> supportedPlatforms) {
         return CreateScriptScheduleInput.builder()
                 .name(name)
                 .description("E2E schedule for " + name)
-                .supportedPlatforms(List.of("WINDOWS"))
+                .supportedPlatforms(supportedPlatforms)
                 .scriptIds(List.of(scriptId))
                 .trigger("DATE_TIME")
                 .startAt(startAt.toString())
                 .repeat(repeat)
                 .build();
+    }
+
+    /** The other supported OS, for a platform-mismatch case: OsType is WINDOWS | MAC_OS. */
+    public static String otherPlatform(String osType) {
+        return "WINDOWS".equals(osType) ? "MAC_OS" : "WINDOWS";
     }
 
     /**

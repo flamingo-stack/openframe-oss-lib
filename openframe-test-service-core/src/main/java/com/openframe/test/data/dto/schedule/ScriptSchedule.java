@@ -30,6 +30,7 @@ public class ScriptSchedule {
     private String description;
     private List<String> supportedPlatforms;
     private String selectionMode;
+    private ScheduleDeviceCriteria deviceCriteria;
     private String trigger;
     private String timeReference;
     private String offlineBehavior;
