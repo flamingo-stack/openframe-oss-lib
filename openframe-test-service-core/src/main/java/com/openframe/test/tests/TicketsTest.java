@@ -329,4 +329,59 @@ public class TicketsTest extends BaseTest {
         assertThat(tag.getEntityType()).as("Tag entityType should be TICKET").isEqualTo("TICKET");
         assertThat(tag.getCreatedAt()).as("Tag createdAt should not be blank").isNotBlank();
     }
+
+    private static Ticket takenOver;
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Take over a ticket in one operation")
+    @Order(6)
+    public void testTakeOverTicket() {
+        List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN);
+        assertThat(users).as("Expected at least one user").isNotEmpty();
+        Machine device = DeviceApi.getAnyDevice(
+                pipelineScoped(onlineDevicesFilter()), pipelineScoped(offlineDevicesFilter()));
+        assertThat(device).as("Expected at least one device%s", orgSuffix()).isNotNull();
+        List<TicketTag> tags = TicketApi.getTicketTags();
+        assertThat(tags).as("Expected at least one ticket tag").isNotEmpty();
+        Ticket created = TicketApi.createTicket(TicketGenerator.createTicketRequest(
+                device.getOrganizationId(), device, TicketGenerator.assigneeId(users), List.of(tags.getFirst())));
+        takenOver = created;
+        String me = UserApi.me().getUser().getId();
+        String techRequiredId = TicketApi.resolveSystemStatusId("TECH_REQUIRED");
+        assertThat(techRequiredId).as("No system status definition found for kind TECH_REQUIRED").isNotNull();
+
+        Ticket taken = TicketApi.takeOverTicket(created.getId(), techRequiredId, me);
+        assertThat(taken.getId()).as("Id should match").isEqualTo(created.getId());
+        assertThat(taken.getStatusDefinition()).as("statusDefinition should be present").isNotNull();
+        assertThat(taken.getStatusDefinition().getId()).as("The ticket moved to the requested status").isEqualTo(techRequiredId);
+        assertThat(taken.getStatusDefinition().getKind()).as("Status kind should be TECH_REQUIRED").isEqualTo("TECH_REQUIRED");
+        assertThat(taken.getAssignedTo()).as("The ticket is assigned to the caller").isEqualTo(me);
+
+        Ticket reread = TicketApi.getTicket(created.getId());
+        assertThat(reread.getStatusDefinition().getKind()).as("The status is persisted").isEqualTo("TECH_REQUIRED");
+        assertThat(reread.getAssignedTo()).as("The assignment is persisted").isEqualTo(me);
+
+        String archivedId = TicketApi.resolveSystemStatusId("ARCHIVED");
+        assertThat(archivedId).as("No system status definition found for kind ARCHIVED").isNotNull();
+        List<String> refused = TicketApi.attemptTakeOverTicketMessages(created.getId(), archivedId, me);
+        assertThat(refused).as("Taking over straight to ARCHIVED from TECH_REQUIRED is refused").isNotEmpty();
+        assertThat(refused.getFirst()).as("The refusal carries a message").isNotBlank();
+        Ticket unchanged = TicketApi.getTicket(created.getId());
+        assertThat(unchanged.getStatusDefinition().getKind()).as("A refused take-over changes nothing").isEqualTo("TECH_REQUIRED");
+        assertThat(unchanged.getAssignedTo()).as("A refused take-over keeps the assignee").isEqualTo(me);
+    }
+
+    @AfterAll
+    public static void cleanupTakenOverTicket() {
+        if (takenOver == null) {
+            return;
+        }
+        try {
+            TicketApi.transitionTicket(takenOver.getId(), TicketApi.resolveSystemStatusId("RESOLVED"));
+            TicketApi.transitionTicket(takenOver.getId(), TicketApi.resolveSystemStatusId("ARCHIVED"));
+        } catch (RuntimeException ignored) {
+            // best effort: a failed cleanup must not mask the case that failed
+        }
+    }
 }

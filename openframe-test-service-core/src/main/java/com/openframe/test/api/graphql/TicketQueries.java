@@ -184,6 +184,31 @@ public class TicketQueries {
             }
             """;
 
+    /** One transition plus one assignment; a transition the rules matrix forbids comes back as an error. */
+    public static final String TAKE_OVER_TICKET = """
+            mutation TakeOverTicket($input: TakeOverTicketInput!) {
+                takeOverTicket(input: $input) {
+                    ticket { id status statusDefinition { id name kind } assignedTo assignedName resolvedAt }
+                    userErrors { field message }
+                }
+            }
+            """;
+
+    /**
+     * Client-initiated reopen of a closed ticket (AGENT callers only). The destination is chosen by
+     * the server: a ticket the client closed returns to AI Handling, one a technician closed goes to
+     * Tech Required; {@code handoffToTechnician} forces the latter. Idempotent on an open ticket.
+     */
+    public static final String REQUEST_TICKET_REOPEN = """
+            mutation RequestTicketReopen($input: TicketReopenInput!) {
+                requestTicketReopen(input: $input) {
+                    ticketId
+                    targetStatusKind
+                    userErrors { field message }
+                }
+            }
+            """;
+
     public static final String CREATE_TICKET = """
             mutation CreateTicket($input: CreateTicketInput!) {
                 createTicket(input: $input) {

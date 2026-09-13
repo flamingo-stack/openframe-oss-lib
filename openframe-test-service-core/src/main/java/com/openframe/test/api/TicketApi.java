@@ -2,6 +2,9 @@ package com.openframe.test.api;
 
 import com.openframe.test.data.dto.shared.CursorPaginationInput;
 import com.openframe.test.data.dto.shared.GraphqlError;
+import com.openframe.test.data.dto.ticket.TakeOverTicketInput;
+import com.openframe.test.data.dto.ticket.TicketReopenInput;
+import com.openframe.test.data.dto.ticket.TicketReopenPayload;
 import com.openframe.test.data.dto.ticket.CreateTicketInput;
 import com.openframe.test.data.dto.ticket.CreateTicketStatusInput;
 import com.openframe.test.data.dto.ticket.DeleteTicketStatusInput;
@@ -28,6 +31,8 @@ import static com.openframe.test.api.graphql.TicketQueries.GET_TICKETS;
 import static com.openframe.test.api.graphql.TicketQueries.REORDER_TICKET;
 import static com.openframe.test.api.graphql.TicketQueries.TICKET_TAGS;
 import static com.openframe.test.api.graphql.TicketQueries.TICKET_STATUSES;
+import static com.openframe.test.api.graphql.TicketQueries.REQUEST_TICKET_REOPEN;
+import static com.openframe.test.api.graphql.TicketQueries.TAKE_OVER_TICKET;
 import static com.openframe.test.api.graphql.TicketQueries.TRANSITION_TICKET;
 import static com.openframe.test.config.EnvironmentConfig.CHAT_GRAPHQL;
 import static com.openframe.test.data.generator.CursorGenerator.limit;
@@ -166,6 +171,58 @@ public class TicketApi {
                 .body(body).post(CHAT_GRAPHQL)
                 .then().statusCode(200)
                 .extract().jsonPath().getList("errors", GraphqlError.class);
+    }
+
+    /** Transition and assignment in one operation; fails on userErrors like every other ticket mutation here. */
+    public static Ticket takeOverTicket(String ticketId, String toStatusId, String assigneeId) {
+        return mutateTicket(TAKE_OVER_TICKET, "takeOverTicket", Map.of("input",
+                TakeOverTicketInput.builder().ticketId(ticketId).toStatusId(toStatusId).assigneeId(assigneeId).build()));
+    }
+
+    /**
+     * A take-over expected to be refused. The lifecycle may report the refusal either as a top-level
+     * GraphQL error (an invalid transition, code TICKET_INVALID_TRANSITION) or as a {@code userErrors}
+     * entry, so both are collected as messages; empty means the server accepted it.
+     */
+    public static List<String> attemptTakeOverTicketMessages(String ticketId, String toStatusId, String assigneeId) {
+        Map<String, Object> body = Map.of("query", TAKE_OVER_TICKET, "variables", Map.of("input",
+                TakeOverTicketInput.builder().ticketId(ticketId).toStatusId(toStatusId).assigneeId(assigneeId).build()));
+        JsonPath response = given(getAuthorizedSpec())
+                .body(body).post(CHAT_GRAPHQL)
+                .then().statusCode(200)
+                .extract().jsonPath();
+        List<String> messages = new java.util.ArrayList<>();
+        List<GraphqlError> errors = response.getList("errors", GraphqlError.class);
+        if (errors != null) {
+            errors.forEach(e -> messages.add(String.valueOf(e.getMessage())));
+        }
+        List<TicketUserError> userErrors = response.getList("data.takeOverTicket.userErrors", TicketUserError.class);
+        if (userErrors != null) {
+            userErrors.forEach(e -> messages.add(String.valueOf(e.getMessage())));
+        }
+        return messages;
+    }
+
+    /**
+     * Client-initiated reopen; returns the payload as-is so a case can assert {@code userErrors}
+     * itself. Only an AGENT session may call it.
+     */
+    public static TicketReopenPayload requestTicketReopen(TicketReopenInput input) {
+        return given(getAuthorizedSpec())
+                .body(Map.of("query", REQUEST_TICKET_REOPEN, "variables", Map.of("input", input)))
+                .post(CHAT_GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.requestTicketReopen", TicketReopenPayload.class);
+    }
+
+    /** A reopen expected to be refused (an ADMIN caller); returns the top-level GraphQL errors. */
+    public static List<GraphqlError> attemptRequestTicketReopenErrors(TicketReopenInput input) {
+        List<GraphqlError> errors = given(getAuthorizedSpec())
+                .body(Map.of("query", REQUEST_TICKET_REOPEN, "variables", Map.of("input", input)))
+                .post(CHAT_GRAPHQL)
+                .then().statusCode(200)
+                .extract().jsonPath().getList("errors", GraphqlError.class);
+        return errors == null ? List.of() : errors;
     }
 
     public static Ticket createTicket(CreateTicketInput input) {
