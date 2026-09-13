@@ -111,6 +111,7 @@ export {
 export {
   renderChatInlineEntityCard,
   ChatCardLoader,
+  chatCardLabel,
   type ChatCardRenderOptions,
   type ChatCardDispatchExtras,
 } from './dispatch';

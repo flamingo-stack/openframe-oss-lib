@@ -113,6 +113,7 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   // (ChatRef-shaped items, `handleEntityCardList`), like github / slack.
   design_doc: (ids, b) => `${b}/api/design-docs?ids=${ids.join(',')}`,
   openframe_tenant: (ids, b) => `${b}/api/openframe-tenants?ids=${ids.join(',')}`,
+  prospect_call: (ids, b) => `${b}/api/prospect-calls?ids=${ids.join(',')}`,
 };
 
 /**
