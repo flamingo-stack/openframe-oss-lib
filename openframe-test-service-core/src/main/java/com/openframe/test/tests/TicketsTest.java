@@ -3,7 +3,11 @@ package com.openframe.test.tests;
 import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.TagApi;
 import com.openframe.test.api.TicketApi;
+import com.openframe.test.api.AttachmentApi;
 import com.openframe.test.api.UserApi;
+import com.openframe.test.data.dto.knowledgebase.TempAttachment;
+import com.openframe.test.data.dto.shared.MutationDeletePayload;
+import com.openframe.test.helpers.ai.RunId;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.shared.GraphqlError;
 import com.openframe.test.data.dto.tag.TagDefinition;
@@ -13,11 +17,15 @@ import com.openframe.test.data.dto.user.UserRole;
 import com.openframe.test.data.generator.TicketGenerator;
 import org.junit.jupiter.api.*;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.openframe.test.data.generator.CursorGenerator.limit;
 import static com.openframe.test.data.generator.DeviceGenerator.offlineDevicesFilter;
 import static com.openframe.test.data.generator.DeviceGenerator.onlineDevicesFilter;
+import static com.openframe.test.data.generator.KnowledgeBaseGenerator.attachmentFile;
 import static com.openframe.test.data.generator.TicketGenerator.activeTickets;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -330,7 +338,26 @@ public class TicketsTest extends BaseTest {
         assertThat(tag.getCreatedAt()).as("Tag createdAt should not be blank").isNotBlank();
     }
 
-    private static Ticket takenOver;
+    private static final RunId RUN_ID = RunId.next();
+    private static final List<Ticket> createdTickets = new ArrayList<>();
+    private static final List<String> createdStatusIds = new ArrayList<>();
+
+    /** A ticket of this run's own, on the pipeline-scoped device and its organization, with one tag. */
+    private static Ticket newOwnTicket(String assigneeId) {
+        Machine device = DeviceApi.getAnyDevice(
+                pipelineScoped(onlineDevicesFilter()), pipelineScoped(offlineDevicesFilter()));
+        assertThat(device).as("Expected at least one device%s", orgSuffix()).isNotNull();
+        List<TicketTag> tags = TicketApi.getTicketTags();
+        assertThat(tags).as("Expected at least one ticket tag").isNotEmpty();
+        Ticket ticket = TicketApi.createTicket(TicketGenerator.createTicketRequest(
+                device.getOrganizationId(), device, assigneeId, List.of(tags.getFirst())));
+        createdTickets.add(ticket);
+        return ticket;
+    }
+
+    private static String me() {
+        return UserApi.me().getUser().getId();
+    }
 
     @Tag("feature")
     @Test
@@ -339,15 +366,8 @@ public class TicketsTest extends BaseTest {
     public void testTakeOverTicket() {
         List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN);
         assertThat(users).as("Expected at least one user").isNotEmpty();
-        Machine device = DeviceApi.getAnyDevice(
-                pipelineScoped(onlineDevicesFilter()), pipelineScoped(offlineDevicesFilter()));
-        assertThat(device).as("Expected at least one device%s", orgSuffix()).isNotNull();
-        List<TicketTag> tags = TicketApi.getTicketTags();
-        assertThat(tags).as("Expected at least one ticket tag").isNotEmpty();
-        Ticket created = TicketApi.createTicket(TicketGenerator.createTicketRequest(
-                device.getOrganizationId(), device, TicketGenerator.assigneeId(users), List.of(tags.getFirst())));
-        takenOver = created;
-        String me = UserApi.me().getUser().getId();
+        Ticket created = newOwnTicket(TicketGenerator.assigneeId(users));
+        String me = me();
         String techRequiredId = TicketApi.resolveSystemStatusId("TECH_REQUIRED");
         assertThat(techRequiredId).as("No system status definition found for kind TECH_REQUIRED").isNotNull();
 
@@ -372,16 +392,174 @@ public class TicketsTest extends BaseTest {
         assertThat(unchanged.getAssignedTo()).as("A refused take-over keeps the assignee").isEqualTo(me);
     }
 
+    @Tag("feature")
+    @Test
+    @DisplayName("Add, edit and delete a ticket note; stage, attach, download and delete a file")
+    @Order(7)
+    public void testNotesAndAttachments() throws Exception {
+        Ticket ticket = newOwnTicket(me());
+        String text = "E2E-" + RUN_ID + " note";
+
+        TicketNote note = TicketApi.addNote(ticket.getId(), text);
+        assertThat(note.getId()).as("A note has an id").isNotBlank();
+        assertThat(note.getTicketId()).as("The note belongs to the ticket").isEqualTo(ticket.getId());
+        assertThat(note.getContent()).as("The note content is stored").isEqualTo(text);
+        assertThat(note.getAuthorId()).as("The note records its author").isNotBlank();
+        assertThat(TicketApi.getTicketDetails(ticket.getId()).getNotes()).extracting(TicketNote::getId)
+                .as("The note is on the ticket").contains(note.getId());
+
+        TicketNote edited = TicketApi.updateNote(note.getId(), text + " edited");
+        assertThat(edited.getId()).as("Editing keeps the id").isEqualTo(note.getId());
+        assertThat(edited.getContent()).as("The content is updated").isEqualTo(text + " edited");
+        assertThat(edited.getUpdatedAt()).as("updatedAt is set on edit").isNotNull();
+
+        MutationDeletePayload deletedNote = TicketApi.deleteNote(note.getId());
+        assertThat(deletedNote.getUserErrors()).as("Deleting a note reports no userErrors").isNullOrEmpty();
+        assertThat(deletedNote.getDeletedId()).as("The deleted note id is echoed").isEqualTo(note.getId());
+        assertThat(TicketApi.getTicketDetails(ticket.getId()).getNotes()).extracting(TicketNote::getId)
+                .as("The note left the ticket").doesNotContain(note.getId());
+
+        Path file = attachmentFile();
+        CreateTempAttachmentInput input = CreateTempAttachmentInput.forFile(file, "text/plain");
+        TempAttachment staged = TicketApi.createTempAttachmentUploadUrl(input);
+        assertThat(staged.getId()).as("A staged file has an id").isNotBlank();
+        assertThat(staged.getUploadUrl()).as("A staged file has a presigned upload URL").isNotBlank();
+        assertThat(staged.getFileName()).as("The file name is echoed").isEqualTo(input.getFileName());
+        AttachmentApi.uploadAttachmentFile(staged.getUploadUrl(), file, "text/plain");
+
+        Ticket withFile = TicketApi.updateTicket(UpdateTicketInput.builder()
+                .id(ticket.getId()).tempAttachmentIds(List.of(staged.getId())).build());
+        assertThat(withFile.getAttachments()).as("Linking the staged file attaches it").isNotEmpty();
+        TicketAttachment attachment = withFile.getAttachments().stream()
+                .filter(a -> input.getFileName().equals(a.getFileName())).findFirst().orElse(null);
+        assertThat(attachment).as("The attachment carries the staged file name").isNotNull();
+        assertThat(attachment.getFileSize()).as("The attachment carries the file size").isEqualTo(input.getFileSize());
+
+        String downloadUrl = TicketApi.getAttachmentDownloadUrl(attachment.getId());
+        assertThat(downloadUrl).as("The attachment has a download URL").isNotBlank();
+        assertThat(AttachmentApi.downloadAttachmentFile(downloadUrl))
+                .as("The downloaded bytes are the uploaded bytes").isEqualTo(Files.readAllBytes(file));
+
+        MutationDeletePayload deletedAttachment = TicketApi.deleteTicketAttachment(attachment.getId());
+        assertThat(deletedAttachment.getUserErrors()).as("Deleting an attachment reports no userErrors").isNullOrEmpty();
+        assertThat(deletedAttachment.getDeletedId()).as("The deleted attachment id is echoed").isEqualTo(attachment.getId());
+        assertThat(TicketApi.getTicketDetails(ticket.getId()).getAttachments()).extracting(TicketAttachment::getId)
+                .as("The attachment left the ticket").doesNotContain(attachment.getId());
+
+        TempAttachment discarded = TicketApi.createTempAttachmentUploadUrl(CreateTempAttachmentInput.forFile(file, "text/plain"));
+        MutationDeletePayload deletedTemp = TicketApi.deleteTempAttachment(discarded.getId());
+        assertThat(deletedTemp.getUserErrors()).as("Discarding a staged file reports no userErrors").isNullOrEmpty();
+        assertThat(deletedTemp.getDeletedId()).as("The discarded staged file id is echoed").isEqualTo(discarded.getId());
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Edit, reassign and unlink a ticket")
+    @Order(8)
+    public void testEditAssignAndUnlink() {
+        List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN);
+        assertThat(users).as("Expected at least one user").isNotEmpty();
+        Ticket ticket = newOwnTicket(TicketGenerator.assigneeId(users));
+        assertThat(ticket.getDeviceId()).as("The ticket starts linked to a device").isNotBlank();
+        assertThat(ticket.getOrganizationId()).as("The ticket starts linked to an organization").isNotBlank();
+
+        String title = "E2E-" + RUN_ID + " edited";
+        Ticket edited = TicketApi.updateTicket(UpdateTicketInput.builder()
+                .id(ticket.getId()).title(title).description("edited by the E2E suite").build());
+        assertThat(edited.getTitle()).as("The title is updated").isEqualTo(title);
+        assertThat(edited.getDescription()).as("The description is updated").isEqualTo("edited by the E2E suite");
+        assertThat(edited.getDeviceId()).as("A partial update keeps the device").isEqualTo(ticket.getDeviceId());
+
+        Ticket unassigned = TicketApi.unassignTicket(ticket.getId());
+        assertThat(unassigned.getAssignedTo()).as("Unassigning clears the assignee").isNull();
+        String me = me();
+        Ticket assigned = TicketApi.assignTicket(ticket.getId(), me);
+        assertThat(assigned.getAssignedTo()).as("Assigning sets the assignee").isEqualTo(me);
+
+        Ticket noDevice = TicketApi.unlinkDeviceFromTicket(ticket.getId());
+        assertThat(noDevice.getDeviceId()).as("Unlinking clears the device").isNull();
+        assertThat(noDevice.getOrganizationId()).as("Unlinking the device keeps the organization").isEqualTo(ticket.getOrganizationId());
+        Ticket noOrg = TicketApi.unlinkOrganizationFromTicket(ticket.getId());
+        assertThat(noOrg.getOrganizationId()).as("Unlinking clears the organization").isNull();
+
+        Ticket reread = TicketApi.getTicketDetails(ticket.getId());
+        assertThat(reread.getTitle()).as("The edit is persisted").isEqualTo(title);
+        assertThat(reread.getAssignedTo()).as("The assignment is persisted").isEqualTo(me);
+        assertThat(reread.getDeviceId()).as("The device unlink is persisted").isNull();
+        assertThat(reread.getOrganizationId()).as("The organization unlink is persisted").isNull();
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Edit and reorder a custom ticket status; read the transition rules and statistics")
+    @Order(9)
+    public void testStatusDefinitionsRulesAndStatistics() {
+        TicketStatusDefinition first = TicketApi.createTicketStatus(TicketGenerator.createStatusRequest());
+        TicketStatusDefinition second = TicketApi.createTicketStatus(TicketGenerator.createStatusRequest());
+        createdStatusIds.add(first.getId());
+        createdStatusIds.add(second.getId());
+
+        TicketStatusDefinition renamed = TicketApi.updateTicketStatus(UpdateTicketStatusInput.builder()
+                .id(first.getId()).name(first.getName() + "-edited").color("#22C55E").build());
+        assertThat(renamed.getId()).as("Editing keeps the id").isEqualTo(first.getId());
+        assertThat(renamed.getName()).as("The name is updated").isEqualTo(first.getName() + "-edited");
+        assertThat(renamed.getColor()).as("The color is updated").isEqualTo("#22C55E");
+        assertThat(renamed.isSystem()).as("A custom status stays custom").isFalse();
+
+        TicketApi.reorderTicketStatus(ReorderTicketStatusInput.builder().id(first.getId()).afterStatusId(second.getId()).build());
+        List<String> order = TicketApi.getTicketStatuses().stream().map(TicketStatusDefinition::getId).toList();
+        assertThat(order.indexOf(first.getId())).as("Moved after the second status").isGreaterThan(order.indexOf(second.getId()));
+        TicketApi.reorderTicketStatus(ReorderTicketStatusInput.builder().id(first.getId()).beforeStatusId(second.getId()).build());
+        order = TicketApi.getTicketStatuses().stream().map(TicketStatusDefinition::getId).toList();
+        assertThat(order.indexOf(first.getId())).as("Moved back before the second status").isLessThan(order.indexOf(second.getId()));
+
+        List<TicketStatusTransitionRule> rules = TicketApi.getTransitionRules();
+        assertThat(rules).as("The transition matrix is not empty").isNotEmpty();
+        assertThat(rules).allSatisfy(rule -> assertThat(rule.getFrom()).as("Every rule names a source status").isNotNull());
+        TicketStatusTransitionRule fromResolved = rules.stream()
+                .filter(r -> "RESOLVED".equals(r.getFrom().getKind())).findFirst().orElse(null);
+        assertThat(fromResolved).as("The matrix has a rule for RESOLVED").isNotNull();
+        assertThat(fromResolved.getTo()).extracting(TicketStatusDefinition::getKind)
+                .as("RESOLVED may move to ARCHIVED").contains("ARCHIVED");
+        TicketStatusTransitionRule fromTech = rules.stream()
+                .filter(r -> "TECH_REQUIRED".equals(r.getFrom().getKind())).findFirst().orElse(null);
+        assertThat(fromTech).as("The matrix has a rule for TECH_REQUIRED").isNotNull();
+        assertThat(fromTech.getTo()).extracting(TicketStatusDefinition::getKind)
+                .as("TECH_REQUIRED may not move straight to ARCHIVED (what the take-over case relies on)").doesNotContain("ARCHIVED");
+
+        TicketStatistics stats = TicketApi.getTicketStatistics();
+        assertThat(stats.getTotalCount()).as("The tenant has tickets (this class created some)").isGreaterThanOrEqualTo(1);
+        assertThat(stats.getStatusDefinitionCounts()).as("Counts per status definition are present").isNotEmpty();
+        assertThat(stats.getStatusDefinitionCounts()).allSatisfy(c -> {
+            assertThat(c.getStatus()).as("Each count names a status").isNotNull();
+            assertThat(c.getCount()).as("Counts are never negative").isGreaterThanOrEqualTo(0);
+        });
+        int sum = stats.getStatusDefinitionCounts().stream().mapToInt(TicketStatusDefinitionCount::getCount).sum();
+        assertThat(sum).as("Per-status counts never exceed the total").isLessThanOrEqualTo(stats.getTotalCount());
+    }
+
     @AfterAll
-    public static void cleanupTakenOverTicket() {
-        if (takenOver == null) {
-            return;
+    public static void cleanupOwnTicketsAndStatuses() {
+        for (Ticket ticket : createdTickets) {
+            try {
+                Ticket current = TicketApi.getTicket(ticket.getId());
+                String kind = current.getStatusDefinition() == null ? null : current.getStatusDefinition().getKind();
+                if (!"RESOLVED".equals(kind) && !"ARCHIVED".equals(kind)) {
+                    TicketApi.transitionTicket(ticket.getId(), TicketApi.resolveSystemStatusId("RESOLVED"));
+                }
+                if (!"ARCHIVED".equals(kind)) {
+                    TicketApi.transitionTicket(ticket.getId(), TicketApi.resolveSystemStatusId("ARCHIVED"));
+                }
+            } catch (RuntimeException ignored) {
+                // best effort: a failed cleanup must not mask the case that failed
+            }
         }
-        try {
-            TicketApi.transitionTicket(takenOver.getId(), TicketApi.resolveSystemStatusId("RESOLVED"));
-            TicketApi.transitionTicket(takenOver.getId(), TicketApi.resolveSystemStatusId("ARCHIVED"));
-        } catch (RuntimeException ignored) {
-            // best effort: a failed cleanup must not mask the case that failed
+        for (String id : createdStatusIds) {
+            try {
+                TicketApi.deleteTicketStatus(id);
+            } catch (RuntimeException ignored) {
+                // best effort
+            }
         }
     }
 }
