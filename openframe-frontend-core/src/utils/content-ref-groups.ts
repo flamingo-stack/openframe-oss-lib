@@ -55,6 +55,7 @@ export const CONTENT_REF_GROUPS: Record<string, ContentRefGroupConfig> = {
   onboarding_guide: { label: 'Onboarding Guides', order: 9, layout: 'list', gridSize: 'default' },
   what_i_shipped: { label: 'What I Shipped', order: 10, layout: 'grid', gridSize: 'default' },
   how_i_work: { label: 'How I Work', order: 11, layout: 'grid', gridSize: 'default' },
+  ai_prompt: { label: 'Squawkbox', order: 12, layout: 'grid', gridSize: 'default' },
 };
 
 /** Human-readable label for a content_ref `type`. Returns null when the type

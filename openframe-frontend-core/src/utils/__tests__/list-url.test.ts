@@ -52,6 +52,7 @@ const BASELINE: Record<string, string> = {
   // product-hub design docs + tenants via per-object card routes).
   what_i_shipped: '/api/what-i-shipped?ids=a,b&limit=2',
   how_i_work: '/api/how-i-work?ids=a,b&limit=2',
+  ai_prompt: '/api/prompts?ids=a,b&limit=2',
   design_doc: '/api/design-docs?ids=a,b',
   openframe_tenant: '/api/openframe-tenants?ids=a,b',
 };

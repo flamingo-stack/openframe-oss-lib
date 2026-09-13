@@ -53,6 +53,7 @@ import { PresentationLineIcon } from '../../icons-v2-generated/charts/presentati
 import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
+import { ChatQuoteIcon } from '../../icons-v2-generated/communication/chat-quote-icon';
 import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon';
 import { ClipboardListIcon } from '../../icons-v2-generated/documents/clipboard-list-icon';
 import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon';
@@ -1363,7 +1364,7 @@ function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
 }
 
 /** People-hub employee feeds hydrate from their EXISTING list APIs
- *  (`/api/what-i-shipped?ids=`, `/api/how-i-work?ids=`) — entry-shaped rows
+ *  (`/api/what-i-shipped?ids=`, `/api/how-i-work?ids=`, `/api/prompts?ids=`) — entry-shaped rows
  *  (title / summary / author), not ChatRefs, hence the bespoke row→display
  *  mapping (the FAQ precedent). The destination comes from the ref (the
  *  server-resolved entry url) or, on a bare marker, the host's
@@ -1379,6 +1380,7 @@ function fetchedEmployeeEntryDisplayRef(item: unknown, chatRef: ChatRef): ChatRe
 const EMPLOYEE_ENTRY_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   what_i_shipped: { label: 'What I Shipped', icon: () => <Rocket02Icon size={24} /> },
   how_i_work: { label: 'How I Work', icon: () => <ClipboardListIcon size={24} /> },
+  ai_prompt: { label: 'Squawkbox', icon: () => <ChatQuoteIcon size={24} /> },
 };
 function employeeEntryRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(EMPLOYEE_ENTRY_CARD_CONFIGS, (cfg, docType) => ({
