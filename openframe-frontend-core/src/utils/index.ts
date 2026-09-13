@@ -132,6 +132,7 @@ export {
   formatLargeNumber,
   formatAbbreviatedNumber,
   nameInitials,
+  personFirstName,
   personInitials,
   singleInitial,
   formatDurationMMSS,

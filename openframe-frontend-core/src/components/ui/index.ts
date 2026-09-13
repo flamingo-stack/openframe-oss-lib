@@ -115,6 +115,7 @@ export * from './page-actions';
 export * from './service-card';
 export * from './slider';
 export * from './avatar-stack';
+export * from './people-cell';
 export * from './deleted-user-avatar';
 export * from './square-avatar';
 export * from './tab-selector';

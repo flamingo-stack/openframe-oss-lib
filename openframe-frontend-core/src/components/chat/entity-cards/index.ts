@@ -25,6 +25,8 @@ export { WhatIShippedCard, WhatIShippedCardSkeleton } from './what-i-shipped-car
 export type { WhatIShippedCardData, WhatIShippedCardProps } from './what-i-shipped-card';
 export { HowIWorkCard, HowIWorkCardSkeleton } from './how-i-work-card';
 export type { HowIWorkCardData, HowIWorkCardProps } from './how-i-work-card';
+export { AiPromptCard, AiPromptCardSkeleton } from './ai-prompt-card';
+export type { AiPromptCardData, AiPromptCardProps } from './ai-prompt-card';
 
 // Moved-into-subdir flat cards
 export { BlockCard, type BlockCardProps } from './block-card';
@@ -109,6 +111,7 @@ export {
 export {
   renderChatInlineEntityCard,
   ChatCardLoader,
+  chatCardLabel,
   type ChatCardRenderOptions,
   type ChatCardDispatchExtras,
 } from './dispatch';

@@ -43,7 +43,7 @@ const PRIORITIES: BoardTicket['priority'][] = ['low', 'medium', 'high', 'urgent'
 const baseTicket = (i: number, status: string, overrides: Partial<BoardTicket> = {}): BoardTicket => ({
   id: `ticket-${status}-${i}`,
   title: TITLES[i % TITLES.length],
-  ticketNumber: `#${1000 + i}`,
+  ticketNumber: `${1000 + i}`,
   status,
   deviceHostnames: i % 2 === 0 ? ['SRV-MAIL-01'] : ['MBP-15', 'WS-2024'],
   organizationName: i % 3 === 0 ? 'Digital Wave Media' : 'Acme Corp',
