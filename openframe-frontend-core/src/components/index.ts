@@ -21,6 +21,7 @@ export * from './comment-thread';
 export * from './content-loading-container';
 export * from './dynamic-skeleton';
 export * from './empty-state';
+export * from './list-empty-state';
 export * from './faq-accordion';
 // FaqSection sub-folder. Also exposed via the "./components/faq" subpath export
 // in package.json — that subpath is ALSO `"use client"` (tsup banner), so it
