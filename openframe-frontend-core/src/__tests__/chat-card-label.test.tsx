@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { chatCardLabel } from '../components/chat/entity-cards/dispatch';
-import { getSourceLabel, SOURCE_ICON_NAMES, DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID } from '../utils/source-icons';
 import { buildListUrl } from '../utils/list-url';
+import { getSourceLabel, SOURCE_ICON_NAMES, DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID } from '../utils/source-icons';
 
 describe('chatCardLabel', () => {
   it('returns the registered label for a document type', () => {

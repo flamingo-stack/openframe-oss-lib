@@ -52,8 +52,8 @@ import { PresentationBarIcon } from '../../icons-v2-generated/charts/presentatio
 import { PresentationLineIcon } from '../../icons-v2-generated/charts/presentation-line-icon';
 import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
-import { CallIcon } from '../../icons-v2-generated/communication/call-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
+import { CallIcon } from '../../icons-v2-generated/communication/call-icon';
 import { ChatQuoteIcon } from '../../icons-v2-generated/communication/chat-quote-icon';
 import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon';
 import { ClipboardListIcon } from '../../icons-v2-generated/documents/clipboard-list-icon';
