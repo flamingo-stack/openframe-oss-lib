@@ -44,6 +44,16 @@ public class ChatQueries {
             }
             """;
 
+    /** The ticket a dialog is bound to (a CLIENT dialog gets one auto-created at creation). */
+    public static final String DIALOG_TICKET = """
+            query DialogTicket($id: ID!) {
+                dialog(id: $id) {
+                    id
+                    ticketId
+                }
+            }
+            """;
+
     public static final String ARCHIVE_DIALOG = """
             mutation ArchiveDialog($input: DialogIdInput!) {
                 archiveDialog(input: $input) {

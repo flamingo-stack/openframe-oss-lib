@@ -9,6 +9,7 @@ import java.util.Map;
 
 import static com.openframe.test.api.graphql.ChatQueries.ARCHIVE_DIALOG;
 import static com.openframe.test.api.graphql.ChatQueries.DIALOG_STREAM_STATE;
+import static com.openframe.test.api.graphql.ChatQueries.DIALOG_TICKET;
 import static com.openframe.test.config.EnvironmentConfig.CHAT_GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
 import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
@@ -44,6 +45,18 @@ public class DialogApi {
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getString("data.dialog.streamState");
         return state == null ? null : DialogStreamState.valueOf(state);
+    }
+
+    /** The id of the ticket bound to the dialog, or null for a dialog without one. */
+    public static String getDialogTicketId(String dialogId) {
+        Map<String, Object> body = Map.of(
+                "query", DIALOG_TICKET,
+                "variables", Map.of("id", dialogId)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(CHAT_GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getString("data.dialog.ticketId");
     }
 
     /** Archives the dialog (teardown). Best-effort — used in cleanup that must run even on failure. */
