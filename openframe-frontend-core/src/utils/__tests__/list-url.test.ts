@@ -54,6 +54,7 @@ const BASELINE: Record<string, string> = {
   how_i_work: '/api/how-i-work?ids=a,b&limit=2',
   design_doc: '/api/design-docs?ids=a,b',
   openframe_tenant: '/api/openframe-tenants?ids=a,b',
+  prospect_call: '/api/prospect-calls?ids=a,b',
 };
 
 describe('buildListUrl — byte parity with the hub mappers', () => {
