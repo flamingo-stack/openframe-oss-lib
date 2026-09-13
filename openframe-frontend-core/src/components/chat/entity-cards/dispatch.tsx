@@ -1346,6 +1346,14 @@ const GITHUB_CARD_CONFIGS: Record<string, GitHubCardConfig> = {
 interface GlyphCardConfig {
   label: string;
   icon: () => React.ReactNode;
+  /**
+   * Video-bearing ref types: render the media card (cover from the ref's
+   * `metadata.videoPoster`, else the host's OG placeholder; the type label as the
+   * status pill; the glyph only when neither cover exists) instead of the plain
+   * glyph card. The player itself is promoted below the card by
+   * `ChatCardLoader` from the same metadata, exactly as for customer interviews.
+   */
+  media?: boolean;
 }
 /** Product-hub internal objects hydrated by their per-object card routes
  *  (`/api/design-docs`, `/api/openframe-tenants`, `/api/prospect-calls` — ChatRef-shaped items,
@@ -1354,13 +1362,30 @@ interface GlyphCardConfig {
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   design_doc: { label: 'Design doc', icon: () => <FileContentIcon size={24} /> },
   openframe_tenant: { label: 'OpenFrame tenant', icon: () => <BuildingsIcon size={24} /> },
-  prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} /> },
+  prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>
-    refHydratedEntry(docType, cfg.label, (displayRef, opts) => (
-      <GlyphChatCard chatRef={displayRef} icon={cfg.icon()} isNewTab={opts.isNewTab} discuss={opts.discuss} />
-    )),
+    refHydratedEntry(docType, cfg.label, (displayRef, opts) =>
+      cfg.media ? (
+        <EntityMingoCard
+          title={displayRef.title}
+          description={displayRef.preview ?? undefined}
+          cover={entityCover(
+            displayRef.metadata?.videoPoster,
+            opts.extras?.buildOgPlaceholderUrl?.(displayRef.title ?? '') ?? null,
+          )}
+          fallbackIcon={cfg.icon()}
+          status={{ label: cfg.label, variant: 'grey' }}
+          chatRef={displayRef}
+          isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
+          menuAriaLabel={`${cfg.label} actions`}
+        />
+      ) : (
+        <GlyphChatCard chatRef={displayRef} icon={cfg.icon()} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+      ),
+    ),
   );
 }
 
