@@ -36,6 +36,7 @@ import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { positiveInt } from '../../utils/search-params';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
+import { ListEmptyState } from '../list-empty-state';
 import { DevSectionPage } from '../shared/dev-section';
 import { DevCardRowSkeletonList } from '../shared/dev-section/dev-card-row';
 import { Button } from '../ui';
@@ -334,28 +335,24 @@ function HelpCenterListAuthed({
             // response landing.
             <DevCardRowSkeletonList rows={1} />
           ) : !hasResults ? (
-            hasActiveFilters ? (
-              <EmptyState
-                type="search"
-                title="No tickets found"
-                description="No tickets match your current filters. Try clearing them or broadening your search."
-                showCTA
-                ctaText="Reset filters"
-                onCtaClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.delete('search');
-                  params.delete('status');
-                  router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-                }}
-              />
-            ) : (
-              <EmptyState
-                type="generic"
-                title="No tickets yet"
-                description="Open one above to start the conversation with the support team."
-                showCTA={false}
-              />
-            )
+            <ListEmptyState
+              isFiltered={hasActiveFilters}
+              filtered={{
+                title: 'No tickets found',
+                description: 'No tickets match your current filters. Try clearing them or broadening your search.',
+                clearText: 'Reset filters',
+              }}
+              onClearFilters={() => {
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete('search');
+                params.delete('status');
+                router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+              }}
+              empty={{
+                title: 'No tickets yet',
+                description: 'Open one above to start the conversation with the support team.',
+              }}
+            />
           ) : (
             // `overflow-clip` (NOT `overflow-hidden`) — both visually
             // clip the rounded corners, but `hidden` makes the element
