@@ -1,0 +1,43 @@
+extend type Query {
+    # Agent logs of one device, newest first, always scoped to the current tenant.
+    # Paginate with first/after (older entries); re-query without `after` to pick up newer ones.
+    deviceLogs(
+        machineId: String!
+        filter: DeviceLogFilterInput
+        first: Int
+        after: String
+    ): DeviceLogConnection!
+}
+
+enum DeviceLogLevel {
+    DEBUG
+    INFO
+    WARN
+    ERROR
+}
+
+input DeviceLogFilterInput {
+    levels: [DeviceLogLevel!]  # Any of these levels; all levels when omitted
+    search: String             # Case-insensitive substring match on the message, max 256 characters
+    from: Instant              # Inclusive; defaults to 7 days before `to`
+    to: Instant                # Inclusive; defaults to now. The range may not exceed 30 days
+}
+
+type DeviceLogConnection {
+    edges: [DeviceLogEdge!]!
+    pageInfo: PageInfo!
+}
+
+type DeviceLogEdge {
+    node: DeviceLogEntry!
+    cursor: String!
+}
+
+type DeviceLogEntry {
+    timestamp: Instant!        # Ingestion time with nanosecond precision; the sort key
+    agentTimestamp: Instant    # When the agent wrote the line
+    level: String!
+    message: String!
+    hostname: String
+    count: Long                # Identical lines the agent collapsed into this entry
+}
