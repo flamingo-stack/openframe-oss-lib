@@ -12,7 +12,10 @@ const AccordionItem = forwardRef<
   ElementRef<typeof AccordionPrimitive.Item>,
   ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>
 >(({ className, ...props }, ref) => (
-  <AccordionPrimitive.Item ref={ref} className={cn('border-b', className)} {...props} />
+  // The divider carries the ODS border token. A bare `border-b` takes Tailwind's
+  // default border colour (gray-200), which reads as a bright white rule on the
+  // dark theme; that is why most hosts had to pass `border-none` to hide it.
+  <AccordionPrimitive.Item ref={ref} className={cn('border-b border-ods-border', className)} {...props} />
 ));
 AccordionItem.displayName = 'AccordionItem';
 
