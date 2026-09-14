@@ -28,9 +28,15 @@ Repositories, all read-only, all at the SHAs in `coverage.json` `meta.refs`:
 | SAAS_LIB_REPO | openframe-saas-lib | SaaS library modules (image controller, tenant-info schema) |
 | FRONTEND_REPO | openframe-oss-frontend | the dashboard app: Relay documents under `src/app/(app)/<feature>/…`, REST calls through `src/lib/api-client.ts` |
 
-Read them with `git -C $REPO show <sha>:<path>`, `git -C $REPO grep -n <pattern> <sha> -- '<glob>'`,
-`git -C $REPO log <sha> …`. Never read a working tree: the checkouts sit on feature branches with
-uncommitted work.
+Read them through the read-only git shim in `ANALYSER_DIR`, never plain `git`:
+`./git-ro -C $REPO show <sha>:<path>`, `./git-ro -C $REPO grep -n <pattern> <sha> -- '<glob>'`,
+`./git-ro -C $REPO log <sha> …`. Never read a working tree: the checkouts sit on feature branches
+with uncommitted work.
+
+The shim takes the read-only subcommands only, and it is the single command this run may shell out
+to — a plain `git`, any other program, and any pipe, redirection or `&&` chain are refused before
+they run. Use git's own flags where you would reach for a pipe: `-n`/`--max-count` instead of
+`| head`, `--format` instead of `| cut`, `git grep -c` instead of `| wc -l`.
 
 ## Rules (non-negotiable)
 
@@ -39,7 +45,9 @@ uncommitted work.
    `notes` or `needs` of an existing item; never change an existing item's `status`, `priority`, `ops`,
    `id` or `test_class`. Nothing else. This milestone produces a report and a backlog; it does not add
    tests, clients, or DTOs (that is the scaffolding milestone).
-2. **Git:** read-only. Never check out, commit, push, or fetch.
+2. **Git:** read-only, through `./git-ro`. Never check out, commit, push, or fetch. Rules 1 and 2
+   are enforced by `run-guard.py`, not merely asked for: a refused call comes back as a hook error
+   naming what was blocked. If you hit one, the answer is a different read, never a workaround.
 3. **Facts, not assumptions.** Coverage numbers come from `coverage.json`. Operation contracts come
    from the schema or controller file at the pinned SHA — read it and quote the field or mapping line.
    Existing fixtures come from the test library at TEST_REF (`api/`, `data/`, `helpers/`). Say "not
@@ -98,7 +106,7 @@ Rank on consequence, roughly in this order:
    auth-server and OAuth BFF flows, plus `covered-by-disabled-only` and unreached client methods.
 
 Adjust with evidence from git, for the areas of your top candidates only:
-`git -C $REPO log <sha> --since="RECENT_DAYS days ago" --format='%h %ad %s' --date=short -- <schema file or controller file>`.
+`./git-ro -C $REPO log <sha> --since="RECENT_DAYS days ago" --format='%h %ad %s' --date=short -- <schema file or controller file>`.
 Fix commits (`fix|bug|regression|revert` in the subject) on an uncovered area raise its priority;
 cite the commit. An area whose last change is over a year old and that the UI barely uses can drop.
 

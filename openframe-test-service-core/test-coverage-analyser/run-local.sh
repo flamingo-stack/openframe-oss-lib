@@ -121,11 +121,36 @@ PROMPT="$RESULTS_DIR/prompt.resolved.md"
 # (bash 3.2 on macOS: "${arr[@]}" on an empty array trips `set -u`, hence the guarded expansion.)
 UNSET=()
 while IFS= read -r v; do UNSET+=(-u "$v"); done < <(env | cut -d= -f1 | grep -E '^(CLAUDECODE|CLAUDE_CODE_|CLAUDE_PID|CLAUDE_EFFORT)' || true)
+# The report run is not trusted with the machine it runs on: it reads five sibling checkouts
+# that sit on feature branches with uncommitted work, and the material it reads (source,
+# commit messages) is the kind of input a prompt injection arrives in. So it runs under
+# permission rules rather than with them switched off. run-guard.py refuses every Bash call
+# that does not start with ./git-ro, and every write outside results/, coverage-plan.toml and
+# known-gaps.md. A rules-only config cannot express either restriction: Bash rules match on
+# command prefix, so a deny of `git push` misses `git -C <repo> push`, and there is no way to
+# say "writes here, nowhere else".
+SETTINGS="$RESULTS_DIR/claude-settings.json"
+cat > "$SETTINGS" <<JSON
+{
+  "permissions": { "deny": ["WebFetch", "WebSearch"] },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          { "type": "command", "command": "ANALYSER_DIR='$HERE' python3 '$HERE/run-guard.py'" }
+        ]
+      }
+    ]
+  }
+}
+JSON
+
 echo "== claude -p ($CLAUDE_MODEL) started $(date -u +%FT%TZ) =="
 started=$(date +%s)
 set +e
 ( cd "$HERE" && env ${UNSET[@]+"${UNSET[@]}"} claude -p "$(cat "$PROMPT")" --output-format json \
-    --dangerously-skip-permissions --model "$CLAUDE_MODEL" ) > "$RESULTS_DIR/claude-result.json"
+    --settings "$SETTINGS" --model "$CLAUDE_MODEL" ) > "$RESULTS_DIR/claude-result.json"
 rc=$?
 set -e
 echo "== claude exited $rc after $(( $(date +%s) - started ))s =="

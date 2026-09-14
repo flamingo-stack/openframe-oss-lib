@@ -136,6 +136,25 @@ The tests behind those numbers are split across review branches, one per area, e
 `test/coverage-kb-tags-rest`. Reproducing the table takes a `--test-ref` pointing at a tree that has
 all of them; scoring one branch alone reports only that branch's share.
 
+## What the report run is allowed to do
+
+The report step is a headless Claude run over five sibling checkouts that sit on feature branches
+with uncommitted work, reading source and commit messages — the kind of input a prompt injection
+arrives in. It therefore runs under permission rules rather than with them switched off:
+
+- **Shell:** only `./git-ro`, a shim that takes git's read-only subcommands and refuses the flags and
+  environment that let git execute a command of its own. Plain `git`, any other program, and any
+  pipe, redirection or `&&` chain are blocked.
+- **Writes:** only `results/**`, `coverage-plan.toml` and `known-gaps.md`. Anything else, including a
+  path that traverses out of the folder, is blocked.
+- **Network:** web fetch and web search are denied.
+
+`run-guard.py` enforces this as a `PreToolUse` hook, and `run-local.sh` generates the settings that
+install it. A hook is what carries the rules rather than a permission allow-list, because Bash rules
+match a command by prefix — a deny of `git push` misses `git -C <repo> push` — and there is no rule
+that says "writes here, nowhere else". A blocked call returns to the model as an error naming what
+was refused, so the run continues and the refusal is visible in the log.
+
 ## Known gaps and limits
 
 - **UI ref vs deployed UI.** The app is read at `origin/main`; the deployed frontend image
