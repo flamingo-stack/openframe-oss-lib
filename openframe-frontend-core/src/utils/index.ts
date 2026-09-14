@@ -391,3 +391,4 @@ export * from './ods-spacing';
 export * from './csv';
 // Social platform vocabulary, host table, link type, picker.
 export * from './social-platforms';
+export { COLOR_PRESETS, colorPreset, pickPresetColor, type ColorPreset } from './color-presets';
