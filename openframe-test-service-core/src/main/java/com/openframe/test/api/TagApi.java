@@ -29,7 +29,7 @@ public class TagApi {
         variables.put("entityType", entityType);
         variables.put("description", description);
         variables.put("color", color);
-        return query(CREATE_TAG, variables).getObject("data.createTag", TagDefinition.class);
+        return object(CREATE_TAG, "createTag", variables, TagDefinition.class);
     }
 
     /** Partial update: an omitted field keeps its value. */
@@ -45,11 +45,11 @@ public class TagApi {
         if (color != null) {
             variables.put("color", color);
         }
-        return query(UPDATE_TAG, variables).getObject("data.updateTag", TagDefinition.class);
+        return object(UPDATE_TAG, "updateTag", variables, TagDefinition.class);
     }
 
     public static boolean deleteTag(String id) {
-        return Boolean.TRUE.equals(query(DELETE_TAG, Map.of("id", id)).getObject("data.deleteTag", Boolean.class));
+        return flag(DELETE_TAG, "deleteTag", Map.of("id", id));
     }
 
     public static List<TagDefinition> tagKeySuggestions(String search, int limit) {
@@ -58,7 +58,7 @@ public class TagApi {
         if (search != null) {
             variables.put("search", search);
         }
-        return query(TAG_KEY_SUGGESTIONS, variables).getList("data.tagKeySuggestions", TagDefinition.class);
+        return list(TAG_KEY_SUGGESTIONS, "tagKeySuggestions", variables, TagDefinition.class);
     }
 
     public static List<String> tagValueSuggestions(String tagKey, String search, int limit) {
@@ -68,12 +68,12 @@ public class TagApi {
         if (search != null) {
             variables.put("search", search);
         }
-        return query(TAG_VALUE_SUGGESTIONS, variables).getList("data.tagValueSuggestions", String.class);
+        return list(TAG_VALUE_SUGGESTIONS, "tagValueSuggestions", variables, String.class);
     }
 
     /** {@code entityType} is DEVICE, TICKET, KNOWLEDGE_ARTICLE or SCRIPT. */
     public static List<TagDefinition> tagsByEntityType(String entityType) {
-        return query(TAGS_BY_ENTITY_TYPE, Map.of("entityType", entityType)).getList("data.tagsByEntityType", TagDefinition.class);
+        return list(TAGS_BY_ENTITY_TYPE, "tagsByEntityType", Map.of("entityType", entityType), TagDefinition.class);
     }
 
     public static List<TagDefinition> scriptsTags(Boolean archived) {
@@ -81,7 +81,29 @@ public class TagApi {
         if (archived != null) {
             variables.put("archived", archived);
         }
-        return query(SCRIPTS_TAGS, variables).getList("data.scriptsTags", TagDefinition.class);
+        return list(SCRIPTS_TAGS, "scriptsTags", variables, TagDefinition.class);
+    }
+
+    // ---- plumbing ----
+    //
+    // Each of these holds the response in a named local before reading a field out of it, so a
+    // failure says which step produced nothing rather than pointing at one long chain.
+
+    private static <T> T object(String document, String field, Map<String, Object> variables, Class<T> type) {
+        JsonPath response = query(document, variables);
+        return response.getObject("data." + field, type);
+    }
+
+    private static <T> List<T> list(String document, String field, Map<String, Object> variables, Class<T> type) {
+        JsonPath response = query(document, variables);
+        return response.getList("data." + field, type);
+    }
+
+    /** A mutation that answers a bare Boolean; a null answer counts as false. */
+    private static boolean flag(String document, String field, Map<String, Object> variables) {
+        JsonPath response = query(document, variables);
+        Boolean answered = response.getObject("data." + field, Boolean.class);
+        return Boolean.TRUE.equals(answered);
     }
 
     private static JsonPath query(String document, Map<String, Object> variables) {
