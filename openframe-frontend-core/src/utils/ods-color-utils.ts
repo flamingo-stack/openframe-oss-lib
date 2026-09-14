@@ -351,10 +351,27 @@ export function hslToRgb(h: number, s: number, l: number): { r: number; g: numbe
 /**
  * A random, saturated, mid-lightness colour (`#rrggbb`) for data that needs its
  * own identity colour, such as a department's badge. Assigned ONCE when the row
- * is created and stored on it; only the hue is random, so every colour reads on
+ * is created and stored on it. Only the hue is random, so every colour reads on
  * both themes and `getReadableTextColor` picks its label colour.
+ *
+ * `avoid` is the colours already in use (the other departments): of several
+ * random hues, the one farthest from every used hue wins, so a new department
+ * never lands on a near-copy of an existing one while no palette is listed.
  */
-export function randomIdentityColor(random: () => number = Math.random): string {
-  const { r, g, b } = hslToRgb(Math.floor(random() * 360), 65, 55);
+export function randomIdentityColor({
+  avoid = [],
+  random = Math.random,
+}: { avoid?: ReadonlyArray<string | null | undefined>; random?: () => number } = {}): string {
+  const usedHues = avoid
+    .map(hex => (hex ? hexToRgb(hex) : null))
+    .filter((rgb): rgb is { r: number; g: number; b: number } => rgb !== null)
+    .map(({ r, g, b }) => rgbToHsl(r, g, b).h);
+  const hueGap = (hue: number) =>
+    usedHues.length === 0
+      ? 180
+      : Math.min(...usedHues.map(used => Math.min(Math.abs(hue - used), 360 - Math.abs(hue - used))));
+  const candidates = Array.from({ length: 24 }, () => Math.floor(random() * 360));
+  const hue = candidates.reduce((best, next) => (hueGap(next) > hueGap(best) ? next : best), candidates[0]);
+  const { r, g, b } = hslToRgb(hue, 65, 55);
   return rgbToHex(r, g, b);
 }

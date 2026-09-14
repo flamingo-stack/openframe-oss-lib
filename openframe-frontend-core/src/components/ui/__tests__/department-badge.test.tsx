@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { randomIdentityColor } from '../../../utils/ods-color-utils';
+import { hexToRgb, randomIdentityColor } from '../../../utils/ods-color-utils';
 import { DepartmentBadge } from '../department-badge';
 
 describe('DepartmentBadge', () => {
@@ -18,8 +18,16 @@ describe('DepartmentBadge', () => {
 });
 
 describe('randomIdentityColor', () => {
-  it('returns a #rrggbb colour whose only random input is the hue', () => {
-    expect(randomIdentityColor(() => 0)).toMatch(/^#[0-9a-f]{6}$/);
-    expect(randomIdentityColor(() => 0)).not.toBe(randomIdentityColor(() => 0.5));
+  it('returns a #rrggbb colour', () => {
+    expect(randomIdentityColor()).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('keeps away from the hues already in use', () => {
+    // Every existing colour is red-ish; the pick must land far from red.
+    const avoid = ['#d74242', '#d75542', '#d74255'];
+    for (let run = 0; run < 20; run++) {
+      const rgb = hexToRgb(randomIdentityColor({ avoid })) ?? { r: 255, g: 0, b: 0 };
+      expect(rgb.r < rgb.g || rgb.r < rgb.b).toBe(true);
+    }
   });
 });
