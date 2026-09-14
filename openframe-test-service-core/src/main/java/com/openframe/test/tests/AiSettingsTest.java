@@ -121,7 +121,8 @@ public class AiSettingsTest extends BaseTest {
             assertThat(reset.getView().getOrganizationId()).as("After a reset the tenant default (no organization) comes back").isNull();
         }
         assertThat(AiSettingsApi.getClientView(orgId)).as("The override is gone").isNull();
-        assertThat(AiSettingsApi.resetClientView(orgId).getUserErrors()).as("Resetting again is harmless").isEmpty();
+        ClientViewPayload resetAgain = AiSettingsApi.resetClientView(orgId);
+        assertThat(resetAgain.getUserErrors()).as("Resetting again is harmless").isEmpty();
     }
 
     private static void writeBack(String which, Supplier<AgentAiConfig> read, Function<AgentAiConfigInput, AgentAiConfigPayload> update) {
@@ -160,8 +161,9 @@ public class AiSettingsTest extends BaseTest {
     @AfterAll
     public static void cleanup() {
         if (organization != null) {
+            String orgId = organization.getOrganizationId();
             try {
-                AiSettingsApi.resetClientView(organization.getOrganizationId());
+                AiSettingsApi.resetClientView(orgId);
             } catch (RuntimeException ignored) {
                 // best effort
             }
