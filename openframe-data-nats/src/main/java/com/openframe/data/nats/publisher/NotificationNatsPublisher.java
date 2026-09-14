@@ -11,7 +11,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -107,13 +106,7 @@ public class NotificationNatsPublisher {
                 .category(category)
                 .type(notification.getType())
                 .attributes(notification.getAttributes())
-                .context(legacyContextShim(notification))
                 .eventType(eventType)
                 .build();
-    }
-
-    private Map<String, String> legacyContextShim(Notification notification) {
-        String type = notification.getType();
-        return type == null ? null : Map.of("type", type);
     }
 }

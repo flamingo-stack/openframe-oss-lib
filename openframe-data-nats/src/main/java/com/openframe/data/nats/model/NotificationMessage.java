@@ -28,11 +28,6 @@ public class NotificationMessage {
     private NotificationEventType eventType;
     private String type;
     private Map<String, String> attributes;
-    // Wire-only shim, never stored: the deployed web client throws inside its Relay updater on a
-    // CREATED push that carries no `context` key at all (it calls setLinkedRecord(null)), and the
-    // failed updater then poisons every later store commit until reload. Drop once the client stops
-    // reading `context` off the payload.
-    private Map<String, String> context;
 
     private List<String> notificationIds;
 }
