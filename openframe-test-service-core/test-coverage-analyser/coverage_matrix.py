@@ -747,7 +747,7 @@ def test_inventory(root, ref):
     files = {p: java_strip_comments(t) for p, t in files.items() if p.endswith(".java")}
 
     # 1. GraphQL documents: constants in api/graphql/*.java text blocks
-    gql_consts = {}   # CONST -> {kind, fields, class}
+    gql_consts = {}   # "QueriesClass.CONST" -> {class, name, fields}; two classes may reuse a constant name
     for path, text in files.items():
         if not path.startswith("api/graphql/"):
             continue
@@ -762,7 +762,7 @@ def test_inventory(root, ref):
                     if fr:
                         kind = (fr.get("on") or "Query").lower()
                         fields += [f"{kind}:{f}" for f in fr["fields"]]
-            gql_consts[m.group(1)] = {"class": cls, "fields": sorted(set(fields))}
+            gql_consts[f"{cls}.{m.group(1)}"] = {"class": cls, "name": m.group(1), "fields": sorted(set(fields))}
 
     # 2. API client methods -> operations (GraphQL fields and REST method+path)
     client_methods = {}   # "TicketApi.getTickets" -> {"gql": set, "rest": set, "calls": set}
@@ -778,11 +778,14 @@ def test_inventory(root, ref):
     def client_calls(text, self_cls=None):
         """'Client.method' for every call into a class under api/.
 
-        Static calls `Client.method(` resolve exactly. Instance calls `.method(` (fluent chains such as
+        Static calls `Client.method(` and method references `Client::method` resolve exactly. Instance
+        calls `.method(` (fluent chains such as
         `new AuthFlowSAAS(user).discoverTenant().startFlow()`) resolve against the client classes
         referenced in the same text (plus the enclosing class), so a method name is credited to every
         referenced class that defines it."""
         out = {f"{c}.{mth}" for c, mth in re.findall(r"\b([A-Z]\w*)\.(\w+)\(", text) if c in client_classes}
+        # method references (`AiSettingsApi::updateAdminAiConfig`) are calls too
+        out |= {f"{c}.{mth}" for c, mth in re.findall(r"\b([A-Z]\w*)::(\w+)\b", text) if c in client_classes}
         referenced = {c for c in client_classes if re.search(rf"\b{c}\b", text)}
         if self_cls:
             referenced.add(self_cls)
@@ -800,8 +803,9 @@ def test_inventory(root, ref):
         if not cls:
             continue
         consts = resolve_java_constants(text)
-        static_imports = re.findall(r"import\s+static\s+com\.openframe\.test\.api\.graphql\.\w+\.(\w+);", text)
-        star_imports = re.findall(r"import\s+static\s+com\.openframe\.test\.api\.graphql\.(\w+)\.\*;", text)
+        # CONST -> QueriesClass for `import static ...graphql.XQueries.CONST;`, and the classes star-imported
+        static_imports = {n: c for c, n in re.findall(r"import\s+static\s+com\.openframe\.test\.api\.graphql\.(\w+)\.(\w+);", text)}
+        star_imports = set(re.findall(r"import\s+static\s+com\.openframe\.test\.api\.graphql\.(\w+)\.\*;", text))
         external = "getExternalApiSpec" in text or "external" in path
         methods = java_methods(text)
         names = {m["name"] for m in methods}
@@ -809,18 +813,25 @@ def test_inventory(root, ref):
             key = f"{cls}.{m['name']}"
             rec = client_methods.setdefault(key, {"gql": set(), "rest": set(), "calls": set(), "class": cls, "file": path})
             body = m["body"]
-            for c in gql_consts:
-                if re.search(rf"\b\w+Queries\.{c}\b", body) or (c in static_imports and re.search(rf"\b{c}\b", body)):
-                    rec["gql"].update(gql_consts[c]["fields"])
-                elif star_imports and gql_consts[c]["class"] in star_imports and re.search(rf"\b{c}\b", body):
-                    rec["gql"].update(gql_consts[c]["fields"])
+            for key, info in gql_consts.items():
+                qcls, name = info["class"], info["name"]
+                qualified = re.search(rf"\b{qcls}\.{name}\b", body)
+                imported = static_imports.get(name) == qcls or qcls in star_imports
+                if qualified or (imported and re.search(rf"\b{name}\b", body)):
+                    rec["gql"].update(info["fields"])
             body_ext = external or "getExternalApiSpec" in body
+            # method-local path variables (`final String UPDATE = ORGANIZATIONS.concat("/").concat(id);`)
+            local_consts = dict(consts)
+            for lm in re.finditer(r"\bString\s+([A-Za-z_]\w*)\s*=\s*([^;]+);", body):
+                folded = resolve_path_expr(lm.group(2), local_consts)
+                if folded:
+                    local_consts[lm.group(1)] = folded
             for cm in re.finditer(r"\.(get|post|put|patch|delete|head|options)\(\s*([^;]*?)\)\s*(?:[;.)]|$)", body):
                 stmt_start = body.rfind(";", 0, cm.start()) + 1
                 stmt = body[stmt_start:cm.start()]
                 if "given(" not in stmt and "spec" not in stmt.lower() and "Spec" not in stmt:
                     continue
-                p = resolve_path_expr(cm.group(2), consts)
+                p = resolve_path_expr(cm.group(2), local_consts)
                 if not p or "/" not in p:
                     continue
                 if p.startswith("http") or GRAPHQL_TRANSPORT.search(norm_path(p)):
