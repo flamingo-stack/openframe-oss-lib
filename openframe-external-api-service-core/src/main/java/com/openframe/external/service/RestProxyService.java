@@ -66,7 +66,7 @@ public class RestProxyService {
         }
         
         IntegratedTool tool = toolOpt.get();
-        log.info("Found tool: {} (enabled: {})", tool.getName(), tool.isEnabled());
+        log.debug("Found tool: {} (enabled: {})", tool.getName(), tool.isEnabled());
         
         if (!tool.isEnabled()) {
             log.warn("Tool {} is not enabled", tool.getName());
@@ -78,7 +78,7 @@ public class RestProxyService {
             if (request.getQueryString() != null) {
                 originalUri = new URI(originalUri + "?" + request.getQueryString());
             }
-            log.info("Original URI: {}", originalUri);
+            log.debug("Original URI: {}", originalUri);
 
             Optional<ToolUrl> optionalToolUrl = toolUrlService.getUrlByToolType(tool, ToolUrlType.API);
             if (optionalToolUrl.isEmpty()) {
@@ -86,10 +86,10 @@ public class RestProxyService {
                 return ResponseEntity.badRequest().body("Tool URL not found for tool: " + toolId);
             }
             ToolUrl toolUrl = optionalToolUrl.get();
-            log.info("Tool URL: {}", toolUrl.getUrl());
+            log.debug("Tool URL: {}", toolUrl.getUrl());
 
             URI targetUri = proxyUrlResolver.resolve(toolId, toolUrl.getUrl(), toolUrl.getPort(), originalUri, "/tools");
-            log.info("Target URI resolved to: {}", targetUri);
+            log.debug("Target URI resolved to: {}", targetUri);
 
             String method = request.getMethod();
             Map<String, String> headers = buildApiRequestHeaders(tool);
@@ -98,10 +98,10 @@ public class RestProxyService {
             
         } catch (URISyntaxException e) {
             log.error("Invalid URI syntax for tool: {}", toolId, e);
-            return ResponseEntity.badRequest().body("Invalid URI: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Invalid request URI");
         } catch (Exception e) {
             log.error("Error proxying request for tool: {}", toolId, e);
-            return ResponseEntity.internalServerError().body("Internal server error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body("Internal server error");
         }
     }
 
@@ -114,7 +114,7 @@ public class RestProxyService {
 
         CredentialHeader credential = credentialHeader(tool.getCredentials());
         if (credential != null) {
-            headers.put(credential.name(), credential.value());
+            headers.put(credential.getName(), credential.getValue());
         }
         
         return headers;
@@ -139,7 +139,7 @@ public class RestProxyService {
                 httpRequest.setEntity(entity);
             }
             
-            log.info("Executing HTTP request to {}", targetUri);
+            log.debug("Executing HTTP request to {}", targetUri);
 
             return httpClient.execute(httpRequest, response -> {
                 int statusCode = response.getCode();
@@ -154,10 +154,10 @@ public class RestProxyService {
             
         } catch (IOException e) {
             log.error("IOException while proxying request to {} at {}: {}", tool.getName(), targetUri, e.getMessage(), e);
-            return ResponseEntity.internalServerError().body("Proxy error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body("Proxy error");
         } catch (Exception e) {
             log.error("Unexpected error proxying request to {} at {}: {}", tool.getName(), targetUri, e.getMessage(), e);
-            return ResponseEntity.internalServerError().body("Unexpected error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body("Unexpected error");
         }
     }
 
@@ -167,7 +167,7 @@ public class RestProxyService {
             return headers;
         }
         Map<String, String> masked = new HashMap<>();
-        headers.forEach((name, value) -> masked.put(name, name.equalsIgnoreCase(credential.name()) ? MASKED_VALUE : value));
+        headers.forEach((name, value) -> masked.put(name, name.equalsIgnoreCase(credential.getName()) ? MASKED_VALUE : value));
         return masked;
     }
 
@@ -183,7 +183,11 @@ public class RestProxyService {
         };
     }
 
-    private record CredentialHeader(String name, String value) {
+    @lombok.Getter
+    @lombok.AllArgsConstructor
+    private static class CredentialHeader {
+        private final String name;
+        private final String value;
     }
 
     private HttpUriRequestBase createHttpRequest(String method, URI uri) {
