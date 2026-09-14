@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.document.rmm.script.ScriptDeliveryRetry;
 import com.openframe.data.repository.rmm.ScriptDeliveryRetryRepository;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,8 +29,8 @@ public class ScriptDeliveryRetryStore {
         try {
             write(executionId, machineId, 0, channel, objectMapper.writeValueAsString(message));
         } catch (Exception e) {
-            log.warn("Failed to serialize retry-state executionId={} machineId={} channel={}: {}",
-                    executionId, machineId, channel, e.getMessage());
+            log.warn("Failed to serialize retry-state executionId={} machineId={} channel={}",
+                    executionId, machineId, channel, e);
         }
     }
 
@@ -37,8 +39,8 @@ public class ScriptDeliveryRetryStore {
     }
 
     public int incrementRetryCount(String executionId, String machineId, RetryState current) {
-        int next = current.retryCount() + 1;
-        write(executionId, machineId, next, current.channel(), current.messageJson());
+        int next = current.getRetryCount() + 1;
+        write(executionId, machineId, next, current.getChannel(), current.getMessageJson());
         return next;
     }
 
@@ -58,7 +60,7 @@ public class ScriptDeliveryRetryStore {
                     .expiresAt(Instant.now().plusSeconds(ttlSeconds))
                     .build());
         } catch (Exception e) {
-            log.warn("Failed to write retry-state executionId={} machineId={}: {}", executionId, machineId, e.getMessage());
+            log.warn("Failed to write retry-state executionId={} machineId={}", executionId, machineId, e);
         }
     }
 
@@ -71,5 +73,11 @@ public class ScriptDeliveryRetryStore {
         return executionId + ":" + machineId;
     }
 
-    public record RetryState(int retryCount, DeliveryChannel channel, String messageJson) {}
+    @Getter
+    @AllArgsConstructor
+    public static class RetryState {
+        private final int retryCount;
+        private final DeliveryChannel channel;
+        private final String messageJson;
+    }
 }
