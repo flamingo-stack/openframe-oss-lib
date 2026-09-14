@@ -5,6 +5,7 @@ import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../utils/cn';
+import { Button } from './button';
 
 /**
  * FadePreview — the single shared progressive-disclosure primitive for
@@ -154,22 +155,23 @@ export function FadePreview({
       >
         {children}
       </div>
-      <button
+      {/* The shared Button's quiet text-action variant. Fixed mode ALWAYS renders
+          the row so the block keeps its height; it is just not visible or
+          focusable while there is nothing to disclose. */}
+      <Button
         type="button"
+        variant="link"
+        size="compact"
+        noPaddingX
         onClick={() => setExpanded(!expanded)}
-        // Fixed mode ALWAYS renders the row so the block keeps its height; it is
-        // just not visible or focusable while there is nothing to disclose.
+        aria-expanded={expanded}
         aria-hidden={showToggle ? undefined : true}
         tabIndex={showToggle ? undefined : -1}
-        className={cn(
-          'mt-4 flex items-center gap-1.5 text-ods-text-secondary transition-colors duration-200 text-h6 hover:text-ods-accent',
-          !showToggle && 'invisible',
-          toggleClassName,
-        )}
+        rightIcon={<ChevronDown className={cn('transition-transform duration-300', expanded && 'rotate-180')} />}
+        className={cn('mt-[var(--spacing-system-mf)]', !showToggle && 'invisible', toggleClassName)}
       >
-        <span>{expanded ? lessLabel : moreLabel}</span>
-        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
-      </button>
+        {expanded ? lessLabel : moreLabel}
+      </Button>
     </div>
   );
 }
