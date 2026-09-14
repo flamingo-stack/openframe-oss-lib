@@ -184,6 +184,202 @@ public class TicketQueries {
             }
             """;
 
+    /** One transition plus one assignment; a transition the rules matrix forbids comes back as an error. */
+    public static final String TAKE_OVER_TICKET = """
+            mutation TakeOverTicket($input: TakeOverTicketInput!) {
+                takeOverTicket(input: $input) {
+                    ticket { id status statusDefinition { id name kind } assignedTo assignedName resolvedAt }
+                    userErrors { field message }
+                }
+            }
+            """;
+
+    /**
+     * Client-initiated reopen of a closed ticket (AGENT callers only). The destination is chosen by
+     * the server: a ticket the client closed returns to AI Handling, one a technician closed goes to
+     * Tech Required; {@code handoffToTechnician} forces the latter. Idempotent on an open ticket.
+     */
+    public static final String REQUEST_TICKET_REOPEN = """
+            mutation RequestTicketReopen($input: TicketReopenInput!) {
+                requestTicketReopen(input: $input) {
+                    ticketId
+                    targetStatusKind
+                    userErrors { field message }
+                }
+            }
+            """;
+
+    private static final String TICKET_EDIT_FIELDS = """
+                    ticket {
+                        id
+                        title
+                        description
+                        assignedTo
+                        deviceId
+                        organizationId
+                        statusDefinition { id name kind }
+                        tags { id key }
+                        attachments { id fileName contentType fileSize }
+                    }
+                    userErrors { field message }
+            """;
+
+    /** A ticket's editable state plus its notes and attachments, for the CP-11/12 cases. */
+    public static final String GET_TICKET_DETAILS = """
+            query GetTicketDetails($id: ID!) {
+                ticket(id: $id) {
+                    id
+                    title
+                    description
+                    assignedTo
+                    deviceId
+                    organizationId
+                    statusDefinition { id name kind }
+                    tags { id key }
+                    notes { id ticketId content authorId createdAt updatedAt }
+                    attachments { id ticketId fileName contentType fileSize uploadedAt }
+                }
+            }
+            """;
+
+    public static final String UPDATE_TICKET = """
+            mutation UpdateTicket($input: UpdateTicketInput!) {
+                updateTicket(input: $input) {
+            """ + TICKET_EDIT_FIELDS + """
+                }
+            }
+            """;
+
+    public static final String ASSIGN_TICKET = """
+            mutation AssignTicket($input: AssignTicketInput!) {
+                assignTicket(input: $input) {
+            """ + TICKET_EDIT_FIELDS + """
+                }
+            }
+            """;
+
+    public static final String UNASSIGN_TICKET = """
+            mutation UnassignTicket($input: TicketIdInput!) {
+                unassignTicket(input: $input) {
+            """ + TICKET_EDIT_FIELDS + """
+                }
+            }
+            """;
+
+    public static final String UNLINK_DEVICE_FROM_TICKET = """
+            mutation UnlinkDeviceFromTicket($input: TicketIdInput!) {
+                unlinkDeviceFromTicket(input: $input) {
+            """ + TICKET_EDIT_FIELDS + """
+                }
+            }
+            """;
+
+    public static final String UNLINK_ORGANIZATION_FROM_TICKET = """
+            mutation UnlinkOrganizationFromTicket($input: TicketIdInput!) {
+                unlinkOrganizationFromTicket(input: $input) {
+            """ + TICKET_EDIT_FIELDS + """
+                }
+            }
+            """;
+
+    private static final String NOTE_PAYLOAD = """
+                    note { id ticketId content authorId createdAt updatedAt }
+                    userErrors { field message }
+            """;
+
+    public static final String ADD_TICKET_NOTE = """
+            mutation AddTicketNote($input: AddTicketNoteInput!) {
+                addTicketNote(input: $input) {
+            """ + NOTE_PAYLOAD + """
+                }
+            }
+            """;
+
+    public static final String UPDATE_TICKET_NOTE = """
+            mutation UpdateTicketNote($input: UpdateTicketNoteInput!) {
+                updateTicketNote(input: $input) {
+            """ + NOTE_PAYLOAD + """
+                }
+            }
+            """;
+
+    private static final String DELETE_PAYLOAD = """
+                    deletedId
+                    userErrors { field message }
+            """;
+
+    public static final String DELETE_TICKET_NOTE = """
+            mutation DeleteTicketNote($input: DeleteByIdInput!) {
+                deleteTicketNote(input: $input) {
+            """ + DELETE_PAYLOAD + """
+                }
+            }
+            """;
+
+    public static final String CREATE_TEMP_ATTACHMENT_UPLOAD_URL = """
+            mutation CreateTempAttachmentUploadUrl($input: CreateTempAttachmentInput!) {
+                createTempAttachmentUploadUrl(input: $input) {
+                    tempAttachment { id fileName contentType fileSize uploadUrl createdAt }
+                    userErrors { field message }
+                }
+            }
+            """;
+
+    public static final String DELETE_TEMP_ATTACHMENT = """
+            mutation DeleteTempAttachment($input: DeleteByIdInput!) {
+                deleteTempAttachment(input: $input) {
+            """ + DELETE_PAYLOAD + """
+                }
+            }
+            """;
+
+    public static final String DELETE_TICKET_ATTACHMENT = """
+            mutation DeleteTicketAttachment($input: DeleteByIdInput!) {
+                deleteTicketAttachment(input: $input) {
+            """ + DELETE_PAYLOAD + """
+                }
+            }
+            """;
+
+    public static final String TICKET_ATTACHMENT_DOWNLOAD_URL = """
+            query TicketAttachmentDownloadUrl($attachmentId: ID!) {
+                ticketAttachmentDownloadUrl(attachmentId: $attachmentId)
+            }
+            """;
+
+    public static final String UPDATE_TICKET_STATUS = """
+            mutation UpdateTicketStatus($input: UpdateTicketStatusInput!) {
+                updateTicketStatus(input: $input) { id name color position kind isSystem systemKey }
+            }
+            """;
+
+    public static final String REORDER_TICKET_STATUS = """
+            mutation ReorderTicketStatus($input: ReorderTicketStatusInput!) {
+                reorderTicketStatus(input: $input) { id name color position kind isSystem systemKey }
+            }
+            """;
+
+    /** The lifecycle transition matrix over every status definition. */
+    public static final String TICKET_STATUS_TRANSITION_RULES = """
+            query TicketStatusTransitionRules {
+                ticketStatusTransitionRules {
+                    from { id name color position kind isSystem systemKey }
+                    to { id name color position kind isSystem systemKey }
+                }
+            }
+            """;
+
+    public static final String TICKET_STATISTICS = """
+            query TicketStatistics {
+                ticketStatistics {
+                    totalCount
+                    statusDefinitionCounts { status { id name color position kind isSystem systemKey } count }
+                    averageResolutionTimeFormatted
+                    averageRating
+                }
+            }
+            """;
+
     public static final String CREATE_TICKET = """
             mutation CreateTicket($input: CreateTicketInput!) {
                 createTicket(input: $input) {
