@@ -30,6 +30,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link #testUpdateDeviceStatus()}.
  */
 @Tag("external-api")
+// No @Tag("device") on the cases below. It reads like the topical tags beside it (read, update,
+// destructive), but the pipeline uses "device" to select a phase, so every case carrying it ran
+// twice per run -- once in the device phase, once here. E2EPipelineService still documents that
+// phase's only non-UI content as CreatePolicyTest, which is true again without these.
 @EnabledIf(ExternalApiBaseTest.EXTERNAL_API_KEY_CONDITION)
 @DisplayName("ExtApi: External API - Devices")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -43,7 +47,6 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
 
     @Tag("feature")
     @Tag("read")
-    @Tag("device")
     @Order(1)
     @Test
     @DisplayName("ExtApi: List devices")
@@ -63,7 +66,6 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
 
     @Tag("feature")
     @Tag("read")
-    @Tag("device")
     @Order(2)
     @Test
     @DisplayName("ExtApi: List devices with tags included")
@@ -79,7 +81,6 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
 
     @Tag("feature")
     @Tag("read")
-    @Tag("device")
     @Order(3)
     @Test
     @DisplayName("ExtApi: Get device filter options")
@@ -99,7 +100,6 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
 
     @Tag("feature")
     @Tag("read")
-    @Tag("device")
     @Order(4)
     @Test
     @DisplayName("ExtApi: Get device by machine ID")
@@ -130,7 +130,6 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
 
     @Tag("feature")
     @Tag("read")
-    @Tag("device")
     @Order(5)
     @Test
     @DisplayName("ExtApi: Get device returns 404 for an unknown machine ID")
@@ -141,7 +140,6 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
 
     @Tag("feature")
     @Tag("read")
-    @Tag("device")
     @Order(6)
     @Test
     @DisplayName("ExtApi: Filter devices by an advertised status")
@@ -184,7 +182,6 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
 
     @Tag("feature")
     @Tag("update")
-    @Tag("device")
     @Order(7)
     @Test
     @DisplayName("ExtApi: Update and restore device nickname")
@@ -218,7 +215,6 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
      * expendable device.
      */
     @Tag("destructive")
-    @Tag("device")
     @Order(8)
     @Test
     @DisplayName("ExtApi: Update device status (destructive; opt-in)")
