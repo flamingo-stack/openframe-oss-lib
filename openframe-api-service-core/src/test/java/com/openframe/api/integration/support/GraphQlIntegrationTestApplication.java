@@ -4,6 +4,7 @@ import com.openframe.api.config.DateScalarConfig;
 import com.openframe.api.config.InstantScalarConfig;
 import com.openframe.api.config.LongScalarConfig;
 import com.openframe.api.datafetcher.NotificationDataFetcher;
+import com.openframe.api.datafetcher.notification.NotificationContextGraphQlTypeResolver;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
 import com.openframe.notification.service.NotificationBroadcaster;
@@ -54,6 +55,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
         NotificationService.class,
         GraphQLNotificationMapper.class,
         NotificationDataFetcher.class,
+        NotificationContextGraphQlTypeResolver.class,
         InstantScalarConfig.class,
         DateScalarConfig.class,
         LongScalarConfig.class

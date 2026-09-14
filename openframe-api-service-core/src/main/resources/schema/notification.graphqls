@@ -34,10 +34,25 @@ type Notification implements Node {
     createdAt: Instant!
     read: Boolean!
     category: NotificationCategory!
+    """
+    Always null: the legacy typed context is no longer written or stored. The field, the
+    interface and its implementations stay in the schema only because deployed clients still
+    select them — removing them fails validation of every notifications query those clients send.
+    """
+    context: NotificationContext
     "Spec-driven notification type."
     type: String
     "Flat string map of the notification's facts, snapshotted at emission."
     attributes: JSON
+}
+
+interface NotificationContext {
+    type: String!
+}
+
+type GenericContext implements NotificationContext {
+    type: String!
+    payload: String
 }
 
 enum NotificationCategory {
