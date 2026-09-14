@@ -7,6 +7,8 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareFilters;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.SortDirection;
@@ -20,7 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 
 @DgsComponent
-@ConditionalOnProperty(name = "openframe.software-management.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class SoftwareDataFetcher {
@@ -56,12 +58,15 @@ public class SoftwareDataFetcher {
     }
 
     @DgsQuery
-    public Object softwareDevices(@InputArgument String softwareId, @InputArgument Object filter,
-                                  @InputArgument Integer first, @InputArgument String after,
-                                  @InputArgument Integer last, @InputArgument String before,
-                                  @InputArgument String search, @InputArgument Object sort) {
-        log.debug("[software-mgmt stub] softwareDevices query softwareId={}", softwareId);
-        return null;
+    public CountedGenericConnection<GenericEdge<SoftwareOnDeviceResponse>> softwareDevices(
+            @InputArgument String softwareId, @InputArgument Object filter,
+            @InputArgument Integer first, @InputArgument String after,
+            @InputArgument Integer last, @InputArgument String before,
+            @InputArgument String search, @InputArgument Object sort) {
+        int page = PageCursors.decodePage(after != null ? after : before);
+        Integer perPage = first != null ? first : last;
+        return PageCursors.toConnection(
+                softwareInventoryService.listDevicesForSoftware(softwareId, search, page, perPage));
     }
 
     @DgsQuery
@@ -79,8 +84,7 @@ public class SoftwareDataFetcher {
     }
 
     @DgsQuery
-    public Object softwareFilters(@InputArgument Object filter, @InputArgument String search) {
-        log.debug("[software-mgmt stub] softwareFilters query");
-        return null;
+    public SoftwareFilters softwareFilters(@InputArgument Object filter, @InputArgument String search) {
+        return softwareInventoryService.getSoftwareFilters(search);
     }
 }

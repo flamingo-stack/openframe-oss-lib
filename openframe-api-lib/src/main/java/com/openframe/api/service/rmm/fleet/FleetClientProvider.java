@@ -21,7 +21,7 @@ import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.StringUtils.hasText;
 
 @Component
-@ConditionalOnProperty(name = "openframe.software-management.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class FleetClientProvider {
 

@@ -239,6 +239,18 @@ public class FleetMdmClient {
             params.add("order_direction=" + URLEncoder.encode(searchRequest.getOrderDirection(), StandardCharsets.UTF_8));
         }
 
+        if (searchRequest.getSoftwareTitleId() != null) {
+            params.add("software_title_id=" + searchRequest.getSoftwareTitleId());
+        }
+
+        if (searchRequest.getSoftwareVersionId() != null) {
+            params.add("software_version_id=" + searchRequest.getSoftwareVersionId());
+        }
+
+        if (searchRequest.getCve() != null && !searchRequest.getCve().trim().isEmpty()) {
+            params.add("vulnerability=" + URLEncoder.encode(searchRequest.getCve(), StandardCharsets.UTF_8));
+        }
+
         if (!params.isEmpty()) {
             urlBuilder.append("?").append(String.join("&", params));
         }

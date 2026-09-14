@@ -1,8 +1,8 @@
 # Software inventory (read side, thin proxy over Fleet MDM REST).
 #
 # The wire contract is stable so the frontend can start binding against it;
-# resolvers currently return null / empty because the feature is stubbed under
-# a Conditional-property. Enable via openframe.software-management.enabled=true.
+# resolvers are gated behind a Conditional-property and only wire up when the
+# Software feature is enabled via openframe.rmm.software.enabled=true.
 
 extend type Query {
     """Single software row by id (Relay global id). Null when unknown."""
@@ -65,6 +65,19 @@ extend type Query {
         search: String,
         sort: SortInput
     ): VulnerabilityConnection!
+
+    """Devices affected by a given CVE — the hosts that have an affected software version, correlated
+    to their OpenFrame Machine. Powers the vulnerability-detail "Devices" table. Each node is a Machine
+    (same shape as the top-level `devices` query)."""
+    vulnerabilityDevices(
+        cveId: String!,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): DeviceConnection!
 }
 
 # ────────── Software (aggregate row) ──────────
