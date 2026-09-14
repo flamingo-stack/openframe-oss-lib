@@ -1,6 +1,7 @@
 package com.openframe.test.tests;
 
 import com.openframe.test.api.DeviceApi;
+import com.openframe.test.context.PipelineContext;
 import com.openframe.test.data.dto.device.DeviceFilters;
 import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.ForceClientUninstallItem;
@@ -221,7 +222,18 @@ public class DevicesTest extends BaseTest {
         assertThat(devices)
                 .as("Expected at least one enrolled device to delete%s", orgSuffix())
                 .isNotEmpty();
-        String machineId = devices.getLast().getMachineId();
+        Machine picked = devices.getLast();
+        // The uninstall endpoint takes bare machine ids and has no organization parameter, so the only
+        // thing keeping this off someone else's box in a shared tenant is the read filter above. Check
+        // the pick against the pipeline's org before the destructive call so a filter regression fails
+        // here instead of uninstalling an unrelated agent.
+        if (PipelineContext.hasOrgId()) {
+            assertThat(picked.getOrganizationId())
+                    .as("Refusing to uninstall %s: it is not in the pipeline's org %s",
+                            picked.getMachineId(), PipelineContext.getOrgId())
+                    .isEqualTo(PipelineContext.getOrgId());
+        }
+        String machineId = picked.getMachineId();
 
         List<ForceClientUninstallItem> items = DeviceApi.forceClientUninstall(List.of(machineId));
         assertThat(items)
