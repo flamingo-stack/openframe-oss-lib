@@ -125,4 +125,14 @@ public class ScriptQueries {
                 }
             }
             """;
+
+    /** Restores an ARCHIVED script to ACTIVE; idempotent on scripts that are not archived. */
+    public static final String UNARCHIVE_SCRIPT = """
+            mutation UnarchiveScript($id: ID!) {
+                unarchiveScript(id: $id) {
+                    id
+                    status
+                }
+            }
+            """;
 }

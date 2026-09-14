@@ -10,6 +10,7 @@ import static com.openframe.test.api.graphql.ScriptQueries.CREATE_SCRIPT;
 import static com.openframe.test.api.graphql.ScriptQueries.DELETE_SCRIPT;
 import static com.openframe.test.api.graphql.ScriptQueries.GET_SCRIPT;
 import static com.openframe.test.api.graphql.ScriptQueries.SCRIPTS_TABLE_RELAY_QUERY;
+import static com.openframe.test.api.graphql.ScriptQueries.UNARCHIVE_SCRIPT;
 import static com.openframe.test.api.graphql.ScriptQueries.UPDATE_SCRIPT;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
@@ -85,5 +86,16 @@ public class ScriptApi {
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getObject("data.archiveScript", Script.class);
+    }
+
+    public static Script unarchiveScript(String id) {
+        Map<String, Object> body = Map.of(
+                "query", UNARCHIVE_SCRIPT,
+                "variables", Map.of("id", id)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.unarchiveScript", Script.class);
     }
 }

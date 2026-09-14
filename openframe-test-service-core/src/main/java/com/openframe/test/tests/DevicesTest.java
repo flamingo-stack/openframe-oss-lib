@@ -1,5 +1,6 @@
 package com.openframe.test.tests;
 
+import com.openframe.test.helpers.ai.RunId;
 import com.openframe.test.api.DeviceApi;
 import com.openframe.test.context.PipelineContext;
 import com.openframe.test.data.dto.device.DeviceFilters;
@@ -260,4 +261,29 @@ public class DevicesTest extends BaseTest {
         assertThat(ids).as("Deleted device should not be in listed devices").doesNotContain(machineId);
     }
 
+
+    @Tag("feature")
+    @Tag("saas")
+    @Test
+    @DisplayName("Update and restore a device nickname")
+    public void testUpdateAndRestoreNickname() {
+        Machine device = DeviceApi.getAnyDevice(pipelineScoped(onlineDevicesFilter()), pipelineScoped(offlineDevicesFilter()));
+        assertThat(device).as("No devices" + orgSuffix()).isNotNull();
+        String machineId = device.getMachineId();
+        String original = DeviceApi.getDevice(machineId).getNickname();
+        String nickname = "E2E-" + RunId.next() + " nick";
+        try {
+            Machine renamed = DeviceApi.updateDeviceNickname(machineId, nickname);
+            assertThat(renamed.getMachineId()).as("The mutation returns the same device").isEqualTo(machineId);
+            assertThat(renamed.getNickname()).as("The nickname is set").isEqualTo(nickname);
+            assertThat(DeviceApi.getDevice(machineId).getNickname()).as("The nickname is persisted").isEqualTo(nickname);
+
+            Machine cleared = DeviceApi.updateDeviceNickname(machineId, null);
+            assertThat(cleared.getNickname()).as("A null nickname clears it").isNull();
+            assertThat(DeviceApi.getDevice(machineId).getNickname()).as("The cleared nickname is persisted").isNull();
+        } finally {
+            DeviceApi.updateDeviceNickname(machineId, original);
+        }
+        assertThat(DeviceApi.getDevice(machineId).getNickname()).as("The original nickname is restored").isEqualTo(original);
+    }
 }
