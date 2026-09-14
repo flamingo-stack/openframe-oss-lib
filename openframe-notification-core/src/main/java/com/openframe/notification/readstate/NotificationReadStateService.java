@@ -112,7 +112,24 @@ public class NotificationReadStateService {
         List<NotificationReadState> unreadRows = repository.findByNotificationId(notificationId).stream()
                 .filter(row -> row.getStatus() == ReadStatus.UNREAD)
                 .toList();
-        long flipped = repository.markAllRecipientsRead(notificationId);
+        if (unreadRows.isEmpty()) {
+            return 0L;
+        }
+        // Flip the snapshot, not "everything unread": constrain the update to the exact rows we
+        // are about to notify, so a row that becomes unread concurrently is left untouched instead
+        // of being silently flipped to read without a corresponding published event.
+        Map<RecipientType, List<String>> recipientIdsByType = new EnumMap<>(RecipientType.class);
+        for (NotificationReadState row : unreadRows) {
+            recipientIdsByType
+                    .computeIfAbsent(row.getRecipientType(), key -> new ArrayList<>())
+                    .add(row.getRecipientId());
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        long flipped = 0L;
+        for (Map.Entry<RecipientType, List<String>> entry : recipientIdsByType.entrySet()) {
+            flipped += repository.markAsReadByRecipientIds(
+                    tenantId, entry.getValue(), entry.getKey(), notificationId);
+        }
         for (NotificationReadState row : unreadRows) {
             publish(row.getRecipientId(), row.getRecipientType(),
                     List.of(notificationId), NotificationReadEvent.Transition.READ);
@@ -147,8 +164,8 @@ public class NotificationReadStateService {
         List<CategoryCount> rows = repository.unreadCountsByCategory(recipientId, recipientType, tenantIdProvider.getTenantId());
         Map<NotificationCategory, Long> counts = new EnumMap<>(NotificationCategory.class);
         for (CategoryCount row : rows) {
-            if (row.category() != null) {
-                counts.put(row.category(), row.count());
+            if (row.getCategory() != null) {
+                counts.put(row.getCategory(), row.getCount());
             }
         }
         return counts;
@@ -178,9 +195,9 @@ public class NotificationReadStateService {
     private Map<String, Long> countsById(List<EntityCount> rows) {
         Map<String, Long> counts = new HashMap<>(rows.size());
         for (EntityCount row : rows) {
-            String entityId = row.entityId();
+            String entityId = row.getEntityId();
             if (entityId != null) {
-                counts.put(entityId, row.count());
+                counts.put(entityId, row.getCount());
             }
         }
         return counts;
