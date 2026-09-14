@@ -527,7 +527,7 @@ function decodeEmployeeEntryRow(row: unknown): WhatIShippedCardData & HowIWorkCa
     session_date: strOrNull(record, 'session_date'),
     discipline: strOrNull(record, 'discipline'),
     published_at: strOrNull(record, 'published_at'),
-    department: record.department ? { name: strOrNull(department, 'name') } : null,
+    department: record.department ? { name: strOrNull(department, 'name'), slug: strOrNull(department, 'slug') } : null,
     step_count: typeof stepCount === 'number' ? stepCount : null,
   };
 }

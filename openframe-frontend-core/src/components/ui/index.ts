@@ -67,6 +67,7 @@ export * from './release-changelog-section';
 export * from './stacked-rows-panel';
 export * from './slack-channel-chip';
 export * from './status-badge';
+export * from './department-badge';
 export * from './status-indicator';
 export * from './toaster';
 // TODO: Add other UI components as they are moved to ui-kit

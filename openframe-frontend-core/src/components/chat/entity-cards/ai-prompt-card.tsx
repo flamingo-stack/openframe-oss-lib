@@ -1,5 +1,6 @@
 import type React from 'react';
 import { formatDateUTC } from '../../../utils/format';
+import { DepartmentBadge } from '../../ui/department-badge';
 import {
   EmployeeEntryBadge,
   EmployeeEntryCard,
@@ -11,8 +12,8 @@ import {
  *  related-content hydrated row satisfy it structurally. */
 export interface AiPromptCardData extends EmployeeEntryCardData {
   published_at?: string | null;
-  /** The department the prompt is for, surfaced as a badge (the library's filter axis). */
-  department?: { name?: string | null } | null;
+  /** The department the prompt is for, surfaced as THE department badge (the library's filter axis). */
+  department?: { name?: string | null; slug?: string | null } | null;
   /** How many steps the prompt has. A chain (more than one) is badged. */
   step_count?: number | null;
 }
@@ -37,7 +38,7 @@ export interface AiPromptCardProps {
  * related-content rail (with `anchorProps`), so the card cannot drift between them.
  */
 export function AiPromptCard({ entry, placeholderUrl, actions, anchorProps, className }: AiPromptCardProps) {
-  const department = entry.department?.name?.trim();
+  const departmentName = entry.department?.name?.trim();
   const steps = typeof entry.step_count === 'number' ? entry.step_count : 0;
   return (
     <EmployeeEntryCard
@@ -45,7 +46,9 @@ export function AiPromptCard({ entry, placeholderUrl, actions, anchorProps, clas
       dateLabel={entry.published_at ? formatDateUTC(entry.published_at, { fallback: '' }) || null : null}
       extraBadges={
         <>
-          {department ? <EmployeeEntryBadge>{department}</EmployeeEntryBadge> : null}
+          {departmentName ? (
+            <DepartmentBadge department={{ name: departmentName, slug: entry.department?.slug ?? null }} />
+          ) : null}
           {steps > 1 ? <EmployeeEntryBadge>{`${steps} steps`}</EmployeeEntryBadge> : null}
         </>
       }
