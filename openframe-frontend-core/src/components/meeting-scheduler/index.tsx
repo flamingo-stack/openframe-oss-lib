@@ -676,6 +676,8 @@ export function HubSpotMeetingScheduler({
    */
   // details-first's form stage grows with the link's questions (see
   // MEETING_SCHEDULER_DETAILS_FIRST_H); every other stage keeps the stated box.
+  // `formOnly` is exactly that stage (`detailsFirst && step === 'details'`), so
+  // slot-first, the calendar, the confirmation and the skeleton of either stay boxed.
   const boxed = !formOnly;
   const cardClass = cn(
     CARD_CLASS,
