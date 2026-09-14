@@ -391,4 +391,5 @@ export * from './ods-spacing';
 export * from './csv';
 // Social platform vocabulary, host table, link type, picker.
 export * from './social-platforms';
-export { COLOR_PRESETS, colorPreset, pickPresetColor, type ColorPreset } from './color-presets';
+// The ODS badge palette a row whose colour is data picks from (departments).
+export { BADGE_PALETTE, isBadgePaletteKey, pickBadgePaletteColor, type BadgePaletteKey } from './badge-palette';

@@ -1,47 +1,49 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { COLOR_PRESETS, pickPresetColor } from '../../../utils/color-presets';
+import { BADGE_PALETTE, pickBadgePaletteColor } from '../../../utils/badge-palette';
 import { DepartmentBadge } from '../department-badge';
 import { PaletteBadge } from '../palette-badge';
+import { statusBadgeVariants } from '../status-badge';
 
 describe('PaletteBadge', () => {
-  it('fills the badge with the palette colour a key names', () => {
-    render(<PaletteBadge text="Teal" color="teal" />);
-    expect(screen.getByText('Teal')).toHaveStyle({ backgroundColor: 'rgb(77, 182, 172)' });
+  it('renders a palette key as its ODS colour scheme, with no inline colour', () => {
+    render(<PaletteBadge text="Teal" color="cyanSoft" />);
+    const badge = screen.getByText('Teal');
+    expect(badge).toHaveClass('bg-ods-flamingo-cyan-secondary', 'text-ods-flamingo-cyan');
+    expect(badge).not.toHaveAttribute('style');
   });
 
-  it('renders the unfilled default badge for an unknown or missing colour', () => {
-    const { rerender } = render(<PaletteBadge text="Other" color="not-a-colour" />);
-    expect(screen.getByText('Other')).not.toHaveAttribute('style');
+  it('renders the unfilled default badge for anything outside the palette, a hex included', () => {
+    const { rerender } = render(<PaletteBadge text="Other" color="#ff0000" />);
+    expect(screen.getByText('Other')).toHaveClass('bg-ods-bg-surface');
     rerender(<PaletteBadge text="Other" color={null} />);
+    expect(screen.getByText('Other')).toHaveClass('bg-ods-bg-surface');
     expect(screen.getByText('Other')).not.toHaveAttribute('style');
   });
 
-  it('fills the neutral preset like any other key', () => {
-    render(<PaletteBadge text="Grey" color="neutral" />);
-    expect(screen.getByText('Grey')).toHaveStyle({ backgroundColor: 'rgb(176, 176, 176)' });
+  it('gives every palette key a distinct ODS colour scheme', () => {
+    const classes = BADGE_PALETTE.map(key => statusBadgeVariants({ colorScheme: key, variant: 'button' }));
+    expect(new Set(classes).size).toBe(BADGE_PALETTE.length);
+    for (const c of classes) expect(c).not.toMatch(/#[0-9a-f]{3,6}/i);
   });
 });
 
 describe('DepartmentBadge', () => {
   it("uses the department's stored palette colour, and the empty label without a department", () => {
-    const { rerender } = render(<DepartmentBadge department={{ name: 'Marketing', color: 'sky' }} />);
-    expect(screen.getByText('Marketing')).toHaveStyle({ backgroundColor: 'rgb(79, 195, 247)' });
+    const { rerender } = render(<DepartmentBadge department={{ name: 'Marketing', color: 'pink' }} />);
+    expect(screen.getByText('Marketing')).toHaveClass('bg-ods-flamingo-pink');
     rerender(<DepartmentBadge department={null} emptyLabel="Unassigned" />);
-    expect(screen.getByText('Unassigned')).not.toHaveStyle({ backgroundColor: 'rgb(79, 195, 247)' });
+    expect(screen.getByText('Unassigned')).toHaveClass('bg-ods-bg-surface');
   });
 });
 
-describe('pickPresetColor', () => {
-  it('picks a palette key that is not taken, and never neutral', () => {
-    const keys = COLOR_PRESETS.map(preset => preset.key);
-    const taken = keys.filter(key => key !== 'teal' && key !== 'neutral');
-    for (let run = 0; run < 10; run++) expect(pickPresetColor({ avoid: taken })).toBe('teal');
+describe('pickBadgePaletteColor', () => {
+  it('picks a palette key that is not taken', () => {
+    const [free, ...taken] = BADGE_PALETTE;
+    expect(pickBadgePaletteColor({ avoid: taken, random: () => 0.99 })).toBe(free);
   });
 
   it('repeats a colour only once every colour is taken', () => {
-    const everything = COLOR_PRESETS.map(preset => preset.key);
-    expect(everything).toContain(pickPresetColor({ avoid: everything }));
-    expect(pickPresetColor({ avoid: everything })).not.toBe('neutral');
+    expect(BADGE_PALETTE).toContain(pickBadgePaletteColor({ avoid: [...BADGE_PALETTE], random: () => 0.5 }));
   });
 });
