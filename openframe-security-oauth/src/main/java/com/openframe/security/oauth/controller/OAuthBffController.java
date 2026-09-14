@@ -195,7 +195,7 @@ public class OAuthBffController {
                 .onErrorResume(AppleNativeRegistrationRequiredException.class, e ->
                         Mono.just(ResponseEntity.status(409).body(Map.of("error", "registration_required"))))
                 .onErrorResume(e -> {
-                    log.warn("Apple native exchange failed: {}", e.getMessage());
+                    log.warn("Apple native exchange failed: {}", e.getMessage(), e);
                     return Mono.just(ResponseEntity.status(401).build());
                 });
     }
@@ -228,18 +228,21 @@ public class OAuthBffController {
                 .onErrorResume(IllegalArgumentException.class, e ->
                         Mono.just(ResponseEntity.badRequest().body(Map.of("error", e.getMessage()))))
                 .onErrorResume(e -> {
-                    log.warn("Apple native registration failed: {}", e.getMessage());
+                    log.warn("Apple native registration failed: {}", e.getMessage(), e);
                     return Mono.just(ResponseEntity.status(401).build());
                 });
     }
 
-    public record AppleNativeRegisterRequest(String identityToken,
-                                             String authorizationCode,
-                                             String nonce,
-                                             String firstName,
-                                             String lastName,
-                                             String tenantName,
-                                             String tenantDomain) {
+    @lombok.Getter
+    @lombok.AllArgsConstructor
+    public static class AppleNativeRegisterRequest {
+        private final String identityToken;
+        private final String authorizationCode;
+        private final String nonce;
+        private final String firstName;
+        private final String lastName;
+        private final String tenantName;
+        private final String tenantDomain;
     }
 
     /**
