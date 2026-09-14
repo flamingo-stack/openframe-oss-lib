@@ -16,6 +16,8 @@ import com.openframe.data.document.tenant.Tenant;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -60,12 +62,16 @@ public class SsoJoinController {
     private final SsoOidcUserService ssoOidcUserService;
     private final TenantService tenantService;
 
-    public record JoinPendingResponse(String email,
-                                      String firstName,
-                                      String lastName,
-                                      String provider,
-                                      String tenantName,
-                                      List<String> roles) {}
+    @Getter
+    @AllArgsConstructor
+    public static class JoinPendingResponse {
+        private final String email;
+        private final String firstName;
+        private final String lastName;
+        private final String provider;
+        private final String tenantName;
+        private final List<String> roles;
+    }
 
     @GetMapping("/pending")
     public JoinPendingResponse pending(Authentication authentication, HttpServletRequest request) {
@@ -106,9 +112,7 @@ public class SsoJoinController {
                          HttpServletRequest request,
                          HttpServletResponse response) throws IOException {
         OidcUser user = requireSessionOidcUser(authentication);
-        if (!agreeTerms) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "terms_not_accepted");
-        }
+        requireTermsAgreed(agreeTerms);
         String[] names = OidcUserUtils.resolveNames(user);
         String provider = SsoAuthentication.registrationId(authentication);
 
@@ -155,6 +159,12 @@ public class SsoJoinController {
         if (!invitationId.equals(stamped)) {
             log.warn("event=sso-join-invite-session-mismatch invitationId={}", invitationId);
             throw expired();
+        }
+    }
+
+    private void requireTermsAgreed(boolean agreeTerms) {
+        if (!agreeTerms) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "terms_not_accepted");
         }
     }
 
