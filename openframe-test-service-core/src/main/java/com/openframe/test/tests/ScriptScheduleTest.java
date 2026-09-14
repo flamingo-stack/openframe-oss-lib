@@ -13,6 +13,7 @@ import com.openframe.test.data.dto.shared.GraphqlError;
 import com.openframe.test.data.generator.ScriptGenerator;
 import com.openframe.test.data.generator.ScriptScheduleGenerator;
 import com.openframe.test.helpers.ai.RunId;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
@@ -36,6 +37,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * timing-grid rejections. Device assignment is CP-2; with no devices assigned the schedule never
  * dispatches, even when its slot arrives during the run.
  */
+@Slf4j
 @Tag("saas")
 @DisplayName("Script schedules")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -193,15 +195,15 @@ public class ScriptScheduleTest extends BaseTest {
         if (created != null) {
             try {
                 ScriptScheduleApi.deleteSchedule(created.getId());
-            } catch (RuntimeException ignored) {
-                // best effort: a failed cleanup must not mask the case that failed
+            } catch (RuntimeException e) {
+                log.warn("Failed to delete schedule {} — it is left in the tenant: {}", created.getId(), e.getMessage());
             }
         }
         if (script != null) {
             try {
                 ScriptApi.deleteScript(script.getId());
-            } catch (RuntimeException ignored) {
-                // best effort
+            } catch (RuntimeException e) {
+                log.warn("Failed to delete script {} — it is left in the tenant: {}", script.getId(), e.getMessage());
             }
         }
     }

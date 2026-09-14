@@ -14,6 +14,7 @@ import com.openframe.test.data.generator.DeviceGenerator;
 import com.openframe.test.data.generator.ScriptGenerator;
 import com.openframe.test.data.generator.ScriptScheduleGenerator;
 import com.openframe.test.helpers.ai.RunId;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +37,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * rejection. The schedule's slot is a day away and it is deleted afterwards, so assigning a real
  * device to it never dispatches anything.
  */
+@Slf4j
 @Tag("saas")
 @DisplayName("Script schedule devices")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -185,13 +187,13 @@ public class ScriptScheduleDevicesTest extends BaseTest {
             }
             try {
                 ScriptScheduleApi.removeAllDevices(s.getId(), null, null);
-            } catch (RuntimeException ignored) {
-                // best effort
+            } catch (RuntimeException e) {
+                log.warn("Failed to clear the devices of schedule {}: {}", s.getId(), e.getMessage());
             }
             try {
                 ScriptScheduleApi.deleteSchedule(s.getId());
-            } catch (RuntimeException ignored) {
-                // best effort: a failed cleanup must not mask the case that failed
+            } catch (RuntimeException e) {
+                log.warn("Failed to delete schedule {} — it is left in the tenant: {}", s.getId(), e.getMessage());
             }
         }
         for (Script s : new Script[]{script, otherScript}) {
@@ -200,8 +202,8 @@ public class ScriptScheduleDevicesTest extends BaseTest {
             }
             try {
                 ScriptApi.deleteScript(s.getId());
-            } catch (RuntimeException ignored) {
-                // best effort
+            } catch (RuntimeException e) {
+                log.warn("Failed to delete script {} — it is left in the tenant: {}", s.getId(), e.getMessage());
             }
         }
     }
