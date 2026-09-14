@@ -123,5 +123,6 @@ export type VideoProcessingEntityType =
   | 'onboarding_guide'
   | 'what_i_shipped'
   | 'how_i_work'
-  | 'walkthrough_video';
+  | 'walkthrough_video'
+  | 'prospect_call';
 // Fri May 15 14:58:59 EDT 2026

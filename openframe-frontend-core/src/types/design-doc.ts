@@ -3,8 +3,25 @@
 //
 // Participant sections are keyed by the employee DEPARTMENT (FK to the ONE
 // `departments` table — see department.ts); there is no function enum.
-// Completion-gate math and status transitions live in the hub's
+// A doc has no status: it is READY when every section is signed off and no
+// blocking comment is open. That math lives in the hub's
 // `lib/utils/design-doc-gate.ts` (isomorphic, shared by server + client).
+
+// MIGRATION NOTE (2026-09-11). This file dropped `status`, `DesignDocStatus`,
+// `DesignDocStatusTransition`, `approved_at`, `dri_vacated_by`, `by_status` and
+// `facets.status`, and added `spec_mode`. Two things a reader will ask:
+//
+//   · LOCKSTEP — the hub is the ONLY consumer. Nothing else in this package
+//     references those names, and neither does the sibling oss-frontend
+//     checkout; every hub reference moves in multi-platform-hub#1257, which
+//     merges after this package is released and the hub's pin bumped.
+//   · `dri_vacated_by` was already VESTIGIAL, so removing it drops no live
+//     protection. It existed for an anti-self-serve rule — a DRI who also held
+//     management could not vacate the seat, act as a "third party" and approve
+//     their own doc — that was removed earlier by product decision, and no
+//     database column ever backed the field. There is no approval step left to
+//     protect: readiness is DERIVED from the department sign-offs, so there is
+//     no seat to vacate and nothing to self-approve.
 
 import type { RoadmapItem } from '../components/chat/types/entities/roadmap-item';
 import type { DeliveryItem } from './delivery';
@@ -15,12 +32,12 @@ import type { EntityAuthor } from './entity-author';
 // ---------------------------------------------------------------------------
 // Value vocabularies — DATA, not source code.
 //
-// Every enumerable design-doc value (doc status, tier, participant status,
-// comment type/status, link type, media type) is a row in the
-// `design_doc_vocabulary` table, with its label, badge colour, display order
-// and the semantic ROLES it claims. Nothing here lists members: a union of
-// literals would be a second, stale copy of that table and would make adding a
-// status a deploy instead of an INSERT.
+// Every enumerable design-doc value (tier, spec mode, participant status, comment
+// type/status, link type, media type) is a row in the `design_doc_vocabulary`
+// table, with its label, badge colour, display order and the semantic ROLES it
+// claims. Nothing here lists members: a union of literals would be a second,
+// stale copy of that table and would make adding a value a deploy instead of an
+// INSERT.
 //
 // What stays in code is the CAPABILITY vocabulary — the role names the gate
 // understands and the renderers a link type can bind to (both declared in the
@@ -36,7 +53,7 @@ import type { EntityAuthor } from './entity-author';
 /** One value of `design_doc_vocabulary.kind` — the STRUCTURAL list (one per
  *  value column), the only design-doc vocabulary that is code. */
 export type DesignDocVocabularyKind =
-  'status' | 'tier' | 'participant_status' | 'comment_type' | 'comment_status' | 'link_type' | 'media_type';
+  'tier' | 'spec_mode' | 'participant_status' | 'comment_type' | 'comment_status' | 'link_type' | 'media_type';
 
 /** A `design_doc_vocabulary` row, as the DAL and the vocabulary API return it. */
 export interface DesignDocVocabularyOption {
@@ -47,13 +64,13 @@ export interface DesignDocVocabularyOption {
   /** A `StatusBadge` colorScheme name (validated against the badge's own union
    *  when the hub reads the row — an unknown scheme degrades to 'default'). */
   color_scheme: string;
-  /** Human copy for surfaces that explain a value rather than just naming it
-   *  (the dashboard's stat tiles). */
+  /** Human copy for surfaces that EXPLAIN a value rather than just naming it —
+   *  the spec-mode picker's per-option hint. Display only. */
   description: string | null;
   display_order: number;
   is_active: boolean;
-  /** Engine capabilities this member claims (`complete`, `blocks_approval`,
-   *  `locked`, …). The names live in the hub's gate module. */
+  /** Engine capabilities this member claims (`complete`, `blocks_ready`, …).
+   *  The names live in the hub's gate module. */
   roles: string[];
   /** link_type only: which renderer previews it. */
   render: DesignDocLinkRender | null;
@@ -64,35 +81,22 @@ export interface DesignDocVocabularyOption {
   /** link_type only: where the artifact comes from, shown beside the label. */
   source: string | null;
   placeholder: string | null;
-  /** status only: the verb on the button that moves a doc INTO this status. */
-  action_label: string | null;
 }
 
 /** How the doc page previews a link type. A CAPABILITY (each key is a
  *  component in the renderer), so this one IS code — a DB row binds to it. */
 export type DesignDocLinkRender = 'task' | 'figma' | 'claude' | 'link';
 
-/** One legal status move, resolved to values by the DAL. */
-export interface DesignDocStatusTransition {
-  from: string;
-  to: string;
-  /** From-specific button copy when it differs from the target's verb
-   *  (`abandoned -> draft` reads "Reopen", not "Back to draft"). */
-  action_label: string | null;
-  display_order: number;
-}
-
-/** The whole vocabulary in one payload — what every surface (server gate,
+/** The whole vocabulary in one payload — what every surface (server rules,
  *  client badges, pickers, validators) reads instead of a literal list. */
 export interface DesignDocVocabulary {
   options: DesignDocVocabularyOption[];
-  transitions: DesignDocStatusTransition[];
 }
 
-/** A `design_doc_vocabulary.value` of kind `status`. */
-export type DesignDocStatus = string;
 /** A `design_doc_vocabulary.value` of kind `tier`. */
 export type DesignDocTier = string;
+/** A `design_doc_vocabulary.value` of kind `spec_mode`. */
+export type DesignDocSpecMode = string;
 /** A `design_doc_vocabulary.value` of kind `participant_status`. */
 export type DesignDocParticipantStatus = string;
 /** A `design_doc_vocabulary.value` of kind `comment_type`. */
@@ -159,7 +163,7 @@ export interface DesignDocMedia {
 
 /**
  * A comment. ROOT comments (`parent_comment_id === null`) carry `comment_type`
- * + `status` and gate approval when `blocking` + `open`; REPLIES carry neither
+ * + `status` and keep the doc from being ready when `blocking` + `open`; REPLIES carry neither
  * (single-level threads — a reply to a reply is re-parented to the root).
  */
 export interface DesignDocComment {
@@ -224,19 +228,15 @@ export interface DesignDoc {
   title: string;
   slug: string;
   tier: DesignDocTier;
+  /**
+   * How much of the solution is knowable before build starts — spec-first
+   * (settled up front) or discovery-first (engineering resolves the design
+   * while building). A LABEL on the doc: no rule reads it.
+   */
+  spec_mode: DesignDocSpecMode;
   summary: string | null;
   content: string | null;
-  status: DesignDocStatus;
   author_id: string | null;
-  /**
-   * EVERYONE who has handed the DRI role away on this doc (appended, never
-   * overwritten). The third-party break-glass excludes all of them: a DRI who
-   * also holds management could otherwise vacate the seat, act as a "third
-   * party" on their own doc and approve it alone — and with a single scalar,
-   * simply hand the seat on twice to erase the memory of their own vacating.
-   */
-  dri_vacated_by: string[];
-  approved_at: string | null;
   created_at: string;
   updated_at: string;
   /** DRI, hydrated via the shared author hydrator. */
@@ -245,8 +245,8 @@ export interface DesignDoc {
    * Engineering feature leads — the people reviewing the doc alongside the
    * department sign-off sections. DISPLAY-ONLY attribution, like
    * `how_i_work_participants`: being listed grants NO rights (nothing in the
-   * hub's `design-doc-gate.ts` reads it) and is NOT an input to the approval
-   * gate. The doc-level owner with actual levers is the DRI (`author_id`).
+   * hub's `design-doc-gate.ts` reads it) and is NOT an input to readiness.
+   * The doc-level owner with actual levers is the DRI (`author_id`).
    *
    * Carried on BOTH the list and the detail payload — the dashboard renders
    * their avatars in its own column.
@@ -296,6 +296,8 @@ export interface CreateDesignDocData {
   title: string;
   slug: string;
   tier: DesignDocTier;
+  /** Defaults to the `spec_mode` row claiming `default` when omitted. */
+  spec_mode?: DesignDocSpecMode;
   summary?: string | null;
   /** Spec markdown (Why / What / How); the create screen carries the same body editor as edit. */
   content?: string | null;
@@ -308,20 +310,21 @@ export interface CreateDesignDocData {
 }
 
 /**
- * Doc-level allowlist (PUT). `status` and `participants` are NOT here — status
- * only moves through PATCH (the gate), participants only through their routes.
+ * Doc-level allowlist (PUT). `participants` are NOT here — they only move
+ * through their own routes.
  */
 export interface UpdateDesignDocData {
   title?: string;
   slug?: string;
   tier?: DesignDocTier;
+  spec_mode?: DesignDocSpecMode;
   summary?: string | null;
   content?: string | null;
   author_id?: string | null;
   /**
    * Replaces the whole feature-lead set (`[]` clears it); omitted leaves it
    * untouched. Display-only, so it rides the STANDING floor like the title —
-   * not the DRI-only levers, and not the frozen decision record.
+   * not the DRI-only levers.
    */
   feature_lead_ids?: string[];
   links?: DesignDocLinkInput[];
@@ -355,8 +358,13 @@ export interface AddDesignDocCommentData {
   body: string;
 }
 
+/** The dashboard's readiness filter (`?ready=`). */
+export type DesignDocReadyFilter = 'ready' | 'not_ready';
+
 export interface DesignDocFilters {
-  status?: string;
+  ready?: DesignDocReadyFilter;
+  /** One or more `spec_mode` values (CSV on the wire). */
+  spec_mode?: string;
   search?: string;
   mine?: 'open';
   limit?: number;
@@ -366,16 +374,16 @@ export interface DesignDocFilters {
 export interface DesignDocListResponse {
   data: DesignDoc[];
   count: number;
-  /** Server-computed status facet counts (how-i-work feed convention). */
-  facets: { status: Record<string, number> };
+  /** Server-computed spec-mode counts over the scope, MINUS the spec-mode
+   *  filter itself — so a filtered row still shows what the other value holds. */
+  facets: { spec_mode: Record<string, number> };
 }
 
 export interface DesignDocStats {
   total: number;
-  /** One count per `status` vocabulary row (zeros included), keyed by value —
-   *  never a fixed set of named keys, so a status added to the table gets a
-   *  tile without a type change. */
-  by_status: Record<string, number>;
+  /** Docs whose every section is signed off with no open blocking comment. */
+  ready: number;
+  not_ready: number;
   waiting_on_me_docs: number;
   waiting_on_me_tasks: number;
 }

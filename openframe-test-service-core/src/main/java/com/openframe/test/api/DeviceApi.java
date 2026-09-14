@@ -19,6 +19,7 @@ import static io.restassured.RestAssured.given;
 public class DeviceApi {
 
     private static final String DEVICES = "api/devices/{machineId}";
+    private static final String FORCE_CLIENT_UNINSTALL = "api/force/client/uninstall";
     private static final String FLEET_HOST = "tools/fleetmdm-server/api/latest/fleet/hosts/{fleetId}";
     private static final String MESH_DEVICE = "tools/meshcentral-server/api/devicestatus";
 
@@ -158,6 +159,20 @@ public class DeviceApi {
 
     public static void deleteDevice(Machine device) {
         updateDeviceStatus(device, DeviceStatus.DELETED);
+    }
+
+    /**
+     * What the dashboard's Delete does. The platform marks each machine {@code PENDING_DELETION} and sends
+     * its client an uninstall command; the client deregisters on its way out and the machine becomes
+     * {@code DELETED}. Unlike {@link #deleteDevice}, which only rewrites the status, this actually removes
+     * the client from the box -- so it is the one to use for a device that is still enrolled.
+     */
+    public static List<ForceClientUninstallItem> forceClientUninstall(List<String> machineIds) {
+        return given(getAuthorizedSpec())
+                .body(Map.of("machineIds", machineIds))
+                .post(FORCE_CLIENT_UNINSTALL)
+                .then().statusCode(200)
+                .extract().jsonPath().getList("items", ForceClientUninstallItem.class);
     }
 
     public static Machine searchDevice(DeviceFilterInput filter, String search) {

@@ -20,8 +20,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
-import java.time.DateTimeException;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -38,8 +36,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @RequiredArgsConstructor
 @Slf4j
 public class DeviceLocalScheduleService {
-
-    private static final ZoneOffset LATEST_ZONE = ZoneOffset.ofHours(-12);
 
     private final ScriptScheduleRepository scheduleRepository;
     private final ScheduleDeviceTargetResolver targetResolver;
@@ -113,7 +109,7 @@ public class DeviceLocalScheduleService {
                                 Instant now, ScheduleLocalMachineTimeDispatch sentinel, long window) {
         String machineId = machine.getMachineId();
 
-        if (repeat == null && isHandled(sentinel)) {
+        if (repeat == null && DeviceLocalOccurrence.isHandled(sentinel)) {
             return;
         }
 
@@ -131,12 +127,12 @@ public class DeviceLocalScheduleService {
             return;
         }
 
-        LocalDateTime occurrence = currentDueOccurrence(startWallClock, repeat, zone, now);
+        LocalDateTime occurrence = DeviceLocalOccurrence.currentDueOccurrence(startWallClock, repeat, zone, now);
         if (occurrence == null) {
             return;
         }
         Instant occurrenceAt = occurrence.toInstant(ZoneOffset.UTC);
-        if (isAlreadyHandled(sentinel, occurrenceAt)) {
+        if (DeviceLocalOccurrence.isAlreadyHandled(sentinel, occurrenceAt)) {
             return;
         }
 
@@ -158,7 +154,7 @@ public class DeviceLocalScheduleService {
 
     private void evaluateOffline(ScheduleScript schedule, Machine machine, LocalDateTime startWallClock, Long repeat,
                                  Instant now, ScheduleLocalMachineTimeDispatch sentinel, long window) {
-        if (repeat == null && isHandled(sentinel)) {
+        if (repeat == null && DeviceLocalOccurrence.isHandled(sentinel)) {
             return;
         }
         String machineId = machine.getMachineId();
@@ -167,8 +163,8 @@ public class DeviceLocalScheduleService {
         if (isBlank(zoneId)) {
             if (repeat == null) {
                 Instant occurrenceAt = startWallClock.toInstant(ZoneOffset.UTC);
-                if (!isAlreadyHandled(sentinel, occurrenceAt)
-                        && now.isAfter(latestPossibleFireAt(startWallClock, null).plusSeconds(window))) {
+                if (!DeviceLocalOccurrence.isAlreadyHandled(sentinel, occurrenceAt)
+                        && now.isAfter(DeviceLocalOccurrence.latestPossibleFireAt(startWallClock, null).plusSeconds(window))) {
                     record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.MISSED, sentinel);
                     log.warn("DEVICE_LOCAL scheduleId={} machineId={} offline with no known timezone past its run "
                             + "window — marked MISSED", schedule.getId(), machineId);
@@ -181,12 +177,12 @@ public class DeviceLocalScheduleService {
         if (zone == null) {
             return;
         }
-        LocalDateTime occurrence = currentDueOccurrence(startWallClock, repeat, zone, now);
+        LocalDateTime occurrence = DeviceLocalOccurrence.currentDueOccurrence(startWallClock, repeat, zone, now);
         if (occurrence == null) {
             return;
         }
         Instant occurrenceAt = occurrence.toInstant(ZoneOffset.UTC);
-        if (isAlreadyHandled(sentinel, occurrenceAt)) {
+        if (DeviceLocalOccurrence.isAlreadyHandled(sentinel, occurrenceAt)) {
             return;
         }
 
@@ -216,52 +212,13 @@ public class DeviceLocalScheduleService {
         return catchupSeconds;
     }
 
-    private static LocalDateTime currentDueOccurrence(LocalDateTime startWallClock, Long repeat, ZoneId zone,
-                                                      Instant now) {
-        Instant firstFireAt = startWallClock.atZone(zone).toInstant();
-        if (now.isBefore(firstFireAt)) {
-            return null;
-        }
-        if (repeat == null) {
-            return startWallClock;
-        }
-        long elapsedSeconds = Duration.between(startWallClock, LocalDateTime.ofInstant(now, zone)).getSeconds();
-        long k = Math.max(0, elapsedSeconds / repeat);
-        LocalDateTime occurrence = startWallClock.plusSeconds(k * repeat);
-        while (k > 0 && occurrence.atZone(zone).toInstant().isAfter(now)) {
-            k--;
-            occurrence = startWallClock.plusSeconds(k * repeat);
-        }
-        return occurrence;
-    }
-
     private ZoneId parseZone(ScheduleScript schedule, String machineId, String zoneId) {
-        try {
-            return ZoneId.of(zoneId);
-        } catch (DateTimeException e) {
+        ZoneId zone = DeviceLocalOccurrence.parseZone(zoneId);
+        if (zone == null) {
             log.warn("DEVICE_LOCAL scheduleId={} machineId={} has invalid stored timezone '{}' — skipping",
                     schedule.getId(), machineId, zoneId);
-            return null;
         }
-    }
-
-    private static boolean isHandled(ScheduleLocalMachineTimeDispatch sentinel) {
-        return sentinel != null && sentinel.getLastOccurrenceAt() != null;
-    }
-
-    private static boolean isAlreadyHandled(ScheduleLocalMachineTimeDispatch sentinel, Instant occurrenceAt) {
-        return sentinel != null && sentinel.getLastOccurrenceAt() != null && !occurrenceAt.isAfter(sentinel.getLastOccurrenceAt());
-    }
-
-    private static Instant latestPossibleFireAt(LocalDateTime wallClock, String storedTimezone) {
-        if (!isBlank(storedTimezone)) {
-            try {
-                return wallClock.atZone(ZoneId.of(storedTimezone)).toInstant();
-            } catch (DateTimeException ignored) {
-                // fall through to the global upper bound
-            }
-        }
-        return wallClock.atOffset(LATEST_ZONE).toInstant();
+        return zone;
     }
 
     private boolean record(ScheduleScript schedule, String machineId, Instant occurrenceAt, Instant now,
