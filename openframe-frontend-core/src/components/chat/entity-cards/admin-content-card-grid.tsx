@@ -19,20 +19,20 @@ export function AdminContentCardSkeleton({ className }: { className?: string }) 
   return (
     <div
       className={cn(
-        'flex h-full flex-col overflow-hidden rounded-2xl border border-ods-border bg-ods-card animate-pulse',
+        'flex h-full animate-pulse flex-col overflow-hidden rounded-2xl border border-ods-border bg-ods-card',
         className,
       )}
     >
       <div className="aspect-[3/2] w-full shrink-0 bg-ods-border/20" />
       <div className="flex flex-1 flex-col gap-[var(--spacing-system-sf)] p-5">
-        <div className="text-h3 h-[2lh] w-full rounded bg-ods-border" />
-        <div className="text-h6 h-[1lh] w-1/2 rounded bg-ods-border" />
-        <div className="text-h6 h-[2lh] w-full rounded bg-ods-border" />
+        <div className="h-[2lh] w-full rounded bg-ods-border text-h3" />
+        <div className="h-[1lh] w-1/2 rounded bg-ods-border text-h6" />
+        <div className="h-[2lh] w-full rounded bg-ods-border text-h6" />
         <div className="flex h-7 items-center gap-[var(--spacing-system-xsf)]">
           <div className="h-5 w-20 rounded-full bg-ods-border" />
           <div className="h-5 w-24 rounded-full bg-ods-border" />
         </div>
-        <div className="text-h6 h-[1lh] w-32 rounded bg-ods-border" />
+        <div className="h-[1lh] w-32 rounded bg-ods-border text-h6" />
         <div className="mt-auto flex items-center justify-between border-t border-ods-border pt-[var(--spacing-system-sf)]">
           <div className="h-10 w-24 rounded bg-ods-border" />
           <div className="flex gap-[var(--spacing-system-xsf)]">
@@ -115,7 +115,7 @@ export function AdminContentCardGrid<T>({
 
   return (
     <div className={gridClass} data-state="items">
-      {items.map((item) => (
+      {items.map(item => (
         <div key={itemKey(item)} className="h-full">
           {renderCard(item)}
         </div>

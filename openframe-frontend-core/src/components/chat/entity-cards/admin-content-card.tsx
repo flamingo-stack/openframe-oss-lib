@@ -111,7 +111,9 @@ export function AdminContentCard({
       {/* Content */}
       <div className="flex flex-1 flex-col gap-3 p-5">
         {/* Title */}
-        <h3 className={cn('line-clamp-2 break-words text-ods-text-primary text-h3', reserveRows && 'min-h-[2lh]')}>{title}</h3>
+        <h3 className={cn('line-clamp-2 break-words text-ods-text-primary text-h3', reserveRows && 'min-h-[2lh]')}>
+          {title}
+        </h3>
 
         {/* Subtitle (optional) */}
         {(subtitle || reserveRows) && (
@@ -139,7 +141,9 @@ export function AdminContentCard({
 
         {/* Meta row */}
         {(meta || reserveRows) && (
-          <div className={cn('flex items-center gap-3 text-ods-text-secondary text-h6', reserveRows && 'min-h-[1lh]')}>{meta}</div>
+          <div className={cn('flex items-center gap-3 text-ods-text-secondary text-h6', reserveRows && 'min-h-[1lh]')}>
+            {meta}
+          </div>
         )}
 
         {/* Actions — pushed to bottom */}
