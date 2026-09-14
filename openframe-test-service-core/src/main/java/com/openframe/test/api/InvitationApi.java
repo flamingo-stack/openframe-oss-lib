@@ -50,4 +50,21 @@ public class InvitationApi {
                 .delete(REVOKE_INVITATION)
                 .then().statusCode(204);
     }
+
+    /** POST /invitations/{id}/resend: renews an expired pending invitation and returns the new one (201). */
+    public static Invitation resendInvitation(String invitationId) {
+        final String RESEND_INVITATION = INVITATIONS.concat("/").concat(invitationId).concat("/resend");
+        return given(getAuthorizedSpec())
+                .post(RESEND_INVITATION)
+                .then().statusCode(201)
+                .extract().as(Invitation.class);
+    }
+
+    /** A resend expected to be refused (the invitation is not expired, or not pending): returns the HTTP status. */
+    public static int attemptResendInvitation(String invitationId) {
+        final String RESEND_INVITATION = INVITATIONS.concat("/").concat(invitationId).concat("/resend");
+        return given(getAuthorizedSpec())
+                .post(RESEND_INVITATION)
+                .then().extract().statusCode();
+    }
 }
