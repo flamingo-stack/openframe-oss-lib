@@ -14,9 +14,9 @@ export interface DepartmentBadgeProps {
 
 /**
  * THE department badge: the shared `PaletteBadge` in the department's own colour.
- * The colour is data, `departments.color`, a `COLOR_PRESETS` key picked at random
- * (`pickPresetColor`) when the department is created, so no department or colour
- * is listed in code.
+ * The colour is data, `departments.color`, a `BADGE_PALETTE` key picked at random
+ * (`pickBadgePaletteColor`) when the department is created, so no department or
+ * colour is listed in code, and every colour is an ODS token.
  */
 export function DepartmentBadge({
   department,
