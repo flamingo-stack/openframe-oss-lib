@@ -13,16 +13,16 @@ import java.time.Instant;
 @AllArgsConstructor
 @NoArgsConstructor
 public class LogProjection {
-    public String toolEventId;
-    public String ingestDay;
-    public String toolType;
-    public String eventType;
-    public String severity;
-    public String userId;
-    public String deviceId;
-    public String hostname;
-    public String organizationId;
-    public String organizationName;
-    public String summary;
-    public Instant eventTimestamp;
+    private String toolEventId;
+    private String ingestDay;
+    private String toolType;
+    private String eventType;
+    private String severity;
+    private String userId;
+    private String deviceId;
+    private String hostname;
+    private String organizationId;
+    private String organizationName;
+    private String summary;
+    private Instant eventTimestamp;
 }
