@@ -2,6 +2,7 @@ package com.openframe.test.tests.external;
 
 import com.openframe.test.api.external.ExternalDeviceApi;
 import com.openframe.test.data.dto.external.common.ExternalErrorResponse;
+import com.openframe.test.data.dto.external.device.DeviceFilterItem;
 import com.openframe.test.data.dto.external.device.DeviceFilterResponse;
 import com.openframe.test.data.dto.external.device.DeviceResponse;
 import com.openframe.test.data.dto.external.device.DevicesResponse;
@@ -148,11 +149,28 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
             return;
         }
 
-        String status = filters.getStatuses().getFirst().getValue();
+        // An advertised option is not a promise that rows exist: the API lists every status it knows
+        // about and reports a count per option, so a status no device currently holds comes back with
+        // count 0. Pick one the tenant actually has. Asserting on the first option regardless only
+        // passed while stale PENDING_DELETION devices happened to be lying around, and broke the
+        // moment they were cleaned up.
+        DeviceFilterItem option = filters.getStatuses().stream()
+                .filter(item -> item.getCount() != null && item.getCount() > 0)
+                .findFirst()
+                .orElse(null);
+        if (option == null) {
+            log.info("No advertised device status has any devices on this tenant; nothing to filter by");
+            return;
+        }
+
+        String status = option.getValue();
         List<DeviceResponse> devices = ExternalDeviceApi
                 .listDevices(Map.of("statuses", status, "limit", 10)).getDevices();
 
-        assertThat(devices).as("Status '%s' is advertised as a filter option", status).isNotEmpty();
+        assertThat(devices)
+                .as("Status '%s' is advertised with count %d, so listing by it must return rows",
+                        status, option.getCount())
+                .isNotEmpty();
         assertThat(devices).as("Every returned device should carry the requested status")
                 .allSatisfy(device -> assertThat(device.getStatus()).isEqualTo(status));
     }
