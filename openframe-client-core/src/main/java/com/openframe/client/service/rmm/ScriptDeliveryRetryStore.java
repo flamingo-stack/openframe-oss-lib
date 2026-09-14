@@ -1,8 +1,8 @@
 package com.openframe.client.service.rmm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.document.rmm.script.ScriptDeliveryRetry;
-import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.repository.rmm.ScriptDeliveryRetryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,17 +23,22 @@ public class ScriptDeliveryRetryStore {
     @Value("${openframe.rmm.execution.retry.ttl-seconds}")
     private long ttlSeconds;
 
-    public void store(String executionId, String machineId, ScriptScheduleExecutionMessage message) {
-        write(executionId, machineId, 0, message);
+    public void store(String executionId, String machineId, DeliveryChannel channel, Object message) {
+        try {
+            write(executionId, machineId, 0, channel, objectMapper.writeValueAsString(message));
+        } catch (Exception e) {
+            log.warn("Failed to serialize retry-state executionId={} machineId={} channel={}: {}",
+                    executionId, machineId, channel, e.getMessage());
+        }
     }
 
     public Optional<RetryState> get(String executionId, String machineId) {
-        return repository.findById(id(executionId, machineId)).flatMap(this::toState);
+        return repository.findById(id(executionId, machineId)).map(this::toState);
     }
 
     public int incrementRetryCount(String executionId, String machineId, RetryState current) {
         int next = current.retryCount() + 1;
-        write(executionId, machineId, next, current.message());
+        write(executionId, machineId, next, current.channel(), current.messageJson());
         return next;
     }
 
@@ -41,14 +46,15 @@ public class ScriptDeliveryRetryStore {
         repository.deleteById(id(executionId, machineId));
     }
 
-    private void write(String executionId, String machineId, int retryCount, ScriptScheduleExecutionMessage message) {
+    private void write(String executionId, String machineId, int retryCount, DeliveryChannel channel, String messageJson) {
         try {
             repository.save(ScriptDeliveryRetry.builder()
                     .id(id(executionId, machineId))
                     .executionId(executionId)
                     .machineId(machineId)
                     .retryCount(retryCount)
-                    .messageJson(objectMapper.writeValueAsString(message))
+                    .channel(channel)
+                    .messageJson(messageJson)
                     .expiresAt(Instant.now().plusSeconds(ttlSeconds))
                     .build());
         } catch (Exception e) {
@@ -56,21 +62,14 @@ public class ScriptDeliveryRetryStore {
         }
     }
 
-    private Optional<RetryState> toState(ScriptDeliveryRetry row) {
-        try {
-            ScriptScheduleExecutionMessage message =
-                    objectMapper.readValue(row.getMessageJson(), ScriptScheduleExecutionMessage.class);
-            return Optional.of(new RetryState(row.getRetryCount(), message));
-        } catch (Exception e) {
-            log.warn("Corrupt retry-state for executionId={} machineId={}: {}",
-                    row.getExecutionId(), row.getMachineId(), e.getMessage());
-            return Optional.empty();
-        }
+    private RetryState toState(ScriptDeliveryRetry row) {
+        DeliveryChannel channel = row.getChannel() != null ? row.getChannel() : DeliveryChannel.SCHEDULE;
+        return new RetryState(row.getRetryCount(), channel, row.getMessageJson());
     }
 
     private static String id(String executionId, String machineId) {
         return executionId + ":" + machineId;
     }
 
-    public record RetryState(int retryCount, ScriptScheduleExecutionMessage message) {}
+    public record RetryState(int retryCount, DeliveryChannel channel, String messageJson) {}
 }

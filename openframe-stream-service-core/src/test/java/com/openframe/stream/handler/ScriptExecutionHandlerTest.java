@@ -2,6 +2,7 @@ package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
@@ -92,7 +93,7 @@ class ScriptExecutionHandlerTest {
         assertThat(saved.getStdoutTruncated()).isFalse();
         assertThat(saved.getFinishedAt()).isNotNull();
         assertThat(saved.getStatusChangedAt()).isNotNull();
-        assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("kind", "script", "status", "SUCCESS").counter().count()).isEqualTo(1.0);
+        assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("kind", "script", "status", "SUCCESS", "source", "MANUAL", "manager", "NONE").counter().count()).isEqualTo(1.0);
     }
 
     @Test
@@ -191,6 +192,22 @@ class ScriptExecutionHandlerTest {
         verify(scriptExecutionRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
         assertThat(captor.getValue().getSource()).isEqualTo(ExecutionSource.SCHEDULED);
+    }
+
+    @Test
+    @DisplayName("handle: package-install row → completed counter carries source and manager, so the software-management board can filter it")
+    void handle_packageInstallRow_countsCompletedBySourceAndManager() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setSource(ExecutionSource.PACKAGE_INSTALLATION);
+        row.setPackageManager(PackageManagerType.BREW);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 1, false, null, 42L, "", "Error: No available formula"), new IntegratedToolEnrichedData());
+
+        assertThat(meterRegistry.get(COMPLETED_COUNTER)
+                .tags("kind", "script", "status", "FAILED", "source", "PACKAGE_INSTALLATION", "manager", "BREW")
+                .counter().count()).isEqualTo(1.0);
     }
 
     @Test

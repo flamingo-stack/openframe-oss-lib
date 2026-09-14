@@ -26,6 +26,8 @@ public class ScriptDeliveryRetry {
 
     private int retryCount;
 
+    private DeliveryChannel channel;
+
     private String messageJson;
 
     @Indexed(name = "script_delivery_retry_ttl", expireAfterSeconds = 0)

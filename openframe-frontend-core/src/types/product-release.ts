@@ -15,6 +15,11 @@ export interface ChangelogEntry {
    * because each entry can be marked internal — see investor-update-utils.ts.
    */
   visibility?: 'public' | 'internal';
+  /**
+   * Optional per-entry classification chosen from the manager's `tagOptions`
+   * (e.g. an owner, a priority, a severity). Product releases never set it.
+   */
+  tag?: string;
 }
 
 export interface ReleaseMedia {

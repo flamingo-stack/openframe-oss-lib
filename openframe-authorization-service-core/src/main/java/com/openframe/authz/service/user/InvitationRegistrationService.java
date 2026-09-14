@@ -30,6 +30,15 @@ public class InvitationRegistrationService {
     private final InvitationValidator invitationValidator;
     private final SsoIdentityService ssoIdentityService;
 
+    /**
+     * Whether accepting this invitation would CREATE a user in the target tenant (vs an existing
+     * active member simply re-accepting). Drives the one-last-step consent gate.
+     */
+    public boolean isNewMemberJoin(String invitationId) {
+        AuthInvitation invitation = invitationValidator.loadAndEnsureAcceptable(invitationId);
+        return userService.findActiveByEmailAndTenant(invitation.getEmail(), invitation.getTenantId()).isEmpty();
+    }
+
     public AuthUser registerByInvitation(InvitationRegistrationRequest request) {
         AuthInvitation invitation = invitationValidator.loadAndEnsureAcceptable(request.getInvitationId());
         String targetTenantId = invitation.getTenantId();

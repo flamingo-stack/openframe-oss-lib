@@ -734,13 +734,13 @@ class ScriptServiceTest {
         Script system = new Script();
         system.setId(SCRIPT_ID);
         system.setStatus(ScriptStatus.ACTIVE);
-        system.setSystem(true);
+        system.setType(com.openframe.data.document.rmm.script.ScriptType.SYSTEM);
         updateInput.setName("renamed");
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
 
         assertThatThrownBy(() -> scriptService.update(updateInput))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("System scripts");
+                .hasMessageContaining("Managed scripts");
 
         verify(scriptRepository, never()).save(any());
     }
@@ -751,12 +751,12 @@ class ScriptServiceTest {
         Script system = new Script();
         system.setId(SCRIPT_ID);
         system.setStatus(ScriptStatus.ACTIVE);
-        system.setSystem(true);
+        system.setType(com.openframe.data.document.rmm.script.ScriptType.SYSTEM);
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
 
         assertThatThrownBy(() -> scriptService.delete(SCRIPT_ID))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("System scripts");
+                .hasMessageContaining("Managed scripts");
 
         verify(scriptRepository, never()).save(any());
     }
@@ -767,12 +767,12 @@ class ScriptServiceTest {
         Script system = new Script();
         system.setId(SCRIPT_ID);
         system.setStatus(ScriptStatus.ACTIVE);
-        system.setSystem(true);
+        system.setType(com.openframe.data.document.rmm.script.ScriptType.SYSTEM);
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
 
         assertThatThrownBy(() -> scriptService.archive(SCRIPT_ID))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("System scripts");
+                .hasMessageContaining("Managed scripts");
 
         verify(scriptRepository, never()).save(any());
     }
