@@ -4,12 +4,13 @@ import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptShell;
+import com.openframe.data.document.rmm.script.ScriptType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum SystemScriptDefinition {
+public enum SystemScriptDefinition implements ManagedScriptDefinition {
 
     INSTALL_BREW(
             SystemScriptCode.INSTALL_BREW,
@@ -45,4 +46,14 @@ public enum SystemScriptDefinition {
     private final PrivilegeLevel privilegeLevel;
     private final Integer defaultTimeoutSeconds;
     private final String description;
+
+    @Override
+    public String getCanonicalName() {
+        return code.canonicalName();
+    }
+
+    @Override
+    public ScriptType getScriptType() {
+        return ScriptType.SYSTEM;
+    }
 }

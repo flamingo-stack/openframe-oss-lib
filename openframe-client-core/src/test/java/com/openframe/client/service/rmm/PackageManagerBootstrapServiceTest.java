@@ -10,6 +10,7 @@ import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ScriptShell;
+import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptBootstrapNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
@@ -74,9 +75,10 @@ class PackageManagerBootstrapServiceTest {
                 .shell(ScriptShell.POWERSHELL)
                 .privilegeLevel(PrivilegeLevel.USER)
                 .defaultTimeoutSeconds(1800)
-                .system(true)
+                .type(ScriptType.SYSTEM)
                 .build();
-        when(scriptRepository.findSystemScript(SystemScriptCode.INSTALL_WINGET, TENANT_ID))
+        when(scriptRepository.findByTenantIdAndNameAndType(
+                TENANT_ID, SystemScriptCode.INSTALL_WINGET.canonicalName(), ScriptType.SYSTEM))
                 .thenReturn(Optional.of(script));
         return script;
     }
@@ -193,7 +195,8 @@ class PackageManagerBootstrapServiceTest {
     @DisplayName("system script not seeded yet: report is ignored, the agent re-reports later")
     void ignoresWhenScriptNotSeeded() {
         givenMachine(DeviceStatus.ONLINE);
-        when(scriptRepository.findSystemScript(SystemScriptCode.INSTALL_BREW, TENANT_ID))
+        when(scriptRepository.findByTenantIdAndNameAndType(
+                TENANT_ID, SystemScriptCode.INSTALL_BREW.canonicalName(), ScriptType.SYSTEM))
                 .thenReturn(Optional.empty());
 
         service.dispatchInstall(MACHINE_ID, PackageManagerType.BREW);

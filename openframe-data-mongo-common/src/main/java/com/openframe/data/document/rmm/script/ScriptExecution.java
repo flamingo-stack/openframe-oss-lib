@@ -2,6 +2,7 @@ package com.openframe.data.document.rmm.script;
 
 import com.openframe.data.document.TenantScoped;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -76,6 +77,8 @@ public class ScriptExecution implements TenantScoped {
     private String initiatedBy;
     private ExecutionSource source;
     private PackageManagerType packageManager;
+    private String packageName;
+    private SoftwareAction softwareAction;
 
     private ExecutionStatus status;
 
