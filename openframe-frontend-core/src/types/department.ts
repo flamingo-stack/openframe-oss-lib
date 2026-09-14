@@ -20,7 +20,7 @@ export interface Department {
   parent_department_id?: string | null;
   display_order: number;
   is_active: boolean;
-  /** The department's badge colour (`#rrggbb`), assigned at random when the row is created. */
+  /** The department's badge colour: a `COLOR_PRESETS` key picked at random (`pickPresetColor`) when the row is created. */
   color: string | null;
 }
 
@@ -35,6 +35,7 @@ export interface DepartmentSummary {
   id: string;
   name: string;
   slug: string;
+  color?: string | null;
   count: number;
 }
 

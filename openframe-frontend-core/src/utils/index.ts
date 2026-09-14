@@ -23,7 +23,6 @@ export {
   // Custom-color helpers so consumers (e.g. the chat client's accent theming)
   // reuse the design-system math instead of re-implementing darken/hex utils.
   getReadableTextColor,
-  randomIdentityColor,
   hexToRgb,
   rgbToHex,
   deriveHoverColor,
@@ -392,3 +391,4 @@ export * from './ods-spacing';
 export * from './csv';
 // Social platform vocabulary, host table, link type, picker.
 export * from './social-platforms';
+export { COLOR_PRESETS, colorPreset, pickPresetColor, type ColorPreset } from './color-presets';

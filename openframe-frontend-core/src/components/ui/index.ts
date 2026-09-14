@@ -67,6 +67,7 @@ export * from './release-changelog-section';
 export * from './stacked-rows-panel';
 export * from './slack-channel-chip';
 export * from './status-badge';
+export * from './palette-badge';
 export * from './department-badge';
 export * from './status-indicator';
 export * from './toaster';
