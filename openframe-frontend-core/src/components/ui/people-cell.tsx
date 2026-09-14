@@ -37,7 +37,19 @@ export interface PersonCellProps {
   onClick?: () => void;
   /** Tooltip for the clickable cell ("Filter by ada@example.com"). */
   actionTitle?: string;
+  /**
+   * `sm` (default) is the dense table cell. `lg` is the same two lines at
+   * showcase scale — 48px avatar, bold body primary, caption secondary — for a
+   * card that leads with a line of text and the person/company it came from
+   * (the landing quote chips).
+   */
+  size?: 'sm' | 'lg';
 }
+
+const PERSON_CELL_SIZE = {
+  sm: { avatar: 'sm', gap: 'gap-3', primary: 'h6' },
+  lg: { avatar: 'lg', gap: 'gap-[var(--spacing-system-sf)]', primary: 'h3' },
+} as const;
 
 export function PersonCell({
   name,
@@ -46,14 +58,16 @@ export function PersonCell({
   fallbackName = 'Unassigned',
   onClick,
   actionTitle,
+  size = 'sm',
 }: PersonCellProps) {
   const displayName = name || fallbackName;
+  const scale = PERSON_CELL_SIZE[size];
   const row = (
-    <div className="group/person-cell flex min-w-0 items-center gap-3">
-      <SquareAvatar size="sm" src={avatarUrl ?? undefined} alt={displayName} fallback={displayName} />
+    <div className={`group/person-cell flex min-w-0 items-center ${scale.gap}`}>
+      <SquareAvatar size={scale.avatar} src={avatarUrl ?? undefined} alt={displayName} fallback={displayName} />
       <div className="min-w-0 flex-1">
         <TruncateText
-          variant="h6"
+          variant={scale.primary}
           className={onClick ? 'text-ods-accent group-hover/person-cell:underline' : undefined}
         >
           {displayName}
