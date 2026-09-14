@@ -2,6 +2,8 @@ package com.openframe.authz.service.sso;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -32,14 +34,17 @@ public class SignupTicketService {
     private final OpenframeRedisKeyBuilder keyBuilder;
     private final ObjectMapper objectMapper;
 
-    public record SignupTicketPayload(String email,
-                                      String firstName,
-                                      String lastName,
-                                      String provider,
-                                      boolean emailVerified,
-                                      String subject,
-                                      String userId,
-                                      String tenantId) {
+    @Getter
+    @AllArgsConstructor
+    public static class SignupTicketPayload {
+        private final String email;
+        private final String firstName;
+        private final String lastName;
+        private final String provider;
+        private final boolean emailVerified;
+        private final String subject;
+        private final String userId;
+        private final String tenantId;
 
         public boolean bound() {
             return userId != null && tenantId != null;
@@ -65,13 +70,13 @@ public class SignupTicketService {
         String k = key(ticket);
         Optional<SignupTicketPayload> current = decode(redisTemplate.opsForValue().get(k));
         if (current.isEmpty()) {
-            throw new IllegalStateException("Signup session expired. Please sign in again.");
+            throw new SignupTicketExpiredException("Signup session expired. Please sign in again.");
         }
         SignupTicketPayload p = current.get();
         Long remaining = redisTemplate.getExpire(k);
         Duration ttl = remaining != null && remaining > 0 ? Duration.ofSeconds(remaining) : TTL;
-        write(ticket, new SignupTicketPayload(p.email(), p.firstName(), p.lastName(), p.provider(),
-                p.emailVerified(), p.subject(), userId, tenantId), ttl);
+        write(ticket, new SignupTicketPayload(p.getEmail(), p.getFirstName(), p.getLastName(), p.getProvider(),
+                p.isEmailVerified(), p.getSubject(), userId, tenantId), ttl);
     }
 
     /** Atomic single use — the token mint, and only it, calls this. */
