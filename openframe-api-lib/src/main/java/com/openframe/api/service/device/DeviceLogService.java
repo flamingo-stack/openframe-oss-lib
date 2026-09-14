@@ -26,6 +26,8 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.stream.Collectors.joining;
 
@@ -51,6 +53,7 @@ public class DeviceLogService {
     private final DeviceService deviceService;
     private final TenantIdProvider tenantIdProvider;
     private final TenantRepository tenantRepository;
+    private final Map<String, String> tenantDomains = new ConcurrentHashMap<>();
 
     /**
      * Logs of one device, newest first.
@@ -114,15 +117,25 @@ public class DeviceLogService {
         return query.append(" | machine_id=").append(LogQl.quote(machineId)).toString();
     }
 
+    /**
+     * Cached for the life of the pod: a tenant pod serves one tenant and tenant domains never change. A missing
+     * domain is not cached, so a tenant that is still being provisioned recovers on the next call.
+     */
     private String resolveTenantDomain() {
         String tenantId = tenantIdProvider.getTenantId();
+        String domain = tenantDomains.computeIfAbsent(tenantId, this::findTenantDomain);
+        if (domain == null) {
+            log.error("Cannot query device logs: tenant {} has no domain", tenantId);
+            throw new InternalException("Device logs are not available for this tenant");
+        }
+        return domain;
+    }
+
+    private String findTenantDomain(String tenantId) {
         return tenantRepository.findById(tenantId)
                 .map(Tenant::getDomain)
                 .filter(StringUtils::hasText)
-                .orElseThrow(() -> {
-                    log.error("Cannot query device logs: tenant {} has no domain", tenantId);
-                    return new InternalException("Device logs are not available for this tenant");
-                });
+                .orElse(null);
     }
 
     /**
