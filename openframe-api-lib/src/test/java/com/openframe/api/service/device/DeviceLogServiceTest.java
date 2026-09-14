@@ -35,7 +35,9 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -110,6 +112,29 @@ class DeviceLogServiceTest {
         assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, window(), page(null, null)))
                 .isInstanceOf(InternalException.class);
         verifyNoInteractions(lokiClient);
+    }
+
+    @Test
+    void cachesTheTenantDomainAcrossRequests() {
+        service.queryDeviceLogs(MACHINE_ID, window(), page(null, null));
+        service.queryDeviceLogs(MACHINE_ID, window(), page(null, null));
+
+        verify(tenantRepository, times(1)).findById(TENANT_ID);
+    }
+
+    @Test
+    void doesNotCacheAMissingDomain() {
+        when(tenantRepository.findById(TENANT_ID))
+                .thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).build()))
+                .thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).domain(TENANT_DOMAIN).build()));
+
+        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, window(), page(null, null)))
+                .isInstanceOf(InternalException.class);
+        service.queryDeviceLogs(MACHINE_ID, window(), page(null, null));
+
+        verify(tenantRepository, times(2)).findById(TENANT_ID);
+        verify(lokiClient).queryRange(startsWith("{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\""),
+                anyLong(), anyLong(), anyInt(), eq(LokiDirection.BACKWARD));
     }
 
     @Test
