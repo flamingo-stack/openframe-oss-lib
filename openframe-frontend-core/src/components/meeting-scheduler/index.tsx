@@ -236,31 +236,17 @@ const STEP_PANEL_CLASS = cn('flex flex-1 flex-col', PANEL_STEP_CLASS);
 export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]';
 
 /**
- * The same box for `flow="details-first"`, where the tallest stage is the
- * DETAILS FORM (email + first/last + the link's declared questions + the
- * consent block + Continue) rather than the calendar.
+ * The box for `flow="details-first"`'s CALENDAR and confirmation stages (and its
+ * degraded stand-in), 638px from `md` (`4904:118213`), 812px on phones (the
+ * calendar stage's natural height at 375px: header strip + six fixed weeks +
+ * the 9.75rem chip cap). Fixed, not a floor, for the slot-first reason: the
+ * times column scrolls inside a stated height.
  *
- * Still a fixed pair, not a floor: everything below the card derives a definite
- * height from it, and a floor was already tried here — it pinned the short
- * stages and let the tall one push the wrapper, which is the screen-shake the
- * fixed height exists to remove.
- *
- * ONE number from `md` up, not two: 638px, the card both mocks draw
- * (`4904:117130` form-only, `4904:118213` three columns). The form stage has no
- * sidebar to stack into a header strip, so nothing about it changes between
- * tablet and desktop, and the calendar stage fits the same box at both — the
- * times column scrolls inside it as it always has.
- *
- * PHONES get a stated height too — the one place this flow departs from
- * slot-first's "the page is the scroller". Slot-first's two stages are the
- * same shape on a phone (calendar + a capped times list either way), so it
- * needs none. Details-first's are not: the form stage, the calendar stage and
- * the two-line confirmation each have their own natural height, and a paid
- * landing page that grows and shrinks by tens of pixels on every step reads as
- * broken. 812px is the calendar stage's natural height at 375px (header strip
- * + six fixed weeks + the 9.75rem chip cap), so that stage fits exactly and the
- * form stage — shorter on the shipped links — sits in it; a link declaring more
- * questions scrolls the form inside the card, as it already does from `md`.
+ * The FORM stage is NOT boxed. It renders at its natural height, so every
+ * question the HubSpot link declares is on the page instead of scrolling inside
+ * a card cut off mid-consent. What keeps that from jumping is the form's own
+ * footprint discipline: the SSR seed renders the real form on first paint, and
+ * the cold-start `BookingFormSkeleton` draws the same rows through the same grid.
  *
  * Hosts read it through `SCHEDULER_FLOW_PRESETS[flow].height`, never directly.
  */
@@ -688,12 +674,21 @@ export function HubSpotMeetingScheduler({
    * last-wins, so appending it after would make a host's own `h-*` unreachable,
    * which is the override the height-inside-CARD_CLASS arrangement allows today.
    */
-  const cardClass = cn(CARD_CLASS, preset.height, detailsFirst && 'flex flex-col', formOnly && 'bg-ods-bg', className);
+  // details-first's form stage grows with the link's questions (see
+  // MEETING_SCHEDULER_DETAILS_FIRST_H); every other stage keeps the stated box.
+  const boxed = !formOnly;
+  const cardClass = cn(
+    CARD_CLASS,
+    boxed ? preset.height : 'md:h-auto',
+    detailsFirst && 'flex flex-col',
+    formOnly && 'bg-ods-bg',
+    className,
+  );
   /** details-first states a height on phones too (see MEETING_SCHEDULER_DETAILS_FIRST_H), so
-   *  the wrappers that let content shrink into a stated height run at every width here. */
-  const innerClass = cn(CARD_INNER_CLASS, detailsFirst && 'min-h-0 flex-1');
-  const actionPanelClass = cn(ACTION_PANEL_CLASS, detailsFirst && 'min-h-0 overflow-y-auto');
-  const stepPanelClass = cn(STEP_PANEL_CLASS, detailsFirst && 'min-h-0 overflow-y-auto');
+   *  the wrappers that let content shrink into a stated height run at every width there. */
+  const innerClass = cn(CARD_INNER_CLASS, detailsFirst && boxed && 'min-h-0 flex-1');
+  const actionPanelClass = cn(ACTION_PANEL_CLASS, detailsFirst && boxed && 'min-h-0 overflow-y-auto');
+  const stepPanelClass = cn(STEP_PANEL_CLASS, detailsFirst && boxed && 'min-h-0 overflow-y-auto');
 
   /** One card SHAPE for every degraded return below. */
   const degraded = (message: string) => (
