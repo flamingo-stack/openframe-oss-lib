@@ -99,7 +99,7 @@ class SoftwareDeviceLocalScheduleServiceTest {
         when(scheduleRepository.findByStatusAndTriggerAndTimeReference(
                 ScriptStatus.ACTIVE, ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL))
                 .thenReturn(List.of(schedule));
-        when(targetResolver.resolveMachineIds(TENANT, SCHEDULE_ID))
+        when(targetResolver.resolveMachineIds(schedule))
                 .thenReturn(List.of(machine.getMachineId()));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(machine));
         when(dispatchRepository.findByScheduleIdAndMachineIdIn(eq(SCHEDULE_ID), any())).thenReturn(List.of());

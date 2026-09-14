@@ -40,7 +40,7 @@ public class SoftwareScheduleExecutionService {
         log.info("Found {} due software schedule(s) — running", due.size());
         for (SoftwareSchedule schedule : due) {
             try {
-                List<String> targets = targetResolver.resolveMachineIds(schedule.getTenantId(), schedule.getId());
+                List<String> targets = targetResolver.resolveMachineIds(schedule);
                 fireDispatcher.dispatch(schedule, targets, now);
                 schedule.setLastRunAt(now);
             } catch (Exception e) {
