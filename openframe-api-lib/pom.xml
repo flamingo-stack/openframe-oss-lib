@@ -35,6 +35,10 @@
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-pinot</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-loki</artifactId>
+        </dependency>
 
         <!-- Spring Framework -->
         <dependency>
