@@ -12,6 +12,7 @@ import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
@@ -36,7 +37,9 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -67,6 +70,19 @@ public class DeviceService {
         Optional<Machine> result = machineRepository.findByMachineId(machineId);
         log.debug("Found machine: {}", result.isPresent());
         return result;
+    }
+
+    public void verifyDispatchable(List<String> machineIds) {
+        machineIds.forEach(this::verifyDispatchable);
+    }
+
+    public void verifyDispatchable(String machineId) {
+        Machine machine = findByMachineId(machineId)
+                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
+        if (!DeviceStatus.DISPATCH_ELIGIBLE.contains(machine.getStatus())) {
+            throw new BadRequestException(
+                    "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + machineId);
+        }
     }
 
     public CountedGenericQueryResult<Machine> queryDevices(DeviceFilterCriteria filterOptions,
@@ -216,11 +232,20 @@ public class DeviceService {
                 .build();
     }
 
+    /** Statuses a device may have to be offered to / kept on a script schedule: only live agents. */
+    private static final Set<DeviceStatus> SCHEDULE_ALLOWED_STATUSES = EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
+
+    /** Every status other than {@link #SCHEDULE_ALLOWED_STATUSES}, applied as a {@code $nin} on top of any user filter. */
+    private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
+            .filter(status -> !SCHEDULE_ALLOWED_STATUSES.contains(status))
+            .map(Enum::name)
+            .toList();
+
     private MachineQueryFilter scheduleDeviceFilter(DeviceFilterCriteria filter,
                                                     Collection<OsType> osTypeScope,
                                                     Collection<String> restrictToMachineIds) {
         MachineQueryFilter out = machineFilter(filter, osTypeScope, restrictToMachineIds);
-        out.setExcludeStatuses(List.of(DeviceStatus.DELETED.name(), DeviceStatus.ARCHIVED.name(), DeviceStatus.PENDING.name()));
+        out.setExcludeStatuses(SCHEDULE_EXCLUDED_STATUSES);
         return out;
     }
 

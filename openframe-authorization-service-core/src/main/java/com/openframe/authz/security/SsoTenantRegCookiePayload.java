@@ -10,7 +10,6 @@ public record SsoTenantRegCookiePayload(
         String provider,
         String redirectTo,
         boolean authMobile,
-        String accessCode,
         RegistrationAttribution attribution,
         long iat,
         long exp

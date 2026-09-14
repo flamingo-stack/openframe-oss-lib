@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
@@ -42,15 +43,46 @@ class ScheduleDeviceTargetResolverTest {
     @InjectMocks private ScheduleDeviceTargetResolver resolver;
 
     @Test
-    @DisplayName("resolveTargetMachineIds: SPECIFIC reads the join rows (deduped)")
+    @DisplayName("resolveTargetMachineIds: SPECIFIC reads the join rows (deduped) and keeps active machines in input order")
     void specific_readsJoinRows() {
         ScheduleScript schedule = ScheduleScript.builder()
                 .id(SCHEDULE_ID).tenantId(TENANT)
                 .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).build();
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID))
                 .thenReturn(List.of(pair("m-1"), pair("m-2"), pair("m-1")));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machineWithStatus("m-1", DeviceStatus.ONLINE),
+                        machineWithStatus("m-2", DeviceStatus.OFFLINE)));
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-1", "m-2");
+    }
+
+    @Test
+    @DisplayName("resolveTargetMachineIds: SPECIFIC drops assigned machines that are now PENDING_DELETION or DELETED (still dispatch to the rest)")
+    void specific_dropsInactiveMachines() {
+        ScheduleScript schedule = ScheduleScript.builder()
+                .id(SCHEDULE_ID).tenantId(TENANT)
+                .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).build();
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID))
+                .thenReturn(List.of(pair("m-1"), pair("m-2"), pair("m-3"), pair("m-4")));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(
+                        machineWithStatus("m-1", DeviceStatus.ONLINE),
+                        machineWithStatus("m-2", DeviceStatus.PENDING_DELETION),
+                        machineWithStatus("m-3", DeviceStatus.DELETED)));
+
+        assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-1");
+    }
+
+    @Test
+    @DisplayName("resolveTargetMachineIds: SPECIFIC with no assigned rows short-circuits — no machine lookup")
+    void specific_emptyAssigned_skipsMachineLookup() {
+        ScheduleScript schedule = ScheduleScript.builder()
+                .id(SCHEDULE_ID).tenantId(TENANT)
+                .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).build();
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID)).thenReturn(List.of());
+
+        assertThat(resolver.resolveTargetMachineIds(schedule)).isEmpty();
         verifyNoInteractions(machineRepository);
     }
 
@@ -185,6 +217,13 @@ class ScheduleDeviceTargetResolverTest {
         m.setOrganizationId(orgId);
         m.setType(type);
         m.setOsType(osType);
+        return m;
+    }
+
+    private static Machine machineWithStatus(String machineId, DeviceStatus status) {
+        Machine m = new Machine();
+        m.setMachineId(machineId);
+        m.setStatus(status);
         return m;
     }
 

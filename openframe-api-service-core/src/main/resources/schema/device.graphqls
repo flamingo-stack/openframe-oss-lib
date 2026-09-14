@@ -124,6 +124,7 @@ type ToolConnection implements Node {
     metadata: String
     connectedAt: Instant
     lastSyncAt: Instant
+    vulnerabilitiesUpdatedAt: Instant
     disconnectedAt: Instant
 }
 

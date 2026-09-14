@@ -5,6 +5,8 @@
  * is authored-content SSOT; chat surfaces never run this.
  */
 
+import { hostMatches } from '../../../../utils/social-platforms';
+
 export const processShortcodes = (content: string): string => {
   let processedContent = content;
 
@@ -197,8 +199,11 @@ export const processShortcodes = (content: string): string => {
         const hostname = urlObj.hostname.toLowerCase();
 
         // Exact host match (or a subdomain of it) — substring checks like
-        // `hostname.includes('x.com')` false-positive on "zabbix.com".
-        const hostIs = (domain: string) => hostname === domain || hostname.endsWith(`.${domain}`);
+        // `hostname.includes('x.com')` false-positive on "zabbix.com". ONE
+        // owner: `hostMatches` in the JSX-free social-platforms leaf, so a
+        // future refinement (`m.` hosts, punycode) cannot land in only one of
+        // the two allowlists that need it.
+        const hostIs = (domain: string) => hostMatches(hostname, domain);
         // Non-video YouTube URLs (channels, playlists, `@handle`) fall
         // through to the og-scraper; only video URLs become inline players.
         const isYouTubeVideo = (hostIs('youtube.com') && urlObj.searchParams.has('v')) || hostIs('youtu.be');

@@ -4,6 +4,7 @@ import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { type ComponentRef, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { CheckboxCheckmarkIcon } from '../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon';
+import { RequiredMark } from './required-mark';
 
 interface CheckboxBlockProps {
   id?: string;
@@ -23,6 +24,9 @@ interface CheckboxBlockProps {
    */
   trailing?: ReactNode;
   disabled?: boolean;
+  /** Marks the box `aria-required` AND draws the `RequiredMark` after the label — the
+   *  same pairing every required field carries, so neither signal stands alone. */
+  required?: boolean;
   /** Error message displayed below the block (also triggers red border) */
   error?: string;
   className?: string;
@@ -40,6 +44,7 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
       truncateLabel,
       trailing,
       disabled,
+      required,
       error,
       className,
     },
@@ -81,6 +86,8 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
           defaultChecked={defaultChecked}
           onCheckedChange={onCheckedChange}
           disabled={disabled}
+          aria-required={required || undefined}
+          aria-invalid={error ? true : undefined}
           className={cn(
             'h-4 w-4 shrink-0 md:h-6 md:w-6',
             'rounded-[6px] border-2',
@@ -116,6 +123,7 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
             )}
           >
             {label}
+            {required && <RequiredMark />}
           </span>
           {description && (
             <span className={cn('!leading-4 text-h6', 'select-none break-words text-ods-text-secondary')}>

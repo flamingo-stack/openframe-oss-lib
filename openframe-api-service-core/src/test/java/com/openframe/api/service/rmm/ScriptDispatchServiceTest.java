@@ -15,7 +15,6 @@ import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.rmm.script.ScriptTimeoutValidator;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ErrorCode;
-import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
@@ -34,13 +33,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 
 import static com.openframe.data.document.rmm.script.ScriptShell.BASH;
 import static com.openframe.data.document.rmm.script.ScriptStatus.ACTIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -85,11 +84,6 @@ class ScriptDispatchServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Target machine exists (happy path). lenient: the not-found test re-stubs this,
-        // and the machine check runs before script resolution.
-        lenient().when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(new Machine()));
-
-        // Saved script resolved from the tenant-scoped store.
         ScriptResponse script = ScriptResponse.builder()
                 .id(SCRIPT_ID)
                 .name("disk usage")
@@ -285,7 +279,8 @@ class ScriptDispatchServiceTest {
     @Test
     @DisplayName("runScript: a non-existent machine is rejected (DeviceNotFoundException) — no Execution row is created and nothing is published. The machine check runs FIRST, before any persistence side-effect.")
     void runScript_rejectsUnknownMachine() {
-        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
+        doThrow(new DeviceNotFoundException("Machine not found: " + MACHINE_ID))
+                .when(deviceService).verifyDispatchable(MACHINE_ID);
 
         assertThatThrownBy(() -> scriptDispatchService.runScript(input, USER_ID, ExecutionSource.MANUAL))
                 .isInstanceOf(DeviceNotFoundException.class);
@@ -293,6 +288,33 @@ class ScriptDispatchServiceTest {
         verifyNoInteractions(scriptExecutionService);
 
         verifyNoInteractions(scriptNatsPublisher);
+    }
+
+    @Test
+    @DisplayName("runScript: a machine in PENDING_DELETION is rejected (BadRequestException) — the row would never receive the message, so fail fast rather than dispatch")
+    void runScript_rejectsPendingDeletionMachine() {
+        doThrow(new BadRequestException(
+                "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + MACHINE_ID))
+                .when(deviceService).verifyDispatchable(MACHINE_ID);
+
+        assertThatThrownBy(() -> scriptDispatchService.runScript(input, USER_ID, ExecutionSource.MANUAL))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("dispatchable state");
+
+        verifyNoInteractions(scriptExecutionService, scriptNatsPublisher);
+    }
+
+    @Test
+    @DisplayName("runScript: a machine already in DELETED is rejected (BadRequestException) — same fail-fast as PENDING_DELETION")
+    void runScript_rejectsDeletedMachine() {
+        doThrow(new BadRequestException(
+                "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + MACHINE_ID))
+                .when(deviceService).verifyDispatchable(MACHINE_ID);
+
+        assertThatThrownBy(() -> scriptDispatchService.runScript(input, USER_ID, ExecutionSource.MANUAL))
+                .isInstanceOf(BadRequestException.class);
+
+        verifyNoInteractions(scriptExecutionService, scriptNatsPublisher);
     }
 
     private BatchRunScriptInput batchInput(List<String> machineIds) {
@@ -307,7 +329,6 @@ class ScriptDispatchServiceTest {
     @DisplayName("batchRunScript: resolves the script once, mints ONE executionId, persists N History rows under it, and fans the same payload (shared executionId, per-machine machineId) out to every target")
     void batchRunScript_fansOutWithSharedExecutionId() {
         List<String> machines = List.of("machine-1", "machine-2", "machine-3");
-        machines.forEach(id -> when(deviceService.findByMachineId(id)).thenReturn(Optional.of(new Machine())));
 
         DispatchResponse response = scriptDispatchService.batchRunScript(batchInput(machines), USER_ID, ExecutionSource.MANUAL);
 
@@ -345,8 +366,8 @@ class ScriptDispatchServiceTest {
     @Test
     @DisplayName("batchRunScript: an unknown machine rejects the whole batch — nothing is persisted, nothing is published")
     void batchRunScript_rejectsUnknownMachine() {
-        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
-        when(deviceService.findByMachineId("machine-missing")).thenReturn(Optional.empty());
+        doThrow(new DeviceNotFoundException("Machine not found: machine-missing"))
+                .when(deviceService).verifyDispatchable(anyList());
 
         assertThatThrownBy(() ->
                 scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-missing")), USER_ID, ExecutionSource.MANUAL))
@@ -357,10 +378,23 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
+    @DisplayName("batchRunScript: any PENDING_DELETION target rejects the whole batch — no half-dispatch across live and inactive machines")
+    void batchRunScript_rejectsBatchWithPendingDeletionMachine() {
+        doThrow(new BadRequestException(
+                "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): machine-decom"))
+                .when(deviceService).verifyDispatchable(anyList());
+
+        assertThatThrownBy(() ->
+                scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-decom")), USER_ID, ExecutionSource.MANUAL))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("dispatchable state");
+
+        verifyNoInteractions(scriptExecutionService, scriptNatsPublisher);
+    }
+
+    @Test
     @DisplayName("batchRunScript: duplicate machineIds collapse to one publish per machine — and one Execution row per machine")
     void batchRunScript_dedupsMachineIds() {
-        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
-
         scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-1")), USER_ID, ExecutionSource.MANUAL);
 
         verify(scriptExecutionService).createBatch(
@@ -373,6 +407,7 @@ class ScriptDispatchServiceTest {
         verify(scriptNatsPublisher).publishScript(eq(MACHINE_ID), captor.capture());
         return captor.getValue();
     }
+
 
     @Test
     @DisplayName("runSchedule: a script's stored custom params override its args + env for the manual run (full replace, not merge)")

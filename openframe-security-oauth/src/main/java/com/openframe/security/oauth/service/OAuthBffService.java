@@ -6,6 +6,7 @@ import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import com.openframe.security.jwt.JwtService;
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
 import com.openframe.security.oauth.dto.TokenResponse;
+import com.openframe.security.oauth.exception.AppleNativeRegistrationRequiredException;
 import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
 import com.openframe.security.oauth.headers.ForwardedHeadersContributor;
 import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
@@ -14,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,8 @@ import reactor.core.scheduler.Schedulers;
 
 import java.net.URI;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -209,6 +213,138 @@ public class OAuthBffService {
      * code to the auth server's token endpoint under the apple-native grant, authenticated with
      * this gateway's client credentials. Tokens come back exactly like any other grant.
      */
+    /**
+     * Resolves the tenant for a native Apple identity via the authorization server's tenantless
+     * discovery endpoint (the token is fully verified there — signature, audience, nonce). 404
+     * means the identity has no account and the app should branch into registration.
+     */
+    public Mono<String> appleNativeDiscoverTenant(String identityToken, String nonce, ServerHttpRequest request) {
+        Map<String, String> body = nonce != null && !nonce.isBlank()
+                ? Map.of("identityToken", identityToken, "nonce", nonce)
+                : Map.of("identityToken", identityToken);
+        return webClientBuilder.build()
+                .post()
+                .uri(authServerUrl + "/oauth/apple/native/discover")
+                .headers(h -> headersContributor.contribute(h, request))
+                .bodyValue(body)
+                .retrieve()
+                .onStatus(st -> st.value() == 404, resp -> Mono.error(new AppleNativeRegistrationRequiredException()))
+                .onStatus(st -> st.is4xxClientError() || st.is5xxServerError(), resp ->
+                        resp.bodyToMono(String.class).defaultIfEmpty("")
+                                .flatMap(b -> {
+                                    log.warn("Apple native tenant discovery rejected ({}): {}", resp.statusCode(), b);
+                                    return Mono.error(new IllegalStateException("Apple sign-in failed. Please try again."));
+                                }))
+                .bodyToMono(AppleNativeDiscoverResponse.class)
+                .map(AppleNativeDiscoverResponse::tenantId);
+    }
+
+    public record AppleNativeDiscoverResponse(String tenantId) {}
+
+    /**
+     * Creates the tenant for a verified Apple identity (no account yet). The authorization code
+     * is NOT spent here — the caller runs the regular exchange against the returned tenant right
+     * after, which redeems it. 4xx bodies (domain taken, account exists) surface as
+     * IllegalArgumentException so the app sees the actual reason.
+     */
+    public Mono<String> appleNativeRegisterTenant(String identityToken, String nonce,
+                                                  String tenantName, String tenantDomain,
+                                                  String firstName, String lastName,
+                                                  ServerHttpRequest request) {
+        Map<String, String> body = new HashMap<>();
+        body.put("identityToken", identityToken);
+        if (hasText(nonce)) body.put("nonce", nonce);
+        body.put("tenantName", tenantName);
+        body.put("tenantDomain", tenantDomain);
+        if (hasText(firstName)) body.put("firstName", firstName);
+        if (hasText(lastName)) body.put("lastName", lastName);
+        return webClientBuilder.build()
+                .post()
+                .uri(authServerUrl + "/oauth/apple/native/register")
+                .headers(h -> headersContributor.contribute(h, request))
+                .bodyValue(body)
+                .retrieve()
+                .onStatus(HttpStatusCode::is4xxClientError, resp ->
+                        resp.bodyToMono(String.class).defaultIfEmpty("Registration failed. Please try again.")
+                                .flatMap(b -> {
+                                    log.warn("Apple native registration rejected ({}): {}", resp.statusCode(), b);
+                                    return Mono.error(new IllegalArgumentException(extractErrorMessage(b)));
+                                }))
+                .bodyToMono(AppleNativeDiscoverResponse.class)
+                .map(AppleNativeDiscoverResponse::tenantId);
+    }
+
+    private static String extractErrorMessage(String body) {
+        try {
+            var node = ERROR_BODY_MAPPER.readTree(body);
+            for (String field : new String[]{"message", "error", "detail"}) {
+                if (node.hasNonNull(field)) return node.get(field).asText();
+            }
+        } catch (Exception ignored) {
+        }
+        return "Registration failed. Please try again.";
+    }
+
+
+    /**
+     * Finishes a mobile SSO signup: registers the tenant on the auth server for the identity the
+     * ticket names, then redeems the ticket at the token endpoint (signup-ticket grant) for the
+     * new user's tokens. 4xx bodies from registration (domain taken, expired ticket) surface as
+     * IllegalArgumentException so the app sees the actual reason.
+     */
+    public Mono<TokenResponse> completeSignupTicket(String ticket,
+                                                    String tenantName,
+                                                    String tenantDomain,
+                                                    Map<String, Object> attribution,
+                                                    ServerHttpRequest request) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("ticket", ticket);
+        body.put("tenantName", tenantName);
+        body.put("tenantDomain", tenantDomain);
+        if (attribution != null && !attribution.isEmpty()) {
+            body.put("attribution", attribution);
+        }
+        return webClientBuilder.build()
+                .post()
+                .uri(authServerUrl + "/oauth/login/sso/complete")
+                .headers(h -> headersContributor.contribute(h, request))
+                .bodyValue(body)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, resp ->
+                        resp.bodyToMono(String.class).defaultIfEmpty("")
+                                .flatMap(b -> {
+                                    log.warn("Signup ticket completion rejected ({}): {}", resp.statusCode(), b);
+                                    return Mono.error(new IllegalArgumentException(extractErrorMessage(b)));
+                                }))
+                .bodyToMono(SignupTicketCompleteResponse.class)
+                .flatMap(completed -> mintWithSignupTicket(completed.tenantId(), ticket, request));
+    }
+
+    public record SignupTicketCompleteResponse(String tenantId) {}
+
+    private Mono<TokenResponse> mintWithSignupTicket(String tenantId, String ticket, ServerHttpRequest request) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "urn:openframe:params:oauth:grant-type:signup-ticket");
+        form.add("ticket", ticket);
+        return webClientBuilder.build()
+                .post()
+                .uri(String.format("%s/%s/oauth2/token", authServerUrl, tenantId))
+                .headers(h -> {
+                    h.add(com.openframe.core.constants.HttpHeaders.AUTHORIZATION, basicAuth(clientId, clientSecret));
+                    headersContributor.contribute(h, request);
+                })
+                .header(ACCEPT, "application/json")
+                .body(BodyInserters.fromFormData(form))
+                .retrieve()
+                .onStatus(st -> st.is4xxClientError() || st.is5xxServerError(), resp ->
+                        resp.bodyToMono(String.class).defaultIfEmpty("")
+                                .flatMap(b -> {
+                                    log.warn("Signup ticket mint rejected for tenant {} ({}): {}", tenantId, resp.statusCode(), b);
+                                    return Mono.error(new IllegalStateException("Sign-up failed. Please try again."));
+                                }))
+                .bodyToMono(TokenResponse.class);
+    }
+
     public Mono<TokenResponse> appleNativeExchange(String tenantId,
                                                    String identityToken,
                                                    String authorizationCode,

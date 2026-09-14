@@ -8,7 +8,6 @@ import net.datafaker.Faker;
 
 import java.time.LocalTime;
 
-import static com.openframe.test.config.EnvironmentConfig.OSS;
 import static com.openframe.test.config.EnvironmentConfig.getEnvMode;
 import static com.openframe.test.config.UserConfig.*;
 
@@ -29,9 +28,6 @@ public class RegistrationGenerator {
                 .password(getPassword())
                 .tenantName(getDomain())
                 .tenantDomain(getDomain());
-        if (!getEnvMode().equals(OSS)) {
-            builder.accessCode(faker.number().digits(8));
-        }
         return builder.build();
     }
 

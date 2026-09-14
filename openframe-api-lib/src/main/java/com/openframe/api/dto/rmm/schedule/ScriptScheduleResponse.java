@@ -6,6 +6,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Builder;
@@ -14,10 +15,6 @@ import lombok.Data;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * API representation of a script schedule. The internal {@code tenantId} is
- * omitted — the caller's tenant context is already known from authentication.
- */
 @Data
 @Builder
 public class ScriptScheduleResponse {
@@ -38,6 +35,8 @@ public class ScriptScheduleResponse {
     private ScheduleDeviceCriteria deviceCriteria;
 
     private ScheduleScriptTrigger trigger;
+
+    private ScheduleTimeReference timeReference;
 
     private ScheduleOfflineBehavior offlineBehavior;
 

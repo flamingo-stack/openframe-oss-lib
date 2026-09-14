@@ -64,6 +64,9 @@ export function meetingAvailabilityKey(apiBaseUrl: string, meetingId: string, mo
   return ['meeting-availability', apiBaseUrl, meetingId, monthOffset] as const;
 }
 
+/** The message `book()` returns for a re-entrant call — a sentinel, not an error; the scheduler matches on it. */
+export const BOOKING_IN_FLIGHT_MESSAGE = 'Already submitting';
+
 export function useMeetingBooking(options: {
   meetingId: string;
   apiBaseUrl?: string;
@@ -155,7 +158,7 @@ export function useMeetingBooking(options: {
   const { mutateAsync } = bookMutation;
   const book = useCallback(
     async (payload: Record<string, unknown>): Promise<BookingResult> => {
-      if (submittingRef.current !== null) return { ok: false, code: 'VALIDATION', message: 'Already submitting' };
+      if (submittingRef.current !== null) return { ok: false, code: 'VALIDATION', message: BOOKING_IN_FLIGHT_MESSAGE };
       const submitToken: object = {};
       submittingRef.current = submitToken;
       try {

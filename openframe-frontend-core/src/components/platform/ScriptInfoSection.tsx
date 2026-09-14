@@ -9,6 +9,7 @@
 import type React from 'react';
 import Image from '../../embed-shims/next-image';
 import { cn } from '../../utils/cn';
+import { nameInitials } from '../../utils/format';
 import { getOSLabel } from '../../utils/os-utils';
 import { getShellLabel } from '../../utils/shell-utils';
 
@@ -57,19 +58,6 @@ function formatSupportedPlatforms(platforms?: string[]): string {
 }
 
 /**
- * Gets initials from a name
- * @param name - Full name
- * @returns Two-letter initials
- */
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
-}
-
-/**
  * InfoCell - Single info cell with label and value
  */
 interface InfoCellProps {
@@ -89,7 +77,7 @@ function InfoCell({ label, value, avatar, className }: InfoCellProps) {
             <Image src={avatar.photoUrl} alt={avatar.name} className="object-cover" fill sizes="32px" unoptimized />
           ) : (
             <div className="flex size-full items-center justify-center text-ods-text-secondary text-h6">
-              {avatar.initials || getInitials(avatar.name)}
+              {avatar.initials || nameInitials(avatar.name)}
             </div>
           )}
         </div>

@@ -98,7 +98,12 @@ export function useDataTable<T>({
   getFilteredRowModel: getFilteredRowModelOverride,
   ...rest
 }: UseDataTableOptions<T>): Table<T> {
-  return useReactTable<T>({
+  // Opted out of the React Compiler on purpose — see the handle published at the
+  // end of this function. Nothing here is worth memoizing anyway: `setOptions`
+  // runs on every render regardless.
+  'use no memo';
+
+  const table = useReactTable<T>({
     ...rest,
     getCoreRowModel: coreRowModelFactory as TableOptions<T>['getCoreRowModel'],
     getSortedRowModel: clientSideSorting
@@ -110,4 +115,34 @@ export function useDataTable<T>({
     manualSorting: manualSorting ?? !clientSideSorting,
     manualFiltering: manualFiltering ?? !clientSideFiltering,
   });
+
+  // A fresh handle per render, and the reason this hook doesn't just return
+  // `useReactTable`'s value.
+  //
+  // `useReactTable` creates ONE instance for the life of the component and
+  // mutates it in place, so its identity is the same object whether a page of
+  // rows just arrived or nothing happened at all. Every consumer reads rows and
+  // state back out of that instance through context (`DataTable.Body`,
+  // `.Header`, `.RowCount`, `.CursorFooter`) — which worked only because the
+  // caller re-rendered and rebuilt their elements.
+  //
+  // Under the React Compiler it stops working, because the compiler caches on
+  // identity: `<DataTable table={table}>` and its children get cached on
+  // `table`, and inside the compiled `DataTableBody` the entire body —
+  // `table.getRowModel().rows` included — sits behind a `$[n] !== table` guard.
+  // A table that gains rows then renders nothing new. On an infinite-scroll
+  // table that is a loop: the sentinel never moves down, so
+  // `DataTable.InfiniteFooter` asks for the next page forever.
+  //
+  // The proxy forwards every read, write and TanStack mutation to that single
+  // instance, so nothing about the table's behaviour changes — only its
+  // identity, which is what puts it back inside React's reactive graph.
+  //
+  // The `use no memo` at the top of this hook is what keeps it a FRESH handle:
+  // without it the compiler caches this very object on `table` and hands back
+  // the same one forever, i.e. the bug. Keying a `useMemo` on
+  // `getRowModel()`/`getState()` instead is not better — `useReactTable`
+  // rebuilds `options.state` on every render anyway, so it would republish just
+  // as often while reading as though it did not.
+  return new Proxy(table, {});
 }

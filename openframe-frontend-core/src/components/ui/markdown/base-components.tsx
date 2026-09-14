@@ -373,11 +373,23 @@ export function buildBaseComponents({
     li: ({ children }: MdRenderProps<'li'>) => <li className={cn('pl-2 leading-relaxed', textSizes.li)}>{children}</li>,
 
     // --- tables ---
+    // The frame and the scroll container are ONE element, matching the sibling
+    // block embed (`mermaid-diagram.tsx`) and `users-grid-skeleton`. It used to
+    // be two — `overflow-x-auto` outside, `rounded-lg border` on an inner
+    // `min-w-full` div — so nothing clipped: the cells' own `border-r`/`border-b`
+    // ran straight through the rounded corners and out past the frame's edge.
+    // `overflow-x-auto` establishes clipping on both axes, which is what rounds
+    // the cell borders off with the frame; the inner div's `min-w-full` is
+    // redundant on a block-level scroll container.
+    //
+    // `[&_tr:last-child_td]:border-b-0` is on the table rather than in the `td`
+    // renderer because Tailwind's `last:` there means "last CELL in its row"
+    // (which is what `last:border-r-0` correctly uses), not "last row" — so the
+    // bottom row's `border-b` used to sit against the frame's own border as a
+    // doubled line.
     table: ({ children }: MdRenderProps<'table'>) => (
-      <div className="table-container my-6 overflow-x-auto">
-        <div className="min-w-full rounded-lg border border-ods-border bg-ods-card">
-          <table className="w-full table-fixed md:table-auto">{children}</table>
-        </div>
+      <div className="table-container my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card">
+        <table className="w-full table-fixed md:table-auto [&_tr:last-child_td]:border-b-0">{children}</table>
       </div>
     ),
     thead: ({ children }: MdRenderProps<'thead'>) => <thead className="bg-ods-bg-surface">{children}</thead>,

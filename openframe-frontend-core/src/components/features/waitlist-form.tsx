@@ -17,6 +17,7 @@ import { CheckboxBlock } from '../ui/checkbox-block';
 import { HoneypotField } from '../ui/honeypot-field';
 import { Input } from '../ui/input';
 import { PhoneInput } from '../ui/phone-input';
+import { PolicyLink } from '../ui/policy-link';
 
 export interface WaitlistFormProps {
   /** Optional ID for the form container (for anchor links) */
@@ -265,26 +266,9 @@ export function WaitlistForm({
             <>
               {consentText}
               {' View our '}
-              <a
-                href={termsOfServiceUrl || '#'}
-                className="text-ods-accent underline"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-              >
-                Terms of Service
-              </a>
+              <PolicyLink href={termsOfServiceUrl || '#'}>Terms of Service</PolicyLink>
               {' and '}
-              <a
-                href={privacyPolicyUrl || '#'}
-                className="text-ods-accent underline"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-              >
-                Privacy Policy
-              </a>
-              .
+              <PolicyLink href={privacyPolicyUrl || '#'}>Privacy Policy</PolicyLink>.
             </>
           }
         />

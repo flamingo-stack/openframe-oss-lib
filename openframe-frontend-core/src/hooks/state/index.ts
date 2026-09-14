@@ -29,7 +29,10 @@ export type { ParamSchema, UseApiParamsOptions, UseApiParamsReturn } from './use
 export { introspector, GraphQLIntrospector } from './introspection';
 
 // Type definitions
-export type { JSType, VariableDefinition } from './graphql-parser';
+export type { VariableDefinition } from './graphql-parser';
+// From its OWNER. The barrel is a convenience for existing importers; the type
+// has one home, `utils/search-params`.
+export type { JSType } from '../../utils/search-params';
 export type { FlattenedParam } from './flatten-schema';
 
 // Cursor pagination state management

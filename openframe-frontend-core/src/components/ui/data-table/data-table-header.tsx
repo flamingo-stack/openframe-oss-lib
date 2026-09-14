@@ -4,6 +4,7 @@ import { flexRender, type Header } from '@tanstack/react-table';
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { Arrow01DownIcon, Arrow01UpIcon, SwitchVrIcon } from '../../icons-v2-generated';
+import { InfoHint } from '../info-hint';
 import { useDataTableContext } from './data-table';
 import { DataTableColumnFilter } from './data-table-column-filter';
 import type { TailwindBreakpoint } from './types';
@@ -57,7 +58,7 @@ export function DataTableHeader({
   const headerGroup = table.getHeaderGroups()[0];
   if (!headerGroup) return null;
 
-  // Below lg only filterable columns (and explicit opt-ins) are visible — the same
+  // Below lg only the interactive columns are visible — the same
   // `keepsCellOnTablet` predicate the cells themselves use, so the two cannot drift.
   // If a table has none, every cell is hidden there, the flex row has no height, and
   // an absolutely-positioned rightSlot has nothing to sit in — so that slot goes
@@ -118,10 +119,24 @@ type ColumnMeta = AnyHeader['column']['columnDef']['meta'];
 /**
  * Whether a column's header stays visible below `lg`, where the row is narrow
  * enough that only the controls a user can act on earn their space: the filter
- * dropdowns, plus anything explicitly opted in via `meta.alwaysShowHeader`.
+ * dropdowns, the sort toggles, plus anything explicitly opted in via
+ * `meta.alwaysShowHeader`.
+ *
+ * `meta.sortable` counts for the same reason `meta.filter` does, and used not
+ * to: the sort arrow lives INSIDE the header cell, so hiding the cell below `lg`
+ * did not merely hide a label — it removed the only way to reorder the table on
+ * every screen narrower than a desktop. A consumer wanting it back had no legal
+ * move: `meta.width` is neutralized here by a doubled-class rule, so the escape
+ * was a specificity fight, and the one consumer who tried it ended up
+ * re-implementing this whole decision in `max-lg:[&&&]:` classes.
+ *
+ * A sortable column whose CELLS are hidden below `lg` (`meta.hideAt`) still
+ * keeps its toggle, exactly as a filterable one does: reordering by a column
+ * this width has no room to print is as useful as filtering by one, and the two
+ * rules staying identical is what keeps this predicate a single sentence.
  */
 function keepsCellOnTablet(meta: ColumnMeta): boolean {
-  return Boolean(meta?.filter) || meta?.alwaysShowHeader === true;
+  return Boolean(meta?.filter) || meta?.sortable === true || meta?.alwaysShowHeader === true;
 }
 
 // Literal class maps — Tailwind's scanner needs the full class strings, which a
@@ -203,6 +218,17 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
   // the `sort` prop; we do not consult TanStack's sort APIs here.
   const canSort = meta?.sortable === true;
   const sortDir: false | 'asc' | 'desc' = sort?.id === column.id ? (sort.desc ? 'desc' : 'asc') : false;
+  // Built once: rendered bare, or beside the column's hint.
+  const filterTrigger = filter ? (
+    <DataTableColumnFilter
+      column={column}
+      options={filter.options}
+      placement={filter.placement}
+      pending={filter.pending}
+      label={resolveHeaderLabel(header)}
+      align={align}
+    />
+  ) : null;
 
   return (
     <div
@@ -233,15 +259,18 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
         meta?.headerClassName,
       )}
     >
-      {filter ? (
-        <DataTableColumnFilter
-          column={column}
-          options={filter.options}
-          placement={filter.placement}
-          pending={filter.pending}
-          label={resolveHeaderLabel(header)}
-          align={align}
-        />
+      {filterTrigger ? (
+        // Only a column that HAS a hint gets the extra row, so every existing
+        // filter header keeps its exact structure — the trigger stays a direct
+        // child of the cell.
+        meta?.hint ? (
+          <div className="flex items-start gap-[var(--spacing-system-xxs)]">
+            {filterTrigger}
+            <InfoHint label={resolveHeaderLabel(header)}>{meta.hint}</InfoHint>
+          </div>
+        ) : (
+          filterTrigger
+        )
       ) : (
         <div
           className={cn(
@@ -255,7 +284,20 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
           )}
           onClick={canSort ? () => onSortChange?.(column.id) : undefined}
         >
-          <HeaderLabel header={header} />
+          {meta?.hint ? (
+            // The hint shares a LABEL GROUP with the text, pinned to the FIRST
+            // line (`items-start`): on a label that breaks onto a second line it
+            // reads beside the opening word instead of floating in the gap
+            // between the two. Only a column WITH a hint gets the group, so a
+            // hint-less header keeps its DOM. The sort icon stays outside it,
+            // centred on the row.
+            <span className="flex min-w-0 items-start gap-[var(--spacing-system-xxs)]">
+              <HeaderLabel header={header} />
+              <InfoHint label={resolveHeaderLabel(header)}>{meta.hint}</InfoHint>
+            </span>
+          ) : (
+            <HeaderLabel header={header} />
+          )}
           {canSort && <SortIcon sorted={sortDir} />}
         </div>
       )}
@@ -263,15 +305,27 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
   );
 }
 
+/**
+ * THE header label styling. Exported because a column may supply a NODE header
+ * (an icon beside the text), and without this those headers rendered unstyled
+ * beside the string ones — same row, two different type treatments.
+ *
+ * The label WRAPS inside its own cell (`min-w-0`, no `whitespace-nowrap`). A
+ * nowrapped label longer than its column does not truncate — it paints straight
+ * across the next column's header, which is how "Implementation owners" landed
+ * on top of "Updated". `text-balance` makes the break a GOOD one: the lines come
+ * out even ("IMPLEMENTATION / OWNERS") instead of one word stranded on its own.
+ * Two lines of the 20px label still fit the fixed 48px header, and a label that
+ * fits on one line looks exactly as it did.
+ */
+export const DATA_TABLE_HEADER_LABEL_CLASS =
+  'min-w-0 text-balance uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary';
+
 function HeaderLabel({ header }: { header: AnyHeader }) {
   const headerDef = header.column.columnDef.header;
   if (headerDef === undefined) return null;
   if (typeof headerDef === 'string') {
-    return (
-      <span className="whitespace-nowrap uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary">
-        {headerDef}
-      </span>
-    );
+    return <span className={DATA_TABLE_HEADER_LABEL_CLASS}>{headerDef}</span>;
   }
   // Render-function or ReactNode: caller is responsible for styling.
   return <>{flexRender(headerDef, header.getContext())}</>;

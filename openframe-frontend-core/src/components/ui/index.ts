@@ -67,6 +67,8 @@ export * from './release-changelog-section';
 export * from './stacked-rows-panel';
 export * from './slack-channel-chip';
 export * from './status-badge';
+export * from './palette-badge';
+export * from './department-badge';
 export * from './status-indicator';
 export * from './toaster';
 // TODO: Add other UI components as they are moved to ui-kit
@@ -115,6 +117,7 @@ export * from './page-actions';
 export * from './service-card';
 export * from './slider';
 export * from './avatar-stack';
+export * from './people-cell';
 export * from './deleted-user-avatar';
 export * from './square-avatar';
 export * from './tab-selector';
@@ -128,7 +131,6 @@ export * from './content-loader';
 
 // Table components
 export {
-  COMPACT_ROW_MIN_HEIGHT_PX,
   Table,
   TableCardSkeleton,
   TableCell,
@@ -218,3 +220,9 @@ export * from './ticket-notes-section';
 export * from './marquee-wall';
 export * from './markdown';
 export * from './filter-pill-row';
+
+// Viewport-gated mounting for heavy previews (players, large images)
+export { LazyMount, type LazyMountProps } from './lazy-mount';
+export { RequiredMark } from './required-mark';
+export { IconTile } from './icon-tile';
+export { PolicyLink } from './policy-link';

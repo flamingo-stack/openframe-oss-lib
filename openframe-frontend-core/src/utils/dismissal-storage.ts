@@ -22,8 +22,8 @@ export function walkthroughDismissCookieName(platform: string): string {
   return `${platform}-${WALKTHROUGH_VIDEO_DISMISS_KEY}`;
 }
 
-/** Client-side dismissal check (id-match). Reads a cookie, so call it from an
- *  effect, never during render. */
+/** Client-side dismissal check (id-match). Reads browser storage, so call it
+ *  from an effect, never during render. */
 export function isWalkthroughDismissed(key: string, id: string | undefined): boolean {
   return isDismissedCookieValue(readDismissCookie(key), id);
 }

@@ -41,6 +41,13 @@ export {
   type HistoryPrependResult,
 } from './history-merge';
 
+// Conversation-list wire client (`ChatRuntime.endpoints.chatConversationsUrl`)
+export {
+  createChatConversationsApi,
+  type ChatConversationsApi,
+  type ChatConversationStatus,
+} from './chat-conversations-api';
+
 // Tool call helpers
 export { getCommandText } from './tool-call-helpers';
 

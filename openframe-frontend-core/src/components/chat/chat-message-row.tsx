@@ -21,7 +21,7 @@
 
 import { useState, type ReactNode } from 'react';
 import Image from '../../embed-shims/next-image';
-import { getFirstLastInitials } from '../../utils/format';
+import { personInitials } from '../../utils/format';
 import { useProxiedImageUrl } from './hooks/use-proxied-image-url';
 
 export interface ChatMessageRowProps {
@@ -34,8 +34,10 @@ export interface ChatMessageRowProps {
    *  Slack passes its server `displayTime`, tickets pass
    *  `formatRelativeTime(createdAt)`. Empty/undefined hides the time. */
   timeLabel?: string | null;
-  /** Message body. Empty + no footer renders nothing under the header. */
-  body: string;
+  /** Message body — a plain string (rendered `whitespace-pre-wrap`) or a
+   *  pre-rendered node (the Slack surfaces pass mrkdwn-formatted nodes).
+   *  Empty/absent + no footer renders nothing under the header. */
+  body: string | ReactNode;
   /** Per-surface slot under the body: Slack reply badge / ticket attachments. */
   footer?: ReactNode;
 }
@@ -52,7 +54,7 @@ export function ChatMessageRow({ displayName, avatarUrl, timeLabel, body, footer
   // rather than inheriting a stale failure.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const src = resolvedAvatar && resolvedAvatar !== failedSrc ? resolvedAvatar : undefined;
-  const hasBody = body.trim().length > 0;
+  const hasBody = typeof body === 'string' ? body.trim().length > 0 : body != null && body !== false;
 
   return (
     <div className="flex w-full min-w-0 gap-2 md:gap-3">
@@ -70,7 +72,7 @@ export function ChatMessageRow({ displayName, avatarUrl, timeLabel, body, footer
         />
       ) : (
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg text-ods-text-primary text-h6 md:h-10 md:w-10">
-          {getFirstLastInitials(displayName) || '?'}
+          {personInitials(displayName) || '?'}
         </div>
       )}
 

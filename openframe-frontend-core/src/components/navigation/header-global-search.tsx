@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { cn } from '../../utils/cn';
+import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
 import { SearchIcon } from '../icons-v2-generated';
 
 export interface HeaderGlobalSearchProps {
@@ -51,6 +52,7 @@ export function HeaderGlobalSearch({
   return (
     <form
       onSubmit={handleSubmit}
+      {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}
       className={cn(
         'flex h-full flex-1 items-center gap-2 px-3',
         // Transparent so the cell inherits the bar's background

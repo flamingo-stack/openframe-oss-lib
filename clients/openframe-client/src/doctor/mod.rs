@@ -4,6 +4,7 @@ pub mod healing;
 use crate::installation_initial_config_service::InstallConfigParams;
 use crate::platform::DirectoryManager;
 use crate::service::Service;
+use crate::services::MachineIdService;
 use checks::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -181,7 +182,8 @@ pub async fn run_preinstall(params: &InstallConfigParams) -> DoctorReport {
     results.push(check_service_config_writable());
 
     let server_url = params.server_url.as_deref().unwrap_or_default();
-    run_network_checks(&mut results, server_url).await;
+    let machine_id = local_machine_id(&dir_manager);
+    run_network_checks(&mut results, server_url, machine_id.as_deref()).await;
 
     DoctorReport {
         results,
@@ -238,7 +240,7 @@ pub fn run_preinstall_parameterless() -> DoctorReport {
 }
 
 /// Pre-auth validation: the params and the network they point at, checked while
-/// the user is at the keyboard — nothing is written unless this passes.
+/// the user is at the keyboard — nothing tenant-specific is written unless this passes.
 pub async fn run_auth(params: &InstallConfigParams) -> DoctorReport {
     let mut results = Vec::new();
 
@@ -266,13 +268,12 @@ pub async fn run_auth(params: &InstallConfigParams) -> DoctorReport {
 
     // Install may lie far in the past (golden image, pre-provisioned package), and tool
     // provisioning starts as soon as this succeeds.
-    results.push(check_disk_space(
-        DirectoryManager::new().app_support_dir(),
-        200,
-    ));
+    let dir_manager = DirectoryManager::new();
+    results.push(check_disk_space(dir_manager.app_support_dir(), 200));
 
     let server_url = params.server_url.as_deref().unwrap_or_default();
-    run_network_checks(&mut results, server_url).await;
+    let machine_id = local_machine_id(&dir_manager);
+    run_network_checks(&mut results, server_url, machine_id.as_deref()).await;
 
     DoctorReport {
         results,
@@ -363,7 +364,8 @@ pub async fn run_healthcheck() -> DoctorReport {
         }
     };
 
-    run_network_checks(&mut results, &server_url).await;
+    let machine_id = local_machine_id(&dir_manager);
+    run_network_checks(&mut results, &server_url, machine_id.as_deref()).await;
 
     DoctorReport {
         results,
@@ -371,15 +373,27 @@ pub async fn run_healthcheck() -> DoctorReport {
     }
 }
 
-async fn run_network_checks(results: &mut Vec<CheckResult>, server_url: &str) {
+/// Same id the agent will send; created here if missing so the install reuses it. Best effort.
+fn local_machine_id(dir_manager: &DirectoryManager) -> Option<String> {
+    MachineIdService::new(dir_manager)
+        .get_or_create()
+        .ok()
+        .filter(|id| reqwest::header::HeaderValue::from_str(id).is_ok())
+}
+
+async fn run_network_checks(
+    results: &mut Vec<CheckResult>,
+    server_url: &str,
+    machine_id: Option<&str>,
+) {
     results.push(check_dns_resolve(server_url));
     if results.last().unwrap().status == CheckStatus::Fail {
         return;
     }
 
     results.push(check_tcp_connect(server_url));
-    results.push(check_tls_handshake(server_url).await);
-    results.push(check_websocket_upgrade(server_url).await);
+    results.push(check_tls_handshake(server_url, machine_id).await);
+    results.push(check_websocket_upgrade(server_url, machine_id).await);
 
     if let Some(proxy) = check_proxy_env() {
         results.push(proxy);

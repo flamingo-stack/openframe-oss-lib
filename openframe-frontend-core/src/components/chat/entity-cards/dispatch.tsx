@@ -45,6 +45,7 @@ import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
 import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon';
+import { BuildingsIcon } from '../../icons-v2-generated/buildings/buildings-icon';
 import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-ver-icon';
 import { ChartPieIcon } from '../../icons-v2-generated/charts/chart-pie-icon';
 import { PresentationBarIcon } from '../../icons-v2-generated/charts/presentation-bar-icon';
@@ -52,7 +53,10 @@ import { PresentationLineIcon } from '../../icons-v2-generated/charts/presentati
 import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
+import { CallIcon } from '../../icons-v2-generated/communication/call-icon';
+import { ChatQuoteIcon } from '../../icons-v2-generated/communication/chat-quote-icon';
 import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon';
+import { ClipboardListIcon } from '../../icons-v2-generated/documents/clipboard-list-icon';
 import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon';
 import { NewspaperIcon } from '../../icons-v2-generated/documents/newspaper-icon';
 import { BankIcon } from '../../icons-v2-generated/finance/bank-icon';
@@ -612,6 +616,34 @@ function SlackChatCard({
       anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
       menuGroups={cardMenuGroups(chatRef.url, discuss)}
       menuAriaLabel="Message actions"
+    />
+  );
+}
+
+/**
+ * Generic glyph card for ChatRef-shaped items (title / preview / url) whose
+ * only per-type variation is the leading icon — used by the ref-hydrated
+ * product-hub objects (design docs, tenants) and the people-hub feeds.
+ */
+function GlyphChatCard({
+  chatRef,
+  icon,
+  isNewTab,
+  discuss,
+}: {
+  chatRef: ChatRef;
+  icon: React.ReactNode;
+  isNewTab: boolean;
+  discuss?: CardDiscussAction;
+}) {
+  return (
+    <MingoInfoCard
+      title={chatRef.title}
+      description={chatRef.preview ?? undefined}
+      icon={icon}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuAriaLabel="Card actions"
     />
   );
 }
@@ -1312,6 +1344,88 @@ const GITHUB_CARD_CONFIGS: Record<string, GitHubCardConfig> = {
   github_pr_review: { label: 'GitHub review', kind: 'pr_review' },
   github_pr_review_public: { label: 'GitHub review (public)', kind: 'pr_review' },
 };
+interface GlyphCardConfig {
+  label: string;
+  icon: () => React.ReactNode;
+  /**
+   * Video-bearing ref types: render the media card (cover from the ref's
+   * `metadata.videoPoster`, else the host's OG placeholder; the type label as the
+   * status pill; the glyph only when neither cover exists) instead of the plain
+   * glyph card. The player itself is promoted below the card by
+   * `ChatCardLoader` from the same metadata, exactly as for customer interviews.
+   */
+  media?: boolean;
+}
+/** Product-hub internal objects hydrated by their per-object card routes
+ *  (`/api/design-docs`, `/api/openframe-tenants`, `/api/prospect-calls` — ChatRef-shaped items,
+ *  same preset as github / slack). Adding one = one line here + the
+ *  `list-url.ts` builder + the `source-icons.ts` label / icon / type entries. */
+const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
+  design_doc: { label: 'Design doc', icon: () => <FileContentIcon size={24} /> },
+  openframe_tenant: { label: 'OpenFrame tenant', icon: () => <BuildingsIcon size={24} /> },
+  prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
+};
+function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
+  return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>
+    refHydratedEntry(docType, cfg.label, (displayRef, opts) =>
+      cfg.media ? (
+        <EntityMingoCard
+          title={displayRef.title}
+          description={displayRef.preview ?? undefined}
+          cover={entityCover(
+            displayRef.metadata?.videoPoster,
+            opts.extras?.buildOgPlaceholderUrl?.(displayRef.title ?? '') ?? null,
+          )}
+          fallbackIcon={cfg.icon()}
+          status={{ label: cfg.label, variant: 'grey' }}
+          chatRef={displayRef}
+          isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
+          menuAriaLabel={`${cfg.label} actions`}
+        />
+      ) : (
+        <GlyphChatCard chatRef={displayRef} icon={cfg.icon()} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+      ),
+    ),
+  );
+}
+
+/** People-hub employee feeds hydrate from their EXISTING list APIs
+ *  (`/api/what-i-shipped?ids=`, `/api/how-i-work?ids=`, `/api/prompts?ids=`) — entry-shaped rows
+ *  (title / summary / author), not ChatRefs, hence the bespoke row→display
+ *  mapping (the FAQ precedent). The destination comes from the ref (the
+ *  server-resolved entry url) or, on a bare marker, the host's
+ *  `composeContentUrl` seam for the type. */
+function fetchedEmployeeEntryDisplayRef(item: unknown, chatRef: ChatRef): ChatRef {
+  const it = item as { title?: unknown; summary?: unknown; author?: { full_name?: unknown } | null };
+  const title = typeof it?.title === 'string' && it.title.trim().length > 0 ? it.title.trim() : chatRef.title;
+  const author = typeof it?.author?.full_name === 'string' ? it.author.full_name.trim() : '';
+  const summary = typeof it?.summary === 'string' ? it.summary.trim() : '';
+  const preview = [author, summary].filter(x => x.length > 0).join(' · ');
+  return { ...chatRef, title, preview: preview.length > 0 ? preview : chatRef.preview };
+}
+const EMPLOYEE_ENTRY_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
+  what_i_shipped: { label: 'What I Shipped', icon: () => <Rocket02Icon size={24} /> },
+  how_i_work: { label: 'How I Work', icon: () => <ClipboardListIcon size={24} /> },
+  ai_prompt: { label: 'Squawkbox', icon: () => <ChatQuoteIcon size={24} /> },
+};
+function employeeEntryRegistryEntries(): Record<string, ChatCardRegistryEntry> {
+  return registryEntries(EMPLOYEE_ENTRY_CARD_CONFIGS, (cfg, docType) => ({
+    label: cfg.label,
+    bareInline: true,
+    contentRefType: docType,
+    skeleton: () => <MingoInfoCardSkeleton />,
+    render: (item, chatRef, opts) => (
+      <GlyphChatCard
+        chatRef={fetchedEmployeeEntryDisplayRef(item, chatRef)}
+        icon={cfg.icon()}
+        isNewTab={opts.isNewTab}
+        discuss={opts.discuss}
+      />
+    ),
+  }));
+}
+
 function githubRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(GITHUB_CARD_CONFIGS, (cfg, docType) =>
     refHydratedEntry(docType, cfg.label, (displayRef, opts) => (
@@ -1423,6 +1537,9 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
       />
     ),
   },
+  // ───────── ref-only types (no list endpoint; the ChatRef IS the card) ─────────
+  ...refGlyphRegistryEntries(),
+  ...employeeEntryRegistryEntries(),
   slack_message: refHydratedEntry('slack_message', 'Slack message', (displayRef, opts) => (
     <SlackChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
   )),
@@ -1587,6 +1704,15 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   },
   ...roadmapRegistryEntries(),
 };
+
+/**
+ * The human label a chat card shows for a document type, or `undefined` for an
+ * unregistered type. `CHAT_CARD_REGISTRY` stays module-private; this accessor is
+ * how a host pins its own label constants to the lib's by value in a test.
+ */
+export function chatCardLabel(docType: string): string | undefined {
+  return CHAT_CARD_REGISTRY[docType]?.label;
+}
 
 // =============================================================================
 // ChatCardNavWrap — click-capture interceptor that routes inner-anchor

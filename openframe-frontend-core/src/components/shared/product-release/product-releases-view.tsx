@@ -27,11 +27,12 @@ import type { ProductRelease, ProductReleaseListResponse } from '../../../types/
 import { cn } from '../../../utils/cn';
 import { resolveContentHref } from '../../../utils/content-href';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
+import { pageCount, positiveInt } from '../../../utils/search-params';
 import { buildProductReleaseCardProps } from '../../chat/entity-cards/product-release-card-defaults';
 import { useEntityCardLink } from '../../chat/entity-cards/use-entity-card-link';
 import { isModifierClick } from '../../chat/utils/chat-nav-resolution';
 import { executeNavigationImperative } from '../../chat/utils/execute-navigation';
-import { EmptyState } from '../../empty-state';
+import { ListEmptyState } from '../../list-empty-state';
 import { PersistentPaginationWrapper } from '../../persistent-pagination';
 import { LoadError } from '../../ui/error-state';
 import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
@@ -149,7 +150,7 @@ export function ProductReleasesView({
   // Filter / page state from the URL (written by the section chrome above).
   const search = searchParams.get(searchParamKey) || '';
   const status = searchParams.get(statusParamKey) || 'all';
-  const currentPage = Math.max(1, parseInt(searchParams.get(pageParamKey) || '1', 10) || 1);
+  const currentPage = positiveInt(searchParams.get(pageParamKey), 1);
   const offset = (currentPage - 1) * itemsPerPage;
 
   // Fold every query param into the url so it IS the fetch key.
@@ -163,7 +164,7 @@ export function ProductReleasesView({
 
   const releases = data?.data ?? [];
   const totalCount = data?.count ?? 0;
-  const totalPages = Math.ceil(totalCount / itemsPerPage);
+  const totalPages = pageCount(totalCount, itemsPerPage);
   const hasActiveFilters = search !== '' || status !== 'all';
   const showEmpty = !isLoading && !error && releases.length === 0;
 
@@ -193,23 +194,16 @@ export function ProductReleasesView({
       <div className="min-h-[600px]">
         {showEmpty ? (
           <div className="flex h-[600px] items-center justify-center">
-            {hasActiveFilters ? (
-              <EmptyState
-                type="search"
-                title="No releases found"
-                description="No releases match your current filters. Try adjusting your search or status filter."
-                showCTA
-                ctaText="Reset Filters"
-                onCtaClick={resetFilters}
-              />
-            ) : (
-              <EmptyState
-                type="generic"
-                title="No releases available"
-                description="Check back soon for product updates!"
-                showCTA={false}
-              />
-            )}
+            <ListEmptyState
+              isFiltered={hasActiveFilters}
+              filtered={{
+                title: 'No releases found',
+                description: 'No releases match your current filters. Try adjusting your search or status filter.',
+                clearText: 'Reset Filters',
+              }}
+              onClearFilters={resetFilters}
+              empty={{ title: 'No releases available', description: 'Check back soon for product updates!' }}
+            />
           </div>
         ) : (
           <>
